@@ -72,7 +72,7 @@ void* AllocateMappedContent(int fd, size_t offset, size_t length,
 // Deallocate memory mapped content.
 void DeallocateMappedContent(void* region, size_t length);
 
-void* TestMapAlignedPagesLastDitch(size_t size, size_t alignment);
+void* TestMapAlignedPagesLastDitch(size_t length, size_t alignment);
 
 void ProtectPages(void* region, size_t length);
 void MakePagesReadOnly(void* region, size_t length);

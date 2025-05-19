@@ -25,15 +25,15 @@
 #include "js/Value.h"               // JS::Value, JS::*Value
 #include "vm/FunctionPrefixKind.h"  // js::FunctionPrefixKind
 #include "vm/GlobalObject.h"        // js::GlobalObject
-#include "vm/JSAtom.h"              // JSAtom, js::Atomize, js::AtomizeChars
+#include "vm/JSAtomUtils.h"         // js::Atomize, js::AtomizeChars
 #include "vm/JSContext.h"           // JSContext, CHECK_THREAD
 #include "vm/JSFunction.h"          // js::IdToFunctionName, js::DefineFunction
 #include "vm/JSObject.h"            // JSObject, js::DefineFunctions
 #include "vm/ObjectOperations.h"  // js::DefineProperty, js::DefineDataProperty, js::HasOwnProperty
 #include "vm/PropertyResult.h"  // js::PropertyResult
-#include "vm/StringType.h"      // js::PropertyName
+#include "vm/StringType.h"      // JSAtom, js::PropertyName
 
-#include "vm/JSAtom-inl.h"            // js::AtomToId, js::IndexToId
+#include "vm/JSAtomUtils-inl.h"       // js::AtomToId, js::IndexToId
 #include "vm/JSContext-inl.h"         // JSContext::check
 #include "vm/JSObject-inl.h"          // js::NewBuiltinClassInstance
 #include "vm/NativeObject-inl.h"      // js::NativeLookupOwnPropertyNoResolve
@@ -109,14 +109,18 @@ static bool DefineAccessorPropertyById(JSContext* cx, JS::Handle<JSObject*> obj,
                                        unsigned attrs) {
   // Getter/setter are both possibly-null JSNatives. Wrap them in JSFunctions.
 
+  // Use unprefixed name with LAZY_ACCESSOR_NAME flag, to avoid calculating
+  // the accessor name, which is less likely to be used.
+  JS::Rooted<JSAtom*> atom(cx, IdToFunctionName(cx, id));
+  if (!atom) {
+    return false;
+  }
+
   JS::Rooted<JSFunction*> getter(cx);
   if (get.op) {
-    JS::Rooted<JSAtom*> atom(cx,
-                             IdToFunctionName(cx, id, FunctionPrefixKind::Get));
-    if (!atom) {
-      return false;
-    }
-    getter = NewNativeFunction(cx, get.op, 0, atom);
+    getter = NewNativeFunction(cx, get.op, 0, atom, gc::AllocKind::FUNCTION,
+                               TenuredObject,
+                               FunctionFlags::NATIVE_GETTER_WITH_LAZY_NAME);
     if (!getter) {
       return false;
     }
@@ -128,12 +132,9 @@ static bool DefineAccessorPropertyById(JSContext* cx, JS::Handle<JSObject*> obj,
 
   JS::Rooted<JSFunction*> setter(cx);
   if (set.op) {
-    JS::Rooted<JSAtom*> atom(cx,
-                             IdToFunctionName(cx, id, FunctionPrefixKind::Set));
-    if (!atom) {
-      return false;
-    }
-    setter = NewNativeFunction(cx, set.op, 1, atom);
+    setter = NewNativeFunction(cx, set.op, 1, atom, gc::AllocKind::FUNCTION,
+                               TenuredObject,
+                               FunctionFlags::NATIVE_SETTER_WITH_LAZY_NAME);
     if (!setter) {
       return false;
     }
@@ -853,6 +854,10 @@ JS_PUBLIC_API bool JS_DefineProperties(JSContext* cx, JS::Handle<JSObject*> obj,
   for (; ps->name; ps++) {
     if (!PropertySpecNameToId(cx, ps->name, &id)) {
       return false;
+    }
+
+    if (ShouldIgnorePropertyDefinition(cx, StandardProtoKeyOrNull(obj), id)) {
+      continue;
     }
 
     if (ps->isAccessor()) {

@@ -10,6 +10,7 @@
 #define mozilla_RefCounted_h
 
 #include <utility>
+#include <type_traits>
 
 #include "mozilla/AlreadyAddRefed.h"
 #include "mozilla/Assertions.h"
@@ -255,6 +256,9 @@ class RefCounted {
       delete static_cast<const T*>(this);
     }
   }
+
+  using HasThreadSafeRefCnt =
+      std::integral_constant<bool, Atomicity == AtomicRefCount>;
 
   // Compatibility with wtf::RefPtr.
   void ref() { AddRef(); }

@@ -405,7 +405,7 @@ extern JS_PUBLIC_API bool JS_DeleteElement(JSContext* cx,
  */
 extern JS_PUBLIC_API bool JS_DeletePropertyById(JSContext* cx,
                                                 JS::Handle<JSObject*> obj,
-                                                jsid id);
+                                                JS::Handle<jsid> id);
 
 extern JS_PUBLIC_API bool JS_DeleteProperty(JSContext* cx,
                                             JS::Handle<JSObject*> obj,

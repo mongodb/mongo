@@ -7,6 +7,12 @@
 #ifndef mozilla_glue_Debug_h
 #define mozilla_glue_Debug_h
 
+#include "mozilla/Attributes.h"  // For MOZ_FORMAT_PRINTF
+#include "mozilla/Types.h"       // For MFBT_API
+
+#include <cstdarg>
+#include <sstream>
+
 /* This header file intends to supply debugging utilities for use in code
  * that cannot use XPCOM debugging facilities like nsDebug.h.
  * e.g. mozglue, browser/app
@@ -15,52 +21,53 @@
  * care; avoid including from header files.
  */
 
-#include <io.h>
-#if defined(XP_WIN)
-#  include <windows.h>
-#endif  // defined(XP_WIN)
-#include "mozilla/Attributes.h"
-#include "mozilla/Sprintf.h"
-
-#if defined(MOZILLA_INTERNAL_API)
-#  error Do not include this file from XUL sources.
-#endif
-
-// Though this is a separate implementation than nsDebug's, we want to make the
-// declarations compatible to avoid confusing the linker if both headers are
-// included.
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-void printf_stderr(const char* fmt, ...) MOZ_FORMAT_PRINTF(1, 2);
-inline void printf_stderr(const char* fmt, ...) {
-#if defined(XP_WIN)
-  if (IsDebuggerPresent()) {
-    char buf[2048];
-    va_list args;
-    va_start(args, fmt);
-    VsprintfLiteral(buf, fmt, args);
-    va_end(args);
-    OutputDebugStringA(buf);
-  }
-#endif  // defined(XP_WIN)
+/**
+ * printf_stderr(...) is much like fprintf(stderr, ...), except that:
+ *  - on Android and Firefox OS, *instead* of printing to stderr, it
+ *    prints to logcat.  (Newlines in the string lead to multiple lines
+ *    of logcat, but each function call implicitly completes a line even
+ *    if the string does not end with a newline.)
+ *  - on Windows, if a debugger is present, it calls OutputDebugString
+ *    in *addition* to writing to stderr
+ */
+MFBT_API void printf_stderr(const char* aFmt, ...) MOZ_FORMAT_PRINTF(1, 2);
 
-  // stderr is unbuffered by default so we open a new FILE (which is buffered)
-  // so that calls to printf_stderr are not as likely to get mixed together.
-  int fd = _fileno(stderr);
-  if (fd == -2) return;
+/**
+ * Same as printf_stderr, but taking va_list instead of varargs
+ */
+MFBT_API void vprintf_stderr(const char* aFmt, va_list aArgs)
+    MOZ_FORMAT_PRINTF(1, 0);
 
-  FILE* fp = _fdopen(_dup(fd), "a");
-  if (!fp) return;
+/**
+ * fprintf_stderr is like fprintf, except that if its file argument
+ * is stderr, it invokes printf_stderr instead.
+ *
+ * This is useful for general debugging code that logs information to a
+ * file, but that you would like to be useful on Android and Firefox OS.
+ * If you use fprintf_stderr instead of fprintf in such debugging code,
+ * then callers can pass stderr to get logging that works on Android and
+ * Firefox OS (and also the other side-effects of using printf_stderr).
+ *
+ * Code that is structured this way needs to be careful not to split a
+ * line of output across multiple calls to fprintf_stderr, since doing
+ * so will cause it to appear in multiple lines in logcat output.
+ * (Producing multiple lines at once is fine.)
+ */
+MFBT_API void fprintf_stderr(FILE* aFile, const char* aFmt, ...)
+    MOZ_FORMAT_PRINTF(2, 3);
 
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(fp, fmt, args);
-  va_end(args);
-
-  fclose(fp);
-}
+/*
+ * print_stderr and fprint_stderr are like printf_stderr and fprintf_stderr,
+ * except they deal with Android logcat line length limitations. They do this
+ * by printing individual lines out of the provided stringstream using separate
+ * calls to logcat.
+ */
+MFBT_API void print_stderr(std::stringstream& aStr);
+MFBT_API void fprint_stderr(FILE* aFile, std::stringstream& aStr);
 
 #ifdef __cplusplus
 }

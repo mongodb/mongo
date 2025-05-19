@@ -21,482 +21,6 @@ function SetConstructorInit(iterable) {
   }
 }
 
-#ifdef ENABLE_NEW_SET_METHODS
-// New Set methods proposal
-//
-// Set.prototype.union(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.union
-function SetUnion(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let Ctr be ? SpeciesConstructor(set, %Set%).
-  var Ctr = SpeciesConstructor(set, GetBuiltinConstructor("Set"));
-
-  // Step 4. Let newSet be ? Construct(Ctr, set).
-  var newSet = constructContentFunction(Ctr, Ctr, set);
-
-  // Step 5. Let adder be ? Get(newSet, "add").
-  var adder = newSet.add;
-
-  // Inlined AddEntryFromIterable Step 1. If IsCallable(adder) is false,
-  // throw a TypeError exception.
-  if (!IsCallable(adder)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "add");
-  }
-
-  // Step 6. Return ? AddEntryFromIterable(newSet, iterable, adder).
-  return AddEntryFromIterable(newSet, iterable, adder);
-}
-
-// New Set methods proposal
-//
-// Set.prototype.intersection(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.intersection
-function SetIntersection(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let Ctr be ? SpeciesConstructor(set, %Set%).
-  var Ctr = SpeciesConstructor(set, GetBuiltinConstructor("Set"));
-
-  // Step 4. Let newSet be ? Construct(Ctr).
-  var newSet = constructContentFunction(Ctr, Ctr);
-
-  // Step 5. Let hasCheck be ? Get(set, "has").
-  var hasCheck = set.has;
-
-  // Step 6. If IsCallable(hasCheck) is false, throw a TypeError exception.
-  if (!IsCallable(hasCheck)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "has");
-  }
-
-  // Step 7. Let adder be ? Get(newSet, "add").
-  var adder = newSet.add;
-
-  // Step 8. If IsCallable(adder) is false, throw a TypeError exception.
-  if (!IsCallable(adder)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "add");
-  }
-
-  // Step 9. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 10. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return newSet.
-    if (!next) {
-      return newSet;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    var has;
-    try {
-      // Step d. Let has be Call(hasCheck, set, « nextValue »).
-      has = callContentFunction(hasCheck, set, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If has is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, has).
-        IteratorClose(iteratorRecord);
-      }
-    }
-
-    // Step f. If has.[[Value]] is true,
-    if (has) {
-      needClose = true;
-      try {
-        // Step i. Let status be Call(adder, newSet, « nextValue »).
-        callContentFunction(adder, newSet, nextValue);
-        needClose = false;
-      } finally {
-        if (needClose) {
-          // Step ii. If status is an abrupt completion, return ?
-          // IteratorClose(iteratorRecord, status).
-          IteratorClose(iteratorRecord);
-        }
-      }
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// Set.prototype.difference(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.difference
-function SetDifference(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let Ctr be ? SpeciesConstructor(set, %Set%).
-  var Ctr = SpeciesConstructor(set, GetBuiltinConstructor("Set"));
-
-  // Step 4. Let newSet be ? Construct(Ctr, set).
-  var newSet = constructContentFunction(Ctr, Ctr, set);
-
-  // Step 5. Let remover be ? Get(newSet, "delete").
-  var remover = newSet.delete;
-
-  // Step 6. If IsCallable(remover) is false, throw a TypeError exception.
-  if (!IsCallable(remover)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "delete");
-  }
-
-  // Step 7. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 8. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return newSet.
-    if (!next) {
-      return newSet;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    try {
-      // Step d. Let status be Call(remover, newSet, « nextValue »).
-      callContentFunction(remover, newSet, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If status is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, status).
-        IteratorClose(iteratorRecord);
-      }
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// Set.prototype.symmetricDifference(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.symmetricDifference
-function SetSymmetricDifference(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let Ctr be ? SpeciesConstructor(set, %Set%).
-  var Ctr = SpeciesConstructor(set, GetBuiltinConstructor("Set"));
-
-  // Step 4. Let newSet be ? Construct(Ctr, set).
-  var newSet = constructContentFunction(Ctr, Ctr, set);
-
-  // Step 5. Let remover be ? Get(newSet, "delete").
-  var remover = newSet.delete;
-
-  // Step 6. If IsCallable(remover) is false, throw a TypeError exception.
-  if (!IsCallable(remover)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "delete");
-  }
-
-  // Step 7. Let adder be ? Get(newSet, "add").
-  var adder = newSet.add;
-
-  // Step 8. If IsCallable(adder) is false, throw a TypeError exception.
-  if (!IsCallable(adder)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "add");
-  }
-
-  // Step 9. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 10. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return newSet.
-    if (!next) {
-      return newSet;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    var removed;
-    try {
-      // Step d. Let removed be Call(remover, newSet, « nextValue »).
-      removed = callContentFunction(remover, newSet, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If removed is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, removed).
-        IteratorClose(iteratorRecord);
-      }
-    }
-
-    // Step f. If removed.[[Value]] is false,
-    if (!removed) {
-      needClose = true;
-      try {
-        // Step i. Let status be Call(adder, newSet, « nextValue »).
-        callContentFunction(adder, newSet, nextValue);
-        needClose = false;
-      } finally {
-        if (needClose) {
-          // Step ii. If status is an abrupt completion,
-          // return ? IteratorClose(iteratorRecord, status).
-          IteratorClose(iteratorRecord);
-        }
-      }
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// Set.prototype.isSubsetOf(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.isSubsetOf
-function SetIsSubsetOf(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. Let iteratorRecord be ? GetIterator(set).
-  var iteratorRecord = GetIteratorSync(set);
-
-  // Step 3. If Type(iterable) is not Object, throw a TypeError exception.
-  if (!IsObject(iterable)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 4. Let otherSet be iterable.
-  var otherSet = iterable;
-
-  // Step 5. Let hasCheck be ? Get(otherSet, "has").
-  var hasCheck = otherSet.has;
-
-  // Step 6. If IsCallable(hasCheck) is false,
-  if (!IsCallable(hasCheck)) {
-    // Step a. Let otherSet be ? Construct(%Set%).
-    let set = GetBuiltinConstructor("Set");
-    otherSet = new set();
-
-    // We are not inlining AddEntryFromIterable Step 1 here because we know
-    // std_Set_add is callable Step b. Perform ?
-    // AddEntryFromIterable(otherSet, iterable, %SetProto_add%).
-    AddEntryFromIterable(otherSet, iterable, std_Set_add);
-
-    // Step c. Let hasCheck be %SetProto_has%.
-    hasCheck = std_Set_has;
-  }
-
-  // Step 7. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return true.
-    if (!next) {
-      return true;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    var has;
-    try {
-      // Step d. Let has be Call(hasCheck, otherSet, « nextValue »).
-      has = callContentFunction(hasCheck, otherSet, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If has is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, has).
-        IteratorClose(iteratorRecord);
-      }
-    }
-
-    // Step f. If has.[[Value]] is false, return false.
-    if (!has) {
-      return false;
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// Set.prototype.isSupersetOf(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.isSupersetOf
-function SetIsSupersetOf(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let hasCheck be ? Get(set, "has").
-  var hasCheck = set.has;
-
-  // Step 4. If IsCallable(hasCheck) is false, throw a TypeError exception.
-  if (!IsCallable(hasCheck)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "has");
-  }
-
-  // Step 5. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 6. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return true.
-    if (!next) {
-      return true;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    var has;
-    try {
-      // Step d. Let has be Call(hasCheck, set, « nextValue »).
-      has = callContentFunction(hasCheck, set, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If has is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, has).
-        IteratorClose(iteratorRecord);
-      }
-    }
-
-    // Step f. If has.[[Value]] is false, return false.
-    if (!has) {
-      return false;
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// Set.prototype.isDisjointFrom(iterable)
-// https://tc39.es/proposal-set-methods/#Set.prototype.isDisjointFrom
-function SetIsDisjointFrom(iterable) {
-  // Step 1. Let set be the this value.
-  var set = this;
-
-  // Step 2. If Type(set) is not Object, throw a TypeError exception.
-  if (!IsObject(set)) {
-    ThrowTypeError(JSMSG_OBJECT_REQUIRED, set === null ? "null" : typeof set);
-  }
-
-  // Step 3. Let hasCheck be ? Get(set, "has").
-  var hasCheck = set.has;
-
-  // Step 4. If IsCallable(hasCheck) is false, throw a TypeError exception.
-  if (!IsCallable(hasCheck)) {
-    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "has");
-  }
-
-  // Step 5. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 6. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return true.
-    if (!next) {
-      return true;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    var has;
-    try {
-      // Step d. Let has be Call(hasCheck, set, « nextValue »).
-      has = callContentFunction(hasCheck, set, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If has is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, has).
-        IteratorClose(iteratorRecord);
-      }
-    }
-
-    // Step f. If has.[[Value]] is true, return false.
-    if (has) {
-      return false;
-    }
-  }
-}
-
-// New Set methods proposal
-//
-// AddEntryFromIterable ( target, iterable, adder )
-// https://tc39.es/proposal-set-methods/#AddEntryFromIterable
-function AddEntryFromIterable(target, iterable, adder) {
-  assert(IsCallable(adder), "adder argument is callable");
-
-  // Step 2. Let iteratorRecord be ? GetIterator(iterable).
-  var iteratorRecord = GetIteratorSync(iterable);
-
-  // Step 3. Repeat,
-  while (true) {
-    // Step a. Let next be ? IteratorStep(iteratorRecord).
-    var next = IteratorStep(iteratorRecord);
-
-    // Step b. If next is false, return target.
-    if (!next) {
-      return target;
-    }
-
-    // Step c. Let nextValue be ? IteratorValue(next).
-    var nextValue = next.value;
-    var needClose = true;
-    try {
-      // Step d. Let status be Call(adder, target, « nextValue »).
-      callContentFunction(adder, target, nextValue);
-      needClose = false;
-    } finally {
-      if (needClose) {
-        // Step e. If status is an abrupt completion,
-        // return ? IteratorClose(iteratorRecord, status).
-        IteratorClose(iteratorRecord);
-      }
-    }
-  }
-}
-#endif
-
 // ES2018 draft rev f83aa38282c2a60c6916ebc410bfdf105a0f6a54
 // 23.2.3.6 Set.prototype.forEach ( callbackfn [ , thisArg ] )
 function SetForEach(callbackfn, thisArg = undefined) {
@@ -594,4 +118,448 @@ function SetIteratorNext() {
 
   // Steps 7, 10.d, 12.
   return retVal;
+}
+
+// GetSetRecord ( obj )
+//
+// https://tc39.es/proposal-set-methods/#sec-getsetrecord
+function GetSetRecord(obj) {
+  // Step 1.
+  if (!IsObject(obj)) {
+    ThrowTypeError(JSMSG_OBJECT_REQUIRED, obj === null ? "null" : typeof obj);
+  }
+
+  // Step 2.
+  var rawSize = obj.size;
+
+  // Step 3.
+  var numSize = +rawSize;
+
+  // Steps 4-5.
+  if (numSize !== numSize) {
+    if (rawSize === undefined) {
+      ThrowTypeError(JSMSG_UNEXPECTED_TYPE, "size", "undefined");
+    } else {
+      ThrowTypeError(JSMSG_UNEXPECTED_TYPE, "size", "NaN");
+    }
+  }
+
+  // Step 6.
+  var intSize = ToInteger(numSize);
+
+  // Step 7.
+  if (intSize < 0) {
+    ThrowRangeError(JSMSG_SET_NEGATIVE_SIZE);
+  }
+
+  // Step 8.
+  var has = obj.has;
+
+  // Step 9.
+  if (!IsCallable(has)) {
+    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "has");
+  }
+
+  // Step 10.
+  var keys = obj.keys;
+
+  // Step 11.
+  if (!IsCallable(keys)) {
+    ThrowTypeError(JSMSG_PROPERTY_NOT_CALLABLE, "keys");
+  }
+
+  // Step 12.
+  return { set: obj, size: intSize, has, keys };
+}
+
+// 7.4.2 GetIteratorFromMethod ( obj, method )
+//
+// ES2024 draft rev a103b287cd19bdc51c7a3d8d7c1431b1506a74e2
+function GetIteratorFromMethod(setRec) {
+  // Step 1.
+  var keysIter = callContentFunction(setRec.keys, setRec.set);
+
+  // Step 2.
+  if (!IsObject(keysIter)) {
+    ThrowTypeError(
+      JSMSG_OBJECT_REQUIRED,
+      keysIter === null ? "null" : typeof keysIter
+    );
+  }
+
+  // Step 3. (Implemented in caller.)
+
+  // Step 4.
+  return keysIter;
+}
+
+// Set.prototype.union ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.union
+function SetUnion(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(CallSetMethodIfWrapped, this, other, "SetUnion");
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Step 4.
+  var keysIter = GetIteratorFromMethod(otherRec);
+  var keysIterNext = keysIter.next;
+
+  // Steps 5 and 8-9. (Reordered)
+  var result = SetCopy(O);
+
+  // Steps 6-7.
+  for (var nextValue of allowContentIterWithNext(keysIter, keysIterNext)) {
+    // Step 7.a and 7.b.i. (Implicit through for-of loop)
+
+    // Steps 7.b.ii-iii. (Implicit through std_Set_add)
+
+    // Step 7.b.iii.1.
+    callFunction(std_Set_add, result, nextValue);
+  }
+
+  // Step 10.
+  return result;
+}
+
+// Set.prototype.intersection ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.intersection
+function SetIntersection(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(CallSetMethodIfWrapped, this, other, "SetIntersection");
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Steps 4 and 8-9. (Reordered)
+  var Set = GetBuiltinConstructor("Set");
+  var result = new Set();
+
+  // Step 5.
+  var thisSize = callFunction(std_Set_size, O);
+
+  // Steps 6-7.
+  if (thisSize <= otherRec.size) {
+    // Steps 6.a-b.
+    var values = callFunction(std_Set_values, O);
+    var setIterationResult = globalSetIterationResult;
+    while (true) {
+      var done = GetNextSetEntryForIterator(values, setIterationResult);
+      if (done) {
+        break;
+      }
+
+      var value = setIterationResult[0];
+      setIterationResult[0] = null;
+
+      // Steps 6.b.i-ii. (Implicit through SetIterator)
+
+      // Steps 6.b.iii.1-2.
+      if (callContentFunction(otherRec.has, otherRec.set, value)) {
+        // Steps 6.b.iii.2.a-b. (Implicit through std_Set_add)
+
+        // Step 6.b.iii.2.c.i.
+        callFunction(std_Set_add, result, value);
+      }
+
+      // Steps 6.b.iii.3-4. (Implicit through SetIterator)
+    }
+  } else {
+    // Step 7.a.
+    var keysIter = GetIteratorFromMethod(otherRec);
+
+    // Steps 7.b-c.
+    for (var nextValue of allowContentIterWithNext(keysIter, keysIter.next)) {
+      // Step 7.c.i and 7.c.ii.1. (Implicit through for-of loop)
+
+      // Steps 7.c.ii.2-4. (Implicit through std_Set_add)
+
+      // Steps 7.c.ii.5-6.
+      if (callFunction(std_Set_has, O, nextValue)) {
+        callFunction(std_Set_add, result, nextValue);
+      }
+    }
+  }
+
+  // Step 10.
+  return result;
+}
+
+// Set.prototype.difference ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.difference
+function SetDifference(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(CallSetMethodIfWrapped, this, other, "SetDifference");
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Steps 4 and 8-9. (Reordered)
+  var result = SetCopy(O);
+
+  // Step 5.
+  var thisSize = callFunction(std_Set_size, O);
+
+  // Steps 6-7.
+  if (thisSize <= otherRec.size) {
+    // Steps 6.a-b.
+    var values = callFunction(std_Set_values, result);
+    var setIterationResult = globalSetIterationResult;
+    while (true) {
+      var done = GetNextSetEntryForIterator(values, setIterationResult);
+      if (done) {
+        break;
+      }
+
+      var value = setIterationResult[0];
+      setIterationResult[0] = null;
+
+      // Steps 6.b.i-ii. (Implicit through SetIterator)
+
+      // Steps 6.b.iii.1-2.
+      if (callContentFunction(otherRec.has, otherRec.set, value)) {
+        callFunction(std_Set_delete, result, value);
+      }
+    }
+  } else {
+    // Step 7.a.
+    var keysIter = GetIteratorFromMethod(otherRec);
+
+    // Steps 7.b-c.
+    for (var nextValue of allowContentIterWithNext(keysIter, keysIter.next)) {
+      // Step 7.c.i and 7.c.ii.1. (Implicit through for-of loop)
+
+      // Steps 7.c.ii.2-3.
+      callFunction(std_Set_delete, result, nextValue);
+    }
+  }
+
+  // Step 10.
+  return result;
+}
+
+// Set.prototype.symmetricDifference ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.symmetricdifference
+function SetSymmetricDifference(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(
+      CallSetMethodIfWrapped,
+      this,
+      other,
+      "SetSymmetricDifference"
+    );
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Step 4.
+  var keysIter = GetIteratorFromMethod(otherRec);
+  var keysIterNext = keysIter.next;
+
+  // Steps 5 and 8-9. (Reordered)
+  var result = SetCopy(O);
+
+  // Steps 6-7.
+  for (var nextValue of allowContentIterWithNext(keysIter, keysIterNext)) {
+    // Step 7.a and 7.b.i. (Implicit through for-of loop)
+
+    // Steps 7.b.ii-iii. (Implicit through std_Set_has)
+
+    // Steps 7.b.iv-v.
+    if (callFunction(std_Set_has, O, nextValue)) {
+      // Step 7.b.iv.1.
+      callFunction(std_Set_delete, result, nextValue);
+    } else {
+      // Step 7.b.v.1.
+      callFunction(std_Set_add, result, nextValue);
+    }
+  }
+
+  // Step 10.
+  return result;
+}
+
+// Set.prototype.isSubsetOf ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.issubsetof
+function SetIsSubsetOf(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(CallSetMethodIfWrapped, this, other, "SetIsSubsetOf");
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Step 4.
+  var thisSize = callFunction(std_Set_size, O);
+
+  // Step 5.
+  if (thisSize > otherRec.size) {
+    return false;
+  }
+
+  // Steps 6-7.
+  var values = callFunction(std_Set_values, O);
+  var setIterationResult = globalSetIterationResult;
+  while (true) {
+    var done = GetNextSetEntryForIterator(values, setIterationResult);
+    if (done) {
+      break;
+    }
+
+    var value = setIterationResult[0];
+    setIterationResult[0] = null;
+
+    // Steps 7.a-b. (Implicit through SetIterator)
+
+    // Steps 7.c-d.
+    if (!callContentFunction(otherRec.has, otherRec.set, value)) {
+      return false;
+    }
+
+    // Steps 7.e-f. (Implicit through SetIterator)
+  }
+
+  // Step 7.
+  return true;
+}
+
+// Set.prototype.isSupersetOf ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.issupersetof
+function SetIsSupersetOf(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(CallSetMethodIfWrapped, this, other, "SetIsSupersetOf");
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Step 4.
+  var thisSize = callFunction(std_Set_size, O);
+
+  // Step 5.
+  if (thisSize < otherRec.size) {
+    return false;
+  }
+
+  // Step 6.
+  var keysIter = GetIteratorFromMethod(otherRec);
+
+  // Steps 7-8.
+  for (var nextValue of allowContentIterWithNext(keysIter, keysIter.next)) {
+    // Step 8.a and 8.b.i. (Implicit through for-of loop)
+
+    // Step 8.b.ii.
+    if (!callFunction(std_Set_has, O, nextValue)) {
+      // Step 8.b.ii.1. (Implicit through for-of loop)
+
+      // Step 8.b.ii.2.
+      return false;
+    }
+  }
+
+  // Step 9.
+  return true;
+}
+
+// Set.prototype.isDisjointFrom ( other )
+//
+// https://tc39.es/proposal-set-methods/#sec-set.prototype.isdisjointfrom
+function SetIsDisjointFrom(other) {
+  // Step 1.
+  var O = this;
+
+  // Step 2.
+  if (!IsObject(O) || (O = GuardToSetObject(O)) === null) {
+    return callFunction(
+      CallSetMethodIfWrapped,
+      this,
+      other,
+      "SetIsDisjointFrom"
+    );
+  }
+
+  // Step 3.
+  var otherRec = GetSetRecord(other);
+
+  // Step 4.
+  var thisSize = callFunction(std_Set_size, O);
+
+  // Steps 5-6.
+  if (thisSize <= otherRec.size) {
+    // Steps 5.a-b.
+    var values = callFunction(std_Set_values, O);
+    var setIterationResult = globalSetIterationResult;
+    while (true) {
+      var done = GetNextSetEntryForIterator(values, setIterationResult);
+      if (done) {
+        break;
+      }
+
+      var value = setIterationResult[0];
+      setIterationResult[0] = null;
+
+      // Step 5.b.i-ii. (Implicit through SetIterator)
+
+      // Steps 5.b.iii.1-2.
+      if (callContentFunction(otherRec.has, otherRec.set, value)) {
+        return false;
+      }
+
+      // Steps 5.b.iii.3-4. (Implicit through SetIterator)
+    }
+  } else {
+    // Step 6.a.
+    var keysIter = GetIteratorFromMethod(otherRec);
+
+    // Steps 6.b-c.
+    for (var nextValue of allowContentIterWithNext(keysIter, keysIter.next)) {
+      // Step 6.c.i and 6.c.ii.1. (Implicit through for-of loop)
+
+      // Step 6.c.ii.2.
+      if (callFunction(std_Set_has, O, nextValue)) {
+        // Step 6.c.ii.2.a. (Implicit through for-of loop)
+
+        // Step 6.c.ii.2.b.
+        return false;
+      }
+    }
+  }
+
+  // Step 7.
+  return true;
 }

@@ -136,14 +136,16 @@ void TimeStamp::Startup() {
     ;
 
   gInitialized = true;
-
-  return;
 }
 
 void TimeStamp::Shutdown() {}
 
 TimeStamp TimeStamp::Now(bool aHighResolution) {
   return TimeStamp(ClockTime());
+}
+
+uint64_t TimeStamp::RawMachAbsoluteTimeNanoseconds() const {
+  return static_cast<uint64_t>(double(mValue) * sNsPerTick);
 }
 
 // Computes and returns the process uptime in microseconds.

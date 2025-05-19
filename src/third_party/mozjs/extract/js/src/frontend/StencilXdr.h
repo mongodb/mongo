@@ -15,7 +15,7 @@
 
 namespace JS {
 
-class DecodeOptions;
+class ReadOnlyDecodeOptions;
 
 }  // namespace JS
 
@@ -92,7 +92,7 @@ class StencilXDR {
  public:
   template <XDRMode mode>
   static XDRResult codeSource(XDRState<mode>* xdr,
-                              const JS::DecodeOptions* maybeOptions,
+                              const JS::ReadOnlyDecodeOptions* maybeOptions,
                               RefPtr<ScriptSource>& source);
 
   template <XDRMode mode>
@@ -186,16 +186,16 @@ class XDRStencilDecoder : public XDRState<XDR_DECODE> {
     MOZ_ASSERT(JS::IsTranscodingBytecodeAligned(range.begin().get()));
   }
 
-  XDRResult codeStencil(const JS::DecodeOptions& options,
+  XDRResult codeStencil(const JS::ReadOnlyDecodeOptions& options,
                         frontend::CompilationStencil& stencil);
 
-  const JS::DecodeOptions& options() {
+  const JS::ReadOnlyDecodeOptions& options() {
     MOZ_ASSERT(options_);
     return *options_;
   }
 
  private:
-  const JS::DecodeOptions* options_ = nullptr;
+  const JS::ReadOnlyDecodeOptions* options_ = nullptr;
 };
 
 class XDRStencilEncoder : public XDRState<XDR_ENCODE> {

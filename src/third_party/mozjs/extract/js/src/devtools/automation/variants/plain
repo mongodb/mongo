@@ -3,6 +3,7 @@
     "optimize": true,
     "compiler": "gcc",
     "env": {
-        "JSTESTS_EXTRA_ARGS": "--jitflags=jstests"
+        "JSTESTS_EXTRA_ARGS": "--jitflags=jstests --run-slow-tests",
+        "JITTEST_EXTRA_ARGS": "--slow"
     }
 }

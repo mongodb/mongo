@@ -22,7 +22,7 @@ ALIGNMENT_COLUMN = 20
 # The maximum column for comment
 MAX_CHARS_PER_LINE = 80
 
-stack_comment_pat = re.compile("^( *//) *(\[stack\].*)$")
+stack_comment_pat = re.compile(r"^( *//) *(\[stack\].*)$")
 
 
 def align_stack_comment(path):

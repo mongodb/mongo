@@ -12,6 +12,7 @@
 #  include <atomic>
 #else
 
+#  include <cstddef>  // For ptrdiff_t
 #  include <cstdint>
 
 // WASI doesn't support <atomic> and we use it as single-threaded for now.

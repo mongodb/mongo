@@ -48,12 +48,10 @@ MacroAssembler& CodeGeneratorShared::ensureMasm(MacroAssembler* masmArg,
 
 CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph,
                                          MacroAssembler* masmArg)
-    : maybeMasm_(),
-      masm(ensureMasm(masmArg, gen->alloc(), gen->realm)),
+    : masm(ensureMasm(masmArg, gen->alloc(), gen->realm)),
       gen(gen),
       graph(*graph),
       current(nullptr),
-      snapshots_(),
       recovers_(),
 #ifdef DEBUG
       pushedArgs_(0),
@@ -62,6 +60,7 @@ CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph,
       safepoints_(graph->localSlotsSize(),
                   (gen->outerInfo().nargs() + 1) * sizeof(Value)),
       returnLabel_(),
+      inboundStackArgBytes_(0),
       nativeToBytecodeMap_(nullptr),
       nativeToBytecodeMapSize_(0),
       nativeToBytecodeTableOffset_(0),
@@ -98,6 +97,23 @@ CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph,
       // regular array where all slots are sizeof(Value), it maintains the max
       // argument stack depth separately.
       MOZ_ASSERT(graph->argumentSlotCount() == 0);
+
+#ifdef ENABLE_WASM_TAIL_CALLS
+      // An MWasmCall does not align the stack pointer at calls sites but
+      // instead relies on the a priori stack adjustment. We need to insert
+      // padding so that pushing the callee's frame maintains frame alignment.
+      uint32_t calleeFramePadding = ComputeByteAlignment(
+          sizeof(wasm::Frame) + frameDepth_, WasmStackAlignment);
+
+      // Tail calls expect the size of stack arguments to be a multiple of
+      // stack alignment when collapsing frames. This ensures that future tail
+      // calls don't overwrite any locals.
+      uint32_t stackArgsWithPadding =
+          AlignBytes(gen->wasmMaxStackArgBytes(), WasmStackAlignment);
+
+      // Add the callee frame padding and stack args to frameDepth.
+      frameDepth_ += calleeFramePadding + stackArgsWithPadding;
+#else
       frameDepth_ += gen->wasmMaxStackArgBytes();
 
       // An MWasmCall does not align the stack pointer at calls sites but
@@ -105,6 +121,7 @@ CodeGeneratorShared::CodeGeneratorShared(MIRGenerator* gen, LIRGraph* graph,
       // last adjustment of frameDepth_.
       frameDepth_ += ComputeByteAlignment(sizeof(wasm::Frame) + frameDepth_,
                                           WasmStackAlignment);
+#endif
     }
 
 #ifdef JS_CODEGEN_ARM64
@@ -305,7 +322,7 @@ void CodeGeneratorShared::dumpNativeToBytecodeEntries() {
   InlineScriptTree* topTree = gen->outerInfo().inlineScriptTree();
   JitSpewStart(JitSpew_Profiling, "Native To Bytecode Entries for %s:%u:%u\n",
                topTree->script()->filename(), topTree->script()->lineno(),
-               topTree->script()->column());
+               topTree->script()->column().oneOriginValue());
   for (unsigned i = 0; i < nativeToBytecodeList_.length(); i++) {
     dumpNativeToBytecodeEntry(i);
   }
@@ -331,11 +348,12 @@ void CodeGeneratorShared::dumpNativeToBytecodeEntry(uint32_t idx) {
       JitSpew_Profiling, "    %08zx [+%-6u] => %-6ld [%-4u] {%-10s} (%s:%u:%u",
       ref.nativeOffset.offset(), nativeDelta, (long)(ref.pc - script->code()),
       pcDelta, CodeName(JSOp(*ref.pc)), script->filename(), script->lineno(),
-      script->column());
+      script->column().oneOriginValue());
 
   for (tree = tree->caller(); tree; tree = tree->caller()) {
     JitSpewCont(JitSpew_Profiling, " <= %s:%u:%u", tree->script()->filename(),
-                tree->script()->lineno(), tree->script()->column());
+                tree->script()->lineno(),
+                tree->script()->column().oneOriginValue());
   }
   JitSpewCont(JitSpew_Profiling, ")");
   JitSpewFin(JitSpew_Profiling);
@@ -353,7 +371,8 @@ static inline int32_t ToStackIndex(LAllocation* a) {
 
 void CodeGeneratorShared::encodeAllocation(LSnapshot* snapshot,
                                            MDefinition* mir,
-                                           uint32_t* allocIndex) {
+                                           uint32_t* allocIndex,
+                                           bool hasSideEffects) {
   if (mir->isBox()) {
     mir = mir->toBox()->getOperand(0);
   }
@@ -518,7 +537,12 @@ void CodeGeneratorShared::encodeAllocation(LSnapshot* snapshot,
   // This set an extra bit as part of the RValueAllocation, such that we know
   // that recover instruction have to be executed without wrapping the
   // instruction in a no-op recover instruction.
-  if (mir->isIncompleteObject()) {
+  //
+  // If the instruction claims to have side-effect but none are registered in
+  // the list of recover instructions, then omit the annotation of the
+  // RValueAllocation as requiring the execution of these side effects before
+  // being readable.
+  if (mir->isIncompleteObject() && hasSideEffects) {
     alloc.setNeedSideEffect();
   }
 
@@ -586,10 +610,11 @@ void CodeGeneratorShared::encode(LSnapshot* snapshot) {
   snapshots_.trackSnapshot(pcOpcode, mirOpcode, mirId, lirOpcode, lirId);
 #endif
 
+  bool hasSideEffects = recoverInfo->hasSideEffects();
   uint32_t allocIndex = 0;
   for (LRecoverInfo::OperandIter it(recoverInfo); !it; ++it) {
     DebugOnly<uint32_t> allocWritten = snapshots_.allocWritten();
-    encodeAllocation(snapshot, *it, &allocIndex);
+    encodeAllocation(snapshot, *it, &allocIndex, hasSideEffects);
     MOZ_ASSERT_IF(!snapshots_.oom(),
                   allocWritten + 1 == snapshots_.allocWritten());
   }

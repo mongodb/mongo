@@ -17,6 +17,7 @@ UNIFIED_SOURCES += [
     "AllocPolicy.cpp",
     "CompleteFile.cpp",
     "DumpFunctions.cpp",
+    "Identifier.cpp",
     "NativeStack.cpp",
     "Printf.cpp",
     "StringBuffer.cpp",

@@ -14,6 +14,7 @@
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Vector.h"
 
+#include "js/CharacterEncoding.h"  // JS::UTF8Chars
 #include "js/GCAnnotations.h"
 #include "js/shadow/Zone.h"
 #include "js/SliceBudget.h"
@@ -307,31 +308,21 @@ typedef enum JSGCParamKey {
   JSGC_LARGE_HEAP_INCREMENTAL_LIMIT = 26,
 
   /**
-   * Attempt to run a minor GC in the idle time if the free space falls
-   * below this number of bytes.
+   * Free space bytes threshold for eager nursery collection.
    *
    * Default: NurseryChunkUsableSize / 4
-   * Pref: None
+   * Pref: javascript.options.mem.nursery_eager_collection_threshold_kb
    */
-  JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION = 27,
+  JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_KB = 27,
 
   /**
-   * If this percentage of the nursery is tenured and the nursery is at least
-   * 4MB, then proceed to examine which groups we should pretenure.
-   *
-   * Default: PretenureThreshold
-   * Pref: None
-   */
-  JSGC_PRETENURE_THRESHOLD = 28,
-
-  /**
-   * Attempt to run a minor GC in the idle time if the free space falls
-   * below this percentage (from 0 to 99).
+   * Free space fraction threshold for eager nursery collection. This is a
+   * percentage (from 0 to 99).
    *
    * Default: 25
-   * Pref: None
+   * Pref: javascript.options.mem.nursery_eager_collection_threshold_percent
    */
-  JSGC_NURSERY_FREE_THRESHOLD_FOR_IDLE_COLLECTION_PERCENT = 30,
+  JSGC_NURSERY_EAGER_COLLECTION_THRESHOLD_PERCENT = 30,
 
   /**
    * Minimum size of the generational GC nurseries.
@@ -412,19 +403,6 @@ typedef enum JSGCParamKey {
   JSGC_HELPER_THREAD_COUNT = 41,
 
   /**
-   * If the percentage of the tenured strings exceeds this threshold, string
-   * will be allocated in tenured heap instead. (Default is allocated in
-   * nursery.)
-   */
-  JSGC_PRETENURE_STRING_THRESHOLD = 42,
-
-  /**
-   * If the finalization rate of the tenured strings exceeds this threshold,
-   * string will be allocated in nursery.
-   */
-  JSGC_STOP_PRETENURE_STRING_THRESHOLD = 43,
-
-  /**
    * A number that is incremented on every major GC slice.
    */
   JSGC_MAJOR_GC_NUMBER = 44,
@@ -439,9 +417,9 @@ typedef enum JSGCParamKey {
    * collected in this many milliseconds.
    *
    * Default: 5000
-   * Pref: None
+   * Pref: javascript.options.mem.nursery_eager_collection_timeout_ms
    */
-  JSGC_NURSERY_TIMEOUT_FOR_IDLE_COLLECTION_MS = 46,
+  JSGC_NURSERY_EAGER_COLLECTION_TIMEOUT_MS = 46,
 
   /**
    * The system page size in KB.
@@ -462,24 +440,54 @@ typedef enum JSGCParamKey {
   JSGC_URGENT_THRESHOLD_MB = 48,
 
   /**
-   * Set the number of threads to use for parallel marking, or zero to use the
-   * default.
-   *
-   * The actual number used is capped to the number of available helper threads.
-   *
-   * This is provided for testing purposes.
+   * Get the number of threads used for parallel marking.
    *
    * Pref: None.
-   * Default: 0 (no effect).
    */
   JSGC_MARKING_THREAD_COUNT = 49,
 
   /**
    * The heap size above which to use parallel marking.
    *
-   * Default: ParallelMarkingThresholdKB
+   * Pref: javascript.options.mem.gc_parallel_marking_threshold_mb
+   * Default: ParallelMarkingThresholdMB
    */
-  JSGC_PARALLEL_MARKING_THRESHOLD_KB = 50,
+  JSGC_PARALLEL_MARKING_THRESHOLD_MB = 50,
+
+  /**
+   * Whether the semispace nursery is enabled.
+   *
+   * Pref: javascript.options.mem.gc_experimental_semispace_nursery
+   * Default: SemispaceNurseryEnabled
+   */
+  JSGC_SEMISPACE_NURSERY_ENABLED = 51,
+
+  /**
+   * Set the maximum number of threads to use for parallel marking, if enabled.
+   *
+   * The actual number used is calculated based on the number of available
+   * helper threads and can be found by getting the JSGC_MARKING_THREAD_COUNT
+   * parameter.
+   *
+   * Pref: javascript.options.mem.gc_max_parallel_marking_threads
+   * Default: 2.
+   */
+  JSGC_MAX_MARKING_THREADS = 52,
+
+  /**
+   * Whether to automatically generate missing allocation sites so data about
+   * them can be gathered.
+   *
+   * Pref: None, this is an internal engine feature.
+   * Default: false.
+   */
+  JSGC_GENERATE_MISSING_ALLOC_SITES = 53,
+
+  /**
+   * A number that is incremented every GC slice.
+   */
+  JSGC_SLICE_NUMBER = 54,
+
 } JSGCParamKey;
 
 /*
@@ -502,7 +510,7 @@ typedef bool (*JSGrayRootsTracer)(JSTracer* trc, js::SliceBudget& budget,
 
 typedef enum JSGCStatus { JSGC_BEGIN, JSGC_END } JSGCStatus;
 
-typedef void (*JSObjectsTenuredCallback)(JSContext* cx, void* data);
+typedef void (*JSObjectsTenuredCallback)(JS::GCContext* gcx, void* data);
 
 typedef enum JSFinalizeStatus {
   /**
@@ -556,9 +564,11 @@ using JSHostCleanupFinalizationRegistryCallback =
  */
 struct JSExternalStringCallbacks {
   /**
-   * Finalizes external strings created by JS_NewExternalString. The finalizer
-   * can be called off the main thread.
+   * Finalizes external strings created by JS_NewExternalStringLatin1 or
+   * JS_NewExternalUCString. The finalizer can be called off the main
+   * thread.
    */
+  virtual void finalize(JS::Latin1Char* chars) const = 0;
   virtual void finalize(char16_t* chars) const = 0;
 
   /**
@@ -569,6 +579,8 @@ struct JSExternalStringCallbacks {
    *
    * Implementations of this callback MUST NOT do anything that can cause GC.
    */
+  virtual size_t sizeOfBuffer(const JS::Latin1Char* chars,
+                              mozilla::MallocSizeOf mallocSizeOf) const = 0;
   virtual size_t sizeOfBuffer(const char16_t* chars,
                               mozilla::MallocSizeOf mallocSizeOf) const = 0;
 };
@@ -603,7 +615,7 @@ namespace JS {
   D(DISABLE_GENERATIONAL_GC, 24)                                       \
   D(FINISH_GC, 25)                                                     \
   D(PREPARE_FOR_TRACING, 26)                                           \
-  D(UNUSED4, 27)                                                       \
+  D(FULL_WASM_ANYREF_BUFFER, 27)                                       \
   D(FULL_CELL_PTR_STR_BUFFER, 28)                                      \
   D(TOO_MUCH_JIT_CODE, 29)                                             \
   D(FULL_CELL_PTR_BIGINT_BUFFER, 30)                                   \
@@ -639,6 +651,7 @@ namespace JS {
   D(DOCSHELL, 54)                                                      \
   D(HTML_PARSER, 55)                                                   \
   D(DOM_TESTUTILS, 56)                                                 \
+  D(PREPARE_FOR_PAGELOAD, 57)                                          \
                                                                        \
   /* Reasons reserved for embeddings. */                               \
   D(RESERVED1, FIRST_RESERVED_REASON)                                  \
@@ -924,14 +937,16 @@ enum class GCNurseryProgress {
  */
 using GCNurseryCollectionCallback = void (*)(JSContext* cx,
                                              GCNurseryProgress progress,
-                                             GCReason reason);
+                                             GCReason reason, void* data);
 
 /**
- * Set the nursery collection callback for the given runtime. When set, it will
+ * Add and remove nursery collection callbacks for the given runtime. These will
  * be called at the start and end of every nursery collection.
  */
-extern JS_PUBLIC_API GCNurseryCollectionCallback SetGCNurseryCollectionCallback(
-    JSContext* cx, GCNurseryCollectionCallback callback);
+extern JS_PUBLIC_API bool AddGCNurseryCollectionCallback(
+    JSContext* cx, GCNurseryCollectionCallback callback, void* data);
+extern JS_PUBLIC_API void RemoveGCNurseryCollectionCallback(
+    JSContext* cx, GCNurseryCollectionCallback callback, void* data);
 
 typedef void (*DoCycleCollectionCallback)(JSContext* cx);
 
@@ -1016,12 +1031,6 @@ class JS_PUBLIC_API AutoDisableGenerationalGC {
 extern JS_PUBLIC_API bool IsGenerationalGCEnabled(JSRuntime* rt);
 
 /**
- * Enable or disable support for pretenuring allocations based on their
- * allocation site.
- */
-extern JS_PUBLIC_API void SetSiteBasedPretenuringEnabled(bool enable);
-
-/**
  * Pass a subclass of this "abstract" class to callees to require that they
  * never GC. Subclasses can use assertions or the hazard analysis to ensure no
  * GC happens.
@@ -1043,16 +1052,25 @@ class JS_PUBLIC_API AutoRequireNoGC {
 class JS_PUBLIC_API AutoAssertNoGC : public AutoRequireNoGC {
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
  protected:
-  JSContext* cx_;
+  JSContext* cx_;  // nullptr if inactive.
 
  public:
-  // This gets the context from TLS if it is not passed in.
+  // Nullptr here means get the context from TLS. It does not mean inactive
+  // (though cx_ may end up nullptr, and thus inactive, if TLS has not yet been
+  // initialized.)
   explicit AutoAssertNoGC(JSContext* cx = nullptr);
+  AutoAssertNoGC(AutoAssertNoGC&& other) : cx_(other.cx_) {
+    other.cx_ = nullptr;
+  }
   ~AutoAssertNoGC();
+
+  void reset();
 #else
  public:
   explicit AutoAssertNoGC(JSContext* cx = nullptr) {}
   ~AutoAssertNoGC() {}
+
+  void reset() {}
 #endif
 };
 
@@ -1123,11 +1141,15 @@ class JS_PUBLIC_API AutoCheckCannotGC : public AutoAssertNoGC {
 #  else
   AutoCheckCannotGC(const AutoCheckCannotGC& other) : AutoCheckCannotGC() {}
 #  endif
+  AutoCheckCannotGC(AutoCheckCannotGC&& other)
+      : AutoAssertNoGC(std::forward<AutoAssertNoGC>(other)) {}
 #else
 class JS_PUBLIC_API AutoCheckCannotGC : public AutoRequireNoGC {
  public:
   explicit AutoCheckCannotGC(JSContext* cx = nullptr) {}
   AutoCheckCannotGC(const AutoCheckCannotGC& other) : AutoCheckCannotGC() {}
+  AutoCheckCannotGC(AutoCheckCannotGC&& other) : AutoCheckCannotGC() {}
+  void reset() {}
 #endif
 } JS_HAZ_GC_INVALIDATED JS_HAZ_GC_REF;
 
@@ -1253,7 +1275,10 @@ extern JS_PUBLIC_API void JS_SetGCParametersBasedOnAvailableMemory(
  * Create a new JSString whose chars member refers to external memory, i.e.,
  * memory requiring application-specific finalization.
  */
-extern JS_PUBLIC_API JSString* JS_NewExternalString(
+extern JS_PUBLIC_API JSString* JS_NewExternalStringLatin1(
+    JSContext* cx, const JS::Latin1Char* chars, size_t length,
+    const JSExternalStringCallbacks* callbacks);
+extern JS_PUBLIC_API JSString* JS_NewExternalUCString(
     JSContext* cx, const char16_t* chars, size_t length,
     const JSExternalStringCallbacks* callbacks);
 
@@ -1264,25 +1289,59 @@ extern JS_PUBLIC_API JSString* JS_NewExternalString(
  * external string allocated by a previous call and |*allocatedExternal| is set
  * to false. If |*allocatedExternal| is false, |fin| won't be called.
  */
-extern JS_PUBLIC_API JSString* JS_NewMaybeExternalString(
+extern JS_PUBLIC_API JSString* JS_NewMaybeExternalStringLatin1(
+    JSContext* cx, const JS::Latin1Char* chars, size_t length,
+    const JSExternalStringCallbacks* callbacks, bool* allocatedExternal);
+extern JS_PUBLIC_API JSString* JS_NewMaybeExternalUCString(
     JSContext* cx, const char16_t* chars, size_t length,
     const JSExternalStringCallbacks* callbacks, bool* allocatedExternal);
 
 /**
- * Return the 'callbacks' arg passed to JS_NewExternalString or
- * JS_NewMaybeExternalString.
+ * Similar to JS_NewMaybeExternalStringLatin1.
+ *
+ * Create an external Latin1 string if the utf8 buffer contains only ASCII
+ * chars, otherwise copy the chars into a non-external string.
+ */
+extern JS_PUBLIC_API JSString* JS_NewMaybeExternalStringUTF8(
+    JSContext* cx, const JS::UTF8Chars& utf8,
+    const JSExternalStringCallbacks* callbacks, bool* allocatedExternal);
+
+/**
+ * Return the 'callbacks' arg passed to JS_NewExternalStringLatin1,
+ * JS_NewExternalUCString, JS_NewMaybeExternalStringLatin1,
+ * or JS_NewMaybeExternalUCString.
  */
 extern JS_PUBLIC_API const JSExternalStringCallbacks*
 JS_GetExternalStringCallbacks(JSString* str);
 
 namespace JS {
 
+/**
+ * Check whether the nursery should be eagerly collected, this is before it is
+ * full.
+ *
+ * The idea is that this can be called when the host environment has some idle
+ * time which it can use to for GC activity.
+ *
+ * Returns GCReason::NO_REASON to indicate no collection is desired.
+ */
 extern JS_PUBLIC_API GCReason WantEagerMinorGC(JSRuntime* rt);
 
 extern JS_PUBLIC_API GCReason WantEagerMajorGC(JSRuntime* rt);
 
+/**
+ * Check whether the nursery should be eagerly collected as per WantEagerMajorGC
+ * above, and if so run a collection.
+ *
+ * The idea is that this can be called when the host environment has some idle
+ * time which it can use to for GC activity.
+ */
 extern JS_PUBLIC_API void MaybeRunNurseryCollection(JSRuntime* rt,
                                                     JS::GCReason reason);
+
+extern JS_PUBLIC_API void RunNurseryCollection(
+    JSRuntime* rt, JS::GCReason reason,
+    mozilla::TimeDuration aSinceLastMinorGC);
 
 extern JS_PUBLIC_API void SetHostCleanupFinalizationRegistryCallback(
     JSContext* cx, JSHostCleanupFinalizationRegistryCallback cb, void* data);
@@ -1314,33 +1373,36 @@ namespace gc {
 extern JS_PUBLIC_API JSObject* NewMemoryInfoObject(JSContext* cx);
 
 /*
- * Run the finalizer of a nursery-allocated JSObject that is known to be dead.
+ * Get the GCContext for the current context.
  *
- * This is a dangerous operation - only use this if you know what you're doing!
- *
- * This is used by the browser to implement nursery-allocated wrapper cached
- * wrappers.
+ * This is here to allow the browser to call finalizers for dead nursery
+ * objects. This is a dangerous operation - only use this if you know what
+ * you're doing!
  */
-extern JS_PUBLIC_API void FinalizeDeadNurseryObject(JSContext* cx,
-                                                    JSObject* obj);
+extern JS_PUBLIC_API JS::GCContext* GetGCContext(JSContext* cx);
 
 } /* namespace gc */
 } /* namespace js */
 
 #ifdef JS_GC_ZEAL
 
-#  define JS_DEFAULT_ZEAL_FREQ 100
+namespace JS {
 
-extern JS_PUBLIC_API void JS_GetGCZealBits(JSContext* cx, uint32_t* zealBits,
-                                           uint32_t* frequency,
-                                           uint32_t* nextScheduled);
+static constexpr uint32_t ShellDefaultGCZealFrequency = 100;
+static constexpr uint32_t BrowserDefaultGCZealFrequency = 5000;
 
-extern JS_PUBLIC_API void JS_SetGCZeal(JSContext* cx, uint8_t zeal,
-                                       uint32_t frequency);
+extern JS_PUBLIC_API void GetGCZealBits(JSContext* cx, uint32_t* zealBits,
+                                        uint32_t* frequency,
+                                        uint32_t* nextScheduled);
 
-extern JS_PUBLIC_API void JS_UnsetGCZeal(JSContext* cx, uint8_t zeal);
+extern JS_PUBLIC_API void SetGCZeal(JSContext* cx, uint8_t zeal,
+                                    uint32_t frequency);
 
-extern JS_PUBLIC_API void JS_ScheduleGC(JSContext* cx, uint32_t count);
+extern JS_PUBLIC_API void UnsetGCZeal(JSContext* cx, uint8_t zeal);
+
+extern JS_PUBLIC_API void ScheduleGC(JSContext* cx, uint32_t count);
+
+}  // namespace JS
 
 #endif
 

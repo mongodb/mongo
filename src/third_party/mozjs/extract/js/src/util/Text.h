@@ -355,18 +355,20 @@ bool ContainsFlag(const char* str, const char* flag);
 
 namespace unicode {
 
-/** Compute the number of code points in the valid UTF-8 range [begin, end). */
-extern size_t CountCodePoints(const mozilla::Utf8Unit* begin,
-                              const mozilla::Utf8Unit* end);
+/**
+ * Compute the number of UTF-16 code units in the valid UTF-8 range
+ * [begin, end).
+ */
+extern size_t CountUTF16CodeUnits(const mozilla::Utf8Unit* begin,
+                                  const mozilla::Utf8Unit* end);
 
 /**
- * Count the number of code points in [begin, end).
- *
- * Unlike the UTF-8 case above, consistent with legacy ECMAScript practice,
- * every sequence of 16-bit units is considered valid.  Lone surrogates are
- * treated as if they represented a code point of the same value.
+ * Count the number of UTF-16 code units in [begin, end).
  */
-extern size_t CountCodePoints(const char16_t* begin, const char16_t* end);
+inline size_t CountUTF16CodeUnits(const char16_t* begin, const char16_t* end) {
+  MOZ_ASSERT(begin <= end);
+  return end - begin;
+}
 
 }  // namespace unicode
 

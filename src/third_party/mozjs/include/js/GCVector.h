@@ -46,6 +46,7 @@ class GCVector {
 
  public:
   using ElementType = T;
+  static constexpr size_t InlineLength = decltype(vector)::InlineLength;
 
   explicit GCVector(AllocPolicy alloc) : vector(std::move(alloc)) {}
   GCVector() : GCVector(AllocPolicy()) {}
@@ -174,11 +175,14 @@ class GCVector {
     return !empty();
   }
 
-  // Like eraseIf, but may mutate the contents of the vector.
+  // Like eraseIf, but may mutate the contents of the vector. Iterates from
+  // |startIndex| to the last element of the vector.
   template <typename Pred>
-  void mutableEraseIf(Pred pred) {
-    T* src = begin();
-    T* dst = begin();
+  void mutableEraseIf(Pred pred, size_t startIndex = 0) {
+    MOZ_ASSERT(startIndex <= length());
+
+    T* src = begin() + startIndex;
+    T* dst = src;
     while (src != end()) {
       if (!pred(*src)) {
         if (src != dst) {

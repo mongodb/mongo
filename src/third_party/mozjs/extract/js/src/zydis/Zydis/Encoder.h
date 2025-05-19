@@ -221,7 +221,11 @@ typedef struct ZydisEncoderOperand_
          */
         ZyanU8 scale;
         /**
-         * The displacement value.
+         * The displacement value. This value is always treated as 64-bit signed integer, so it's
+         * important to take this into account when specifying absolute addresses. For example
+         * to specify a 16-bit address 0x8000 in 16-bit mode it should be sign extended to
+         * `0xFFFFFFFFFFFF8000`. See `address_size_hint` for more information about absolute
+         * addresses.
          */
         ZyanI64 displacement;
         /**
@@ -302,6 +306,13 @@ typedef struct ZydisEncoderRequest_
      * encoder deduces address size from `ZydisEncoderOperand` structures that represent
      * explicit and implicit operands. This hint resolves conflicts when instruction's hidden
      * operands scale with address size attribute.
+     *
+     * This hint is also used for instructions with absolute memory addresses (memory operands with
+     * displacement and no registers). Since displacement field is a 64-bit signed integer it's not
+     * possible to determine actual size of the address value in all situations. This hint
+     * specifies size of the address value provided inside encoder request rather than desired
+     * address size attribute of encoded instruction. Use `ZYDIS_ADDRESS_SIZE_HINT_NONE` to assume
+     * address size default for specified machine mode.
      */
     ZydisAddressSizeHint address_size_hint;
     /**

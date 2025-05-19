@@ -17,11 +17,13 @@
 #include "js/ValueArray.h"    // JS::HandleValueArray
 #include "vm/BytecodeUtil.h"  // JSDVG_IGNORE_STACK
 #include "vm/Interpreter.h"   // js::Call, js::Construct
-#include "vm/JSAtom.h"        // JSAtom, js::Atomize
+#include "vm/JSAtomUtils.h"   // js::Atomize
 #include "vm/JSContext.h"     // JSContext, CHECK_THREAD, ReportValueError
 #include "vm/JSObject.h"      // JSObject
 #include "vm/Stack.h"  // js::InvokeArgs, js::FillArgumentsFromArraylike, js::ConstructArgs
+#include "vm/StringType.h"  // JSAtom
 
+#include "vm/JSAtomUtils-inl.h"       // js::AtomToId
 #include "vm/JSContext-inl.h"         // JSContext::check
 #include "vm/JSObject-inl.h"          // js::IsConstructor
 #include "vm/ObjectOperations-inl.h"  // js::GetProperty

@@ -57,7 +57,7 @@ class DateObject : public NativeObject {
   static const JSClass class_;
   static const JSClass protoClass_;
 
-  js::DateTimeInfo::ShouldRFP shouldRFP() const;
+  js::DateTimeInfo::ForceUTC forceUTC() const;
 
   JS::ClippedTime clippedTime() const {
     double t = getFixedSlot(UTC_TIME_SLOT).toDouble();

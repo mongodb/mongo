@@ -17,6 +17,7 @@
 #include "gc/Barrier.h"        // HeapPtr
 #include "gc/ZoneAllocator.h"  // CellAllocPolicy
 #include "js/Class.h"          // JSClass, ObjectOpResult
+#include "js/ColumnNumber.h"   // JS::ColumnNumberOneOrigin
 #include "js/GCVector.h"
 #include "js/Id.h"  // jsid
 #include "js/Modules.h"
@@ -42,24 +43,44 @@ namespace js {
 
 class ArrayObject;
 class CyclicModuleFields;
+class SyntheticModuleFields;
 class ListObject;
 class ModuleEnvironmentObject;
 class ModuleObject;
 class PromiseObject;
 class ScriptSourceObject;
 
+class ImportAttribute {
+  const HeapPtr<JSAtom*> key_;
+  const HeapPtr<JSString*> value_;
+
+ public:
+  ImportAttribute(Handle<JSAtom*> key, Handle<JSString*> value);
+
+  JSAtom* key() const { return key_; }
+  JSString* value() const { return value_; }
+
+  void trace(JSTracer* trc);
+};
+
+using ImportAttributeVector = GCVector<ImportAttribute, 0, SystemAllocPolicy>;
+
 class ModuleRequestObject : public NativeObject {
  public:
-  enum { SpecifierSlot = 0, AssertionSlot, SlotCount };
+  enum { SpecifierSlot = 0, AttributesSlot, SlotCount };
 
   static const JSClass class_;
   static bool isInstance(HandleValue value);
   [[nodiscard]] static ModuleRequestObject* create(
       JSContext* cx, Handle<JSAtom*> specifier,
-      Handle<ArrayObject*> maybeAssertions);
+      MutableHandle<UniquePtr<ImportAttributeVector>> maybeAttributes);
 
   JSAtom* specifier() const;
-  ArrayObject* assertions() const;
+  mozilla::Span<const ImportAttribute> attributes() const;
+  bool hasAttributes() const;
+  static bool getModuleType(JSContext* cx,
+                            const Handle<ModuleRequestObject*> moduleRequest,
+                            JS::ModuleType& moduleType);
 };
 
 using ModuleRequestVector =
@@ -69,19 +90,23 @@ class ImportEntry {
   const HeapPtr<ModuleRequestObject*> moduleRequest_;
   const HeapPtr<JSAtom*> importName_;
   const HeapPtr<JSAtom*> localName_;
+
+  // Line number (1-origin).
   const uint32_t lineNumber_;
-  const uint32_t columnNumber_;
+
+  // Column number in UTF-16 code units.
+  const JS::ColumnNumberOneOrigin columnNumber_;
 
  public:
   ImportEntry(Handle<ModuleRequestObject*> moduleRequest,
               Handle<JSAtom*> maybeImportName, Handle<JSAtom*> localName,
-              uint32_t lineNumber, uint32_t columnNumber);
+              uint32_t lineNumber, JS::ColumnNumberOneOrigin columnNumber);
 
   ModuleRequestObject* moduleRequest() const { return moduleRequest_; }
   JSAtom* importName() const { return importName_; }
   JSAtom* localName() const { return localName_; }
   uint32_t lineNumber() const { return lineNumber_; }
-  uint32_t columnNumber() const { return columnNumber_; }
+  JS::ColumnNumberOneOrigin columnNumber() const { return columnNumber_; }
 
   void trace(JSTracer* trc);
 };
@@ -93,20 +118,24 @@ class ExportEntry {
   const HeapPtr<ModuleRequestObject*> moduleRequest_;
   const HeapPtr<JSAtom*> importName_;
   const HeapPtr<JSAtom*> localName_;
+
+  // Line number (1-origin).
   const uint32_t lineNumber_;
-  const uint32_t columnNumber_;
+
+  // Column number in UTF-16 code units.
+  const JS::ColumnNumberOneOrigin columnNumber_;
 
  public:
   ExportEntry(Handle<JSAtom*> maybeExportName,
               Handle<ModuleRequestObject*> maybeModuleRequest,
               Handle<JSAtom*> maybeImportName, Handle<JSAtom*> maybeLocalName,
-              uint32_t lineNumber, uint32_t columnNumber);
+              uint32_t lineNumber, JS::ColumnNumberOneOrigin columnNumber);
   JSAtom* exportName() const { return exportName_; }
   ModuleRequestObject* moduleRequest() const { return moduleRequest_; }
   JSAtom* importName() const { return importName_; }
   JSAtom* localName() const { return localName_; }
   uint32_t lineNumber() const { return lineNumber_; }
-  uint32_t columnNumber() const { return columnNumber_; }
+  JS::ColumnNumberOneOrigin columnNumber() const { return columnNumber_; }
 
   void trace(JSTracer* trc);
 };
@@ -115,15 +144,19 @@ using ExportEntryVector = GCVector<ExportEntry, 0, SystemAllocPolicy>;
 
 class RequestedModule {
   const HeapPtr<ModuleRequestObject*> moduleRequest_;
+
+  // Line number (1-origin).
   const uint32_t lineNumber_;
-  const uint32_t columnNumber_;
+
+  // Column number in UTF-16 code units.
+  const JS::ColumnNumberOneOrigin columnNumber_;
 
  public:
   RequestedModule(Handle<ModuleRequestObject*> moduleRequest,
-                  uint32_t lineNumber, uint32_t columnNumber);
+                  uint32_t lineNumber, JS::ColumnNumberOneOrigin columnNumber);
   ModuleRequestObject* moduleRequest() const { return moduleRequest_; }
   uint32_t lineNumber() const { return lineNumber_; }
-  uint32_t columnNumber() const { return columnNumber_; }
+  JS::ColumnNumberOneOrigin columnNumber() const { return columnNumber_; }
 
   void trace(JSTracer* trc);
 };
@@ -296,6 +329,10 @@ constexpr uint32_t ASYNC_EVALUATING_POST_ORDER_INIT = 1;
 // Value that the field is set to after being cleared.
 constexpr uint32_t ASYNC_EVALUATING_POST_ORDER_CLEARED = 0;
 
+// Currently, the ModuleObject class is used to represent both the Source Text
+// Module Record and the Synthetic Module Record. Ideally, this is something
+// that should be refactored to follow the same hierarchy as in the spec.
+// TODO: See Bug 1880519.
 class ModuleObject : public NativeObject {
  public:
   // Module fields including those for AbstractModuleRecords described by:
@@ -305,6 +342,8 @@ class ModuleObject : public NativeObject {
     EnvironmentSlot,
     NamespaceSlot,
     CyclicModuleFieldsSlot,
+    // `SyntheticModuleFields` if a synthetic module. Otherwise `undefined`.
+    SyntheticModuleFieldsSlot,
     SlotCount
   };
 
@@ -313,6 +352,9 @@ class ModuleObject : public NativeObject {
   static bool isInstance(HandleValue value);
 
   static ModuleObject* create(JSContext* cx);
+
+  static ModuleObject* createSynthetic(
+      JSContext* cx, MutableHandle<ExportNameVector> exportNames);
 
   // Initialize the slots on this object that are dependent on the script.
   void initScriptSlots(HandleScript script);
@@ -333,6 +375,7 @@ class ModuleObject : public NativeObject {
 
   JSScript* maybeScript() const;
   JSScript* script() const;
+  const char* filename() const;
   ModuleEnvironmentObject& initialEnvironment() const;
   ModuleEnvironmentObject* environment() const;
   ModuleNamespaceObject* namespace_();
@@ -351,6 +394,8 @@ class ModuleObject : public NativeObject {
   mozilla::Span<const ExportEntry> localExportEntries() const;
   mozilla::Span<const ExportEntry> indirectExportEntries() const;
   mozilla::Span<const ExportEntry> starExportEntries() const;
+  const ExportNameVector& syntheticExportNames() const;
+
   IndirectBindingMap& importBindings();
 
   void setStatus(ModuleStatus newStatus);
@@ -377,6 +422,8 @@ class ModuleObject : public NativeObject {
   void clearAsyncEvaluatingPostOrder();
   void setCycleRoot(ModuleObject* cycleRoot);
   ModuleObject* getCycleRoot() const;
+  bool hasCyclicModuleFields() const;
+  bool hasSyntheticModuleFields() const;
 
   static void onTopLevelEvaluationFinished(ModuleObject* module);
 
@@ -400,6 +447,9 @@ class ModuleObject : public NativeObject {
       MutableHandle<UniquePtr<ExportNameVector>> exports);
 
   static bool createEnvironment(JSContext* cx, Handle<ModuleObject*> self);
+  static bool createSyntheticEnvironment(JSContext* cx,
+                                         Handle<ModuleObject*> self,
+                                         Handle<GCVector<Value>> values);
 
   void initAsyncSlots(JSContext* cx, bool hasTopLevelAwait,
                       Handle<ListObject*> asyncParentModules);
@@ -410,9 +460,11 @@ class ModuleObject : public NativeObject {
   static void trace(JSTracer* trc, JSObject* obj);
   static void finalize(JS::GCContext* gcx, JSObject* obj);
 
-  bool hasCyclicModuleFields() const;
   CyclicModuleFields* cyclicModuleFields();
   const CyclicModuleFields* cyclicModuleFields() const;
+
+  SyntheticModuleFields* syntheticModuleFields();
+  const SyntheticModuleFields* syntheticModuleFields() const;
 };
 
 JSObject* GetOrCreateModuleMetaObject(JSContext* cx, HandleObject module);

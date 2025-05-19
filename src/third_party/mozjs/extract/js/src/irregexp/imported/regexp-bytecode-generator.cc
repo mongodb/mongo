@@ -383,7 +383,7 @@ Handle<HeapObject> RegExpBytecodeGenerator::GetCode(Handle<String> source) {
         isolate_, zone(), source, buffer_.data(), length(), jump_edges_);
   } else {
     array = isolate_->factory()->NewByteArray(length());
-    Copy(array->GetDataStartAddress());
+    Copy(array->begin());
   }
 
   return array;
@@ -391,7 +391,7 @@ Handle<HeapObject> RegExpBytecodeGenerator::GetCode(Handle<String> source) {
 
 int RegExpBytecodeGenerator::length() { return pc_; }
 
-void RegExpBytecodeGenerator::Copy(byte* a) {
+void RegExpBytecodeGenerator::Copy(uint8_t* a) {
   MemCopy(a, buffer_.data(), length());
 }
 

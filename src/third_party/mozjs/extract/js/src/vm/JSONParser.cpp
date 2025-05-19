@@ -20,16 +20,19 @@
 
 #include "jsnum.h"  // ParseDecimalNumber, GetFullInteger, FullStringToDouble
 
-#include "builtin/Array.h"            // NewDenseCopiedArray
-#include "ds/IdValuePair.h"           // IdValuePair
-#include "gc/Allocator.h"             // CanGC
-#include "gc/Tracer.h"                // JS::TraceRoot
-#include "js/AllocPolicy.h"           // ReportOutOfMemory
-#include "js/ErrorReport.h"           // JS_ReportErrorNumberASCII
-#include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
-#include "js/GCVector.h"              // JS::GCVector
-#include "js/Id.h"                    // jsid
-#include "js/JSON.h"                  // JS::IsValidJSON
+#include "builtin/Array.h"              // NewDenseCopiedArray
+#include "builtin/ParseRecordObject.h"  // js::ParseRecordObject
+#include "ds/IdValuePair.h"             // IdValuePair
+#include "gc/GCEnum.h"                  // CanGC
+#include "gc/Tracer.h"                  // JS::TraceRoot
+#include "js/AllocPolicy.h"             // ReportOutOfMemory
+#include "js/CharacterEncoding.h"       // JS::ConstUTF8CharsZ
+#include "js/ColumnNumber.h"            // JS::ColumnNumberOneOrigin
+#include "js/ErrorReport.h"             // JS_ReportErrorNumberASCII
+#include "js/friend/ErrorMessages.h"    // js::GetErrorMessage, JSMSG_*
+#include "js/GCVector.h"                // JS::GCVector
+#include "js/Id.h"                      // jsid
+#include "js/JSON.h"                    // JS::IsValidJSON
 #include "js/RootingAPI.h"  // JS::Handle, JS::MutableHandle, MutableWrappedPtrOperations
 #include "js/TypeDecls.h"  // Latin1Char
 #include "js/Utility.h"    // js_delete
@@ -38,12 +41,13 @@
 #include "util/StringBuffer.h"  // JSStringBuilder
 #include "vm/ArrayObject.h"     // ArrayObject
 #include "vm/ErrorReporting.h"  // ReportCompileErrorLatin1, ErrorMetadata
-#include "vm/JSAtom.h"          // AtomizeChars
+#include "vm/JSAtomUtils.h"     // AtomizeChars
 #include "vm/JSContext.h"       // JSContext
 #include "vm/PlainObject.h"     // NewPlainObjectWithMaybeDuplicateKeys
+#include "vm/Realm.h"           // JS::Realm
 #include "vm/StringType.h"  // JSString, JSAtom, JSLinearString, NewStringCopyN, NameToId
 
-#include "vm/JSAtom-inl.h"  // AtomToId
+#include "vm/JSAtomUtils-inl.h"  // AtomToId
 
 using namespace js;
 
@@ -53,10 +57,279 @@ using mozilla::IsAsciiHexDigit;
 using mozilla::RangedPtr;
 
 template <typename CharT, typename ParserT, typename StringBuilderT>
+void JSONTokenizer<CharT, ParserT, StringBuilderT>::getTextPosition(
+    uint32_t* column, uint32_t* line) {
+  CharPtr ptr = begin;
+  uint32_t col = 1;
+  uint32_t row = 1;
+  for (; ptr < current; ptr++) {
+    if (*ptr == '\n' || *ptr == '\r') {
+      ++row;
+      col = 1;
+      // \r\n is treated as a single newline.
+      if (ptr + 1 < current && *ptr == '\r' && *(ptr + 1) == '\n') {
+        ++ptr;
+      }
+    } else {
+      ++col;
+    }
+  }
+  *column = col;
+  *line = row;
+}
+
+static inline bool IsJSONWhitespace(char16_t c) {
+  return c == '\t' || c == '\r' || c == '\n' || c == ' ';
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+bool JSONTokenizer<CharT, ParserT,
+                   StringBuilderT>::consumeTrailingWhitespaces() {
+  for (; current < end; current++) {
+    if (!IsJSONWhitespace(*current)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advance() {
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("unexpected end of data");
+    return token(JSONToken::Error);
+  }
+
+  sourceStart = current;
+  switch (*current) {
+    case '"':
+      return readString<JSONStringType::LiteralValue>();
+
+    case '-':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      return readNumber();
+
+    case 't':
+      if (end - current < 4 || current[1] != 'r' || current[2] != 'u' ||
+          current[3] != 'e') {
+        error("unexpected keyword");
+        return token(JSONToken::Error);
+      }
+      current += 4;
+      if (!parser->handler.setBooleanValue(true, getSource())) {
+        return token(JSONToken::OOM);
+      }
+      return token(JSONToken::True);
+
+    case 'f':
+      if (end - current < 5 || current[1] != 'a' || current[2] != 'l' ||
+          current[3] != 's' || current[4] != 'e') {
+        error("unexpected keyword");
+        return token(JSONToken::Error);
+      }
+      current += 5;
+      if (!parser->handler.setBooleanValue(false, getSource())) {
+        return token(JSONToken::OOM);
+      }
+      return token(JSONToken::False);
+
+    case 'n':
+      if (end - current < 4 || current[1] != 'u' || current[2] != 'l' ||
+          current[3] != 'l') {
+        error("unexpected keyword");
+        return token(JSONToken::Error);
+      }
+      current += 4;
+      if (!parser->handler.setNullValue(getSource())) {
+        return token(JSONToken::OOM);
+      }
+      return token(JSONToken::Null);
+
+    case '[':
+      current++;
+      return token(JSONToken::ArrayOpen);
+    case ']':
+      current++;
+      return token(JSONToken::ArrayClose);
+
+    case '{':
+      current++;
+      return token(JSONToken::ObjectOpen);
+    case '}':
+      current++;
+      return token(JSONToken::ObjectClose);
+
+    case ',':
+      current++;
+      return token(JSONToken::Comma);
+
+    case ':':
+      current++;
+      return token(JSONToken::Colon);
+
+    default:
+      error("unexpected character");
+      return token(JSONToken::Error);
+  }
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyName() {
+  MOZ_ASSERT(current[-1] == ',');
+
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("end of data when property name was expected");
+    return token(JSONToken::Error);
+  }
+
+  if (*current == '"') {
+    return readString<JSONStringType::PropertyName>();
+  }
+
+  error("expected double-quoted property name");
+  return token(JSONToken::Error);
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken
+JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyColon() {
+  MOZ_ASSERT(current[-1] == '"');
+
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("end of data after property name when ':' was expected");
+    return token(JSONToken::Error);
+  }
+
+  if (*current == ':') {
+    current++;
+    return token(JSONToken::Colon);
+  }
+
+  error("expected ':' after property name in object");
+  return token(JSONToken::Error);
+}
+
+template <typename CharT>
+static inline void AssertPastValue(const RangedPtr<const CharT> current) {
+  /*
+   * We're past an arbitrary JSON value, so the previous character is
+   * *somewhat* constrained, even if this assertion is pretty broad.  Don't
+   * knock it till you tried it: this assertion *did* catch a bug once.
+   */
+  MOZ_ASSERT((current[-1] == 'l' && current[-2] == 'l' && current[-3] == 'u' &&
+              current[-4] == 'n') ||
+             (current[-1] == 'e' && current[-2] == 'u' && current[-3] == 'r' &&
+              current[-4] == 't') ||
+             (current[-1] == 'e' && current[-2] == 's' && current[-3] == 'l' &&
+              current[-4] == 'a' && current[-5] == 'f') ||
+             current[-1] == '}' || current[-1] == ']' || current[-1] == '"' ||
+             IsAsciiDigit(current[-1]));
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken
+JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterProperty() {
+  AssertPastValue(current);
+
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("end of data after property value in object");
+    return token(JSONToken::Error);
+  }
+
+  if (*current == ',') {
+    current++;
+    return token(JSONToken::Comma);
+  }
+
+  if (*current == '}') {
+    current++;
+    return token(JSONToken::ObjectClose);
+  }
+
+  error("expected ',' or '}' after property value in object");
+  return token(JSONToken::Error);
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken
+JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterObjectOpen() {
+  MOZ_ASSERT(current[-1] == '{');
+
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("end of data while reading object contents");
+    return token(JSONToken::Error);
+  }
+
+  if (*current == '"') {
+    return readString<JSONStringType::PropertyName>();
+  }
+
+  if (*current == '}') {
+    current++;
+    return token(JSONToken::ObjectClose);
+  }
+
+  error("expected property name or '}'");
+  return token(JSONToken::Error);
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
+JSONToken
+JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterArrayElement() {
+  AssertPastValue(current);
+
+  while (current < end && IsJSONWhitespace(*current)) {
+    current++;
+  }
+  if (current >= end) {
+    error("end of data when ',' or ']' was expected");
+    return token(JSONToken::Error);
+  }
+
+  if (*current == ',') {
+    current++;
+    return token(JSONToken::Comma);
+  }
+
+  if (*current == ']') {
+    current++;
+    return token(JSONToken::ArrayClose);
+  }
+
+  error("expected ',' or ']' after array element");
+  return token(JSONToken::Error);
+}
+
+template <typename CharT, typename ParserT, typename StringBuilderT>
 template <JSONStringType ST>
 JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
     const CharPtr start, size_t length) {
-  if (!parser->handler.template setStringValue<ST>(start, length)) {
+  if (!parser->handler.template setStringValue<ST>(start, length,
+                                                   getSource())) {
     return JSONToken::OOM;
   }
   return JSONToken::String;
@@ -66,7 +339,7 @@ template <typename CharT, typename ParserT, typename StringBuilderT>
 template <JSONStringType ST>
 JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
     StringBuilderT& builder) {
-  if (!parser->handler.template setStringValue<ST>(builder)) {
+  if (!parser->handler.template setStringValue<ST>(builder, getSource())) {
     return JSONToken::OOM;
   }
   return JSONToken::String;
@@ -74,7 +347,9 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::stringToken(
 
 template <typename CharT, typename ParserT, typename StringBuilderT>
 JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::numberToken(double d) {
-  parser->handler.setNumberValue(d);
+  if (!parser->handler.setNumberValue(d, getSource())) {
+    return JSONToken::OOM;
+  }
   return JSONToken::Number;
 }
 
@@ -320,268 +595,33 @@ JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::readNumber() {
   return numberToken(negative ? -d : d);
 }
 
-static inline bool IsJSONWhitespace(char16_t c) {
-  return c == '\t' || c == '\r' || c == '\n' || c == ' ';
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-bool JSONTokenizer<CharT, ParserT,
-                   StringBuilderT>::consumeTrailingWhitespaces() {
-  for (; current < end; current++) {
-    if (!IsJSONWhitespace(*current)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advance() {
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("unexpected end of data");
-    return token(JSONToken::Error);
-  }
-
-  switch (*current) {
-    case '"':
-      return readString<JSONStringType::LiteralValue>();
-
-    case '-':
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-      return readNumber();
-
-    case 't':
-      if (end - current < 4 || current[1] != 'r' || current[2] != 'u' ||
-          current[3] != 'e') {
-        error("unexpected keyword");
-        return token(JSONToken::Error);
-      }
-      current += 4;
-      return token(JSONToken::True);
-
-    case 'f':
-      if (end - current < 5 || current[1] != 'a' || current[2] != 'l' ||
-          current[3] != 's' || current[4] != 'e') {
-        error("unexpected keyword");
-        return token(JSONToken::Error);
-      }
-      current += 5;
-      return token(JSONToken::False);
-
-    case 'n':
-      if (end - current < 4 || current[1] != 'u' || current[2] != 'l' ||
-          current[3] != 'l') {
-        error("unexpected keyword");
-        return token(JSONToken::Error);
-      }
-      current += 4;
-      return token(JSONToken::Null);
-
-    case '[':
-      current++;
-      return token(JSONToken::ArrayOpen);
-    case ']':
-      current++;
-      return token(JSONToken::ArrayClose);
-
-    case '{':
-      current++;
-      return token(JSONToken::ObjectOpen);
-    case '}':
-      current++;
-      return token(JSONToken::ObjectClose);
-
-    case ',':
-      current++;
-      return token(JSONToken::Comma);
-
-    case ':':
-      current++;
-      return token(JSONToken::Colon);
-
-    default:
-      error("unexpected character");
-      return token(JSONToken::Error);
-  }
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyName() {
-  MOZ_ASSERT(current[-1] == ',');
-
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("end of data when property name was expected");
-    return token(JSONToken::Error);
-  }
-
-  if (*current == '"') {
-    return readString<JSONStringType::PropertyName>();
-  }
-
-  error("expected double-quoted property name");
-  return token(JSONToken::Error);
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advancePropertyColon() {
-  MOZ_ASSERT(current[-1] == '"');
-
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("end of data after property name when ':' was expected");
-    return token(JSONToken::Error);
-  }
-
-  if (*current == ':') {
-    current++;
-    return token(JSONToken::Colon);
-  }
-
-  error("expected ':' after property name in object");
-  return token(JSONToken::Error);
-}
-
-template <typename CharT>
-static inline void AssertPastValue(const RangedPtr<const CharT> current) {
-  /*
-   * We're past an arbitrary JSON value, so the previous character is
-   * *somewhat* constrained, even if this assertion is pretty broad.  Don't
-   * knock it till you tried it: this assertion *did* catch a bug once.
-   */
-  MOZ_ASSERT((current[-1] == 'l' && current[-2] == 'l' && current[-3] == 'u' &&
-              current[-4] == 'n') ||
-             (current[-1] == 'e' && current[-2] == 'u' && current[-3] == 'r' &&
-              current[-4] == 't') ||
-             (current[-1] == 'e' && current[-2] == 's' && current[-3] == 'l' &&
-              current[-4] == 'a' && current[-5] == 'f') ||
-             current[-1] == '}' || current[-1] == ']' || current[-1] == '"' ||
-             IsAsciiDigit(current[-1]));
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterProperty() {
-  AssertPastValue(current);
-
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("end of data after property value in object");
-    return token(JSONToken::Error);
-  }
-
-  if (*current == ',') {
-    current++;
-    return token(JSONToken::Comma);
-  }
-
-  if (*current == '}') {
-    current++;
-    return token(JSONToken::ObjectClose);
-  }
-
-  error("expected ',' or '}' after property value in object");
-  return token(JSONToken::Error);
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterObjectOpen() {
-  MOZ_ASSERT(current[-1] == '{');
-
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("end of data while reading object contents");
-    return token(JSONToken::Error);
-  }
-
-  if (*current == '"') {
-    return readString<JSONStringType::PropertyName>();
-  }
-
-  if (*current == '}') {
-    current++;
-    return token(JSONToken::ObjectClose);
-  }
-
-  error("expected property name or '}'");
-  return token(JSONToken::Error);
-}
-
-template <typename CharT, typename ParserT, typename StringBuilderT>
-JSONToken
-JSONTokenizer<CharT, ParserT, StringBuilderT>::advanceAfterArrayElement() {
-  AssertPastValue(current);
-
-  while (current < end && IsJSONWhitespace(*current)) {
-    current++;
-  }
-  if (current >= end) {
-    error("end of data when ',' or ']' was expected");
-    return token(JSONToken::Error);
-  }
-
-  if (*current == ',') {
-    current++;
-    return token(JSONToken::Comma);
-  }
-
-  if (*current == ']') {
-    current++;
-    return token(JSONToken::ArrayClose);
-  }
-
-  error("expected ',' or ']' after array element");
-  return token(JSONToken::Error);
-}
-
 template <typename CharT, typename ParserT, typename StringBuilderT>
 void JSONTokenizer<CharT, ParserT, StringBuilderT>::error(const char* msg) {
   parser->error(msg);
 }
 
-template <typename CharT, typename ParserT, typename StringBuilderT>
-void JSONTokenizer<CharT, ParserT, StringBuilderT>::getTextPosition(
-    uint32_t* column, uint32_t* line) {
-  CharPtr ptr = begin;
-  uint32_t col = 1;
-  uint32_t row = 1;
-  for (; ptr < current; ptr++) {
-    if (*ptr == '\n' || *ptr == '\r') {
-      ++row;
-      col = 1;
-      // \r\n is treated as a single newline.
-      if (ptr + 1 < current && *ptr == '\r' && *(ptr + 1) == '\n') {
-        ++ptr;
-      }
-    } else {
-      ++col;
-    }
-  }
-  *column = col;
-  *line = row;
-}
+// JSONFullParseHandlerAnyChar uses an AutoSelectGCHeap to switch to allocating
+// in the tenured heap if we trigger more than one nursery collection.
+//
+// JSON parsing allocates from the leaves of the tree upwards (unlike
+// structured clone deserialization which works from the root
+// downwards). Because of this it doesn't necessarily make sense to stop
+// nursery allocation after the first collection as this doesn't doom the
+// whole data structure to being tenured. We don't know ahead of time how
+// big the resulting data structure will be but after two nursery
+// collections then at least half of it will end up tenured.
+
+JSONFullParseHandlerAnyChar::JSONFullParseHandlerAnyChar(JSContext* cx)
+    : cx(cx), gcHeap(cx, 1), freeElements(cx), freeProperties(cx) {}
+
+JSONFullParseHandlerAnyChar::JSONFullParseHandlerAnyChar(
+    JSONFullParseHandlerAnyChar&& other) noexcept
+    : cx(other.cx),
+      v(other.v),
+      parseType(other.parseType),
+      gcHeap(cx, 1),
+      freeElements(std::move(other.freeElements)),
+      freeProperties(std::move(other.freeProperties)) {}
 
 JSONFullParseHandlerAnyChar::~JSONFullParseHandlerAnyChar() {
   for (size_t i = 0; i < freeElements.length(); i++) {
@@ -591,63 +631,6 @@ JSONFullParseHandlerAnyChar::~JSONFullParseHandlerAnyChar() {
   for (size_t i = 0; i < freeProperties.length(); i++) {
     js_delete(freeProperties[i]);
   }
-}
-
-void JSONFullParseHandlerAnyChar::trace(JSTracer* trc) {
-  JS::TraceRoot(trc, &v, "JSONFullParseHandlerAnyChar current value");
-}
-
-inline void JSONFullParseHandlerAnyChar::freeStackEntry(StackEntry& entry) {
-  if (entry.state == JSONParserState::FinishArrayElement) {
-    js_delete(&entry.elements());
-  } else {
-    js_delete(&entry.properties());
-  }
-}
-
-template <typename CharT>
-void JSONParser<CharT>::trace(JSTracer* trc) {
-  this->handler.trace(trc);
-
-  for (auto& elem : this->stack) {
-    if (elem.state == JSONParserState::FinishArrayElement) {
-      elem.elements().trace(trc);
-    } else {
-      elem.properties().trace(trc);
-    }
-  }
-}
-
-inline void JSONFullParseHandlerAnyChar::setNumberValue(double d) {
-  v = JS::NumberValue(d);
-}
-
-template <typename CharT>
-template <JSONStringType ST>
-inline bool JSONFullParseHandler<CharT>::setStringValue(CharPtr start,
-                                                        size_t length) {
-  JSLinearString* str = (ST == JSONStringType::PropertyName)
-                            ? AtomizeChars(cx, start.get(), length)
-                            : NewStringCopyN<CanGC>(cx, start.get(), length);
-  if (!str) {
-    return false;
-  }
-  v = JS::StringValue(str);
-  return true;
-}
-
-template <typename CharT>
-template <JSONStringType ST>
-inline bool JSONFullParseHandler<CharT>::setStringValue(
-    StringBuilder& builder) {
-  JSLinearString* str = (ST == JSONStringType::PropertyName)
-                            ? builder.buffer.finishAtom()
-                            : builder.buffer.finishString();
-  if (!str) {
-    return false;
-  }
-  v = JS::StringValue(str);
-  return true;
 }
 
 inline bool JSONFullParseHandlerAnyChar::objectOpen(
@@ -661,7 +644,7 @@ inline bool JSONFullParseHandlerAnyChar::objectOpen(
       return false;
     }
   }
-  if (!stack.append(*properties)) {
+  if (!stack.append(StackEntry(cx, *properties))) {
     js_delete(*properties);
     return false;
   }
@@ -680,7 +663,7 @@ inline bool JSONFullParseHandlerAnyChar::objectPropertyName(
     // supports the former semantics, so if this parse attempt is for
     // |eval|, return true (without reporting an error) to indicate the
     // JSON parse attempt was unsuccessful.
-    if (id == NameToId(cx->names().proto)) {
+    if (id == NameToId(cx->names().proto_)) {
       *isProtoInEval = true;
       return true;
     }
@@ -693,26 +676,32 @@ inline bool JSONFullParseHandlerAnyChar::objectPropertyName(
   return true;
 }
 
-inline void JSONFullParseHandlerAnyChar::finishObjectMember(
+inline bool JSONFullParseHandlerAnyChar::finishObjectMember(
     Vector<StackEntry, 10>& stack, JS::Handle<JS::Value> value,
     PropertyVector** properties) {
   *properties = &stack.back().properties();
   (*properties)->back().value = value;
+  return true;
 }
 
 inline bool JSONFullParseHandlerAnyChar::finishObject(
     Vector<StackEntry, 10>& stack, JS::MutableHandle<JS::Value> vp,
-    PropertyVector& properties) {
-  MOZ_ASSERT(&properties == &stack.back().properties());
+    PropertyVector* properties) {
+  MOZ_ASSERT(properties == &stack.back().properties());
 
-  JSObject* obj = NewPlainObjectWithMaybeDuplicateKeys(cx, properties.begin(),
-                                                       properties.length());
+  NewObjectKind newKind = GenericObject;
+  if (gcHeap == gc::Heap::Tenured) {
+    newKind = TenuredObject;
+  }
+  // properties is traced in the parser; see JSONParser<CharT>::trace()
+  JSObject* obj = NewPlainObjectWithMaybeDuplicateKeys(
+      cx, Handle<IdValueVector>::fromMarkedLocation(properties), newKind);
   if (!obj) {
     return false;
   }
 
   vp.setObject(*obj);
-  if (!freeProperties.append(&properties)) {
+  if (!freeProperties.append(properties)) {
     return false;
   }
   stack.popBack();
@@ -730,7 +719,7 @@ inline bool JSONFullParseHandlerAnyChar::arrayOpen(
       return false;
     }
   }
-  if (!stack.append(*elements)) {
+  if (!stack.append(StackEntry(cx, *elements))) {
     js_delete(*elements);
     return false;
   }
@@ -747,52 +736,37 @@ inline bool JSONFullParseHandlerAnyChar::arrayElement(
 
 inline bool JSONFullParseHandlerAnyChar::finishArray(
     Vector<StackEntry, 10>& stack, JS::MutableHandle<JS::Value> vp,
-    ElementVector& elements) {
-  MOZ_ASSERT(&elements == &stack.back().elements());
+    ElementVector* elements) {
+  MOZ_ASSERT(elements == &stack.back().elements());
 
+  NewObjectKind newKind = GenericObject;
+  if (gcHeap == gc::Heap::Tenured) {
+    newKind = TenuredObject;
+  }
   ArrayObject* obj =
-      NewDenseCopiedArray(cx, elements.length(), elements.begin());
+      NewDenseCopiedArray(cx, elements->length(), elements->begin(), newKind);
   if (!obj) {
     return false;
   }
 
   vp.setObject(*obj);
-  if (!freeElements.append(&elements)) {
+  if (!freeElements.append(elements)) {
     return false;
   }
   stack.popBack();
   return true;
 }
 
-template <typename CharT>
-void JSONFullParseHandler<CharT>::reportError(const char* msg,
-                                              const char* lineString,
-                                              const char* columnString) {
-  JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_JSON_BAD_PARSE,
-                            msg, lineString, columnString);
-}
-
-template <typename CharT, typename HandlerT>
-void JSONPerHandlerParser<CharT, HandlerT>::outOfMemory() {
-  ReportOutOfMemory(handler.context());
-}
-
-template <typename CharT, typename HandlerT>
-void JSONPerHandlerParser<CharT, HandlerT>::error(const char* msg) {
-  if (handler.ignoreError()) {
-    return;
+inline void JSONFullParseHandlerAnyChar::freeStackEntry(StackEntry& entry) {
+  if (entry.state == JSONParserState::FinishArrayElement) {
+    js_delete(&entry.elements());
+  } else {
+    js_delete(&entry.properties());
   }
+}
 
-  uint32_t column = 1, line = 1;
-  tokenizer.getTextPosition(&column, &line);
-
-  const size_t MaxWidth = sizeof("4294967295");
-  char columnNumber[MaxWidth];
-  SprintfLiteral(columnNumber, "%" PRIu32, column);
-  char lineNumber[MaxWidth];
-  SprintfLiteral(lineNumber, "%" PRIu32, line);
-
-  handler.reportError(msg, lineNumber, columnNumber);
+void JSONFullParseHandlerAnyChar::trace(JSTracer* trc) {
+  JS::TraceRoot(trc, &v, "JSONFullParseHandlerAnyChar current value");
 }
 
 template <typename CharT>
@@ -806,17 +780,80 @@ bool JSONFullParseHandler<CharT>::StringBuilder::append(const CharT* begin,
   return buffer.append(begin, end);
 }
 
+template <typename CharT>
+template <JSONStringType ST>
+inline bool JSONFullParseHandler<CharT>::setStringValue(
+    CharPtr start, size_t length, mozilla::Span<const CharT>&& source) {
+  JSString* str;
+  if constexpr (ST == JSONStringType::PropertyName) {
+    str = AtomizeChars(cx, start.get(), length);
+  } else {
+    str = NewStringCopyN<CanGC>(cx, start.get(), length, gcHeap);
+  }
+
+  if (!str) {
+    return false;
+  }
+  v = JS::StringValue(str);
+  return true;
+}
+
+template <typename CharT>
+template <JSONStringType ST>
+inline bool JSONFullParseHandler<CharT>::setStringValue(
+    StringBuilder& builder, mozilla::Span<const CharT>&& source) {
+  JSString* str;
+  if constexpr (ST == JSONStringType::PropertyName) {
+    str = builder.buffer.finishAtom();
+  } else {
+    str = builder.buffer.finishString(gcHeap);
+  }
+
+  if (!str) {
+    return false;
+  }
+  v = JS::StringValue(str);
+  return true;
+}
+
+template <typename CharT>
+inline bool JSONFullParseHandler<CharT>::setNumberValue(
+    double d, mozilla::Span<const CharT>&& source) {
+  v = JS::NumberValue(d);
+  return true;
+}
+
+template <typename CharT>
+inline bool JSONFullParseHandler<CharT>::setBooleanValue(
+    bool value, mozilla::Span<const CharT>&& source) {
+  return true;
+}
+
+template <typename CharT>
+inline bool JSONFullParseHandler<CharT>::setNullValue(
+    mozilla::Span<const CharT>&& source) {
+  return true;
+}
+
+template <typename CharT>
+void JSONFullParseHandler<CharT>::reportError(const char* msg, uint32_t line,
+                                              uint32_t column) {
+  const size_t MaxWidth = sizeof("4294967295");
+  char columnString[MaxWidth];
+  SprintfLiteral(columnString, "%" PRIu32, column);
+  char lineString[MaxWidth];
+  SprintfLiteral(lineString, "%" PRIu32, line);
+
+  JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_JSON_BAD_PARSE,
+                            msg, lineString, columnString);
+}
+
 template <typename CharT, typename HandlerT>
 JSONPerHandlerParser<CharT, HandlerT>::~JSONPerHandlerParser() {
   for (size_t i = 0; i < stack.length(); i++) {
     handler.freeStackEntry(stack[i]);
   }
 }
-
-template class js::JSONPerHandlerParser<Latin1Char,
-                                        js::JSONFullParseHandler<Latin1Char>>;
-template class js::JSONPerHandlerParser<char16_t,
-                                        js::JSONFullParseHandler<char16_t>>;
 
 template <typename CharT, typename HandlerT>
 template <typename TempValueT, typename ResultSetter>
@@ -830,11 +867,13 @@ bool JSONPerHandlerParser<CharT, HandlerT>::parseImpl(TempValueT& value,
     switch (state) {
       case JSONParserState::FinishObjectMember: {
         typename HandlerT::PropertyVector* properties;
-        handler.finishObjectMember(stack, value, &properties);
+        if (!handler.finishObjectMember(stack, value, &properties)) {
+          return false;
+        }
 
         token = tokenizer.advanceAfterProperty();
         if (token == JSONToken::ObjectClose) {
-          if (!handler.finishObject(stack, &value, *properties)) {
+          if (!handler.finishObject(stack, &value, properties)) {
             return false;
           }
           break;
@@ -889,7 +928,7 @@ bool JSONPerHandlerParser<CharT, HandlerT>::parseImpl(TempValueT& value,
           goto JSONValue;
         }
         if (token == JSONToken::ArrayClose) {
-          if (!handler.finishArray(stack, &value, *elements)) {
+          if (!handler.finishArray(stack, &value, elements)) {
             return false;
           }
           break;
@@ -927,7 +966,7 @@ bool JSONPerHandlerParser<CharT, HandlerT>::parseImpl(TempValueT& value,
 
             token = tokenizer.advance();
             if (token == JSONToken::ArrayClose) {
-              if (!handler.finishArray(stack, &value, *elements)) {
+              if (!handler.finishArray(stack, &value, elements)) {
                 return false;
               }
               break;
@@ -943,7 +982,7 @@ bool JSONPerHandlerParser<CharT, HandlerT>::parseImpl(TempValueT& value,
 
             token = tokenizer.advanceAfterObjectOpen();
             if (token == JSONToken::ObjectClose) {
-              if (!handler.finishObject(stack, &value, *properties)) {
+              if (!handler.finishObject(stack, &value, properties)) {
                 return false;
               }
               break;
@@ -988,6 +1027,40 @@ bool JSONPerHandlerParser<CharT, HandlerT>::parseImpl(TempValueT& value,
   return true;
 }
 
+template <typename CharT, typename HandlerT>
+void JSONPerHandlerParser<CharT, HandlerT>::outOfMemory() {
+  ReportOutOfMemory(handler.context());
+}
+
+template <typename CharT, typename HandlerT>
+void JSONPerHandlerParser<CharT, HandlerT>::error(const char* msg) {
+  if (handler.ignoreError()) {
+    return;
+  }
+
+  uint32_t column = 1, line = 1;
+  tokenizer.getTextPosition(&column, &line);
+
+  handler.reportError(msg, line, column);
+}
+
+template class js::JSONPerHandlerParser<Latin1Char,
+                                        js::JSONFullParseHandler<Latin1Char>>;
+template class js::JSONPerHandlerParser<char16_t,
+                                        js::JSONFullParseHandler<char16_t>>;
+
+#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
+template class js::JSONPerHandlerParser<Latin1Char,
+                                        js::JSONReviveHandler<Latin1Char>>;
+template class js::JSONPerHandlerParser<char16_t,
+                                        js::JSONReviveHandler<char16_t>>;
+#endif
+
+template class js::JSONPerHandlerParser<Latin1Char,
+                                        js::JSONSyntaxParseHandler<Latin1Char>>;
+template class js::JSONPerHandlerParser<char16_t,
+                                        js::JSONSyntaxParseHandler<char16_t>>;
+
 template <typename CharT>
 bool JSONParser<CharT>::parse(JS::MutableHandle<JS::Value> vp) {
   JS::Rooted<JS::Value> tempValue(this->handler.cx);
@@ -998,8 +1071,163 @@ bool JSONParser<CharT>::parse(JS::MutableHandle<JS::Value> vp) {
                          [&](JS::Handle<JS::Value> value) { vp.set(value); });
 }
 
+template <typename CharT>
+void JSONParser<CharT>::trace(JSTracer* trc) {
+  this->handler.trace(trc);
+
+  for (auto& elem : this->stack) {
+    if (elem.state == JSONParserState::FinishArrayElement) {
+      elem.elements().trace(trc);
+    } else {
+      elem.properties().trace(trc);
+    }
+  }
+}
+
 template class js::JSONParser<Latin1Char>;
 template class js::JSONParser<char16_t>;
+
+#ifdef ENABLE_JSON_PARSE_WITH_SOURCE
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::objectOpen(Vector<StackEntry, 10>& stack,
+                                                 PropertyVector** properties) {
+  if (!parseRecordStack.append(ParseRecordEntry{context()})) {
+    return false;
+  }
+
+  return Base::objectOpen(stack, properties);
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishObjectMember(
+    Vector<StackEntry, 10>& stack, JS::Handle<JS::Value> value,
+    PropertyVector** properties) {
+  if (!Base::finishObjectMember(stack, value, properties)) {
+    return false;
+  }
+  parseRecord.value = value;
+  return finishMemberParseRecord((*properties)->back().id,
+                                 parseRecordStack.back());
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishObject(
+    Vector<StackEntry, 10>& stack, JS::MutableHandle<JS::Value> vp,
+    PropertyVector* properties) {
+  if (!Base::finishObject(stack, vp, properties)) {
+    return false;
+  }
+  if (!finishCompoundParseRecord(vp, parseRecordStack.back())) {
+    return false;
+  }
+  parseRecordStack.popBack();
+
+  return true;
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::arrayOpen(Vector<StackEntry, 10>& stack,
+                                                ElementVector** elements) {
+  if (!parseRecordStack.append(ParseRecordEntry{context()})) {
+    return false;
+  }
+
+  return Base::arrayOpen(stack, elements);
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::arrayElement(
+    Vector<StackEntry, 10>& stack, JS::Handle<JS::Value> value,
+    ElementVector** elements) {
+  if (!Base::arrayElement(stack, value, elements)) {
+    return false;
+  }
+  size_t index = (*elements)->length() - 1;
+  JS::PropertyKey key = js::PropertyKey::Int(index);
+  return finishMemberParseRecord(key, parseRecordStack.back());
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishArray(
+    Vector<StackEntry, 10>& stack, JS::MutableHandle<JS::Value> vp,
+    ElementVector* elements) {
+  if (!Base::finishArray(stack, vp, elements)) {
+    return false;
+  }
+  if (!finishCompoundParseRecord(vp, parseRecordStack.back())) {
+    return false;
+  }
+  parseRecordStack.popBack();
+
+  return true;
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishMemberParseRecord(
+    JS::PropertyKey& key, ParseRecordEntry& objectEntry) {
+  parseRecord.key = key;
+  return objectEntry.put(key, std::move(parseRecord));
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishCompoundParseRecord(
+    const Value& value, ParseRecordEntry& objectEntry) {
+  Rooted<JSONParseNode*> parseNode(context());
+  parseRecord = ParseRecordObject(parseNode, value);
+  return parseRecord.addEntries(context(), std::move(objectEntry));
+}
+
+template <typename CharT>
+inline bool JSONReviveHandler<CharT>::finishPrimitiveParseRecord(
+    const Value& value, SourceT source) {
+  MOZ_ASSERT(!source.IsEmpty());  // Empty source is for objects and arrays
+  Rooted<JSONParseNode*> parseNode(
+      context(), NewStringCopy<CanGC, CharT>(context(), source));
+  if (!parseNode) {
+    return false;
+  }
+  parseRecord = ParseRecordObject(parseNode, value);
+  return true;
+}
+
+template <typename CharT>
+void JSONReviveHandler<CharT>::trace(JSTracer* trc) {
+  Base::trace(trc);
+  parseRecord.trace(trc);
+  for (auto& entry : this->parseRecordStack) {
+    entry.trace(trc);
+  }
+}
+
+template <typename CharT>
+bool JSONReviveParser<CharT>::parse(JS::MutableHandle<JS::Value> vp,
+                                    JS::MutableHandle<ParseRecordObject> pro) {
+  JS::Rooted<JS::Value> tempValue(this->handler.cx);
+
+  vp.setUndefined();
+
+  bool result = this->parseImpl(
+      tempValue, [&](JS::Handle<JS::Value> value) { vp.set(value); });
+  pro.set(std::move(this->handler.parseRecord));
+  return result;
+}
+
+template <typename CharT>
+void JSONReviveParser<CharT>::trace(JSTracer* trc) {
+  this->handler.trace(trc);
+
+  for (auto& elem : this->stack) {
+    if (elem.state == JSONParserState::FinishArrayElement) {
+      elem.elements().trace(trc);
+    } else {
+      elem.properties().trace(trc);
+    }
+  }
+}
+
+template class js::JSONReviveParser<Latin1Char>;
+template class js::JSONReviveParser<char16_t>;
+#endif  // ENABLE_JSON_PARSE_WITH_SOURCE
 
 template <typename CharT>
 inline bool JSONSyntaxParseHandler<CharT>::objectOpen(
@@ -1013,7 +1241,7 @@ inline bool JSONSyntaxParseHandler<CharT>::objectOpen(
 
 template <typename CharT>
 inline bool JSONSyntaxParseHandler<CharT>::finishObject(
-    Vector<StackEntry, 10>& stack, DummyValue* vp, PropertyVector& properties) {
+    Vector<StackEntry, 10>& stack, DummyValue* vp, PropertyVector* properties) {
   stack.popBack();
   return true;
 }
@@ -1030,7 +1258,7 @@ inline bool JSONSyntaxParseHandler<CharT>::arrayOpen(
 
 template <typename CharT>
 inline bool JSONSyntaxParseHandler<CharT>::finishArray(
-    Vector<StackEntry, 10>& stack, DummyValue* vp, ElementVector& elements) {
+    Vector<StackEntry, 10>& stack, DummyValue* vp, ElementVector* elements) {
   stack.popBack();
   return true;
 }
@@ -1040,21 +1268,26 @@ static void ReportJSONSyntaxError(FrontendContext* fc, ErrorMetadata&& metadata,
   va_list args;
   va_start(args, errorNumber);
 
-  js::ReportCompileErrorLatin1(fc, std::move(metadata), nullptr, errorNumber,
-                               &args);
+  js::ReportCompileErrorLatin1VA(fc, std::move(metadata), nullptr, errorNumber,
+                                 &args);
 
   va_end(args);
 }
 
 template <typename CharT>
-void JSONSyntaxParseHandler<CharT>::reportError(const char* msg,
-                                                const char* lineString,
-                                                const char* columnString) {
+void JSONSyntaxParseHandler<CharT>::reportError(const char* msg, uint32_t line,
+                                                uint32_t column) {
+  const size_t MaxWidth = sizeof("4294967295");
+  char columnString[MaxWidth];
+  SprintfLiteral(columnString, "%" PRIu32, column);
+  char lineString[MaxWidth];
+  SprintfLiteral(lineString, "%" PRIu32, line);
+
   ErrorMetadata metadata;
   metadata.isMuted = false;
-  metadata.filename = "";
+  metadata.filename = JS::ConstUTF8CharsZ("");
   metadata.lineNumber = 0;
-  metadata.columnNumber = 0;
+  metadata.columnNumber = JS::ColumnNumberOneOrigin();
 
   ReportJSONSyntaxError(fc, std::move(metadata), JSMSG_JSON_BAD_PARSE, msg,
                         lineString, columnString);
@@ -1074,11 +1307,6 @@ bool JSONSyntaxParser<CharT>::parse() {
 
   return true;
 }
-
-template class js::JSONPerHandlerParser<Latin1Char,
-                                        js::JSONSyntaxParseHandler<Latin1Char>>;
-template class js::JSONPerHandlerParser<char16_t,
-                                        js::JSONSyntaxParseHandler<char16_t>>;
 
 template class js::JSONSyntaxParser<Latin1Char>;
 template class js::JSONSyntaxParser<char16_t>;
@@ -1104,4 +1332,268 @@ JS_PUBLIC_API bool JS::IsValidJSON(const JS::Latin1Char* chars, uint32_t len) {
 
 JS_PUBLIC_API bool JS::IsValidJSON(const char16_t* chars, uint32_t len) {
   return IsValidJSONImpl(chars, len);
+}
+
+template <typename CharT>
+class MOZ_STACK_CLASS DelegateHandler {
+ private:
+  using CharPtr = mozilla::RangedPtr<const CharT>;
+
+ public:
+  using ContextT = FrontendContext;
+
+  class DummyValue {};
+
+  struct ElementVector {};
+  struct PropertyVector {};
+
+  class StringBuilder {
+   public:
+    StringBuffer buffer;
+
+    explicit StringBuilder(FrontendContext* fc) : buffer(fc) {}
+
+    bool append(char16_t c) { return buffer.append(c); }
+    bool append(const CharT* begin, const CharT* end) {
+      return buffer.append(begin, end);
+    }
+  };
+
+  struct StackEntry {
+    JSONParserState state;
+  };
+
+ public:
+  FrontendContext* fc;
+
+  explicit DelegateHandler(FrontendContext* fc) : fc(fc) {}
+
+  DelegateHandler(DelegateHandler&& other) noexcept
+      : fc(other.fc), handler_(other.handler_) {}
+
+  DelegateHandler(const DelegateHandler& other) = delete;
+  void operator=(const DelegateHandler& other) = delete;
+
+  FrontendContext* context() { return fc; }
+
+  template <JSONStringType ST>
+  inline bool setStringValue(CharPtr start, size_t length,
+                             mozilla::Span<const CharT>&& source) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    if constexpr (ST == JSONStringType::PropertyName) {
+      return handler_->propertyName(start.get(), length);
+    }
+
+    return handler_->stringValue(start.get(), length);
+  }
+
+  template <JSONStringType ST>
+  inline bool setStringValue(StringBuilder& builder,
+                             mozilla::Span<const CharT>&& source) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    if constexpr (ST == JSONStringType::PropertyName) {
+      if (builder.buffer.isUnderlyingBufferLatin1()) {
+        return handler_->propertyName(builder.buffer.rawLatin1Begin(),
+                                      builder.buffer.length());
+      }
+
+      return handler_->propertyName(builder.buffer.rawTwoByteBegin(),
+                                    builder.buffer.length());
+    }
+
+    if (builder.buffer.isUnderlyingBufferLatin1()) {
+      return handler_->stringValue(builder.buffer.rawLatin1Begin(),
+                                   builder.buffer.length());
+    }
+
+    return handler_->stringValue(builder.buffer.rawTwoByteBegin(),
+                                 builder.buffer.length());
+  }
+
+  inline bool setNumberValue(double d, mozilla::Span<const CharT>&& source) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    if (!handler_->numberValue(d)) {
+      hadHandlerError_ = true;
+    }
+    return !hadHandlerError_;
+  }
+
+  inline bool setBooleanValue(bool value, mozilla::Span<const CharT>&& source) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    if (!handler_->booleanValue(value)) {
+      hadHandlerError_ = true;
+    }
+    return !hadHandlerError_;
+  }
+  inline bool setNullValue(mozilla::Span<const CharT>&& source) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    if (!handler_->nullValue()) {
+      hadHandlerError_ = true;
+    }
+    return !hadHandlerError_;
+  }
+
+  inline DummyValue numberValue() const { return DummyValue(); }
+
+  inline DummyValue stringValue() const { return DummyValue(); }
+
+  inline DummyValue booleanValue(bool value) { return DummyValue(); }
+
+  inline DummyValue nullValue() { return DummyValue(); }
+
+  inline bool objectOpen(Vector<StackEntry, 10>& stack,
+                         PropertyVector** properties) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    StackEntry entry{JSONParserState::FinishObjectMember};
+    if (!stack.append(entry)) {
+      return false;
+    }
+
+    return handler_->startObject();
+  }
+  inline bool objectPropertyName(Vector<StackEntry, 10>& stack,
+                                 bool* isProtoInEval) {
+    *isProtoInEval = false;
+    return true;
+  }
+  inline bool finishObjectMember(Vector<StackEntry, 10>& stack,
+                                 DummyValue& value,
+                                 PropertyVector** properties) {
+    return true;
+  }
+  inline bool finishObject(Vector<StackEntry, 10>& stack, DummyValue* vp,
+                           PropertyVector* properties) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    stack.popBack();
+
+    return handler_->endObject();
+  }
+
+  inline bool arrayOpen(Vector<StackEntry, 10>& stack,
+                        ElementVector** elements) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    StackEntry entry{JSONParserState::FinishArrayElement};
+    if (!stack.append(entry)) {
+      return false;
+    }
+
+    return handler_->startArray();
+  }
+  inline bool arrayElement(Vector<StackEntry, 10>& stack, DummyValue& value,
+                           ElementVector** elements) {
+    return true;
+  }
+  inline bool finishArray(Vector<StackEntry, 10>& stack, DummyValue* vp,
+                          ElementVector* elements) {
+    if (hadHandlerError_) {
+      return false;
+    }
+
+    stack.popBack();
+
+    return handler_->endArray();
+  }
+
+  inline bool errorReturn() const { return false; }
+
+  inline bool ignoreError() const { return false; }
+
+  inline void freeStackEntry(StackEntry& entry) {}
+
+  void reportError(const char* msg, uint32_t line, uint32_t column) {
+    handler_->error(msg, line, column);
+  }
+
+  void setDelegateHandler(JS::JSONParseHandler* handler) { handler_ = handler; }
+
+ private:
+  JS::JSONParseHandler* handler_ = nullptr;
+  bool hadHandlerError_ = false;
+};
+
+template class DelegateHandler<Latin1Char>;
+template class DelegateHandler<char16_t>;
+
+template <typename CharT>
+class MOZ_STACK_CLASS DelegateParser
+    : JSONPerHandlerParser<CharT, DelegateHandler<CharT>> {
+  using HandlerT = DelegateHandler<CharT>;
+  using Base = JSONPerHandlerParser<CharT, HandlerT>;
+
+ public:
+  DelegateParser(FrontendContext* fc, mozilla::Range<const CharT> data,
+                 JS::JSONParseHandler* handler)
+      : Base(fc, data) {
+    this->handler.setDelegateHandler(handler);
+  }
+
+  DelegateParser(DelegateParser<CharT>&& other) noexcept
+      : Base(std::move(other)) {}
+
+  DelegateParser(const DelegateParser& other) = delete;
+  void operator=(const DelegateParser& other) = delete;
+
+  bool parse() {
+    typename HandlerT::DummyValue unused;
+
+    if (!this->parseImpl(unused,
+                         [&](const typename HandlerT::DummyValue& unused) {})) {
+      return false;
+    }
+
+    return true;
+  }
+};
+
+template class DelegateParser<Latin1Char>;
+template class DelegateParser<char16_t>;
+
+template <typename CharT>
+static bool ParseJSONWithHandlerImpl(const CharT* chars, uint32_t len,
+                                     JS::JSONParseHandler* handler) {
+  FrontendContext fc;
+  // NOTE: We don't set stack quota here because JSON parser doesn't use it.
+
+  DelegateParser<CharT> parser(&fc, mozilla::Range(chars, len), handler);
+  if (!parser.parse()) {
+    return false;
+  }
+  MOZ_ASSERT(!fc.hadErrors());
+
+  return true;
+}
+
+JS_PUBLIC_API bool JS::ParseJSONWithHandler(const JS::Latin1Char* chars,
+                                            uint32_t len,
+                                            JS::JSONParseHandler* handler) {
+  return ParseJSONWithHandlerImpl(chars, len, handler);
+}
+
+JS_PUBLIC_API bool JS::ParseJSONWithHandler(const char16_t* chars, uint32_t len,
+                                            JS::JSONParseHandler* handler) {
+  return ParseJSONWithHandlerImpl(chars, len, handler);
 }

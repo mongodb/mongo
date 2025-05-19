@@ -423,7 +423,7 @@ class LStackArea : public LAllocation {
     inline bool done() const;
     inline void next();
     inline LAllocation alloc() const;
-    inline bool isGcPointer() const;
+    inline bool isWasmAnyRef() const;
 
     explicit operator bool() const { return !done(); }
   };
@@ -501,10 +501,12 @@ class LDefinition {
     GENERAL,  // Generic, integer or pointer-width data (GPR).
     INT32,    // int32 data (GPR).
     OBJECT,   // Pointer that may be collected as garbage (GPR).
-    SLOTS,    // Slots/elements pointer that may be moved by minor GCs (GPR).
-    FLOAT32,  // 32-bit floating-point value (FPU).
-    DOUBLE,   // 64-bit floating-point value (FPU).
-    SIMD128,  // 128-bit SIMD vector (FPU).
+    SLOTS,  // Slots/elements/wasm array data pointer that may be moved by minor
+            // GCs (GPR).
+    WASM_ANYREF,   // Tagged pointer that may be collected as garbage (GPR).
+    FLOAT32,       // 32-bit floating-point value (FPU).
+    DOUBLE,        // 64-bit floating-point value (FPU).
+    SIMD128,       // 128-bit SIMD vector (FPU).
     STACKRESULTS,  // A variable-size stack allocation that may contain objects.
 #ifdef JS_NUNBOX32
     // A type virtual register must be followed by a payload virtual
@@ -632,7 +634,6 @@ class LDefinition {
       case MIRType::Symbol:
       case MIRType::BigInt:
       case MIRType::Object:
-      case MIRType::RefOrNull:
         return LDefinition::OBJECT;
       case MIRType::Double:
         return LDefinition::DOUBLE;
@@ -644,7 +645,10 @@ class LDefinition {
 #endif
       case MIRType::Slots:
       case MIRType::Elements:
+      case MIRType::WasmArrayData:
         return LDefinition::SLOTS;
+      case MIRType::WasmAnyRef:
+        return LDefinition::WASM_ANYREF;
       case MIRType::Pointer:
       case MIRType::IntPtr:
         return LDefinition::GENERAL;
@@ -1235,6 +1239,9 @@ class LRecoverInfo : public TempObject {
   // Cached offset where this resume point is encoded.
   RecoverOffset recoverOffset_;
 
+  // Whether this LRecoverInfo has any side-effect associated with it.
+  bool hasSideEffects_ = false;
+
   explicit LRecoverInfo(TempAllocator& alloc);
   [[nodiscard]] bool init(MResumePoint* mir);
 
@@ -1259,6 +1266,7 @@ class LRecoverInfo : public TempObject {
   MNode** begin() { return instructions_.begin(); }
   MNode** end() { return instructions_.end(); }
   size_t numInstructions() const { return instructions_.length(); }
+  bool hasSideEffects() { return hasSideEffects_; }
 
   class OperandIter {
    private:
@@ -1404,6 +1412,20 @@ struct SafepointNunboxEntry {
       : typeVreg(typeVreg), type(type), payload(payload) {}
 };
 
+enum class WasmSafepointKind : uint8_t {
+  // For wasm call instructions (isCall() == true) where registers are spilled
+  // by register allocation.
+  LirCall,
+  // For wasm instructions (isCall() == false) which will spill/restore live
+  // registers manually in codegen.
+  CodegenCall,
+  // For resumable wasm traps where registers will be spilled by the trap
+  // handler.
+  Trap,
+  // For stack switch call.
+  StackSwitch,
+};
+
 class LSafepoint : public TempObject {
   using SlotEntry = SafepointSlotEntry;
   using NunboxEntry = SafepointNunboxEntry;
@@ -1464,23 +1486,27 @@ class LSafepoint : public TempObject {
   // List of slots which have slots/elements pointers.
   SlotList slotsOrElementsSlots_;
 
+  // The subset of liveRegs which contains wasm::AnyRef's.
+  LiveGeneralRegisterSet wasmAnyRefRegs_;
+  // List of slots which have wasm::AnyRef's.
+  SlotList wasmAnyRefSlots_;
+
   // Wasm only: with what kind of instruction is this LSafepoint associated?
-  // true => wasm trap, false => wasm call.
-  bool isWasmTrap_;
+  WasmSafepointKind wasmSafepointKind_;
 
   // Wasm only: what is the value of masm.framePushed() that corresponds to
   // the lowest-addressed word covered by the StackMap that we will generate
   // from this LSafepoint?  This depends on the instruction:
   //
-  // if isWasmTrap_ == true:
-  //    masm.framePushed() unmodified.  Note that when constructing the
-  //    StackMap we will add entries below this point to take account of
-  //    registers dumped on the stack as a result of the trap.
-  //
-  // if isWasmTrap_ == false:
+  // WasmSafepointKind::LirCall:
   //    masm.framePushed() - StackArgAreaSizeUnaligned(arg types for the call),
   //    because the map does not include the outgoing args themselves, but
   //    it does cover any and all alignment space above them.
+  //
+  // WasmSafepointKind::CodegenCall and WasmSafepointKind::Trap:
+  //    masm.framePushed() unmodified. Note that when constructing the
+  //    StackMap we will add entries below this point to take account of
+  //    registers dumped on the stack.
   uint32_t framePushedAtStackMapBase_;
 
  public:
@@ -1490,6 +1516,7 @@ class LSafepoint : public TempObject {
     MOZ_ASSERT((valueRegs().bits() & ~liveRegs().gprs().bits()) == 0);
 #endif
     MOZ_ASSERT((gcRegs().bits() & ~liveRegs().gprs().bits()) == 0);
+    MOZ_ASSERT((wasmAnyRefRegs().bits() & ~liveRegs().gprs().bits()) == 0);
   }
 
   explicit LSafepoint(TempAllocator& alloc)
@@ -1502,7 +1529,8 @@ class LSafepoint : public TempObject {
         valueSlots_(alloc),
 #endif
         slotsOrElementsSlots_(alloc),
-        isWasmTrap_(false),
+        wasmAnyRefSlots_(alloc),
+        wasmSafepointKind_(WasmSafepointKind::LirCall),
         framePushedAtStackMapBase_(0) {
     assertInvariants();
   }
@@ -1595,12 +1623,51 @@ class LSafepoint : public TempObject {
     return false;
   }
 
+  void addWasmAnyRefReg(Register reg) {
+    wasmAnyRefRegs_.addUnchecked(reg);
+    assertInvariants();
+  }
+  LiveGeneralRegisterSet wasmAnyRefRegs() const { return wasmAnyRefRegs_; }
+
+  [[nodiscard]] bool addWasmAnyRefSlot(bool stack, uint32_t slot) {
+    bool result = wasmAnyRefSlots_.append(SlotEntry(stack, slot));
+    if (result) {
+      assertInvariants();
+    }
+    return result;
+  }
+  SlotList& wasmAnyRefSlots() { return wasmAnyRefSlots_; }
+
+  [[nodiscard]] bool addWasmAnyRef(LAllocation alloc) {
+    if (alloc.isMemory()) {
+      return addWasmAnyRefSlot(alloc.isStackSlot(), alloc.memorySlot());
+    }
+    if (alloc.isRegister()) {
+      addWasmAnyRefReg(alloc.toRegister().gpr());
+    }
+    assertInvariants();
+    return true;
+  }
+  bool hasWasmAnyRef(LAllocation alloc) const {
+    if (alloc.isRegister()) {
+      return wasmAnyRefRegs().has(alloc.toRegister().gpr());
+    }
+    MOZ_ASSERT(alloc.isMemory());
+    for (size_t i = 0; i < wasmAnyRefSlots_.length(); i++) {
+      if (wasmAnyRefSlots_[i].stack == alloc.isStackSlot() &&
+          wasmAnyRefSlots_[i].slot == alloc.memorySlot()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Return true if all GC-managed pointers from `alloc` are recorded in this
   // safepoint.
-  bool hasAllGcPointersFromStackArea(LAllocation alloc) const {
+  bool hasAllWasmAnyRefsFromStackArea(LAllocation alloc) const {
     for (LStackArea::ResultIterator iter = alloc.toStackArea()->results(); iter;
          iter.next()) {
-      if (iter.isGcPointer() && !hasGcPointer(iter.alloc())) {
+      if (iter.isWasmAnyRef() && !hasWasmAnyRef(iter.alloc())) {
         return false;
       }
     }
@@ -1753,9 +1820,12 @@ class LSafepoint : public TempObject {
     osiCallPointOffset_ = osiCallPointOffset;
   }
 
-  bool isWasmTrap() const { return isWasmTrap_; }
-  void setIsWasmTrap() { isWasmTrap_ = true; }
+  WasmSafepointKind wasmSafepointKind() const { return wasmSafepointKind_; }
+  void setWasmSafepointKind(WasmSafepointKind kind) {
+    wasmSafepointKind_ = kind;
+  }
 
+  // See comment on framePushedAtStackMapBase_.
   uint32_t framePushedAtStackMapBase() const {
     return framePushedAtStackMapBase_;
   }
@@ -1763,6 +1833,12 @@ class LSafepoint : public TempObject {
     MOZ_ASSERT(framePushedAtStackMapBase_ == 0);
     framePushedAtStackMapBase_ = n;
   }
+};
+
+struct WasmRefIsSubtypeDefs {
+  LAllocation superSTV;
+  LDefinition scratch1;
+  LDefinition scratch2;
 };
 
 class LInstruction::InputIterator {

@@ -36,6 +36,7 @@
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"
 #include "vm/Realm.h"
+#include "vm/RegExpShared.h"
 #include "vm/Shape.h"
 #include "vm/StringType.h"
 
@@ -128,8 +129,8 @@ class GlobalObjectData {
     HeapPtr<JSObject*> constructor;
     HeapPtr<JSObject*> prototype;
   };
-  using CtorArray =
-      mozilla::EnumeratedArray<JSProtoKey, JSProto_LIMIT, ConstructorWithProto>;
+  using CtorArray = mozilla::EnumeratedArray<JSProtoKey, ConstructorWithProto,
+                                             size_t(JSProto_LIMIT)>;
   CtorArray builtinConstructors;
 
   // Built-in prototypes for this global. Note that this is different from the
@@ -148,11 +149,13 @@ class GlobalObjectData {
     WrapForValidIteratorProto,
     IteratorHelperProto,
     AsyncIteratorHelperProto,
+    SegmentsProto,
+    SegmentIteratorProto,
 
     Limit
   };
-  using ProtoArray =
-      mozilla::EnumeratedArray<ProtoKind, ProtoKind::Limit, HeapPtr<JSObject*>>;
+  using ProtoArray = mozilla::EnumeratedArray<ProtoKind, HeapPtr<JSObject*>,
+                                              size_t(ProtoKind::Limit)>;
   ProtoArray builtinProtos;
 
   HeapPtr<GlobalScope*> emptyGlobalScope;
@@ -192,8 +195,9 @@ class GlobalObjectData {
 
   // Shape for PlainObject with %Object.prototype% as proto, for each object
   // AllocKind.
-  using PlainObjectShapeArray = mozilla::EnumeratedArray<
-      PlainObjectSlotsKind, PlainObjectSlotsKind::Limit, HeapPtr<SharedShape*>>;
+  using PlainObjectShapeArray =
+      mozilla::EnumeratedArray<PlainObjectSlotsKind, HeapPtr<SharedShape*>,
+                               size_t(PlainObjectSlotsKind::Limit)>;
   PlainObjectShapeArray plainObjectShapesWithDefaultProto;
 
   // Shape for JSFunction with %Function.prototype% as proto, for both
@@ -205,7 +209,7 @@ class GlobalObjectData {
   HeapPtr<SharedShape*> boundFunctionShapeWithDefaultProto;
 
   // Global state for regular expressions.
-  UniquePtr<RegExpStatics> regExpStatics;
+  RegExpRealm regExpRealm;
 
   HeapPtr<ArgumentsObject*> mappedArgumentsTemplate;
   HeapPtr<ArgumentsObject*> unmappedArgumentsTemplate;
@@ -238,6 +242,9 @@ class GlobalObjectData {
     static_assert(sizeof(lexicalEnvironment) == sizeof(uintptr_t),
                   "JIT code assumes field is pointer-sized");
     return offsetof(GlobalObjectData, lexicalEnvironment);
+  }
+  static constexpr size_t offsetOfRegExpRealm() {
+    return offsetof(GlobalObjectData, regExpRealm);
   }
 };
 
@@ -462,9 +469,9 @@ class GlobalObject : public NativeObject {
    * complete the minimal initialization to make the returned object safe to
    * touch.
    */
-  static NativeObject* createBlankPrototype(JSContext* cx,
-                                            Handle<GlobalObject*> global,
-                                            const JSClass* clasp);
+  static NativeObject* createBlankPrototype(
+      JSContext* cx, Handle<GlobalObject*> global, const JSClass* clasp,
+      ObjectFlags objFlags = ObjectFlags());
 
   /*
    * Identical to createBlankPrototype, but uses proto as the [[Prototype]]
@@ -481,8 +488,9 @@ class GlobalObject : public NativeObject {
   }
 
   template <typename T>
-  static T* createBlankPrototype(JSContext* cx, Handle<GlobalObject*> global) {
-    NativeObject* res = createBlankPrototype(cx, global, &T::class_);
+  static T* createBlankPrototype(JSContext* cx, Handle<GlobalObject*> global,
+                                 ObjectFlags objFlags = ObjectFlags()) {
+    NativeObject* res = createBlankPrototype(cx, global, &T::class_, objFlags);
     return res ? &res->template as<T>() : nullptr;
   }
 
@@ -597,6 +605,14 @@ class GlobalObject : public NativeObject {
     return &global->getPrototype(JSProto_RegExp);
   }
 
+  static JSObject* getOrCreateRegExpConstructor(JSContext* cx,
+                                                Handle<GlobalObject*> global) {
+    if (!ensureConstructor(cx, global, JSProto_RegExp)) {
+      return nullptr;
+    }
+    return &global->getConstructor(JSProto_RegExp);
+  }
+
   JSObject* maybeGetRegExpPrototype() {
     if (classIsInitialized(JSProto_RegExp)) {
       return &getPrototype(JSProto_RegExp);
@@ -634,6 +650,14 @@ class GlobalObject : public NativeObject {
       return nullptr;
     }
     return &global->getPrototype(JSProto_SharedArrayBuffer);
+  }
+
+  static JSObject* getOrCreateSharedArrayBufferConstructor(
+      JSContext* cx, Handle<GlobalObject*> global) {
+    if (!ensureConstructor(cx, global, JSProto_SharedArrayBuffer)) {
+      return nullptr;
+    }
+    return &global->getConstructor(JSProto_SharedArrayBuffer);
   }
 
   static JSObject* getOrCreateCustomErrorPrototype(JSContext* cx,
@@ -729,6 +753,13 @@ class GlobalObject : public NativeObject {
                                            Handle<GlobalObject*> global);
 
  public:
+  NativeObject* maybeGetIteratorPrototype() {
+    if (JSObject* obj = maybeBuiltinProto(ProtoKind::IteratorProto)) {
+      return &obj->as<NativeObject>();
+    }
+    return nullptr;
+  }
+
   static JSObject* getOrCreateIteratorPrototype(JSContext* cx,
                                                 Handle<GlobalObject*> global) {
     if (JSObject* proto = global->maybeBuiltinProto(ProtoKind::IteratorProto)) {
@@ -856,6 +887,18 @@ class GlobalObject : public NativeObject {
                                    initSetIteratorProto);
   }
 
+  static JSObject* getOrCreateSegmentsPrototype(JSContext* cx,
+                                                Handle<GlobalObject*> global) {
+    return getOrCreateBuiltinProto(cx, global, ProtoKind::SegmentsProto,
+                                   initSegmentsProto);
+  }
+
+  static JSObject* getOrCreateSegmentIteratorPrototype(
+      JSContext* cx, Handle<GlobalObject*> global) {
+    return getOrCreateBuiltinProto(cx, global, ProtoKind::SegmentIteratorProto,
+                                   initSegmentIteratorProto);
+  }
+
   static JSObject* getOrCreateDataViewPrototype(JSContext* cx,
                                                 Handle<GlobalObject*> global) {
     if (!ensureConstructor(cx, global, JSProto_DataView)) {
@@ -946,6 +989,8 @@ class GlobalObject : public NativeObject {
   static JSObject* getOrCreateThrowTypeError(JSContext* cx,
                                              Handle<GlobalObject*> global);
 
+  RegExpRealm& regExpRealm() { return data().regExpRealm; }
+
   // Infallibly test whether the given value is the eval function for this
   // global.
   bool valueIsEval(const Value& val);
@@ -980,7 +1025,7 @@ class GlobalObject : public NativeObject {
   // Implemented in vm/Iteration.cpp.
   static bool initIteratorProto(JSContext* cx, Handle<GlobalObject*> global);
   template <ProtoKind Kind, const JSClass* ProtoClass,
-            const JSFunctionSpec* Methods>
+            const JSFunctionSpec* Methods, const bool needsFuseProperty = false>
   static bool initObjectIteratorProto(JSContext* cx,
                                       Handle<GlobalObject*> global,
                                       Handle<JSAtom*> tag);
@@ -994,6 +1039,11 @@ class GlobalObject : public NativeObject {
   // Implemented in builtin/MapObject.cpp.
   static bool initMapIteratorProto(JSContext* cx, Handle<GlobalObject*> global);
   static bool initSetIteratorProto(JSContext* cx, Handle<GlobalObject*> global);
+
+  // Implemented in builtin/intl/Segmenter.cpp.
+  static bool initSegmentsProto(JSContext* cx, Handle<GlobalObject*> global);
+  static bool initSegmentIteratorProto(JSContext* cx,
+                                       Handle<GlobalObject*> global);
 
   static bool initStandardClasses(JSContext* cx, Handle<GlobalObject*> global);
 
@@ -1022,10 +1072,7 @@ class GlobalObject : public NativeObject {
   void setSourceURLsHolder(ArrayObject* holder) {
     data().sourceURLsHolder = holder;
   }
-  void clearSourceURLSHolder() {
-    // This is called at the start of shrinking GCs, so avoids barriers.
-    data().sourceURLsHolder.unbarrieredSet(nullptr);
-  }
+  void clearSourceURLSHolder() { setSourceURLsHolder(nullptr); }
 
   SharedShape* maybeArrayShapeWithDefaultProto() const {
     return data().arrayShapeWithDefaultProto;
@@ -1053,6 +1100,14 @@ class GlobalObject : public NativeObject {
   static SharedShape* createPlainObjectShapeWithDefaultProto(
       JSContext* cx, gc::AllocKind kind);
 
+  static SharedShape* getEmptyPlainObjectShape(JSContext* cx) {
+    const PlainObjectSlotsKind kind = PlainObjectSlotsKind::Slots0;
+    SharedShape* shape =
+        cx->global()->data().plainObjectShapesWithDefaultProto[kind];
+    MOZ_ASSERT(shape);  // This is created on initialization.
+    return shape;
+  }
+
   static SharedShape* getFunctionShapeWithDefaultProto(JSContext* cx,
                                                        bool extended) {
     GlobalObjectData& data = cx->global()->data();
@@ -1071,10 +1126,6 @@ class GlobalObject : public NativeObject {
   }
   void setBoundFunctionShapeWithDefaultProto(SharedShape* shape) {
     data().boundFunctionShapeWithDefaultProto = shape;
-  }
-
-  PropertyIteratorObject* maybeEmptyIterator() const {
-    return data().emptyIterator;
   }
 
   static PropertyIteratorObject* getOrCreateEmptyIterator(JSContext* cx);
@@ -1131,7 +1182,7 @@ template <JSNative ctor, unsigned length, gc::AllocKind kind,
           const JSJitInfo* jitInfo = nullptr>
 JSObject* GenericCreateConstructor(JSContext* cx, JSProtoKey key) {
   // Note - We duplicate the trick from ClassName() so that we don't need to
-  // include vm/JSAtom-inl.h here.
+  // include vm/JSAtomUtils-inl.h here.
   PropertyName* name = (&cx->names().Null)[key];
   return GlobalObject::createConstructor(cx, ctor, name, length, kind, jitInfo);
 }

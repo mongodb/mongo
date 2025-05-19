@@ -23,7 +23,6 @@
 #include "vm/JSContext.h"
 #include "vm/PlainObject.h"  // js::PlainObject
 #include "vm/StringType.h"
-#include "vm/WellKnownAtom.h"  // js_*_str
 
 #include "vm/NativeObject-inl.h"
 
@@ -72,7 +71,7 @@ static const JSFunctionSpec relativeTimeFormat_methods[] = {
     JS_SELF_HOSTED_FN("format", "Intl_RelativeTimeFormat_format", 2, 0),
     JS_SELF_HOSTED_FN("formatToParts", "Intl_RelativeTimeFormat_formatToParts",
                       2, 0),
-    JS_FN(js_toSource_str, relativeTimeFormat_toSource, 0, 0), JS_FS_END};
+    JS_FN("toSource", relativeTimeFormat_toSource, 0, 0), JS_FS_END};
 
 static const JSPropertySpec relativeTimeFormat_properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Intl.RelativeTimeFormat", JSPROP_READONLY),

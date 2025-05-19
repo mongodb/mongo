@@ -17,7 +17,7 @@
 #include "util/StringBuffer.h"
 #include "vm/ArrayObject.h"
 #include "vm/EqualityOperations.h"
-#include "vm/JSAtom.h"
+#include "vm/JSAtomUtils.h"  // AtomizeString, EnsureAtomized
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"
@@ -29,7 +29,7 @@
 #include "vm/ToSource.h"
 #include "vm/TupleType.h"
 
-#include "vm/JSAtom-inl.h"
+#include "vm/JSAtomUtils-inl.h"  // AtomToId
 #include "vm/JSObject-inl.h"
 #include "vm/NativeObject-inl.h"
 

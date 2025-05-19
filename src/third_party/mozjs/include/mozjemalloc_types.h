@@ -63,6 +63,13 @@ typedef size_t arena_id_t;
 #define ARENA_FLAG_RANDOMIZE_SMALL_ENABLED 1
 #define ARENA_FLAG_RANDOMIZE_SMALL_DISABLED 2
 
+// Arenas are usually protected by a lock (ARENA_FLAG_THREAD_SAFE) however some
+// arenas are accessed by only the main thread
+// (ARENA_FLAG_THREAD_MAIN_THREAD_ONLY) and their locking can be skipped.
+#define ARENA_FLAG_THREAD_MASK 0x4
+#define ARENA_FLAG_THREAD_MAIN_THREAD_ONLY 0x4
+#define ARENA_FLAG_THREAD_SAFE 0x0
+
 typedef struct arena_params_s {
   size_t mMaxDirty;
   // Arena specific modifiers which override the value passed to
@@ -103,16 +110,17 @@ typedef struct {
   size_t dirty_max;         // Max dirty pages per arena.
 
   // Current memory usage statistics.
-  size_t mapped;       // Bytes mapped (not necessarily committed).
-  size_t allocated;    // Bytes allocated (committed, in use by application).
-  size_t waste;        // Bytes committed, not in use by the
-                       // application, and not intentionally left
-                       // unused (i.e., not dirty).
-  size_t page_cache;   // Committed, unused pages kept around as a
-                       // cache.  (jemalloc calls these "dirty".)
-  size_t bookkeeping;  // Committed bytes used internally by the
-                       // allocator.
-  size_t bin_unused;   // Bytes committed to a bin but currently unused.
+  size_t mapped;          // Bytes mapped (not necessarily committed).
+  size_t allocated;       // Bytes allocated (committed, in use by application).
+  size_t waste;           // Bytes committed, not in use by the
+                          // application, and not intentionally left
+                          // unused (i.e., not dirty).
+  size_t pages_dirty;     // Committed, unused pages kept around as a cache.
+  size_t pages_fresh;     // Unused pages that have never been touched.
+  size_t pages_madvised;  // Unsed pages we told the kernel we don't need.
+  size_t bookkeeping;     // Committed bytes used internally by the
+                          // allocator.
+  size_t bin_unused;      // Bytes committed to a bin but currently unused.
 } jemalloc_stats_t;
 
 typedef struct {

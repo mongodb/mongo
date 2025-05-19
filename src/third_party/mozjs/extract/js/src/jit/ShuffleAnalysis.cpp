@@ -4,7 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "jit/ShuffleAnalysis.h"
+#include "mozilla/MathAlgorithms.h"
 #include "jit/MIR.h"
+#include "wasm/WasmFeatures.h"
 
 using namespace js;
 using namespace jit;
@@ -368,9 +370,86 @@ static Maybe<SimdPermuteOp> TryShift8x16(SimdConstant* control) {
   return Some(SimdPermuteOp::SHIFT_LEFT_8x16);
 }
 
+// Check if it is unsigned integer extend operation.
+static Maybe<SimdPermuteOp> TryZeroExtend(SimdConstant* control) {
+  const SimdConstant::I8x16& lanes = control->asInt8x16();
+
+  // Find fragment of sequantial lanes indices that starts from 0.
+  uint32_t i = 0;
+  for (; i <= 4 && lanes[i] == int8_t(i); i++) {
+  }
+  // The length of the fragment has to be a power of 2, and next item is zero.
+  if (!mozilla::IsPowerOfTwo(i) || lanes[i] < 16) {
+    return Nothing();
+  }
+  MOZ_ASSERT(i > 0 && i <= 4);
+  uint32_t fromLen = i;
+  // Skip items that will be zero'ed.
+  for (; i <= 8 && lanes[i] >= 16; i++) {
+  }
+  // The length of the entire fragment of zero and non-zero items
+  // needs to be power of 2.
+  if (!mozilla::IsPowerOfTwo(i)) {
+    return Nothing();
+  }
+  MOZ_ASSERT(i > fromLen && i <= 8);
+  uint32_t toLen = i;
+
+  // The sequence will repeat every toLen elements: in which first
+  // fromLen items are sequential lane indices, and the rest are zeros.
+  int8_t current = int8_t(fromLen);
+  for (; i < 16; i++) {
+    if ((i % toLen) >= fromLen) {
+      // Expect the item be a zero.
+      if (lanes[i] < 16) {
+        return Nothing();
+      }
+    } else {
+      // Check the item is in ascending sequence.
+      if (lanes[i] != current) {
+        return Nothing();
+      }
+      current++;
+    }
+  }
+
+  switch (fromLen) {
+    case 1:
+      switch (toLen) {
+        case 2:
+          return Some(SimdPermuteOp::ZERO_EXTEND_8x16_TO_16x8);
+        case 4:
+          return Some(SimdPermuteOp::ZERO_EXTEND_8x16_TO_32x4);
+        case 8:
+          return Some(SimdPermuteOp::ZERO_EXTEND_8x16_TO_64x2);
+      }
+      break;
+    case 2:
+      switch (toLen) {
+        case 4:
+          return Some(SimdPermuteOp::ZERO_EXTEND_16x8_TO_32x4);
+        case 8:
+          return Some(SimdPermuteOp::ZERO_EXTEND_16x8_TO_64x2);
+      }
+      break;
+    case 4:
+      switch (toLen) {
+        case 8:
+          return Some(SimdPermuteOp::ZERO_EXTEND_32x4_TO_64x2);
+      }
+      break;
+  }
+  MOZ_CRASH("Invalid TryZeroExtend match");
+}
+
 static Maybe<SimdPermuteOp> AnalyzeShuffleWithZero(SimdConstant* control) {
   Maybe<SimdPermuteOp> op;
   op = TryShift8x16(control);
+  if (op) {
+    return op;
+  }
+
+  op = TryZeroExtend(control);
   if (op) {
     return op;
   }
@@ -672,6 +751,24 @@ static const SimdShuffle& ReportShuffleSpecialization(const SimdShuffle& s) {
           break;
         case SimdPermuteOp::SHIFT_RIGHT_8x16:
           js::wasm::ReportSimdAnalysis("shuffle -> shift-right 8x16");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_16x8:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 8x16 to 16x8");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_32x4:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 8x16 to 32x4");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_64x2:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 8x16 to 64x2");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_16x8_TO_32x4:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 16x8 to 32x4");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_16x8_TO_64x2:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 16x8 to 64x2");
+          break;
+        case SimdPermuteOp::ZERO_EXTEND_32x4_TO_64x2:
+          js::wasm::ReportSimdAnalysis("shuffle -> zero-extend 32x4 to 64x2");
           break;
         default:
           MOZ_CRASH("Unexpected permute op");

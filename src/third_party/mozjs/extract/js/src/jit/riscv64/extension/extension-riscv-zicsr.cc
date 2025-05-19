@@ -40,5 +40,9 @@ void AssemblerRISCVZicsr::csrrci(Register rd, ControlStatusReg csr,
   GenInstrCSR_ii(0b111, rd, csr, imm5);
 }
 
+void AssemblerRISCVZicsr::illegal_trap(uint8_t code) {
+  csrrwi(zero, csr_cycle, code);
+}
+
 }  // namespace jit
 }  // namespace js

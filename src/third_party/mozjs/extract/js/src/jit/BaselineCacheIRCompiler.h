@@ -52,6 +52,7 @@ ICAttachResult AttachBaselineCacheIRStub(JSContext* cx,
 // BaselineCacheIRCompiler compiles CacheIR to BaselineIC native code.
 class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   bool makesGCCalls_;
+  uint8_t localTracingSlots_ = 0;
   Register baselineFrameReg_ = FramePointer;
 
   // This register points to the baseline frame of the caller. It should only
@@ -107,6 +108,10 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   enum class StringCode { CodeUnit, CodePoint };
   bool emitStringFromCodeResult(Int32OperandId codeId, StringCode stringCode);
 
+  enum class StringCharOutOfBounds { Failure, EmptyString, UndefinedValue };
+  bool emitLoadStringCharResult(StringOperandId strId, Int32OperandId indexId,
+                                StringCharOutOfBounds outOfBounds);
+
   void emitAtomizeString(Register str, Register temp, Label* failure);
 
   bool emitCallScriptedGetterShared(ValOperandId receiverId,
@@ -118,6 +123,13 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
                                     bool sameRealm,
                                     uint32_t nargsAndFlagsOffset,
                                     mozilla::Maybe<uint32_t> icScriptOffset);
+
+  template <typename IdType>
+  bool emitCallScriptedProxyGetShared(ValOperandId targetId,
+                                      ObjOperandId receiverId,
+                                      ObjOperandId handlerId,
+                                      ObjOperandId trapId, IdType id,
+                                      uint32_t nargsAndFlags);
 
   BaselineICPerfSpewer perfSpewer_;
 
@@ -137,11 +149,25 @@ class MOZ_RAII BaselineCacheIRCompiler : public CacheIRCompiler {
   JitCode* compile();
 
   bool makesGCCalls() const;
+  bool localTracingSlots() const { return localTracingSlots_; }
 
   Address stubAddress(uint32_t offset) const;
 
  private:
   CACHE_IR_COMPILER_UNSHARED_GENERATED
+};
+
+// Special object used for storing a list of shapes to guard against. These are
+// only used in the fields of CacheIR stubs and do not escape.
+class ShapeListObject : public ListObject {
+ public:
+  static const JSClass class_;
+  static const JSClassOps classOps_;
+  static ShapeListObject* create(JSContext* cx);
+  static void trace(JSTracer* trc, JSObject* obj);
+
+  Shape* get(uint32_t index);
+  bool traceWeak(JSTracer* trc);
 };
 
 }  // namespace jit

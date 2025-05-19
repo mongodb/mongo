@@ -96,6 +96,14 @@ bool DebugAPI::onNewGenerator(JSContext* cx, AbstractFramePtr frame,
 }
 
 /* static */
+void DebugAPI::onGeneratorClosed(JSContext* cx,
+                                 AbstractGeneratorObject* genObj) {
+  if (cx->realm()->isDebuggee()) {
+    slowPathOnGeneratorClosed(cx, genObj);
+  }
+}
+
+/* static */
 bool DebugAPI::checkNoExecute(JSContext* cx, HandleScript script) {
   if (!cx->realm()->isDebuggee() || !cx->noExecuteDebuggerTop) {
     return true;
@@ -131,6 +139,15 @@ NativeResumeMode DebugAPI::onNativeCall(JSContext* cx, const CallArgs& args,
   }
 
   return NativeResumeMode::Continue;
+}
+
+/* static */
+bool DebugAPI::shouldAvoidSideEffects(JSContext* cx) {
+  if (MOZ_UNLIKELY(cx->realm()->isDebuggee())) {
+    return slowPathShouldAvoidSideEffects(cx);
+  }
+
+  return false;
 }
 
 /* static */

@@ -603,16 +603,23 @@ struct AssemblerBufferWithConstantPools
   // locations.
   BranchDeadlineSet<NumShortBranchRanges> branchDeadlines_;
 
-  // When true dumping pools is inhibited.
-  bool canNotPlacePool_;
+  // When true dumping pools is inhibited.  Any value above zero indicates
+  // inhibition of pool dumping.  These is no significance to different
+  // above-zero values; this is a counter and not a boolean only so as to
+  // facilitate correctly tracking nested enterNoPools/leaveNoPools calls.
+  unsigned int inhibitPools_;
 
 #ifdef DEBUG
-  // State for validating the 'maxInst' argument to enterNoPool().
-  // The buffer offset when entering the no-pool region.
-  size_t canNotPlacePoolStartOffset_;
-  // The maximum number of word sized instructions declared for the no-pool
-  // region.
-  size_t canNotPlacePoolMaxInst_;
+  // State for validating the 'maxInst' argument to enterNoPool() in the case
+  // `inhibitPools_` was zero before the call (that is, when we enter the
+  // outermost nesting level).
+  //
+  // The buffer offset at the start of the outermost nesting level no-pool
+  // region.  Set to all-ones (0xFF..FF) to mean "invalid".
+  size_t inhibitPoolsStartOffset_;
+  // The maximum number of word sized instructions declared for the outermost
+  // nesting level no-pool region.  Set to zero when invalid.
+  size_t inhibitPoolsMaxInst_;
 #endif
 
   // Instruction to use for alignment fill.
@@ -626,8 +633,9 @@ struct AssemblerBufferWithConstantPools
   const unsigned nopFill_;
 
   // For inhibiting the insertion of fill NOPs in the dynamic context in which
-  // they are being inserted.
-  bool inhibitNops_;
+  // they are being inserted.  The zero-vs-nonzero meaning is the same as that
+  // documented for `inhibitPools_` above.
+  unsigned int inhibitNops_;
 
  private:
   // The buffer slices are in a double linked list.
@@ -648,15 +656,15 @@ struct AssemblerBufferWithConstantPools
         instBufferAlign_(instBufferAlign),
         poolInfo_(this->lifoAlloc_),
         branchDeadlines_(this->lifoAlloc_),
-        canNotPlacePool_(false),
+        inhibitPools_(0),
 #ifdef DEBUG
-        canNotPlacePoolStartOffset_(0),
-        canNotPlacePoolMaxInst_(0),
+        inhibitPoolsStartOffset_(~size_t(0) /*"invalid"*/),
+        inhibitPoolsMaxInst_(0),
 #endif
         alignFillInst_(alignFillInst),
         nopFillInst_(nopFillInst),
         nopFill_(nopFill),
-        inhibitNops_(false) {
+        inhibitNops_(0) {
   }
 
  private:
@@ -677,8 +685,8 @@ struct AssemblerBufferWithConstantPools
  private:
   void insertNopFill() {
     // Insert fill for testing.
-    if (nopFill_ > 0 && !inhibitNops_ && !canNotPlacePool_) {
-      inhibitNops_ = true;
+    if (nopFill_ > 0 && inhibitNops_ == 0 && inhibitPools_ == 0) {
+      inhibitNops_++;
 
       // Fill using a branch-nop rather than a NOP so this can be
       // distinguished and skipped.
@@ -686,7 +694,7 @@ struct AssemblerBufferWithConstantPools
         putInt(nopFillInst_);
       }
 
-      inhibitNops_ = false;
+      inhibitNops_--;
     }
   }
 
@@ -806,7 +814,7 @@ struct AssemblerBufferWithConstantPools
                           PoolEntry* pe = nullptr) {
     // The allocation of pool entries is not supported in a no-pool region,
     // check.
-    MOZ_ASSERT_IF(numPoolEntries, !canNotPlacePool_);
+    MOZ_ASSERT_IF(numPoolEntries > 0, inhibitPools_ == 0);
 
     if (this->oom()) {
       return BufferOffset();
@@ -963,7 +971,7 @@ struct AssemblerBufferWithConstantPools
     }
 
     // Should not be placing a pool in a no-pool region, check.
-    MOZ_ASSERT(!canNotPlacePool_);
+    MOZ_ASSERT(inhibitPools_ == 0);
 
     // Dump the pool with a guard branch around the pool.
     BufferOffset guard = this->putBytes(guardSize_ * InstSize, nullptr);
@@ -1047,11 +1055,35 @@ struct AssemblerBufferWithConstantPools
   }
 
   void enterNoPool(size_t maxInst) {
+    // Calling this with a zero arg is pointless.
+    MOZ_ASSERT(maxInst > 0);
+
     if (this->oom()) {
       return;
     }
-    // Don't allow re-entry.
-    MOZ_ASSERT(!canNotPlacePool_);
+
+    if (inhibitPools_ > 0) {
+      // This is a nested call to enterNoPool.  Assert that the reserved area
+      // fits within that of the outermost call, but otherwise don't do
+      // anything.
+      //
+      // Assert that the outermost call set these.
+      MOZ_ASSERT(inhibitPoolsStartOffset_ != ~size_t(0));
+      MOZ_ASSERT(inhibitPoolsMaxInst_ > 0);
+      // Check inner area fits within that of the outermost.
+      MOZ_ASSERT(size_t(this->nextOffset().getOffset()) >=
+                 inhibitPoolsStartOffset_);
+      MOZ_ASSERT(size_t(this->nextOffset().getOffset()) + maxInst * InstSize <=
+                 inhibitPoolsStartOffset_ + inhibitPoolsMaxInst_ * InstSize);
+      inhibitPools_++;
+      return;
+    }
+
+    // This is an outermost level call to enterNoPool.
+    MOZ_ASSERT(inhibitPools_ == 0);
+    MOZ_ASSERT(inhibitPoolsStartOffset_ == ~size_t(0));
+    MOZ_ASSERT(inhibitPoolsMaxInst_ == 0);
+
     insertNopFill();
 
     // Check if the pool will spill by adding maxInst instructions, and if
@@ -1071,37 +1103,54 @@ struct AssemblerBufferWithConstantPools
 #ifdef DEBUG
     // Record the buffer position to allow validating maxInst when leaving
     // the region.
-    canNotPlacePoolStartOffset_ = this->nextOffset().getOffset();
-    canNotPlacePoolMaxInst_ = maxInst;
+    inhibitPoolsStartOffset_ = this->nextOffset().getOffset();
+    inhibitPoolsMaxInst_ = maxInst;
+    MOZ_ASSERT(inhibitPoolsStartOffset_ != ~size_t(0));
 #endif
 
-    canNotPlacePool_ = true;
+    inhibitPools_ = 1;
   }
 
   void leaveNoPool() {
     if (this->oom()) {
-      canNotPlacePool_ = false;
+      inhibitPools_ = 0;
       return;
     }
-    MOZ_ASSERT(canNotPlacePool_);
-    canNotPlacePool_ = false;
+    MOZ_ASSERT(inhibitPools_ > 0);
 
-    // Validate the maxInst argument supplied to enterNoPool().
-    MOZ_ASSERT(this->nextOffset().getOffset() - canNotPlacePoolStartOffset_ <=
-               canNotPlacePoolMaxInst_ * InstSize);
+    if (inhibitPools_ > 1) {
+      // We're leaving a non-outermost nesting level.  Note that fact, but
+      // otherwise do nothing.
+      inhibitPools_--;
+      return;
+    }
+
+    // This is an outermost level call to leaveNoPool.
+    MOZ_ASSERT(inhibitPools_ == 1);
+    MOZ_ASSERT(inhibitPoolsStartOffset_ != ~size_t(0));
+    MOZ_ASSERT(inhibitPoolsMaxInst_ > 0);
+
+    // Validate the maxInst argument supplied to enterNoPool(), in the case
+    // where we are leaving the outermost nesting level.
+    MOZ_ASSERT(this->nextOffset().getOffset() - inhibitPoolsStartOffset_ <=
+               inhibitPoolsMaxInst_ * InstSize);
+
+#ifdef DEBUG
+    inhibitPoolsStartOffset_ = ~size_t(0);
+    inhibitPoolsMaxInst_ = 0;
+#endif
+
+    inhibitPools_ = 0;
   }
 
-  void enterNoNops() {
-    MOZ_ASSERT(!inhibitNops_);
-    inhibitNops_ = true;
-  }
+  void enterNoNops() { inhibitNops_++; }
   void leaveNoNops() {
-    MOZ_ASSERT(inhibitNops_);
-    inhibitNops_ = false;
+    MOZ_ASSERT(inhibitNops_ > 0);
+    inhibitNops_--;
   }
   void assertNoPoolAndNoNops() {
-    MOZ_ASSERT(inhibitNops_);
-    MOZ_ASSERT_IF(!this->oom(), isPoolEmptyFor(InstSize) || canNotPlacePool_);
+    MOZ_ASSERT(inhibitNops_ > 0);
+    MOZ_ASSERT_IF(!this->oom(), isPoolEmptyFor(InstSize) || inhibitPools_ > 0);
   }
 
   void align(unsigned alignment) { align(alignment, alignFillInst_); }
@@ -1129,12 +1178,11 @@ struct AssemblerBufferWithConstantPools
       finishPool(requiredFill);
     }
 
-    bool prevInhibitNops = inhibitNops_;
-    inhibitNops_ = true;
+    inhibitNops_++;
     while ((sizeExcludingCurrentPool() & (alignment - 1)) && !this->oom()) {
       putInt(pattern);
     }
-    inhibitNops_ = prevInhibitNops;
+    inhibitNops_--;
   }
 
  public:

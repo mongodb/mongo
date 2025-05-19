@@ -20,7 +20,23 @@
 #include "wasm/WasmInstance.h"
 #include "wasm/WasmLog.h"
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX512BW)
+#  if defined(USE_AVX512VNNI)
+#    define SUPPORTED_ARCHS                                                 \
+      xsimd::arch_list<xsimd::avx512vnni<xsimd::avx512bw>, xsimd::avx512bw, \
+                       xsimd::avx2, xsimd::ssse3, xsimd::sse2>
+#  elif defined(USE_AVXVNNI)
+#    define SUPPORTED_ARCHS                                          \
+      xsimd::arch_list<xsimd::avx512bw, xsimd::avxvnni, xsimd::avx2, \
+                       xsimd::ssse3, xsimd::sse2>
+#  else
+#    define SUPPORTED_ARCHS \
+      xsimd::arch_list<xsimd::avx512bw, xsimd::avx2, xsimd::ssse3, xsimd::sse2>
+#  endif
+#elif defined(USE_AVXVNNI)
+#  define SUPPORTED_ARCHS \
+    xsimd::arch_list<xsimd::avxvnni, xsimd::avx2, xsimd::ssse3, xsimd::sse2>
+#elif defined(USE_AVX2)
 #  define SUPPORTED_ARCHS \
     xsimd::arch_list<xsimd::avx2, xsimd::ssse3, xsimd::sse2>
 #elif defined(USE_SSSE3)
@@ -28,7 +44,12 @@
 #elif defined(USE_SSE2)
 #  define SUPPORTED_ARCHS xsimd::arch_list<xsimd::sse2>
 #elif defined(USE_NEON) and defined(XSIMD_WITH_NEON64)
-#  define SUPPORTED_ARCHS xsimd::arch_list<xsimd::neon64>
+#  if defined(USE_NEON_I8MM)
+#    define SUPPORTED_ARCHS \
+      xsimd::arch_list<xsimd::i8mm<xsimd::neon64>, xsimd::neon64>
+#  else
+#    define SUPPORTED_ARCHS xsimd::arch_list<xsimd::neon64>
+#  endif
 #else
 #  error no supported architecture
 #endif

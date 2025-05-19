@@ -41,8 +41,7 @@ const JSPropertySpec SymbolObject::properties[] = {
     JS_STRING_SYM_PS(toStringTag, "Symbol", JSPROP_READONLY), JS_PS_END};
 
 const JSFunctionSpec SymbolObject::methods[] = {
-    JS_FN(js_toString_str, toString, 0, 0),
-    JS_FN(js_valueOf_str, valueOf, 0, 0),
+    JS_FN("toString", toString, 0, 0), JS_FN("valueOf", valueOf, 0, 0),
     JS_SYM_FN(toPrimitive, toPrimitive, 1, JSPROP_READONLY), JS_FS_END};
 
 const JSFunctionSpec SymbolObject::staticMethods[] = {

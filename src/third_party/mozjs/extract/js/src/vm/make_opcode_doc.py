@@ -165,13 +165,13 @@ def print_doc(index):
         )
     )
 
-    for (category_name, types) in index:
+    for category_name, types in index:
         print(
             '<h3 id="{id}">{name}</h3>'.format(
                 name=category_name, id=make_element_id(category_name)
             )
         )
-        for (type_name, opcodes) in types:
+        for type_name, opcodes in types:
             if type_name:
                 print(
                     '<h4 id="{id}">{name}</h4>'.format(

@@ -6,6 +6,8 @@
 
 #include "jit/TrialInlining.h"
 
+#include "mozilla/DebugOnly.h"
+
 #include "jit/BaselineCacheIRCompiler.h"
 #include "jit/BaselineFrame.h"
 #include "jit/BaselineIC.h"
@@ -82,8 +84,9 @@ bool DoTrialInlining(JSContext* cx, BaselineFrame* frame) {
       }
     }
     UniqueChars funName;
-    if (script->function() && script->function()->displayAtom()) {
-      funName = AtomToPrintableString(cx, script->function()->displayAtom());
+    if (script->function() && script->function()->fullDisplayAtom()) {
+      funName =
+          AtomToPrintableString(cx, script->function()->fullDisplayAtom());
     }
 
     JitSpew(
@@ -91,7 +94,8 @@ bool DoTrialInlining(JSContext* cx, BaselineFrame* frame) {
         "Trial inlining for %s script '%s' (%s:%u:%u (%p)) (inliningRoot=%p)",
         (isRecursive ? "inner" : "outer"),
         funName ? funName.get() : "<unnamed>", script->filename(),
-        script->lineno(), script->column(), frame->script(), root);
+        script->lineno(), script->column().oneOriginValue(), frame->script(),
+        root);
     JitSpewIndent spewIndent(JitSpew_WarpTrialInlining);
   }
 
@@ -114,7 +118,7 @@ bool TrialInliner::replaceICStub(ICEntry& entry, ICFallbackStub* fallback,
                                  CacheIRWriter& writer, CacheKind kind) {
   MOZ_ASSERT(fallback->trialInliningState() == TrialInliningState::Candidate);
 
-  fallback->discardStubs(cx(), &entry);
+  fallback->discardStubs(cx()->zone(), &entry);
 
   // Note: AttachBaselineCacheIRStub never throws an exception.
   ICAttachResult result = AttachBaselineCacheIRStub(
@@ -459,6 +463,28 @@ static uint32_t GetMaxCalleeNumActuals(BytecodeLocation loc) {
 }
 
 /*static*/
+bool TrialInliner::IsValidInliningOp(JSOp op) {
+  switch (op) {
+    case JSOp::GetProp:
+    case JSOp::GetElem:
+    case JSOp::SetProp:
+    case JSOp::StrictSetProp:
+    case JSOp::Call:
+    case JSOp::CallContent:
+    case JSOp::CallIgnoresRv:
+    case JSOp::CallIter:
+    case JSOp::CallContentIter:
+    case JSOp::New:
+    case JSOp::NewContent:
+    case JSOp::SuperCall:
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
+/*static*/
 bool TrialInliner::canInline(JSFunction* target, HandleScript caller,
                              BytecodeLocation loc) {
   if (!target->hasJitScript()) {
@@ -489,6 +515,10 @@ bool TrialInliner::canInline(JSFunction* target, HandleScript caller,
   }
   if (JitOptions.onlyInlineSelfHosted && !script->selfHosted()) {
     JitSpew(JitSpew_WarpTrialInlining, "SKIP: only inlining self hosted");
+    return false;
+  }
+  if (!IsValidInliningOp(loc.getOp())) {
+    JitSpew(JitSpew_WarpTrialInlining, "SKIP: non inlineable op");
     return false;
   }
 
@@ -525,6 +555,47 @@ bool TrialInliner::canInline(JSFunction* target, HandleScript caller,
   return true;
 }
 
+static bool ShouldUseMonomorphicInlining(JSScript* targetScript) {
+  switch (JitOptions.monomorphicInlining) {
+    case UseMonomorphicInlining::Default:
+      // Use heuristics below.
+      break;
+    case UseMonomorphicInlining::Always:
+      return true;
+    case UseMonomorphicInlining::Never:
+      return false;
+  }
+
+  JitScript* jitScript = targetScript->jitScript();
+  ICScript* icScript = jitScript->icScript();
+
+  // Check for any ICs which are not monomorphic. The observation here is that
+  // trial inlining can help us a lot in cases where it lets us further
+  // specialize a script. But if it's already monomorphic, it's unlikely that
+  // we will see significant specialization wins from trial inlining, so we
+  // can use a cheaper and simpler inlining strategy.
+  for (size_t i = 0; i < icScript->numICEntries(); i++) {
+    ICEntry& entry = icScript->icEntry(i);
+    ICFallbackStub* fallback = icScript->fallbackStub(i);
+    if (fallback->enteredCount() > 0 ||
+        fallback->state().mode() != ICState::Mode::Specialized) {
+      return false;
+    }
+
+    ICStub* firstStub = entry.firstStub();
+    if (firstStub != fallback) {
+      for (ICStub* next = firstStub->toCacheIRStub()->next(); next;
+           next = next->maybeNext()) {
+        if (next->enteredCount() != 0) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
 TrialInliningDecision TrialInliner::getInliningDecision(JSFunction* target,
                                                         ICCacheIRStub* stub,
                                                         BytecodeLocation loc) {
@@ -534,8 +605,8 @@ TrialInliningDecision TrialInliner::getInliningDecision(JSFunction* target,
         target->hasBaseScript() ? target->baseScript() : nullptr;
 
     UniqueChars funName;
-    if (target->displayAtom()) {
-      funName = AtomToPrintableString(cx(), target->displayAtom());
+    if (target->maybePartialDisplayAtom()) {
+      funName = AtomToPrintableString(cx(), target->maybePartialDisplayAtom());
     }
 
     JitSpew(JitSpew_WarpTrialInlining,
@@ -545,7 +616,7 @@ TrialInliningDecision TrialInliner::getInliningDecision(JSFunction* target,
             funName ? funName.get() : "<unnamed>",
             baseScript ? baseScript->filename() : "<not-scripted>",
             baseScript ? baseScript->lineno() : 0,
-            baseScript ? baseScript->column() : 0);
+            baseScript ? baseScript->column().oneOriginValue() : 0);
     JitSpewIndent spewIndent(JitSpew_WarpTrialInlining);
   }
 #endif
@@ -597,31 +668,9 @@ TrialInliningDecision TrialInliner::getInliningDecision(JSFunction* target,
             unsigned(targetScript->length()));
   }
 
-  JitScript* jitScript = targetScript->jitScript();
-  ICScript* icScript = jitScript->icScript();
-
-  // Check for any ICs which are not monomorphic. The observation here is that
-  // trial inlining can help us a lot in cases where it lets us further
-  // specialize a script. But if it's already monomorphic, it's unlikely that
-  // we will see significant specialization wins from trial inlining, so we
-  // can use a cheaper and simpler inlining strategy.
-  for (size_t i = 0; i < icScript->numICEntries(); i++) {
-    ICEntry& entry = icScript->icEntry(i);
-    ICFallbackStub* fallback = icScript->fallbackStub(i);
-    if (fallback->enteredCount() > 0 ||
-        fallback->state().mode() != ICState::Mode::Specialized) {
-      return TrialInliningDecision::Inline;
-    }
-
-    ICStub* firstStub = entry.firstStub();
-    if (firstStub != fallback) {
-      for (ICStub* next = firstStub->toCacheIRStub()->next(); next;
-           next = next->maybeNext()) {
-        if (next->enteredCount() != 0) {
-          return TrialInliningDecision::Inline;
-        }
-      }
-    }
+  // Decide between trial inlining or monomorphic inlining.
+  if (!ShouldUseMonomorphicInlining(targetScript)) {
+    return TrialInliningDecision::Inline;
   }
 
   JitSpewIndent spewIndent(JitSpew_WarpTrialInlining);
@@ -659,8 +708,9 @@ ICScript* TrialInliner::createInlinedICScript(JSFunction* target,
   uint32_t initialWarmUpCount = JitOptions.trialInliningInitialWarmUpCount;
 
   uint32_t depth = icScript_->depth() + 1;
-  UniquePtr<ICScript> inlinedICScript(new (raw) ICScript(
-      initialWarmUpCount, fallbackStubsOffset, allocSize, depth, root));
+  UniquePtr<ICScript> inlinedICScript(
+      new (raw) ICScript(initialWarmUpCount, fallbackStubsOffset, allocSize,
+                         depth, targetScript->length(), root));
 
   inlinedICScript->initICEntries(cx(), targetScript);
 
@@ -912,16 +962,39 @@ void InliningRoot::trace(JSTracer* trc) {
   }
 }
 
-void InliningRoot::purgeOptimizedStubs(Zone* zone) {
+bool InliningRoot::traceWeak(JSTracer* trc) {
+  bool allSurvived = true;
   for (auto& inlinedScript : inlinedScripts_) {
-    inlinedScript->purgeOptimizedStubs(zone);
+    if (!inlinedScript->traceWeak(trc)) {
+      allSurvived = false;
+    }
   }
+  return allSurvived;
 }
 
-void InliningRoot::resetWarmUpCounts(uint32_t count) {
+void InliningRoot::purgeInactiveICScripts() {
+  mozilla::DebugOnly<uint32_t> totalSize = owningScript_->length();
+
   for (auto& inlinedScript : inlinedScripts_) {
-    inlinedScript->resetWarmUpCount(count);
+    if (inlinedScript->active()) {
+      totalSize += inlinedScript->bytecodeSize();
+    } else {
+      MOZ_ASSERT(inlinedScript->bytecodeSize() < totalBytecodeSize_);
+      totalBytecodeSize_ -= inlinedScript->bytecodeSize();
+    }
   }
+
+  MOZ_ASSERT(totalBytecodeSize_ == totalSize);
+
+  Zone* zone = owningScript_->zone();
+
+  inlinedScripts_.eraseIf([zone](auto& inlinedScript) {
+    if (inlinedScript->active()) {
+      return false;
+    }
+    inlinedScript->prepareForDestruction(zone);
+    return true;
+  });
 }
 
 }  // namespace jit

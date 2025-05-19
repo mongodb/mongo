@@ -20,42 +20,45 @@ namespace js {
 namespace jit {
 
 // JSOps not yet supported by WarpBuilder. See warning at the end of the list.
-#define WARP_UNSUPPORTED_OPCODE_LIST(_)  \
-  /* Intentionally not implemented */    \
-  _(ForceInterpreter)                    \
-  /* With */                             \
-  _(EnterWith)                           \
-  _(LeaveWith)                           \
-  /* Eval */                             \
-  _(Eval)                                \
-  _(StrictEval)                          \
-  _(SpreadEval)                          \
-  _(StrictSpreadEval)                    \
-  /* Super */                            \
-  _(SetPropSuper)                        \
-  _(SetElemSuper)                        \
-  _(StrictSetPropSuper)                  \
-  _(StrictSetElemSuper)                  \
-  /* Compound assignment */              \
-  _(GetBoundName)                        \
-  /* Generators / Async (bug 1317690) */ \
-  _(IsGenClosing)                        \
-  _(Resume)                              \
-  /* Misc */                             \
-  _(DelName)                             \
-  _(SetIntrinsic)                        \
-  /* Private Fields */                   \
-  _(GetAliasedDebugVar)                  \
-  /* Non-syntactic scope */              \
-  _(NonSyntacticGlobalThis)              \
-  /* Records and Tuples */               \
-  IF_RECORD_TUPLE(_(InitRecord))         \
-  IF_RECORD_TUPLE(_(AddRecordProperty))  \
-  IF_RECORD_TUPLE(_(AddRecordSpread))    \
-  IF_RECORD_TUPLE(_(FinishRecord))       \
-  IF_RECORD_TUPLE(_(InitTuple))          \
-  IF_RECORD_TUPLE(_(AddTupleElement))    \
-  IF_RECORD_TUPLE(_(FinishTuple))        \
+#define WARP_UNSUPPORTED_OPCODE_LIST(_)                  \
+  /* Intentionally not implemented */                    \
+  _(ForceInterpreter)                                    \
+  /* With */                                             \
+  _(EnterWith)                                           \
+  _(LeaveWith)                                           \
+  /* Eval */                                             \
+  _(Eval)                                                \
+  _(StrictEval)                                          \
+  _(SpreadEval)                                          \
+  _(StrictSpreadEval)                                    \
+  /* Super */                                            \
+  _(SetPropSuper)                                        \
+  _(SetElemSuper)                                        \
+  _(StrictSetPropSuper)                                  \
+  _(StrictSetElemSuper)                                  \
+  /* Compound assignment */                              \
+  _(GetBoundName)                                        \
+  /* Generators / Async (bug 1317690) */                 \
+  _(IsGenClosing)                                        \
+  _(Resume)                                              \
+  /* Misc */                                             \
+  _(DelName)                                             \
+  _(SetIntrinsic)                                        \
+  /* Private Fields */                                   \
+  _(GetAliasedDebugVar)                                  \
+  /* Non-syntactic scope */                              \
+  _(NonSyntacticGlobalThis)                              \
+  /* TODO: To be implemented (Bug 1899501) */            \
+  IF_EXPLICIT_RESOURCE_MANAGEMENT(_(AddDisposable))      \
+  IF_EXPLICIT_RESOURCE_MANAGEMENT(_(DisposeDisposables)) \
+  /* Records and Tuples */                               \
+  IF_RECORD_TUPLE(_(InitRecord))                         \
+  IF_RECORD_TUPLE(_(AddRecordProperty))                  \
+  IF_RECORD_TUPLE(_(AddRecordSpread))                    \
+  IF_RECORD_TUPLE(_(FinishRecord))                       \
+  IF_RECORD_TUPLE(_(InitTuple))                          \
+  IF_RECORD_TUPLE(_(AddTupleElement))                    \
+  IF_RECORD_TUPLE(_(FinishTuple))                        \
   // === !! WARNING WARNING WARNING !! ===
   // Do you really want to sacrifice performance by not implementing this
   // operation in the optimizing compiler?
@@ -204,7 +207,6 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
 
   WarpCompilation* warpCompilation() const { return warpCompilation_; }
   MIRGraph& graph() { return graph_; }
-  const CompileInfo& info() const { return info_; }
   const WarpScriptSnapshot* scriptSnapshot() const { return scriptSnapshot_; }
 
   uint32_t loopDepth() const { return warpCompilation_->loopDepth(); }
@@ -314,10 +316,8 @@ class MOZ_STACK_CLASS WarpBuilder : public WarpBuilderShared {
   [[nodiscard]] bool build();
   [[nodiscard]] bool buildInline();
 
+  const CompileInfo& info() const { return info_; }
   CallInfo* inlineCallInfo() const { return inlineCallInfo_; }
-  bool isMonomorphicInlined() const {
-    return scriptSnapshot_->isMonomorphicInlined();
-  }
 };
 
 }  // namespace jit

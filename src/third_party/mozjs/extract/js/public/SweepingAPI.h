@@ -19,19 +19,17 @@
 namespace js {
 namespace gc {
 
-class StoreBuffer;
-
-JS_PUBLIC_API void LockStoreBuffer(StoreBuffer* sb);
-JS_PUBLIC_API void UnlockStoreBuffer(StoreBuffer* sb);
+JS_PUBLIC_API void LockStoreBuffer(JSRuntime* runtime);
+JS_PUBLIC_API void UnlockStoreBuffer(JSRuntime* runtim);
 
 class AutoLockStoreBuffer {
-  StoreBuffer* sb;
+  JSRuntime* runtime;
 
  public:
-  explicit AutoLockStoreBuffer(StoreBuffer* sb) : sb(sb) {
-    LockStoreBuffer(sb);
+  explicit AutoLockStoreBuffer(JSRuntime* runtime) : runtime(runtime) {
+    LockStoreBuffer(runtime);
   }
-  ~AutoLockStoreBuffer() { UnlockStoreBuffer(sb); }
+  ~AutoLockStoreBuffer() { UnlockStoreBuffer(runtime); }
 };
 
 }  // namespace gc
@@ -50,17 +48,22 @@ JS_PUBLIC_API void RegisterWeakCache(JSRuntime* rt,
 }  // namespace shadow
 
 namespace detail {
+
 class WeakCacheBase : public mozilla::LinkedListElement<WeakCacheBase> {
   WeakCacheBase() = delete;
   explicit WeakCacheBase(const WeakCacheBase&) = delete;
 
  public:
-  explicit WeakCacheBase(Zone* zone) { shadow::RegisterWeakCache(zone, this); }
+  enum NeedsLock : bool { LockStoreBuffer = true, DontLockStoreBuffer = false };
+
+  explicit WeakCacheBase(JS::Zone* zone) {
+    shadow::RegisterWeakCache(zone, this);
+  }
   explicit WeakCacheBase(JSRuntime* rt) { shadow::RegisterWeakCache(rt, this); }
   WeakCacheBase(WeakCacheBase&& other) = default;
   virtual ~WeakCacheBase() = default;
 
-  virtual size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) = 0;
+  virtual size_t traceWeak(JSTracer* trc, NeedsLock needLock) = 0;
 
   // Sweeping will be skipped if the cache is empty already.
   virtual bool empty() = 0;
@@ -76,6 +79,7 @@ class WeakCacheBase : public mozilla::LinkedListElement<WeakCacheBase> {
     return false;
   }
 };
+
 }  // namespace detail
 
 // A WeakCache stores the given Sweepable container and links itself into a
@@ -100,13 +104,13 @@ class WeakCache : protected detail::WeakCacheBase,
   const T& get() const { return cache; }
   T& get() { return cache; }
 
-  size_t traceWeak(JSTracer* trc, js::gc::StoreBuffer* sbToLock) override {
+  size_t traceWeak(JSTracer* trc, NeedsLock needsLock) override {
     // Take the store buffer lock in case sweeping triggers any generational
     // post barriers. This is not always required and WeakCache specializations
     // may delay or skip taking the lock as appropriate.
     mozilla::Maybe<js::gc::AutoLockStoreBuffer> lock;
-    if (sbToLock) {
-      lock.emplace(sbToLock);
+    if (needsLock) {
+      lock.emplace(trc->runtime());
     }
 
     GCPolicy<T>::traceWeak(trc, &cache);

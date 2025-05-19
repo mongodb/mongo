@@ -21,15 +21,17 @@ namespace internal {
 
 class ByteArrayData {
  public:
-  uint32_t length;
+  ByteArrayData(uint32_t length) : length_(length) {}
+
+  uint32_t length() { return length_; };
   uint8_t* data();
 
   uint8_t get(uint32_t index) {
-    MOZ_ASSERT(index < length);
+    MOZ_ASSERT(index < length());
     return data()[index];
   }
   void set(uint32_t index, uint8_t val) {
-    MOZ_ASSERT(index < length);
+    MOZ_ASSERT(index < length());
     data()[index] = val;
   }
 
@@ -39,9 +41,19 @@ class ByteArrayData {
   template <typename T>
   void setTyped(uint32_t index, T value);
 
+#ifdef DEBUG
+  const static uint32_t ExpectedMagic = 0x12344321;
+  uint32_t magic() const { return magic_; }
+
+ private:
+  uint32_t magic_ = ExpectedMagic;
+#endif
+
  private:
   template <typename T>
   T* typedData();
+
+  uint32_t length_;
 };
 
 class Isolate;

@@ -14,11 +14,15 @@
 #  include <windows.h>
 #  if defined(__MINGW32__) || defined(__MINGW64__)
 // Add missing constants and types for mingw builds
-#    define HREPORT HANDLE
-#    define PWER_SUBMIT_RESULT WER_SUBMIT_RESULT*
-#    define WER_MAX_PREFERRED_MODULES_BUFFER (256)
+typedef HANDLE HREPORT;
+#    define WerReportSubmit(a, b, c, d) \
+      WerReportSubmit(a, b, c, WER_SUBMIT_RESULT* pSubmitResult)
+#    define WER_MAX_PREFERRED_MODULES_BUFFER 256
 #  endif               // defined(__MINGW32__) || defined(__MINGW64__)
 #  include <werapi.h>  // For WerRegisterRuntimeExceptionModule()
+#  if defined(__MINGW32__) || defined(__MINGW64__)
+#    undef WerReportSubmit
+#  endif  // defined(__MINGW32__) || defined(__MINGW64__)
 #  include <stdlib.h>
 
 #  include "mozilla/Unused.h"

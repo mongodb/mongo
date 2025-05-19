@@ -39,6 +39,11 @@ class Watchtower {
                                       HandleId id);
   static bool watchPropertyChangeSlow(JSContext* cx, Handle<NativeObject*> obj,
                                       HandleId id, PropertyFlags flags);
+  template <AllowGC allowGC>
+  static bool watchPropertyModificationSlow(
+      JSContext* cx,
+      typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
+      typename MaybeRooted<PropertyKey, allowGC>::HandleType id);
   static bool watchFreezeOrSealSlow(JSContext* cx, Handle<NativeObject*> obj);
   static bool watchProtoChangeSlow(JSContext* cx, HandleObject obj);
   static bool watchObjectSwapSlow(JSContext* cx, HandleObject a,
@@ -50,14 +55,18 @@ class Watchtower {
         {ObjectFlag::IsUsedAsPrototype, ObjectFlag::UseWatchtowerTestingLog});
   }
   static bool watchesPropertyRemove(NativeObject* obj) {
-    return obj->hasAnyFlag({ObjectFlag::IsUsedAsPrototype,
-                            ObjectFlag::GenerationCountedGlobal,
-                            ObjectFlag::UseWatchtowerTestingLog});
+    return obj->hasAnyFlag(
+        {ObjectFlag::IsUsedAsPrototype, ObjectFlag::GenerationCountedGlobal,
+         ObjectFlag::UseWatchtowerTestingLog, ObjectFlag::HasFuseProperty});
   }
   static bool watchesPropertyChange(NativeObject* obj) {
-    return obj->hasAnyFlag({ObjectFlag::IsUsedAsPrototype,
-                            ObjectFlag::GenerationCountedGlobal,
-                            ObjectFlag::UseWatchtowerTestingLog});
+    return obj->hasAnyFlag(
+        {ObjectFlag::IsUsedAsPrototype, ObjectFlag::GenerationCountedGlobal,
+         ObjectFlag::HasFuseProperty, ObjectFlag::UseWatchtowerTestingLog});
+  }
+  static bool watchesPropertyModification(NativeObject* obj) {
+    return obj->hasAnyFlag(
+        {ObjectFlag::HasFuseProperty, ObjectFlag::UseWatchtowerTestingLog});
   }
   static bool watchesFreezeOrSeal(NativeObject* obj) {
     return obj->hasAnyFlag({ObjectFlag::UseWatchtowerTestingLog});
@@ -95,6 +104,19 @@ class Watchtower {
     }
     return watchPropertyChangeSlow(cx, obj, id, flags);
   }
+
+  // Note: We can only watch property modification for regular object slots
+  // with an id, not reserved slots.
+  template <AllowGC allowGC>
+  static bool watchPropertyModification(
+      JSContext* cx,
+      typename MaybeRooted<NativeObject*, allowGC>::HandleType obj,
+      typename MaybeRooted<PropertyKey, allowGC>::HandleType id) {
+    if (MOZ_LIKELY(!watchesPropertyModification(obj))) {
+      return true;
+    }
+    return watchPropertyModificationSlow<allowGC>(cx, obj, id);
+  }
   static bool watchFreezeOrSeal(JSContext* cx, Handle<NativeObject*> obj) {
     if (MOZ_LIKELY(!watchesFreezeOrSeal(obj))) {
       return true;
@@ -107,6 +129,7 @@ class Watchtower {
     }
     return watchProtoChangeSlow(cx, obj);
   }
+
   static bool watchObjectSwap(JSContext* cx, HandleObject a, HandleObject b) {
     if (MOZ_LIKELY(!watchesObjectSwap(a, b))) {
       return true;

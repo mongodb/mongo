@@ -2,15 +2,15 @@ const ZydisEncoderRelInfo *ZydisGetRelInfo(ZydisMnemonic mnemonic)
 {
     static const ZydisEncoderRelInfo info_lookup[9] =
     {
-        { { { 0, 3, 6 }, { 0, 4, 5 }, { 0, 0, 5 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 2, 4, 7 }, { 2, 5, 6 }, { 2, 0, 6 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_TRUE },
-        { { { 2, 0, 0 }, { 3, 0, 0 }, { 0, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 3, 0, 0 }, { 2, 0, 0 }, { 3, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 0, 0, 0 }, { 0, 0, 0 }, { 5, 0, 7 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 2, 3, 6 }, { 2, 4, 5 }, { 2, 0, 5 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 0, 0, 0 }, { 0, 0, 0 }, { 2, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE },
-        { { { 2, 0, 0 }, { 2, 0, 0 }, { 2, 0, 0 } }, ZYDIS_SIZE_HINT_ASZ, ZYAN_FALSE },
-        { { { 0, 4, 7 }, { 0, 5, 6 }, { 0, 5, 6 } }, ZYDIS_SIZE_HINT_OSZ, ZYAN_FALSE },
+        { { { 0, 3, 6 }, { 0, 4, 5 }, { 0, 0, 5 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_TRUE },
+        { { { 2, 4, 7 }, { 2, 5, 6 }, { 2, 0, 6 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_TRUE, ZYAN_TRUE },
+        { { { 2, 0, 0 }, { 3, 0, 0 }, { 0, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_FALSE },
+        { { { 3, 0, 0 }, { 2, 0, 0 }, { 3, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_FALSE },
+        { { { 0, 0, 0 }, { 0, 0, 0 }, { 5, 0, 7 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_FALSE },
+        { { { 2, 3, 6 }, { 2, 4, 5 }, { 2, 0, 5 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_TRUE },
+        { { { 0, 0, 0 }, { 0, 0, 0 }, { 2, 0, 0 } }, ZYDIS_SIZE_HINT_NONE, ZYAN_FALSE, ZYAN_FALSE },
+        { { { 2, 0, 0 }, { 2, 0, 0 }, { 2, 0, 0 } }, ZYDIS_SIZE_HINT_ASZ, ZYAN_FALSE, ZYAN_FALSE },
+        { { { 0, 4, 7 }, { 0, 5, 6 }, { 0, 5, 6 } }, ZYDIS_SIZE_HINT_OSZ, ZYAN_FALSE, ZYAN_FALSE },
     };
 
     switch (mnemonic)

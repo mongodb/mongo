@@ -28,11 +28,11 @@
 #include "mozilla/mscom/ProcessRuntime.h"
 #include "mozilla/ResultVariant.h"
 #include "mozilla/ScopeExit.h"
+#include "mozilla/Try.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/UniquePtrExtensions.h"
 #include "mozilla/Unused.h"
 #include "mozilla/WindowsDpiAwareness.h"
-#include "mozilla/WindowsVersion.h"
 #include "mozilla/WindowsProcessMitigations.h"
 
 namespace mozilla {
@@ -1830,10 +1830,6 @@ static Result<Ok, PreXULSkeletonUIError> CreateAndStorePreXULSkeletonUIImpl(
       mscom::ProcessRuntime::ProcessCategory::GeckoBrowserParent);
 
   const TimeStamp skeletonStart = TimeStamp::Now();
-
-  if (!IsWin10OrLater()) {
-    return Err(PreXULSkeletonUIError::Ineligible);
-  }
 
   HKEY regKey;
   MOZ_TRY_VAR(regKey, OpenPreXULSkeletonUIRegKey());

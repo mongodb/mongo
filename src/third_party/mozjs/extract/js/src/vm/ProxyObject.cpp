@@ -6,7 +6,6 @@
 
 #include "vm/ProxyObject.h"
 
-#include "gc/Allocator.h"
 #include "gc/GCProbes.h"
 #include "gc/Marking.h"
 #include "gc/Zone.h"
@@ -15,6 +14,7 @@
 #include "vm/Realm.h"
 
 #include "gc/ObjectKind-inl.h"
+#include "vm/JSContext-inl.h"
 
 using namespace js;
 

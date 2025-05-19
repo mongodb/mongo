@@ -472,7 +472,7 @@ class Simulator {
   void setCallResultDouble(double result);
   void setCallResultFloat(float result);
   void setCallResult(int64_t res);
-  void scratchVolatileRegisters(bool scratchFloat = true);
+  void scratchVolatileRegisters(void* target = nullptr);
 
   template <class ReturnType, int register_size>
   void getFromVFPRegister(int reg_index, ReturnType* out);

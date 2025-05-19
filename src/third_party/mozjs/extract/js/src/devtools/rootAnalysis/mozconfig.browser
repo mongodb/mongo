@@ -12,4 +12,8 @@ ac_add_options --enable-js-shell
 # the sixgill wrapper is not compatible with building wasm objects with clang.
 export WASM_SANDBOXED_LIBRARIES=
 
+# the hazard analysis is not happy with std::filesystem uses in relrhack host
+# tool.
+ac_add_options --disable-elf-hack
+
 . $topsrcdir/js/src/devtools/rootAnalysis/mozconfig.common

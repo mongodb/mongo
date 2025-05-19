@@ -19,7 +19,7 @@
 #include <stdint.h>  // uint16_t, uint32_t
 
 #include "frontend/AbstractScopePtr.h"  // ScopeIndex
-#include "frontend/BytecodeSection.h"  // BytecodeSection, PerScriptData, CGScopeList
+#include "frontend/BytecodeSection.h"  // BytecodeSection, PerScriptData, GCThingList
 #include "frontend/DestructuringFlavor.h"  // DestructuringFlavor
 #include "frontend/EitherParser.h"         // EitherParser
 #include "frontend/IteratorKind.h"         // IteratorKind
@@ -34,6 +34,7 @@
 #include "frontend/SourceNotes.h"          // SrcNoteType
 #include "frontend/ValueUsage.h"           // ValueUsage
 #include "js/AllocPolicy.h"                // ReportOutOfMemory
+#include "js/ColumnNumber.h"               // JS::LimitedColumnNumberOneOrigin
 #include "js/TypeDecls.h"                  // jsbytecode
 #include "vm/BuiltinObjectKind.h"          // BuiltinObjectKind
 #include "vm/CheckIsObjectKind.h"          // CheckIsObjectKind
@@ -215,6 +216,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
 
   BytecodeSection bytecodeSection_;
 
+  static constexpr unsigned LastSrcNoteIsNotLineOnly = unsigned(-1);
+
+  unsigned lastLineOnlySrcNoteIndex = LastSrcNoteIsNotLineOnly;
+
  public:
   BytecodeSection& bytecodeSection() { return bytecodeSection_; }
   const BytecodeSection& bytecodeSection() const { return bytecodeSection_; }
@@ -328,8 +333,6 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
                   SharedContext* sc, const ErrorReporter& errorReporter,
                   CompilationState& compilationState, EmitterMode emitterMode);
 
-  BytecodeEmitter(BytecodeEmitter* parent, SharedContext* sc);
-
   void initFromBodyPosition(TokenPos bodyPosition);
 
  public:
@@ -343,6 +346,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
                   EmitterMode emitterMode = Normal)
       : BytecodeEmitter(fc, EitherParser(parser), sc, compilationState,
                         emitterMode) {}
+
+  BytecodeEmitter(BytecodeEmitter* parent, SharedContext* sc);
 
   [[nodiscard]] bool init();
   [[nodiscard]] bool init(TokenPos bodyPosition);
@@ -489,6 +494,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   [[nodiscard]] bool newSrcNote(SrcNoteType type, unsigned* indexp = nullptr);
   [[nodiscard]] bool newSrcNote2(SrcNoteType type, ptrdiff_t operand,
                                  unsigned* indexp = nullptr);
+  [[nodiscard]] bool convertLastNewLineToNewLineColumn(
+      JS::LimitedColumnNumberOneOrigin column);
+  [[nodiscard]] bool convertLastSetLineToSetLineColumn(
+      JS::LimitedColumnNumberOneOrigin column);
 
   [[nodiscard]] bool newSrcNoteOperand(ptrdiff_t operand);
 
@@ -510,7 +519,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   // encompasses the entire source.
   [[nodiscard]] bool emitScript(ParseNode* body);
 
-  // Calculate the `nslots` value for BCEScriptStencil constructor parameter.
+  // Calculate the `nslots` value for ImmutableScriptData constructor parameter.
   // Fails if it overflows.
   [[nodiscard]] bool getNslots(uint32_t* nslots);
 
@@ -521,6 +530,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   [[nodiscard]] bool markSimpleBreakpoint();
   [[nodiscard]] bool updateLineNumberNotes(uint32_t offset);
   [[nodiscard]] bool updateSourceCoordNotes(uint32_t offset);
+  [[nodiscard]] bool updateSourceCoordNotesIfNonLiteral(ParseNode* node);
 
   JSOp strictifySetNameOp(JSOp op);
 
@@ -645,7 +655,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
 
   [[nodiscard]] bool emitObjLiteralArray(ListNode* array);
 
-  // Is a field value OBJLITERAL-compatible?
+  // Is a field value JSOp::Object-compatible?
   [[nodiscard]] bool isRHSObjLiteralCompatible(ParseNode* value);
 
   [[nodiscard]] bool emitObjLiteralValue(ObjLiteralWriter& writer,
@@ -657,7 +667,12 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
                                          FieldPlacement placement);
   [[nodiscard]] bool emitCreateMemberInitializers(ClassEmitter& ce,
                                                   ListNode* obj,
-                                                  FieldPlacement placement);
+                                                  FieldPlacement placement
+#ifdef ENABLE_DECORATORS
+                                                  ,
+                                                  bool hasHeritage
+#endif
+  );
   const MemberInitializers& findMemberInitializersForCall();
   [[nodiscard]] bool emitInitializeInstanceMembers(
       bool isDerivedClassConstructor);
@@ -809,15 +824,16 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
 
   JSOp getIterCallOp(JSOp callOp, SelfHostedIter selfHostedIter);
 
+  // Push the operands for emit(Async)Iterator onto the stack.
+  [[nodiscard]] bool emitIterable(ParseNode* value,
+                                  SelfHostedIter selfHostedIter,
+                                  IteratorKind iterKind = IteratorKind::Sync);
+
   // emitIterator expects the iterable to already be on the stack.
   // It will replace that stack value with the corresponding iterator
-  [[nodiscard]] bool emitIterator(
-      SelfHostedIter selfHostedIter = SelfHostedIter::Deny,
-      bool isIteratorMethodOnStack = false);
+  [[nodiscard]] bool emitIterator(SelfHostedIter selfHostedIter);
 
-  [[nodiscard]] bool emitAsyncIterator(
-      SelfHostedIter selfHostedIter = SelfHostedIter::Deny,
-      bool isIteratorMethodOnStack = false);
+  [[nodiscard]] bool emitAsyncIterator(SelfHostedIter selfHostedIter);
 
   // Pops iterator from the top of the stack. Pushes the result of |.next()|
   // onto the stack.
@@ -909,6 +925,8 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   // |op| must be JSOp::Typeof or JSOp::TypeofExpr.
   [[nodiscard]] bool emitTypeof(UnaryNode* typeofNode, JSOp op);
 
+  [[nodiscard]] bool tryEmitTypeofEq(ListNode* node, bool* emitted);
+
   [[nodiscard]] bool emitUnary(UnaryNode* unaryNode);
   [[nodiscard]] bool emitRightAssociative(ListNode* node);
   [[nodiscard]] bool emitLeftAssociative(ListNode* node);
@@ -935,12 +953,14 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   [[nodiscard]] bool emitSelfHostedForceInterpreter();
   [[nodiscard]] bool emitSelfHostedAllowContentIter(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedAllowContentIterWith(CallNode* callNode);
+  [[nodiscard]] bool emitSelfHostedAllowContentIterWithNext(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedDefineDataProperty(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedGetPropertySuper(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedHasOwn(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedToNumeric(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedToString(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedIsNullOrUndefined(CallNode* callNode);
+  [[nodiscard]] bool emitSelfHostedIteratorClose(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedGetBuiltinConstructor(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedGetBuiltinPrototype(CallNode* callNode);
   [[nodiscard]] bool emitSelfHostedGetBuiltinSymbol(CallNode* callNode);
@@ -994,8 +1014,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   // This shortcut can be used when spreading into arrays, as it assumes
   // `spreadeeStackItems = 2` (|ARRAY INDEX|) and `storeElementOp =
   // JSOp::InitElemInc`
-  [[nodiscard]] bool emitSpread(
-      SelfHostedIter selfHostedIter = SelfHostedIter::Deny);
+  [[nodiscard]] bool emitSpread(SelfHostedIter selfHostedIter);
 
   enum class ClassNameKind {
     // The class name is defined through its BindingIdentifier, if present.
@@ -1018,7 +1037,7 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
   [[nodiscard]] bool emitSuperGetElem(PropertyByValue* elem,
                                       bool isCall = false);
 
-  [[nodiscard]] bool emitCalleeAndThis(ParseNode* callee, ParseNode* call,
+  [[nodiscard]] bool emitCalleeAndThis(ParseNode* callee, CallNode* maybeCall,
                                        CallOrNewEmitter& cone);
 
   [[nodiscard]] bool emitOptionalCalleeAndThis(ParseNode* callee,
@@ -1051,6 +1070,10 @@ struct MOZ_STACK_CLASS BytecodeEmitter {
                                          ListNode* classMembers);
 
   [[nodiscard]] js::UniquePtr<ImmutableScriptData> createImmutableScriptData();
+
+#if defined(ENABLE_DECORATORS) || defined(ENABLE_EXPLICIT_RESOURCE_MANAGEMENT)
+  [[nodiscard]] bool emitCheckIsCallable();
+#endif
 
  private:
   [[nodiscard]] SelfHostedIter getSelfHostedIterFor(ParseNode* parseNode);

@@ -44,7 +44,7 @@ extern "C" {
 /* Enums and types                                                                                */
 /* ============================================================================================== */
 
-#if !(defined(ZYAN_AARCH64) && defined(ZYAN_APPLE))
+#if !defined(ZYAN_APPLE)
 #   pragma pack(push, 1)
 #endif
 
@@ -68,7 +68,7 @@ typedef struct ZydisShortString_
     ZyanU8 size;
 } ZydisShortString;
 
-#if !(defined(ZYAN_AARCH64) && defined(ZYAN_APPLE))
+#if !defined(ZYAN_APPLE)
 #   pragma pack(pop)
 #endif
 

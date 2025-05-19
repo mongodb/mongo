@@ -17,6 +17,7 @@ namespace js {
 // This is a mixin class to use for types that have trailing arrays and use
 // offsets to delimit them. It provides helper methods to do casting and
 // initialization while avoiding C++ undefined behaviour.
+template <typename Base>
 class TrailingArray {
  protected:
   // Offsets are measured in bytes relative to 'this'.
@@ -35,12 +36,13 @@ class TrailingArray {
   // Translate an offset into a concrete pointer.
   template <typename T>
   T* offsetToPointer(Offset offset) {
-    uintptr_t base = reinterpret_cast<uintptr_t>(this);
+    uintptr_t base = reinterpret_cast<uintptr_t>(static_cast<Base*>(this));
     return reinterpret_cast<T*>(base + offset);
   }
   template <typename T>
   const T* offsetToPointer(Offset offset) const {
-    uintptr_t base = reinterpret_cast<uintptr_t>(this);
+    uintptr_t base =
+        reinterpret_cast<uintptr_t>(static_cast<const Base*>(this));
     return reinterpret_cast<const T*>(base + offset);
   }
 
@@ -52,7 +54,8 @@ class TrailingArray {
     MOZ_ASSERT(isAlignedOffset<T>(offset));
 
     // Address of first array element.
-    uintptr_t elem = reinterpret_cast<uintptr_t>(this) + offset;
+    uintptr_t elem =
+        reinterpret_cast<uintptr_t>(static_cast<Base*>(this)) + offset;
 
     for (size_t i = 0; i < nelem; ++i) {
       void* raw = reinterpret_cast<void*>(elem);

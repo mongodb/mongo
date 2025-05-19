@@ -1,6 +1,6 @@
-diff --git a/mfbt/double-conversion/double-conversion/double-to-string.cc b/mfbt/double-conversion/double-conversion/double-to-string.cc
---- a/mfbt/double-conversion/double-conversion/double-to-string.cc
-+++ b/mfbt/double-conversion/double-conversion/double-to-string.cc
+diff --git a/double-conversion/double-to-string.cc b/double-conversion/double-to-string.cc
+--- a/double-conversion/double-to-string.cc
++++ b/double-conversion/double-to-string.cc
 @@ -207,25 +207,21 @@ bool DoubleToStringConverter::ToShortest
    }
    return true;
@@ -27,9 +27,9 @@ diff --git a/mfbt/double-conversion/double-conversion/double-to-string.cc b/mfbt
    const int kDecimalRepCapacity =
        kMaxFixedDigitsBeforePoint + kMaxFixedDigitsAfterPoint + 1;
    char decimal_rep[kDecimalRepCapacity];
-diff --git a/mfbt/double-conversion/double-conversion/double-to-string.h b/mfbt/double-conversion/double-conversion/double-to-string.h
---- a/mfbt/double-conversion/double-conversion/double-to-string.h
-+++ b/mfbt/double-conversion/double-conversion/double-to-string.h
+diff --git a/double-conversion/double-to-string.h b/double-conversion/double-to-string.h
+--- a/double-conversion/double-to-string.h
++++ b/double-conversion/double-to-string.h
 @@ -33,17 +33,17 @@
  
  namespace double_conversion {

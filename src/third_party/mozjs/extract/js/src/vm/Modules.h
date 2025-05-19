@@ -20,20 +20,32 @@ namespace js {
 
 using ModuleVector = GCVector<ModuleObject*, 0, SystemAllocPolicy>;
 
-bool ModuleResolveExport(JSContext* cx, Handle<ModuleObject*> module,
-                         Handle<JSAtom*> exportName,
-                         MutableHandle<Value> result);
+// A struct with detailed error information when import/export failed.
+struct ModuleErrorInfo {
+  ModuleErrorInfo(uint32_t lineNumber_, JS::ColumnNumberOneOrigin columnNumber_)
+      : lineNumber(lineNumber_), columnNumber(columnNumber_) {}
+
+  void setImportedModule(JSContext* cx, ModuleObject* importedModule);
+  void setCircularImport(JSContext* cx, ModuleObject* importedModule);
+  void setForAmbiguousImport(JSContext* cx, ModuleObject* importedModule,
+                             ModuleObject* module1, ModuleObject* module2);
+
+  uint32_t lineNumber;
+  JS::ColumnNumberOneOrigin columnNumber;
+
+  // The filename of the imported module.
+  const char* imported;
+
+  // The filenames of the ambiguous entries.
+  const char* entry1;
+  const char* entry2;
+
+  // A bool to indicate the error is a circular import when it's true.
+  bool isCircular = false;
+};
 
 ModuleNamespaceObject* GetOrCreateModuleNamespace(JSContext* cx,
                                                   Handle<ModuleObject*> module);
-
-bool ModuleInitializeEnvironment(JSContext* cx, Handle<ModuleObject*> module);
-
-bool ModuleLink(JSContext* cx, Handle<ModuleObject*> module);
-
-// Start evaluating the module. If TLA is enabled, result will be a promise.
-bool ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> module,
-                    MutableHandle<Value> result);
 
 void AsyncModuleExecutionFulfilled(JSContext* cx, Handle<ModuleObject*> module);
 

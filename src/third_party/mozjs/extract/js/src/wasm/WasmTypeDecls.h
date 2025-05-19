@@ -41,6 +41,8 @@ class WasmTagObject;
 class WasmExceptionObject;
 
 using WasmInstanceObjectVector = GCVector<WasmInstanceObject*>;
+using WasmMemoryObjectVector =
+    GCVector<WasmMemoryObject*, 0, SystemAllocPolicy>;
 using WasmTableObjectVector = GCVector<WasmTableObject*, 0, SystemAllocPolicy>;
 using WasmGlobalObjectVector =
     GCVector<WasmGlobalObject*, 0, SystemAllocPolicy>;
@@ -75,10 +77,8 @@ using MutableDataSegment = RefPtr<DataSegment>;
 using SharedDataSegment = RefPtr<const DataSegment>;
 using DataSegmentVector = Vector<SharedDataSegment, 0, SystemAllocPolicy>;
 
-struct ElemSegment;
-using MutableElemSegment = RefPtr<ElemSegment>;
-using SharedElemSegment = RefPtr<const ElemSegment>;
-using ElemSegmentVector = Vector<SharedElemSegment, 0, SystemAllocPolicy>;
+struct ModuleElemSegment;
+using ModuleElemSegmentVector = Vector<ModuleElemSegment, 0, SystemAllocPolicy>;
 
 class Val;
 using ValVector = GCVector<Val, 0, SystemAllocPolicy>;

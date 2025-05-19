@@ -26,7 +26,6 @@
 #include "jstypes.h"  // JS_PUBLIC_API
 
 #include "js/CharacterEncoding.h"  // JS::UTF8Chars, JS::ConstUTF8CharsZ
-#include "js/Id.h"                 // jsid, JSID_IS_STRING, JSID_TO_STRING
 #include "js/RootingAPI.h"         // JS::Handle
 #include "js/TypeDecls.h"          // JS::Latin1Char
 #include "js/UniquePtr.h"          // JS::UniquePtr
@@ -68,7 +67,7 @@ extern JS_PUBLIC_API JSString* JS_NewStringCopyUTF8Z(
     JSContext* cx, const JS::ConstUTF8CharsZ s);
 
 extern JS_PUBLIC_API JSString* JS_NewStringCopyUTF8N(JSContext* cx,
-                                                     const JS::UTF8Chars s);
+                                                     const JS::UTF8Chars& s);
 
 extern JS_PUBLIC_API JSString* JS_AtomizeStringN(JSContext* cx, const char* s,
                                                  size_t length);
@@ -192,9 +191,8 @@ extern JS_PUBLIC_API bool JS_GetStringCharAt(JSContext* cx, JSString* str,
 extern JS_PUBLIC_API const char16_t* JS_GetTwoByteExternalStringChars(
     JSString* str);
 
-extern JS_PUBLIC_API bool JS_CopyStringChars(JSContext* cx,
-                                             mozilla::Range<char16_t> dest,
-                                             JSString* str);
+extern JS_PUBLIC_API bool JS_CopyStringChars(
+    JSContext* cx, const mozilla::Range<char16_t>& dest, JSString* str);
 
 /**
  * Copies the string's characters to a null-terminated char16_t buffer.
@@ -393,17 +391,37 @@ MOZ_ALWAYS_INLINE JSLinearString* AtomToLinearString(JSAtom* atom) {
 }
 
 /**
- * If the provided string uses externally-managed storage, return true and set
- * |*callbacks| to the external-string callbacks used to create it and |*chars|
- * to a pointer to its two-byte storage.  (These pointers remain valid as long
- * as the provided string is kept alive.)
+ * If the provided string uses externally-managed latin-1 storage, return true
+ * and set |*callbacks| to the external-string callbacks used to create it and
+ * |*chars| to a pointer to its latin1 storage.  (These pointers remain valid
+ * as long as the provided string is kept alive.)
  */
-MOZ_ALWAYS_INLINE bool IsExternalString(
+MOZ_ALWAYS_INLINE bool IsExternalStringLatin1(
+    JSString* str, const JSExternalStringCallbacks** callbacks,
+    const JS::Latin1Char** chars) {
+  shadow::String* s = shadow::AsShadowString(str);
+
+  if (!s->isExternal() || !s->hasLatin1Chars()) {
+    return false;
+  }
+
+  *callbacks = s->externalCallbacks;
+  *chars = s->nonInlineCharsLatin1;
+  return true;
+}
+
+/**
+ * If the provided string uses externally-managed two-byte storage, return true
+ * and set |*callbacks| to the external-string callbacks used to create it and
+ * |*chars| to a pointer to its two-byte storage.  (These pointers remain valid
+ * as long as the provided string is kept alive.)
+ */
+MOZ_ALWAYS_INLINE bool IsExternalUCString(
     JSString* str, const JSExternalStringCallbacks** callbacks,
     const char16_t** chars) {
   shadow::String* s = shadow::AsShadowString(str);
 
-  if (!s->isExternal()) {
+  if (!s->isExternal() || s->hasLatin1Chars()) {
     return false;
   }
 

@@ -76,6 +76,7 @@ mongo_cc_library(
         "extract/mfbt/lz4/xxhash.c",
         "extract/mozglue/misc/AutoProfilerLabel.cpp",
         "extract/mozglue/misc/AwakeTimeStamp.cpp",
+        "extract/mozglue/misc/Debug.cpp",
         "extract/mozglue/misc/MmapFaultHandler.cpp",
         "extract/mozglue/misc/Printf.cpp",
         "extract/mozglue/misc/SIMD.cpp",
@@ -312,6 +313,9 @@ mongo_cc_library(
     ] + PLATFORM_INCLUDES,
     linkopts = select({
         "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+        "@platforms//os:windows": [
+            "ntdll.lib",
+        ],
         "//conditions:default": [""],
     }),
     local_defines = [

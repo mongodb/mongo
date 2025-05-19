@@ -215,7 +215,7 @@ static void RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind,
   // Allocate a new cell.
   MOZ_ASSERT(zone == src->zone());
   TenuredCell* dst =
-      reinterpret_cast<TenuredCell*>(AllocateCellInGC(zone, thingKind));
+      reinterpret_cast<TenuredCell*>(AllocateTenuredCellInGC(zone, thingKind));
 
   // Copy source cell contents to destination.
   memcpy(dst, src, thingSize);
@@ -266,8 +266,12 @@ static void RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind,
   JSObject* srcObj = IsObjectAllocKind(thingKind)
                          ? static_cast<JSObject*>(static_cast<Cell*>(src))
                          : nullptr;
-  if (!srcObj || !srcObj->is<NativeObject>() ||
-      !srcObj->as<NativeObject>().hasFixedElements()) {
+  bool doNotPoison =
+      srcObj && ((srcObj->is<NativeObject>() &&
+                  srcObj->as<NativeObject>().hasFixedElements()) ||
+                 (srcObj->is<WasmArrayObject>() &&
+                  srcObj->as<WasmArrayObject>().isDataInline()));
+  if (!doNotPoison) {
     AlwaysPoison(reinterpret_cast<uint8_t*>(src) + sizeof(uintptr_t),
                  JS_MOVED_TENURED_PATTERN, thingSize - sizeof(uintptr_t),
                  MemCheckKind::MakeNoAccess);
@@ -329,7 +333,7 @@ Arena* ArenaList::relocateArenas(Arena* toRelocate, Arena* relocated,
 
 // Skip compacting zones unless we can free a certain proportion of their GC
 // heap memory.
-static const float MIN_ZONE_RECLAIM_PERCENT = 2.0;
+static const double MIN_ZONE_RECLAIM_PERCENT = 2.0;
 
 static bool ShouldRelocateZone(size_t arenaCount, size_t relocCount,
                                JS::GCReason reason) {
@@ -341,7 +345,8 @@ static bool ShouldRelocateZone(size_t arenaCount, size_t relocCount,
     return true;
   }
 
-  return (relocCount * 100.0f) / arenaCount >= MIN_ZONE_RECLAIM_PERCENT;
+  double relocFraction = double(relocCount) / double(arenaCount);
+  return relocFraction * 100.0 >= MIN_ZONE_RECLAIM_PERCENT;
 }
 
 static AllocKinds CompactingAllocKinds() {
@@ -458,26 +463,25 @@ void GCRuntime::sweepZoneAfterCompacting(MovingTracer* trc, Zone* zone) {
   MOZ_ASSERT(zone->isGCCompacting());
 
   zone->traceWeakMaps(trc);
+  zone->sweepObjectsWithWeakPointers(trc);
 
   traceWeakFinalizationObserverEdges(trc, zone);
 
   for (auto* cache : zone->weakCaches()) {
-    cache->traceWeak(trc, nullptr);
+    cache->traceWeak(trc, JS::detail::WeakCacheBase::DontLockStoreBuffer);
   }
 
   if (jit::JitZone* jitZone = zone->jitZone()) {
-    jitZone->traceWeak(trc);
+    jitZone->traceWeak(trc, zone);
   }
 
   for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
     c->traceWeakNativeIterators(trc);
 
     for (RealmsInCompartmentIter r(c); !r.done(); r.next()) {
-      r->traceWeakRegExps(trc);
       r->traceWeakSavedStacks(trc);
       r->traceWeakGlobalEdge(trc);
       r->traceWeakDebugEnvironmentEdges(trc);
-      r->traceWeakEdgesInJitRealm(trc);
     }
   }
 }
@@ -803,6 +807,8 @@ void GCRuntime::updateRuntimePointersToRelocatedCells(AutoGCSession& session) {
 
   traceRuntimeForMajorGC(&trc, session);
 
+  jit::UpdateJitActivationsForCompactingGC(rt);
+
   {
     gcstats::AutoPhase ap2(stats(), gcstats::PhaseKind::MARK_ROOTS);
     DebugAPI::traceAllForMovingGC(&trc);
@@ -817,7 +823,7 @@ void GCRuntime::updateRuntimePointersToRelocatedCells(AutoGCSession& session) {
   // Sweep everything to fix up weak pointers.
   jit::JitRuntime::TraceWeakJitcodeGlobalTable(rt, &trc);
   for (JS::detail::WeakCacheBase* cache : rt->weakCaches()) {
-    cache->traceWeak(&trc, nullptr);
+    cache->traceWeak(&trc, JS::detail::WeakCacheBase::DontLockStoreBuffer);
   }
 
   if (rt->hasJitRuntime() && rt->jitRuntime()->hasInterpreterEntryMap()) {

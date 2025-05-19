@@ -18,6 +18,12 @@ using namespace js;
 
 void JSONPrinter::indent() {
   MOZ_ASSERT(indentLevel_ >= 0);
+
+  if (inlineLevel_ > 0) {
+    out_.putChar(' ');
+    return;
+  }
+
   if (indent_) {
     out_.putChar('\n');
     for (int i = 0; i < indentLevel_; i++) {
@@ -26,11 +32,15 @@ void JSONPrinter::indent() {
   }
 }
 
-void JSONPrinter::propertyName(const char* name) {
+void JSONPrinter::beforeValue() {
   if (!first_) {
     out_.putChar(',');
   }
   indent();
+}
+
+void JSONPrinter::propertyName(const char* name) {
+  beforeValue();
   out_.printf("\"%s\":", name);
   if (indent_) {
     out_.put(" ");
@@ -39,20 +49,14 @@ void JSONPrinter::propertyName(const char* name) {
 }
 
 void JSONPrinter::beginObject() {
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.putChar('{');
   indentLevel_++;
   first_ = true;
 }
 
 void JSONPrinter::beginList() {
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.putChar('[');
   indentLevel_++;
   first_ = true;
@@ -72,6 +76,11 @@ void JSONPrinter::beginListProperty(const char* name) {
   first_ = true;
 }
 
+void JSONPrinter::beginInlineListProperty(const char* name) {
+  beginListProperty(name);
+  beginInline();
+}
+
 GenericPrinter& JSONPrinter::beginStringProperty(const char* name) {
   propertyName(name);
   out_.putChar('"');
@@ -84,10 +93,7 @@ void JSONPrinter::endStringProperty() {
 }
 
 GenericPrinter& JSONPrinter::beginString() {
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.putChar('"');
   return out_;
 }
@@ -148,8 +154,8 @@ void JSONPrinter::formatProperty(const char* name, const char* format, ...) {
   va_end(ap);
 }
 
-void JSONPrinter::formatProperty(const char* name, const char* format,
-                                 va_list ap) {
+void JSONPrinter::formatPropertyVA(const char* name, const char* format,
+                                   va_list ap) {
   beginStringProperty(name);
   out_.vprintf(format, ap);
   endStringProperty();
@@ -159,10 +165,7 @@ void JSONPrinter::value(const char* format, ...) {
   va_list ap;
   va_start(ap, format);
 
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.putChar('"');
   out_.vprintf(format, ap);
   out_.putChar('"');
@@ -177,10 +180,7 @@ void JSONPrinter::property(const char* name, int32_t value) {
 }
 
 void JSONPrinter::value(int val) {
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.printf("%d", val);
   first_ = false;
 }
@@ -250,10 +250,7 @@ void JSONPrinter::nullProperty(const char* name) {
 }
 
 void JSONPrinter::nullValue() {
-  if (!first_) {
-    out_.putChar(',');
-  }
-  indent();
+  beforeValue();
   out_.put("null");
   first_ = false;
 }
@@ -271,3 +268,12 @@ void JSONPrinter::endList() {
   out_.putChar(']');
   first_ = false;
 }
+
+void JSONPrinter::endInlineList() {
+  endList();
+  endInline();
+}
+
+void JSONPrinter::beginInline() { inlineLevel_++; }
+
+void JSONPrinter::endInline() { inlineLevel_--; }

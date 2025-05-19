@@ -58,6 +58,9 @@ class CodeGeneratorShared : public LElementVisitor {
   // Label for the common return path.
   NonAssertingLabel returnLabel_;
 
+  // Amount of bytes allocated for incoming args. Used for Wasm return calls.
+  uint32_t inboundStackArgBytes_;
+
   js::Vector<CodegenSafepointIndex, 0, SystemAllocPolicy> safepointIndices_;
   js::Vector<OsiIndex, 0, SystemAllocPolicy> osiIndices_;
 
@@ -195,7 +198,7 @@ class CodeGeneratorShared : public LElementVisitor {
   void encode(LRecoverInfo* recover);
   void encode(LSnapshot* snapshot);
   void encodeAllocation(LSnapshot* snapshot, MDefinition* def,
-                        uint32_t* startIndex);
+                        uint32_t* startIndex, bool hasSideEffects);
 
   // Encode all encountered safepoints in CG-order, and resolve |indices| for
   // safepoint offsets.

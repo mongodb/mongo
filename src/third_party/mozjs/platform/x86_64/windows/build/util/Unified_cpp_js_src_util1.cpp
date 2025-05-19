@@ -1,4 +1,13 @@
 #define MOZ_UNIFIED_BUILD
+#include "util/Printf.cpp"
+#ifdef PL_ARENA_CONST_ALIGN_MASK
+#error "util/Printf.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#undef PL_ARENA_CONST_ALIGN_MASK
+#endif
+#ifdef INITGUID
+#error "util/Printf.cpp defines INITGUID, so it cannot be built in unified mode."
+#undef INITGUID
+#endif
 #include "util/StringBuffer.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
 #error "util/StringBuffer.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."

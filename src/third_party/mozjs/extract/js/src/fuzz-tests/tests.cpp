@@ -11,6 +11,8 @@
 #include "js/AllocPolicy.h"
 #include "js/GlobalObject.h"
 #include "js/Initialization.h"
+#include "js/Prefs.h"
+#include "js/RealmOptions.h"
 #include "js/RootingAPI.h"
 #include "js/Stack.h"
 #include "vm/JSContext.h"
@@ -33,8 +35,7 @@ static const JSClass* getGlobalClass() {
 static JSObject* jsfuzz_createGlobal(JSContext* cx, JSPrincipals* principals) {
   /* Create the global object. */
   JS::RealmOptions options;
-  options.creationOptions().setWeakRefsEnabled(
-      JS::WeakRefSpecifier::EnabledWithCleanupSome);
+  options.creationOptions().setSharedMemoryAndAtomicsEnabled(true);
   return JS_NewGlobalObject(cx, getGlobalClass(), principals,
                             JS::FireOnNewGlobalHook, options);
 }
@@ -71,6 +72,10 @@ static void jsfuzz_uninit(JSContext* cx) {
 }
 
 int main(int argc, char* argv[]) {
+  // Override prefs for fuzz-tests.
+  JS::Prefs::setAtStartup_weakrefs(true);
+  JS::Prefs::setAtStartup_experimental_weakrefs_expose_cleanupSome(true);
+
   if (!JS_Init()) {
     fprintf(stderr, "Error: Call to jsfuzz_init() failed\n");
     return 1;

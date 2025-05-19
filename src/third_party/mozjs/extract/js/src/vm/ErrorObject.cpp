@@ -22,8 +22,9 @@
 #include "gc/GCContext.h"
 #include "js/CallArgs.h"
 #include "js/CallNonGenericMethod.h"
-#include "js/CharacterEncoding.h"
+#include "js/CharacterEncoding.h"  // JS::ConstUTF8CharsZ
 #include "js/Class.h"
+#include "js/ColumnNumber.h"  // JS::ColumnNumberOneOrigin
 #include "js/Conversions.h"
 #include "js/ErrorReport.h"
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
@@ -38,7 +39,7 @@
 #include "util/StringBuffer.h"
 #include "vm/GlobalObject.h"
 #include "vm/Iteration.h"
-#include "vm/JSAtom.h"
+#include "vm/JSAtomUtils.h"  // ClassName
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
 #include "vm/NativeObject.h"
@@ -48,8 +49,7 @@
 #include "vm/Shape.h"
 #include "vm/Stack.h"
 #include "vm/StringType.h"
-#include "vm/ToSource.h"       // js::ValueToSource
-#include "vm/WellKnownAtom.h"  // js_*_str
+#include "vm/ToSource.h"  // js::ValueToSource
 
 #include "vm/JSContext-inl.h"
 #include "vm/JSObject-inl.h"
@@ -86,8 +86,8 @@ const JSClass ErrorObject::protoClasses[JSEXN_ERROR_LIMIT] = {
 static bool exn_toSource(JSContext* cx, unsigned argc, Value* vp);
 
 static const JSFunctionSpec error_methods[] = {
-    JS_FN(js_toSource_str, exn_toSource, 0, 0),
-    JS_SELF_HOSTED_FN(js_toString_str, "ErrorToString", 0, 0), JS_FS_END};
+    JS_FN("toSource", exn_toSource, 0, 0),
+    JS_SELF_HOSTED_FN("toString", "ErrorToString", 0, 0), JS_FS_END};
 
 // Error.prototype and NativeError.prototype have own .message and .name
 // properties.
@@ -259,14 +259,16 @@ static ErrorObject* CreateErrorObject(JSContext* cx, const CallArgs& args,
     return nullptr;
   }
 
-  uint32_t lineNumber, columnNumber = 0;
+  uint32_t lineNumber;
+  JS::ColumnNumberOneOrigin columnNumber;
   if (!hasOptions && args.length() > messageArg + 2) {
     if (!ToUint32(cx, args[messageArg + 2], &lineNumber)) {
       return nullptr;
     }
   } else {
-    lineNumber = iter.done() ? 0 : iter.computeLine(&columnNumber);
-    columnNumber = FixupColumnForDisplay(columnNumber);
+    JS::TaggedColumnNumberOneOrigin tmp;
+    lineNumber = iter.done() ? 0 : iter.computeLine(&tmp);
+    columnNumber = JS::ColumnNumberOneOrigin(tmp.oneOriginValue());
   }
 
   RootedObject stack(cx);
@@ -445,7 +447,8 @@ bool js::ErrorObject::init(JSContext* cx, Handle<ErrorObject*> obj,
                            JSExnType type, UniquePtr<JSErrorReport> errorReport,
                            HandleString fileName, HandleObject stack,
                            uint32_t sourceId, uint32_t lineNumber,
-                           uint32_t columnNumber, HandleString message,
+                           JS::ColumnNumberOneOrigin columnNumber,
+                           HandleString message,
                            Handle<mozilla::Maybe<JS::Value>> cause) {
   MOZ_ASSERT(JSEXN_ERR <= type && type < JSEXN_ERROR_LIMIT);
   AssertObjectIsSavedFrameOrWrapper(cx, stack);
@@ -501,7 +504,8 @@ bool js::ErrorObject::init(JSContext* cx, Handle<ErrorObject*> obj,
   obj->setReservedSlot(ERROR_REPORT_SLOT, PrivateValue(report));
   obj->initReservedSlot(FILENAME_SLOT, StringValue(fileName));
   obj->initReservedSlot(LINENUMBER_SLOT, Int32Value(lineNumber));
-  obj->initReservedSlot(COLUMNNUMBER_SLOT, Int32Value(columnNumber));
+  obj->initReservedSlot(COLUMNNUMBER_SLOT,
+                        Int32Value(columnNumber.oneOriginValue()));
   if (message) {
     obj->initReservedSlot(MESSAGE_SLOT, StringValue(message));
   }
@@ -523,7 +527,7 @@ bool js::ErrorObject::init(JSContext* cx, Handle<ErrorObject*> obj,
 ErrorObject* js::ErrorObject::create(JSContext* cx, JSExnType errorType,
                                      HandleObject stack, HandleString fileName,
                                      uint32_t sourceId, uint32_t lineNumber,
-                                     uint32_t columnNumber,
+                                     JS::ColumnNumberOneOrigin columnNumber,
                                      UniquePtr<JSErrorReport> report,
                                      HandleString message,
                                      Handle<mozilla::Maybe<JS::Value>> cause,
@@ -577,7 +581,7 @@ JSErrorReport* js::ErrorObject::getOrCreateErrorReport(JSContext* cx) {
   if (!filenameStr) {
     return nullptr;
   }
-  report.filename = filenameStr.get();
+  report.filename = JS::ConstUTF8CharsZ(filenameStr.get());
 
   // Coordinates.
   report.sourceId = sourceId();
@@ -638,8 +642,8 @@ static bool FindErrorInstanceOrPrototype(JSContext* cx, HandleObject obj,
   // We walked the whole prototype chain and did not find an Error
   // object.
   JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
-                            JSMSG_INCOMPATIBLE_PROTO, js_Error_str,
-                            "(get stack)", obj->getClass()->name);
+                            JSMSG_INCOMPATIBLE_PROTO, "Error", "(get stack)",
+                            obj->getClass()->name);
   return false;
 }
 

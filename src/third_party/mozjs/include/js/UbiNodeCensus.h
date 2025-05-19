@@ -7,6 +7,7 @@
 #ifndef js_UbiNodeCensus_h
 #define js_UbiNodeCensus_h
 
+#include "js/GCVector.h"
 #include "js/UbiNode.h"
 #include "js/UbiNodeBreadthFirst.h"
 
@@ -222,8 +223,9 @@ using CensusTraversal = BreadthFirst<CensusHandler>;
 // Parse the breakdown language (as described in
 // js/src/doc/Debugger/Debugger.Memory.md) into a CountTypePtr. A null pointer
 // is returned on error and is reported to the cx.
-JS_PUBLIC_API CountTypePtr ParseBreakdown(JSContext* cx,
-                                          HandleValue breakdownValue);
+JS_PUBLIC_API CountTypePtr
+ParseBreakdown(JSContext* cx, HandleValue breakdownValue,
+               MutableHandle<JS::GCVector<JSLinearString*>> seen);
 
 }  // namespace ubi
 }  // namespace JS

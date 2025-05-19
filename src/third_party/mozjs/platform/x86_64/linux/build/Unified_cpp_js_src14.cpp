@@ -1,55 +1,55 @@
 #define MOZ_UNIFIED_BUILD
-#include "vm/JSAtom.cpp"
+#include "vm/Initialization.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSAtom.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Initialization.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSAtom.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Initialization.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/JSContext.cpp"
+#include "vm/InternalThreadPool.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSContext.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/InternalThreadPool.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSContext.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/InternalThreadPool.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/JSFunction.cpp"
+#include "vm/InvalidatingFuse.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSFunction.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/InvalidatingFuse.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSFunction.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/InvalidatingFuse.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/JSONParser.cpp"
+#include "vm/Iteration.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSONParser.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Iteration.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSONParser.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Iteration.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/JSONPrinter.cpp"
+#include "vm/Iterator.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSONPrinter.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/Iterator.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSONPrinter.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/Iterator.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif
-#include "vm/JSObject.cpp"
+#include "vm/JSAtomUtils.cpp"
 #ifdef PL_ARENA_CONST_ALIGN_MASK
-#error "vm/JSObject.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
+#error "vm/JSAtomUtils.cpp uses PL_ARENA_CONST_ALIGN_MASK, so it cannot be built in unified mode."
 #undef PL_ARENA_CONST_ALIGN_MASK
 #endif
 #ifdef INITGUID
-#error "vm/JSObject.cpp defines INITGUID, so it cannot be built in unified mode."
+#error "vm/JSAtomUtils.cpp defines INITGUID, so it cannot be built in unified mode."
 #undef INITGUID
 #endif

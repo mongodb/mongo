@@ -128,8 +128,10 @@ extern const uint8_t index1[];
 extern const uint8_t index2[];
 extern const CharacterInfo js_charinfo[];
 
+constexpr size_t CharInfoShift = 6;
+
 inline const CharacterInfo& CharInfo(char16_t code) {
-  const size_t shift = 6;
+  const size_t shift = CharInfoShift;
   size_t index = index1[code >> shift];
   index = index2[(index << shift) + (code & ((1 << shift) - 1))];
 

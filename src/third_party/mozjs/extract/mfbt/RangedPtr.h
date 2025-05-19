@@ -47,19 +47,19 @@ class RangedPtr {
 
   T* mPtr;
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
   T* const mRangeStart;
   T* const mRangeEnd;
 #endif
 
   void checkSanity() {
-    MOZ_ASSERT(mRangeStart <= mPtr);
-    MOZ_ASSERT(mPtr <= mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mRangeStart <= mPtr);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr <= mRangeEnd);
   }
 
   /* Creates a new pointer for |aPtr|, restricted to this pointer's range. */
   RangedPtr<T> create(T* aPtr) const {
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
     return RangedPtr<T>(aPtr, mRangeStart, mRangeEnd);
 #else
     return RangedPtr<T>(aPtr, nullptr, size_t(0));
@@ -71,41 +71,43 @@ class RangedPtr {
  public:
   RangedPtr(T* aPtr, T* aStart, T* aEnd)
       : mPtr(aPtr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aStart),
         mRangeEnd(aEnd)
 #endif
   {
-    MOZ_ASSERT(mRangeStart <= mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mRangeStart <= mRangeEnd);
     checkSanity();
   }
   RangedPtr(T* aPtr, T* aStart, size_t aLength)
       : mPtr(aPtr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aStart),
         mRangeEnd(aStart + aLength)
 #endif
   {
-    MOZ_ASSERT(aLength <= size_t(-1) / sizeof(T));
-    MOZ_ASSERT(reinterpret_cast<uintptr_t>(mRangeStart) + aLength * sizeof(T) >=
-               reinterpret_cast<uintptr_t>(mRangeStart));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aLength <= size_t(-1) / sizeof(T));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(reinterpret_cast<uintptr_t>(mRangeStart) +
+                                    aLength * sizeof(T) >=
+                                reinterpret_cast<uintptr_t>(mRangeStart));
     checkSanity();
   }
 
   /* Equivalent to RangedPtr(aPtr, aPtr, aLength). */
   RangedPtr(T* aPtr, size_t aLength)
       : mPtr(aPtr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aPtr),
         mRangeEnd(aPtr + aLength)
 #endif
   {
-    MOZ_ASSERT(aLength <= size_t(-1) / sizeof(T));
-    MOZ_ASSERT(reinterpret_cast<uintptr_t>(mRangeStart) + aLength * sizeof(T) >=
-               reinterpret_cast<uintptr_t>(mRangeStart));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aLength <= size_t(-1) / sizeof(T));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(reinterpret_cast<uintptr_t>(mRangeStart) +
+                                    aLength * sizeof(T) >=
+                                reinterpret_cast<uintptr_t>(mRangeStart));
     checkSanity();
   }
 
@@ -113,7 +115,7 @@ class RangedPtr {
   template <size_t N>
   explicit RangedPtr(T (&aArr)[N])
       : mPtr(aArr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aArr),
         mRangeEnd(aArr + N)
@@ -124,7 +126,7 @@ class RangedPtr {
 
   RangedPtr(const RangedPtr& aOther)
       : mPtr(aOther.mPtr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aOther.mRangeStart),
         mRangeEnd(aOther.mRangeEnd)
@@ -136,7 +138,7 @@ class RangedPtr {
   template <typename U>
   MOZ_IMPLICIT RangedPtr(const RangedPtr<U>& aOther)
       : mPtr(aOther.mPtr)
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
         ,
         mRangeStart(aOther.mRangeStart),
         mRangeEnd(aOther.mRangeEnd)
@@ -150,13 +152,13 @@ class RangedPtr {
   explicit operator bool() const { return mPtr != nullptr; }
 
   void checkIdenticalRange(const RangedPtr<T>& aOther) const {
-    MOZ_ASSERT(mRangeStart == aOther.mRangeStart);
-    MOZ_ASSERT(mRangeEnd == aOther.mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mRangeStart == aOther.mRangeStart);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mRangeEnd == aOther.mRangeEnd);
   }
 
   template <typename U>
   RangedPtr<U> ReinterpretCast() const {
-#ifdef DEBUG
+#if defined(DEBUG) || defined(FUZZING)
     return {reinterpret_cast<U*>(mPtr), reinterpret_cast<U*>(mRangeStart),
             reinterpret_cast<U*>(mRangeEnd)};
 #else
@@ -182,14 +184,14 @@ class RangedPtr {
   }
 
   RangedPtr<T> operator+(size_t aInc) const {
-    MOZ_ASSERT(aInc <= size_t(-1) / sizeof(T));
-    MOZ_ASSERT(asUintptr() + aInc * sizeof(T) >= asUintptr());
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aInc <= size_t(-1) / sizeof(T));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(asUintptr() + aInc * sizeof(T) >= asUintptr());
     return create(mPtr + aInc);
   }
 
   RangedPtr<T> operator-(size_t aDec) const {
-    MOZ_ASSERT(aDec <= size_t(-1) / sizeof(T));
-    MOZ_ASSERT(asUintptr() - aDec * sizeof(T) <= asUintptr());
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aDec <= size_t(-1) / sizeof(T));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(asUintptr() - aDec * sizeof(T) <= asUintptr());
     return create(mPtr - aDec);
   }
 
@@ -205,8 +207,8 @@ class RangedPtr {
 
   template <typename U>
   RangedPtr<T>& operator=(const RangedPtr<U>& aPtr) {
-    MOZ_ASSERT(mRangeStart <= aPtr.mPtr);
-    MOZ_ASSERT(aPtr.mPtr <= mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mRangeStart <= aPtr.mPtr);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(aPtr.mPtr <= mRangeEnd);
     mPtr = aPtr.mPtr;
     checkSanity();
     return *this;
@@ -239,19 +241,20 @@ class RangedPtr {
   }
 
   T& operator[](ptrdiff_t aIndex) const {
-    MOZ_ASSERT(size_t(aIndex > 0 ? aIndex : -aIndex) <= size_t(-1) / sizeof(T));
+    MOZ_ASSERT_DEBUG_OR_FUZZING(size_t(aIndex > 0 ? aIndex : -aIndex) <=
+                                size_t(-1) / sizeof(T));
     return *create(mPtr + aIndex);
   }
 
   T& operator*() const {
-    MOZ_ASSERT(mPtr >= mRangeStart);
-    MOZ_ASSERT(mPtr < mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr >= mRangeStart);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr < mRangeEnd);
     return *mPtr;
   }
 
   T* operator->() const {
-    MOZ_ASSERT(mPtr >= mRangeStart);
-    MOZ_ASSERT(mPtr < mRangeEnd);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr >= mRangeStart);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr < mRangeEnd);
     return mPtr;
   }
 
@@ -295,7 +298,7 @@ class RangedPtr {
   }
 
   size_t operator-(const RangedPtr<T>& aOther) const {
-    MOZ_ASSERT(mPtr >= aOther.mPtr);
+    MOZ_ASSERT_DEBUG_OR_FUZZING(mPtr >= aOther.mPtr);
     return PointerRangeSize(aOther.mPtr, mPtr);
   }
 

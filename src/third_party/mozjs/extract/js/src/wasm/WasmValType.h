@@ -88,12 +88,18 @@ union PackedTypeCode {
     MOZ_ASSERT(uint32_t(tc) <= ((1 << TypeCodeBits) - 1));
     MOZ_ASSERT_IF(tc != AbstractTypeRefCode, typeDef == nullptr);
     MOZ_ASSERT_IF(tc == AbstractTypeRefCode, typeDef != nullptr);
-    // Double check that the type definition was allocated within 48-bits, as
-    // noted above.
-    MOZ_ASSERT((uint64_t)typeDef <= ((uint64_t)1 << TypeDefBits) - 1);
+#if defined(JS_64BIT) && defined(DEBUG)
+    // Double check that `typeDef` only has 48 significant bits, with the top
+    // 16 being zero.  This is necessary since we will only store the lowest
+    // 48 bits of it, as noted above.  There's no equivalent check on 32 bit
+    // targets since we can store the whole pointer.
+    static_assert(sizeof(int64_t) == sizeof(uintptr_t));
+    uint64_t w = (uint64_t)(uintptr_t)typeDef;
+    MOZ_ASSERT((w >> TypeDefBits) == 0);
+#endif
     PackedTypeCode ptc = {};
     ptc.typeCode_ = PackedRepr(tc);
-    ptc.typeDef_ = (uintptr_t)typeDef;
+    ptc.typeDef_ = (uint64_t)(uintptr_t)typeDef;
     ptc.nullable_ = isNullable;
     return ptc;
   }
@@ -104,11 +110,11 @@ union PackedTypeCode {
 
   static PackedTypeCode pack(TypeCode tc) { return pack(tc, nullptr, false); }
 
-  bool isValid() const { return typeCode_ != NoTypeCode; }
+  constexpr bool isValid() const { return typeCode_ != NoTypeCode; }
 
   PackedRepr bits() const { return bits_; }
 
-  TypeCode typeCode() const {
+  constexpr TypeCode typeCode() const {
     MOZ_ASSERT(isValid());
     return TypeCode(typeCode_);
   }
@@ -126,7 +132,7 @@ union PackedTypeCode {
   // what ValType needs, so that this decoding step is not necessary, but that
   // moves complexity elsewhere, and the perf gain here would be only about 1%
   // for baseline compilation throughput.
-  TypeCode typeCodeAbstracted() const {
+  constexpr TypeCode typeCodeAbstracted() const {
     TypeCode tc = typeCode();
     return tc < LowestPrimitiveTypeCode ? AbstractReferenceTypeCode : tc;
   }
@@ -141,6 +147,9 @@ union PackedTypeCode {
 
   const TypeDef* typeDef() const {
     MOZ_ASSERT(isValid());
+    // On a 64-bit target, this reconstitutes the pointer by zero-extending
+    // the lowest TypeDefBits bits of `typeDef_`.  On a 32-bit target, the
+    // pointer is stored exactly in the lowest 32 bits of `typeDef_`.
     return (const TypeDef*)(uintptr_t)typeDef_;
   }
 
@@ -293,7 +302,7 @@ enum class TableRepr { Ref, Func };
 
 // An enum that describes the different type hierarchies.
 
-enum class RefTypeHierarchy { Func, Extern, Any };
+enum class RefTypeHierarchy { Func, Extern, Exn, Any };
 
 // The RefType carries more information about types t for which t.isRefType()
 // is true.
@@ -303,11 +312,14 @@ class RefType {
   enum Kind {
     Func = uint8_t(TypeCode::FuncRef),
     Extern = uint8_t(TypeCode::ExternRef),
+    Exn = uint8_t(TypeCode::ExnRef),
     Any = uint8_t(TypeCode::AnyRef),
     NoFunc = uint8_t(TypeCode::NullFuncRef),
     NoExtern = uint8_t(TypeCode::NullExternRef),
+    NoExn = uint8_t(TypeCode::NullExnRef),
     None = uint8_t(TypeCode::NullAnyRef),
     Eq = uint8_t(TypeCode::EqRef),
+    I31 = uint8_t(TypeCode::I31Ref),
     Struct = uint8_t(TypeCode::StructRef),
     Array = uint8_t(TypeCode::ArrayRef),
     TypeRef = uint8_t(AbstractTypeRefCode)
@@ -354,12 +366,15 @@ class RefType {
     switch (ptc_.typeCode()) {
       case TypeCode::FuncRef:
       case TypeCode::ExternRef:
+      case TypeCode::ExnRef:
       case TypeCode::AnyRef:
       case TypeCode::EqRef:
+      case TypeCode::I31Ref:
       case TypeCode::StructRef:
       case TypeCode::ArrayRef:
       case TypeCode::NullFuncRef:
       case TypeCode::NullExternRef:
+      case TypeCode::NullExnRef:
       case TypeCode::NullAnyRef:
       case AbstractTypeRefCode:
         return true;
@@ -371,11 +386,14 @@ class RefType {
 
   static RefType func() { return RefType(Func, true); }
   static RefType extern_() { return RefType(Extern, true); }
+  static RefType exn() { return RefType(Exn, true); }
   static RefType any() { return RefType(Any, true); }
   static RefType nofunc() { return RefType(NoFunc, true); }
   static RefType noextern() { return RefType(NoExtern, true); }
+  static RefType noexn() { return RefType(NoExn, true); }
   static RefType none() { return RefType(None, true); }
   static RefType eq() { return RefType(Eq, true); }
+  static RefType i31() { return RefType(I31, true); }
   static RefType struct_() { return RefType(Struct, true); }
   static RefType array() { return RefType(Array, true); }
 
@@ -384,8 +402,10 @@ class RefType {
   bool isAny() const { return kind() == RefType::Any; }
   bool isNoFunc() const { return kind() == RefType::NoFunc; }
   bool isNoExtern() const { return kind() == RefType::NoExtern; }
+  bool isNoExn() const { return kind() == RefType::NoExn; }
   bool isNone() const { return kind() == RefType::None; }
   bool isEq() const { return kind() == RefType::Eq; }
+  bool isI31() const { return kind() == RefType::I31; }
   bool isStruct() const { return kind() == RefType::Struct; }
   bool isArray() const { return kind() == RefType::Array; }
   bool isTypeRef() const { return kind() == RefType::TypeRef; }
@@ -396,7 +416,9 @@ class RefType {
     return RefType(ptc_.withIsNullable(nullable));
   }
 
-  bool isRefBottom() const { return isNone() || isNoFunc() || isNoExtern(); }
+  bool isRefBottom() const {
+    return isNone() || isNoFunc() || isNoExtern() || isNoExn();
+  }
 
   // These methods are defined in WasmTypeDef.h to avoid a cycle while allowing
   // inlining.
@@ -405,6 +427,7 @@ class RefType {
   inline bool isFuncHierarchy() const;
   inline bool isExternHierarchy() const;
   inline bool isAnyHierarchy() const;
+  inline bool isExnHierarchy() const;
   static bool isSubTypeOf(RefType subType, RefType superType);
   static bool castPossible(RefType sourceType, RefType destType);
 
@@ -416,11 +439,14 @@ class RefType {
   // for RefType::Struct.
   TypeDefKind typeDefKind() const;
 
+  inline void AddRef() const;
+  inline void Release() const;
+
   bool operator==(const RefType& that) const { return ptc_ == that.ptc_; }
   bool operator!=(const RefType& that) const { return ptc_ != that.ptc_; }
 };
 
-class FieldTypeTraits {
+class StorageTypeTraits {
  public:
   enum Kind {
     I8 = uint8_t(TypeCode::I8),
@@ -448,16 +474,19 @@ class FieldTypeTraits {
 #endif
       case TypeCode::FuncRef:
       case TypeCode::ExternRef:
+      case TypeCode::ExnRef:
+      case TypeCode::NullExnRef:
 #ifdef ENABLE_WASM_GC
       case TypeCode::AnyRef:
       case TypeCode::EqRef:
+      case TypeCode::I31Ref:
       case TypeCode::StructRef:
       case TypeCode::ArrayRef:
       case TypeCode::NullFuncRef:
       case TypeCode::NullExternRef:
       case TypeCode::NullAnyRef:
 #endif
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
+#ifdef ENABLE_WASM_GC
       case AbstractTypeRefCode:
 #endif
         return true;
@@ -524,16 +553,19 @@ class ValTypeTraits {
 #endif
       case TypeCode::FuncRef:
       case TypeCode::ExternRef:
+      case TypeCode::ExnRef:
+      case TypeCode::NullExnRef:
 #ifdef ENABLE_WASM_GC
       case TypeCode::AnyRef:
       case TypeCode::EqRef:
+      case TypeCode::I31Ref:
       case TypeCode::StructRef:
       case TypeCode::ArrayRef:
       case TypeCode::NullFuncRef:
       case TypeCode::NullExternRef:
       case TypeCode::NullAnyRef:
 #endif
-#ifdef ENABLE_WASM_FUNCTION_REFERENCES
+#ifdef ENABLE_WASM_GC
       case AbstractTypeRefCode:
 #endif
         return true;
@@ -570,7 +602,7 @@ class ValTypeTraits {
 
 // The PackedType represents the storage type of a WebAssembly location, whether
 // parameter, local, field, or global. See specializations below for ValType and
-// FieldType.
+// StorageType.
 
 template <class T>
 class PackedType : public T {
@@ -604,6 +636,14 @@ class PackedType : public T {
 
   explicit PackedType(PackedTypeCode ptc) : tc_(ptc) { MOZ_ASSERT(isValid()); }
 
+  inline void AddRef() const;
+  inline void Release() const;
+
+  static constexpr PackedType i32() { return PackedType(PackedType::I32); }
+  static constexpr PackedType f32() { return PackedType(PackedType::F32); }
+  static constexpr PackedType i64() { return PackedType(PackedType::I64); }
+  static constexpr PackedType f64() { return PackedType(PackedType::F64); }
+
   static PackedType fromMIRType(jit::MIRType mty) {
     switch (mty) {
       case jit::MIRType::Int32:
@@ -621,7 +661,7 @@ class PackedType : public T {
       case jit::MIRType::Simd128:
         return PackedType::V128;
         break;
-      case jit::MIRType::RefOrNull:
+      case jit::MIRType::WasmAnyRef:
         return PackedType::Ref;
       default:
         MOZ_CRASH("fromMIRType: unexpected type");
@@ -685,15 +725,21 @@ class PackedType : public T {
 
   bool isExternRef() const { return tc_.typeCode() == TypeCode::ExternRef; }
 
+  bool isExnRef() const { return tc_.typeCode() == TypeCode::ExnRef; }
+
   bool isAnyRef() const { return tc_.typeCode() == TypeCode::AnyRef; }
 
   bool isNoFunc() const { return tc_.typeCode() == TypeCode::NullFuncRef; }
 
   bool isNoExtern() const { return tc_.typeCode() == TypeCode::NullExternRef; }
 
+  bool isNoExn() const { return tc_.typeCode() == TypeCode::NullExnRef; }
+
   bool isNone() const { return tc_.typeCode() == TypeCode::NullAnyRef; }
 
   bool isEqRef() const { return tc_.typeCode() == TypeCode::EqRef; }
+
+  bool isI31Ref() const { return tc_.typeCode() == TypeCode::I31Ref; }
 
   bool isStructRef() const { return tc_.typeCode() == TypeCode::StructRef; }
 
@@ -709,9 +755,9 @@ class PackedType : public T {
   // Returns whether the type has a representation in JS.
   bool isExposable() const {
 #if defined(ENABLE_WASM_SIMD)
-    return kind() != Kind::V128;
+    return kind() != Kind::V128 && !isExnRef() && !isNoExn();
 #else
-    return true;
+    return !isExnRef() && !isNoExn();
 #endif
   }
 
@@ -798,7 +844,7 @@ class PackedType : public T {
   // as a pointer.  At the JS/wasm boundary, an AnyRef can be represented as a
   // JS::Value, and the type translation may have to be handled specially and on
   // a case-by-case basis.
-  jit::MIRType toMIRType() const {
+  constexpr jit::MIRType toMIRType() const {
     switch (tc_.typeCodeAbstracted()) {
       case TypeCode::I32:
         return jit::MIRType::Int32;
@@ -811,7 +857,7 @@ class PackedType : public T {
       case TypeCode::V128:
         return jit::MIRType::Simd128;
       case AbstractReferenceTypeCode:
-        return jit::MIRType::RefOrNull;
+        return jit::MIRType::WasmAnyRef;
       default:
         MOZ_CRASH("bad type");
     }
@@ -827,9 +873,9 @@ class PackedType : public T {
     }
   }
 
-  PackedType<FieldTypeTraits> fieldType() const {
+  PackedType<StorageTypeTraits> storageType() const {
     MOZ_ASSERT(isValid());
-    return PackedType<FieldTypeTraits>(tc_);
+    return PackedType<StorageTypeTraits>(tc_);
   }
 
   static bool isSubTypeOf(PackedType subType, PackedType superType) {
@@ -866,7 +912,7 @@ class PackedType : public T {
 };
 
 using ValType = PackedType<ValTypeTraits>;
-using FieldType = PackedType<FieldTypeTraits>;
+using StorageType = PackedType<StorageTypeTraits>;
 
 // The dominant use of this data type is for locals and args, and profiling
 // with ZenGarden and Tanks suggests an initial size of 16 minimises heap
@@ -880,7 +926,7 @@ extern bool ToRefType(JSContext* cx, HandleValue v, RefType* out);
 
 extern UniqueChars ToString(RefType type, const TypeContext* types);
 extern UniqueChars ToString(ValType type, const TypeContext* types);
-extern UniqueChars ToString(FieldType type, const TypeContext* types);
+extern UniqueChars ToString(StorageType type, const TypeContext* types);
 extern UniqueChars ToString(const Maybe<ValType>& type,
                             const TypeContext* types);
 

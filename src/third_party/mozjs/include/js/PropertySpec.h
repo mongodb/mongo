@@ -373,6 +373,10 @@ constexpr uint8_t CheckAccessorAttrs() {
   JSPropertySpec::nativeAccessors(::JS::SymbolCode::symbol,                 \
                                   CheckAccessorAttrs<attributes>(), getter, \
                                   nullptr)
+#define JS_SYM_GETSET(symbol, getter, setter, attributes)                   \
+  JSPropertySpec::nativeAccessors(::JS::SymbolCode::symbol,                 \
+                                  CheckAccessorAttrs<attributes>(), getter, \
+                                  nullptr, setter, nullptr)
 #define JS_SELF_HOSTED_GET(name, getterName, attributes)                      \
   JSPropertySpec::selfHostedAccessors(name, CheckAccessorAttrs<attributes>(), \
                                       getterName)
@@ -417,11 +421,15 @@ struct JSFunctionSpec {
 #define JS_FS_END JS_FN(nullptr, nullptr, 0, 0)
 
 /*
- * Initializer macros for a JSFunctionSpec array element. JS_FNINFO allows the
- * simple adding of JSJitInfos. JS_SELF_HOSTED_FN declares a self-hosted
- * function. JS_INLINABLE_FN allows specifying an InlinableNative enum value for
- * natives inlined or specialized by the JIT. Finally JS_FNSPEC has slots for
- * all the fields.
+ * Initializer macros for a JSFunctionSpec array element.
+ *
+ * - JS_FNINFO allows the simple adding of JSJitInfos.
+ * - JS_SELF_HOSTED_FN declares a self-hosted function.
+ * - JS_INLINABLE_FN allows specifying an InlinableNative enum value for natives
+ *   inlined or specialized by the JIT.
+ * - JS_TRAMPOLINE_FN allows specifying a TrampolineNative enum value for
+ *   natives that have a JitEntry trampoline.
+ * - JS_FNSPEC has slots for all the fields.
  *
  * The _SYM variants allow defining a function with a symbol key rather than a
  * string key. For example, use JS_SYM_FN(iterator, ...) to define an
@@ -430,6 +438,8 @@ struct JSFunctionSpec {
 #define JS_FN(name, call, nargs, flags) \
   JS_FNSPEC(name, call, nullptr, nargs, flags, nullptr)
 #define JS_INLINABLE_FN(name, call, nargs, flags, native) \
+  JS_FNSPEC(name, call, &js::jit::JitInfo_##native, nargs, flags, nullptr)
+#define JS_TRAMPOLINE_FN(name, call, nargs, flags, native) \
   JS_FNSPEC(name, call, &js::jit::JitInfo_##native, nargs, flags, nullptr)
 #define JS_SYM_FN(symbol, call, nargs, flags) \
   JS_SYM_FNSPEC(symbol, call, nullptr, nargs, flags, nullptr)

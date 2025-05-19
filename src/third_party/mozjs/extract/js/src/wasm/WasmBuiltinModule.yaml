@@ -1,0 +1,455 @@
+# The file contains information need to define wasm builtin module funcs
+# operations.
+
+# i8vecmul(dest: i32, src1: i32, src2: i32, len: i32)
+#  Performs pairwise multiplication of two i8 vectors of 'len' specified at
+#  'src1' and 'src2'. Output is written to 'dest'. This is used as a
+#  basic self-test for builtin module funcs.
+- op: I8VecMul
+  symbolic_address:
+    name: IntrI8VecMul
+    type: Args_Int32_GeneralInt32Int32Int32Int32General
+  entry: Instance::intrI8VecMul
+  export: i8vecmul
+  params:
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+#if defined(ENABLE_WASM_MOZ_INTGEMM)
+
+# Intrinsics for integer matrix multiplication followed by addition of bias.
+# Please refer to @TOPSRCDIR/js/src/intgemm/IntegerGemmIntrinsic.h for more details on these intrinsics.
+
+
+# Prepare B for the Matrix Multiply intrinsic from Input matrix B.
+#
+#  Quantization is performed on the input.
+#  The final prepared B is in CPU-dependent format and can be used as an input to matrix multiply
+#  intrinsic (`int8_multiply_and_add_bias`).
+#
+# int8_prepare_b(const float* inputMatrixB, float scale, float zeroPoint, uint32_t rowsB, uint32_t colsB, int8_t* outputMatrixB)
+# int8_prepare_b(inputMatrixB: i32, scale: f32, zeroPoint: f32, rowsB: i32, colsB: i32, outputMatrixB: i32)
+- op: I8PrepareB
+  symbolic_address:
+    name: IntrI8PrepareB
+    type: Args_Int32_GeneralInt32Float32Float32Int32Int32Int32General
+  entry: intgemm::IntrI8PrepareB
+  export: int8_prepare_b
+  params:
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Prepare B for the Matrix Multiply intrinsic from transposed version of Input matrix B.
+#
+#  Quantization is performed on floating values of input.
+#  The final prepared B is in CPU-dependent format and can be used as an input to matrix multiply
+#  intrinsic (`int8_multiply_and_add_bias`).
+#
+# int8_prepare_b_from_transposed(const float* inputMatrixBTransposed, float scale, float zeroPoint, uint32_t rowsB, uint32_t colsB, int8_t* outputMatrixB)
+# int8_prepare_b_from_transposed(inputMatrixBTransposed: i32, scale: f32, zeroPoint: f32, rowsB: i32, colsB: i32, outputMatrixB: i32)
+- op: I8PrepareBFromTransposed
+  symbolic_address:
+    name: IntrI8PrepareBFromTransposed
+    type: Args_Int32_GeneralInt32Float32Float32Int32Int32Int32General
+  entry: intgemm::IntrI8PrepareBFromTransposed
+  export: int8_prepare_b_from_transposed
+  params:
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Prepare B for the Matrix Multiply intrinsic from a quantized and transposed version of Input
+# matrix B which is also in a CPU-independent format.
+#
+#  The final prepared B is in CPU-dependent format and can be used as an input to matrix multiply
+#  intrinsic (`int8_multiply_and_add_bias`).
+#
+# int8_prepare_b_from_quantized_transposed(const int8_t* inputMatrixBQuantizedTransposed, uint32_t rowsB, uint32_t colsB, int8_t* outputMatrixB)
+# int8_prepare_b_from_quantized_transposed(inputMatrixBQuantizedTransposed: i32, rowsB: i32, colsB: i32, outputMatrixB: i32)
+- op: I8PrepareBFromQuantizedTransposed
+  symbolic_address:
+    name: IntrI8PrepareBFromQuantizedTransposed
+    type: Args_Int32_GeneralInt32Int32Int32Int32General
+  entry: intgemm::IntrI8PrepareBFromQuantizedTransposed
+  export: int8_prepare_b_from_quantized_transposed
+  params:
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Prepare A for the Matrix Multiply intrinsic from Input matrix A.
+#
+#  It performs quantization on floating values of input.
+#  The final prepared A might be architecture dependent. e.g. On some architectures like x86, it
+#  might be unsigned (achieved by adding 127 to quantized values) while on others like Arm, it might
+#  be signed.
+#  The final prepared A can be used as an input to matrix multiply intrinsic
+#  (`int8_multiply_and_add_bias`).
+#
+# int8_prepare_a(const float* inputMatrixA, float scale, float zeroPoint, uint32_t rowsA, uint32_t colsA, int8_t* outputMatrixA)
+# int8_prepare_a(inputMatrixA: i32, scale: f32, zeroPoint: f32, rowsA: i32, colsA: i32, outputMatrixA: i32)
+- op: I8PrepareA
+  symbolic_address:
+    name: IntrI8PrepareA
+    type: Args_Int32_GeneralInt32Float32Float32Int32Int32Int32General
+  entry: intgemm::IntrI8PrepareA
+  export: int8_prepare_a
+  params:
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Prepares bias for the Matrix Multiply intrinsic.
+#
+#  It uses the prepared B (which must be obtained by using any of the `int8_prepare_b*` intrinsics) and
+#  a bias input to prepare the final bias.
+#
+#  The final bias can be used as an input to matrix multiply intrinsic (`int8_multiply_and_add_bias`).
+#
+# int8_prepare_bias(const int8_t* inputMatrixBPrepared, float scaleA, float zeroPointA, float scaleB, float zeroPointB, uint32_t rowsB, uint32_t colsB, const float* inputBias, float* output)
+# int8_prepare_bias(inputMatrixBPrepared: i32, scaleA: f32, zeroPointA: f32, scaleB: f32, zeroPointB: f32, rowsB: i32, colsB: i32, inputBias: i32, output: i32)
+- op: I8PrepareBias
+  symbolic_address:
+    name: IntrI8PrepareBias
+    type: Args_Int32_GeneralInt32Float32Float32Float32Float32Int32Int32Int32Int32General
+  entry: intgemm::IntrI8PrepareBias
+  export: int8_prepare_bias
+  params:
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Perform multiplication of 2 matrices followed by adding a bias.
+#
+#  i.e Output = inputMatrixAPrepared * inputMatrixBPrepared + inputBiasPrepared
+#
+#  The inputs of this intrinsic must be obtained by using `int8_prepare_A`,
+#  one of the `int8_prepare_b*` and `int8_prepare_bias` intrinsics respectively.
+#
+# int8_multiply_and_add_bias(const int8_t* inputMatrixAPrepared, float scaleA, float zeroPointA,
+#                      const int8_t* inputMatrixBPrepared, float scaleB, float zeroPointB,
+#                      const float* inputBiasPrepared, float unquantMultiplier,
+#                      uint32_t rowsA, uint32_t width, uint32_t colsB, float* output)
+# int8_multiply_and_add_bias(inputMatrixAPrepared: i32, scaleA: f32, zeroPointA: f32,
+#                      inputMatrixBPrepared: i32, scaleB: f32, zeroPointB: f32,
+#                      inputBiasPrepared: i32, unquantMultiplier: f32,
+#                      rowsA: i32, width: i32, colsB: i32, output: i32)
+- op: I8MultiplyAndAddBias
+  symbolic_address:
+    name: IntrI8MultiplyAndAddBias
+    type: Args_Int32_GeneralInt32Float32Float32Int32Float32Float32Int32Float32Int32Int32Int32Int32General
+  entry: intgemm::IntrI8MultiplyAndAddBias
+  export: int8_multiply_and_add_bias
+  params:
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'f32'
+    - 'f32'
+    - 'i32'
+    - 'f32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+
+# Select a subset of columns of prepared B.
+#
+#  Indices of the columns to be selected are specified by an array.
+#
+# int8_select_columns_of_b(const int8_t* inputMatrixBPrepared, uint32_t rowsB, uint32_t colsB, const uint32_t* colIndexList, const uint32_t sizeColIndexList, int8_t* output)
+# int8_select_columns_of_b(inputMatrixBPrepared: i32, rowsB: i32, colsB: i32, colIndexList: i32, sizeColIndexList: i32, output: i32)
+- op: I8SelectColumnsOfB
+  symbolic_address:
+    name: IntrI8SelectColumnsOfB
+    type: Args_Int32_GeneralInt32Int32Int32Int32Int32Int32General
+  entry: intgemm::IntrI8SelectColumnsOfB
+  export: int8_select_columns_of_b
+  params:
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+    - 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: true
+
+#endif // ENABLE_WASM_MOZ_INTGEMM
+
+#if defined(ENABLE_WASM_JS_STRING_BUILTINS)
+
+- op: StringTest
+  symbolic_address:
+    name: StringTest
+    type: Args_Int32_GeneralGeneral
+  entry: Instance::stringTest
+  export: test
+  params:
+    - 'externref'
+  result: 'i32'
+  fail_mode: Infallible
+  uses_memory: false
+
+- op: StringCast
+  symbolic_address:
+    name: StringCast
+    type: Args_General2
+  entry: Instance::stringCast
+  export: cast
+  params:
+    - 'externref'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringFromCharCodeArray
+  symbolic_address:
+    name: StringFromCharCodeArray
+    type: Args_General_GeneralGeneralInt32Int32
+  entry: Instance::stringFromCharCodeArray
+  export: fromCharCodeArray
+  params:
+    - type: "StaticTypeDefs::arrayMutI16"
+      nullable: true
+    - 'i32'
+    - 'i32'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringIntoCharCodeArray
+  symbolic_address:
+    name: StringIntoCharCodeArray
+    type: Args_Int32_GeneralGeneralGeneralInt32
+  entry: Instance::stringIntoCharCodeArray
+  export: intoCharCodeArray
+  params:
+    - 'externref'
+    - type: "StaticTypeDefs::arrayMutI16"
+      nullable: true
+    - 'i32'
+  result: 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+- op: StringFromCharCode
+  symbolic_address:
+    name: StringFromCharCode
+    type: Args_General_GeneralInt32
+  entry: Instance::stringFromCharCode
+  export: fromCharCode
+  params:
+    - 'i32'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringFromCodePoint
+  symbolic_address:
+    name: StringFromCodePoint
+    type: Args_General_GeneralInt32
+  entry: Instance::stringFromCodePoint
+  export: fromCodePoint
+  params:
+    - 'i32'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringCharCodeAt
+  symbolic_address:
+    name: StringCharCodeAt
+    type: Args_Int32_GeneralGeneralInt32
+  entry: Instance::stringCharCodeAt
+  export: charCodeAt
+  params:
+    - 'externref'
+    - 'i32'
+  result: 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+- op: StringCodePointAt
+  symbolic_address:
+    name: StringCodePointAt
+    type: Args_Int32_GeneralGeneralInt32
+  entry: Instance::stringCodePointAt
+  export: codePointAt
+  params:
+    - 'externref'
+    - 'i32'
+  result: 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+- op: StringLength
+  symbolic_address:
+    name: StringLength
+    type: Args_Int32_GeneralGeneral
+  entry: Instance::stringLength
+  export: length
+  params:
+    - 'externref'
+  result: 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+- op: StringConcat
+  symbolic_address:
+    name: StringConcat
+    type: Args_General3
+  entry: Instance::stringConcat
+  export: concat
+  params:
+    - 'externref'
+    - 'externref'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringSubstring
+  symbolic_address:
+    name: StringSubstring
+    type: Args_General_GeneralGeneralInt32Int32
+  entry: Instance::stringSubstring
+  export: substring
+  params:
+    - 'externref'
+    - 'i32'
+    - 'i32'
+  result:
+    code: 'extern'
+    nullable: false
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: StringEquals
+  symbolic_address:
+    name: StringEquals
+    type: Args_Int32_GeneralGeneralGeneral
+  entry: Instance::stringEquals
+  export: equals
+  params:
+    - 'externref'
+    - 'externref'
+  result: 'i32'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+- op: StringCompare
+  symbolic_address:
+    name: StringCompare
+    type: Args_Int32_GeneralGeneralGeneral
+  entry: Instance::stringCompare
+  export: compare
+  params:
+    - 'externref'
+    - 'externref'
+  result: 'i32'
+  fail_mode: FailOnMaxI32
+  uses_memory: false
+
+#endif // ENABLE_WASM_JS_STRING_BUILTINS
+
+#if defined(ENABLE_WASM_JSPI)
+
+- op: CheckSuspender
+  symbolic_address:
+    name: CheckSuspender
+    type: Args_General2
+  entry: CheckSuspender
+  export: suspenderCheck
+  params:
+    - 'externref'
+  result: 'externref'
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: CurrentSuspender
+  symbolic_address:
+    name: CurrentSuspender
+    type: Args_General_GeneralInt32
+  entry: CurrentSuspender
+  export: currentSuspender
+  params:
+    - 'i32'
+  result: 'externref'
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: GetSuspendingPromiseResult
+  symbolic_address:
+    name: GetSuspendingPromiseResult
+    type: Args_General2
+  entry: GetSuspendingPromiseResult
+  export: getSuspendingPromiseResult
+  params:
+    - 'externref'
+  result: 'anyref'
+  fail_mode: FailOnNullPtr
+  uses_memory: false
+
+- op: SetPromisingPromiseResults
+  symbolic_address:
+    name: SetPromisingPromiseResults
+    type: Args_Int32_GeneralGeneralGeneral
+  entry: SetPromisingPromiseResults
+  export: setPromisingPromiseResults
+  params:
+    - 'externref'
+    - 'anyref'
+  fail_mode: FailOnNegI32
+  uses_memory: false
+
+#endif // ENABLE_WASM_JSPI

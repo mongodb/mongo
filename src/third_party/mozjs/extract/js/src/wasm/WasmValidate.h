@@ -55,10 +55,12 @@ struct ModuleEnvironment {
   // Module fields decoded from the module environment (or initialized while
   // validating an asm.js module) and immutable during compilation:
   Maybe<uint32_t> dataCount;
-  Maybe<MemoryDesc> memory;
+  MemoryDescVector memories;
   MutableTypeContext types;
   FuncDescVector funcs;
+  BranchHintCollection branchHints;
   uint32_t numFuncImports;
+  uint32_t numGlobalImports;
   GlobalDescVector globals;
   TagDescVector tags;
   TableDescVector tables;
@@ -66,7 +68,7 @@ struct ModuleEnvironment {
   ImportVector imports;
   ExportVector exports;
   Maybe<uint32_t> startFuncIndex;
-  ElemSegmentVector elemSegments;
+  ModuleElemSegmentVector elemSegments;
   MaybeSectionRange codeSection;
 
   // The start offset of the FuncImportInstanceData[] section of the instance
@@ -75,6 +77,9 @@ struct ModuleEnvironment {
   // The start offset of the TypeDefInstanceData[] section of the instance
   // data. There is one entry for every type.
   uint32_t typeDefsOffsetStart;
+  // The start offset of the MemoryInstanceData[] section of the instance data.
+  // There is one entry for every memory.
+  uint32_t memoriesOffsetStart;
   // The start offset of the TableInstanceData[] section of the instance data.
   // There is one entry for every table.
   uint32_t tablesOffsetStart;
@@ -89,16 +94,21 @@ struct ModuleEnvironment {
   Maybe<Name> moduleName;
   NameVector funcNames;
 
+  // Indicates whether the branch hint section was successfully parsed.
+  bool parsedBranchHints;
+
   explicit ModuleEnvironment(FeatureArgs features,
                              ModuleKind kind = ModuleKind::Wasm)
       : kind(kind),
         features(features),
-        memory(Nothing()),
         numFuncImports(0),
+        numGlobalImports(0),
         funcImportsOffsetStart(UINT32_MAX),
         typeDefsOffsetStart(UINT32_MAX),
+        memoriesOffsetStart(UINT32_MAX),
         tablesOffsetStart(UINT32_MAX),
-        tagsOffsetStart(UINT32_MAX) {}
+        tagsOffsetStart(UINT32_MAX),
+        parsedBranchHints(false) {}
 
   [[nodiscard]] bool init() {
     types = js_new<TypeContext>(features);
@@ -113,24 +123,27 @@ struct ModuleEnvironment {
   bool funcIsImport(uint32_t funcIndex) const {
     return funcIndex < numFuncImports;
   }
+  size_t numMemories() const { return memories.length(); }
 
 #define WASM_FEATURE(NAME, SHORT_NAME, ...) \
   bool SHORT_NAME##Enabled() const { return features.SHORT_NAME; }
-  JS_FOR_WASM_FEATURES(WASM_FEATURE, WASM_FEATURE, WASM_FEATURE)
+  JS_FOR_WASM_FEATURES(WASM_FEATURE)
 #undef WASM_FEATURE
   Shareable sharedMemoryEnabled() const { return features.sharedMemory; }
-  bool hugeMemoryEnabled() const {
-    return !isAsmJS() && usesMemory() &&
-           IsHugeMemoryEnabled(memory->indexType());
-  }
   bool simdAvailable() const { return features.simd; }
-  bool intrinsicsEnabled() const { return features.intrinsics; }
 
   bool isAsmJS() const { return kind == ModuleKind::AsmJS; }
+  // A builtin module is a host constructed wasm module that exports host
+  // functionality, using special opcodes. Otherwise, it has the same rules
+  // as wasm modules and so it does not get a new ModuleKind.
+  bool isBuiltinModule() const { return features.isBuiltinModule; }
 
-  bool usesMemory() const { return memory.isSome(); }
-  bool usesSharedMemory() const {
-    return memory.isSome() && memory->isShared();
+  bool hugeMemoryEnabled(uint32_t memoryIndex) const {
+    return !isAsmJS() && memoryIndex < memories.length() &&
+           IsHugeMemoryEnabled(memories[memoryIndex].indexType());
+  }
+  bool usesSharedMemory(uint32_t memoryIndex) const {
+    return memoryIndex < memories.length() && memories[memoryIndex].isShared();
   }
 
   void declareFuncExported(uint32_t funcIndex, bool eager, bool canRefFunc) {
@@ -170,6 +183,10 @@ struct ModuleEnvironment {
            offsetof(TypeDefInstanceData, superTypeVector);
   }
 
+  uint32_t offsetOfMemoryInstanceData(uint32_t memoryIndex) const {
+    MOZ_ASSERT(memoryIndex < memories.length());
+    return memoriesOffsetStart + memoryIndex * sizeof(MemoryInstanceData);
+  }
   uint32_t offsetOfTableInstanceData(uint32_t tableIndex) const {
     MOZ_ASSERT(tableIndex < tables.length());
     return tablesOffsetStart + tableIndex * sizeof(TableInstanceData);
@@ -179,6 +196,15 @@ struct ModuleEnvironment {
     MOZ_ASSERT(tagIndex < tags.length());
     return tagsOffsetStart + tagIndex * sizeof(TagInstanceData);
   }
+
+  bool addDefinedFunc(
+      ValTypeVector&& params, ValTypeVector&& results,
+      bool declareForRef = false,
+      Maybe<CacheableName>&& optionalExportedName = mozilla::Nothing());
+
+  bool addImportedFunc(ValTypeVector&& params, ValTypeVector&& results,
+                       CacheableName&& importModName,
+                       CacheableName&& importFieldName);
 };
 
 // ElemSegmentFlags provides methods for decoding and encoding the flags field
@@ -187,13 +213,20 @@ struct ModuleEnvironment {
 // enums.
 class ElemSegmentFlags {
   enum class Flags : uint32_t {
+    // 0 means active. 1 means (passive or declared), disambiguated by the next
+    // bit.
     Passive = 0x1,
-    WithIndexOrDeclared = 0x2,
-    ElemExpression = 0x4,
+    // For active segments, 1 means a table index is present. Otherwise, 0 means
+    // passive and 1 means declared.
+    TableIndexOrDeclared = 0x2,
+    // 0 means element kind / index (currently only func indexes). 1 means
+    // element ref type and initializer expressions.
+    ElemExpressions = 0x4,
+
     // Below this line are convenient combinations of flags
-    KindMask = Passive | WithIndexOrDeclared,
-    PayloadMask = ElemExpression,
-    AllFlags = Passive | WithIndexOrDeclared | ElemExpression,
+    KindMask = Passive | TableIndexOrDeclared,
+    PayloadMask = ElemExpressions,
+    AllFlags = Passive | TableIndexOrDeclared | ElemExpressions,
   };
   uint32_t encoded_;
 
@@ -228,11 +261,13 @@ class NothingVector {
   Nothing unused_;
 
  public:
+  bool reserve(size_t size) { return true; }
   bool resize(size_t length) { return true; }
   Nothing& operator[](size_t) { return unused_; }
   Nothing& back() { return unused_; }
   size_t length() const { return 0; }
   bool append(Nothing& nothing) { return true; }
+  void infallibleAppend(Nothing& nothing) {}
 };
 
 struct ValidatingPolicy {
@@ -249,8 +284,8 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
 // Shared subtyping function across validation.
 
 [[nodiscard]] bool CheckIsSubtypeOf(Decoder& d, const ModuleEnvironment& env,
-                                    size_t opcodeOffset, FieldType subType,
-                                    FieldType superType);
+                                    size_t opcodeOffset, StorageType subType,
+                                    StorageType superType);
 
 // The local entries are part of function bodies and thus serialized by both
 // wasm and asm.js and decoded as part of both validation and compilation.
@@ -264,11 +299,13 @@ using ValidatingOpIter = OpIter<ValidatingPolicy>;
                                                Decoder& d,
                                                ValTypeVector* locals);
 
-// This validates the entries.
+// This validates the entries. Function params are inserted before the locals
+// to generate the full local entries for use in validation
 
-[[nodiscard]] bool DecodeLocalEntries(Decoder& d, const TypeContext& types,
-                                      const FeatureArgs& features,
-                                      ValTypeVector* locals);
+[[nodiscard]] bool DecodeLocalEntriesWithParams(Decoder& d,
+                                                const ModuleEnvironment& env,
+                                                uint32_t funcIndex,
+                                                ValTypeVector* locals);
 
 // Returns whether the given [begin, end) prefix of a module's bytecode starts a
 // code section and, if so, returns the SectionRange of that code section.

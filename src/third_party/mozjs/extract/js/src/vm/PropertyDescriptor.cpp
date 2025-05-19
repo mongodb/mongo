@@ -15,13 +15,14 @@
 #include "js/Context.h"           // js::AssertHeapIsIdle
 #include "js/Id.h"                // jsid
 #include "js/RootingAPI.h"        // JS::Rooted, JS::Handle, JS::MutableHandle
-#include "vm/JSAtom.h"            // JSAtom, Atomize, AtomizeChars
+#include "vm/JSAtomUtils.h"       // Atomize, AtomizeChars
 #include "vm/JSContext.h"         // JSContext, CHECK_THREAD
 #include "vm/JSObject.h"          // JSObject
 #include "vm/ObjectOperations.h"  // GetOwnPropertyDescriptor
+#include "vm/StringType.h"        // JSAtom
 
-#include "vm/JSAtom-inl.h"     // AtomToId
-#include "vm/JSContext-inl.h"  // JSContext::check
+#include "vm/JSAtomUtils-inl.h"  // AtomToId
+#include "vm/JSContext-inl.h"    // JSContext::check
 
 using namespace js;
 

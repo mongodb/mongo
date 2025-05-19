@@ -99,6 +99,7 @@ typedef FILE ZyanFile;
 #include <stdlib.h>
 #define ZYAN_CALLOC     calloc
 #define ZYAN_FREE       free
+#define ZYAN_GETENV     getenv
 #define ZYAN_MALLOC     malloc
 #define ZYAN_REALLOC    realloc
 

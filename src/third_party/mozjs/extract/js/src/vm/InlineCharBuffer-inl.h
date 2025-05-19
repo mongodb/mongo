@@ -7,6 +7,8 @@
 #ifndef vm_InlineCharBuffer_inl_h
 #define vm_InlineCharBuffer_inl_h
 
+#include "vm/JSAtomUtils.h"
+
 #include "vm/StringType-inl.h"
 
 namespace js {
@@ -150,6 +152,11 @@ class MOZ_NON_PARAM InlineCharBuffer {
                "heap storage was not allocated for non-inline string");
 
     return NewString<CanGC>(cx, std::move(heapStorage), length, heap);
+  }
+
+  JSAtom* toAtom(JSContext* cx, size_t length) {
+    MOZ_ASSERT(length == lastRequestedLength);
+    return AtomizeChars(cx, get(), length);
   }
 };
 

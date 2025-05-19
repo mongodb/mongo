@@ -45,10 +45,11 @@ class ICState {
   // Baseline IC.
   bool usedByTranspiler_ : 1;
 
-  // Whether stubs attached to this IC have been folded together into
-  // a single stub. Used as a hint when attaching additional stubs to
-  // try folding them too.
-  bool hasFoldedStub_ : 1;
+  // Whether stubs attached to this IC have been folded together into a single
+  // stub. Used as a hint when attaching additional stubs to try folding them
+  // too. The folded stub may be removed later by GC sweeping so this is not
+  // exact.
+  bool mayHaveFoldedStub_ : 1;
 
   // Number of optimized stubs currently attached to this IC.
   uint8_t numOptimizedStubs_;
@@ -136,7 +137,7 @@ class ICState {
 #endif
     trialInliningState_ = uint32_t(TrialInliningState::Initial);
     usedByTranspiler_ = false;
-    hasFoldedStub_ = false;
+    mayHaveFoldedStub_ = false;
     numOptimizedStubs_ = 0;
     numFailures_ = 0;
   }
@@ -169,9 +170,9 @@ class ICState {
   void setUsedByTranspiler() { usedByTranspiler_ = true; }
   bool usedByTranspiler() const { return usedByTranspiler_; }
 
-  void clearHasFoldedStub() { hasFoldedStub_ = false; }
-  void setHasFoldedStub() { hasFoldedStub_ = true; }
-  bool hasFoldedStub() const { return hasFoldedStub_; }
+  void clearMayHaveFoldedStub() { mayHaveFoldedStub_ = false; }
+  void setMayHaveFoldedStub() { mayHaveFoldedStub_ = true; }
+  bool mayHaveFoldedStub() const { return mayHaveFoldedStub_; }
 
   TrialInliningState trialInliningState() const {
     return TrialInliningState(trialInliningState_);

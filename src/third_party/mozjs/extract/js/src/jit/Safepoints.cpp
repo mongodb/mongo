@@ -110,12 +110,14 @@ void SafepointWriter::writeGcRegs(LSafepoint* safepoint) {
   LiveGeneralRegisterSet spilledGpr(safepoint->liveRegs().gprs());
   LiveFloatRegisterSet spilledFloat(safepoint->liveRegs().fpus());
   LiveGeneralRegisterSet slots(safepoint->slotsOrElementsRegs());
+  LiveGeneralRegisterSet wasmAnyRef(safepoint->wasmAnyRefRegs());
   LiveGeneralRegisterSet valueRegs;
 
   WriteRegisterMask(stream_, spilledGpr.bits());
   if (!spilledGpr.empty()) {
     WriteRegisterMask(stream_, gc.bits());
     WriteRegisterMask(stream_, slots.bits());
+    WriteRegisterMask(stream_, wasmAnyRef.bits());
 
 #ifdef JS_PUNBOX64
     valueRegs = safepoint->valueRegs();
@@ -195,6 +197,22 @@ void SafepointWriter::writeSlotsOrElementsSlots(LSafepoint* safepoint) {
     }
 #ifdef JS_JITSPEW
     JitSpew(JitSpew_Safepoints, "    slots/elements slot: %u", slots[i].slot);
+#endif
+    stream_.writeUnsigned(slots[i].slot);
+  }
+}
+
+void SafepointWriter::writeWasmAnyRefSlots(LSafepoint* safepoint) {
+  LSafepoint::SlotList& slots = safepoint->wasmAnyRefSlots();
+
+  stream_.writeUnsigned(slots.length());
+
+  for (uint32_t i = 0; i < slots.length(); i++) {
+    if (!slots[i].stack) {
+      MOZ_CRASH();
+    }
+#ifdef JS_JITSPEW
+    JitSpew(JitSpew_Safepoints, "    wasm_anyref slot: %u", slots[i].slot);
 #endif
     stream_.writeUnsigned(slots[i].slot);
   }
@@ -390,6 +408,7 @@ void SafepointWriter::encode(LSafepoint* safepoint) {
 #endif
 
   writeSlotsOrElementsSlots(safepoint);
+  writeWasmAnyRefSlots(safepoint);
 
   endEntry();
   safepoint->setOffset(safepointOffset);
@@ -407,7 +426,8 @@ SafepointReader::SafepointReader(IonScript* script, const SafepointIndex* si)
                   1),  // Stack slot counts are inclusive.
       argumentSlots_(script->argumentSlotsSize() / sizeof(intptr_t)),
       nunboxSlotsRemaining_(0),
-      slotsOrElementsSlotsRemaining_(0) {
+      slotsOrElementsSlotsRemaining_(0),
+      wasmAnyRefSlotsRemaining_(0) {
   osiCallPointOffset_ = stream_.readUnsigned();
 
   // gcSpills is a subset of allGprSpills.
@@ -416,9 +436,11 @@ SafepointReader::SafepointReader(IonScript* script, const SafepointIndex* si)
     gcSpills_ = allGprSpills_;
     valueSpills_ = allGprSpills_;
     slotsOrElementsSpills_ = allGprSpills_;
+    wasmAnyRefSpills_ = allGprSpills_;
   } else {
     gcSpills_ = GeneralRegisterSet(ReadRegisterMask(stream_));
     slotsOrElementsSpills_ = GeneralRegisterSet(ReadRegisterMask(stream_));
+    wasmAnyRefSpills_ = GeneralRegisterSet(ReadRegisterMask(stream_));
 #ifdef JS_PUNBOX64
     valueSpills_ = GeneralRegisterSet(ReadRegisterMask(stream_));
 #endif
@@ -551,6 +573,20 @@ void SafepointReader::advanceFromNunboxOrValueSlots() {
 
 bool SafepointReader::getSlotsOrElementsSlot(SafepointSlotEntry* entry) {
   if (!slotsOrElementsSlotsRemaining_--) {
+    advanceFromSlotsOrElementsSlots();
+    return false;
+  }
+  entry->stack = true;
+  entry->slot = stream_.readUnsigned();
+  return true;
+}
+
+void SafepointReader::advanceFromSlotsOrElementsSlots() {
+  wasmAnyRefSlotsRemaining_ = stream_.readUnsigned();
+}
+
+bool SafepointReader::getWasmAnyRefSlot(SafepointSlotEntry* entry) {
+  if (!wasmAnyRefSlotsRemaining_--) {
     return false;
   }
   entry->stack = true;

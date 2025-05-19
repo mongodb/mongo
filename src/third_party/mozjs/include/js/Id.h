@@ -37,6 +37,11 @@
 #include "js/TracingAPI.h"
 #include "js/TypeDecls.h"
 
+namespace js {
+class JS_PUBLIC_API GenericPrinter;
+class JSONPrinter;
+}  // namespace js
+
 namespace JS {
 
 enum class SymbolCode : uint32_t;
@@ -203,6 +208,16 @@ class PropertyKey {
   MOZ_ALWAYS_INLINE JSLinearString* toLinearString() const {
     return reinterpret_cast<JSLinearString*>(toString());
   }
+
+#if defined(DEBUG) || defined(JS_JITSPEW)
+  void dump() const;
+  void dump(js::GenericPrinter& out) const;
+  void dump(js::JSONPrinter& json) const;
+
+  void dumpFields(js::JSONPrinter& json) const;
+  void dumpPropertyName(js::GenericPrinter& out) const;
+  void dumpStringContent(js::GenericPrinter& out) const;
+#endif
 
  private:
   static bool isNonIntAtom(JSAtom* atom);

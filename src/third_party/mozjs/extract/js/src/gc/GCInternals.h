@@ -12,7 +12,9 @@
 #define gc_GCInternals_h
 
 #include "mozilla/Maybe.h"
+#include "mozilla/Range.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/Vector.h"
 
 #include "gc/Cell.h"
 #include "gc/GC.h"
@@ -329,7 +331,7 @@ inline bool IsOOMReason(JS::GCReason reason) {
          reason == JS::GCReason::MEM_PRESSURE;
 }
 
-void* AllocateCellInGC(JS::Zone* zone, AllocKind thingKind);
+void* AllocateTenuredCellInGC(JS::Zone* zone, AllocKind thingKind);
 
 void ReadProfileEnv(const char* envName, const char* helpText, bool* enableOut,
                     bool* workersOut, mozilla::TimeDuration* thresholdOut);
@@ -337,6 +339,16 @@ void ReadProfileEnv(const char* envName, const char* helpText, bool* enableOut,
 bool ShouldPrintProfile(JSRuntime* runtime, bool enable, bool workers,
                         mozilla::TimeDuration threshold,
                         mozilla::TimeDuration duration);
+
+using CharRange = mozilla::Range<const char>;
+using CharRangeVector = Vector<CharRange, 0, SystemAllocPolicy>;
+
+// Split a string on a given character and produce a vector of CharRanges that
+// reference the input string.
+extern bool SplitStringBy(const char* string, char delimiter,
+                          CharRangeVector* resultOut);
+extern bool SplitStringBy(const CharRange& string, char delimiter,
+                          CharRangeVector* resultOut);
 
 } /* namespace gc */
 } /* namespace js */

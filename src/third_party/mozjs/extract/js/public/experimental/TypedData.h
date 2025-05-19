@@ -14,6 +14,7 @@
 
 #include "mozilla/Assertions.h"  // MOZ_ASSERT, MOZ_CRASH
 #include "mozilla/Casting.h"     // mozilla::AssertedCast
+#include "mozilla/Span.h"
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // {,u}int8_t, {,u}int16_t, {,u}int32_t
@@ -59,7 +60,8 @@ class JS_PUBLIC_API AutoRequireNoGC;
   MACRO(double, double, Float64)                  \
   MACRO(uint8_t, js::uint8_clamped, Uint8Clamped) \
   MACRO(int64_t, int64_t, BigInt64)               \
-  MACRO(uint64_t, uint64_t, BigUint64)
+  MACRO(uint64_t, uint64_t, BigUint64)            \
+  MACRO(uint16_t, js::float16, Float16)
 
 /*
  * JS_New(type)Array:
@@ -275,6 +277,39 @@ namespace JS {
  */
 JS_PUBLIC_API bool IsLargeArrayBufferView(JSObject* obj);
 
+/*
+ * Returns whether the passed array buffer view has a resizable or growable
+ * array buffer.
+ *
+ * |obj| must pass a JS_IsArrayBufferViewObject test.
+ */
+JS_PUBLIC_API bool IsResizableArrayBufferView(JSObject* obj);
+
+/*
+ * Given an ArrayBuffer or view, prevent the length of the underlying
+ * ArrayBuffer from changing (with pin=true) until unfrozen (with
+ * pin=false). Note that some objects (eg SharedArrayBuffers) cannot change
+ * length to begin with, and are treated as always pinned.
+ *
+ * ArrayBuffers and their views can change length by being detached, or
+ * if they are ResizableArrayBuffers or (shared) GrowableArrayBuffers.
+ *
+ * Returns whether the pinned status changed.
+ */
+JS_PUBLIC_API bool PinArrayBufferOrViewLength(JSObject* obj, bool pin);
+
+/*
+ * Given an ArrayBuffer or view, make sure its contents are not stored inline
+ * so that the data is safe for use even if a GC moves the owning object.
+ *
+ * Note that this by itself does not make it safe to use the data pointer
+ * if JS can run or the ArrayBuffer can be detached in any way. Consider using
+ * this in conjunction with PinArrayBufferOrViewLength, which will cause any
+ * potentially invalidating operations to fail.
+ */
+JS_PUBLIC_API bool EnsureNonInlineArrayBufferOrView(JSContext* cx,
+                                                    JSObject* obj);
+
 namespace detail {
 
 // Map from eg Uint8Clamped -> uint8_t, Uint8 -> uint8_t, or Float64 ->
@@ -333,6 +368,7 @@ class JS_PUBLIC_API ArrayBufferOrView {
   }
 
   bool isDetached() const;
+  bool isResizable() const;
 
   void exposeToActiveJS() const {
     if (obj) {
@@ -358,17 +394,21 @@ class JS_PUBLIC_API ArrayBufferOrView {
 };
 
 class JS_PUBLIC_API ArrayBuffer : public ArrayBufferOrView {
+  static const JSClass* const FixedLengthUnsharedClass;
+  static const JSClass* const ResizableUnsharedClass;
+  static const JSClass* const FixedLengthSharedClass;
+  static const JSClass* const GrowableSharedClass;
+
  protected:
   explicit ArrayBuffer(JSObject* unwrapped) : ArrayBufferOrView(unwrapped) {}
 
  public:
-  static const JSClass* const UnsharedClass;
-  static const JSClass* const SharedClass;
-
   static ArrayBuffer fromObject(JSObject* unwrapped) {
     if (unwrapped) {
       const JSClass* clasp = GetClass(unwrapped);
-      if (clasp == UnsharedClass || clasp == SharedClass) {
+      if (clasp == FixedLengthUnsharedClass ||
+          clasp == ResizableUnsharedClass || clasp == FixedLengthSharedClass ||
+          clasp == GrowableSharedClass) {
         return ArrayBuffer(unwrapped);
       }
     }
@@ -378,16 +418,8 @@ class JS_PUBLIC_API ArrayBuffer : public ArrayBufferOrView {
 
   static ArrayBuffer create(JSContext* cx, size_t nbytes);
 
-  bool isDetached() const;
-  bool isSharedMemory() const;
-
-  uint8_t* getLengthAndData(size_t* length, bool* isSharedMemory,
-                            const JS::AutoRequireNoGC&);
-
-  uint8_t* getData(bool* isSharedMemory, const JS::AutoRequireNoGC& nogc) {
-    size_t length;
-    return getLengthAndData(&length, isSharedMemory, nogc);
-  }
+  mozilla::Span<uint8_t> getData(bool* isSharedMemory,
+                                 const JS::AutoRequireNoGC&);
 };
 
 // A view into an ArrayBuffer, either a DataViewObject or a Typed Array variant.
@@ -410,29 +442,29 @@ class JS_PUBLIC_API ArrayBufferView : public ArrayBufferOrView {
   }
 
   bool isDetached() const;
-  bool isSharedMemory() const;
+  bool isResizable() const;
 
-  uint8_t* getLengthAndData(size_t* length, bool* isSharedMemory,
-                            const JS::AutoRequireNoGC&);
-  uint8_t* getData(bool* isSharedMemory, const JS::AutoRequireNoGC& nogc) {
-    size_t length;
-    return getLengthAndData(&length, isSharedMemory, nogc);
-  }
+  mozilla::Span<uint8_t> getData(bool* isSharedMemory,
+                                 const JS::AutoRequireNoGC&);
 
   // Must only be called if !isDetached().
   size_t getByteLength(const JS::AutoRequireNoGC&);
 };
 
 class JS_PUBLIC_API DataView : public ArrayBufferView {
+  static const JSClass* const FixedLengthClassPtr;
+  static const JSClass* const ResizableClassPtr;
+
  protected:
   explicit DataView(JSObject* unwrapped) : ArrayBufferView(unwrapped) {}
 
  public:
-  static const JSClass* const ClassPtr;
-
   static DataView fromObject(JSObject* unwrapped) {
-    if (unwrapped && GetClass(unwrapped) == ClassPtr) {
-      return DataView(unwrapped);
+    if (unwrapped) {
+      const JSClass* clasp = GetClass(unwrapped);
+      if (clasp == FixedLengthClassPtr || clasp == ResizableClassPtr) {
+        return DataView(unwrapped);
+      }
     }
     return DataView(nullptr);
   }
@@ -454,7 +486,8 @@ class JS_PUBLIC_API TypedArray_base : public ArrayBufferView {
  protected:
   explicit TypedArray_base(JSObject* unwrapped) : ArrayBufferView(unwrapped) {}
 
-  static const JSClass* const classes;
+  static const JSClass* const fixedLengthClasses;
+  static const JSClass* const resizableClasses;
 
  public:
   static TypedArray_base fromObject(JSObject* unwrapped);
@@ -473,14 +506,6 @@ class JS_PUBLIC_API TypedArray_base : public ArrayBufferView {
 
 template <JS::Scalar::Type TypedArrayElementType>
 class JS_PUBLIC_API TypedArray : public TypedArray_base {
- protected:
-  explicit TypedArray(JSObject* unwrapped) : TypedArray_base(unwrapped) {}
-
- public:
-  using DataType = detail::ExternalTypeOf_t<TypedArrayElementType>;
-
-  static constexpr JS::Scalar::Type Scalar = TypedArrayElementType;
-
   // This cannot be a static data member because on Windows,
   // __declspec(dllexport) causes the class to be instantiated immediately,
   // leading to errors when later explicit specializations of inline member
@@ -488,9 +513,22 @@ class JS_PUBLIC_API TypedArray : public TypedArray_base {
   // after instantiation"). And those inlines need to be defined outside of the
   // class due to order dependencies. This is the only way I could get it to
   // work on both Windows and POSIX.
-  static const JSClass* clasp() {
-    return &TypedArray_base::classes[static_cast<int>(TypedArrayElementType)];
+  static const JSClass* fixedLengthClasp() {
+    return &TypedArray_base::fixedLengthClasses[static_cast<int>(
+        TypedArrayElementType)];
   }
+  static const JSClass* resizableClasp() {
+    return &TypedArray_base::resizableClasses[static_cast<int>(
+        TypedArrayElementType)];
+  }
+
+ protected:
+  explicit TypedArray(JSObject* unwrapped) : TypedArray_base(unwrapped) {}
+
+ public:
+  using DataType = detail::ExternalTypeOf_t<TypedArrayElementType>;
+
+  static constexpr JS::Scalar::Type Scalar = TypedArrayElementType;
 
   static TypedArray create(JSContext* cx, size_t nelements);
   static TypedArray fromArray(JSContext* cx, HandleObject other);
@@ -500,8 +538,11 @@ class JS_PUBLIC_API TypedArray : public TypedArray_base {
   // Return an interface wrapper around `obj`, or around nullptr if `obj` is not
   // an unwrapped typed array of the correct type.
   static TypedArray fromObject(JSObject* unwrapped) {
-    if (unwrapped && GetClass(unwrapped) == clasp()) {
-      return TypedArray(unwrapped);
+    if (unwrapped) {
+      const JSClass* clasp = GetClass(unwrapped);
+      if (clasp == fixedLengthClasp() || clasp == resizableClasp()) {
+        return TypedArray(unwrapped);
+      }
     }
     return TypedArray(nullptr);
   }
@@ -530,13 +571,8 @@ class JS_PUBLIC_API TypedArray : public TypedArray_base {
   // |*isSharedMemory| will be set to true if the typed array maps a
   // SharedArrayBuffer, otherwise to false.
   //
-  DataType* getLengthAndData(size_t* length, bool* isSharedMemory,
-                             const JS::AutoRequireNoGC& nogc);
-
-  DataType* getData(bool* isSharedMemory, const JS::AutoRequireNoGC& nogc) {
-    size_t length;
-    return getLengthAndData(&length, isSharedMemory, nogc);
-  }
+  mozilla::Span<DataType> getData(bool* isSharedMemory,
+                                  const JS::AutoRequireNoGC& nogc);
 };
 
 ArrayBufferOrView ArrayBufferOrView::fromObject(JSObject* unwrapped) {
@@ -591,8 +627,7 @@ ArrayBufferView ArrayBufferView::fromObject(JSObject* unwrapped) {
                                             size_t* length,                \
                                             bool* isSharedMemory,          \
                                             ExternalType** data) {         \
-    MOZ_ASSERT(JS::GetClass(unwrapped) ==                                  \
-               JS::TypedArray<JS::Scalar::Name>::clasp());                 \
+    MOZ_ASSERT(JS::TypedArray<JS::Scalar::Name>::fromObject(unwrapped));   \
     const JS::Value& lenSlot =                                             \
         JS::GetReservedSlot(unwrapped, detail::TypedArrayLengthSlot);      \
     *length = size_t(lenSlot.toPrivate());                                 \
@@ -659,13 +694,8 @@ class WrappedPtrOperations<T, Wrapper, EnableIfABOVType<T>> {
   bool isDetached() const { return get().isDetached(); }
   bool isSharedMemory() const { return get().isSharedMemory(); }
 
-  typename T::DataType* getLengthAndData(size_t* length, bool* isSharedMemory,
-                                         const JS::AutoRequireNoGC& nogc) {
-    return get().getLengthAndData(length, isSharedMemory, nogc);
-  }
-
-  typename T::DataType* getData(bool* isSharedMemory,
-                                const JS::AutoRequireNoGC& nogc) {
+  mozilla::Span<typename T::DataType> getData(bool* isSharedMemory,
+                                              const JS::AutoRequireNoGC& nogc) {
     return get().getData(isSharedMemory, nogc);
   }
 };

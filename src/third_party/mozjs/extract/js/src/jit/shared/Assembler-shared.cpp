@@ -8,8 +8,21 @@
 
 #include "jit/JitSpewer.h"
 #include "vm/NativeObject.h"
+#include "wasm/WasmMemory.h"
 
-namespace js::jit {
+namespace js {
+
+namespace wasm {
+
+#ifdef DEBUG
+void MemoryAccessDesc::assertOffsetInGuardPages() const {
+  MOZ_ASSERT(offset64_ < (uint64_t)GetMaxOffsetGuardLimit(hugeMemory_));
+}
+#endif
+
+}  // namespace wasm
+
+namespace jit {
 
 void BaseObjectElementIndex::staticAssertions() {
   NativeObject::elementsSizeMustNotOverflow();
@@ -71,4 +84,6 @@ bool AssemblerShared::hasCreator() const {
 }
 #endif
 
-}  // namespace js::jit
+}  // namespace jit
+
+}  // namespace js

@@ -35,22 +35,28 @@ class InlineScriptTree {
   InlineScriptTree* children_;
   InlineScriptTree* nextCallee_;
 
+  // Whether this script is monomorphically inlined into its caller.
+  bool isMonomorphicallyInlined_;
+
  public:
   InlineScriptTree(InlineScriptTree* caller, jsbytecode* callerPc,
-                   JSScript* script)
+                   JSScript* script, bool isMonomorphicallyInlined)
       : caller_(caller),
         callerPc_(callerPc),
         script_(script),
         children_(nullptr),
-        nextCallee_(nullptr) {}
+        nextCallee_(nullptr),
+        isMonomorphicallyInlined_(isMonomorphicallyInlined) {}
 
   static inline InlineScriptTree* New(TempAllocator* allocator,
                                       InlineScriptTree* caller,
-                                      jsbytecode* callerPc, JSScript* script);
+                                      jsbytecode* callerPc, JSScript* script,
+                                      bool isMonomorphicallyInlined = false);
 
   inline InlineScriptTree* addCallee(TempAllocator* allocator,
                                      jsbytecode* callerPc,
-                                     JSScript* calleeScript);
+                                     JSScript* calleeScript,
+                                     bool isMonomorphicallyInlined);
   inline void removeCallee(InlineScriptTree* callee);
 
   InlineScriptTree* caller() const { return caller_; }
@@ -79,6 +85,21 @@ class InlineScriptTree {
       return 1;
     }
     return 1 + caller_->depth();
+  }
+
+  // Returns true if this script, or any of its callers in the
+  // inlining tree, was monomorphically inlined. If this is true,
+  // ICs transpiled into this compilation may also be transpiled
+  // into another compilation.
+  bool hasSharedICScript() const {
+    const InlineScriptTree* script = this;
+    while (!script->isOutermostCaller()) {
+      if (script->isMonomorphicallyInlined_) {
+        return true;
+      }
+      script = script->caller();
+    }
+    return false;
   }
 };
 

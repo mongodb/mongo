@@ -92,6 +92,22 @@ const void* CompileRuntime::addressOfLastBufferedWholeCell() {
   return runtime()->gc.addressOfLastBufferedWholeCell();
 }
 
+const void* CompileRuntime::addressOfHasSeenObjectEmulateUndefinedFuse() {
+  // We're merely accessing the address of the fuse here, and so we don't need
+  // the MainThreadData check here.
+  return runtime()->hasSeenObjectEmulateUndefinedFuse.refNoCheck().fuseRef();
+}
+
+bool CompileRuntime::hasSeenObjectEmulateUndefinedFuseIntact() {
+  // Note: This accesses the bit; this would be unsafe off-thread, however
+  // this should only be accessed by CompileInfo in its constructor on main
+  // thread and so should be safe.
+  //
+  // (This value is also checked by ref() rather than skipped like the address
+  // call above.)
+  return runtime()->hasSeenObjectEmulateUndefinedFuse.ref().intact();
+}
+
 const DOMCallbacks* CompileRuntime::DOMcallbacks() {
   return runtime()->DOMcallbacks;
 }
@@ -187,7 +203,7 @@ CompileRealm::addressOfRandomNumberGenerator() {
   return realm()->addressOfRandomNumberGenerator();
 }
 
-const JitRealm* CompileRealm::jitRealm() { return realm()->jitRealm(); }
+const JitZone* CompileZone::jitZone() { return zone()->jitZone(); }
 
 const GlobalObject* CompileRealm::maybeGlobal() {
   // This uses unsafeUnbarrieredMaybeGlobal() so as not to trigger the read
@@ -200,8 +216,8 @@ const uint32_t* CompileRealm::addressOfGlobalWriteBarriered() {
   return &realm()->globalWriteBarriered;
 }
 
-bool CompileRealm::hasAllocationMetadataBuilder() {
-  return realm()->hasAllocationMetadataBuilder();
+bool CompileZone::hasRealmWithAllocMetadataBuilder() {
+  return zone()->hasRealmWithAllocMetadataBuilder();
 }
 
 JitCompileOptions::JitCompileOptions()

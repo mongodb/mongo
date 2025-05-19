@@ -38,7 +38,7 @@ class MOZ_RAII AutoProfilerLabelData {
   // Does not preserve behavior in JS record/replay.
   class Mutex : private mozilla::detail::MutexImpl {
    public:
-    Mutex() : mozilla::detail::MutexImpl() {}
+    Mutex() = default;
     void Lock() { mozilla::detail::MutexImpl::lock(); }
     void Unlock() { mozilla::detail::MutexImpl::unlock(); }
   };

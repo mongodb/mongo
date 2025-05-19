@@ -169,19 +169,17 @@ union Utf8Unit {
 
   explicit constexpr Utf8Unit(char aUnit) : mValue(aUnit) {}
 
-#if defined(__cpp_char8_t) && __cpp_char8_t >= 201811
-
-  explicit constexpr Utf8Unit(char8_t aUnit)
-      : Utf8Unit(static_cast<char>(aUnit)) {}
-
-#endif
-
   explicit constexpr Utf8Unit(unsigned char aUnit)
       : mValue(static_cast<char>(aUnit)) {
     // Per the above comment, the prior cast is integral conversion with
     // implementation-defined semantics, and we regretfully but unavoidably
     // assume the conversion does what we want it to.
   }
+
+#ifdef __cpp_char8_t
+  explicit constexpr Utf8Unit(char8_t aUnit)
+      : mValue(static_cast<char>(aUnit)) {}
+#endif
 
   constexpr bool operator==(const Utf8Unit& aOther) const {
     return mValue == aOther.mValue;

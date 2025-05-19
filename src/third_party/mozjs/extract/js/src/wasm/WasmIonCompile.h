@@ -22,6 +22,9 @@
 #include "wasm/WasmGenerator.h"
 
 namespace js {
+
+class GenericPrinter;
+
 namespace wasm {
 
 // Return whether IonCompileFunction() can generate code on the current device.
@@ -34,6 +37,11 @@ namespace wasm {
                                        LifoAlloc& lifo,
                                        const FuncCompileInputVector& inputs,
                                        CompiledCode* code, UniqueChars* error);
+
+[[nodiscard]] bool IonDumpFunction(const ModuleEnvironment& moduleEnv,
+                                   const FuncCompileInput& func,
+                                   IonDumpContents contents,
+                                   GenericPrinter& out, UniqueChars* error);
 
 }  // namespace wasm
 }  // namespace js

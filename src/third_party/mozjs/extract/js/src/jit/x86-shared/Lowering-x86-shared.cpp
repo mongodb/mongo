@@ -10,6 +10,7 @@
 
 #include "jit/Lowering.h"
 #include "jit/MIR.h"
+#include "wasm/WasmFeatures.h"  // for wasm::ReportSimdAnalysis
 
 #include "jit/shared/Lowering-shared-inl.h"
 
@@ -400,6 +401,7 @@ void LIRGenerator::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins) {
     case Scalar::Uint8Clamped:
     case Scalar::BigInt64:
     case Scalar::BigUint64:
+    case Scalar::Float16:
     case Scalar::MaxTypedArrayViewType:
       MOZ_CRASH("unexpected array type");
   }
@@ -731,8 +733,8 @@ void LIRGeneratorX86Shared::lowerAtomicTypedArrayElementBinop(
   // There are optimization opportunities:
   //  - better register allocation in the x86 8-bit case, Bug #1077036.
 
-  bool bitOp = !(ins->operation() == AtomicFetchAddOp ||
-                 ins->operation() == AtomicFetchSubOp);
+  bool bitOp =
+      !(ins->operation() == AtomicOp::Add || ins->operation() == AtomicOp::Sub);
   bool fixedOutput = true;
   bool reuseInput = false;
   LDefinition tempDef1 = LDefinition::BogusTemp();
@@ -835,10 +837,10 @@ void LIRGenerator::visitWasmTernarySimd128(MWasmTernarySimd128* ins) {
       defineReuseInput(lir, ins, LWasmTernarySimd128::V0);
       break;
     }
-    case wasm::SimdOp::F32x4RelaxedFma:
-    case wasm::SimdOp::F32x4RelaxedFnma:
-    case wasm::SimdOp::F64x2RelaxedFma:
-    case wasm::SimdOp::F64x2RelaxedFnma: {
+    case wasm::SimdOp::F32x4RelaxedMadd:
+    case wasm::SimdOp::F32x4RelaxedNmadd:
+    case wasm::SimdOp::F64x2RelaxedMadd:
+    case wasm::SimdOp::F64x2RelaxedNmadd: {
       auto* lir = new (alloc()) LWasmTernarySimd128(
           ins->simdOp(), useRegister(ins->v0()), useRegister(ins->v1()),
           useRegisterAtStart(ins->v2()));
@@ -1500,6 +1502,12 @@ void LIRGenerator::visitWasmShuffleSimd128(MWasmShuffleSimd128* ins) {
         case SimdPermuteOp::REVERSE_16x8:
         case SimdPermuteOp::REVERSE_32x4:
         case SimdPermuteOp::REVERSE_64x2:
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_16x8:
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_32x4:
+        case SimdPermuteOp::ZERO_EXTEND_8x16_TO_64x2:
+        case SimdPermuteOp::ZERO_EXTEND_16x8_TO_32x4:
+        case SimdPermuteOp::ZERO_EXTEND_16x8_TO_64x2:
+        case SimdPermuteOp::ZERO_EXTEND_32x4_TO_64x2:
           // No need to reuse registers when VEX instructions are enabled.
           reuse = !Assembler::HasAVX();
           break;

@@ -34,19 +34,23 @@
 #include "builtin/JSON.h"
 #include "builtin/Promise.h"
 #include "builtin/Symbol.h"
-#include "frontend/BytecodeCompiler.h"
 #include "frontend/FrontendContext.h"  // AutoReportFrontendContext
 #include "gc/GC.h"
 #include "gc/GCContext.h"
 #include "gc/Marking.h"
 #include "gc/PublicIterators.h"
 #include "jit/JitSpewer.h"
+#include "jit/TrampolineNatives.h"
 #include "js/CallAndConstruct.h"  // JS::IsCallable
 #include "js/CharacterEncoding.h"
+#include "js/ColumnNumber.h"  // JS::TaggedColumnNumberOneOrigin, JS::ColumnNumberOneOrigin
 #include "js/CompileOptions.h"
 #include "js/ContextOptions.h"  // JS::ContextOptions{,Ref}
 #include "js/Conversions.h"
+#include "js/Date.h"  // JS::GetReduceMicrosecondTimePrecisionCallback
 #include "js/ErrorInterceptor.h"
+#include "js/ErrorReport.h"           // JSErrorBase
+#include "js/experimental/JitInfo.h"  // JSJitInfo
 #include "js/friend/ErrorMessages.h"  // js::GetErrorMessage, JSMSG_*
 #include "js/friend/StackLimits.h"    // js::AutoCheckRecursionLimit
 #include "js/GlobalObject.h"
@@ -56,6 +60,7 @@
 #include "js/LocaleSensitive.h"
 #include "js/MemoryCallbacks.h"
 #include "js/MemoryFunctions.h"
+#include "js/Prefs.h"
 #include "js/PropertySpec.h"
 #include "js/Proxy.h"
 #include "js/ScriptPrivate.h"
@@ -71,6 +76,7 @@
 #include "js/Wrapper.h"
 #include "js/WrapperCallbacks.h"
 #include "proxy/DOMProxy.h"
+#include "util/Identifier.h"  // IsIdentifier
 #include "util/StringBuffer.h"
 #include "util/Text.h"
 #include "vm/BoundFunctionObject.h"
@@ -79,8 +85,8 @@
 #include "vm/ErrorReporting.h"
 #include "vm/FunctionPrefixKind.h"
 #include "vm/Interpreter.h"
-#include "vm/JSAtom.h"
 #include "vm/JSAtomState.h"
+#include "vm/JSAtomUtils.h"  // Atomize, AtomizeWithoutActiveZone, AtomizeChars, PinAtom, ClassName
 #include "vm/JSContext.h"
 #include "vm/JSFunction.h"
 #include "vm/JSObject.h"
@@ -92,6 +98,7 @@
 #include "vm/StringType.h"
 #include "vm/Time.h"
 #include "vm/ToSource.h"
+#include "vm/Watchtower.h"
 #include "vm/WrapperObject.h"
 #include "wasm/WasmModule.h"
 #include "wasm/WasmProcess.h"
@@ -101,7 +108,7 @@
 #include "vm/Compartment-inl.h"
 #include "vm/Interpreter-inl.h"
 #include "vm/IsGivenTypeObject-inl.h"  // js::IsGivenTypeObject
-#include "vm/JSAtom-inl.h"
+#include "vm/JSAtomUtils-inl.h"  // AtomToId, PrimitiveValueToId, IndexToId, ClassName
 #include "vm/JSFunction-inl.h"
 #include "vm/JSScript-inl.h"
 #include "vm/NativeObject-inl.h"
@@ -1284,7 +1291,7 @@ JS_PUBLIC_API void JS_RemoveExtraGCRootsTracer(JSContext* cx,
 }
 
 JS_PUBLIC_API JS::GCReason JS::WantEagerMinorGC(JSRuntime* rt) {
-  if (rt->gc.nursery().shouldCollect()) {
+  if (rt->gc.nursery().wantEagerCollection()) {
     return JS::GCReason::EAGER_NURSERY_COLLECTION;
   }
   return JS::GCReason::NO_REASON;
@@ -1297,7 +1304,18 @@ JS_PUBLIC_API JS::GCReason JS::WantEagerMajorGC(JSRuntime* rt) {
 JS_PUBLIC_API void JS::MaybeRunNurseryCollection(JSRuntime* rt,
                                                  JS::GCReason reason) {
   gc::GCRuntime& gc = rt->gc;
-  if (gc.nursery().shouldCollect()) {
+  if (gc.nursery().wantEagerCollection()) {
+    gc.minorGC(reason);
+  }
+}
+
+JS_PUBLIC_API void JS::RunNurseryCollection(
+    JSRuntime* rt, JS::GCReason reason,
+    mozilla::TimeDuration aSinceLastMinorGC) {
+  gc::GCRuntime& gc = rt->gc;
+  if (!gc.nursery().lastCollectionEndTime() ||
+      (mozilla::TimeStamp::Now() - gc.nursery().lastCollectionEndTime() >
+       aSinceLastMinorGC)) {
     gc.minorGC(reason);
   }
 }
@@ -1394,7 +1412,10 @@ JS_PUBLIC_API bool JS_UpdateWeakPointerAfterGCUnbarriered(JSTracer* trc,
 
 JS_PUBLIC_API void JS_SetGCParameter(JSContext* cx, JSGCParamKey key,
                                      uint32_t value) {
-  MOZ_ALWAYS_TRUE(cx->runtime()->gc.setParameter(cx, key, value));
+  // Bug 1742118: JS_SetGCParameter has no way to return an error
+  // The GC ignores invalid values internally but this is not reported to the
+  // caller.
+  (void)cx->runtime()->gc.setParameter(cx, key, value);
 }
 
 JS_PUBLIC_API void JS_ResetGCParameter(JSContext* cx, JSGCParamKey key) {
@@ -1413,7 +1434,7 @@ JS_PUBLIC_API void JS_SetGCParametersBasedOnAvailableMemory(
   };
 
   static const JSGCConfig minimal[] = {
-      {JSGC_SLICE_TIME_BUDGET_MS, 5},
+      {JSGC_SLICE_TIME_BUDGET_MS, 10},
       {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1500},
       {JSGC_LARGE_HEAP_SIZE_MIN, 250},
       {JSGC_SMALL_HEAP_SIZE_MAX, 50},
@@ -1427,7 +1448,7 @@ JS_PUBLIC_API void JS_SetGCParametersBasedOnAvailableMemory(
       {JSGC_URGENT_THRESHOLD_MB, 8}};
 
   static const JSGCConfig nominal[] = {
-      {JSGC_SLICE_TIME_BUDGET_MS, 5},
+      {JSGC_SLICE_TIME_BUDGET_MS, 10},
       {JSGC_HIGH_FREQUENCY_TIME_LIMIT, 1000},
       {JSGC_LARGE_HEAP_SIZE_MIN, 500},
       {JSGC_SMALL_HEAP_SIZE_MAX, 100},
@@ -1446,7 +1467,15 @@ JS_PUBLIC_API void JS_SetGCParametersBasedOnAvailableMemory(
   }
 }
 
-JS_PUBLIC_API JSString* JS_NewExternalString(
+JS_PUBLIC_API JSString* JS_NewExternalStringLatin1(
+    JSContext* cx, const Latin1Char* chars, size_t length,
+    const JSExternalStringCallbacks* callbacks) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+  return JSExternalString::new_(cx, chars, length, callbacks);
+}
+
+JS_PUBLIC_API JSString* JS_NewExternalUCString(
     JSContext* cx, const char16_t* chars, size_t length,
     const JSExternalStringCallbacks* callbacks) {
   AssertHeapIsIdle();
@@ -1454,7 +1483,35 @@ JS_PUBLIC_API JSString* JS_NewExternalString(
   return JSExternalString::new_(cx, chars, length, callbacks);
 }
 
-JS_PUBLIC_API JSString* JS_NewMaybeExternalString(
+JS_PUBLIC_API JSString* JS_NewMaybeExternalStringLatin1(
+    JSContext* cx, const JS::Latin1Char* chars, size_t length,
+    const JSExternalStringCallbacks* callbacks, bool* allocatedExternal) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+  return NewMaybeExternalString(cx, chars, length, callbacks,
+                                allocatedExternal);
+}
+
+JS_PUBLIC_API JSString* JS_NewMaybeExternalStringUTF8(
+    JSContext* cx, const JS::UTF8Chars& utf8,
+    const JSExternalStringCallbacks* callbacks, bool* allocatedExternal) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+
+  JS::SmallestEncoding encoding = JS::FindSmallestEncoding(utf8);
+  if (encoding == JS::SmallestEncoding::ASCII) {
+    // ASCII case can use the external buffer as Latin1 buffer.
+    return NewMaybeExternalString(
+        cx, reinterpret_cast<JS::Latin1Char*>(utf8.begin().get()),
+        utf8.length(), callbacks, allocatedExternal);
+  }
+
+  // Non-ASCII case cannot use the external buffer.
+  *allocatedExternal = false;
+  return NewStringCopyUTF8N(cx, utf8, encoding);
+}
+
+JS_PUBLIC_API JSString* JS_NewMaybeExternalUCString(
     JSContext* cx, const char16_t* chars, size_t length,
     const JSExternalStringCallbacks* callbacks, bool* allocatedExternal) {
   AssertHeapIsIdle();
@@ -1487,7 +1544,6 @@ JS_PUBLIC_API void JS_SetNativeStackQuota(
     JS::NativeStackSize trustedScriptStackSize,
     JS::NativeStackSize untrustedScriptStackSize) {
   MOZ_ASSERT(!cx->activation());
-  MOZ_ASSERT(cx->isMainThreadContext());
 
   if (!trustedScriptStackSize) {
     trustedScriptStackSize = systemCodeStackSize;
@@ -1548,7 +1604,8 @@ JS_PUBLIC_API bool JS::ToPrimitive(JSContext* cx, HandleObject obj, JSType hint,
   return ToPrimitiveSlow(cx, hint, vp);
 }
 
-JS_PUBLIC_API bool JS::GetFirstArgumentAsTypeHint(JSContext* cx, CallArgs args,
+JS_PUBLIC_API bool JS::GetFirstArgumentAsTypeHint(JSContext* cx,
+                                                  const CallArgs& args,
                                                   JSType* result) {
   if (!args.get(0).isString()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
@@ -1721,6 +1778,24 @@ JS::RealmCreationOptions& JS::RealmCreationOptions::setCoopAndCoepEnabled(
   return *this;
 }
 
+JS::RealmCreationOptions& JS::RealmCreationOptions::setLocaleCopyZ(
+    const char* locale) {
+  const size_t size = strlen(locale) + 1;
+
+  AutoEnterOOMUnsafeRegion oomUnsafe;
+  char* memoryPtr = js_pod_malloc<char>(sizeof(LocaleString) + size);
+  if (!memoryPtr) {
+    oomUnsafe.crash("RealmCreationOptions::setLocaleCopyZ");
+  }
+
+  char* localePtr = memoryPtr + sizeof(LocaleString);
+  memcpy(localePtr, locale, size);
+
+  locale_ = new (memoryPtr) LocaleString(localePtr);
+
+  return *this;
+}
+
 const JS::RealmBehaviors& JS::RealmBehaviorsRef(JS::Realm* realm) {
   return realm->behaviors();
 }
@@ -1730,6 +1805,11 @@ const JS::RealmBehaviors& JS::RealmBehaviorsRef(JSContext* cx) {
 }
 
 void JS::SetRealmNonLive(Realm* realm) { realm->setNonLive(); }
+
+void JS::SetRealmReduceTimerPrecisionCallerType(Realm* realm,
+                                                JS::RTPCallerTypeToken type) {
+  realm->setReduceTimerPrecisionCallerType(type);
+}
 
 JS_PUBLIC_API JSObject* JS_NewGlobalObject(JSContext* cx, const JSClass* clasp,
                                            JSPrincipals* principals,
@@ -1787,7 +1867,18 @@ JS_PUBLIC_API void JS_FireOnNewGlobalObject(JSContext* cx,
   // This infallibility will eat OOM and slow script, but if that happens
   // we'll likely run up into them again soon in a fallible context.
   cx->check(global);
+
   Rooted<js::GlobalObject*> globalObject(cx, &global->as<GlobalObject>());
+#ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
+  if (JS::GetReduceMicrosecondTimePrecisionCallback()) {
+    MOZ_DIAGNOSTIC_ASSERT(globalObject->realm()
+                              ->behaviors()
+                              .reduceTimerPrecisionCallerType()
+                              .isSome(),
+                          "Trying to create a global without setting an "
+                          "explicit RTPCallerType!");
+  }
+#endif
   DebugAPI::onNewGlobalObject(cx, globalObject);
   cx->runtime()->ensureRealmIsRecordingAllocations(globalObject);
 }
@@ -1883,6 +1974,12 @@ JS_PUBLIC_API void JS::SetFilenameValidationCallback(
 JS_PUBLIC_API void JS::SetHostEnsureCanAddPrivateElementHook(
     JSContext* cx, JS::EnsureCanAddPrivateElementOp op) {
   cx->runtime()->canAddPrivateElement = op;
+}
+
+JS_PUBLIC_API bool JS::SetBrittleMode(JSContext* cx, bool setting) {
+  bool wasBrittle = cx->brittleMode;
+  cx->brittleMode = setting;
+  return wasBrittle;
 }
 
 /*** Standard internal methods **********************************************/
@@ -2041,13 +2138,13 @@ JS_PUBLIC_API bool JS::PropertySpecNameToPermanentId(JSContext* cx,
   return true;
 }
 
-JS_PUBLIC_API bool JS::ObjectToCompletePropertyDescriptor(
-    JSContext* cx, HandleObject obj, HandleValue descObj,
+JS_PUBLIC_API bool JS::ToCompletePropertyDescriptor(
+    JSContext* cx, HandleValue descriptor,
     MutableHandle<PropertyDescriptor> desc) {
-  // |obj| can be in a different compartment here. The caller is responsible
-  // for wrapping it (see JS_WrapPropertyDescriptor).
-  cx->check(descObj);
-  if (!ToPropertyDescriptor(cx, descObj, true, desc)) {
+  AssertHeapIsIdle();
+  CHECK_THREAD(cx);
+  cx->check(descriptor);
+  if (!ToPropertyDescriptor(cx, descriptor, /* checkAccessors */ true, desc)) {
     return false;
   }
   CompletePropertyDescriptor(desc);
@@ -2059,9 +2156,11 @@ JS_PUBLIC_API void JS_SetAllNonReservedSlotsToUndefined(JS::HandleObject obj) {
     return;
   }
 
+  NativeObject& nobj = obj->as<NativeObject>();
+  MOZ_RELEASE_ASSERT(!Watchtower::watchesPropertyModification(&nobj));
   const JSClass* clasp = obj->getClass();
   unsigned numReserved = JSCLASS_RESERVED_SLOTS(clasp);
-  unsigned numSlots = obj->as<NativeObject>().slotSpan();
+  unsigned numSlots = nobj.slotSpan();
   for (unsigned i = numReserved; i < numSlots; i++) {
     obj->as<NativeObject>().setSlot(i, UndefinedValue());
   }
@@ -2071,8 +2170,10 @@ JS_PUBLIC_API void JS_SetReservedSlot(JSObject* obj, uint32_t index,
                                       const Value& value) {
   // Note: we don't use setReservedSlot so that this also works on swappable DOM
   // objects. See NativeObject::getReservedSlotRef comment.
+  NativeObject& nobj = obj->as<NativeObject>();
   MOZ_ASSERT(index < JSCLASS_RESERVED_SLOTS(obj->getClass()));
-  obj->as<NativeObject>().setSlot(index, value);
+  MOZ_ASSERT(!Watchtower::watchesPropertyModification(&nobj));
+  nobj.setSlot(index, value);
 }
 
 JS_PUBLIC_API void JS_InitReservedSlot(JSObject* obj, uint32_t index, void* ptr,
@@ -2243,8 +2344,12 @@ JS_PUBLIC_API JSFunction* JS::NewFunctionFromSpec(JSContext* cx,
     return nullptr;
   }
 
-  if (fs->call.info) {
-    fun->setJitInfo(fs->call.info);
+  if (auto* jitInfo = fs->call.info) {
+    if (jitInfo->type() == JSJitInfo::OpType::TrampolineNative) {
+      jit::SetTrampolineNativeJitEntry(cx, fun, jitInfo->trampolineNative);
+    } else {
+      fun->setJitInfo(jitInfo);
+    }
   }
   return fun;
 }
@@ -2261,12 +2366,33 @@ JS_PUBLIC_API JSFunction* JS::NewFunctionFromSpec(JSContext* cx,
 
 JS_PUBLIC_API JSObject* JS_GetFunctionObject(JSFunction* fun) { return fun; }
 
-JS_PUBLIC_API JSString* JS_GetFunctionId(JSFunction* fun) {
-  return fun->explicitName();
+JS_PUBLIC_API bool JS_GetFunctionId(JSContext* cx, JS::Handle<JSFunction*> fun,
+                                    JS::MutableHandle<JSString*> name) {
+  JS::Rooted<JSAtom*> atom(cx);
+  if (!fun->getExplicitName(cx, &atom)) {
+    return false;
+  }
+  name.set(atom);
+  return true;
 }
 
-JS_PUBLIC_API JSString* JS_GetFunctionDisplayId(JSFunction* fun) {
-  return fun->displayAtom();
+JS_PUBLIC_API JSString* JS_GetMaybePartialFunctionId(JSFunction* fun) {
+  return fun->maybePartialExplicitName();
+}
+
+JS_PUBLIC_API bool JS_GetFunctionDisplayId(JSContext* cx,
+                                           JS::Handle<JSFunction*> fun,
+                                           JS::MutableHandle<JSString*> name) {
+  JS::Rooted<JSAtom*> atom(cx);
+  if (!fun->getDisplayAtom(cx, &atom)) {
+    return false;
+  }
+  name.set(atom);
+  return true;
+}
+
+JS_PUBLIC_API JSString* JS_GetMaybePartialFunctionDisplayId(JSFunction* fun) {
+  return fun->maybePartialDisplayAtom();
 }
 
 JS_PUBLIC_API uint16_t JS_GetFunctionArity(JSFunction* fun) {
@@ -2301,29 +2427,25 @@ void JS::TransitiveCompileOptions::copyPODTransitiveOptions(
 
   mutedErrors_ = rhs.mutedErrors_;
   forceStrictMode_ = rhs.forceStrictMode_;
-  shouldResistFingerprinting_ = rhs.shouldResistFingerprinting_;
-  sourcePragmas_ = rhs.sourcePragmas_;
+  alwaysUseFdlibm_ = rhs.alwaysUseFdlibm_;
   skipFilenameValidation_ = rhs.skipFilenameValidation_;
   hideScriptFromDebugger_ = rhs.hideScriptFromDebugger_;
   deferDebugMetadata_ = rhs.deferDebugMetadata_;
   eagerDelazificationStrategy_ = rhs.eagerDelazificationStrategy_;
 
   selfHostingMode = rhs.selfHostingMode;
-  asmJSOption = rhs.asmJSOption;
-  throwOnAsmJSValidationFailureOption = rhs.throwOnAsmJSValidationFailureOption;
-  forceAsync = rhs.forceAsync;
   discardSource = rhs.discardSource;
   sourceIsLazy = rhs.sourceIsLazy;
   allowHTMLComments = rhs.allowHTMLComments;
   nonSyntacticScope = rhs.nonSyntacticScope;
 
   topLevelAwait = rhs.topLevelAwait;
-  importAssertions = rhs.importAssertions;
 
   borrowBuffer = rhs.borrowBuffer;
   usePinnedBytecode = rhs.usePinnedBytecode;
-  allocateInstantiationStorage = rhs.allocateInstantiationStorage;
   deoptimizeModuleGlobalVars = rhs.deoptimizeModuleGlobalVars;
+
+  prefableOptions_ = rhs.prefableOptions_;
 
   introductionType = rhs.introductionType;
   introductionLineno = rhs.introductionLineno;
@@ -2340,30 +2462,55 @@ void JS::ReadOnlyCompileOptions::copyPODNonTransitiveOptions(
   noScriptRval = rhs.noScriptRval;
 }
 
-JS::OwningCompileOptions::OwningCompileOptions(JSContext* cx)
-    : ReadOnlyCompileOptions() {}
+JS::OwningCompileOptions::OwningCompileOptions(JSContext* cx) {}
 
 void JS::OwningCompileOptions::release() {
   // OwningCompileOptions always owns these, so these casts are okay.
-  js_free(const_cast<char*>(filename_));
+  js_free(const_cast<char*>(filename_.c_str()));
   js_free(const_cast<char16_t*>(sourceMapURL_));
-  js_free(const_cast<char*>(introducerFilename_));
+  js_free(const_cast<char*>(introducerFilename_.c_str()));
 
-  filename_ = nullptr;
+  filename_ = JS::ConstUTF8CharsZ();
   sourceMapURL_ = nullptr;
-  introducerFilename_ = nullptr;
+  introducerFilename_ = JS::ConstUTF8CharsZ();
 }
 
 JS::OwningCompileOptions::~OwningCompileOptions() { release(); }
 
 size_t JS::OwningCompileOptions::sizeOfExcludingThis(
     mozilla::MallocSizeOf mallocSizeOf) const {
-  return mallocSizeOf(filename_) + mallocSizeOf(sourceMapURL_) +
-         mallocSizeOf(introducerFilename_);
+  return mallocSizeOf(filename_.c_str()) + mallocSizeOf(sourceMapURL_) +
+         mallocSizeOf(introducerFilename_.c_str());
 }
 
-bool JS::OwningCompileOptions::copy(JSContext* cx,
-                                    const ReadOnlyCompileOptions& rhs) {
+void JS::OwningCompileOptions::steal(JS::OwningCompileOptions&& rhs) {
+  // Release existing string allocations.
+  release();
+
+  copyPODNonTransitiveOptions(rhs);
+  copyPODTransitiveOptions(rhs);
+
+  filename_ = rhs.filename_;
+  rhs.filename_ = JS::ConstUTF8CharsZ();
+  introducerFilename_ = rhs.introducerFilename_;
+  rhs.introducerFilename_ = JS::ConstUTF8CharsZ();
+  sourceMapURL_ = rhs.sourceMapURL_;
+  rhs.sourceMapURL_ = nullptr;
+}
+
+void JS::OwningCompileOptions::steal(JS::OwningDecodeOptions&& rhs) {
+  // Release existing string allocations.
+  release();
+
+  rhs.copyPODOptionsTo(*this);
+
+  introducerFilename_ = rhs.introducerFilename_;
+  rhs.introducerFilename_ = JS::ConstUTF8CharsZ();
+}
+
+template <typename ContextT>
+bool JS::OwningCompileOptions::copyImpl(ContextT* cx,
+                                        const ReadOnlyCompileOptions& rhs) {
   // Release existing string allocations.
   release();
 
@@ -2371,10 +2518,11 @@ bool JS::OwningCompileOptions::copy(JSContext* cx,
   copyPODTransitiveOptions(rhs);
 
   if (rhs.filename()) {
-    filename_ = DuplicateString(cx, rhs.filename()).release();
-    if (!filename_) {
+    const char* str = DuplicateString(cx, rhs.filename().c_str()).release();
+    if (!str) {
       return false;
     }
+    filename_ = JS::ConstUTF8CharsZ(str);
   }
 
   if (rhs.sourceMapURL()) {
@@ -2385,37 +2533,38 @@ bool JS::OwningCompileOptions::copy(JSContext* cx,
   }
 
   if (rhs.introducerFilename()) {
-    introducerFilename_ =
-        DuplicateString(cx, rhs.introducerFilename()).release();
-    if (!introducerFilename_) {
+    const char* str =
+        DuplicateString(cx, rhs.introducerFilename().c_str()).release();
+    if (!str) {
       return false;
     }
+    introducerFilename_ = JS::ConstUTF8CharsZ(str);
   }
 
   return true;
 }
 
-JS::CompileOptions::CompileOptions(JSContext* cx) : ReadOnlyCompileOptions() {
-  if (!js::IsAsmJSCompilationAvailable(cx)) {
-    // Distinguishing the cases is just for error reporting.
-    asmJSOption = !cx->options().asmJS()
-                      ? AsmJSOption::DisabledByAsmJSPref
-                      : AsmJSOption::DisabledByNoWasmCompiler;
-  } else if (cx->realm() && (cx->realm()->debuggerObservesWasm() ||
-                             cx->realm()->debuggerObservesAsmJS())) {
-    asmJSOption = AsmJSOption::DisabledByDebugger;
-  } else {
-    asmJSOption = AsmJSOption::Enabled;
+bool JS::OwningCompileOptions::copy(JSContext* cx,
+                                    const ReadOnlyCompileOptions& rhs) {
+  return copyImpl(cx, rhs);
+}
+
+bool JS::OwningCompileOptions::copy(JS::FrontendContext* fc,
+                                    const ReadOnlyCompileOptions& rhs) {
+  return copyImpl(fc, rhs);
+}
+
+JS::CompileOptions::CompileOptions(JSContext* cx) {
+  prefableOptions_ = cx->options().compileOptions();
+
+  if (cx->options().asmJSOption() == AsmJSOption::Enabled) {
+    if (!js::IsAsmJSCompilationAvailable(cx)) {
+      prefableOptions_.setAsmJSOption(AsmJSOption::DisabledByNoWasmCompiler);
+    } else if (cx->realm() && (cx->realm()->debuggerObservesWasm() ||
+                               cx->realm()->debuggerObservesAsmJS())) {
+      prefableOptions_.setAsmJSOption(AsmJSOption::DisabledByDebugger);
+    }
   }
-  throwOnAsmJSValidationFailureOption =
-      cx->options().throwOnAsmJSValidationFailure();
-
-  importAssertions = cx->options().importAssertions();
-
-  sourcePragmas_ = cx->options().sourcePragmas();
-
-  // Certain modes of operation force strict-mode in general.
-  forceStrictMode_ = cx->options().strictMode();
 
   // Certain modes of operation disallow syntax parsing in general.
   if (coverage::IsLCovEnabled()) {
@@ -2425,8 +2574,7 @@ JS::CompileOptions::CompileOptions(JSContext* cx) : ReadOnlyCompileOptions() {
   // Note: If we parse outside of a specific realm, we do not inherit any realm
   // behaviours. These can still be set manually on the options though.
   if (Realm* realm = cx->realm()) {
-    shouldResistFingerprinting_ =
-        realm->behaviors().shouldResistFingerprinting();
+    alwaysUseFdlibm_ = realm->creationOptions().alwaysUseFdlibm();
     discardSource = realm->behaviors().discardSource();
   }
 }
@@ -2436,7 +2584,7 @@ CompileOptions& CompileOptions::setIntroductionInfoToCaller(
     MutableHandle<JSScript*> introductionScript) {
   RootedScript maybeScript(cx);
   const char* filename;
-  unsigned lineno;
+  uint32_t lineno;
   uint32_t pcOffset;
   bool mutedErrors;
   DescribeScriptedCallerForCompilation(cx, &maybeScript, &filename, &lineno,
@@ -2446,6 +2594,43 @@ CompileOptions& CompileOptions::setIntroductionInfoToCaller(
     return setIntroductionInfo(filename, introductionType, lineno, pcOffset);
   }
   return setIntroductionType(introductionType);
+}
+
+JS::OwningDecodeOptions::~OwningDecodeOptions() { release(); }
+
+void JS::OwningDecodeOptions::release() {
+  js_free(const_cast<char*>(introducerFilename_.c_str()));
+
+  introducerFilename_ = JS::ConstUTF8CharsZ();
+}
+
+bool JS::OwningDecodeOptions::copy(JS::FrontendContext* maybeFc,
+                                   const JS::ReadOnlyDecodeOptions& rhs) {
+  copyPODOptionsFrom(rhs);
+
+  if (rhs.introducerFilename()) {
+    MOZ_ASSERT(maybeFc);
+    const char* str =
+        DuplicateString(maybeFc, rhs.introducerFilename().c_str()).release();
+    if (!str) {
+      return false;
+    }
+    introducerFilename_ = JS::ConstUTF8CharsZ(str);
+  }
+
+  return true;
+}
+
+void JS::OwningDecodeOptions::infallibleCopy(
+    const JS::ReadOnlyDecodeOptions& rhs) {
+  copyPODOptionsFrom(rhs);
+
+  MOZ_ASSERT(!rhs.introducerFilename());
+}
+
+size_t JS::OwningDecodeOptions::sizeOfExcludingThis(
+    mozilla::MallocSizeOf mallocSizeOf) const {
+  return mallocSizeOf(introducerFilename_.c_str());
 }
 
 JS_PUBLIC_API JSObject* JS_GetGlobalFromScript(JSScript* script) {
@@ -2983,7 +3168,7 @@ JS_PUBLIC_API JSString* JS_NewStringCopyUTF8Z(JSContext* cx,
 }
 
 JS_PUBLIC_API JSString* JS_NewStringCopyUTF8N(JSContext* cx,
-                                              const JS::UTF8Chars s) {
+                                              const JS::UTF8Chars& s) {
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   return NewStringCopyUTF8N(cx, s);
@@ -3059,7 +3244,7 @@ JS_PUBLIC_API JSString* JS_NewUCStringCopyN(JSContext* cx, const char16_t* s,
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
   if (!n) {
-    return cx->names().empty;
+    return cx->names().empty_;
   }
   return NewStringCopyN<CanGC>(cx, s, n);
 }
@@ -3142,7 +3327,7 @@ JS_PUBLIC_API bool JS_GetStringCharAt(JSContext* cx, JSString* str,
 }
 
 JS_PUBLIC_API bool JS_CopyStringChars(JSContext* cx,
-                                      mozilla::Range<char16_t> dest,
+                                      const mozilla::Range<char16_t>& dest,
                                       JSString* str) {
   AssertHeapIsIdle();
   CHECK_THREAD(cx);
@@ -3872,15 +4057,15 @@ void JSErrorBase::freeMessage() {
   message_ = JS::ConstUTF8CharsZ();
 }
 
-JSErrorNotes::JSErrorNotes() : notes_() {}
+JSErrorNotes::JSErrorNotes() = default;
 
 JSErrorNotes::~JSErrorNotes() = default;
 
 static UniquePtr<JSErrorNotes::Note> CreateErrorNoteVA(
     FrontendContext* fc, const char* filename, unsigned sourceId,
-    unsigned lineno, unsigned column, JSErrorCallback errorCallback,
-    void* userRef, const unsigned errorNumber, ErrorArgumentsType argumentsType,
-    va_list ap) {
+    uint32_t lineno, JS::ColumnNumberOneOrigin column,
+    JSErrorCallback errorCallback, void* userRef, const unsigned errorNumber,
+    ErrorArgumentsType argumentsType, va_list ap) {
   auto note = MakeUnique<JSErrorNotes::Note>();
   if (!note) {
     ReportOutOfMemory(fc);
@@ -3888,7 +4073,7 @@ static UniquePtr<JSErrorNotes::Note> CreateErrorNoteVA(
   }
 
   note->errorNumber = errorNumber;
-  note->filename = filename;
+  note->filename = JS::ConstUTF8CharsZ(filename);
   note->sourceId = sourceId;
   note->lineno = lineno;
   note->column = column;
@@ -3902,9 +4087,10 @@ static UniquePtr<JSErrorNotes::Note> CreateErrorNoteVA(
 }
 
 bool JSErrorNotes::addNoteVA(FrontendContext* fc, const char* filename,
-                             unsigned sourceId, unsigned lineno,
-                             unsigned column, JSErrorCallback errorCallback,
-                             void* userRef, const unsigned errorNumber,
+                             unsigned sourceId, uint32_t lineno,
+                             JS::ColumnNumberOneOrigin column,
+                             JSErrorCallback errorCallback, void* userRef,
+                             const unsigned errorNumber,
                              ErrorArgumentsType argumentsType, va_list ap) {
   auto note =
       CreateErrorNoteVA(fc, filename, sourceId, lineno, column, errorCallback,
@@ -3921,10 +4107,10 @@ bool JSErrorNotes::addNoteVA(FrontendContext* fc, const char* filename,
 }
 
 bool JSErrorNotes::addNoteASCII(JSContext* cx, const char* filename,
-                                unsigned sourceId, unsigned lineno,
-                                unsigned column, JSErrorCallback errorCallback,
-                                void* userRef, const unsigned errorNumber,
-                                ...) {
+                                unsigned sourceId, uint32_t lineno,
+                                JS::ColumnNumberOneOrigin column,
+                                JSErrorCallback errorCallback, void* userRef,
+                                const unsigned errorNumber, ...) {
   AutoReportFrontendContext fc(cx);
   va_list ap;
   va_start(ap, errorNumber);
@@ -3935,10 +4121,10 @@ bool JSErrorNotes::addNoteASCII(JSContext* cx, const char* filename,
 }
 
 bool JSErrorNotes::addNoteASCII(FrontendContext* fc, const char* filename,
-                                unsigned sourceId, unsigned lineno,
-                                unsigned column, JSErrorCallback errorCallback,
-                                void* userRef, const unsigned errorNumber,
-                                ...) {
+                                unsigned sourceId, uint32_t lineno,
+                                JS::ColumnNumberOneOrigin column,
+                                JSErrorCallback errorCallback, void* userRef,
+                                const unsigned errorNumber, ...) {
   va_list ap;
   va_start(ap, errorNumber);
   bool ok = addNoteVA(fc, filename, sourceId, lineno, column, errorCallback,
@@ -3948,10 +4134,10 @@ bool JSErrorNotes::addNoteASCII(FrontendContext* fc, const char* filename,
 }
 
 bool JSErrorNotes::addNoteLatin1(JSContext* cx, const char* filename,
-                                 unsigned sourceId, unsigned lineno,
-                                 unsigned column, JSErrorCallback errorCallback,
-                                 void* userRef, const unsigned errorNumber,
-                                 ...) {
+                                 unsigned sourceId, uint32_t lineno,
+                                 JS::ColumnNumberOneOrigin column,
+                                 JSErrorCallback errorCallback, void* userRef,
+                                 const unsigned errorNumber, ...) {
   AutoReportFrontendContext fc(cx);
   va_list ap;
   va_start(ap, errorNumber);
@@ -3962,10 +4148,10 @@ bool JSErrorNotes::addNoteLatin1(JSContext* cx, const char* filename,
 }
 
 bool JSErrorNotes::addNoteLatin1(FrontendContext* fc, const char* filename,
-                                 unsigned sourceId, unsigned lineno,
-                                 unsigned column, JSErrorCallback errorCallback,
-                                 void* userRef, const unsigned errorNumber,
-                                 ...) {
+                                 unsigned sourceId, uint32_t lineno,
+                                 JS::ColumnNumberOneOrigin column,
+                                 JSErrorCallback errorCallback, void* userRef,
+                                 const unsigned errorNumber, ...) {
   va_list ap;
   va_start(ap, errorNumber);
   bool ok = addNoteVA(fc, filename, sourceId, lineno, column, errorCallback,
@@ -3975,9 +4161,10 @@ bool JSErrorNotes::addNoteLatin1(FrontendContext* fc, const char* filename,
 }
 
 bool JSErrorNotes::addNoteUTF8(JSContext* cx, const char* filename,
-                               unsigned sourceId, unsigned lineno,
-                               unsigned column, JSErrorCallback errorCallback,
-                               void* userRef, const unsigned errorNumber, ...) {
+                               unsigned sourceId, uint32_t lineno,
+                               JS::ColumnNumberOneOrigin column,
+                               JSErrorCallback errorCallback, void* userRef,
+                               const unsigned errorNumber, ...) {
   AutoReportFrontendContext fc(cx);
   va_list ap;
   va_start(ap, errorNumber);
@@ -3988,9 +4175,10 @@ bool JSErrorNotes::addNoteUTF8(JSContext* cx, const char* filename,
 }
 
 bool JSErrorNotes::addNoteUTF8(FrontendContext* fc, const char* filename,
-                               unsigned sourceId, unsigned lineno,
-                               unsigned column, JSErrorCallback errorCallback,
-                               void* userRef, const unsigned errorNumber, ...) {
+                               unsigned sourceId, uint32_t lineno,
+                               JS::ColumnNumberOneOrigin column,
+                               JSErrorCallback errorCallback, void* userRef,
+                               const unsigned errorNumber, ...) {
   va_list ap;
   va_start(ap, errorNumber);
   bool ok = addNoteVA(fc, filename, sourceId, lineno, column, errorCallback,
@@ -4040,27 +4228,6 @@ extern MOZ_NEVER_INLINE JS_PUBLIC_API void JS_AbortIfWrongThread(
   }
 }
 
-#ifdef JS_GC_ZEAL
-JS_PUBLIC_API void JS_GetGCZealBits(JSContext* cx, uint32_t* zealBits,
-                                    uint32_t* frequency,
-                                    uint32_t* nextScheduled) {
-  cx->runtime()->gc.getZealBits(zealBits, frequency, nextScheduled);
-}
-
-JS_PUBLIC_API void JS_SetGCZeal(JSContext* cx, uint8_t zeal,
-                                uint32_t frequency) {
-  cx->runtime()->gc.setZeal(zeal, frequency);
-}
-
-JS_PUBLIC_API void JS_UnsetGCZeal(JSContext* cx, uint8_t zeal) {
-  cx->runtime()->gc.unsetZeal(zeal);
-}
-
-JS_PUBLIC_API void JS_ScheduleGC(JSContext* cx, uint32_t count) {
-  cx->runtime()->gc.setNextScheduled(count);
-}
-#endif
-
 JS_PUBLIC_API void JS_SetParallelParsingEnabled(JSContext* cx, bool enabled) {
   cx->runtime()->setParallelParsingEnabled(enabled);
 }
@@ -4075,6 +4242,22 @@ JS_PUBLIC_API void JS_SetGlobalJitCompilerOption(JSContext* cx,
                                                  uint32_t value) {
   JSRuntime* rt = cx->runtime();
   switch (opt) {
+#ifdef ENABLE_PORTABLE_BASELINE_INTERP
+    case JSJITCOMPILER_PORTABLE_BASELINE_ENABLE:
+      if (value == 1) {
+        jit::JitOptions.portableBaselineInterpreter = true;
+      } else if (value == 0) {
+        jit::JitOptions.portableBaselineInterpreter = false;
+      }
+      break;
+    case JSJITCOMPILER_PORTABLE_BASELINE_WARMUP_THRESHOLD:
+      if (value == uint32_t(-1)) {
+        jit::DefaultJitOptions defaultValues;
+        value = defaultValues.portableBaselineInterpreterWarmUpThreshold;
+      }
+      jit::JitOptions.portableBaselineInterpreterWarmUpThreshold = value;
+      break;
+#endif
     case JSJITCOMPILER_BASELINE_INTERPRETER_WARMUP_TRIGGER:
       if (value == uint32_t(-1)) {
         jit::DefaultJitOptions defaultValues;
@@ -4230,8 +4413,8 @@ JS_PUBLIC_API void JS_SetGlobalJitCompilerOption(JSContext* cx,
     case JSJITCOMPILER_SPECTRE_JIT_TO_CXX_CALLS:
       jit::JitOptions.spectreJitToCxxCalls = !!value;
       break;
-    case JSJITCOMPILER_WATCHTOWER_MEGAMORPHIC:
-      jit::JitOptions.enableWatchtowerMegamorphic = !!value;
+    case JSJITCOMPILER_WRITE_PROTECT_CODE:
+      jit::JitOptions.maybeSetWriteProtectCode(!!value);
       break;
     case JSJITCOMPILER_WASM_FOLD_OFFSETS:
       jit::JitOptions.wasmFoldOffsets = !!value;
@@ -4245,6 +4428,13 @@ JS_PUBLIC_API void JS_SetGlobalJitCompilerOption(JSContext* cx,
     case JSJITCOMPILER_WASM_JIT_OPTIMIZING:
       JS::ContextOptionsRef(cx).setWasmIon(!!value);
       break;
+
+#ifdef NIGHTLY_BUILD
+    case JSJITCOMPILER_REGEXP_DUPLICATE_NAMED_GROUPS:
+      jit::JitOptions.js_regexp_duplicate_named_groups = !!value;
+      break;
+#endif
+
 #ifdef DEBUG
     case JSJITCOMPILER_FULL_DEBUG_CHECKS:
       jit::JitOptions.fullDebugChecks = !!value;
@@ -4319,8 +4509,8 @@ JS_PUBLIC_API bool JS_GetGlobalJitCompilerOption(JSContext* cx,
     case JSJITCOMPILER_SPECTRE_JIT_TO_CXX_CALLS:
       *valueOut = jit::JitOptions.spectreJitToCxxCalls ? 1 : 0;
       break;
-    case JSJITCOMPILER_WATCHTOWER_MEGAMORPHIC:
-      *valueOut = jit::JitOptions.enableWatchtowerMegamorphic ? 1 : 0;
+    case JSJITCOMPILER_WRITE_PROTECT_CODE:
+      *valueOut = jit::JitOptions.writeProtectCode ? 1 : 0;
       break;
     case JSJITCOMPILER_WASM_FOLD_OFFSETS:
       *valueOut = jit::JitOptions.wasmFoldOffsets ? 1 : 0;
@@ -4340,7 +4530,18 @@ JS_PUBLIC_API bool JS_GetGlobalJitCompilerOption(JSContext* cx,
       return false;
   }
 #else
-  *valueOut = 0;
+  switch (opt) {
+#  ifdef ENABLE_PORTABLE_BASELINE_INTERP
+    case JSJITCOMPILER_PORTABLE_BASELINE_ENABLE:
+      *valueOut = jit::JitOptions.portableBaselineInterpreter;
+      break;
+    case JSJITCOMPILER_PORTABLE_BASELINE_WARMUP_THRESHOLD:
+      *valueOut = jit::JitOptions.portableBaselineInterpreterWarmUpThreshold;
+      break;
+#  endif
+    default:
+      *valueOut = 0;
+  }
 #endif
   return true;
 }
@@ -4408,12 +4609,12 @@ JS_PUBLIC_API bool JS_IsIdentifier(JSContext* cx, HandleString str,
     return false;
   }
 
-  *isIdentifier = js::frontend::IsIdentifier(linearStr);
+  *isIdentifier = IsIdentifier(linearStr);
   return true;
 }
 
 JS_PUBLIC_API bool JS_IsIdentifier(const char16_t* chars, size_t length) {
-  return js::frontend::IsIdentifier(chars, length);
+  return IsIdentifier(chars, length);
 }
 
 namespace JS {
@@ -4458,7 +4659,8 @@ const char* AutoFilename::get() const {
 }
 
 JS_PUBLIC_API bool DescribeScriptedCaller(JSContext* cx, AutoFilename* filename,
-                                          unsigned* lineno, unsigned* column) {
+                                          uint32_t* lineno,
+                                          JS::ColumnNumberOneOrigin* column) {
   if (filename) {
     filename->reset();
   }
@@ -4466,7 +4668,7 @@ JS_PUBLIC_API bool DescribeScriptedCaller(JSContext* cx, AutoFilename* filename,
     *lineno = 0;
   }
   if (column) {
-    *column = 0;
+    *column = JS::ColumnNumberOneOrigin();
   }
 
   if (!cx->compartment()) {
@@ -4500,9 +4702,15 @@ JS_PUBLIC_API bool DescribeScriptedCaller(JSContext* cx, AutoFilename* filename,
   }
 
   if (lineno) {
-    *lineno = i.computeLine(column);
+    JS::TaggedColumnNumberOneOrigin columnNumber;
+    *lineno = i.computeLine(&columnNumber);
+    if (column) {
+      *column = JS::ColumnNumberOneOrigin(columnNumber.oneOriginValue());
+    }
   } else if (column) {
-    i.computeLine(column);
+    JS::TaggedColumnNumberOneOrigin columnNumber;
+    i.computeLine(&columnNumber);
+    *column = JS::ColumnNumberOneOrigin(columnNumber.oneOriginValue());
   }
 
   return true;
@@ -4762,7 +4970,25 @@ JS_PUBLIC_API bool JS::CopyAsyncStack(JSContext* cx,
   return true;
 }
 
-JS_PUBLIC_API Zone* JS::GetObjectZone(JSObject* obj) { return obj->zone(); }
+JS_PUBLIC_API Zone* JS::GetObjectZone(JSObject* obj) {
+  Zone* zone = obj->zone();
+
+  // Check zone pointer is valid and not a poison value. See bug 1878421.
+  MOZ_RELEASE_ASSERT(zone->runtimeFromMainThread());
+
+  return zone;
+}
+
+JS_PUBLIC_API Zone* JS::GetTenuredGCThingZone(GCCellPtr thing) {
+  js::gc::Cell* cell = thing.asCell();
+  MOZ_ASSERT(!js::gc::IsInsideNursery(cell));
+  Zone* zone = js::gc::detail::GetTenuredGCThingZone(cell);
+
+  // Check zone pointer is valid and not a poison value. See bug 1878421.
+  MOZ_RELEASE_ASSERT(zone->runtimeFromMainThread());
+
+  return zone;
+}
 
 JS_PUBLIC_API Zone* JS::GetNurseryCellZone(gc::Cell* cell) {
   return cell->nurseryZone();

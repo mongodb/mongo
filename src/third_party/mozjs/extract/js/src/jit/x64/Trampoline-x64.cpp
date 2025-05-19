@@ -260,14 +260,14 @@ void JitRuntime::generateEnterJIT(JSContext* cx, MacroAssembler& masm) {
 
     masm.push(reg_code);
 
-    using Fn = bool (*)(BaselineFrame * frame, InterpreterFrame * interpFrame,
+    using Fn = bool (*)(BaselineFrame* frame, InterpreterFrame* interpFrame,
                         uint32_t numStackValues);
     masm.setupUnalignedABICall(scratch);
     masm.passABIArg(framePtrScratch);  // BaselineFrame
     masm.passABIArg(OsrFrameReg);      // InterpreterFrame
     masm.passABIArg(numStackValues);
     masm.callWithABI<Fn, jit::InitBaselineFrameForOsr>(
-        MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
+        ABIType::General, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
     masm.pop(reg_code);
 
@@ -423,13 +423,12 @@ void JitRuntime::generateInvalidator(MacroAssembler& masm, Label* bailoutTail) {
   masm.reserveStack(sizeof(void*));
   masm.movq(rsp, rbx);
 
-  using Fn =
-      bool (*)(InvalidationBailoutStack * sp, BaselineBailoutInfo * *info);
+  using Fn = bool (*)(InvalidationBailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupUnalignedABICall(rdx);
   masm.passABIArg(rax);
   masm.passABIArg(rbx);
   masm.callWithABI<Fn, InvalidationBailout>(
-      MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckOther);
+      ABIType::General, CheckUnsafeCallWithABI::DontCheckOther);
 
   masm.pop(r9);  // Get the bailoutInfo outparam.
 
@@ -629,11 +628,11 @@ static void GenerateBailoutThunk(MacroAssembler& masm, Label* bailoutTail) {
   masm.movq(rsp, r9);
 
   // Call the bailout function.
-  using Fn = bool (*)(BailoutStack * sp, BaselineBailoutInfo * *info);
+  using Fn = bool (*)(BailoutStack* sp, BaselineBailoutInfo** info);
   masm.setupUnalignedABICall(rax);
   masm.passABIArg(r8);
   masm.passABIArg(r9);
-  masm.callWithABI<Fn, Bailout>(MoveOp::GENERAL,
+  masm.callWithABI<Fn, Bailout>(ABIType::General,
                                 CheckUnsafeCallWithABI::DontCheckOther);
 
   masm.pop(r9);  // Get the bailoutInfo outparam.
@@ -655,8 +654,8 @@ void JitRuntime::generateBailoutHandler(MacroAssembler& masm,
 }
 
 bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
-                                   const VMFunctionData& f, DynFn nativeFun,
-                                   uint32_t* wrapperOffset) {
+                                   VMFunctionId id, const VMFunctionData& f,
+                                   DynFn nativeFun, uint32_t* wrapperOffset) {
   AutoCreatedBy acb(masm, "JitRuntime::generateVMWrapper");
 
   *wrapperOffset = startTrampolineCode(masm);
@@ -683,70 +682,31 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   masm.Push(FramePointer);
   masm.moveStackPtrTo(FramePointer);
   masm.loadJSContext(cxreg);
-  masm.enterExitFrame(cxreg, regs.getAny(), &f);
-
-  // Save the current stack pointer as the base for copying arguments.
-  Register argsBase = InvalidReg;
-  if (f.explicitArgs) {
-    argsBase = r10;
-    regs.take(argsBase);
-    masm.lea(Operand(rsp, ExitFrameLayout::SizeWithFooter()), argsBase);
-  }
+  masm.enterExitFrame(cxreg, regs.getAny(), id);
 
   // Reserve space for the outparameter.
-  Register outReg = InvalidReg;
-  switch (f.outParam) {
-    case Type_Value:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(Value));
-      masm.movq(esp, outReg);
-      break;
+  masm.reserveVMFunctionOutParamSpace(f);
 
-    case Type_Handle:
-      outReg = regs.takeAny();
-      masm.PushEmptyRooted(f.outParamRootType);
-      masm.movq(esp, outReg);
-      break;
-
-    case Type_Int32:
-    case Type_Bool:
-    case Type_Pointer:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(uintptr_t));
-      masm.movq(esp, outReg);
-      break;
-
-    case Type_Double:
-      outReg = regs.takeAny();
-      masm.reserveStack(sizeof(double));
-      masm.movq(esp, outReg);
-      break;
-
-    default:
-      MOZ_ASSERT(f.outParam == Type_Void);
-      break;
-  }
-
-  masm.setupUnalignedABICall(regs.getAny());
+  masm.setupUnalignedABICallDontSaveRestoreSP();
   masm.passABIArg(cxreg);
 
-  size_t argDisp = 0;
+  size_t argDisp = ExitFrameLayout::Size();
 
   // Copy arguments.
   for (uint32_t explicitArg = 0; explicitArg < f.explicitArgs; explicitArg++) {
     switch (f.argProperties(explicitArg)) {
       case VMFunctionData::WordByValue:
         if (f.argPassedInFloatReg(explicitArg)) {
-          masm.passABIArg(MoveOperand(argsBase, argDisp), MoveOp::DOUBLE);
+          masm.passABIArg(MoveOperand(FramePointer, argDisp), ABIType::Float64);
         } else {
-          masm.passABIArg(MoveOperand(argsBase, argDisp), MoveOp::GENERAL);
+          masm.passABIArg(MoveOperand(FramePointer, argDisp), ABIType::General);
         }
         argDisp += sizeof(void*);
         break;
       case VMFunctionData::WordByRef:
-        masm.passABIArg(
-            MoveOperand(argsBase, argDisp, MoveOperand::Kind::EffectiveAddress),
-            MoveOp::GENERAL);
+        masm.passABIArg(MoveOperand(FramePointer, argDisp,
+                                    MoveOperand::Kind::EffectiveAddress),
+                        ABIType::General);
         argDisp += sizeof(void*);
         break;
       case VMFunctionData::DoubleByValue:
@@ -756,11 +716,15 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
   }
 
   // Copy the implicit outparam, if any.
-  if (outReg != InvalidReg) {
-    masm.passABIArg(outReg);
+  const int32_t outParamOffset =
+      -int32_t(ExitFooterFrame::Size()) - f.sizeOfOutParamStackSlot();
+  if (f.outParam != Type_Void) {
+    masm.passABIArg(MoveOperand(FramePointer, outParamOffset,
+                                MoveOperand::Kind::EffectiveAddress),
+                    ABIType::General);
   }
 
-  masm.callWithABI(nativeFun, MoveOp::GENERAL,
+  masm.callWithABI(nativeFun, ABIType::General,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
   // Test for failure.
@@ -778,41 +742,8 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
       MOZ_CRASH("unknown failure kind");
   }
 
-  // Load the outparam and free any allocated stack.
-  switch (f.outParam) {
-    case Type_Handle:
-      masm.popRooted(f.outParamRootType, ReturnReg, JSReturnOperand);
-      break;
-
-    case Type_Value:
-      masm.loadValue(Address(esp, 0), JSReturnOperand);
-      masm.freeStack(sizeof(Value));
-      break;
-
-    case Type_Int32:
-      masm.load32(Address(esp, 0), ReturnReg);
-      masm.freeStack(sizeof(uintptr_t));
-      break;
-
-    case Type_Bool:
-      masm.load8ZeroExtend(Address(esp, 0), ReturnReg);
-      masm.freeStack(sizeof(uintptr_t));
-      break;
-
-    case Type_Double:
-      masm.loadDouble(Address(esp, 0), ReturnDoubleReg);
-      masm.freeStack(sizeof(double));
-      break;
-
-    case Type_Pointer:
-      masm.loadPtr(Address(esp, 0), ReturnReg);
-      masm.freeStack(sizeof(uintptr_t));
-      break;
-
-    default:
-      MOZ_ASSERT(f.outParam == Type_Void);
-      break;
-  }
+  // Load the outparam.
+  masm.loadVMFunctionOutParam(f, Address(FramePointer, outParamOffset));
 
   // Until C++ code is instrumented against Spectre, prevent speculative
   // execution from returning any private data.
@@ -820,8 +751,8 @@ bool JitRuntime::generateVMWrapper(JSContext* cx, MacroAssembler& masm,
     masm.speculationBarrier();
   }
 
-  // Pop ExitFooterFrame and the frame pointer.
-  masm.leaveExitFrame(0);
+  // Pop frame and restore frame pointer.
+  masm.moveToStackPtr(FramePointer);
   masm.pop(FramePointer);
 
   // Return. Subtract sizeof(void*) for the frame pointer.
