@@ -76,6 +76,12 @@ struct __wt_file_handle;    typedef struct __wt_file_handle WT_FILE_HANDLE;
 struct __wt_file_system;    typedef struct __wt_file_system WT_FILE_SYSTEM;
 struct __wt_item;       typedef struct __wt_item WT_ITEM;
 struct __wt_modify;     typedef struct __wt_modify WT_MODIFY;
+#if !defined(DOXYGEN)
+struct __wt_page_log; typedef struct __wt_page_log WT_PAGE_LOG;
+struct __wt_page_log_get_args; typedef struct __wt_page_log_get_args WT_PAGE_LOG_GET_ARGS;
+struct __wt_page_log_put_args; typedef struct __wt_page_log_put_args WT_PAGE_LOG_PUT_ARGS;
+struct __wt_page_log_handle; typedef struct __wt_page_log_handle WT_PAGE_LOG_HANDLE;
+#endif
 struct __wt_session;        typedef struct __wt_session WT_SESSION;
 #if !defined(DOXYGEN)
 struct __wt_storage_source; typedef struct __wt_storage_source WT_STORAGE_SOURCE;
@@ -2177,6 +2183,9 @@ struct __wt_connection {
      * true\, control all dirty page evictions through forcing update restore eviction., a boolean
      * flag; default \c false.}
      * @config{ ),,}
+     * @config{disaggregated = (, configure disaggregated storage for this connection., a set of
+     * related configuration options defined as follows.}
+     * @config{ ),,}
      * @config{error_prefix, prefix string for error messages., a string; default empty.}
      * @config{eviction = (, eviction configuration options., a set of related configuration options
      * defined as follows.}
@@ -2749,6 +2758,21 @@ struct __wt_connection {
 #if !defined(DOXYGEN)
 #if !defined(SWIG)
     /*!
+     * Add a page and log service implementation.
+     *
+     * The application must first implement the WT_PAGE_LOG
+     * interface and then register the implementation with WiredTiger:
+     *
+     * @param connection the connection handle
+     * @param name the name of the storage source implementation
+     * @param page_log the populated page log service structure
+     * @configempty{WT_CONNECTION.add_page_log, see dist/api_data.py}
+     * @errors
+     */
+    int __F(add_page_log)(WT_CONNECTION *connection, const char *name,
+        WT_PAGE_LOG *page_log, const char *config);
+
+    /*!
      * Add a storage source implementation.
      *
      * The application must first implement the WT_STORAGE_SOURCE
@@ -2765,6 +2789,22 @@ struct __wt_connection {
     int __F(add_storage_source)(WT_CONNECTION *connection, const char *name,
         WT_STORAGE_SOURCE *storage_source, const char *config);
 #endif
+
+    /*!
+     * Get a page log service implementation.
+     *
+     * Look up a page log service by name and return it. The returned page log service
+     * must be released by calling WT_PAGE_LOG::terminate.
+     *
+     * @snippet ex_storage_source.c WT_PAGE_LOG register
+     *
+     * @param connection the connection handle
+     * @param name the name of the page log service implementation
+     * @param storage_source the page log service structure
+     * @errors
+     */
+    int __F(get_page_log)(WT_CONNECTION *connection, const char *name,
+        WT_PAGE_LOG **page_logp);
 
     /*!
      * Get a storage source implementation.
@@ -2992,6 +3032,9 @@ struct __wt_connection {
  * a write to tiered storage\, continue when an error occurs., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;update_restore_evict, if true\, control all dirty page evictions
  * through forcing update restore eviction., a boolean flag; default \c false.}
+ * @config{ ),,}
+ * @config{disaggregated = (, configure disaggregated storage for this connection., a set of related
+ * configuration options defined as follows.}
  * @config{ ),,}
  * @config{encryption = (, configure an encryptor for system wide metadata and logs.  If a system
  * wide encryptor is set\, it is also used for encrypting data files and tables\, unless encryption
@@ -5278,6 +5321,286 @@ struct __wt_storage_source {
      */
     int (*terminate)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session);
 };
+
+/*!
+ * The interface implemented by applications to provide a page log service
+ * implementation.
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_PAGE_LOG
+ * interface from multiple threads concurrently. It is the responsibility of
+ * the implementation to protect any shared data.
+ *
+ * <b>Reentrancy:</b>Methods on the WT_PAGE_LOG interface are not expected to
+ * support reentrant use.
+ *
+ * Applications register implementations with WiredTiger by calling
+ * WT_CONNECTION::add_page_log.
+ *
+ * @snippet ex_page_log.c WT_PAGE_LOG register
+ */
+struct __wt_page_log {
+
+    /*!
+     * A reference is added to the page log service.  The reference is released by a
+     * call to WT_PAGE_LOG::terminate.  A reference is added as a side effect
+     * of calling WT_CONNECTION::get_page_log.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     */
+    int (*pl_add_reference)(WT_PAGE_LOG *page_log);
+
+    /*!
+     * Begin checkpointing using the given checkpoint_id.  After this call, any handle
+     * can put or get using the checkpoint id.  The checkpoint id must be greater than
+     * any previous checkpoint id used with this call.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_id the checkpoint id to use. Must be greater than any other
+     *        checkpoint_id used with this call.
+     */
+    int (*pl_begin_checkpoint)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t checkpoint_id);
+
+    /*!
+     * Complete checkpointing using the given checkpoint_id. This implies that other
+     * nodes can now use the given checkpoint_id. (Do not use - will be deprecated.)
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_id the checkpoint id to use. Must be greater than any other
+     *        checkpoint_id used with this call.
+     */
+    int (*pl_complete_checkpoint)(WT_PAGE_LOG *page_log, WT_SESSION *session,
+        uint64_t checkpoint_id);
+
+    /*!
+     * Complete checkpointing using the given checkpoint_id. This implies that other
+     * nodes can now use the given checkpoint_id.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_id the checkpoint id to use. Must be greater than any other
+     *        checkpoint_id used with this call.
+     * @param checkpoint_timestamp the stable timestamp associated with the checkpoint
+     * @param checkpoint_metadata the buffer with checkpoint metadata
+     * @param lsnp an optional output argument for the checkpoint completion record's LSN
+     */
+    int (*pl_complete_checkpoint_ext)(WT_PAGE_LOG *page_log, WT_SESSION *session,
+        uint64_t checkpoint_id, uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata,
+        uint64_t *lsnp);
+
+    /*!
+     * Get the most recent completed checkpoint number.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_id the checkpoint id returned
+     */
+    int (*pl_get_complete_checkpoint)(WT_PAGE_LOG *page_log, WT_SESSION *session,
+        uint64_t *checkpoint_id);
+
+    /*!
+     * Get information about the most recently completed checkpoint.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_lsn the checkpoint LSN
+     * @param checkpoint_id the checkpoint ID
+     * @param checkpoint_timestamp the checkpoint timestamp
+     * @param checkpoint_metadata the checkpoint metadata
+     */
+    int (*pl_get_complete_checkpoint_ext)(WT_PAGE_LOG *page_log, WT_SESSION *session,
+        uint64_t *checkpoint_lsn, uint64_t *checkpoint_id, uint64_t *checkpoint_timestamp,
+        WT_ITEM *checkpoint_metadata);
+
+    /*!
+     * Get the last written page LSN. This is an optional function used for testing only.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param lsn the LSN returned
+     */
+    int (*pl_get_last_lsn)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t *lsn);
+
+    /*!
+     * Get the most recently opened checkpoint number.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param checkpoint_id the checkpoint id returned
+     */
+    int (*pl_get_open_checkpoint)(WT_PAGE_LOG *page_log, WT_SESSION *session,
+        uint64_t *checkpoint_id);
+
+    /*!
+     * Open a handle for further operations on a table.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param table_id the unique table id for the given table
+     * @param plh the returned handle
+     */
+    int (*pl_open_handle)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t table_id,
+        WT_PAGE_LOG_HANDLE **plh);
+
+    /*!
+     * Set the last materialized LSN. This is an optional method used for testing only.
+     *
+     * @errors
+     *
+     * @param page_log the WT_PAGE_LOG
+     * @param session the current WiredTiger session
+     * @param lsn the last materialized LSN
+     */
+    int (*pl_set_last_materialized_lsn)(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t lsn);
+
+    /*!
+     * A callback performed when the page log service or reference is closed
+     * and will no longer be used.  The initial creation of the page log service
+     * counts as a reference, and each call to WT_PAGE_LOG::add_reference
+     * increase the number of references.  When all references are released, the
+     * page log service and any resources associated with it are released.
+     *
+     * This method is not required and should be set to NULL when not
+     * required by the page log service implementation.
+     *
+     * The WT_PAGE_LOG::terminate callback is intended to allow cleanup;
+     * the handle will not be subsequently accessed by WiredTiger.
+     */
+    int (*terminate)(WT_PAGE_LOG *page_log, WT_SESSION *session);
+};
+
+/*!
+ * Values given to, or returned by the WT_PAGE_LOG_HANDLE::plh_put interface.
+ */
+struct __wt_page_log_put_args {
+       /*
+        * Input arguments
+        */
+       uint64_t backlink_lsn;
+       uint64_t base_lsn;
+       uint64_t backlink_checkpoint_id;
+       uint64_t base_checkpoint_id;
+
+       /* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_PAGE_LOG_COMPRESSED 0x1u
+#define WT_PAGE_LOG_DELTA 0x2u
+#define WT_PAGE_LOG_ENCRYPTED 0x4u
+        /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+       uint32_t flags;
+
+       /*
+        * Output arguments, returned by the call
+        */
+       uint64_t lsn;
+};
+
+/*!
+ * Values given to, or returned by the WT_PAGE_LOG_HANDLE::plh_get interface.
+ */
+struct __wt_page_log_get_args {
+       /*
+        * Input/output arguments
+        */
+       uint64_t lsn;    /* If non-zero, we are asking for a specific LSN */
+
+       /*
+        * Output arguments, returned by the call
+        */
+       uint64_t backlink_lsn;
+       uint64_t base_lsn;
+       uint64_t backlink_checkpoint_id;
+       uint64_t base_checkpoint_id;
+       uint32_t delta_count;
+};
+
+/*!
+ * The interface implemented by applications to provide handles used
+ * by a page log service implementation. This interface is returned by
+ * WT_PAGE_LOG::pl_open_handle .
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_PAGE_LOG_HANDLES
+ * interface from multiple threads concurrently. It is the responsibility of
+ * the implementation to protect any shared data.
+ *
+ * <b>Reentrancy:</b>Methods on the WT_PAGE_LOG_HANDLE interface are not expected to
+ * support reentrant use.
+ */
+struct __wt_page_log_handle {
+
+    /*
+     * The containing page log service.
+     */
+    WT_PAGE_LOG *page_log;
+
+    /*!
+     * Put an object into the paging/logging service.
+     *
+     * @errors
+     *
+     * @param plh the WT_PAGE_LOG_HANDLE
+     * @param session the current WiredTiger session
+     * @param page_id the page to be written
+     * @param checkpoint_id the checkpoint to be written to
+     * @param args additional arguments used or returned by the call, memory owned by caller
+     * @param buf content to be written
+     */
+    int (*plh_put)(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session,
+        uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_PUT_ARGS *args,
+        const WT_ITEM *buf);
+
+    /*!
+     * Get an object from the paging/logging service.
+     *
+     * @errors
+     *
+     * @param plh the WT_PAGE_LOG_HANDLE
+     * @param session the current WiredTiger session
+     * @param page_id the page to be read
+     * @param checkpoint_id the checkpoint to use
+     * @param args additional arguments returned by the call, memory owned by caller
+     * @param results_array an array of results allocated by the
+     *        caller. Each result, up to the returned count, must be
+     *        filled in by the implementation.  The implementation
+     *        may allocate storage to hold results using the WT_ITEM::mem field,
+     *        if that is done, the caller will call free to dispose of the memory
+     *        when done.
+     * @param results_count on input, the size of allocated results_array.
+     *        On output, the number of items filled by the call.
+     */
+    int (*plh_get)(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session,
+        uint64_t page_id, uint64_t checkpoint_id, WT_PAGE_LOG_GET_ARGS *args,
+        WT_ITEM *results_array, uint32_t *results_count);
+
+    /*!
+     * Close the handle
+     *
+     * @errors
+     *
+     * @param plh the WT_PAGE_LOG_HANDLE
+     * @param session the current WiredTiger session
+     */
+    int (*plh_close)(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session);
+};
+
 #endif
 
 /*!

@@ -108,6 +108,27 @@ source_meta = [
         application'''),
 ]
 
+connection_disaggregated_config_common = [
+]
+disaggregated_config_common = [
+    Config('page_log', '', r'''
+        The page log service used as a backing for this table. This is used experimentally
+        by layered tables to back their stable component in shared/object based storage''',
+        type='string', undoc=True),
+]
+connection_disaggregated_config = [
+    Config('disaggregated', '', r'''
+        configure disaggregated storage for this connection''',
+        type='category', subconfig=connection_disaggregated_config_common +\
+              disaggregated_config_common),
+]
+wiredtiger_open_disaggregated_storage_configuration = connection_disaggregated_config
+connection_reconfigure_disaggregated_configuration = [
+    Config('disaggregated', '', r'''
+        configure disaggregated storage for this connection''',
+        type='category', subconfig=connection_disaggregated_config_common),
+]
+
 format_meta = common_meta + [
     Config('key_format', 'u', r'''
         the format of the data packed into key items. See @ref schema_format_types for details.
@@ -1136,6 +1157,7 @@ wiredtiger_open_common =\
     connection_runtime_config +\
     wiredtiger_open_chunk_cache_configuration +\
     wiredtiger_open_compatibility_configuration +\
+    wiredtiger_open_disaggregated_storage_configuration +\
     wiredtiger_open_log_configuration +\
     wiredtiger_open_live_restore_configuration +\
     wiredtiger_open_tiered_storage_configuration +\
@@ -1873,6 +1895,7 @@ methods = {
 'WT_CONNECTION.add_compressor' : Method([]),
 'WT_CONNECTION.add_data_source' : Method([]),
 'WT_CONNECTION.add_encryptor' : Method([]),
+'WT_CONNECTION.add_page_log' : Method([]),
 'WT_CONNECTION.add_storage_source' : Method([]),
 'WT_CONNECTION.close' : Method([
     Config('final_flush', 'false', r'''
@@ -1907,6 +1930,7 @@ methods = {
 'WT_CONNECTION.reconfigure' : Method(
     connection_reconfigure_chunk_cache_configuration +\
     connection_reconfigure_compatibility_configuration +\
+    connection_reconfigure_disaggregated_configuration +\
     connection_reconfigure_log_configuration +\
     connection_reconfigure_statistics_log_configuration +\
     connection_reconfigure_tiered_storage_configuration +\

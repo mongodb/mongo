@@ -87,13 +87,14 @@ class test_live_restore02(backup_base):
                 os.remove(f)
 
         os.mkdir("DEST")
-        self.open_conn("DEST", config="statistics=(all),live_restore=(enabled=true,path=\"SOURCE\",threads_max=1,read_size=" + self.read_size + ")")
+        self.open_conn("DEST", config="statistics=(all),verbose=[live_restore_progress:1],live_restore=(enabled=true,path=\"SOURCE\",threads_max=1,read_size=" + self.read_size + ")")
 
         state = 0
         timeout = 120
         iteration_count = 0
         # Build in a 2 minute timeout. Once we see the complete state exit the loop.
         while (iteration_count < timeout):
+            self.ignoreStdoutPatternIfExists(r".*Starting \d+ threads to restore \d+ files.*")
             state = self.get_stat(stat.conn.live_restore_state)
             # Stress the file create path in the meantime, this checks some assert conditions.
             self.session.create(f'file:abc{iteration_count}', f'key_format={self.key_format},value_format={self.value_format}')
@@ -101,8 +102,10 @@ class test_live_restore02(backup_base):
                       Current iteration: is {iteration_count}')
             # State 2 means the live restore has completed.
             if (state == wiredtiger.WT_LIVE_RESTORE_COMPLETE):
+                self.expectedStderrPattern(r".*Live restore has completed.")
                 break
             time.sleep(1)
+            self.ignoreStdoutPatternIfExists(r".*Live restore finished restoring \d+ files in \d+ seconds.*")
             iteration_count += 1
         self.assertEqual(state, wiredtiger.WT_LIVE_RESTORE_COMPLETE)
 

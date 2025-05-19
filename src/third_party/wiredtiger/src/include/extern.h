@@ -417,6 +417,8 @@ extern int __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_conn_remove_page_log(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
   WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")))
     WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

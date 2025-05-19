@@ -65,7 +65,7 @@ from packing import pack, unpack
     typedef unsigned int uint32_t;
 %}
 
-/* Set the input argument to point to a temporary variable */ 
+/* Set the input argument to point to a temporary variable */
 %typemap(in, numinputs=0) WT_CONNECTION ** (WT_CONNECTION *temp = NULL) {
 	$1 = &temp;
 }
@@ -76,10 +76,16 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 %typemap(in, numinputs=0) WT_FILE_HANDLE ** (WT_FILE_HANDLE *temp = NULL) {
-    $1 = &temp;
+	$1 = &temp;
  }
 %typemap(in, numinputs=0) WT_FILE_SYSTEM ** (WT_FILE_SYSTEM *temp = NULL) {
-    $1 = &temp;
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) WT_PAGE_LOG ** (WT_PAGE_LOG *temp = NULL) {
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) WT_PAGE_LOG_HANDLE ** (WT_PAGE_LOG_HANDLE *temp = NULL) {
+	$1 = &temp;
  }
 %typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
 	$1 = &temp;
@@ -194,6 +200,91 @@ from packing import pack, unpack
 	$1 = &val;
 }
 
+/* Why do we need an explicit conversion for plh_put - doesn't the previous typemap cover this? */
+%typemap(in) struct __wt_item *buf (WT_ITEM item) {
+	if (unpackBytesOrString($input, &item.data, &item.size) != 0)
+		SWIG_exception_fail(SWIG_AttributeError,
+		  "bad string value for WT_ITEM");
+	$1 = &item;
+}
+
+/*
+ * This typemap removes the three last arguments for plh_get, and uses local variables for them instead.
+ * The local variables will be used in the matching argout typemap.
+ * Code in this typemap appears before the call to the API function.
+ */
+%typemap(in,numinputs=0) (WT_ITEM *results_array, u_int *results_count)
+  (WT_ITEM results[32], u_int count) {
+	memset(&results, 0, sizeof(results));
+	count = 32;
+	$1 = results;
+	$2 = &count;
+}
+
+/*
+ * This typemap is for plh_get, and is used in conjunction with the previous typemap.
+ * Code in this typemap appears after the call to the API function.
+ * Using the local variables set up previously, and used in the call to plh_get
+ * now are converted to a python list of byte strings.
+ */
+%typemap(argout) (WT_ITEM *results_array, u_int *results_count) {
+	int i;
+	u_int n;
+	WT_ITEM *results_array;
+
+	results_array = $1;
+	$result = PyList_New(*$2);
+	for (n = 0; n < *$2; n++) {
+		PyBytesObject *pbo = PyBytes_FromStringAndSize(results_array[n].data, results_array[n].size);
+		PyList_SetItem($result, (int)n, pbo);
+	}
+	/* Free in reverse order, since the first item might hold all the memory used by other items. */
+	for (i = *$2 - 1; i >= 0; i--)
+		free(results_array[i].mem);
+}
+
+/*
+ * This typemap removes the three last arguments for pl_get_complete_checkpoint_ext, and uses local
+ * variables for them instead.
+ * The local variables will be used in the matching argout typemap.
+ * Code in this typemap appears before the call to the API function.
+ */
+%typemap(in,numinputs=0) (uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
+  uint64_t *checkpoint_timestamp, WT_ITEM *checkpoint_metadata)
+  (uint64_t lsn, uint64_t id, uint64_t timestamp, WT_ITEM metadata) {
+	memset(&metadata, 0, sizeof(metadata));
+	$1 = &lsn;
+	$2 = &id;
+	$3 = &timestamp;
+	$4 = &metadata;
+}
+
+/*
+ * This typemap is for pl_get_complete_checkpoint_ext, and is used in conjunction with the previous
+ * typemap. Code in this typemap appears after the call to the API function.
+ * Using the local variables set up previously, and used in the call to
+ * pl_get_complete_checkpoint_ext now are converted to a python tuple.
+ */
+%typemap(argout)(uint64_t *checkpoint_lsn, uint64_t *checkpoint_id, uint64_t *checkpoint_timestamp,
+  WT_ITEM *checkpoint_metadata) {
+	PyBytesObject *pbo;
+	WT_ITEM *checkpoint_metadata;
+
+	checkpoint_metadata = $4;
+
+	if (checkpoint_metadata->data != NULL) {
+		pbo = PyUnicode_FromStringAndSize(checkpoint_metadata->data, checkpoint_metadata->size);
+		free(checkpoint_metadata->mem);
+	} else
+		pbo = PyUnicode_FromStringAndSize("", 0);
+
+	$result = PyTuple_New(4);
+	PyTuple_SetItem($result, 0, PyLong_FromUnsignedLongLong(*$1));
+	PyTuple_SetItem($result, 1, PyLong_FromUnsignedLongLong(*$2));
+	PyTuple_SetItem($result, 2, PyLong_FromUnsignedLongLong(*$3));
+	PyTuple_SetItem($result, 3, pbo);
+}
+
 %typemap(in,numinputs=0) (char ***dirlist, int *countp) (char **list, uint32_t nentries) {
 	$1 = &list;
 	$2 = &nentries;
@@ -225,6 +316,14 @@ from packing import pack, unpack
 
 %typemap(argout) WT_FILE_SYSTEM ** {
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_file_system, 0);
+}
+
+%typemap(argout) WT_PAGE_LOG ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_page_log, 0);
+}
+
+%typemap(argout) WT_PAGE_LOG_HANDLE ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_page_log_handle, 0);
 }
 
 %typemap(argout) WT_STORAGE_SOURCE ** {
@@ -331,7 +430,7 @@ from packing import pack, unpack
 %feature("shadow") class::method %{
 	def method(self, *args):
 		'''method(self, config) -> int
-		
+
 		@copydoc class::method'''
 		try:
 			self._freecb()
@@ -343,6 +442,8 @@ from packing import pack, unpack
 DESTRUCTOR(__wt_connection, close)
 DESTRUCTOR(__wt_cursor, close)
 DESTRUCTOR(__wt_file_handle, close)
+DESTRUCTOR(__wt_page_log, pl_terminate)
+DESTRUCTOR(__wt_page_log_handle, plh_close)
 DESTRUCTOR(__wt_session, close)
 DESTRUCTOR(__wt_storage_source, ss_terminate)
 DESTRUCTOR(__wt_file_system, fs_terminate)
@@ -371,7 +472,7 @@ DESTRUCTOR(__wt_file_system, fs_terminate)
 %typemap(default) const char *config { $1 = NULL; }
 %typemap(default) WT_CURSOR *to_dup { $1 = NULL; }
 
-/* 
+/*
  * Error returns other than WT_NOTFOUND generate an exception.
  * Use our own exception type, in future tailored to the kind
  * of error.
@@ -527,6 +628,8 @@ SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 SELFHELPER(struct __wt_file_handle, file_handle)
 SELFHELPER(struct __wt_file_system, file_system)
+SELFHELPER(struct __wt_page_log, page_log)
+SELFHELPER(struct __wt_page_log_handle, page_log_handle)
 SELFHELPER(struct __wt_storage_source, storage_source)
 
  /*
@@ -596,6 +699,8 @@ NOTFOUND_OK(__wt_cursor::_modify)
 NOTFOUND_OK(__wt_cursor::largest_key)
 ANY_OK(__wt_modify::__wt_modify)
 ANY_OK(__wt_modify::~__wt_modify)
+ANY_OK(__wt_page_log_get_args::__wt_page_log_get_args)
+ANY_OK(__wt_page_log_put_args::__wt_page_log_put_args)
 
 COMPARE_OK(__wt_cursor::_compare)
 COMPARE_OK(__wt_cursor::_equals)
@@ -635,10 +740,29 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
+%ignore __wt_page_log::get_complete_checkpoint(WT_PAGE_LOG *, int *);
+%ignore __wt_page_log::get_open_checkpoint(WT_PAGE_LOG *, int *);
+
+/* TODO: workaround for issues with getting a Python version of structs working. */
+%ignore __wt_page_log_put_args::backlink_lsn;
+%ignore __wt_page_log_put_args::base_lsn;
+%ignore __wt_page_log_put_args::backlink_checkpoint_id;
+%ignore __wt_page_log_put_args::base_checkpoint_id;
+%ignore __wt_page_log_put_args::flags;
+%ignore __wt_page_log_put_args::lsn;
+%ignore __wt_page_log_get_args::lsn;
+%ignore __wt_page_log_get_args::backlink_lsn;
+%ignore __wt_page_log_get_args::base_lsn;
+%ignore __wt_page_log_get_args::backlink_checkpoint_id;
+%ignore __wt_page_log_get_args::base_checkpoint_id;
+%ignore __wt_page_log_get_args::lsn_frontier;
+%ignore __wt_page_log_get_args::delta_count;
 
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, compare, (self, other))
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, equals, (self, other))
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
+OVERRIDE_METHOD(__wt_page_log, WT_PAGE_LOG, get_complete_checkpoint, (self))
+OVERRIDE_METHOD(__wt_page_log, WT_PAGE_LOG, get_open_checkpoint, (self))
 
 /* SWIG magic to turn Python byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -909,7 +1033,7 @@ typedef int int_void;
 %pythoncode %{
 	def get_key(self):
 		'''get_key(self) -> object
-		
+
 		@copydoc WT_CURSOR::get_key
 		Returns only the first column.'''
 		k = self.get_keys()
@@ -919,7 +1043,7 @@ typedef int int_void;
 
 	def get_keys(self):
 		'''get_keys(self) -> (object, ...)
-		
+
 		@copydoc WT_CURSOR::get_key'''
 		if self.is_json:
 			return [self._get_json_key()]
@@ -930,7 +1054,7 @@ typedef int int_void;
 
 	def get_value(self):
 		'''get_value(self) -> object
-		
+
 		@copydoc WT_CURSOR::get_value
 		Returns only the first column.'''
 		v = self.get_values()
@@ -940,7 +1064,7 @@ typedef int int_void;
 
 	def get_values(self):
 		'''get_values(self) -> (object, ...)
-		
+
 		@copydoc WT_CURSOR::get_value'''
 		if self.is_json:
 			return [self._get_json_value()]
@@ -965,7 +1089,7 @@ typedef int int_void;
 
 	def set_key(self, *args):
 		'''set_key(self) -> None
-		
+
 		@copydoc WT_CURSOR::set_key'''
 		if len(args) == 1 and type(args[0]) == tuple:
 			args = args[0]
@@ -980,7 +1104,7 @@ typedef int int_void;
 
 	def set_value(self, *args):
 		'''set_value(self) -> None
-		
+
 		@copydoc WT_CURSOR::set_value'''
 		if self.is_json:
 			self._set_value_str(args[0])
@@ -1071,6 +1195,60 @@ typedef int int_void;
      }
 };
 %enddef
+
+SIDESTEP_METHOD(__wt_page_log, pl_begin_checkpoint,
+  (WT_SESSION *session, int checkpoint_id),
+  (self, session, checkpoint_id))
+
+SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint,
+  (WT_SESSION *session, int checkpoint_id),
+  (self, session, checkpoint_id))
+
+SIDESTEP_METHOD(__wt_page_log, pl_complete_checkpoint_ext,
+  (WT_SESSION *session, int checkpoint_id, uint64_t checkpoint_timestamp, const WT_ITEM *checkpoint_metadata, uint64_t *lsnp),
+  (self, session, checkpoint_id, checkpoint_timestamp, checkpoint_metadata, lsnp))
+
+SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint,
+  (WT_SESSION *session, int *checkpoint_id),
+  (self, session, checkpoint_id))
+
+SIDESTEP_METHOD(__wt_page_log, pl_get_complete_checkpoint_ext,
+  (WT_SESSION *session, uint64_t *checkpoint_lsn, uint64_t *checkpoint_id,
+    uint64_t *checkpoint_timestamp, WT_ITEM *checkpoint_metadata),
+  (self, session, checkpoint_lsn, checkpoint_id, checkpoint_timestamp, checkpoint_metadata))
+
+SIDESTEP_METHOD(__wt_page_log, pl_get_last_lsn,
+  (WT_SESSION *session, int *lsn),
+  (self, session, lsn))
+
+SIDESTEP_METHOD(__wt_page_log, pl_get_open_checkpoint,
+  (WT_SESSION *session, int *checkpoint_id),
+  (self, session, checkpoint_id))
+
+SIDESTEP_METHOD(__wt_page_log, pl_open_handle,
+  (WT_SESSION *session, int table_id, WT_PAGE_LOG_HANDLE **handle),
+  (self, session, table_id, handle))
+
+SIDESTEP_METHOD(__wt_page_log, pl_set_last_materialized_lsn,
+  (WT_SESSION *session, uint64_t lsn),
+  (self, session, lsn))
+
+SIDESTEP_METHOD(__wt_page_log, terminate,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_page_log_handle, plh_put,
+  (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_PUT_ARGS *put_args, WT_ITEM *buf),
+  (self, session, page_id, checkpoint_id, put_args, buf))
+
+SIDESTEP_METHOD(__wt_page_log_handle, plh_get,
+  (WT_SESSION *session, int page_id, int checkpoint_id, WT_PAGE_LOG_GET_ARGS *get_args,
+    WT_ITEM *results_array, u_int *results_count),
+  (self, session, page_id, checkpoint_id, get_args, results_array, results_count))
+
+SIDESTEP_METHOD(__wt_page_log_handle, plh_close,
+  (WT_SESSION *session),
+  (self, session))
 
 SIDESTEP_METHOD(__wt_storage_source, ss_customize_file_system,
   (WT_SESSION *session, const char *bucket_name,
@@ -1272,6 +1450,11 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
 %rename(FileHandle) __wt_file_handle;
+%rename(PageLog) __wt_page_log;
+%rename(PageLogGetArgs) __wt_page_log_get_args;
+%rename(PageLogHandle) __wt_page_log_handle;
+%rename(PageLogPutArgs) __wt_page_log_put_args;
+%rename(StorageSource) __wt_storage_source;
 %rename(StorageSource) __wt_storage_source;
 %rename(FileSystem) __wt_file_system;
 
@@ -1359,7 +1542,7 @@ writeToPythonStream(const char *streamname, const char *message)
 	strcpy(&msg[msglen], "\n");
 
 	/* Acquire python Global Interpreter Lock. Otherwise can segfault. */
-	SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
+	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
 
 	ret = 1;
 	if ((sys = PyImport_ImportModule("sys")) == NULL)

@@ -66,7 +66,7 @@ check() {
     l="$l `echo ../src/utilities/*.c` `echo ../examples/c/*.c`"
 
     (
-    # Get the list of typedefs
+    # Get the list of typedefs, then strip exceptions
     search=`cat ../src/*/*.h ../src/include/*.in |
         sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' \
             -e 's/^union.*typedef.* \(.*\);$/\1/p' \
@@ -74,7 +74,11 @@ check() {
         sort -u`
     echo "$search"
     grep -F -who "$search" $l
-    ) | sort | uniq -u > $t
+    ) | sort | uniq -u | \
+      sed -e '/^WT_PAGE_LOG_GET_ARGS$/d' \
+          -e '/^WT_PAGE_LOG_HANDLE$/d' \
+          -e '/^WT_PAGE_LOG_PUT_ARGS$/d' \
+      > $t
 
     test -s $t && cat $t
 }

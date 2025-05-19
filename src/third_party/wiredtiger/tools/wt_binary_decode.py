@@ -36,6 +36,7 @@ import codecs, io, os, re, sys, traceback, pprint
 from py_common import binary_data, btree_format
 from dataclasses import dataclass
 import typing
+binary_to_pretty_string = binary_data.binary_to_pretty_string  # a convenient function nam
 
 # Optional dependency: crc32c
 have_crc32c = False
@@ -268,32 +269,6 @@ def raw_bytes(b):
 def d_and_h(n):
     return f'{n} (0x{n:x})'
 
-# Convert binary data to a multi-line string with hex and printable characters
-def binary_to_pretty_string(b, per_line=16, line_prefix='  ', start_with_line_prefix=True):
-    printable = ''
-    result = ''
-    if start_with_line_prefix:
-        result += line_prefix
-    if len(b) == 0:
-        return result
-    for i in range(0, len(b)):
-        if i > 0:
-            if i % per_line == 0:
-                result += '  ' + printable + '\n' + line_prefix
-                printable = ''
-            else:
-                result += ' '
-        result += '%02x' % b[i]
-        if b[i] >= ord(' ') and b[i] < 0x7f:
-            printable += chr(b[i])
-        else:
-            printable += '.'
-    if i % per_line != per_line - 1:
-        for j in range(i % per_line + 1, per_line):
-            result += '   '
-    result += '  ' + printable
-    return result
-
 def dumpraw(p, b, pos):
     savepos = b.tell()
     b.seek(pos)
@@ -360,46 +335,72 @@ def process_timestamps(p, cell: btree_format.Cell, pagestats: PageStats):
         pagestats.num_d_stop_ts += 1
         p.rint_v(' durable stop ts: ' + ts(cell.durable_stop_ts))
 
-def block_decode(p, b, opts):
+def block_decode(p, b, nbytes, opts):
     disk_pos = b.tell()
+    disagg_delta = False
 
     # Switch the printer and the binary stream to work on the page data as opposed to working on
     # the file itself. We need to do this to support compressed blocks. As a consequence, offsets
     # printed in the split mode are relative to a (potentially uncompressed) page, rather than
     # the file.
-    page_data = bytearray(b.read(40))
+    #
+    # The size of the page data for disagg is dependent on whether the page is a delta.
+    if opts.disagg:
+        # Size of WT_PAGE_HEADER
+        page_data = bytearray(b.read(28))
+        if page_data[0] == 0xdd:   # if it's a delta, then it's a different layout
+            # 16 for block header + 20 bytes for page delta, total of 36
+            page_data += bytearray(b.read(8))
+            disagg_delta = True
+        else:
+            # Add 16 for block header + 28 bytes for page header, total of 44
+            page_data += bytearray(b.read(16))
+    else:
+        # Size of WT_PAGE_HEADER + size of WT_BLOCK_HEADER
+        page_data = bytearray(b.read(40))
     b.saved_bytes()
     b_page = binary_data.BinaryFile(io.BytesIO(page_data))
     p = Printer(b_page, opts)
 
-    # WT_PAGE_HEADER in btmem.h (28 bytes)
-    pagehead = btree_format.PageHeader.parse(b_page)
-    if pagehead.unused != 0:
-        p.rint('? garbage in unused bytes')
-        return
-    if pagehead.type == btree_format.PageType.WT_PAGE_INVALID:
-        p.rint('? invalid page')
-        return
+    if disagg_delta:
+        # WT_BLOCK_HEADER in block.h (44 bytes)
+        blockhead = btree_format.BlockHeader.parse(b_page, disagg=opts.disagg)
+        # WT_DELTA_HEADER in btmem.h (20 bytes)
+        deltahead = btree_format.DeltaHeader.parse(b_page)
+    else:
+        # WT_PAGE_HEADER in btmem.h (28 bytes)
+        pagehead = btree_format.PageHeader.parse(b_page)
+        # WT_BLOCK_HEADER in block.h (12 bytes or 44 bytes)
+        blockhead = btree_format.BlockHeader.parse(b_page, disagg=opts.disagg)
 
-    p.rint('Page Header:')
-    p.rint('  recno: ' + str(pagehead.recno))
-    p.rint('  writegen: ' + str(pagehead.write_gen))
-    p.rint('  memsize: ' + str(pagehead.mem_size))
-    p.rint('  ncells (oflow len): ' + str(pagehead.entries))
-    p.rint('  page type: ' + str(pagehead.type.value) + ' (' + pagehead.type.name + ')')
-    p.rint('  page flags: ' + hex(pagehead.flags))
-    p.rint('  version: ' + str(pagehead.version))
+        if pagehead.unused != 0:
+            p.rint('? garbage in unused bytes')
+            return
+        if pagehead.type == btree_format.PageType.WT_PAGE_INVALID:
+            p.rint('? invalid page')
+            return
 
-    # WT_BLOCK_HEADER in block.h (12 bytes)
-    blockhead = btree_format.BlockHeader.parse(b_page)
+        p.rint('Page Header:')
+        p.rint('  recno: ' + str(pagehead.recno))
+        p.rint('  writegen: ' + str(pagehead.write_gen))
+        p.rint('  memsize: ' + str(pagehead.mem_size))
+        p.rint('  ncells (oflow len): ' + str(pagehead.entries))
+        p.rint('  page type: ' + str(pagehead.type.value) + ' (' + pagehead.type.name + ')')
+        p.rint('  page flags: ' + hex(pagehead.flags))
+        p.rint('  version: ' + str(pagehead.version))
+
     if blockhead.unused != 0:
         p.rint('garbage in unused bytes')
         return
+
+    if opts.disagg and nbytes > 0:
+        blockhead.disk_size = nbytes
+
     if blockhead.disk_size > 17 * 1024 * 1024:
         # The maximum document size in MongoDB is 16MB. Larger block sizes are suspect.
         p.rint('the block is too big')
         return
-    if blockhead.disk_size < 40:
+    if blockhead.disk_size < 40 and not opts.disagg:
         # The disk size is too small
         return
 
@@ -407,6 +408,15 @@ def block_decode(p, b, opts):
     p.rint('  disk_size: ' + str(blockhead.disk_size))
     p.rint('  checksum: ' + hex(blockhead.checksum))
     p.rint('  block flags: ' + hex(blockhead.flags))
+
+    if disagg_delta:
+        p.rint('Delta Header:')
+        p.rint('  writegen: ' + str(deltahead.write_gen))
+        p.rint('  memsize: ' + str(deltahead.mem_size))
+        p.rint('  ncells (oflow len): ' + str(deltahead.entries))
+        p.rint('  page type: ' + str(deltahead.type.value) + ' (' + deltahead.type.name + ')')
+        p.rint('  page flags: ' + hex(deltahead.flags))
+        p.rint('  version: ' + str(deltahead.version))
 
     pagestats = PageStats()
 
@@ -432,7 +442,15 @@ def block_decode(p, b, opts):
                 return
 
     # Skip the rest if we don't want to display the data
-    if opts.skip_data:
+    skip_data = opts.skip_data
+    if opts.disagg and blockhead.flags & btree_format.BlockHeader.WT_BLOCK_DISAGG_COMPRESSED:
+        p.rint(f'? the block is compressed, skipping payload')
+        skip_data = True
+    if opts.disagg and blockhead.flags & btree_format.BlockHeader.WT_BLOCK_DISAGG_ENCRYPTED:
+        p.rint(f'? the block is encrypted, skipping payload')
+        skip_data = True
+
+    if skip_data:
         b.seek(disk_pos + blockhead.disk_size)
         return
 
@@ -478,7 +496,7 @@ def block_decode(p, b, opts):
         p.rint_v(binary_to_pretty_string(payload_data))
     elif pagehead.type == btree_format.PageType.WT_PAGE_ROW_INT or \
         pagehead.type == btree_format.PageType.WT_PAGE_ROW_LEAF:
-        row_decode(p, b_page, pagehead, blockhead, pagestats)
+        row_decode(p, b_page, pagehead, blockhead, pagestats, opts)
     elif pagehead.type == btree_format.PageType.WT_PAGE_OVFL:
         # Use b_page.read() so that we can also print the raw bytes in the split mode
         p.rint_v(raw_bytes(b_page.read(len(payload_data))))
@@ -489,7 +507,7 @@ def block_decode(p, b, opts):
     outfile_stats_end(opts, pagehead, blockhead, pagestats)
 
 # Hacking this up so we count timestamps and txns
-def row_decode(p, b, pagehead, blockhead, pagestats):
+def row_decode(p, b, pagehead, blockhead, pagestats, opts):
     for cellnum in range(0, pagehead.entries):
         cellpos = b.tell()
         if cellpos >= pagehead.mem_size:
@@ -678,7 +696,7 @@ def wtdecode_file_object(b, opts, nbytes):
         print('Decode at ' + d_h)
         b.seek(startblock)
         try:
-            block_decode(p, b, opts)
+            block_decode(p, b, nbytes, opts)
         except BrokenPipeError:
             break
         except Exception:
@@ -732,38 +750,45 @@ def wtdecode(opts):
         with open(opts.filename, "rb") as fileobj:
             wtdecode_file_object(binary_data.BinaryFile(fileobj), opts, nbytes)
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('-b', '--bytes', help="show bytes alongside decoding", action='store_true')
-parser.add_argument('--bson', help="decode cell values as bson data", action='store_true')
-parser.add_argument("-c", "--csv", type=argparse.FileType('w'), dest='output', help="output filename for summary of page statistics in CSV format", action='store')
-parser.add_argument('--continue', help="continue on checksum failure", dest='cont', action='store_true')
-parser.add_argument('-D', '--debug', help="debug this tool", action='store_true')
-parser.add_argument('-d', '--dumpin', help="input is hex dump (may be embedded in log messages)", action='store_true')
-parser.add_argument('--ext', help="dump only the extent lists", action='store_true')
-parser.add_argument('-f', '--fragment', help="input file is a fragment, does not have a WT file header", action='store_true')
-parser.add_argument('-o', '--offset', help="seek offset before decoding", type=int, default=0)
-parser.add_argument('-p', '--pages', help="number of pages to decode", type=int, default=0)
-parser.add_argument('-v', '--verbose', help="print things about data, not just the headers", action='store_true')
-parser.add_argument('-s', '--split', help="split output to also show raw bytes", action='store_true')
-parser.add_argument('--skip-data', help="do not read/process data", action='store_true')
-parser.add_argument('-V', '--version', help="print version number of this program", action='store_true')
-parser.add_argument('filename', help="file name or '-' for stdin")
-opts = parser.parse_args()
+def get_arg_parser():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-b', '--bytes', help="show bytes alongside decoding", action='store_true')
+    parser.add_argument('--bson', help="decode cell values as bson data", action='store_true')
+    parser.add_argument("-c", "--csv", type=argparse.FileType('w'), dest='output', help="output filename for summary of page statistics in CSV format", action='store')
+    parser.add_argument('--continue', help="continue on checksum failure", dest='cont', action='store_true')
+    parser.add_argument('-D', '--debug', help="debug this tool", action='store_true')
+    parser.add_argument('-d', '--dumpin', help="input is hex dump (may be embedded in log messages)", action='store_true')
+    parser.add_argument('--disagg', help="input comes from disaggregated storage", action='store_true')
+    parser.add_argument('--ext', help="dump only the extent lists", action='store_true')
+    parser.add_argument('-f', '--fragment', help="input file is a fragment, does not have a WT file header", action='store_true')
+    parser.add_argument('-o', '--offset', help="seek offset before decoding", type=int, default=0)
+    parser.add_argument('-p', '--pages', help="number of pages to decode", type=int, default=0)
+    parser.add_argument('-v', '--verbose', help="print things about data, not just the headers", action='store_true')
+    parser.add_argument('-s', '--split', help="split output to also show raw bytes", action='store_true')
+    parser.add_argument('--skip-data', help="do not read/process data", action='store_true')
+    parser.add_argument('-V', '--version', help="print version number of this program", action='store_true')
+    parser.add_argument('filename', help="file name or '-' for stdin")
+    return parser
 
-if opts.bson and not have_bson:
-    print('ERROR: the pymongo bson library is required to decode bson data')
-    sys.exit(1)
+# Only run the main code if this file is not imported.
+if __name__ == '__main__':
+    parser = get_arg_parser()
+    opts = parser.parse_args()
 
-if opts.version:
-    print('wt_binary_decode version "{}"'.format(decode_version))
+    if opts.bson and not have_bson:
+        print('ERROR: the pymongo bson library is required to decode bson data')
+        sys.exit(1)
+
+    if opts.version:
+        print('wt_binary_decode version "{}"'.format(decode_version))
+        sys.exit(0)
+
+    try:
+        wtdecode(opts)
+    except KeyboardInterrupt:
+        pass
+    except BrokenPipeError:
+        pass
+
     sys.exit(0)
-
-try:
-    wtdecode(opts)
-except KeyboardInterrupt:
-    pass
-except BrokenPipeError:
-    pass
-
-sys.exit(0)
