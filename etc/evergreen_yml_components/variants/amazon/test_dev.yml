@@ -94,6 +94,11 @@ buildvariants:
       compile_variant: *amazon-linux2023-arm64-static-compile
       evergreen_remote_exec: on
       skip_debug_link: true
+      # Boost the priority on remote execution since this is the longest running task chain in
+      # the required patch build. This priority is still lower than the priority on developer
+      # workstation builds.
+      bazel_compile_flags: >-
+        --remote_execution_priority=3
     tasks:
       - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG

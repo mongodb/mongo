@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import os
+import pathlib
 import socket
 import sys
 
@@ -9,10 +10,11 @@ import git
 
 
 def write_workstation_bazelrc(args):
-    workstation_file = ".bazelrc.common_bes"
+    repo_root = pathlib.Path(os.path.abspath(__file__)).parent.parent.parent
+    workstation_file = os.path.join(repo_root, ".bazelrc.common_bes")
     existing_hash = ""
     if os.path.exists(workstation_file):
-        with open(workstation_file) as f:
+        with open(workstation_file, encoding="utf-8") as f:
             existing_hash = hashlib.md5(f.read().encode()).hexdigest()
 
     status = "Unknown"
@@ -83,7 +85,11 @@ common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
     if developer_build:
         bazelrc_contents += f"common --bes_keywords=workstation={hostname}{os.linesep}"
 
+        # Boost the remote execution priority on developer workstation builds for lower
+        # queue times.
+        bazelrc_contents += "common --remote_execution_priority=5"
+
     current_hash = hashlib.md5(bazelrc_contents.encode()).hexdigest()
     if existing_hash != current_hash:
-        with open(workstation_file, "w") as f:
+        with open(workstation_file, "w", encoding="utf-8") as f:
             f.write(bazelrc_contents)
