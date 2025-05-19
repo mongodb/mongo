@@ -64,7 +64,7 @@ const kCommandRetryableOnShardNotFoundError = {
     },
     "enableSharding": (command) => {
         // if the target is omitted, we can retry
-        if (!command.hasOwnProperty["primaryShard"]) {
+        if (!("primaryShard" in command)) {
             return true;
         }
         // only retryable if the target is the config shard (as eventually it will show up again)
@@ -72,7 +72,7 @@ const kCommandRetryableOnShardNotFoundError = {
     },
     "reshardCollection": (command) => {
         // if the target is omitted, we can retry
-        if (!command.hasOwnProperty["shardDistribution"]) {
+        if (!("shardDistribution" in command)) {
             return true;
         }
         // if we have more than one target, it's non-retryable
