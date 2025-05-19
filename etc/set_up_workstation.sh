@@ -120,6 +120,15 @@ setup_db_contrib_tool() {
     fi
 }
 
+setup_clang_config() {
+    echo "################################################################################"
+    echo "Installing clang config..."
+
+    bazel build compiledb
+    
+    echo "Finished installing clang config..."
+}
+
 setup_gdb() {
     echo "################################################################################"
     echo "Setting up GDB..."
@@ -149,6 +158,7 @@ run_setup() {
     
     setup_bash
 
+    setup_clang_config
     setup_gdb
     setup_pipx
     setup_db_contrib_tool  # This step requires `setup_pipx` to have been run.

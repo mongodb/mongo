@@ -46,6 +46,13 @@ else
   failed_setup=true
 fi
 
+if test -f "./compile_commands.json"; then
+  echo "Clang configuration set up correctly"
+else
+  echo "Clang configuration failed setup"
+  failed_setup=true
+fi
+
 if $failed_setup; then
   exit 1
 fi
