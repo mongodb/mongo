@@ -110,14 +110,6 @@ export function copyBackupCursorExtendFiles(
         _copyFiles(files, dbpath, destinationDirectory, copyFileHelper);
     }
 
-    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
-    jsTestLog({
-        msg: "Destination",
-        destination: destinationDirectory,
-        dbpath: ls(destinationDirectory),
-        journal: ls(destinationDirectory + "/journal")
-    });
-
     return copyThread;
 }
 
@@ -156,6 +148,14 @@ export function _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback) {
 export function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) {
     files.forEach((file) => {
         jsTestLog(copyFileHelper(file, dbpath, destinationDirectory));
+    });
+
+    // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
+    jsTestLog({
+        msg: "Directory contents on destination after $backupCursorExtend finished",
+        destination: destinationDirectory,
+        dbpath: listFiles(destinationDirectory),
+        journal: listFiles(destinationDirectory + "/journal")
     });
 }
 
