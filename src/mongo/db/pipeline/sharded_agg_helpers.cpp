@@ -1710,6 +1710,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
         "targeting pipeline to attach cursors"_sd,
         [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
             auto pipelineToTarget = pipeline->clone();
+            LOGV2_DEBUG(9497005,
+                        5,
+                        "Cloned pipeline",
+                        "pipelineToTarget"_attr = pipelineToTarget->serializeToBson());
 
             // CRI, provided by CollectionRouter, contains the latest data. We call
             // getCollectionRoutingInfoForTxnCmd to get CRI with historical data for transactions

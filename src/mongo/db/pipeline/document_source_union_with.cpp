@@ -248,7 +248,10 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
         try {
-
+            LOGV2_DEBUG(9497002,
+                        5,
+                        "$unionWith before pipeline prep: ",
+                        "pipeline"_attr = _pipeline->serializeToBson());
             // We determine whether we should dismiss disposal for a $search subpipeline here for a
             // combination of reasons:
             // 1. The subpipeline of the $search stage will have an invalid opCtx on its
@@ -271,6 +274,10 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                             ->dismissSearchSubpipelineDisposal(std::move(_pipeline));
             _pipeline =
                 pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(_pipeline.release());
+            LOGV2_DEBUG(9497003,
+                        5,
+                        "$unionWith POST pipeline prep: ",
+                        "pipeline"_attr = _pipeline->serializeToBson());
             _executionState = ExecutionProgress::kIteratingSubPipeline;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
             _pipeline = buildPipelineFromViewDefinition(
