@@ -263,6 +263,17 @@ recovery:
     - src/mongo/db/modules/enterprise/src/magic_restore
     - src/mongo/dbtests/rollbacktests.cpp
 
+fcv:
+  meta:
+    slack: server-fcv
+    jira: Replication
+  files:
+    - src/mongo/db/feature_compatibility*
+    - src/mongo/db/commands/feature_compatibility*
+    - src/mongo/db/commands/set_feature_compatibility_version*
+    - src/mongo/db/op_observer/fcv_op_observer*
+    - src/mongo/unittest/ensure_fcv.h
+
 access_control:
   meta:
     slack: TODO
@@ -654,7 +665,6 @@ replication:
     jira: Server Replication
   files:
     - src/mongo/db/repl/ # excluding ./dbcheck*
-    - src/mongo/db/op_observer/fcv_op_observer* # specific files
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
     - src/mongo/db/mongod_options_replication*
     - src/mongo/db/concurrency/replication_state_transition_lock_guard*
