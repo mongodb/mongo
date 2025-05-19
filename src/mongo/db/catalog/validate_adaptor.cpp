@@ -335,6 +335,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
     } else {
         BSONColumn col{timeField};
         Date_t prevTimestamp = Date_t::min();
+        bool detectedOutOfOrder = false;
         for (const auto& metric : col) {
             if (!metric.eoo()) {
                 if (metric.type() != BSONType::Date) {
@@ -342,21 +343,28 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                         ErrorCodes::BadValue,
                         fmt::format("Time-series bucket '{}' field is not a Date", fieldName));
                 }
-                // Checks the time values are sorted in increasing order for compressed buckets.
+                // Check the time values are sorted in increasing order for v2 buckets (compressed,
+                // sorted). Skip the check if the bucket is v3 (compressed, unsorted).
                 Date_t curTimestamp = metric.Date();
-                if (curTimestamp >= prevTimestamp) {
-                    prevTimestamp = curTimestamp;
-                } else {
-                    return Status(
-                        ErrorCodes::BadValue,
-                        fmt::format("Time-series bucket '{}' field is not in ascending order",
-                                    fieldName));
+                if (curTimestamp < prevTimestamp) {
+                    if (version == 2) {
+                        return Status(
+                            ErrorCodes::BadValue,
+                            fmt::format("Time-series bucket '{}' field is not in ascending order",
+                                        fieldName));
+                    } else if (version == 3) {
+                        detectedOutOfOrder = true;
+                    }
                 }
                 minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
                 ++(*bucketCount);
             } else {
                 return Status(ErrorCodes::BadValue, "Time-series bucket has missing time fields");
             }
+        }
+        if (version == 3 && !detectedOutOfOrder) {
+            return Status(ErrorCodes::BadValue,
+                          "Time-series bucket is v3 but has its measurements in-order on time");
         }
     }
 
