@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

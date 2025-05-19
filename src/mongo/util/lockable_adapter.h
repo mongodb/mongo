@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 namespace mongo {
 
 // BasicLockableAdapter allows non-template functions to take any lockable type. This can be useful

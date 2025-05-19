@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 
 namespace mongo::stage_builder {

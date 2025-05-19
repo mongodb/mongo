@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"

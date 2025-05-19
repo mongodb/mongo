@@ -56,6 +56,8 @@
 #include <boost/intrusive/set.hpp>
 #include <type_traits>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 template <typename Int>
 requires std::is_integral_v<Int>
