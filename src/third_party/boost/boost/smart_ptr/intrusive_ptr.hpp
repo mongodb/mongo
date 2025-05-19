@@ -13,6 +13,7 @@
 //  See http://www.boost.org/libs/smart_ptr/ for documentation.
 //
 
+#include <boost/smart_ptr/detail/sp_cxx20_constexpr.hpp>
 #include <boost/smart_ptr/detail/sp_convertible.hpp>
 #include <boost/smart_ptr/detail/sp_noexcept.hpp>
 #include <boost/assert.hpp>
@@ -53,29 +54,29 @@ public:
     {
     }
 
-    intrusive_ptr( T * p, bool add_ref = true ): px( p )
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr( T * p, bool add_ref = true ): px( p )
     {
         if( px != 0 && add_ref ) intrusive_ptr_add_ref( px );
     }
 
     template<class U>
-    intrusive_ptr( intrusive_ptr<U> const & rhs, typename boost::detail::sp_enable_if_convertible<U,T>::type = boost::detail::sp_empty() )
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr( intrusive_ptr<U> const & rhs, typename boost::detail::sp_enable_if_convertible<U,T>::type = boost::detail::sp_empty() )
     : px( rhs.get() )
     {
         if( px != 0 ) intrusive_ptr_add_ref( px );
     }
 
-    intrusive_ptr(intrusive_ptr const & rhs): px( rhs.px )
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr(intrusive_ptr const & rhs): px( rhs.px )
     {
         if( px != 0 ) intrusive_ptr_add_ref( px );
     }
 
-    ~intrusive_ptr()
+    BOOST_SP_CXX20_CONSTEXPR ~intrusive_ptr()
     {
         if( px != 0 ) intrusive_ptr_release( px );
     }
 
-    template<class U> intrusive_ptr & operator=(intrusive_ptr<U> const & rhs)
+    template<class U> BOOST_SP_CXX20_CONSTEXPR intrusive_ptr & operator=(intrusive_ptr<U> const & rhs)
     {
         this_type(rhs).swap(*this);
         return *this;
@@ -83,12 +84,12 @@ public:
 
 // Move support
 
-    intrusive_ptr(intrusive_ptr && rhs) noexcept : px( rhs.px )
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr(intrusive_ptr && rhs) noexcept : px( rhs.px )
     {
         rhs.px = 0;
     }
 
-    intrusive_ptr & operator=(intrusive_ptr && rhs) noexcept
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr & operator=(intrusive_ptr && rhs) noexcept
     {
         this_type( static_cast< intrusive_ptr && >( rhs ) ).swap(*this);
         return *this;
@@ -97,76 +98,76 @@ public:
     template<class U> friend class intrusive_ptr;
 
     template<class U>
-    intrusive_ptr(intrusive_ptr<U> && rhs, typename boost::detail::sp_enable_if_convertible<U,T>::type = boost::detail::sp_empty())
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr(intrusive_ptr<U> && rhs, typename boost::detail::sp_enable_if_convertible<U,T>::type = boost::detail::sp_empty())
     : px( rhs.px )
     {
         rhs.px = 0;
     }
 
     template<class U>
-    intrusive_ptr & operator=(intrusive_ptr<U> && rhs) noexcept
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr & operator=(intrusive_ptr<U> && rhs) noexcept
     {
         this_type( static_cast< intrusive_ptr<U> && >( rhs ) ).swap(*this);
         return *this;
     }
 
-    intrusive_ptr & operator=(intrusive_ptr const & rhs)
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr & operator=(intrusive_ptr const & rhs)
     {
         this_type(rhs).swap(*this);
         return *this;
     }
 
-    intrusive_ptr & operator=(T * rhs)
+    BOOST_SP_CXX20_CONSTEXPR intrusive_ptr & operator=(T * rhs)
     {
         this_type(rhs).swap(*this);
         return *this;
     }
 
-    void reset()
+    BOOST_SP_CXX20_CONSTEXPR void reset()
     {
         this_type().swap( *this );
     }
 
-    void reset( T * rhs )
+    BOOST_SP_CXX20_CONSTEXPR void reset( T * rhs )
     {
         this_type( rhs ).swap( *this );
     }
 
-    void reset( T * rhs, bool add_ref )
+    BOOST_SP_CXX20_CONSTEXPR void reset( T * rhs, bool add_ref )
     {
         this_type( rhs, add_ref ).swap( *this );
     }
 
-    T * get() const noexcept
+    BOOST_SP_CXX20_CONSTEXPR T * get() const noexcept
     {
         return px;
     }
 
-    T * detach() noexcept
+    BOOST_SP_CXX20_CONSTEXPR T * detach() noexcept
     {
         T * ret = px;
         px = 0;
         return ret;
     }
 
-    T & operator*() const BOOST_SP_NOEXCEPT_WITH_ASSERT
+    BOOST_SP_CXX20_CONSTEXPR T & operator*() const BOOST_SP_NOEXCEPT_WITH_ASSERT
     {
         BOOST_ASSERT( px != 0 );
         return *px;
     }
 
-    T * operator->() const BOOST_SP_NOEXCEPT_WITH_ASSERT
+    BOOST_SP_CXX20_CONSTEXPR T * operator->() const BOOST_SP_NOEXCEPT_WITH_ASSERT
     {
         BOOST_ASSERT( px != 0 );
         return px;
     }
 
-    explicit operator bool () const noexcept
+    BOOST_SP_CXX20_CONSTEXPR explicit operator bool () const noexcept
     {
         return px != 0;
     }
 
-    void swap(intrusive_ptr & rhs) noexcept
+    BOOST_SP_CXX20_CONSTEXPR void swap(intrusive_ptr & rhs) noexcept
     {
         T * tmp = px;
         px = rhs.px;
@@ -178,101 +179,101 @@ private:
     T * px;
 };
 
-template<class T, class U> inline bool operator==(intrusive_ptr<T> const & a, intrusive_ptr<U> const & b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator==(intrusive_ptr<T> const & a, intrusive_ptr<U> const & b) noexcept
 {
     return a.get() == b.get();
 }
 
-template<class T, class U> inline bool operator!=(intrusive_ptr<T> const & a, intrusive_ptr<U> const & b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator!=(intrusive_ptr<T> const & a, intrusive_ptr<U> const & b) noexcept
 {
     return a.get() != b.get();
 }
 
-template<class T, class U> inline bool operator==(intrusive_ptr<T> const & a, U * b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator==(intrusive_ptr<T> const & a, U * b) noexcept
 {
     return a.get() == b;
 }
 
-template<class T, class U> inline bool operator!=(intrusive_ptr<T> const & a, U * b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator!=(intrusive_ptr<T> const & a, U * b) noexcept
 {
     return a.get() != b;
 }
 
-template<class T, class U> inline bool operator==(T * a, intrusive_ptr<U> const & b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator==(T * a, intrusive_ptr<U> const & b) noexcept
 {
     return a == b.get();
 }
 
-template<class T, class U> inline bool operator!=(T * a, intrusive_ptr<U> const & b) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline bool operator!=(T * a, intrusive_ptr<U> const & b) noexcept
 {
     return a != b.get();
 }
 
-template<class T> inline bool operator==( intrusive_ptr<T> const & p, std::nullptr_t ) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline bool operator==( intrusive_ptr<T> const & p, std::nullptr_t ) noexcept
 {
     return p.get() == 0;
 }
 
-template<class T> inline bool operator==( std::nullptr_t, intrusive_ptr<T> const & p ) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline bool operator==( std::nullptr_t, intrusive_ptr<T> const & p ) noexcept
 {
     return p.get() == 0;
 }
 
-template<class T> inline bool operator!=( intrusive_ptr<T> const & p, std::nullptr_t ) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline bool operator!=( intrusive_ptr<T> const & p, std::nullptr_t ) noexcept
 {
     return p.get() != 0;
 }
 
-template<class T> inline bool operator!=( std::nullptr_t, intrusive_ptr<T> const & p ) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline bool operator!=( std::nullptr_t, intrusive_ptr<T> const & p ) noexcept
 {
     return p.get() != 0;
 }
 
-template<class T> inline bool operator<(intrusive_ptr<T> const & a, intrusive_ptr<T> const & b) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline bool operator<(intrusive_ptr<T> const & a, intrusive_ptr<T> const & b) noexcept
 {
     return std::less<T *>()(a.get(), b.get());
 }
 
-template<class T> void swap(intrusive_ptr<T> & lhs, intrusive_ptr<T> & rhs) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline void swap(intrusive_ptr<T> & lhs, intrusive_ptr<T> & rhs) noexcept
 {
     lhs.swap(rhs);
 }
 
 // mem_fn support
 
-template<class T> T * get_pointer(intrusive_ptr<T> const & p) noexcept
+template<class T> BOOST_SP_CXX20_CONSTEXPR inline T * get_pointer(intrusive_ptr<T> const & p) noexcept
 {
     return p.get();
 }
 
 // pointer casts
 
-template<class T, class U> intrusive_ptr<T> static_pointer_cast(intrusive_ptr<U> const & p)
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> static_pointer_cast(intrusive_ptr<U> const & p)
 {
     return static_cast<T *>(p.get());
 }
 
-template<class T, class U> intrusive_ptr<T> const_pointer_cast(intrusive_ptr<U> const & p)
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> const_pointer_cast(intrusive_ptr<U> const & p)
 {
     return const_cast<T *>(p.get());
 }
 
-template<class T, class U> intrusive_ptr<T> dynamic_pointer_cast(intrusive_ptr<U> const & p)
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> dynamic_pointer_cast(intrusive_ptr<U> const & p)
 {
     return dynamic_cast<T *>(p.get());
 }
 
-template<class T, class U> intrusive_ptr<T> static_pointer_cast( intrusive_ptr<U> && p ) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> static_pointer_cast( intrusive_ptr<U> && p ) noexcept
 {
     return intrusive_ptr<T>( static_cast<T*>( p.detach() ), false );
 }
 
-template<class T, class U> intrusive_ptr<T> const_pointer_cast( intrusive_ptr<U> && p ) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> const_pointer_cast( intrusive_ptr<U> && p ) noexcept
 {
     return intrusive_ptr<T>( const_cast<T*>( p.detach() ), false );
 }
 
-template<class T, class U> intrusive_ptr<T> dynamic_pointer_cast( intrusive_ptr<U> && p ) noexcept
+template<class T, class U> BOOST_SP_CXX20_CONSTEXPR inline intrusive_ptr<T> dynamic_pointer_cast( intrusive_ptr<U> && p ) noexcept
 {
     T * p2 = dynamic_cast<T*>( p.get() );
 
