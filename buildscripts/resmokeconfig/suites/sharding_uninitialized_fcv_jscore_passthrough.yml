@@ -72,6 +72,9 @@ selector:
 
   # Will fail all commands including those needed to forward command to initial sync node.
   - jstests/core/failcommand_failpoint.js
+  # This test runs many aggregations, and the override slows them down enough to hit the timeout
+  # more easily.
+  - jstests/core/timeseries/timeseries_group_aggregations.js
   # Starts MongoCryptD instead of mongod nodes
   - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
 

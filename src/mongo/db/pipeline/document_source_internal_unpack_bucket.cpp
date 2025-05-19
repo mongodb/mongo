@@ -434,7 +434,7 @@ boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
 boost::intrusive_ptr<Expression> rewriteGroupByElement(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     boost::intrusive_ptr<Expression> expr,
-    const timeseries::BucketSpec& bucketSpec,
+    const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
     bool fixedBuckets,
     bool usesExtendedRange) {
@@ -448,17 +448,18 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     }
 
     // Option 2: The only field path supported is at or under the metaField.
-    auto metaField = bucketSpec.metaField();
+    auto metaField = bucketUnpacker.getMetaField();
     if (fieldPathsAccessOnlyMetaField(expr, metaField) && metaField &&
-        bucketSpec.doesBucketSpecProvideField(*metaField)) {
-        return rewriteMetaFieldPaths(pExpCtx, bucketSpec.metaField(), expr);
+        bucketUnpacker.providesField(*metaField)) {
+        return rewriteMetaFieldPaths(pExpCtx, metaField, expr);
     }
 
     // Option 3: Currently the only allowed field path not on the metaField is $dateTrunc on the
     // timeField if the buckets are fixed and do not use an extended range.
     if (fixedBuckets && !usesExtendedRange &&
-        bucketSpec.doesBucketSpecProvideField(bucketSpec.timeField())) {
-        return handleDateTruncRewrite(pExpCtx, expr, bucketSpec.timeField(), bucketMaxSpanSeconds);
+        bucketUnpacker.providesField(bucketUnpacker.getTimeField())) {
+        return handleDateTruncRewrite(
+            pExpCtx, expr, bucketUnpacker.getTimeField(), bucketMaxSpanSeconds);
     }
     return {};
 }
@@ -466,7 +467,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
 std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
     ExpressionContext* pExpCtx,
     const mongo::AccumulationStatement& stmt,
-    const timeseries::BucketSpec& bucketSpec) {
+    const timeseries::BucketUnpacker& bucketUnpacker) {
     // We rewrite {$sum: 1} to use the bucket level field names and account for
     // compressed/uncompressed buckets. The resulting MQL will look like:
     //$sum : {
@@ -482,7 +483,7 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
 
     // BucketSpec should have access to timeField to be able to do this rewrite, because version 1
     // buckets do not store an explicit count field.
-    if (!bucketSpec.doesBucketSpecProvideFieldWithoutModification(bucketSpec.timeField())) {
+    if (!bucketUnpacker.providesFieldWithoutModification(bucketUnpacker.getTimeField())) {
         return {};
     }
 
@@ -503,9 +504,9 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
     auto thenExpr = ExpressionFieldPath::createPathFromString(
         pExpCtx, controlCountField, pExpCtx->variablesParseState);
 
-    auto elseExpr =
-        BSON("$size" << BSON("$objectToArray"
-                             << "$" + timeseries::kDataFieldNamePrefix + bucketSpec.timeField()));
+    auto elseExpr = BSON(
+        "$size" << BSON("$objectToArray"
+                        << "$" + timeseries::kDataFieldNamePrefix + bucketUnpacker.getTimeField()));
     auto argument = ExpressionCond::create(
         pExpCtx,
         std::move(ifExpr),
@@ -523,7 +524,7 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
 std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     const mongo::AccumulationStatement& stmt,
-    const timeseries::BucketSpec& bucketSpec) {
+    const timeseries::BucketUnpacker& bucketUnpacker) {
     const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(stmt.expr.argument.get());
 
     // This is either a const or a compound expression. While some such expressions (e.g: {$min:
@@ -540,13 +541,13 @@ std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
         return {};
     }
     const auto& accFieldName = path.getFieldName(1).toString();
-    if (!bucketSpec.doesBucketSpecProvideFieldWithoutModification(accFieldName)) {
+    if (!bucketUnpacker.providesFieldWithoutModification(accFieldName)) {
         return {};
     }
 
     // Build the paths for the bucket-level fields.
     std::ostringstream os;
-    if (bucketSpec.metaField() && accFieldName == *bucketSpec.metaField()) {
+    if (bucketUnpacker.getMetaField() && accFieldName == *bucketUnpacker.getMetaField()) {
         // Update aggregates to reference the meta field.
         os << timeseries::kBucketMetaFieldName;
 
@@ -559,11 +560,19 @@ std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
         if (op == "$min") {
             // Rewrite not valid for the timeField because control.min.time contains a rounded-down
             // time and not the actual min time of events in the bucket.
-            if (accFieldName == bucketSpec.timeField()) {
+            if (accFieldName == bucketUnpacker.getTimeField()) {
                 return {};
             }
             os << timeseries::kControlMinFieldNamePrefix;
         } else if (op == "$max") {
+            // The control.max.time field is not a true max if there's extended range data. So we
+            // can only perform this rewrite conditionally.
+            // If we are on mongos, the extended range flag may not be accurate. If we are on
+            // mongod, the flag is accurate and we can perform the rewrite if there's no extended
+            // range data.
+            if (pExpCtx->inMongos || bucketUnpacker.getUsesExtendedRange()) {
+                return {};
+            }
             os << timeseries::kControlMaxFieldNamePrefix;
         } else {
             MONGO_UNREACHABLE;
@@ -589,7 +598,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     const std::vector<boost::intrusive_ptr<Expression>>& idFieldExpressions,
     const std::vector<std::string>& idFieldNames,
-    const timeseries::BucketSpec& bucketSpec,
+    const timeseries::BucketUnpacker& bucketUnpacker,
     int bucketMaxSpanSeconds,
     bool fixedBuckets,
     bool usesExtendedRange) {
@@ -603,7 +612,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByField(
     for (std::size_t i = 0; i < idFieldExpressions.size(); ++i) {
         auto expr = rewriteGroupByElement(pExpCtx,
                                           idFieldExpressions[i],
-                                          bucketSpec,
+                                          bucketUnpacker,
                                           bucketMaxSpanSeconds,
                                           fixedBuckets,
                                           usesExtendedRange);
@@ -924,22 +933,22 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     if (_bucketUnpacker.removedMetaFieldFromFieldSet() &&
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
-                  *spec.metaField()) == spec.computedMetaProjFields().cend())
-        fields.emplace_back(opts.serializeFieldPathFromString(*spec.metaField()));
+                  *_bucketUnpacker.getMetaField()) == spec.computedMetaProjFields().cend())
+        fields.emplace_back(opts.serializeFieldPathFromString(*_bucketUnpacker.getMetaField()));
 
     out.addField(behavior, Value{std::move(fields)});
     out.addField(timeseries::kTimeFieldName,
-                 Value{opts.serializeFieldPathFromString(spec.timeField())});
-    if (spec.metaField()) {
+                 Value{opts.serializeFieldPathFromString(_bucketUnpacker.getTimeField())});
+    if (_bucketUnpacker.getMetaField()) {
         out.addField(timeseries::kMetaFieldName,
-                     Value{opts.serializeFieldPathFromString(*spec.metaField())});
+                     Value{opts.serializeFieldPathFromString(*_bucketUnpacker.getMetaField())});
     }
     out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData,
                      opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
-    if (spec.usesExtendedRange()) {
+    if (_bucketUnpacker.getUsesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
@@ -1091,7 +1100,7 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     }
     _triedComputedMetaPushDownFor.push_back(nextTransform);
 
-    auto& metaName = _bucketUnpacker.bucketSpec().metaField().value();
+    auto& metaName = _bucketUnpacker.getMetaField().value();
     auto [addFieldsSpec, deleteStage] =
         nextTransform->extractComputedProjections(metaName,
                                                   timeseries::kBucketMetaFieldName.toString(),
@@ -1234,10 +1243,10 @@ bool DocumentSourceInternalUnpackBucket::generateBucketLevelIdPredicates(
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
     DocumentSource* src) const {
     if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
-        _bucketUnpacker.bucketSpec().metaField() && nextProject &&
+        _bucketUnpacker.getMetaField() && nextProject &&
         nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
-        return nextProject->extractProjectOnFieldAndRename(
-            _bucketUnpacker.bucketSpec().metaField().value(), timeseries::kBucketMetaFieldName);
+        return nextProject->extractProjectOnFieldAndRename(_bucketUnpacker.getMetaField().value(),
+                                                           timeseries::kBucketMetaFieldName);
     }
 
     return {BSONObj{}, false};
@@ -1279,7 +1288,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
     auto rewrittenIdExpression = rewriteGroupByField(pExpCtx,
                                                      idFieldExpressions,
                                                      idFieldNames,
-                                                     _bucketUnpacker.bucketSpec(),
+                                                     _bucketUnpacker,
                                                      _bucketMaxSpanSeconds,
                                                      _fixedBuckets,
                                                      _usesExtendedRange);
@@ -1295,12 +1304,12 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
         // into implementing them). $count is desugared to {$sum: 1}.
         std::unique_ptr<AccumulationExpression> accExpr;
         if (op == "$min" || op == "$max") {
-            accExpr = rewriteMinMaxGroupAccm(pExpCtx, stmt, _bucketUnpacker.bucketSpec());
+            accExpr = rewriteMinMaxGroupAccm(pExpCtx, stmt, _bucketUnpacker);
             if (!accExpr) {
                 return {};
             }
         } else if (op == "$sum") {
-            accExpr = rewriteCountGroupAccm(pExpCtx.get(), stmt, _bucketUnpacker.bucketSpec());
+            accExpr = rewriteCountGroupAccm(pExpCtx.get(), stmt, _bucketUnpacker);
             if (!accExpr) {
                 return {};
             }
@@ -1336,9 +1345,8 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
 }
 
 bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
-    return _bucketUnpacker.bucketSpec().metaField() &&
-        _bucketUnpacker.bucketSpec().fieldIsComputed(
-            _bucketUnpacker.bucketSpec().metaField().value());
+    return _bucketUnpacker.getMetaField() &&
+        _bucketUnpacker.bucketSpec().fieldIsComputed(_bucketUnpacker.getMetaField().value());
 }
 
 bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
@@ -1346,7 +1354,7 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
     // skip unpack stage
     itr = std::next(itr);
 
-    FieldPath timeField = _bucketUnpacker.bucketSpec().timeField();
+    FieldPath timeField = _bucketUnpacker.getTimeField();
     DocumentSourceGroup* groupStage = nullptr;
     bool isSortedOnTime = false;
     for (; itr != container->end(); ++itr) {
@@ -1566,9 +1574,8 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         return false;
     }
 
-    auto spec = _bucketUnpacker.bucketSpec();
-    auto maybeMetaField = spec.metaField();
-    auto timeField = spec.timeField();
+    auto maybeMetaField = _bucketUnpacker.getMetaField();
+    auto timeField = _bucketUnpacker.getTimeField();
     if (!maybeMetaField || haveComputedMetaField()) {
         return false;
     }
@@ -1767,6 +1774,7 @@ bool DocumentSourceInternalUnpackBucket::tryToAbsorbTopKSortIntoGroup(
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+
     invariant(*itr == this);
 
     // See ../query/timeseries/README.md for a description of all the rewrites implemented in this
@@ -1784,7 +1792,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         // *before* the unpack stage. So we need to apply this rewrite first, before the others,
         // which might cause us to return early.
         if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get());
-            prevMatch && !pExpCtx->inMongos && !_bucketUnpacker.bucketSpec().usesExtendedRange()) {
+            prevMatch && !pExpCtx->inMongos && !_bucketUnpacker.getUsesExtendedRange()) {
             MatchExpression* matchExpr = prevMatch->getMatchExpression();
             bool updated = generateBucketLevelIdPredicates(matchExpr);
             if (updated) {
@@ -1806,8 +1814,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get());
         sortPtr && !_eventFilter) {
-        if (auto metaField = _bucketUnpacker.bucketSpec().metaField();
-            metaField && !haveComputedMetaField) {
+        if (auto metaField = _bucketUnpacker.getMetaField(); metaField && !haveComputedMetaField) {
             if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.value())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
@@ -1860,7 +1867,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             "Must not specify 'query' for $geoNear on a time-series collection; use $match instead",
             nextNear->getQuery().binaryEqual(BSONObj()));
 
-        auto metaField = _bucketUnpacker.bucketSpec().metaField();
+        auto metaField = _bucketUnpacker.getMetaField();
         if (metaField && *metaField == keyField->front()) {
             // Make sure we actually re-write the key field for the buckets collection so we can
             // locate the index.
@@ -1955,8 +1962,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         // interested in $count.
         auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
         if (deps.hasNoRequirements() && !hasAlreadyAbsorbedProjectSpec) {
-            _bucketUnpacker.setBucketSpec({_bucketUnpacker.bucketSpec().timeField(),
-                                           _bucketUnpacker.bucketSpec().metaField(),
+            _bucketUnpacker.setBucketSpec({_bucketUnpacker.getTimeField(),
+                                           _bucketUnpacker.getMetaField(),
                                            {},
                                            BucketSpec::Behavior::kInclude});
 
@@ -2117,8 +2124,7 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
 DocumentSource::GetModPathsReturn DocumentSourceInternalUnpackBucket::getModifiedPaths() const {
     if (_bucketUnpacker.includeMetaField()) {
         StringMap<std::string> renames;
-        renames.emplace(*_bucketUnpacker.bucketSpec().metaField(),
-                        timeseries::kBucketMetaFieldName);
+        renames.emplace(*_bucketUnpacker.getMetaField(), timeseries::kBucketMetaFieldName);
         return {GetModPathsReturn::Type::kAllExcept, OrderedPathSet{}, std::move(renames)};
     }
     return {GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
