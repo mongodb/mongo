@@ -848,3 +848,17 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
+
+mongo_cc_benchmark(
+    name = "catalog_control_bm",
+    srcs = [
+        "catalog_control_bm.cpp",
+    ],
+    deps = [
+        ":collection_catalog",
+        ":collection_mock",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/catalog:catalog_control",
+        "//src/mongo/db/repl:storage_interface_impl",
+    ],
+)

@@ -173,18 +173,28 @@ public:
     static void appendSnapshotWindowSettings(WiredTigerKVEngine* engine, BSONObjBuilder* bob);
 
     /**
-     * Gets the creation metadata string for a collection or index at a given URI. Accepts an
-     * OperationContext or session.
+     * Gets the creation metadata string for a collection or index at a given URI.
      *
-     * This returns more information, but is slower than getMetadata().
+     * This merges together the config strings for the table, colgroup, and file, which is a very
+     * slow process.
      */
     static StatusWith<std::string> getMetadataCreate(WiredTigerSession& session, StringData uri);
 
     /**
-     * Gets the entire metadata string for collection or index at URI. Accepts an OperationContext
-     * or session.
+     * Gets the entire metadata string for collection or index at URI.
+     *
+     * This returns only the table config string, and for fields stored there is the fastest way to
+     * obtain that information.
      */
     static StatusWith<std::string> getMetadata(WiredTigerSession& session, StringData uri);
+
+    /**
+     * Gets the source metadata string for collection or index at URI.
+     *
+     * This is the WiredTiger config string for a specific file. If given a table: URI, it will
+     * return the config for the file of the table's only colgroup.
+     */
+    static StatusWith<std::string> getSourceMetadata(WiredTigerSession& session, StringData uri);
 
     /**
      * Reads app_metadata for collection/index at URI as a BSON document.

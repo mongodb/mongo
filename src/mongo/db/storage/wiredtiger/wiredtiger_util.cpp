@@ -59,9 +59,6 @@ auto kLogKeyName = "log"_sd;
 auto kLogEnabledKeyName = "enabled"_sd;
 
 auto& cancelledCacheMetric = *MetricBuilder<Counter64>("storage.cancelledCacheEvictions");
-}  // namespace
-
-namespace {
 
 // TODO SERVER-81069: Remove this.
 MONGO_FAIL_POINT_DEFINE(allowEncryptionOptionsInCreationString);
@@ -87,6 +84,22 @@ StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
     }
     invariant(metadata);
     return StatusWith<std::string>(metadata);
+}
+
+WT_CURSOR* _getMaybeCachedCursor(WiredTigerSession& session,
+                                 const std::string& uri,
+                                 uint64_t tableId) {
+    WT_CURSOR* cursor = nullptr;
+    try {
+        cursor = session.getCachedCursor(tableId, "");
+        if (!cursor) {
+            cursor = session.getNewCursor(uri);
+        }
+    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+        LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
+    }
+    invariant(cursor);
+    return cursor;
 }
 
 }  // namespace
@@ -123,41 +136,48 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
 
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WiredTigerSession& session,
                                                           StringData uri) {
-    WT_CURSOR* cursor = nullptr;
-    try {
-        const std::string metadataURI = "metadata:create";
-        cursor = session.getCachedCursor(kMetadataCreateTableId, "");
-        if (!cursor) {
-            cursor = session.getNewCursor(metadataURI);
-        }
-    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_FATAL_NOTRACE(51257, "Cursor not found", "error"_attr = ex);
-    }
-    invariant(cursor);
+    WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:create", kMetadataCreateTableId);
     ScopeGuard releaser = [&] {
         session.releaseCursor(kMetadataCreateTableId, cursor, "");
     };
-
     return _getMetadata(cursor, uri);
 }
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, StringData uri) {
-    WT_CURSOR* cursor = nullptr;
-    try {
-        const std::string metadataURI = "metadata:";
-        cursor = session.getCachedCursor(kMetadataTableId, "");
-        if (!cursor) {
-            cursor = session.getNewCursor(metadataURI);
-        }
-    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_FATAL_NOTRACE(31293, "Cursor not found", "error"_attr = ex);
-    }
-    invariant(cursor);
+    WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
     ScopeGuard releaser = [&] {
         session.releaseCursor(kMetadataTableId, cursor, "");
     };
 
     return _getMetadata(cursor, uri);
+}
+
+StatusWith<std::string> WiredTigerUtil::getSourceMetadata(WiredTigerSession& session,
+                                                          StringData uri) {
+    if (uri.startsWith("file:")) {
+        return getMetadata(session, uri);
+    }
+    invariant(uri.startsWith("table:"));
+
+    WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
+    ScopeGuard releaser = [&] {
+        session.releaseCursor(kMetadataTableId, cursor, "");
+    };
+
+    // Look up the config for the single colgroup for the table
+    auto colgroupUri = std::string("colgroup:") + uri.substr(strlen("table:"));
+    auto colgroupMetadata = _getMetadata(cursor, colgroupUri);
+    if (!colgroupMetadata.isOK())
+        return colgroupMetadata.getStatus();
+
+    // The source field of the colgroup's config is the URI of the file backing the colgroup
+    WiredTigerConfigParser parser(colgroupMetadata.getValue());
+    WT_CONFIG_ITEM item;
+    invariant(parser.get("source", &item) == 0);
+    invariant(item.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
+
+    // Get the metadata for the file
+    return _getMetadata(cursor, StringData(item.str, item.len));
 }
 
 Status WiredTigerUtil::getApplicationMetadata(WiredTigerSession& session,
@@ -227,7 +247,7 @@ StatusWith<BSONObj> WiredTigerUtil::getApplicationMetadata(WiredTigerSession& se
 StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
     WiredTigerSession& session, StringData uri, int64_t minimumVersion, int64_t maximumVersion) {
     StatusWith<std::string> result = getMetadata(session, uri);
-    if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
+    if (result == ErrorCodes::NoSuchKey) {
         return result.getStatus();
     }
     invariant(result.getStatus());
@@ -801,7 +821,7 @@ void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
     }
     attrs.add("uri", uri);
 
-    auto metadata = WiredTigerUtil::getMetadataCreate(session, uri);
+    auto metadata = WiredTigerUtil::getSourceMetadata(session, uri);
     if (!metadata.isOK()) {
         attrs.add("error", metadata.getStatus());
         LOGV2_WARNING(6898100, "Failed to check WT table logging setting", attrs);
@@ -886,7 +906,7 @@ Status WiredTigerUtil::setTableLogging(WiredTigerSession& session,
     std::string existingMetadata;
     {
         auto managedSession = connection.getUninterruptibleSession();
-        auto metadata = getMetadataCreate(*managedSession, uri);
+        auto metadata = getSourceMetadata(*managedSession, uri);
         if (!metadata.isOK()) {
             return metadata.getStatus();
         }

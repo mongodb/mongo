@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <map>
 
 #include "mongo/bson/timestamp.h"
