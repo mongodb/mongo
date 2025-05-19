@@ -43,6 +43,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -856,6 +857,16 @@ void auto_get_collection::checkShardingAndLocalCatalogCollectionUUIDMatch(
                     collectionPtr ? collectionPtr->uuid().toString() : ""));
         } else {
             // TODO: SERVER-88476: reintroduce tassert here similar to the uassert above.
+            static logv2::SeveritySuppressor logSeverity{
+                Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+            auto clusterUuidString = shardingCollectionDescription.getUUID().toString();
+            auto localUuidString = collectionPtr ? collectionPtr->uuid().toString() : "";
+            LOGV2_DEBUG(9087200,
+                        logSeverity().toInt(),
+                        "Sharding catalog and local catalog collection uuid do not match",
+                        "nss"_attr = nss.toStringForErrorMsg(),
+                        "sharding uuid"_attr = clusterUuidString,
+                        "local uuid"_attr = localUuidString);
         }
     }
 }
