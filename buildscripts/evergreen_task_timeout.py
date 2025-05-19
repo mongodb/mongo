@@ -50,7 +50,7 @@ DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
 
 # An idle timeout will expire in the presence of an exceptionally long running test in a resmoke task.
 # This helps prevent the introduction of new long-running tests in required build variants.
-DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT = timedelta(minutes=40)
+DEFAULT_REQUIRED_BUILD_IDLE_TIMEOUT = timedelta(minutes=21)
 
 
 class TimeoutOverride(BaseModel):
