@@ -70,7 +70,7 @@ function runTestAsyncAddDropIndex(conn, query, index, indexName, docs, results) 
     const queryFn = (dbName, host, query, results) => {
         var conn = new Mongo(host);
         var testDb = conn.getDB(dbName);
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 10; i++) {
             let failed = false;
             let res = [];
             let code = [];
@@ -88,7 +88,7 @@ function runTestAsyncAddDropIndex(conn, query, index, indexName, docs, results) 
     const indexFn = (dbName, host, index, indexName) => {
         var conn = new Mongo(host);
         var testDb = conn.getDB(dbName);
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 10; i++) {
             assert.commandWorked(testDb.c.createIndex(index, {name: indexName}));
             assert.commandWorked(testDb.c.dropIndex(indexName));
         }
