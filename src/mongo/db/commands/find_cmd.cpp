@@ -315,6 +315,8 @@ public:
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
             const auto& collection = ctx->getCollection();

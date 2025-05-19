@@ -621,6 +621,8 @@ public:
             // info is more accurate.
             AutoGetCollection collection(opCtx, request().getNamespace(), MODE_IX);
 
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             auto exec = uassertStatusOK(getExecutorUpdate(&CurOp::get(opCtx)->debug(),
                                                           &collection.getCollection(),
                                                           &parsedUpdate,
@@ -820,6 +822,8 @@ public:
                                           ? collection->getTimeseriesOptions()
                                           : boost::none);
             uassertStatusOK(parsedDelete.parseRequest());
+
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Explain the plan tree.
             auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),

@@ -167,6 +167,8 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();

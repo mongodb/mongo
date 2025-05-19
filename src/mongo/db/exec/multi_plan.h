@@ -44,6 +44,7 @@
 
 namespace mongo {
 
+
 /**
  * This stage outputs its mainChild, and possibly it's backup child
  * and also updates the cache.

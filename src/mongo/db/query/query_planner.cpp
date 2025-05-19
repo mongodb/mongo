@@ -1113,9 +1113,16 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
     return attemptCollectionScan(query, isTailable, params);
 }
 
+MONGO_FAIL_POINT_DEFINE(sleepWhilePlanning);
 
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
+
+    if (MONGO_unlikely(sleepWhilePlanning.shouldFail())) {
+        sleepWhilePlanning.execute(
+            [&](const BSONObj& data) { sleepmillis(data["ms"].numberInt()); });
+    }
+
     LOGV2_DEBUG(20967,
                 5,
                 "Beginning planning",

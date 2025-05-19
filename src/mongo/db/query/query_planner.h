@@ -48,6 +48,8 @@ void logCachedPlanNotFound(size_t numChildren, size_t childIndex);
 void logNumberOfSolutions(size_t numSolutions);
 }  // namespace log_detail
 
+extern FailPoint sleepWhilePlanning;
+
 class Collection;
 class CollectionPtr;
 
