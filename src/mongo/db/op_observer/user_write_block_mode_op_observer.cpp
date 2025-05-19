@@ -48,14 +48,6 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
-namespace {
-
-bool isStandaloneOrPrimary(OperationContext* opCtx, const NamespaceString& nss) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    return replCoord->canAcceptWritesFor(opCtx, nss);
-}
-
-}  // namespace
 
 void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              const CollectionPtr& coll,
@@ -84,9 +76,11 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                  insertedNss = collCSDoc.getNss()](OperationContext* opCtx,
                                                    boost::optional<Timestamp>) {
                     invariant(insertedNss.isEmpty());
+                    // Primaries take the global lock when writing to the
+                    // config.user_writes_critical_sections namespace. It must be ensured that this
+                    // lock is also taken on secondaries, when applying the related oplog entries.
                     boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                    if (!isStandaloneOrPrimary(
-                            opCtx, NamespaceString::kUserWritesCriticalSectionsNamespace)) {
+                    if (!opCtx->isEnforcingConstraints()) {
                         globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                     }
 
@@ -123,9 +117,11 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
              insertedNss = collCSDoc.getNss()](OperationContext* opCtx,
                                                boost::optional<Timestamp>) {
                 invariant(updatedNss.isEmpty());
+                // Primaries take the global lock when writing to the
+                // config.user_writes_critical_sections namespace. It must be ensured that this lock
+                // is also taken on secondaries, when applying the related oplog entries.
                 boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx,
-                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
+                if (!opCtx->isEnforcingConstraints()) {
                     globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                 }
 
@@ -166,9 +162,11 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
             [deletedNss = collCSDoc.getNss()](OperationContext* opCtx,
                                               boost::optional<Timestamp> _) {
                 invariant(deletedNss.isEmpty());
+                // Primaries take the global lock when writing to the
+                // config.user_writes_critical_sections namespace. It must be ensured that this lock
+                // is also taken on secondaries, when applying the related oplog entries.
                 boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx,
-                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
+                if (!opCtx->isEnforcingConstraints()) {
                     globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                 }
 

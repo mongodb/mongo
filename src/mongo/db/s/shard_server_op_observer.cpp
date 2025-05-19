@@ -92,11 +92,6 @@ namespace {
 
 const auto documentIdDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
 
-bool isStandaloneOrPrimary(OperationContext* opCtx) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    return replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
-}
-
 /**
  * Used to notify the catalog cache loader of a new placement version and invalidate the in-memory
  * routing table cache once the oplog updates are committed and become visible.
@@ -143,8 +138,9 @@ private:
  */
 void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext* opCtx,
                                                                const BSONObj& query) {
-    // Notification of routing table changes are only needed on secondaries
-    if (isStandaloneOrPrimary(opCtx)) {
+    // Notification of routing table changes is only needed on secondaries that are applying
+    // oplog entries.
+    if (opCtx->isEnforcingConstraints()) {
         return;
     }
 
@@ -252,7 +248,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (nss == NamespaceString::kRangeDeletionNamespace) {
-            if (!isStandaloneOrPrimary(opCtx)) {
+            // Return early on secondaries that are in oplog application.
+            if (!opCtx->isEnforcingConstraints()) {
                 return;
             }
 
@@ -272,8 +269,11 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (insertedNss.isDbOnly()) {
+                        // Primaries take locks when writing to certain internal namespaces. It must
+                        // be ensured that those locks are also taken on secondaries, when
+                        // applying the related oplog entries.
                         boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                        if (!isStandaloneOrPrimary(opCtx)) {
+                        if (!opCtx->isEnforcingConstraints()) {
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                         }
                         // TODO (SERVER-71444): Fix to be interruptible or document exception.
@@ -282,8 +282,11 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             opCtx, insertedNss.dbName());
                         scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
                     } else {
+                        // Primaries take locks when writing to certain internal namespaces. It must
+                        // be ensured that those locks are also taken on secondaries, when
+                        // applying the related oplog entries.
                         boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                        if (!isStandaloneOrPrimary(opCtx)) {
+                        if (!opCtx->isEnforcingConstraints()) {
                             lockCollectionIfNotPrimary.emplace(
                                 opCtx,
                                 insertedNss,
@@ -319,8 +322,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
          update_oplog_entry::UpdateType::kReplacement);
     if (needsSpecialHandling &&
         args.coll->ns() == NamespaceString::kShardConfigCollectionsNamespace) {
-        // Notification of routing table changes are only needed on secondaries
-        if (isStandaloneOrPrimary(opCtx)) {
+        // Notification of routing table changes is only needed on secondaries that are applying
+        // oplog entries.
+        if (opCtx->isEnforcingConstraints()) {
             return;
         }
 
@@ -386,8 +390,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
     if (needsSpecialHandling &&
         args.coll->ns() == NamespaceString::kShardConfigDatabasesNamespace) {
-        // Notification of routing table changes are only needed on secondaries
-        if (isStandaloneOrPrimary(opCtx)) {
+        // Notification of routing table changes is only needed on secondaries that are applying
+        // oplog entries.
+        if (opCtx->isEnforcingConstraints()) {
             return;
         }
 
@@ -431,8 +436,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (updatedNss.isDbOnly()) {
+                    // Primaries take locks when writing to certain internal namespaces. It must
+                    // be ensured that those locks are also taken on secondaries, when
+                    // applying the related oplog entries.
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    if (!opCtx->isEnforcingConstraints()) {
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
                     }
 
@@ -442,8 +450,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                         opCtx, updatedNss.dbName());
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
                 } else {
+                    // Primaries take locks when writing to certain internal namespaces. It must
+                    // be ensured that those locks are also taken on secondaries, when
+                    // applying the related oplog entries.
                     boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    if (!opCtx->isEnforcingConstraints()) {
                         lockCollectionIfNotPrimary.emplace(
                             opCtx,
                             updatedNss,
@@ -629,7 +640,11 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kShardConfigDatabasesNamespace) {
-        if (isStandaloneOrPrimary(opCtx)) {
+        // Primaries take locks when writing to certain internal namespaces. It must
+        // be ensured that those locks are also taken on secondaries, when applying
+        // the related oplog entries. Return early, if the node is not a secondary
+        // in oplog application.
+        if (opCtx->isEnforcingConstraints()) {
             return;
         }
 
@@ -691,8 +706,11 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
             [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                 OperationContext* opCtx, boost::optional<Timestamp>) {
                 if (deletedNss.isDbOnly()) {
+                    // Primaries take locks when writing to certain internal namespaces. It must
+                    // be ensured that those locks are also taken on secondaries, when
+                    // applying the related oplog entries.
                     boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    if (!opCtx->isEnforcingConstraints()) {
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
                     }
 
@@ -701,16 +719,19 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
                         opCtx, deletedNss.dbName());
 
-                    // Secondary nodes must clear the database metadata before releasing the
-                    // in-memory critical section.
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    // Secondaries that are in oplog application must clear the database metadata
+                    // before releasing the in-memory critical section.
+                    if (!opCtx->isEnforcingConstraints()) {
                         scopedDss->clearDbInfo(opCtx);
                     }
 
                     scopedDss->exitCriticalSection(opCtx, reason);
                 } else {
+                    // Primaries take locks when writing to certain internal namespaces. It must
+                    // be ensured that those locks are also taken on secondaries, when
+                    // applying the related oplog entries.
                     boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    if (!opCtx->isEnforcingConstraints()) {
                         lockCollectionIfNotPrimary.emplace(
                             opCtx,
                             deletedNss,
@@ -725,9 +746,9 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, deletedNss);
 
-                    // Secondary nodes must clear the collection filtering metadata before releasing
-                    // the in-memory critical section.
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    // Secondaries that are in oplog application must clear the collection
+                    // filtering metadata before releasing the in-memory critical section.
+                    if (!opCtx->isEnforcingConstraints()) {
                         scopedCsr->clearFilteringMetadata(opCtx);
                     }
 
