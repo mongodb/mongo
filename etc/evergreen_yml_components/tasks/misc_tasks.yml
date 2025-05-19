@@ -2316,3 +2316,15 @@ tasks:
           remote_file: bazel_rules_mongo/${bazel_rules_mongo_version}/bazel_rules_mongo.tar.gz.sha256
           skip_existing: true
           optional: true
+
+  - name: select_multiversion_binaries
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "configure evergreen api credentials"
+      - func: "do multiversion selection"

@@ -1,5 +1,11 @@
 version: 1.0.0
 filters:
+  - "multiversion_selection.sh":
+    approvers:
+      - 10gen/devprod-correctness
+  - "multiversion_setup.sh":
+    approvers:
+      - 10gen/devprod-correctness
   - "restore_git_history_and_tags.sh":
     approvers:
       - 10gen/devprod-correctness

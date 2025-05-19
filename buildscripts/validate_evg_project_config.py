@@ -22,6 +22,9 @@ DEFAULT_EVG_NIGHTLY_PROJECT_CONFIG = "etc/evergreen_nightly.yml"
 ALLOWABLE_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(r".*buildvariant .+ has unmatched selector: .+"),
     re.compile(r".*buildvariant .+ has unmatched criteria: .+"),
+    re.compile(
+        r".*task 'select_multiversion_binaries' defined but not used by any variants; consider using or disabling.*"
+    ),  # this task is added to variants only alongside multiversion generated tasks
 ]
 ALLOWABLE_IF_NOT_IN_ALL_PROJECTS_EVG_VALIDATE_MESSAGE_REGEXES = [
     re.compile(r".*task .+ defined but not used by any variants; consider using or disabling.*"),
@@ -66,13 +69,13 @@ def main(
         interesting_messages = result.stdout.strip().split("\n")[:-1]
 
         for message in interesting_messages:
+            if any(regex.match(message) for regex in ALLOWABLE_EVG_VALIDATE_MESSAGE_REGEXES):
+                continue
             if num_of_projects > 1 and any(
                 regex.match(message)
                 for regex in ALLOWABLE_IF_NOT_IN_ALL_PROJECTS_EVG_VALIDATE_MESSAGE_REGEXES
             ):
                 shared_evg_validate_messages.append(message)
-                continue
-            if any(regex.match(message) for regex in ALLOWABLE_EVG_VALIDATE_MESSAGE_REGEXES):
                 continue
             error_on_evg_validate_messages[project].append(message)
 

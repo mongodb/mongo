@@ -871,9 +871,57 @@ functions:
         multiversion_install_dir: ${multiversion_install_dir|/data/install}
         multiversion_link_dir: ${multiversion_link_dir|/data/multiversion}
 
+  "do_multiversion_selection": &do_multiversion_selection
+    command: subprocess.exec
+    display_name: "multiversion selection"
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/multiversion_selection.sh"
+
+  "get multiversion selection results": &get_multiversion_selection_results
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/multiversion-downloads.json
+      remote_file: ${project}/${version_id}/${build_variant}/select_multiversion_binaries/multiversion-downloads.json
+      bucket: mciuploads
+
+  "attach local db-contrib-tool invocation":
+    &attach_local_db_contrib_tool_invocation
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/local-db-contrib-tool-invocation.txt
+      remote_file: ${project}/${version_id}/${build_variant}/${task_name}/local-db-contrib-tool-invocation.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: "db-contrib-tool invocation for local use"
+
+  "get local db-contrib-tool invocation": &get_local_db_contrib_tool_invocation
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/local-db-contrib-tool-invocation.txt
+      remote_file: ${project}/${version_id}/${build_variant}/select_multiversion_binaries/local-db-contrib-tool-invocation.txt
+      bucket: mciuploads
+
+  "do multiversion selection":
+    - *f_expansions_write
+    - *set_up_venv
+    - *do_multiversion_selection
+    - *attach_local_db_contrib_tool_invocation
+
   "do multiversion setup":
     - *f_expansions_write
     - *set_up_venv
+    - *get_multiversion_selection_results
+    - *get_local_db_contrib_tool_invocation
     - *do_multiversion_setup
 
   # Used by generator
@@ -2744,9 +2792,10 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/multiversion-downloads.json
-      remote_file: ${project}/${build_variant}/${revision}/multiversion-downloads-${task_id}-${execution}.json
+      remote_file: ${project}/${version_id}/${build_variant}/${task_name}/multiversion-downloads.json
       bucket: mciuploads
-      permissions: public-read
+      permissions: private
+      visibility: signed
       content_type: application/json
       display_name: Multiversion download links
 

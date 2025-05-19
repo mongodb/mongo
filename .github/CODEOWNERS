@@ -200,6 +200,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /etc/evergreen_yml_components/variants/mongot/**/* @10gen/query-integration-search @svc-auto-approve-bot
 
 # The following patterns are parsed from ./evergreen/OWNERS.yml
+/evergreen/**/multiversion_selection.sh @10gen/devprod-correctness @svc-auto-approve-bot
+/evergreen/**/multiversion_setup.sh @10gen/devprod-correctness @svc-auto-approve-bot
 /evergreen/**/restore_git_history_and_tags.sh @10gen/devprod-correctness @svc-auto-approve-bot
 /evergreen/**/retry_git.sh @10gen/devprod-correctness @svc-auto-approve-bot
 /evergreen/**/validate_compile_commands.py @10gen/devprod-build @svc-auto-approve-bot
