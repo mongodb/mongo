@@ -252,19 +252,6 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 shardMembershipLock.unlock();
 
-                {
-                    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is
-                    // removed alongside the RSEndpoint.
-                    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock
-                    // before the FixedFCVRegion and others take the FixedFCVRegion before the
-                    // _kClusterCardinalityParameterLock lock. However, all paths take the
-                    // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have
-                    // a lock ordering problem. See SERVER-99708 for more information.
-                    DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
-                    topology_change_helpers::unblockDDLCoordinators(
-                        opCtx, /*removeRecoveryDocument*/ false);
-                }
-
                 topology_change_helpers::updateClusterCardinalityParameter(
                     clusterCardinalityParameterLock, opCtx);
             }))
@@ -273,6 +260,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             [this, _ = shared_from_this(), executor](auto* opCtx) {
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
                     opCtx, _getTargeter(opCtx), **executor);
+                topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                                /*removeRecoveryDocument*/ false);
             }))
         .then(_buildPhaseHandler(Phase::kFinal,
                                  [this, _ = shared_from_this()](auto* opCtx) {
