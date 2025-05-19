@@ -15,7 +15,7 @@ const kProxyVersion = 2;
 if (_isWindows()) {
     quit();
 }
-import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+load("jstests/sharding/libs/proxy_protocol.js");
 
 (() => {
     const numConnections = 10;

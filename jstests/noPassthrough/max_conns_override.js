@@ -7,7 +7,7 @@
  *      requires_sharding,
  * ]
  */
-import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+load("jstests/sharding/libs/proxy_protocol.js");
 
 (function() {
 'use strict';

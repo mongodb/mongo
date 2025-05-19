@@ -12,7 +12,7 @@ if (_isWindows()) {
 }
 
 load("jstests/libs/host_ipaddr.js");
-import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+load("jstests/sharding/libs/proxy_protocol.js");
 
 const ingressPort = allocatePort();
 const egressPort = allocatePort();

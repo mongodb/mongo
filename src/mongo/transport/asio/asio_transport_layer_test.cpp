@@ -786,6 +786,9 @@ public:
     }
 
 private:
+    RAIIServerParameterControllerForTest _disableTFOServer{"tcpFastOpenServer", false};
+    RAIIServerParameterControllerForTest _disableTFOClient{"tcpFastOpenClient", false};
+
     std::unique_ptr<TestFixture> _fixture;
 };
 
@@ -1339,7 +1342,8 @@ TEST_F(NetworkOperationTest, InterruptDuringRead) {
     connection().wait();
 
     auto pf = makePromiseFuture<Message>();
-    JoinThread serverThread([&] { pf.promise.setFrom(client().session()->sourceMessage()); });
+    transport::test::JoinThread serverThread(
+        [&] { pf.promise.setFrom(client().session()->sourceMessage()); });
 
     auto msg = [] {
         OpMsgRequest request;
