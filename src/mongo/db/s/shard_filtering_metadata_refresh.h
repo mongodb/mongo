@@ -208,7 +208,6 @@ private:
                               const DatabaseName& dbName,
                               boost::optional<DatabaseVersion> receivedDbVersion);
 
-    // TODO (SERVER-103712): Place this method inside the DatabaseShardingState.
     void _onDbVersionMismatchAuthoritative(OperationContext* opCtx,
                                            const DatabaseName& dbName,
                                            const DatabaseVersion& receivedDbVersion);

@@ -814,7 +814,6 @@ void FilteringMetadataCache::_onDbVersionMismatch(
     }
 }
 
-// TODO (SERVER-103712): Place this method inside the DatabaseShardingState.
 void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
     OperationContext* opCtx, const DatabaseName& dbName, const DatabaseVersion& receivedDbVersion) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
