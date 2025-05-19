@@ -147,7 +147,7 @@ public:
      * intent.
      */
     stdx::future<ReplicationStateTransitionGuard> killConflictingOperations(
-        InterruptionType interruption);
+        InterruptionType interruption, boost::optional<uint32_t> timeout_sec = boost::none);
 
     /**
      * Marks the IntentRegistry enabled and resets the active and last interruption.
@@ -158,8 +158,6 @@ public:
      * Marks the IntentRegistry disabled.
      */
     void disable();
-
-    void setDrainTimeout(uint32_t sec);
 
     /**
      * Returns the Intent held by an opCtx (boost::none if it is not holding any).
@@ -183,7 +181,6 @@ private:
         stdx::mutex lock;
         stdx::unordered_map<OperationContext*, Intent> map;
     };
-
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent);
     void _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
@@ -191,13 +188,11 @@ private:
 
     bool _enabled = true;
     stdx::mutex _stateMutex;
-    stdx::condition_variable activeInterruptionCV;
+    stdx::condition_variable _activeInterruptionCV;
     bool _activeInterruption = false;
     InterruptionType _lastInterruption = InterruptionType::None;
     std::vector<tokenMap> _tokenMaps;
     mutable opCtxIntentMap _opCtxIntentMap;
-    std::chrono::seconds _drainTimeoutSec =
-        std::chrono::seconds(repl::fassertOnLockTimeoutForStepUpDown.load());
 };
 }  // namespace consensus
 }  // namespace rss

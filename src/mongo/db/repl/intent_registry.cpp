@@ -49,6 +49,9 @@ auto registryDecoration = ServiceContext::declareDecoration<IntentRegistry>();
 
 }  // namespace
 
+using namespace std::chrono_literals;
+
+
 IntentRegistry::IntentToken::IntentToken(Intent intent) : _intent(intent) {
     _id = _currentTokenId.fetchAndAdd(1);
 }
@@ -127,26 +130,30 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
 }
 
 stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
-    IntentRegistry::InterruptionType interrupt) {
+    IntentRegistry::InterruptionType interrupt, boost::optional<uint32_t> timeout_sec) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
+    auto timeOutSec = std::chrono::seconds(
+        timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
     {
         stdx::unique_lock<stdx::mutex> lock(_stateMutex);
         if (_activeInterruption) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
-
-        if (!activeInterruptionCV.wait_for(
-                lock, _drainTimeoutSec, [this] { return !_activeInterruption; })) {
+        if (timeOutSec.count() && !_activeInterruptionCV.wait_for(lock, timeOutSec, [this] {
+                return !_activeInterruption;
+            })) {
             LOGV2(9945005,
                   "Timeout while wating on a previous interrupt to drain.",
                   "last"_attr = _lastInterruption,
                   "new"_attr = interrupt);
             fasserted(9945002);
+        } else if (!timeOutSec.count()) {
+            _activeInterruptionCV.wait(lock, [this] { return !_activeInterruption; });
         }
         _activeInterruption = true;
         _lastInterruption = interrupt;
     }
-    return stdx::async(stdx::launch::async, [&, interrupt] {
+    return stdx::async(stdx::launch::async, [&, interrupt, timeOutSec] {
         const std::vector<Intent>* intents = nullptr;
         switch (interrupt) {
             case InterruptionType::Rollback:
@@ -169,19 +176,24 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 _killOperationsByIntent(intent);
             }
             Timer timer;
-            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(_drainTimeoutSec);
+            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(timeOutSec);
             for (auto intent : *intents) {
                 _waitForDrain(intent, timeout);
                 // Negative duration to cv::wait_for can cause undefined behavior
-                timeout -= std::min(
-                    std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
-                    timeout);
+                // Since timeout == 0 is a special case to enable untimed wait we prevent a non-zero
+                // timeout to ever drop to 0 by setting it to at least to 1ms
+                if (timeout.count()) {
+                    timeout -= std::min(
+                        std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
+                        timeout - 1ms);
+                }
             }
         }
         return ReplicationStateTransitionGuard([&]() {
             stdx::lock_guard<stdx::mutex> lock(_stateMutex);
-            _activeInterruption = false;
             _lastInterruption = InterruptionType::None;
+            _activeInterruption = false;
+            _activeInterruptionCV.notify_one();
         });
     });
 }
@@ -189,17 +201,14 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
 void IntentRegistry::enable() {
     stdx::lock_guard<stdx::mutex> lock(_stateMutex);
     _enabled = true;
-    _activeInterruption = false;
     _lastInterruption = InterruptionType::None;
+    _activeInterruption = false;
+    _activeInterruptionCV.notify_one();
 }
 
 void IntentRegistry::disable() {
     stdx::lock_guard<stdx::mutex> lock(_stateMutex);
     _enabled = false;
-}
-
-void IntentRegistry::setDrainTimeout(uint32_t sec) {
-    _drainTimeoutSec = std::chrono::seconds(sec);
 }
 
 boost::optional<IntentRegistry::Intent> IntentRegistry::getHeldIntent(
@@ -253,7 +262,8 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
                                    std::chrono::milliseconds timeout) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
-    if (!tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
+    if (timeout.count() &&
+        !tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
         LOGV2(
             9795403, "There are still registered intents", "Intent"_attr = _intentToString(intent));
         for (auto& [token, opCtx] : tokenMap.map) {
@@ -261,6 +271,8 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
         }
         LOGV2(9795404, "Timeout while wating on intent queue to drain");
         fasserted(9795401);
+    } else if (!timeout.count()) {
+        tokenMap.cv.wait(lock, [&tokenMap] { return tokenMap.map.empty(); });
     }
 }
 

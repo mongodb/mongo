@@ -74,6 +74,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -90,6 +91,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
@@ -378,15 +380,25 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
     LOGV2(21593, "Transition to ROLLBACK");
     {
         rollbackHangBeforeTransitioningToRollback.pauseWhileSet(opCtx);
-        ReplicationStateTransitionLockGuard rstlLock(
-            opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+
+        boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstGuard;
+        boost::optional<repl::ReplicationStateTransitionLockGuard> rstlLock;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstGuard.emplace(rss::consensus::IntentRegistry::get(opCtx)
+                                 .killConflictingOperations(
+                                     rss::consensus::IntentRegistry::InterruptionType::Rollback)
+                                 .get());
+        }
+        rstlLock.emplace(opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
+
 
         // Kill all user operations to ensure we can successfully acquire the RSTL. Since the node
         // must be a secondary, this is only killing readers, whose connections will be closed
         // shortly regardless.
         _killAllUserOperations(opCtx);
-
-        rstlLock.waitForLockUntil(Date_t::max());
+        if (rstlLock) {
+            rstlLock->waitForLockUntil(Date_t::max());
+        }
 
         auto status = _replicationCoordinator->setFollowerModeRollback(opCtx);
         if (!status.isOK()) {

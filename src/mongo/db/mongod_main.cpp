@@ -1795,7 +1795,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             4784910, {LogComponent::kSharding}, "Shutting down the ShardingInitializationMongoD");
         ShardingInitializationMongoD::get(serviceContext)->shutDown(opCtx);
 
-        // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all operations,
+        boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstg.emplace(rss::consensus::IntentRegistry::get(serviceContext)
+                             .killConflictingOperations(
+                                 rss::consensus::IntentRegistry::InterruptionType::Shutdown)
+                             .get());
+        }
+        // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all
+        // operations,
         // destroy all stashed transaction resources in order to release locks, and finally wait
         // until the lock request is granted.
         LOGV2_OPTIONS(4784911,
@@ -1846,6 +1854,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // Release the rstl before waiting for the index build threads to join as index build
         // reacquires rstl in uninterruptible lock guard to finish their cleanup process.
         rstl.release();
+        rstg = boost::none;
 
         // Shuts down the thread pool and waits for index builds to finish.
         // Depends on setKillAllOperations() above to interrupt the index build operations.
