@@ -723,7 +723,6 @@ is not affected as this option is only syntactic sugar.
 - `strict` - bool - defaults to true, a strict parser errors if a unknown field is encountered by
   the generated parser. Persisted structs should set this to `false` to allow them to encounter
   documents from future versions of MongoDB without throwing an error.
-- `chained_types` - mapping - undocumented
 - `chained_structs` - mapping - a list of structs to include this struct. IDL adds the chained
   structs as member variables in the generated C++ class. IDL also adds a getter for each chained
   struct.
@@ -834,7 +833,6 @@ Commands can also specify their replies that they return. Replies are regular `s
 ### Commands Reference
 
 - `description` - [see structs](#struct-reference)
-- `chained_types` - - [see structs](#struct-reference)
 - `chained_structs` - - [see structs](#struct-reference)
 - `fields` - - [see structs](#struct-reference)
 - `cpp_name` - - [see structs](#struct-reference)

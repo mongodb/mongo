@@ -229,8 +229,8 @@ def get_new_commands(
     return new_commands, new_command_file, new_command_file_path
 
 
-def get_chained_type_or_struct(
-    chained_type_or_struct: Union[syntax.ChainedType, syntax.ChainedStruct],
+def get_chained_struct(
+    chained_struct: syntax.ChainedStruct,
     idl_file: syntax.IDLParsedSpec,
     idl_file_path: str,
 ) -> Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]]:
@@ -238,9 +238,9 @@ def get_chained_type_or_struct(
     parser_ctxt = errors.ParserContext(idl_file_path, errors.ParserErrorCollection())
     resolved = idl_file.spec.symbols.resolve_type_from_name(
         parser_ctxt,
-        chained_type_or_struct,
-        chained_type_or_struct.name,
-        chained_type_or_struct.name,
+        chained_struct,
+        chained_struct.name,
+        chained_struct.name,
     )
     if parser_ctxt.errors.has_errors():
         parser_ctxt.errors.dump_errors()
@@ -720,46 +720,6 @@ def check_reply_fields(
     new_idl_file_path: str,
 ):
     """Check compatibility between old and new reply fields."""
-    for new_chained_type in new_reply.chained_types or []:
-        resolved_new_chained_type = get_chained_type_or_struct(
-            new_chained_type, new_idl_file, new_idl_file_path
-        )
-        if resolved_new_chained_type is not None:
-            for old_chained_type in old_reply.chained_types or []:
-                resolved_old_chained_type = get_chained_type_or_struct(
-                    old_chained_type, old_idl_file, old_idl_file_path
-                )
-                if (
-                    resolved_old_chained_type is not None
-                    and resolved_old_chained_type.name == resolved_new_chained_type.name
-                ):
-                    # Check that the old and new version of each chained type is also compatible.
-                    old = FieldCompatibility(
-                        resolved_old_chained_type,
-                        old_idl_file,
-                        old_idl_file_path,
-                        stability="stable",
-                        optional=False,
-                    )
-                    new = FieldCompatibility(
-                        resolved_new_chained_type,
-                        new_idl_file,
-                        new_idl_file_path,
-                        stability="stable",
-                        optional=False,
-                    )
-
-                    check_reply_field_type(
-                        ctxt, FieldCompatibilityPair(old, new, cmd_name, old_reply.name)
-                    )
-                    break
-
-            else:
-                # new chained type was not found in old chained types.
-                ctxt.add_new_reply_chained_type_not_subset_error(
-                    cmd_name, new_reply.name, resolved_new_chained_type.name, new_idl_file_path
-                )
-
     old_reply_fields = get_all_struct_fields(old_reply, old_idl_file, old_idl_file_path)
     new_reply_fields = get_all_struct_fields(new_reply, new_idl_file, new_idl_file_path)
     for old_field in old_reply_fields or []:
@@ -1234,9 +1194,7 @@ def get_all_struct_fields(
     """Get all the fields of a struct, including the chained struct fields."""
     all_fields = struct.fields or []
     for chained_struct in struct.chained_structs or []:
-        resolved_chained_struct = get_chained_type_or_struct(
-            chained_struct, idl_file, idl_file_path
-        )
+        resolved_chained_struct = get_chained_struct(chained_struct, idl_file, idl_file_path)
         if resolved_chained_struct is not None:
             for field in resolved_chained_struct.fields:
                 all_fields.append(field)
@@ -1256,52 +1214,6 @@ def check_command_params_or_type_struct_fields(
     is_command_parameter: bool,
 ):
     """Check compatibility between old and new parameters or command type fields."""
-    # Check chained types.
-    for old_chained_type in old_struct.chained_types or []:
-        resolved_old_chained_type = get_chained_type_or_struct(
-            old_chained_type, old_idl_file, old_idl_file_path
-        )
-        if resolved_old_chained_type is not None:
-            for new_chained_type in new_struct.chained_types or []:
-                resolved_new_chained_type = get_chained_type_or_struct(
-                    new_chained_type, new_idl_file, new_idl_file_path
-                )
-                if (
-                    resolved_new_chained_type is not None
-                    and resolved_old_chained_type.name == resolved_new_chained_type.name
-                ):
-                    # Check that the old and new version of each chained type is also compatible.
-                    old = FieldCompatibility(
-                        resolved_old_chained_type,
-                        old_idl_file,
-                        old_idl_file_path,
-                        stability="stable",
-                        optional=False,
-                    )
-                    new = FieldCompatibility(
-                        resolved_new_chained_type,
-                        new_idl_file,
-                        new_idl_file_path,
-                        stability="stable",
-                        optional=False,
-                    )
-                    check_param_or_command_type(
-                        ctxt,
-                        FieldCompatibilityPair(old, new, cmd_name, old_struct.name),
-                        is_command_parameter=False,
-                    )
-                    break
-
-            else:
-                # old chained type was not found in new chained types.
-                ctxt.add_new_command_or_param_chained_type_not_superset_error(
-                    cmd_name,
-                    old_chained_type.name,
-                    new_idl_file_path,
-                    old_struct.name,
-                    is_command_parameter,
-                )
-
     old_struct_fields = get_all_struct_fields(old_struct, old_idl_file, old_idl_file_path)
     new_struct_fields = get_all_struct_fields(new_struct, new_idl_file, new_idl_file_path)
 

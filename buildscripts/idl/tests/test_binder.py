@@ -1472,145 +1472,6 @@ class TestBinder(testcase.IDLTestcase):
                 idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED,
             )
 
-    def test_chained_type_positive(self):
-        # type: () -> None
-        """Positive parser chaining test cases."""
-        # Setup some common types
-        test_preamble = self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
-            foo1:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: chain
-                serializer: foo
-                deserializer: foo
-                default: foo
-                is_view: false
-        """),
-        )
-
-        # Chaining only
-        self.assert_bind(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    foo1: alias
-        """)
-        )
-
-    def test_chained_type_negative(self):
-        # type: () -> None
-        """Negative parser chaining test cases."""
-        # Setup some common types
-        test_preamble = self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
-            foo1:
-                description: foo
-                cpp_type: foo
-                bson_serialization_type: chain
-                serializer: foo
-                deserializer: foo
-                is_view: false
-        """),
-        )
-
-        # Chaining with strict struct
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: true
-                chained_types:
-                    foo1: alias
-        """),
-            idl.errors.ERROR_ID_CHAINED_NO_TYPE_STRICT,
-        )
-
-        # Non-'any' type as chained type
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    string: alias
-        """),
-            idl.errors.ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE,
-        )
-
-        # Chaining and fields only with same name
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    foo1: alias
-                fields:
-                    foo1: string
-        """),
-            idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD,
-        )
-
-        # Non-existent chained type
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    foobar1: alias
-                fields:
-                    foo1: string
-        """),
-            idl.errors.ERROR_ID_UNKNOWN_TYPE,
-            True,
-        )
-
-        # A regular field as a chained type
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                fields:
-                    foo1: string
-                    foo2: foobar1
-        """),
-            idl.errors.ERROR_ID_UNKNOWN_TYPE,
-            True,
-        )
-
-        # Array of chained types
-        self.assert_bind_fail(
-            test_preamble
-            + textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: true
-                fields:
-                    field1: array<foo1>
-        """),
-            idl.errors.ERROR_ID_NO_ARRAY_OF_CHAIN,
-        )
-
     def test_chained_struct_positive(self):
         # type: () -> None
         """Positive parser chaining test cases."""
@@ -1635,8 +1496,6 @@ class TestBinder(testcase.IDLTestcase):
             chained:
                 description: foo
                 strict: false
-                chained_types:
-                    foo1: alias
 
             chained2:
                 description: foo
@@ -1687,8 +1546,6 @@ class TestBinder(testcase.IDLTestcase):
             bar1:
                 description: foo
                 strict: false
-                chained_types:
-                    foo1: alias
                 chained_structs:
                     chained2: alias
                 fields:
@@ -1830,22 +1687,6 @@ class TestBinder(testcase.IDLTestcase):
             idl.errors.ERROR_ID_CHAINED_STRUCT_NOT_FOUND,
         )
 
-        # Struct as chained type
-        self.assert_bind_fail(
-            test_preamble
-            + indent_text(
-                1,
-                textwrap.dedent("""
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    chained: alias
-        """),
-            ),
-            idl.errors.ERROR_ID_CHAINED_TYPE_NOT_FOUND,
-        )
-
         # Duplicated field names across chained struct's fields and fields
         self.assert_bind_fail(
             test_preamble
@@ -1926,31 +1767,6 @@ class TestBinder(testcase.IDLTestcase):
                     bar1: alias
                 fields:
                     f1: string
-
-        """),
-            ),
-            idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED,
-        )
-
-        # Chained struct with nested chained type
-        self.assert_bind_fail(
-            test_preamble
-            + indent_text(
-                1,
-                textwrap.dedent("""
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    foo1: alias
-
-            foobar:
-                description: foo
-                strict: false
-                chained_structs:
-                    bar1: alias
-                fields:
-                    f1: bar1
 
         """),
             ),

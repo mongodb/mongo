@@ -2115,35 +2115,6 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             str(type_with_incompatible_chained_struct_error), "typeWithIncompatibleChainedStruct"
         )
 
-        incompatible_chained_type_error = error_collection.get_error_by_command_name(
-            "incompatibleChainedType"
-        )
-        self.assertTrue(
-            incompatible_chained_type_error.error_id
-            == idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET
-        )
-        self.assertRegex(str(incompatible_chained_type_error), "incompatibleChainedType")
-
-        new_parameter_removed_chained_type_error = error_collection.get_error_by_command_name(
-            "newParameterRemovedChainedType"
-        )
-        self.assertTrue(
-            new_parameter_removed_chained_type_error.error_id
-            == idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET
-        )
-        self.assertRegex(
-            str(new_parameter_removed_chained_type_error), "newParameterRemovedChainedType"
-        )
-
-        new_reply_added_chained_type_error = error_collection.get_error_by_command_name(
-            "newReplyAddedChainedType"
-        )
-        self.assertTrue(
-            new_reply_added_chained_type_error.error_id
-            == idl_compatibility_errors.ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET
-        )
-        self.assertRegex(str(new_reply_added_chained_type_error), "newReplyAddedChainedType")
-
         optional_bool_to_bool_parameter_error = error_collection.get_error_by_command_name(
             "optionalBoolToBoolParameter"
         )
@@ -2250,7 +2221,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             "newUnstableRequiredParameterAdded",
         )
 
-        self.assertEqual(error_collection.count(), 217)
+        self.assertEqual(error_collection.count(), 214)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""

@@ -960,15 +960,6 @@ structs:
         chained_structs:
             NewBsonSerializationTypeAnyUnstableStruct: NewBsonSerializationTypeAnyUnstableStruct
 
-    NewAddedChainedTypeReply:
-        description: "This reply contains an added chained type in the new version"
-        is_command_reply: true
-
-    NewRemovedChainedTypeStruct:
-        description: "This reply contains an added chained type in the new version"
-        chained_types:
-            intStringToInt: intStringToInt
-
     OptionalBoolToBoolStruct:
         description: "optionalBool field replaced by bool"
         fields:
@@ -3420,39 +3411,6 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
-
-    incompatibleChainedType:
-        description: "new command fails because its chained types are incompatible"
-        command_name: incompatibleChainedType
-        namespace: ignored
-        cpp_name: incompatibleChainedType
-        strict: true
-        api_version: "1"
-        reply_type: OkReply
-        chained_types:
-            intStringToInt: intStringToInt
-
-    newParameterRemovedChainedType:
-        description: "new command fails because its parameter has removed a chained type"
-        command_name: newParameterRemovedChainedType
-        namespace: ignored
-        cpp_name: newParameterRemovedChainedType
-        strict: true
-        api_version: "1"
-        reply_type: OkReply
-        fields:
-            NewRemovedChainedTypeParameter:
-                stability: stable
-                type: NewRemovedChainedTypeStruct
-
-    newReplyAddedChainedType:
-        description: "new command fails because its reply has added a chained type"
-        command_name: newReplyAddedChainedType
-        namespace: ignored
-        cpp_name: newReplyAddedChainedType
-        strict: true
-        api_version: "1"
-        reply_type: NewAddedChainedTypeReply
 
     optionalBoolToBoolParameter:
         description: "new command gets bool parameter instead of optionalBool"

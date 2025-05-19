@@ -752,62 +752,6 @@ class TestParser(testcase.IDLTestcase):
             idl.errors.ERROR_ID_DUPLICATE_SYMBOL,
         )
 
-    def test_chained_type_positive(self):
-        # type: () -> None
-        """Positive parser chaining test cases."""
-        self.assert_parse(
-            textwrap.dedent("""
-        structs:
-            foo1:
-                description: foo
-                chained_types:
-                    foo1: alias
-                    foo2: alias
-        """)
-        )
-
-    def test_chained_type_negative(self):
-        # type: () -> None
-        """Negative parser chaining test cases."""
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        structs:
-            foo1:
-                description: foo
-                chained_types: foo1
-                fields:
-                    foo: bar
-        """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-        )
-
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        structs:
-            foo1:
-                description: foo
-                chained_types:
-                    - foo1
-                fields:
-                    foo: bar
-        """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-        )
-
-        # Duplicate chained types
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        structs:
-            bar1:
-                description: foo
-                strict: false
-                chained_types:
-                    foo1: alias
-                    foo1: alias
-        """),
-            idl.errors.ERROR_ID_DUPLICATE_NODE,
-        )
-
     def test_chained_struct_positive(self):
         # type: () -> None
         """Positive parser chaining test cases."""

@@ -285,12 +285,6 @@ structs:
         chained_structs:
             ViewStruct: ViewStruct
 
-    ViewStructChainedType:
-        description: Struct that is chained with a view type.
-        strict: false
-        chained_types:
-            ViewChainedType: ViewChainedType
-
     ViewStructWithViewStructMember:
         description: Struct that has a type that is a view and a struct.
         fields:
@@ -675,13 +669,6 @@ structs:
                 type: StringEnum
                 default: s0
 
-    chained_struct_only:
-        description: UnitTest for chained struct with only chained types
-        strict: false
-        chained_types:
-            ChainedType: ChainedType
-            AnotherChainedType: AnotherChainedType
-
     chained_struct_mixed:
         description: Chained struct with chained structs and fields
         strict: true
@@ -692,20 +679,6 @@ structs:
             chained_enum_type: chained_enum_type
         fields:
             field3: string
-
-    chained_struct_type_mixed:
-        description: Chained struct with chained types, structs, and fields
-        strict: false
-        chained_types:
-            ChainedType: chained_type
-            AnotherChainedType:
-                cpp_name: AnotherChainedType
-        chained_structs:
-            chained_string_basic_type:
-                cpp_name: ChainedStringBasicType
-        fields:
-            field3:
-                type: int
 
     chained_string_inline_basic_type:
         description: Base struct type for a chained string
@@ -1285,23 +1258,6 @@ commands:
                 type: array<object_basic_type>
                 supports_doc_sequence: true
                 optional: true
-
-    chained_command_type_mixed:
-        description: Chained command with chained types, structs, and fields
-        command_name: chained_command_type_mixed
-        namespace: concatenate_with_db
-        api_version: ""
-        strict: false
-        chained_types:
-            ChainedType: chained_type
-            AnotherChainedType:
-                cpp_name: AnotherChainedType
-        chained_structs:
-            chained_string_basic_type:
-                cpp_name: ChainedStringBasicType
-        fields:
-            field3:
-                type: int
 
     CommandTypeStringCommand:
         description: Command with custom type string

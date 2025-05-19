@@ -297,7 +297,7 @@ def _compute_field_is_view(resolved_field, ctxt, symbols):
 
 
 def _compute_chained_item_is_view(struct, ctxt, symbols, chained_item):
-    # type: (syntax.Struct, errors.ParserContext, syntax.SymbolTable, Union[syntax.ChainedType, syntax.ChainedStruct]) -> bool
+    # type: (syntax.Struct, errors.ParserContext, syntax.SymbolTable, syntax.ChainedStruct) -> bool
     """Helper to compute is_view of chained types or structs."""
     resolved_chained_item = symbols.resolve_type_from_name(
         ctxt, struct, chained_item.name, chained_item.name
@@ -359,11 +359,6 @@ def _compute_struct_is_view(struct, ctxt, symbols):
         # If any field is a view type, then the struct is also a view type.
         if _compute_field_is_view(resolved_field, ctxt, symbols):
             return True
-
-    if struct.chained_types:
-        for chained_type in struct.chained_types:
-            if _compute_chained_item_is_view(struct, ctxt, symbols, chained_type):
-                return True
 
     if struct.chained_structs:
         for chained_struct in struct.chained_structs:
@@ -439,18 +434,6 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     # Validate naming restrictions
     if ast_struct.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_struct, "struct", ast_struct.name)
-
-    # Merge chained types as chained fields
-    if struct.chained_types:
-        if ast_struct.strict:
-            ctxt.add_chained_type_no_strict_error(ast_struct, ast_struct.name)
-
-        for chained_type in struct.chained_types:
-            ast_field = _bind_chained_type(ctxt, parsed_spec, ast_struct, chained_type)
-            if ast_field and not _is_duplicate_field(
-                ctxt, chained_type.name, ast_struct.fields, ast_field
-            ):
-                ast_struct.fields.append(ast_field)
 
     # Merge chained structs as a chained struct and ignored fields
     for chained_struct in struct.chained_structs or []:
@@ -1296,37 +1279,6 @@ def _bind_field(ctxt, parsed_spec, field):
     return ast_field
 
 
-def _bind_chained_type(ctxt, parsed_spec, location, chained_type):
-    # type: (errors.ParserContext, syntax.IDLSpec, common.SourceLocation, syntax.ChainedType) -> ast.Field
-    """Bind the specified chained type."""
-    syntax_symbol = parsed_spec.symbols.resolve_type_from_name(
-        ctxt, location, chained_type.name, chained_type.name
-    )
-    if not syntax_symbol:
-        return None
-
-    if not isinstance(syntax_symbol, syntax.Type):
-        ctxt.add_chained_type_not_found_error(location, chained_type.name)
-        return None
-
-    idltype = cast(syntax.Type, syntax_symbol)
-
-    if len(idltype.bson_serialization_type) != 1 or idltype.bson_serialization_type[0] != "chain":
-        ctxt.add_chained_type_wrong_type_error(
-            location, chained_type.name, idltype.bson_serialization_type[0]
-        )
-        return None
-
-    ast_field = ast.Field(location.file_name, location.line, location.column)
-    ast_field.name = idltype.name
-    ast_field.cpp_name = chained_type.cpp_name
-    ast_field.description = idltype.description
-    ast_field.chained = True
-    ast_field.type = _bind_type(idltype)
-
-    return ast_field
-
-
 def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     # type: (errors.ParserContext, syntax.IDLSpec, ast.Struct, syntax.ChainedStruct) -> None
     """Bind the specified chained struct."""
@@ -1349,7 +1301,7 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
             ast_struct, ast_struct.name, chained_struct.name
         )
 
-    if struct.chained_types or struct.chained_structs:
+    if struct.chained_structs:
         ctxt.add_chained_nested_struct_no_nested_error(
             ast_struct, ast_struct.name, chained_struct.name
         )

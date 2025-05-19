@@ -876,35 +876,6 @@ class TestGenerator(testcase.IDLTestcase):
             ],
         )
 
-    def test_chained_struct(self) -> None:
-        """Test generation of 'chained_types:' and 'chained_struct:' tag."""
-        header, source = self.assert_generate_with_basic_types(
-            dedent(
-                """
-            types:
-                ChainedType:
-                    bson_serialization_type: chain
-                    description: "An Chain Type to test chaining"
-                    cpp_type: "mongo::ChainedType"
-                    serializer: mongo::ChainedType::serializeToBSON
-                    deserializer: mongo::ChainedType::parseFromBSON
-                    is_view: false
-            structs:
-                ChainedStruct:
-                    description: Test struct with chained type.
-                    strict: false
-                    chained_types:
-                        ChainedType: ChainedType
-            """
-            )
-        )
-        self.assertStringsInFile(
-            header,
-            [
-                "mongo::ChainedType _chainedType;",
-            ],
-        )
-
     def test_enum(self) -> None:
         """Test generation of enum fields."""
         header, _ = self.assert_generate_with_basic_types(

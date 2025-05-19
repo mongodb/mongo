@@ -211,9 +211,6 @@ properties:
           description:
             type: string
             description: A comment to add to the generated C++.
-          chained_types:
-            type: object
-            description: chained_types is an undocumented field.
           chained_structs:
             type: object
             description: >
@@ -412,9 +409,6 @@ properties:
           description:
             type: string
             description: A comment to add to the generated C++.
-          chained_types:
-            type: object
-            description: chained_types is an undocumented field.
           chained_structs:
             type: object
             description: >

@@ -2300,17 +2300,6 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
-    incompatibleChainedType:
-        description: "new command passes because its chained types are compatible"
-        command_name: incompatibleChainedType
-        namespace: ignored
-        cpp_name: incompatibleChainedType
-        strict: true
-        api_version: "1"
-        reply_type: OkReply
-        chained_types:
-            intToIntString: intToIntString
-
     newParameterOptionalBool:
         description: "new command can add parameters of type optionalBoolean"
         command_name: newParameterOptionalBool
