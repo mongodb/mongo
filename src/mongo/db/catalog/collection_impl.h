@@ -431,6 +431,12 @@ private:
     void _initCommon(OperationContext* opCtx);
 
     /**
+     * Helper to set the _metadata field. Every set must check for the storageEngine option to work
+     * around the issue described in SERVER-91193 and SERVER-91194.
+     */
+    void _setMetadata(std::shared_ptr<BSONCollectionCatalogEntry::MetaData>&& metadata);
+
+    /**
      * Holder of shared state between CollectionImpl clones
      */
     struct SharedState {
