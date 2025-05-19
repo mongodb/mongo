@@ -54,12 +54,12 @@
 
 namespace mongo {
 
-namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPreImage,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamAddPreImage::createFromBson,
                                   true);
-}  // namespace
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamAddPreImage,
+                            DocumentSourceChangeStreamAddPreImage::id)
 
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kStageName;
 constexpr StringData DocumentSourceChangeStreamAddPreImage::kFullDocumentBeforeChangeFieldName;

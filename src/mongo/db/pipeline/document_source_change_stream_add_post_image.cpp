@@ -58,12 +58,14 @@ namespace mongo {
 constexpr StringData DocumentSourceChangeStreamAddPostImage::kStageName;
 constexpr StringData DocumentSourceChangeStreamAddPostImage::kFullDocumentFieldName;
 
-namespace {
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamAddPostImage,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamAddPostImage::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamAddPostImage,
+                            DocumentSourceChangeStreamAddPostImage::id)
 
+namespace {
 constexpr auto makePostImageNotFoundErrorMsg =
     &DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg;
 

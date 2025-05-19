@@ -56,6 +56,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamOplogMatch,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamOplogMatch::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamOplogMatch,
+                            DocumentSourceChangeStreamOplogMatch::id)
 
 namespace change_stream_filter {
 /**

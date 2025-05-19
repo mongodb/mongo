@@ -92,6 +92,12 @@ public:
         return kStageName.rawData();
     }
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 protected:
     DocumentSource::GetNextResult doGetNext() override;
 

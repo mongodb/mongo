@@ -46,6 +46,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckTopologyChange,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamCheckTopologyChange::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckTopologyChange,
+                            DocumentSourceChangeStreamCheckTopologyChange::id)
 
 StageConstraints DocumentSourceChangeStreamCheckTopologyChange::constraints(
     Pipeline::SplitState pipeState) const {

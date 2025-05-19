@@ -119,6 +119,12 @@ public:
     static ResumeStatus compareAgainstClientResumeToken(const Document& eventFromResumedStream,
                                                         const ResumeTokenData& tokenDataFromClient);
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 protected:
     /**
      * Use the create static method to create a DocumentSourceChangeStreamCheckResumability.

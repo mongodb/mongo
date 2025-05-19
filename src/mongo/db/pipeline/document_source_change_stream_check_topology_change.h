@@ -86,6 +86,12 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 private:
     DocumentSourceChangeStreamCheckTopologyChange(
         const boost::intrusive_ptr<ExpressionContext>& expCtx)

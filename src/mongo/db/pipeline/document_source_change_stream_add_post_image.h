@@ -143,6 +143,12 @@ public:
         return kStageName.rawData();
     }
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 private:
     DocumentSourceChangeStreamAddPostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const FullDocumentModeEnum fullDocumentMode)

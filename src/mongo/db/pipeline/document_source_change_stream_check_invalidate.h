@@ -97,6 +97,12 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 private:
     /**
      * Use the create static method to create a DocumentSourceChangeStreamCheckInvalidate.

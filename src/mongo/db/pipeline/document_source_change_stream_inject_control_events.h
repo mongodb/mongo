@@ -121,6 +121,12 @@ public:
         const DocumentSourceChangeStreamSpec& spec,
         const BSONObj& actions = {});
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 protected:
     GetNextResult doGetNext() override;
 

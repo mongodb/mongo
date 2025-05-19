@@ -53,14 +53,13 @@ using boost::intrusive_ptr;
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-namespace {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamCheckResumability::createFromBson,
                                   true);
-
-}  // namespace
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckResumability,
+                            DocumentSourceChangeStreamCheckResumability::id)
 
 // Returns ResumeStatus::kFoundToken if the document retrieved from the resumed pipeline satisfies
 // the client's resume token, ResumeStatus::kCheckNextDoc if it is older than the client's token,

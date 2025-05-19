@@ -59,6 +59,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckInvalidate,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamCheckInvalidate::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckInvalidate,
+                            DocumentSourceChangeStreamCheckInvalidate::id)
 
 namespace {
 

@@ -95,6 +95,12 @@ public:
 
     Value doSerialize(const SerializationOptions& opts) const final;
 
+    static const Id& id;
+
+    Id getId() const override {
+        return id;
+    }
+
 protected:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;

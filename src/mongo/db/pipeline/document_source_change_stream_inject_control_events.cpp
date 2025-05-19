@@ -45,12 +45,16 @@
 using boost::intrusive_ptr;
 
 namespace mongo {
-namespace {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamInjectControlEvents,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamInjectControlEvents::createFromBson,
                                   true);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamInjectControlEvents,
+                            DocumentSourceChangeStreamInjectControlEvents::id)
+
+namespace {
 
 constexpr StringData kActionsName = "actions"_sd;
 

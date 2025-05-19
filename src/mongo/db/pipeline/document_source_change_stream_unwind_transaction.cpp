@@ -71,6 +71,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamUnwindTransaction,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamUnwindTransaction::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamUnwindTransaction,
+                            DocumentSourceChangeStreamUnwindTransaction::id)
 
 namespace {
 const std::set<std::string> kUnwindExcludedFields = {"clusterTime", "lsid", "txnNumber"};

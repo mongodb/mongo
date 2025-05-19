@@ -65,13 +65,15 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-namespace {
 
 REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamHandleTopologyChange,
                                   LiteParsedDocumentSourceChangeStreamInternal::parse,
                                   DocumentSourceChangeStreamHandleTopologyChange::createFromBson,
                                   true);
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamHandleTopologyChange,
+                            DocumentSourceChangeStreamHandleTopologyChange::id)
 
+namespace {
 // Failpoint to throw an exception when the 'kNewShardDetected' event is observed.
 MONGO_FAIL_POINT_DEFINE(throwChangeStreamTopologyChangeExceptionToClient);
 
