@@ -101,6 +101,8 @@ core.servers:
     - src/mongo/db/mongod_options_test.cpp
     - src/mongo/db/service_context_d_test_fixture*
     - src/mongo/db/global_settings*
+    - src/mongo/db/mongod_options_sharding*
+    - src/mongo/db/replica_set_endpoint*
     - src/mongo/s/mongos.cpp
     - src/mongo/s/mongos_main.*
     - src/mongo/s/mongos_options*
@@ -312,13 +314,26 @@ shard_role:
     - src/mongo/db/s/
     - src/mongo/db/service_entry_point_shard_role[._]*
 
+causal_consistency:
+  meta:
+    slack: server-sharding
+    jira: Cluster Scalability
+  files:
+    - src/mongo/db/keys_collection*
+
 data_movement:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-sharding
+    jira: Cluster Scalability
   files:
+    - src/mongo/db/cloner*
     - src/mongo/db/s/migration* # note the filename pattern
+    - src/mongo/db/s/active_migrations*
+    - src/mongo/db/s/range_delet*
+    - src/mongo/db/s/balancer
     - src/mongo/db/s/resharding
+    - src/mongo/s/resharding
+    - src/mongo/s/migration_blocking_operation*
 
 observability:
   meta:
