@@ -46,7 +46,6 @@ mongo_cc_library(
         "//src/mongo/db:feature_compatibility_version_parser.h",
         "//src/mongo/db:feature_flag.h",
         "//src/mongo/db:index_names.h",
-        "//src/mongo/db:json.h",
         "//src/mongo/db:keypattern.h",
         "//src/mongo/db:multitenancy_gen",
         "//src/mongo/db:namespace_spec_gen",

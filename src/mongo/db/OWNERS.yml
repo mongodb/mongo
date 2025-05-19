@@ -51,9 +51,6 @@ filters:
   - "index_names.*":
     approvers:
       - 10gen/query-execution-write-exec
-  - "json.*":
-    approvers:
-      - 10gen/server-programmability
   - "keys_collection*":
     approvers:
       - 10gen/server-cluster-scalability

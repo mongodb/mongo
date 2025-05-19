@@ -68,7 +68,6 @@ core.bson:
     - src/mongo/dbtests/jsobjtests.cpp
     - src/mongo/dbtests/jsontests.cpp
     - src/mongo/db/hasher* # TODO move to bson/ or at least rename to be less generic
-    - src/mongo/db/json.h # TODO delete this forwarding header which is only included in 5 places
 
 core.idl:
   files:
