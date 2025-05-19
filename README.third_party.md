@@ -26,7 +26,7 @@ a notice will be included in
 | [ASIO]                     | BSL-1.0                                                        | 1.12.2                                             |                      |                ✗                |
 | [benchmark]                | Apache-2.0                                                     | 1.5.2                                              |                      |                                 |
 | [Boost]                    | BSL-1.0                                                        | 1.79.0                                             |                      |                ✗                |
-| [c-ares]                   | MIT                                                            | 1.19.1                                             |                      |                ✗                |
+| [c-ares]                   | MIT                                                            | 1.27.0                                             |                      |                ✗                |
 | [CRoaring]                 | Apache-2.0/ MIT                                                | 2.1.2.1                                            |                      |                ✗                |
 | [Cyrus SASL]               | BSD-Attribution-HPND-disclaimer                                | 2.1.28                                             |       unknown        |                                 |
 | [double-conversion]        | BSD 3-Clause                                                   | bf4607277fa7133825cb7899015374917cd06b8f           |                      |                ✗                |

@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=cares
-REVISION="cares-1_19_1"
-VERSION="1.19.1"
+REVISION="cares-1_27_0"
+VERSION="1.27.0"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/cares
 if [[ -d $DEST_DIR/dist ]]; then
@@ -16,7 +16,7 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch cares-1_19_1 git@github.com:mongodb-forks/c-ares.git $DEST_DIR/dist
+git clone --branch $REVISION git@github.com:mongodb-forks/c-ares.git $DEST_DIR/dist
 
 HOST_OS="$(uname -s|tr A-Z a-z)"
 HOST_ARCH="$(uname -m)"
@@ -59,6 +59,7 @@ config_headers=(
 public_headers=(
     ares_build.h
     ares_dns.h
+    ares_dns_record.h
     ares_nameser.h
     ares_rules.h
     ares_version.h

@@ -209,7 +209,7 @@
         "name": "Organization: github"
       },
       "name": "c-ares",
-      "version": "1.19.1",
+      "version": "1.27.0",
       "licenses": [
         {
           "license": {
@@ -217,7 +217,7 @@
           }
         }
       ],
-      "purl": "pkg:github/c-ares/c-ares@cares-1_19_1",
+      "purl": "pkg:github/c-ares/c-ares@cares-1_27_0",
       "properties": [
         {
           "name": "internal:team_responsible",

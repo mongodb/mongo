@@ -1,4 +1,6 @@
 #!/usr/bin/perl
+# Copyright (C) The c-ares project and its contributors
+# SPDX-License-Identifier: MIT
 
 # git log --pretty=fuller --no-color --date=short --decorate=full
 

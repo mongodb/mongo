@@ -1,4 +1,7 @@
-image: Visual Studio 2015
+# Copyright (C) The c-ares project and its contributors
+# SPDX-License-Identifier: MIT
+
+image: Previous Visual Studio 2022
 
 # Github/Bitbucket only: get source code for one particular commit as zip archive, instead of git clone'ing.
 shallow_clone: true
@@ -9,53 +12,128 @@ skip_commits:
     - .gitignore
     - '**/*.md'
     - .travis.yml
+    - .cirrus.yml
+    - '.github/**'
 
 # List of build configurations to test.
 configuration:
-  - RelWithDebInfo
+  - DEBUG
 
 # Note: You can set extra cmake args for a particular matrix entry with CMAKE_EXTRA_OPTIONS. For example:
 #     CMAKE_EXTRA_OPTIONS: -DOPENSSL_ROOT_DIR=C:/OpenSSL-Win32
 environment:
   matrix:
-    # MSVC 2015, 32-bit x86 (cmake)
+    # MSVC 2022, 32-bit x86 (cmake)
     - COMPILER: MSVC
-      BUILDTOOL: CMAKE
+      CONFTOOL: CMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
       MSVC_SETUP_ARG: x86
-      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+      MSVC_SETUP_PATH: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat
+      CMAKE_EXTRA_OPTIONS: -GNinja -DCARES_BUILD_TESTS=ON -DGTEST_ROOT=C:\projects\googletest -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL
+      TOOLSDIR: ./build/bin
+      TESTDIR: ./build/bin
+      BUILD_GOOGLETEST: yes
 
-    # MSVC 2015, 64-bit x86 (cmake)
+    # MSVC 2022, 64-bit x64 (cmake)
     - COMPILER: MSVC
-      BUILDTOOL: CMAKE
+      CONFTOOL: CMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
       MSVC_SETUP_ARG: x64
-      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+      MSVC_SETUP_PATH: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
+      TOOLSDIR: ./build/bin
+      TESTDIR: ./build/bin
+      CMAKE_EXTRA_OPTIONS: -GNinja -DCARES_BUILD_TESTS=ON -DGTEST_ROOT=C:\projects\googletest -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL
+      BUILD_GOOGLETEST: yes
 
-    # MinGW, 32-bit x86 (cmake)
+    # MinGW gcc via MSYS2 (latest version)
     - COMPILER: MINGW
-      BUILDTOOL: CMAKE
-      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+      CONFTOOL: CMAKE
+      SYSTEM: MSYS2
+      SKIP_TESTS: no
+      MSYSTEM: MINGW64
+      TOOLSDIR: ./build/bin
+      TESTDIR: ./build/bin
+      CMAKE_EXTRA_OPTIONS: -GNinja
+      CHERE_INVOKING: YES
 
-    # MinGW, 32-bit x86 (cmake static only)
+    # MinGW gcc via MSYS2 using autotools
     - COMPILER: MINGW
-      BUILDTOOL: CMAKESTATIC
-      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+      CONFTOOL: AUTOTOOLS
+      SKIP_TESTS: no
+      SYSTEM: MSYS2
+      MSYSTEM: MINGW64
+      TOOLSDIR: ./src/tools
+      TESTDIR: ./test
+      CHERE_INVOKING: YES
 
-    # MSVC 2015, 32-bit x86 (nmake)
+    # MinGW clang UBSAN via MSYS2
+    - COMPILER: MINGW
+      CONFTOOL: CMAKE
+      SKIP_TESTS: no
+      SYSTEM: MSYS2
+      MSYSTEM: CLANG64
+      TOOLSDIR: ./build/bin
+      TESTDIR: ./build/bin
+      CMAKE_EXTRA_OPTIONS: -GNinja -DCMAKE_CXX_FLAGS=-fsanitize=undefined -DCMAKE_C_FLAGS=-fsanitize=undefined -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=undefined -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined
+      CHERE_INVOKING: YES
+
+    # MinGW clang ASAN via MSYS2 -- doesn't work due to some issue with clang itself
+    # - COMPILER: MINGW
+    #   CONFTOOL: CMAKE
+    #   SKIP_TESTS: no
+    #   SYSTEM: MSYS2
+    #   MSYSTEM: CLANG64
+    #   TESTDIR: ./cmakebld/bin
+    #   CMAKE_EXTRA_OPTIONS: -GNinja -DCMAKE_CXX_FLAGS=-fsanitize=address -DCMAKE_C_FLAGS=-fsanitize=address -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address
+    #   CHERE_INVOKING: YES
+
+    # MSVC 2022, 64-bit x86 (nmake)
     - COMPILER: MSVC
-      BUILDTOOL: NMAKE
+      CONFTOOL: NMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
+      MSVC_SETUP_ARG: x64
+      MSVC_SETUP_PATH: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
+      BUILD_GOOGLETEST: yes
+
+    # MSVC 2022, 32-bit x86 (nmake)
+    - COMPILER: MSVC
+      CONFTOOL: NMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
       MSVC_SETUP_ARG: x86
-      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
-
-    # MSVC 2015, 64-bit x86 (nmake)
-    - COMPILER: MSVC
-      BUILDTOOL: NMAKE
-      MSVC_SETUP_ARG: x64
-      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+      MSVC_SETUP_PATH: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat
+      BUILD_GOOGLETEST: yes
 
     # MinGW, 32-bit x86 (makefiles)
     - COMPILER: MINGW
-      BUILDTOOL: MAKE
-      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+      CONFTOOL: MAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
+      PATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;%PATH%
+      BUILD_GOOGLETEST: yes
+
+    # MinGW, 32-bit x86 (cmake static only)
+    - COMPILER: MINGW
+      CONFTOOL: CMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: no
+      TOOLSDIR: ./build/bin
+      TESTDIR: ./build/bin
+      PATH: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32\bin;%PATH%
+      CMAKE_EXTRA_OPTIONS: -DCARES_SHARED=OFF -GNinja -DCARES_BUILD_TESTS=ON -DGTEST_ROOT=C:\projects\googletest
+      BUILD_GOOGLETEST: yes
+
+    # MSVC 2022, UWP (cmake)
+    - COMPILER: MSVC
+      CONFTOOL: CMAKE
+      SYSTEM: CONSOLE
+      SKIP_TESTS: yes
+      MSVC_SETUP_ARG: x64 store
+      MSVC_SETUP_PATH: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat
+      CMAKE_EXTRA_OPTIONS: -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -A x64
 
 install:
   - if "%COMPILER%" == "MINGW" rename "C:\Program Files\Git\usr\bin\sh.exe" "sh2.exe"
@@ -64,43 +142,48 @@ before_build:
   # Setup build environment for the selected compiler (not all compilers need to do anything here).
   #  -- Visual Studio --
   - if "%COMPILER%" == "MSVC" call "%MSVC_SETUP_PATH%" %MSVC_SETUP_ARG%
+  - if "%SYSTEM%" == "MSYS2" C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Syuu"
+  - if "%SYSTEM%" == "MSYS2" if "%MSYSTEM%" == "MINGW64" C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Syu autoconf autoconf-archive automake libtool make git mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja mingw-w64-x86_64-gtest"
+  - if "%SYSTEM%" == "MSYS2" if "%MSYSTEM%" == "CLANG64" C:\msys64\usr\bin\bash -lc "pacman --noconfirm -Syu autoconf autoconf-archive automake libtool make git mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-clang-analyzer mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-gtest"
+  - if "%BUILD_GOOGLETEST%" == "yes" git clone --depth=1 https://github.com/google/googletest googletest
+  - if "%BUILD_GOOGLETEST%" == "yes" cd googletest
+  - if "%BUILD_GOOGLETEST%" == "yes" cmake -DCMAKE_INSTALL_PREFIX=C:\projects\googletest -DCMAKE_POLICY_DEFAULT_CMP0091:STRING=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL -GNinja -Bbuild
+  - if "%BUILD_GOOGLETEST%" == "yes" cmake --build build --config Debug
+  - if "%BUILD_GOOGLETEST%" == "yes" cmake --install build --config Debug
+  - if "%BUILD_GOOGLETEST%" == "yes" cd ..
 
 build_script:
-  - if "%BUILDTOOL%" == "NMAKE" copy .\include\ares_build.h.dist .\include\ares_build.h
-  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc
-  - if "%BUILDTOOL%" == "CMAKE" mkdir C:\projects\build-cares
-  - if "%BUILDTOOL%" == "CMAKE" cd C:\projects\build-cares
-  - if "%BUILDTOOL%" == "CMAKE" cmake -GNinja -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% %APPVEYOR_BUILD_FOLDER%
-  - if "%BUILDTOOL%" == "CMAKE" ninja -v install
-  - if "%BUILDTOOL%" == "CMAKESTATIC" mkdir C:\projects\build-cares
-  - if "%BUILDTOOL%" == "CMAKESTATIC" cd C:\projects\build-cares
-  - if "%BUILDTOOL%" == "CMAKESTATIC" cmake -GNinja -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_SHARED=OFF -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% %APPVEYOR_BUILD_FOLDER%
-  - if "%BUILDTOOL%" == "CMAKESTATIC" ninja -v install
-  - if "%BUILDTOOL%" == "MAKE" copy .\include\ares_build.h.dist .\include\ares_build.h
-  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32 demos
+  - if "%SYSTEM%" == "MSYS2"   if "%CONFTOOL%" == "CMAKE"     C:\msys64\usr\bin\bash -lc "%ANALYZE_PREFIX% cmake -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:/projects/build-cares/test_install -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% -Bbuild ."
+  - if "%SYSTEM%" == "MSYS2"   if "%CONFTOOL%" == "CMAKE"     C:\msys64\usr\bin\bash -lc "%ANALYZE_PREFIX% cmake --build build"
+  - if "%SYSTEM%" == "MSYS2"   if "%CONFTOOL%" == "AUTOTOOLS" C:\msys64\usr\bin\bash -lc "./buildconf"
+  - if "%SYSTEM%" == "MSYS2"   if "%CONFTOOL%" == "AUTOTOOLS" C:\msys64\usr\bin\bash -lc "%ANALYZE_PREFIX% ./configure --enable-static --disable-shared --enable-tests"
+  - if "%SYSTEM%" == "MSYS2"   if "%CONFTOOL%" == "AUTOTOOLS" C:\msys64\usr\bin\bash -lc "%ANALYZE_PREFIX% make"
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE"     copy .\include\ares_build.h.dist .\include\ares_build.h
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE"     nmake /NOLOGO /f .\Makefile.msvc
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE"     cmake -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON %CMAKE_EXTRA_OPTIONS% -Bbuild
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE"     cmake --build build --config Debug
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE"     cmake --install build --config Debug
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"      copy .\include\ares_build.h.dist .\include\ares_build.h
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"      mingw32-make.exe -f Makefile.m32 demos
 
 test_script:
   # We can't use powershell for tests due to treating stderr as an error
-  - if "%BUILDTOOL%" == "NMAKE" cd test
-  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc vtest
-  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc aresfuzz aresfuzzname dnsdump
-  - if "%BUILDTOOL%" == "NMAKE" .\msvc\arestest\lib-debug\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
-  - if "%BUILDTOOL%" == "MAKE" cd test
-  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32
-  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32 aresfuzz.exe aresfuzzname.exe dnsdump.exe
-  - if "%BUILDTOOL%" == "MAKE" .\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
-  - if "%BUILDTOOL%" == "CMAKE" cd C:\projects\build-cares\bin
-  - if "%BUILDTOOL%" == "CMAKE" .\adig.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKE" .\acountry.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKE" .\ahost.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKE" .\arestest.exe -4 -v
-  - if "%BUILDTOOL%" == "CMAKE" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
-  - if "%BUILDTOOL%" == "CMAKESTATIC" cd C:\projects\build-cares\bin
-  - if "%BUILDTOOL%" == "CMAKESTATIC" .\adig.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKESTATIC" .\acountry.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKESTATIC" .\ahost.exe www.google.com
-  - if "%BUILDTOOL%" == "CMAKESTATIC" .\arestest.exe -4 -v
-  - if "%BUILDTOOL%" == "CMAKESTATIC" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
+  - if "%SYSTEM%" == "MSYS2"                              if not "%SKIP_TESTS%" == "yes" C:\msys64\usr\bin\bash -lc "%TOOLSDIR%/adig.exe www.google.com"
+  - if "%SYSTEM%" == "MSYS2"                              if not "%SKIP_TESTS%" == "yes" C:\msys64\usr\bin\bash -lc "%TOOLSDIR%/ahost.exe www.google.com"
+  - if "%SYSTEM%" == "MSYS2"                              if not "%SKIP_TESTS%" == "yes" C:\msys64\usr\bin\bash -lc "%TESTDIR%/arestest.exe -4 -v --gtest_filter=-*LiveSearchTXT*:*LiveSearchANY*:*LiveGetLocalhostByAddr*"
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE" if not "%SKIP_TESTS%" == "yes" cd test
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE" if not "%SKIP_TESTS%" == "yes" nmake GTEST_ROOT=C:\projects\googletest /NOLOGO /f .\Makefile.msvc vtest
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE" if not "%SKIP_TESTS%" == "yes" nmake GTEST_ROOT=C:\projects\googletest /NOLOGO /f .\Makefile.msvc aresfuzz aresfuzzname dnsdump
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "NMAKE" if not "%SKIP_TESTS%" == "yes" .\msvc\arestest\lib-debug\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"  if not "%SKIP_TESTS%" == "yes" cd test
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"  if not "%SKIP_TESTS%" == "yes" mingw32-make.exe GTEST_ROOT=C:\projects\googletest -f Makefile.m32 vtest
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"  if not "%SKIP_TESTS%" == "yes" mingw32-make.exe GTEST_ROOT=C:\projects\googletest -f Makefile.m32 aresfuzz.exe aresfuzzname.exe dnsdump.exe
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "MAKE"  if not "%SKIP_TESTS%" == "yes" .\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE" if not "%SKIP_TESTS%" == "yes" cd %TESTDIR%
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE" if not "%SKIP_TESTS%" == "yes" .\adig.exe www.google.com
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE" if not "%SKIP_TESTS%" == "yes" .\ahost.exe www.google.com
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE" if not "%SKIP_TESTS%" == "yes" .\arestest.exe -4 -v --gtest_filter=-*LiveSearchTXT*:*LiveSearchANY*:*LiveGetLocalhostByAddr*
+  - if "%SYSTEM%" == "CONSOLE" if "%CONFTOOL%" == "CMAKE" if not "%SKIP_TESTS%" == "yes" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
 
 #on_finish:
 #  - cd C:\projects\build-cares\test
