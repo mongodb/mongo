@@ -57,12 +57,12 @@ find ./mozilla-release/js/src/_build/mfbt -name "Unified_cpp_mfbt*.cpp" -exec cp
 
 SEDOPTION="-i"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-  SEDOPTION="-i ''"
+  SEDOPTION=(-i '')
 fi
 
 for unified_file in extract/js/src/mfbt/*.cpp ; do
     echo "Processing $unified_file"
-    sed $SEDOPTION \
+    sed "${SEDOPTION[@]}" \
         -e 's|#include ".*/mfbt/|#include "|' \
         -e 's|#error ".*/mfbt/|#error "|' \
         "$unified_file"
