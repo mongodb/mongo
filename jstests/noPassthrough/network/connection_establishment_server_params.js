@@ -17,15 +17,14 @@ function getIngressConnectionEstablishmentMaxQueueDepthDefault(mongo) {
 
 // Check the default values are used if not set explicitly
 let mongo = MongoRunner.runMongod();
-const maxInt32 = Math.pow(2, 31) - 1;
 
 let ingressConnectionEstablishmentRatePerSecDefault =
     getIngressConnectionEstablishmentRatePerSec(mongo);
-assert.eq(ingressConnectionEstablishmentRatePerSecDefault, maxInt32);
+assert.eq(ingressConnectionEstablishmentRatePerSecDefault, Number.MAX_VALUE);
 
 let ingressConnectionEstablishmentBurstSizeDefault =
     getIngressConnectionEstablishmentBurstSize(mongo);
-assert.eq(ingressConnectionEstablishmentBurstSizeDefault, maxInt32);
+assert.eq(ingressConnectionEstablishmentBurstSizeDefault, Number.MAX_VALUE);
 
 let ingressConnectionEstablishmentMaxQueueDepthDefault =
     getIngressConnectionEstablishmentMaxQueueDepthDefault(mongo);
