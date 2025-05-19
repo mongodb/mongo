@@ -15,6 +15,9 @@ executor:
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+      global_vars:
+        TestData:
+          mongosBinVersion: last-lts
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
