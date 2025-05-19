@@ -1,7 +1,8 @@
 /**
  * Test to ensure that fcv change and add shard are mutually exclusive
  * @tags: [
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   featureFlagUseTopologyChangeCoordinators
  * ]
  */
 

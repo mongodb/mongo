@@ -158,8 +158,7 @@ feature_flags:
     featureFlagUseTopologyChangeCoordinators:
         description: "Feature flag for enabling the coordinator based topology changes."
         cpp_varname: feature_flags::gUseTopologyChangeCoordinators
-        default: true
-        version: 8.2
+        default: false
         shouldBeFCVGated: true
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
     featureFlagShardAuthoritativeDbMetadataCRUD:
@@ -194,8 +193,7 @@ feature_flags:
             Feature flag for running the shard collection coordinator on the config server for
             config.system.sessions.
         cpp_varname: feature_flags::gSessionsCollectionCoordinatorOnConfigServer
-        default: true
-        version: 8.1
+        default: false
         shouldBeFCVGated: true
     featureFlagTerminateSecondaryReadsUponRangeDeletion:
         description: "Feature flag to enable the termination of secondary reads due to range deletions."

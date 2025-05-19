@@ -113,8 +113,12 @@ assert.commandWorked(db.adminCommand({enableSharding: kDbName}));
         // If we are running in suites with authentication this will fail with
         // ErrorCodes.Unauthorized
         !TestData.auth) {
-        assert.commandWorked(
-            db.adminCommand({shardCollection: "config.system.sessions", key: {_id: 1}}));
+        // When running with config transitions, this might target a different first shard than when
+        // the collection was first being sharded causing it to fail (SERVER-86949).
+        if (!TestData.shardsAddedRemoved) {
+            assert.commandWorked(
+                db.adminCommand({shardCollection: "config.system.sessions", key: {_id: 1}}));
+        }
     }
 }
 

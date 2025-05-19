@@ -5,7 +5,8 @@
  * @tags: [
  *   requires_persistence,
  *   multiversion_incompatible,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   featureFlagUseTopologyChangeCoordinators
  * ]
  */
 

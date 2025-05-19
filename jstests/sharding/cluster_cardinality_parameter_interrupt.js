@@ -8,6 +8,7 @@
  *
  * @tags: [
  *   requires_fcv_82,
+ *   featureFlagUseTopologyChangeCoordinators
  * ]
  */
 

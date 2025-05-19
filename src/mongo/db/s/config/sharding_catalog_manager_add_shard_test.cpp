@@ -953,15 +953,13 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 
 // TODO (SERVER-100309): remove once 9.0 becomes last LTS.
 TEST_F(AddShardTest, SuccessfullyAddConfigShardOldPath) {
-    // Since unit tests always run with all feature flags enabled, manually disable the feature flag
-    // to maintain testing for old FCV.
     RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagSessionsCollectionCoordinatorOnConfigServer", false);
-    runSuccessfulConfigShardTest(true);
+        "featureFlagSessionsCollectionCoordinatorOnConfigServer", true);
+    runSuccessfulConfigShardTest(false);
 }
 
 TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
-    runSuccessfulConfigShardTest(false);
+    runSuccessfulConfigShardTest(true);
 }
 
 TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
