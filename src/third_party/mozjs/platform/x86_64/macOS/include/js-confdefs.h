@@ -7,7 +7,7 @@
 #define js_confdefs_h
 
 // Expands to all the defines from configure.
-#define CROSS_COMPILE
+#define CROSS_COMPILE 
 #define ENABLE_SHARED_MEMORY 1
 #define ENABLE_WASM_GC 1
 #define ENABLE_WASM_JS_STRING_BUILTINS 1
@@ -57,10 +57,10 @@
 #define MALLOC_H <malloc/malloc.h>
 #define MALLOC_USABLE_SIZE_CONST_PTR const
 #define MOZILLA_UAVERSION "128.0"
-#define MOZILLA_VERSION "128.9.0"
-#define MOZILLA_VERSION_U 128.9.0
+#define MOZILLA_VERSION "128.11.0"
+#define MOZILLA_VERSION_U 128.11.0
 #define MOZJS_MAJOR_VERSION 128
-#define MOZJS_MINOR_VERSION 9
+#define MOZJS_MINOR_VERSION 11
 #define MOZ_AARCH64_JSCVT 0
 #define MOZ_BUILD_APP js
 #define MOZ_DLL_PREFIX "lib"

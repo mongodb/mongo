@@ -42,7 +42,7 @@ a notice will be included in
 | [libmongocrypt]            | Apache-2.0                                                     | 1.8.4                                              |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause                                                   | 6cdc775 + changes                                  |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0                                                     | 1.27.6                                             |          ✗           |                ✗                |
-| [Mozilla Firefox]          | MPL-2.0                                                        | 128.8.0esr                                         |       unknown        |                ✗                |
+| [Mozilla Firefox]          | MPL-2.0                                                        | 128.10.0esr                                        |       unknown        |                ✗                |
 | [MurmurHash3]              | Public Domain                                                  | a6bd3ce + changes                                  |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT                                                            | 0.10.2                                             |                      |                                 |
 | [ocspresponder]            | Apache-2.0                                                     | 0.5.0                                              |                      |                                 |

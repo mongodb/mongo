@@ -954,7 +954,7 @@
         "name": "Organization: debian"
       },
       "name": "Mozilla Firefox",
-      "version": "128.8.0esr",
+      "version": "128.10.0esr",
       "licenses": [
         {
           "license": {
@@ -962,7 +962,7 @@
           }
         }
       ],
-      "purl": "pkg:deb/debian/firefox-esr@128.8.0esr-1",
+      "purl": "pkg:deb/debian/firefox-esr@128.10.0esr-1",
       "properties": [
         {
           "name": "internal:team_responsible",
