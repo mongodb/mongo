@@ -167,6 +167,12 @@ export const workerThread = (function() {
                     "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
             }
 
+            if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns ||
+                TestData.killShards) {
+                await import(
+                    "jstests/libs/override_methods/implicitly_retry_crud_on_no_progress_made.js");
+            }
+
             if (TestData.runningWithBalancer && !TestData.shardsAddedRemoved) {
                 // Skipping the import on shard transitions because it's already imported under
                 // implicitly_retry_on_shard_transition_errors.js
