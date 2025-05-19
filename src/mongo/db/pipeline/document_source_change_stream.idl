@@ -62,6 +62,15 @@ enums:
             # Post-images are required. Throw an exception if not available.
             kRequired: "required"
 
+    ChangeStreamReaderVersion:
+        description: Possible change stream reader versions, with respect to shard-targeting behavior.
+        type: string
+        values:
+            # Selects change stream reader version 1, in which all the shards in the cluster are tracked.
+            kV1: "v1"
+            # Selects change stream reader version 2 with precise shard-targeting, as introduced by SPM-1941.
+            kV2: "v2"
+
 structs:
     ResumeTokenClusterTime:
         description: The IDL type of cluster time
@@ -206,6 +215,12 @@ structs:
                     collection where UUID matches the one from the corresponding change
                     event. In case of a mismatch, null document will be returned.
                 query_shape: literal
+
+            version:
+                type: ChangeStreamReaderVersion
+                description: Selects the change stream reader version.
+                optional: true
+                query_shape: parameter
 
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true

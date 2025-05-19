@@ -259,10 +259,11 @@ export function ChangeStreamTest(_db, options) {
      * ChangeStreamTest has been created on the 'admin' db, and will assert if not. It uses the
      * 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
      */
-    self.startWatchingAllChangesForCluster = function(aggregateOptions) {
+    self.startWatchingAllChangesForCluster = function(aggregateOptions, changeStreamOptions = {}) {
         assert.eq(_db.getName(), "admin");
         return self.startWatchingChanges({
-            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            pipeline:
+                [{$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)}],
             collection: 1,
             aggregateOptions: aggregateOptions
         });

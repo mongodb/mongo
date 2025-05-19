@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <array>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -681,6 +682,73 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
+    // Versions "v1", "v2" are supported.
+    std::array<boost::optional<StringData>, 3> versions = {boost::none, "v1"_sd, "v2"_sd};
+
+    for (auto version : versions) {
+        BSONObj spec;
+        if (version.has_value()) {
+            spec = BSON("$changeStream" << BSON("version" << *version));
+        } else {
+            spec = BSON("$changeStream" << BSONObj());
+        }
+
+        auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+        ASSERT_FALSE(pipeline.empty());
+
+        bool found = false;
+        for (auto& stage : pipeline) {
+            if (stage->getSourceName() == DocumentSourceChangeStreamTransform::kStageName) {
+                // Serialize the stage to BSON and read back the "version" field.
+                std::vector<Value> serialization;
+                stage->serializeToArray(serialization);
+
+                ASSERT_EQ(serialization.size(), 1UL);
+                ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+
+                if (version.has_value()) {
+                    ASSERT_EQ(version,
+                              serialization[0]
+                                  .getDocument()
+                                  .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                  .getDocument()
+                                  .getField("version"_sd)
+                                  .getStringData());
+                } else {
+                    ASSERT_TRUE(serialization[0]
+                                    .getDocument()
+                                    .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                    .getDocument()
+                                    .getField("version"_sd)
+                                    .missing());
+                }
+                found = true;
+            }
+        }
+        ASSERT_TRUE(found);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithoutAnyVersion) {
+    // Do not specify "version" at all.
+    auto spec = BSON("$changeStream" << BSONObj());
+
+    auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_FALSE(pipeline.empty());
+}
+
+TEST_F(ChangeStreamStageTest, CreatingChangestreamFailsWithInvalidVersions) {
+    // Test a bunch of unsupported versions.
+    for (auto version : {"v3", "v0", "V1", "", "1", "2"}) {
+        auto spec = BSON("$changeStream" << BSON("version" << version));
+
+        ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                           AssertionException,
+                           ErrorCodes::BadValue);
+    }
 }
 
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {

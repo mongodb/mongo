@@ -206,6 +206,12 @@ void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
                        opts,
                        DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName,
                        spec.getShowRawUpdateDescription());
+    if (spec.getVersion()) {
+        serializeSpecField(builder,
+                           opts,
+                           DocumentSourceChangeStreamSpec::kVersionFieldName,
+                           ChangeStreamReaderVersion_serializer(*spec.getVersion()));
+    }
 }
 
 }  // namespace
