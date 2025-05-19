@@ -98,6 +98,20 @@ export const loadTest = (ingressPort, egressPort, node, isRouter) => {
     }
 };
 
+export const testProxyProtocolReplicaSet = (ingressPort, egressPort, version, testFn) => {
+    const proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
+    proxy_server.start();
+
+    const rs = new ReplSetTest({nodes: 1, nodeOptions: {"proxyPort": egressPort}});
+    rs.startSet({setParameter: {featureFlagMongodProxyProcolSupport: true}});
+    rs.initiate();
+
+    testFn(ingressPort, egressPort, rs.getPrimary(), false);
+
+    proxy_server.stop();
+    rs.stopSet();
+};
+
 export const testProxyProtocolShardedCluster = (ingressPort, egressPort, version, testFn) => {
     const proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
