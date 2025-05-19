@@ -29,45 +29,53 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
-constexpr auto fieldName = "Field"_sd;
-constexpr auto anotherFieldName = "AnotherField"_sd;
-constexpr auto collectorName = "Collector1"_sd;
-constexpr auto anotherCollectorName = "Collector2"_sd;
-constexpr auto sampleData = 1;
-constexpr auto moreSampleData = 12;
+constexpr auto kClusterRole = ClusterRole::None;
+constexpr auto kFieldName = "Field"_sd;
+constexpr auto kAnotherFieldName = "AnotherField"_sd;
+constexpr auto kCollectorName = "Collector1"_sd;
+constexpr auto kAnotherCollectorName = "Collector2"_sd;
+constexpr auto kSampleData = 1;
+constexpr auto kMoreSampleData = 12;
 
 class SampleCollectorCacheTestFixture : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
-        opCtxPtr = makeOperationContext();
+        _opCtx = makeOperationContext();
     }
 
     BSONObj collect(SampleCollectorCache& collectorCache) {
         BSONObjBuilder bob;
-        collectorCache.refresh(getOpCtx(), &bob);
+        collectorCache.refresh(_opCtx.get(), &bob);
         return bob.obj();
     }
 
-    OperationContext* getOpCtx() {
-        return opCtxPtr.get();
+    SampleCollectorCache makeSampleCollectorCache(ClusterRole role = kClusterRole,
+                                                  Milliseconds timeout = Milliseconds{200},
+                                                  size_t minThreads = 1,
+                                                  size_t maxThreads = 2) {
+        return {role, timeout, minThreads, maxThreads};
     }
 
 private:
-    ServiceContext::UniqueOperationContext opCtxPtr;
+    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 class DummyFTDCCollector : public FTDCCollectorInterface {
@@ -81,19 +89,18 @@ public:
     }
 };
 
-std::string doCollect(FTDCCollectorInterface& collector) {
-    BSONObjBuilder builder;
-    if (collector.hasData()) {
-        collector.collect(nullptr, builder);
-    }
-    return builder.done().toString();
-}
-
 TEST(FTDCCollectorTest, FilteredCollectorTest) {
+    auto doCollect = [](FTDCCollectorInterface& collector) {
+        BSONObjBuilder builder;
+        if (collector.hasData()) {
+            collector.collect(nullptr, builder);
+        }
+        return builder.done().toString();
+    };
+
     bool enabled = true;
     FilteredFTDCCollector filter([&] { return enabled; }, std::make_unique<DummyFTDCCollector>());
 
-    enabled = true;
     ASSERT_TRUE(filter.hasData());
     ASSERT_EQUALS(doCollect(filter), R"({ name: "dummy" })");
 
@@ -103,123 +110,115 @@ TEST(FTDCCollectorTest, FilteredCollectorTest) {
 }
 
 TEST_F(SampleCollectorCacheTestFixture, NoCollectorsShouldReturnNothing) {
-    SampleCollectorCache collector(
-        ClusterRole::None, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
-
+    auto collector = makeSampleCollectorCache();
     auto sample = collect(collector);
     ASSERT_EQ(sample.begin(), sample.end());
 }
 
 TEST_F(SampleCollectorCacheTestFixture, MultipleCollectors) {
-    auto role = ClusterRole::None;
-    SampleCollectorCache collector(role, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
-
-    collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-        bob->append(fieldName, sampleData);
-    });
+    auto collector = makeSampleCollectorCache();
     collector.addCollector(
-        anotherCollectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-            bob->append(anotherFieldName, moreSampleData);
+        kCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder* bob) {
+            bob->append(kFieldName, kSampleData);
+        });
+    collector.addCollector(
+        kAnotherCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder* bob) {
+            bob->append(kAnotherFieldName, kMoreSampleData);
         });
 
     auto sample = collect(collector);
-    auto firstSubObj = sample.getObjectField(collectorName);
-    auto secondSubObj = sample.getObjectField(anotherCollectorName);
-    ASSERT_TRUE(firstSubObj.hasField(fieldName));
-    ASSERT_TRUE(secondSubObj.hasField(anotherFieldName));
-    ASSERT_EQ(firstSubObj.getField(fieldName).Int(), sampleData);
-    ASSERT_EQ(secondSubObj.getField(anotherFieldName).Int(), moreSampleData);
+    ASSERT_TRUE(sample.hasField(kCollectorName));
+    ASSERT_TRUE(sample.hasField(kAnotherCollectorName));
 }
 
 TEST_F(SampleCollectorCacheTestFixture, CollectorThrowsError) {
-    auto role = ClusterRole::None;
-    SampleCollectorCache collector(role, Milliseconds(100), 1 /*minThreads*/, 1 /*maxThreads*/);
-
-    collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-        uasserted(ErrorCodes::CallbackCanceled, "Collection threw an error.");
-    });
+    auto collector = makeSampleCollectorCache(kClusterRole, Seconds(5));
+    collector.addCollector(
+        kCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder*) {
+            uasserted(ErrorCodes::CallbackCanceled, "Collection threw an error.");
+        });
 
     // An error thrown in the collection thread should be passed into the main thread.
     ASSERT_THROWS_CODE(collect(collector), DBException, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(SampleCollectorCacheTestFixture, TimeoutDuringCollectionShouldFinishInTheNextCycle) {
-    auto timeout = Milliseconds(100);
-    auto role = ClusterRole::None;
-    SampleCollectorCache collector(ClusterRole::None, timeout, 1 /*minThreads*/, 1 /*maxThreads*/);
+    auto collector = makeSampleCollectorCache();
 
     Notification<void> stall;
-    collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-        stall.get();
-        bob->append(fieldName, sampleData);
-    });
+    collector.addCollector(
+        kCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder* bob) {
+            stall.get();
+            bob->append(kFieldName, kSampleData);
+        });
 
     // Sample should be empty since collector is stalling.
-    auto sample = collect(collector);
-    ASSERT_EQ(sample.begin(), sample.end());
+    auto sample1 = collect(collector);
+    ASSERT_EQ(sample1.begin(), sample1.end());
 
     stall.set();
 
     // After the stall, we should be able to get the data.
-    auto nextSample = collect(collector);
-    auto subObj = nextSample.getObjectField(collectorName);
-    ASSERT_TRUE(subObj.hasField(fieldName));
-    ASSERT_TRUE(subObj.hasField(kFTDCCollectStartField));
-    ASSERT_TRUE(subObj.hasField(kFTDCCollectEndField));
-    ASSERT_EQ(subObj.getField(fieldName).Int(), sampleData);
+    auto sample2 = collect(collector);
+    ASSERT_TRUE(sample2.hasField(kCollectorName));
 }
 
 TEST_F(SampleCollectorCacheTestFixture, TimeoutShouldNotAffectOtherSamples) {
-    auto timeout = Milliseconds(100);
-    auto role = ClusterRole::None;
-    SampleCollectorCache collector(role, timeout, 1 /*minThreads*/, 2 /*maxThreads*/);
+    // Tracks the order of collections by recording the name of collectors in the order they are
+    // invoked by `collector`.
+    synchronized_value<std::vector<StringData>> collections;
 
-    collector.addCollector(collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-        bob->append(fieldName, sampleData);
-    });
+    auto collector = makeSampleCollectorCache();
 
-    Notification<void> stall;
+    Notification<void> collectionCanMakeProgress;
     collector.addCollector(
-        anotherCollectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-            stall.get();
-            bob->append(anotherFieldName, moreSampleData);
+        kCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder* bob) {
+            (**collections).push_back(kCollectorName);
+            collectionCanMakeProgress.get();
+            bob->append(kFieldName, kSampleData);
         });
 
-    // Our goal is to check that a collection can start and finish successfully while another
-    // collection is currently stalling. We need to run two samples here because there is no
-    // guarantee about which collector runs first. By running a second, we guarantee that the slow
-    // collector is already running when we want to start the fast collector.
+    collector.addCollector(
+        kAnotherCollectorName, true, kClusterRole, [&](OperationContext*, BSONObjBuilder* bob) {
+            (**collections).push_back(kAnotherCollectorName);
+            bob->append(kAnotherFieldName, kMoreSampleData);
+        });
+
     auto sample1 = collect(collector);
-    ASSERT_TRUE(sample1.hasField(collectorName));
-    ASSERT_FALSE(sample1.hasField(anotherCollectorName));
+
+    // The following is set for the next round of tests -- i.e. `auto sample2 = collect(...)`, but
+    // we set it early to make sure the test doesn't hang if any of the following assertions throw.
+    collectionCanMakeProgress.set();
+
+    ASSERT_FALSE(sample1.hasField(kCollectorName));
+    ASSERT_TRUE(sample1.hasField(kAnotherCollectorName));
+
+    using unittest::match::Eq;
+    ASSERT_THAT(**collections, Eq(std::vector<StringData>{kCollectorName, kAnotherCollectorName}));
+
     auto sample2 = collect(collector);
-    ASSERT_TRUE(sample2.hasField(collectorName));
-    ASSERT_FALSE(sample2.hasField(anotherCollectorName));
-
-    stall.set();
-
-    // After the stall ends, collection should behave normally.
-    auto sample3 = collect(collector);
-    ASSERT_TRUE(sample3.hasField(collectorName));
-    ASSERT_TRUE(sample3.hasField(anotherCollectorName));
+    ASSERT_TRUE(sample2.hasField(kCollectorName));
+    ASSERT_TRUE(sample2.hasField(kAnotherCollectorName));
 }
 
 TEST_F(SampleCollectorCacheTestFixture, ShutdownDrainsWork) {
-    bool finished = false;
-    auto timeout = Milliseconds(100);
-    auto role = ClusterRole::None;
+    Notification<void> workDrained;
     {
-        SampleCollectorCache collector(role, timeout, 1 /*minThreads*/, 1 /*maxThreads*/);
-
+        Notification<void> collectReturned;
+        auto collector = makeSampleCollectorCache();
+        ON_BLOCK_EXIT([&] { collectReturned.set(); });
         collector.addCollector(
-            collectorName, true, role, [&](OperationContext*, BSONObjBuilder* bob) {
-                sleepmillis(5 * timeout.count());
-                finished = true;
+            kCollectorName, true, kClusterRole, [&](OperationContext* opCtx, BSONObjBuilder*) {
+                collectReturned.get();
+                // The following just increases the odds of running the destructor for `collector`
+                // while still running this callback.
+                opCtx->sleepFor(Milliseconds(100));
+                workDrained.set();
             });
         collect(collector);
     }
 
-    ASSERT_TRUE(finished);
+    ASSERT_TRUE(workDrained);
 }
 
 }  // namespace

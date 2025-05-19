@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -42,7 +43,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
@@ -235,7 +235,7 @@ private:
 
     void _startNewPool(size_t minThreads, size_t maxThreads);
 
-    stdx::unordered_map<std::string, SampleCollector> _sampleCollectors;
+    std::map<std::string, SampleCollector> _sampleCollectors;
 
     ClusterRole _role;
     Atomic<Milliseconds> _maxSampleWaitMS;
