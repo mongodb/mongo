@@ -30,17 +30,22 @@ import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
 
-function getNonConfigShards() {
-    const shards = testDB.getSiblingDB('config').shards.find({_id: {$ne: "config"}}).toArray();
+function getShards() {
+    const shards = testDB.getSiblingDB('config').shards.find({draining: {$ne: true}}).toArray();
     return shards.map(doc => doc._id);
 }
 
-const nonConfigShards = getNonConfigShards();
-
 if (FixtureHelpers.isMongos(db)) {
     testDB.dropDatabase();
-    assert.commandWorked(
-        testDB.adminCommand({enableSharding: dbName, primaryShard: nonConfigShards[0]}));
+    assert.soon(() => {
+        let shardsMap = getShards();
+        let res = testDB.adminCommand({enableSharding: dbName, primaryShard: shardsMap[0]});
+        if (!res.ok && res.code == ErrorCodes.ShardNotFound) {
+            return false;
+        }
+        assert.commandWorked(res);
+        return true;
+    });
 }
 
 // Create unindexed collection
@@ -61,12 +66,14 @@ jsTestLog(collIndexed.getIndexes());
 jsTestLog(bucketsIndexed.getIndexes());
 
 for (const collection of [coll, collIndexed]) {
-    if (isShardedTimeseries(collection) && nonConfigShards.length >= 2) {
+    let shardList = getShards();
+    if (isShardedTimeseries(collection) && !TestData.hasRandomShardsAddedRemoved &&
+        shardList.length >= 2) {
         // Split and move data to create an interesting scenario: we have some data on each shard,
         // but all the extended-range data is on a non-primary shard. This means view resolution is
         // unaware of the extended-range data, because that happens on the primary shard.
-
-        const [shardName0, shardName1] = nonConfigShards;
+        const shardName0 = shardList[0];
+        const shardName1 = shardList[1];
 
         const collName = getTimeseriesBucketsColl(collection).getFullName();
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
@@ -146,7 +153,7 @@ function checkAgainstReferenceBoundedSortUnexpected(
     const options = hint ? {hint: hint} : {};
 
     const plan = collection.explain().aggregate(pipeline, options);
-    if (isShardedTimeseries(collection) && nonConfigShards.length >= 2) {
+    if (isShardedTimeseries(collection)) {
         // With a sharded collection, some shards might not have any extended-range data,
         // so they might still use $_internalBoundedSort. But we know at least one
         // shard has extended-range data, so we know at least one shard has to
@@ -154,9 +161,10 @@ function checkAgainstReferenceBoundedSortUnexpected(
         const bounded = getAggPlanStages(plan, "$_internalBoundedSort");
         const blocking = getAggPlanStages(plan, "$sort");
         assert.gt(blocking.length, 0, {bounded, blocking, plan});
-        assert.lt(bounded.length,
-                  FixtureHelpers.numberOfShardsForCollection(buckets),
-                  {bounded, blocking, plan});
+        if (!TestData.hasRandomShardsAddedRemoved)
+            assert.lt(bounded.length,
+                      FixtureHelpers.numberOfShardsForCollection(buckets),
+                      {bounded, blocking, plan});
     } else {
         const stages = getAggPlanStages(plan, "$_internalBoundedSort");
         assert.eq([], stages, plan);
