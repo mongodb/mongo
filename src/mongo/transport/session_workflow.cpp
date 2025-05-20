@@ -57,6 +57,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
@@ -304,9 +305,9 @@ using Metrics = NoopSessionWorkflowMetrics;
 
 /**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
- * allowed, produces the subsequent request message, and modifies the response message to indicate
- * it is part of an exhaust stream. Returns the subsequent request message, which is known as a
- * 'synthetic' exhaust request. Returns an empty optional if exhaust is not allowed.
+ * allowed, produces the subsequent request message, and modifies the response message to
+ * indicate it is part of an exhaust stream. Returns the subsequent request message, which is
+ * known as a 'synthetic' exhaust request. Returns an empty optional if exhaust is not allowed.
  */
 boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& response) {
     if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported) ||
@@ -385,7 +386,8 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
     return false;
 }
 
-// Counts the # of responses to completed operations that we were unable to send back to the client.
+// Counts the # of responses to completed operations that we were unable to send back to the
+// client.
 auto& unsendableCompletedResponses =
     *MetricBuilder<Counter64>("operation.unsendableCompletedResponses");
 }  // namespace
@@ -411,16 +413,18 @@ public:
     /*
      * Terminates the associated transport Session, regardless of tags.
      *
-     * This will not block on the session terminating cleaning itself up, it returns immediately.
+     * This will not block on the session terminating cleaning itself up, it returns
+     * immediately.
      */
     void terminate();
 
     /*
-     * Terminates the associated transport Session if the connection tags in the client don't match
-     * the supplied tags.  If the connection tags indicate a pending state, before any tags have
-     * been set, it will not be terminated.
+     * Terminates the associated transport Session if the connection tags in the client don't
+     * match the supplied tags.  If the connection tags indicate a pending state, before any
+     * tags have been set, it will not be terminated.
      *
-     * This will not block on the session terminating cleaning itself up, it returns immediately.
+     * This will not block on the session terminating cleaning itself up, it returns
+     * immediately.
      */
     void terminateIfTagsDontMatch(Client::TagMask tags);
 
@@ -542,6 +546,8 @@ private:
         executor()->yieldIfAppropriate();
     }
 
+    void _waitForEstabilshmentRateLimit();
+
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
@@ -549,6 +555,8 @@ private:
 
     AtomicWord<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
+
+    bool _inFirstIteration = true;
 
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
@@ -724,11 +732,11 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     auto&& work = *_work;
-    // opCtx must be delisted here so that the operation cannot show up in currentOp results after
-    // the response reaches the client. We are assuming that the operation has already been killed
-    // once we are accepting the response here, so delisting is sufficient. Destruction of the
-    // already killed opCtx is postponed for later (i.e., after completion of the future-chain) to
-    // mitigate its performance impact on the critical path of execution.
+    // opCtx must be delisted here so that the operation cannot show up in currentOp results
+    // after the response reaches the client. We are assuming that the operation has already
+    // been killed once we are accepting the response here, so delisting is sufficient.
+    // Destruction of the already killed opCtx is postponed for later (i.e., after completion of
+    // the future-chain) to mitigate its performance impact on the critical path of execution.
     // Note that destroying futures after execution, rather that postponing the destruction
     // until completion of the future-chain, would expose the cost of destroying opCtx to
     // the critical path and result in serious performance implications.
@@ -804,6 +812,13 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
 
         try {
+            // If this is the first iteration of the session workflow, we must acquire an
+            // "establishment token" to respect connection establishment rate limits.
+            if (MONGO_unlikely(_inFirstIteration)) {
+                _waitForEstabilshmentRateLimit();
+                _inFirstIteration = false;
+            }
+
             // All available service executors use dedicated threads, so it's okay to
             // run eager futures in an ordinary loop to bypass scheduler overhead.
             while (true) {
@@ -823,6 +838,24 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
     _onLoopError(error);
 }
 
+void SessionWorkflow::Impl::_waitForEstabilshmentRateLimit() {
+    auto sm = session()->getTransportLayer()->getSessionManager();
+    auto exemptionsList = sm->getSessionEstablishmentRateLimitExemptionList();
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabledUseLatestFCVWhenUninitialized(
+            fcvSnapshot) &&
+        !(exemptionsList && session()->isExemptedByCIDRList(*exemptionsList))) {
+        // Create an opCtx for interruptibility and to make queued waiters return tokens when
+        // the client has disconnected.
+        auto establishmentOpCtx = client()->makeOperationContext();
+        establishmentOpCtx->markKillOnClientDisconnect();
+        // Acquire a token or block until one becomes available.
+        uassertStatusOK(
+            sm->getSessionEstablishmentRateLimiter().acquireToken(establishmentOpCtx.get()));
+    }
+}
+
 void SessionWorkflow::Impl::terminate() {
     if (_isTerminated.swap(true))
         return;
@@ -836,8 +869,8 @@ void SessionWorkflow::Impl::terminateIfTagsDontMatch(Client::TagMask tags) {
 
     auto clientTags = client()->getTags();
 
-    // If terminateIfTagsDontMatch gets called when we still are 'pending' where no tags have been
-    // set, then skip the termination check.
+    // If terminateIfTagsDontMatch gets called when we still are 'pending' where no tags have
+    // been set, then skip the termination check.
     if ((clientTags & tags) || (clientTags & Client::kPending)) {
         LOGV2(
             22991, "Skip closing connection for connection", "connectionId"_attr = session()->id());

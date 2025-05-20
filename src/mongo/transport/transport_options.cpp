@@ -36,7 +36,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_options.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -123,142 +128,37 @@ Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
     return setParameter(&serverGlobalParams.maxEstablishingConnsOverride, fromjson(str));
 }
 
-void IngressConnectionEstablishmentRatePerSecServerParameter::append(
-    OperationContext*, BSONObjBuilder* bob, StringData name, const boost::optional<TenantId>&) {
-    bob->append(name, _data);
-}
-
-Status IngressConnectionEstablishmentRatePerSecServerParameter::set(
-    const BSONElement& value, const boost::optional<TenantId>&) {
-    double newValue;
-    Status coercionStatus = value.tryCoerce(&newValue);
-    if (!coercionStatus.isOK() || newValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid value for ingressConnectionEstablishmentRatePerSec: "
-                          << value);
+template <typename Callback>
+Status forEachSessionManager(Callback&& updateFunc) try {
+    // If the global service context hasn't yet been initialized, then the parameters will be
+    // set on SessionManager construction rather than through the hooks here.
+    if (MONGO_likely(hasGlobalServiceContext())) {
+        getGlobalServiceContext()->getTransportLayerManager()->forEach([&](auto tl) {
+            if (tl->getSessionManager()) {
+                updateFunc(tl->getSessionManager());
+            }
+        });
     }
-
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
     return Status::OK();
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
-Status IngressConnectionEstablishmentRatePerSecServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
-    double newValue;
-    Status status = NumberParser{}(str, &newValue);
-    if (!status.isOK()) {
-        return status;
-    }
-    if (newValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid value for ingressConnectionEstablishmentRatePerSec: "
-                          << newValue);
-    }
-
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
-    return Status::OK();
+Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
+    return forEachSessionManager([newValue](SessionManager* sm) {
+        sm->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(newValue);
+    });
 }
 
-void IngressConnectionEstablishmentBurstSizeServerParameter::append(
-    OperationContext*, BSONObjBuilder* bob, StringData name, const boost::optional<TenantId>&) {
-    bob->append(name, _data);
+Status onUpdateEstablishmentBurstSize(int32_t newValue) {
+    return forEachSessionManager([newValue](SessionManager* sm) {
+        sm->getSessionEstablishmentRateLimiter().setBurstSize(newValue);
+    });
 }
 
-Status IngressConnectionEstablishmentBurstSizeServerParameter::set(
-    const BSONElement& value, const boost::optional<TenantId>&) {
-    double newValue;
-    Status coercionStatus = value.tryCoerce(&newValue);
-    if (!coercionStatus.isOK() || newValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid value for ingressConnectionEstablishmentBurstSize: "
-                                    << value);
-    }
-
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
-    return Status::OK();
+Status onUpdateEstablishmentMaxQueueDepth(int32_t newValue) {
+    return forEachSessionManager([newValue](SessionManager* sm) {
+        sm->getSessionEstablishmentRateLimiter().setMaxQueueDepth(newValue);
+    });
 }
-
-Status IngressConnectionEstablishmentBurstSizeServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
-    double newValue;
-    Status status = NumberParser{}(str, &newValue);
-    if (!status.isOK()) {
-        return status;
-    }
-    if (newValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Invalid value for ingressConnectionEstablishmentBurstSize: "
-                                    << newValue);
-    }
-
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
-    return Status::OK();
-}
-
-void IngressConnectionEstablishmentMaxQueueDepthServerParameter::append(
-    OperationContext*, BSONObjBuilder* bob, StringData name, const boost::optional<TenantId>&) {
-    bob->append(name, _data);
-}
-
-Status IngressConnectionEstablishmentMaxQueueDepthServerParameter::set(
-    const BSONElement& value, const boost::optional<TenantId>&) {
-    if (!value.isNumber()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid type for ingressConnectionEstablishmentMaxQueueDepth: "
-                          << value);
-    }
-
-    auto valueLong = value.safeNumberLong();
-    if (valueLong < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid value for ingressConnectionEstablishmentMaxQueueDepth: "
-                          << value);
-    }
-
-    size_t newValue = valueLong;
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
-    return Status::OK();
-}
-
-Status IngressConnectionEstablishmentMaxQueueDepthServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
-    long long valueLong;
-    Status status = NumberParser{}(str, &valueLong);
-    if (!status.isOK()) {
-        return status;
-    }
-    if (valueLong < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Invalid value for ingressConnectionEstablishmentMaxQueueDepth: "
-                          << valueLong);
-    }
-
-    size_t newValue = valueLong;
-    _data = newValue;
-
-    // TODO SERVER-104415 Set value on RateLimiter
-
-    return Status::OK();
-}
-
 }  // namespace mongo::transport
