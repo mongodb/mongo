@@ -817,7 +817,10 @@ bool offlineValidateCollection(OperationContext* opCtx, NamespaceString nss) {
     } else {
         BSONObjBuilder results;
         validateResults.appendToResultObj(&results, /*debug=*/false);
-        LOGV2(9437301, "Offline validation result", "results"_attr = results.done());
+        LOGV2_OPTIONS(9437301,
+                      {logv2::LogTruncation::Disabled},
+                      "Offline validation result",
+                      "results"_attr = results.done());
     }
     return validateResults.isValid();
 }
