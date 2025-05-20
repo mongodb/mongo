@@ -180,9 +180,9 @@ void PeriodicThreadToRollbackUnderCachePressure::_init(ServiceContext* serviceCo
                     bytesTarget -= bytesClearedEstimate;
                     killsTarget -= numKills;
                 }
-            } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
+            } catch (ExceptionFor<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(10036701, 2, "Periodic job canceled", "reason"_attr = ex.reason());
-            } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+            } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
                 LOGV2_DEBUG(10036702, 2, "Periodic job interrupted", "reason"_attr = ex.reason());
             }
         },

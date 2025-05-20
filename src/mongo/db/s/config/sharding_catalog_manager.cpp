@@ -1284,9 +1284,9 @@ void ShardingCatalogManager::withTransaction(
         try {
             startTransactionWithNoopFind(asr.opCtx(), namespaceForInitialFind, txnNumber);
             func(asr.opCtx(), txnNumber);
-        } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>&) {
+        } catch (const ExceptionFor<ErrorCategory::NotPrimaryError>&) {
             throw;
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>&) {
             throw;
         } catch (const DBException& ex) {
             if (isTransientTransactionError(

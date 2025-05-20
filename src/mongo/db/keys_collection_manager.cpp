@@ -217,7 +217,7 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
         _refresher.switchFunc(
             opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
-} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
+} catch (const ExceptionFor<ErrorCategory::ShutdownError>& ex) {
     LOGV2(518091, "Exception during key generation", "error"_attr = ex, "enable"_attr = doEnable);
     return;
 }

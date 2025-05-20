@@ -801,7 +801,7 @@ ShardServerCatalogCacheLoaderImpl::_schedulePrimaryGetChunksSince(
         try {
             // If there are no enqueued tasks, get the max persisted
             return getPersistedMaxChunkVersion(opCtx, nss);
-        } catch (const ExceptionForCat<ErrorCategory::IDLParseError>& parseError) {
+        } catch (const ExceptionFor<ErrorCategory::IDLParseError>& parseError) {
             LOGV2_WARNING(9580700,
                           "Clearing up corrupted cached collection metadata. "
                           "The cache will be eventually repopulated by a full refresh.",
@@ -1155,7 +1155,7 @@ void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceSt
 
         _updatePersistedCollAndChunksMetadata(context.opCtx(), nss);
         taskFinished = true;
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
+    } catch (const ExceptionFor<ErrorCategory::ShutdownError>&) {
         LOGV2(22094,
               "Failed to persist chunk metadata update for collection due to shutdown",
               logAttrs(nss));
@@ -1231,7 +1231,7 @@ void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) 
 
         _updatePersistedDbMetadata(context.opCtx(), dbName);
         taskFinished = true;
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
+    } catch (const ExceptionFor<ErrorCategory::ShutdownError>&) {
         LOGV2(
             22097, "Failed to persist metadata update for db due to shutdown", "db"_attr = dbName);
         inShutdown = true;

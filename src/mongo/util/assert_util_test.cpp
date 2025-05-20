@@ -118,9 +118,9 @@ namespace {
 MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::BadValue>,
                                  error_details::CategoryList<>>());
 MONGO_STATIC_ASSERT(std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionFor<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionFor<ErrorCategory::NotPrimaryError>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
 
 TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
@@ -128,8 +128,8 @@ TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
     ASSERT_CATCHES(ErrorCodes::BadValue, AssertionException);
     ASSERT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCodes::BadValue>);
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCodes::DuplicateKey>);
-    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NotPrimaryError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCategory::NetworkError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCategory::NotPrimaryError>);
 }
 
 // NotWritablePrimary - NotPrimaryError, RetriableError
@@ -138,9 +138,9 @@ MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::N
                                                              ErrorCategory::RetriableError>>());
 MONGO_STATIC_ASSERT(
     std::is_base_of<AssertionException, ExceptionFor<ErrorCodes::NotWritablePrimary>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionFor<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::NotWritablePrimary>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
+MONGO_STATIC_ASSERT(std::is_base_of<ExceptionFor<ErrorCategory::NotPrimaryError>,
                                     ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 
 TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
@@ -148,9 +148,8 @@ TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
     ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, AssertionException);
     ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCodes::NotWritablePrimary>);
     ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCodes::DuplicateKey>);
-    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary,
-                       ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionForCat<ErrorCategory::NotPrimaryError>);
+    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCategory::NetworkError>);
+    ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionFor<ErrorCategory::NotPrimaryError>);
 }
 
 // InterruptedDueToReplStateChange - NotPrimaryError, Interruption, RetriableError
@@ -162,9 +161,9 @@ MONGO_STATIC_ASSERT(
                                              ErrorCategory::RetriableError>>());
 MONGO_STATIC_ASSERT(std::is_base_of<AssertionException,
                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
+MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionFor<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
+MONGO_STATIC_ASSERT(std::is_base_of<ExceptionFor<ErrorCategory::NotPrimaryError>,
                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 
 TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
@@ -175,9 +174,9 @@ TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
     ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                        ExceptionFor<ErrorCodes::DuplicateKey>);
     ASSERT_NOT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
-                       ExceptionForCat<ErrorCategory::NetworkError>);
+                       ExceptionFor<ErrorCategory::NetworkError>);
     ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
-                   ExceptionForCat<ErrorCategory::NotPrimaryError>);
+                   ExceptionFor<ErrorCategory::NotPrimaryError>);
 }
 
 MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
@@ -187,8 +186,8 @@ TEST(AssertUtils, UassertNumericCode) {
     ASSERT_CATCHES(19999, DBException);
     ASSERT_CATCHES(19999, AssertionException);
     ASSERT_NOT_CATCHES(19999, ExceptionFor<ErrorCodes::DuplicateKey>);
-    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NotPrimaryError>);
+    ASSERT_NOT_CATCHES(19999, ExceptionFor<ErrorCategory::NetworkError>);
+    ASSERT_NOT_CATCHES(19999, ExceptionFor<ErrorCategory::NotPrimaryError>);
 }
 
 TEST(AssertUtils, UassertStatusOKPreservesExtraInfo) {

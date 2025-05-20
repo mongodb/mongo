@@ -193,7 +193,7 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Date_t waitDeadli
         if (_oplogBuffer->waitForDataUntil(waitDeadline, opCtx)) {
             return true;
         }
-    } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
+    } catch (const ExceptionFor<ErrorCategory::CancellationError>& e) {
         LOGV2(8569501,
               "Interrupted when waiting for data, return what we have now",
               "error"_attr = e);

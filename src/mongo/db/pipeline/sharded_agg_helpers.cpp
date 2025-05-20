@@ -633,7 +633,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
     } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
         // The current node has stale information about this collection, proceed with
         // shard targeting, which has logic to handle refreshing that may be needed.
-    } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
+    } catch (ExceptionFor<ErrorCategory::StaleShardVersionError>&) {
         // The current node has stale information about this collection, proceed with
         // shard targeting, which has logic to handle refreshing that may be needed.
     } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {

@@ -216,7 +216,7 @@ void OplogCapMaintainerThread::_run() {
             }
 
             opCtx->sleepFor(Seconds(1));  // Back off in case there were problems deleting.
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
             LOGV2_DEBUG(9259900,
                         1,
                         "Interrupted due to shutdown. OplogCapMaintainerThread Exiting",

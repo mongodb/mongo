@@ -190,7 +190,7 @@ public:
                         "Failed to get last stable recovery timestamp due to lock acquire timeout. "
                         "Note this is expected if shutdown is in progress.");
                 }
-            } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
+            } catch (const ExceptionFor<ErrorCategory::CancellationError>& ex) {
                 LOGV2_WARNING(
                     6100701,
                     "Failed to get last stable recovery timestamp due to cancellation error. Note "

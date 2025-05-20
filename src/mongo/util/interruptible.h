@@ -109,7 +109,7 @@ public:
         try {
             const auto guard = makeDeadlineGuard(deadline, error);
             return std::forward<Callback>(cb)();
-        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+        } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>&) {
             // May throw replacement exception
             checkForInterrupt();
             throw;

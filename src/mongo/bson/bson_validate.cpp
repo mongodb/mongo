@@ -446,7 +446,7 @@ public:
             const char* end = _currFrame->end = _data + len;
             uassert(InvalidBSON, "BSON object not terminated with EOO", end[-1] == 0);
             _validateIterative(Cursor{cursor.ptr, end});
-        } catch (const ExceptionForCat<ErrorCategory::ValidationError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
             return Status(e.code(), str::stream() << e.what() << " " << _context());
         }
         return Status::OK();
@@ -830,7 +830,7 @@ public:
                     ptr += 1 + size;
                 }
             }
-        } catch (const ExceptionForCat<ErrorCategory::ValidationError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ValidationError>& e) {
             return Status(e.code(), str::stream() << e.what());
         }
 

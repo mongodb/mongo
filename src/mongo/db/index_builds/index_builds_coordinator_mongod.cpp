@@ -855,7 +855,7 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIs
         try {
             nextAction =
                 opCtx->runWithDeadline(deadline, timeoutError, [&] { return future.get(opCtx); });
-        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>& e) {
             if (e.code() == timeoutError) {
                 return false;
             }

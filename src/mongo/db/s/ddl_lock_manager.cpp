@@ -112,7 +112,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
                 deadline, opCtx->getTimeoutError(), [_recoverable = this->_recoverable, &opCtx]() {
                     _recoverable->waitForRecovery(opCtx);
                 });
-        } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+        } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>&) {
             uasserted(ErrorCodes::LockTimeout,
                       fmt::format(
                           "Failed to acquire DDL lock for namespace '{}' in mode {} after {} with "

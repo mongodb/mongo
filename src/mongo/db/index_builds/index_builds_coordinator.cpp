@@ -3245,7 +3245,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
         uassertStatusOK(_indexBuildsManager.commitIndexBuild(
             opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+    } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
         logFailure(e.toStatus(), collection->ns(), replState);
         _completeAbortForShutdown(opCtx, replState, collection.get());
         throw;

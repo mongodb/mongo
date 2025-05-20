@@ -305,7 +305,7 @@ TEST_F(RangeDeleterServiceTest, ScheduledTaskInvalidatedOnStepDown) {
     rds->onStepDown();
     try {
         completionFuture.get(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+    } catch (const ExceptionFor<ErrorCategory::Interruption>&) {
         // Expect an interruption error when the service gets disabled
     }
 }
@@ -903,7 +903,7 @@ TEST_F(RangeDeleterServiceTest, WaitForOngoingQueriesInvalidatedOnStepDown) {
     rds->onStepDown();
     try {
         completionFuture.get(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+    } catch (const ExceptionFor<ErrorCategory::Interruption>&) {
         // Future must have been set to an interruption error because the service was disabled
     }
 }

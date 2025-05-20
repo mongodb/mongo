@@ -138,9 +138,9 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
                 abortExpiredTransactionsPasses.increment(1);
                 abortExpiredTransactionsSuccessfulKills.increment(numKills);
                 abortExpiredTransactionsTimedOutKills.increment(numTimeOuts);
-            } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
+            } catch (ExceptionFor<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
-            } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+            } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
                 LOGV2_DEBUG(7465601, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }
         },

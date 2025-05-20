@@ -216,7 +216,7 @@ public:
                 ->shardRegistry()
                 ->updateReplSetHosts(connStr,
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
             LOGV2(471694,
                   "Unable to update the shard registry with confirmed replica set",
                   "error"_attr = e);

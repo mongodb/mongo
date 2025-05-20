@@ -114,7 +114,7 @@ private:
                         return;
                 }
                 noopWrite(&opCtx);
-            } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+            } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
                 LOGV2_DEBUG(7465602,
                             2,
                             "NoopWriter interrupted, will retry in the next run",

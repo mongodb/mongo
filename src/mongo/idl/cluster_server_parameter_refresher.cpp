@@ -180,7 +180,7 @@ getFCVAndClusterParametersFromConfigServer() {
             }
 
             return {fcv, allDocs};
-        } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::SnapshotError>& e) {
             if (retry < kOnSnapshotErrorNumRetries) {
                 LOGV2_DEBUG(9565402,
                             3,

@@ -231,7 +231,7 @@ public:
             const auto guard = opCtx->makeDeadlineGuard(deadline, ErrorCodes::MaxTimeMSExpired);
             try {
                 return std::forward<Callback>(cb)();
-            } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+            } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>&) {
                 // TODO (SERVER-104462): remove the comment below, and restore the catch statement
                 // above to use ExceptionFor.
                 // Need to catch the entire category of errors because there are parts across the

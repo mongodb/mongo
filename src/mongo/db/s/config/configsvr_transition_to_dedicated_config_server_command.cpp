@@ -100,7 +100,7 @@ public:
                 try {
                     repl::ReplClientInfo::forClient(opCtx->getClient())
                         .setLastOpToSystemLastOpTime(opCtx);
-                } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+                } catch (const ExceptionFor<ErrorCategory::Interruption>&) {
                     // This can throw if the opCtx was interrupted. Catch to prevent crashing.
                 }
             });

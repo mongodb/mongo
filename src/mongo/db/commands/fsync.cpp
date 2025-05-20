@@ -523,7 +523,7 @@ void FSyncLockThread::run() {
             }
         }
 
-    } catch (const ExceptionForCat<ErrorCategory::ExceededTimeLimitError>&) {
+    } catch (const ExceptionFor<ErrorCategory::ExceededTimeLimitError>&) {
         LOGV2_ERROR(204739, "Fsync timed out with ExceededTimeLimitError");
         fsyncCore.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
         fsyncCore.acquireFsyncLockSyncCV.notify_one();
@@ -533,7 +533,7 @@ void FSyncLockThread::run() {
         fsyncCore.threadStatus = Status(ErrorCodes::Error::LockTimeout, "Fsync lock timed out");
         fsyncCore.acquireFsyncLockSyncCV.notify_one();
         return;
-    } catch (ExceptionForCat<ErrorCategory::Interruption>& ex) {
+    } catch (ExceptionFor<ErrorCategory::Interruption>& ex) {
         LOGV2_ERROR(204741, "Fsync interrupted", "{reason}"_attr = ex.reason());
         fsyncCore.threadStatus = ex.toStatus();
         fsyncCore.acquireFsyncLockSyncCV.notify_one();

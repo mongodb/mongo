@@ -235,7 +235,7 @@ StatusWith<OplogApplierBatch> OplogApplierBatcher::getNextApplierBatch(
                         "totalBytes"_attr = batchStats.totalBytes);
             try {
                 _oplogBuffer->waitForDataUntil(batchDeadline, opCtx);
-            } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
+            } catch (const ExceptionFor<ErrorCategory::CancellationError>& e) {
                 LOGV2(6572300,
                       "Cancelled in oplog batching; returning current partial batch.",
                       "error"_attr = e);
@@ -373,7 +373,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
                 feature_flags::gReduceMajorityWriteLatency.isEnabled() ? 0 : oplogBatchDelayMillis);
             ops = fassertNoTrace(31004,
                                  getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
             LOGV2_DEBUG(6133400,
                         1,
                         "Cancelled getting the global lock in Repl Batcher",

@@ -101,7 +101,7 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfCalledFirst) {
 
     BSONObj reply;
     ASSERT_THROWS(conn->runCommand(DatabaseName::kAdmin, sleepCmd, reply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);  // Currently SocketException.
+                  ExceptionFor<ErrorCategory::NetworkError>);  // Currently SocketException.
 }
 
 TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
@@ -116,7 +116,7 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
 
     BSONObj reply;
     ASSERT_THROWS(conn->runCommand(DatabaseName::kAdmin, sleepCmd, reply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
+                  ExceptionFor<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
 }
 
 }  // namespace

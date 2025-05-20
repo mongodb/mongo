@@ -1235,7 +1235,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 }
                 _shuttingDown = true;
                 LOGV2(22263, "Timestamp monitor is stopping", "error"_attr = ex);
-            } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
+            } catch (const ExceptionFor<ErrorCategory::CancellationError>&) {
                 return;
             } catch (const DBException& ex) {
                 // Logs and rethrows the exceptions of other types.

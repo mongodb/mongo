@@ -219,6 +219,12 @@ private:
 
 
 /**
+ * This namespace contains implementation details for our error handling code and should not be used
+ * directly in general code.
+ */
+namespace error_details {
+
+/**
  * The base class of all DBExceptions for codes of the given ErrorCategory to allow catching by
  * category.
  */
@@ -234,18 +240,12 @@ protected:
     }
 };
 
-/**
- * This namespace contains implementation details for our error handling code and should not be used
- * directly in general code.
- */
-namespace error_details {
-
 template <ErrorCodes::Error kCode, typename... Bases>
-class ExceptionForImpl final : public Bases... {
+class ExceptionForCode final : public Bases... {
 public:
     MONGO_STATIC_ASSERT(isNamedCode<kCode>);
 
-    ExceptionForImpl(const Status& status) : AssertionException(status) {
+    ExceptionForCode(const Status& status) : AssertionException(status) {
         invariant(status.code() == kCode);
     }
 
@@ -262,14 +262,20 @@ private:
 };
 
 template <ErrorCodes::Error code, typename categories = ErrorCategoriesFor<code>>
-struct ExceptionForDispatcher;
+struct ExceptionForCodeDispatcher;
 
 template <ErrorCodes::Error code, ErrorCategory... categories>
-struct ExceptionForDispatcher<code, CategoryList<categories...>> {
+struct ExceptionForCodeDispatcher<code, CategoryList<categories...>> {
     using type = std::conditional_t<sizeof...(categories) == 0,
-                                    ExceptionForImpl<code, AssertionException>,
-                                    ExceptionForImpl<code, ExceptionForCat<categories>...>>;
+                                    ExceptionForCode<code, AssertionException>,
+                                    ExceptionForCode<code, ExceptionForCat<categories>...>>;
 };
+
+template <auto codeOrCat>
+struct ExceptionForDispatcher;
+
+template <ErrorCodes::Error code>
+struct ExceptionForDispatcher<code> : ExceptionForCodeDispatcher<code> {};
 
 template <>
 struct ExceptionForDispatcher<ErrorCodes::WriteConflict> {
@@ -286,21 +292,25 @@ struct ExceptionForDispatcher<ErrorCodes::TransactionTooLargeForCache> {
     using type = TransactionTooLargeForCacheException;
 };
 
+template <ErrorCategory category>
+struct ExceptionForDispatcher<category> {
+    using type = ExceptionForCat<category>;
+};
+
 }  // namespace error_details
 
 
 /**
- * Resolves to the concrete exception type for the given error code.
+ * Resolves to the concrete exception type for the given ErrorCode or ErrorCategory.
  *
- * It will be a subclass of both AssertionException, along with ExceptionForCat<> of every category
- * that the code belongs to.
- *
- * TODO in C++17 we can combine this with ExceptionForCat by doing something like:
- * template <auto codeOrCategory> using ExceptionFor = typename
- *      error_details::ExceptionForDispatcher<decltype(codeOrCategory)>::type;
+ * It will be a subclass of AssertionException, and when passed an error code, it will also be a
+ * subclass of ExceptionFor<ErrorCategory> of every category that the code belongs to.
  */
-template <ErrorCodes::Error code>
-using ExceptionFor = typename error_details::ExceptionForDispatcher<code>::type;
+template <auto codeOrCatagory>
+requires std::is_same_v<decltype(codeOrCatagory), ErrorCodes::Error> ||
+    std::is_same_v<decltype(codeOrCatagory), ErrorCategory>
+using ExceptionFor = typename error_details::ExceptionForDispatcher<codeOrCatagory>::type;
+
 
 MONGO_COMPILER_NORETURN void verifyFailed(const char* expr,
                                           SourceLocation loc = MONGO_SOURCE_LOCATION());

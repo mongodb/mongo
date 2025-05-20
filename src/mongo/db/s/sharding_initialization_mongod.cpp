@@ -165,7 +165,7 @@ public:
                 ->shardRegistry()
                 ->updateReplSetHosts(connStr,
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
             LOGV2(471692, "Unable to update the shard registry", "error"_attr = e);
         }
 
@@ -277,7 +277,7 @@ private:
                             ClientOperationKillableByStepdown{false});
             auto opCtx = tc->makeOperationContext();
             ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), update);
-        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
             LOGV2(22069, "Unable to update shard identity config string", "error"_attr = e);
         } catch (...) {
             _endUpdateShardIdentityConfigString(setName, update);

@@ -283,7 +283,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // conn.call() calculated the request checksum, but setFlag() makes it invalid. Clear the
         // checksum so the next conn.call() recalculates it.
         OpMsg::removeChecksum(&request);
-        ASSERT_THROWS(conn.call(request), ExceptionForCat<ErrorCategory::NetworkError>);
+        ASSERT_THROWS(conn.call(request), ExceptionFor<ErrorCategory::NetworkError>);
 
         conn.connect(host, "integration_test", boost::none);  // Reconnect.
 
@@ -320,7 +320,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // Fire-and-forget should still close connection.
         OpMsg::setFlag(&request, OpMsg::kMoreToCome);
         OpMsg::removeChecksum(&request);
-        ASSERT_THROWS(conn.call(request), ExceptionForCat<ErrorCategory::NetworkError>);
+        ASSERT_THROWS(conn.call(request), ExceptionFor<ErrorCategory::NetworkError>);
 
         break;
     }

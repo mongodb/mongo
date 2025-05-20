@@ -179,13 +179,13 @@ TEST(OpLegacy, UnsupportedWriteOps) {
 
     // Issue the requests. They are expected to fail.
     auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    ASSERT_THROWS(conn->call(opInsert), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opInsert), ExceptionFor<ErrorCategory::NetworkError>);
 
     auto opUpdate = makeUnsupportedOpUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    ASSERT_THROWS(conn->call(opUpdate), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opUpdate), ExceptionFor<ErrorCategory::NetworkError>);
 
     auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
-    ASSERT_THROWS(conn->call(opDelete), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opDelete), ExceptionFor<ErrorCategory::NetworkError>);
 }
 
 void assertFailure(const Message response, StringData expectedErr) {
@@ -230,7 +230,7 @@ TEST(OpLegacy, UnsupportedReadOps) {
     assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
     auto opKillCursors = makeUnsupportedOpKillCursorsMessage(cursorId);
-    ASSERT_THROWS(conn->call(opKillCursors), ExceptionForCat<ErrorCategory::NetworkError>);
+    ASSERT_THROWS(conn->call(opKillCursors), ExceptionFor<ErrorCategory::NetworkError>);
 }
 
 TEST(OpLegacy, InvalidNs) {

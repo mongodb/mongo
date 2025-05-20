@@ -136,7 +136,7 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(Service::kServiceName);
         StateMachine::getOrCreate(opCtx, service, doc.toBSON());
-    } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>&) {
+    } catch (const ExceptionFor<ErrorCategory::NotPrimaryError>&) {
         // resharding::processReshardingFieldsForCollection() is called on both primary and
         // secondary nodes as part of the shard version being refreshed. Due to the RSTL lock not
         // being held throughout the shard version refresh, it is also possible for the node to

@@ -938,7 +938,7 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
             // This can happen when we are to do an initial sync.
             return OpTime();
         }
-    } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
+    } catch (const ExceptionFor<ErrorCategory::ShutdownError>&) {
         throw;
     } catch (const DBException& ex) {
         LOGV2_FATAL(18904,

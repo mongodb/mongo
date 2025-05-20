@@ -267,7 +267,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
 
         _cacheHelloResponse(opCtxHandle.get(), getTopologyVersion());
     }
-} catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
+} catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
     LOGV2_DEBUG(40443, 3, "Observer thread stopped due to shutdown", "error"_attr = e.toString());
 }
 
