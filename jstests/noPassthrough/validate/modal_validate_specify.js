@@ -44,20 +44,25 @@ function runDbTest() {
     let validateLogs =
         generateResults(dbpath, {validateDbName: "test", validateCollectionName: "ham"});
     jsTestLog("Specific Collection");
-    assert.eq(1, validateLogs.length);
-    assert.eq("test.ham", validateLogs[0].attr.results.ns);
     jsTestLog(validateLogs);
+    assert.eq(1, validateLogs.length);
+    const validateResult = validateLogs[0].attr.results;
+    assert.eq("test.ham", validateResult.ns);
+    assert.eq(2, validateResult.nIndexes);
+
     clearRawMongoProgramOutput();
 
     // Verify that command validates everything in the specified DB
     validateLogs = generateResults(dbpath, {validateDbName: "test"});
     jsTestLog("Specific DB");
-    assert.eq(2, validateLogs.length);
-    assert(validateLogs[0].attr.results.ns == "test.ham" ||
-           validateLogs[0].attr.results.ns == "test.cheese");
-    assert(validateLogs[1].attr.results.ns == "test.ham" ||
-           validateLogs[1].attr.results.ns == "test.cheese");
     jsTestLog(validateLogs);
+    assert.eq(2, validateLogs.length);
+    const firstResult = validateLogs[0].attr.results;
+    const secondResult = validateLogs[1].attr.results;
+    assert(firstResult.ns == "test.ham" || firstResult.ns == "test.cheese");
+    assert(secondResult.ns == "test.ham" || secondResult.ns == "test.cheese");
+    assert.eq(2, firstResult.nIndexes);
+    assert.eq(2, secondResult.nIndexes);
     clearRawMongoProgramOutput();
 
     // Error if collection is non-existant

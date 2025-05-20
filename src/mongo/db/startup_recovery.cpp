@@ -817,6 +817,8 @@ bool offlineValidateCollection(OperationContext* opCtx, NamespaceString nss) {
 
 // Perform collection validation for all collections on a databases
 bool offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+    databaseHolder->openDb(opCtx, dbName);
     bool allResultsValid = true;
     if (!gValidateCollectionName.empty()) {
         NamespaceString userNss = NamespaceStringUtil::deserialize(dbName, gValidateCollectionName);
@@ -847,8 +849,6 @@ void offlineValidate(OperationContext* opCtx) {
 
     } else {
         for (const auto& dbName : CollectionCatalog::get(opCtx)->getAllDbNames()) {
-            auto databaseHolder = DatabaseHolder::get(opCtx);
-            databaseHolder->openDb(opCtx, dbName);
             allResultsValid &= offlineValidateDb(opCtx, dbName);
         }
     }
