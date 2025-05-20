@@ -99,4 +99,5 @@ feature_flags:
     featureFlagMongodProxyProcolSupport:
         description: "Enables non-OCS proxy protocol connections on Mongos and Mongod"
         cpp_varname: gFeatureFlagMongodProxyProcolSupport
-        default: false
+        default: true
+        version: 7.0
