@@ -97,6 +97,11 @@ protected:
 };
 
 class ShardServerTestFixtureWithCatalogCacheMock : public ShardServerTestFixture {
+public:
+    ShardServerTestFixtureWithCatalogCacheMock() : ShardServerTestFixture() {}
+    ShardServerTestFixtureWithCatalogCacheMock(Options options)
+        : ShardServerTestFixture(std::move(options)) {}
+
 protected:
     void setUp() override;
     CatalogCacheMock* getCatalogCacheMock();

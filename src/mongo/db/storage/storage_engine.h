@@ -106,10 +106,13 @@ public:
         /**
          * Return a new instance of the StorageEngine. Caller owns the returned pointer.
          */
-        virtual std::unique_ptr<StorageEngine> create(
-            OperationContext* opCtx,
-            const StorageGlobalParams& params,
-            const StorageEngineLockFile* lockFile) const = 0;
+        virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                                      const StorageGlobalParams& params,
+                                                      const StorageEngineLockFile* lockFile,
+                                                      bool isReplSet,
+                                                      bool shouldSkipOplogSampling,
+                                                      bool shouldRecoverFromOplogAsStandalone,
+                                                      bool inStandaloneMode) const = 0;
 
         /**
          * Returns the name of the storage engine.
@@ -202,6 +205,12 @@ public:
      * not race with shutdown should obtain the global lock.
      */
     virtual void notifyReplStartupRecoveryComplete(RecoveryUnit&) {}
+
+    /**
+     * The storage engine can save several elements of ReplSettings on construction.  Standalone
+     * mode is one such setting that can change after construction and need to be updated.
+     */
+    virtual void setInStandaloneMode(bool inStandaloneMode) {}
 
     /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery

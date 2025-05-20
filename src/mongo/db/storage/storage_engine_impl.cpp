@@ -868,6 +868,10 @@ void StorageEngineImpl::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
     _engine->notifyReplStartupRecoveryComplete(ru);
 }
 
+void StorageEngineImpl::setInStandaloneMode(bool inStandaloneMode) {
+    _engine->setInStandaloneMode(inStandaloneMode);
+}
+
 std::unique_ptr<RecoveryUnit> StorageEngineImpl::newRecoveryUnit() {
     if (!_engine) {
         // shutdown

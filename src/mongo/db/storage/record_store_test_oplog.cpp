@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -261,9 +262,20 @@ std::string stringifyForDebug(OperationContext* opCtx,
 }
 
 TEST(RecordStoreTest, OplogOrder) {
+    {
+        // Set replset settings before creation of underlying WiredTigerKvEngine
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString("realReplicaSet");
+        setGlobalReplSettings(replSettings);
+    }
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = harnessHelper->getEngine();
+    {
+        // Settings are remembered by the engine, reset now to avoid contaminating other tests
+        repl::ReplSettings replSettings;
+        setGlobalReplSettings(replSettings);
+    }
 
     RecordId id1, id2, id3;
 

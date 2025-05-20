@@ -75,6 +75,12 @@ public:
      */
     virtual void notifyReplStartupRecoveryComplete(RecoveryUnit&) {}
 
+    /**
+     * The storage engine can save several elements of ReplSettings on construction.  Standalone
+     * mode is one such setting that can change after construction and need to be updated.
+     */
+    virtual void setInStandaloneMode(bool inStandaloneMode) {}
+
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() {
         MONGO_UNREACHABLE;
     }

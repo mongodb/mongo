@@ -240,10 +240,21 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
  * long as the commit for each insert comes before the next insert starts.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
+    {
+        // Set replset settings before creation of underlying WiredTigerKvEngine
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString("realReplicaSet");
+        setGlobalReplSettings(replSettings);
+    }
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop();
+    {
+        // Settings are remembered by the engine, reset now to avoid contaminating other tests
+        repl::ReplSettings replSettings;
+        setGlobalReplSettings(replSettings);
+    }
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -276,10 +287,21 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
  * op and all earlier ops are durable.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
+    {
+        // Set replset settings before creation of underlying WiredTigerKvEngine
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString("realReplicaSet");
+        setGlobalReplSettings(replSettings);
+    }
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop();
+    {
+        // Settings are remembered by the engine, reset now to avoid contaminating other tests
+        repl::ReplSettings replSettings;
+        setGlobalReplSettings(replSettings);
+    }
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -313,7 +335,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ASSERT(isOpHidden(id1));
     ASSERT(isOpHidden(id2));
 
-    engine->getOplogManager()->start(longLivedOp.get(), *engine, *rs);
+    engine->getOplogManager()->start(
+        longLivedOp.get(), *engine, *rs, getGlobalReplSettings().isReplSet());
     engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs.get());
 
     ASSERT_FALSE(isOpHidden(id1));

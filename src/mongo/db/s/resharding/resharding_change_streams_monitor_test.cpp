@@ -70,6 +70,9 @@ const StringData kDefaultExecutorDescriptionSuffix = "Default";
 
 class ReshardingChangeStreamsMonitorTest : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
+    ReshardingChangeStreamsMonitorTest()
+        : ShardServerTestFixtureWithCatalogCacheMock(Options{}.useReplSettings(true)) {}
+
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheMock::setUp();
 

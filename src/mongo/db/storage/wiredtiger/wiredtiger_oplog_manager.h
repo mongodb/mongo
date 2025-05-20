@@ -68,7 +68,7 @@ public:
      * Starts the oplog manager, initializing the oplog read timestamp with the highest oplog
      * timestamp.
      */
-    void start(OperationContext*, const KVEngine&, RecordStore& oplog);
+    void start(OperationContext*, const KVEngine&, RecordStore& oplog, bool isReplSet);
 
     /**
      * Stops the oplog manager.
