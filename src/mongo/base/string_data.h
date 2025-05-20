@@ -29,11 +29,9 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
 #include <algorithm>
 #include <cstring>
 #include <fmt/format.h>
-#include <functional>
 #include <iosfwd>
 #include <limits>
 #include <stdexcept>
@@ -348,12 +346,6 @@ public:
                });
     }
 
-    /** absl::Hash ADL hook (behave exactly as std::string_view). */
-    template <typename H>
-    friend H AbslHashValue(H h, StringData sd) {
-        return H::combine(std::move(h), std::string_view{sd});
-    }
-
 private:
     explicit constexpr StringData(std::string_view sv) : _sv{sv} {}
 
@@ -441,15 +433,6 @@ constexpr StringData operator""_sd(const char* c, std::size_t len) {
 }  // namespace literals
 
 }  // namespace mongo
-
-namespace std {
-template <>
-struct hash<mongo::StringData> {
-    size_t operator()(mongo::StringData s) const noexcept {
-        return hash<std::string_view>{}(toStdStringViewForInterop(s));
-    }
-};
-}  // namespace std
 
 namespace fmt {
 template <>

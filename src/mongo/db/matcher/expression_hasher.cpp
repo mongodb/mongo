@@ -29,10 +29,8 @@
 
 #include "mongo/db/matcher/expression_hasher.h"
 
-#include <absl/hash/hash.h>
-
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/fts/fts_query_hash.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -68,6 +66,7 @@
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hash_utils.h"
 
 namespace mongo {
 /**
