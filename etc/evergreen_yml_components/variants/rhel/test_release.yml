@@ -75,8 +75,14 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: selinux_rhel8_org
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - rhel8.8-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - rhel8.8-large
 
 - name: enterprise-rhel-8-64-bit
   display_name: "Enterprise RHEL 8"
@@ -126,8 +132,14 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: selinux_rhel8_enterprise
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - rhel8.8-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - rhel8.8-large
 
 - name: rhel-8-arm64
   display_name: RHEL 8 arm64
@@ -163,8 +175,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - rhel8.8-arm64-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - rhel8.8-arm64-large
 
 - name: enterprise-rhel-8-arm64
   display_name: "Enterprise RHEL 8 arm64"
@@ -203,8 +221,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - rhel8.8-arm64-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - rhel8.8-arm64-large
 
 - name: rhel93
   display_name: RHEL 9.3

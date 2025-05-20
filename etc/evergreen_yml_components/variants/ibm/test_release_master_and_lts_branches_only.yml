@@ -51,8 +51,14 @@ buildvariants:
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel81-power8-large
-  - name: .development_critical !.incompatible_ppc
-  - name: .release_critical !.incompatible_ppc
+  - name: .development_critical !.requires_large_host !.incompatible_ppc
+  - name: .development_critical .requires_large_host !.incompatible_ppc
+    distros:
+    - rhel81-power8-large
+  - name: .release_critical !.requires_large_host !.incompatible_ppc
+  - name: .release_critical .requires_large_host !.incompatible_ppc
+    distros:
+    - rhel81-power8-large
 
 - <<: *enterprise-rhel-81-ppc64le-template
   name: enterprise-rhel-81-ppc64le-dynamic
@@ -122,8 +128,14 @@ buildvariants:
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel9-power-large
-  - name: .development_critical !.incompatible_ppc
-  - name: .release_critical !.incompatible_ppc
+  - name: .development_critical !.requires_large_host !.incompatible_ppc
+  - name: .development_critical .requires_large_host !.incompatible_ppc
+    distros:
+    - rhel9-power-large
+  - name: .release_critical !.requires_large_host !.incompatible_ppc
+  - name: .release_critical .requires_large_host !.incompatible_ppc
+    distros:
+    - rhel9-power-large
 
 - <<: *enterprise-rhel-9-ppc64le-template
   name: enterprise-rhel-9-ppc64le-dynamic

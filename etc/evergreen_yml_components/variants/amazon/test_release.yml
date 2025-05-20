@@ -42,8 +42,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2-latest-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2-latest-large
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
@@ -86,8 +92,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2-latest-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - amazon2-latest-large
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 arm64"
@@ -125,8 +137,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2-arm64-latest-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2-arm64-latest-large
 
 - name: amazon2023
   display_name: "Amazon Linux 2023"
@@ -163,8 +181,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2023.3-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2023.3-large
 
 - name: enterprise-amazon2023
   display_name: "Enterprise Amazon Linux 2023"
@@ -202,8 +226,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2023.3-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - amazon2023.3-large
 
   # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
   # This variant is a special variant to test Link Time Optimization (LTO).
@@ -289,8 +319,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2023.3-arm64-large
+  - name: .release_critical !.requires_large_host !.incompatible_community
+  - name: .release_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2023.3-arm64-large
 
 - name: amazon2023-arm64-grav4
   display_name: "Amazon Linux 2023 arm64 Graviton 4"
@@ -318,8 +354,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023-arm64-latest-large-m8g
-  - name: .development_critical !.incompatible_community
-  - name: .release_critical !.incompatible_community !.publish
+  - name: .development_critical !.requires_large_host !.incompatible_community
+  - name: .development_critical .requires_large_host !.incompatible_community
+    distros:
+    - amazon2023-arm64-latest-large-m8g
+  - name: .release_critical !.requires_large_host !.incompatible_community !.publish
+  - name: .release_critical .requires_large_host !.incompatible_community !.publish
+    distros:
+    - amazon2023-arm64-latest-large-m8g
 
 - &enterprise-amazon2023-arm64-template
   name: enterprise-amazon2023-arm64
@@ -358,8 +400,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2023.3-arm64-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - amazon2023.3-arm64-large
 
 - name: enterprise-amazon2023-arm64-grav4
   display_name: "Enterprise Amazon Linux 2023 arm64 Graviton 4"
@@ -389,8 +437,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2023-arm64-latest-large-m8g
-  - name: .development_critical
-  - name: .release_critical !.publish !.publish_crypt
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2023-arm64-latest-large-m8g
+  - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+  - name: .release_critical .requires_large_host !.publish !.publish_crypt
+    distros:
+    - amazon2023-arm64-latest-large-m8g
 
   # TODO(SERVER-85904): Enable when Bazel supports --link-model=object.
   # This variant is a special variant to test Link Time Optimization (LTO).
@@ -486,8 +540,14 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
-  - name: .development_critical
-  - name: .release_critical
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2-arm64-latest-large
+  - name: .release_critical !.requires_large_host
+  - name: .release_critical .requires_large_host
+    distros:
+    - amazon2-arm64-latest-large
 
 - name: enterprise-amazon2-arm64-grav4
   display_name: "Enterprise Amazon Linux 2 arm64 Graviton 4"
@@ -521,8 +581,14 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - amazon2-arm64-latest-large-m8g
-  - name: .development_critical
-  - name: .release_critical !.publish !.publish_crypt
+  - name: .development_critical !.requires_large_host
+  - name: .development_critical .requires_large_host
+    distros:
+    - amazon2-arm64-latest-large
+  - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+  - name: .release_critical .requires_large_host !.publish !.publish_crypt
+    distros:
+    - amazon2-arm64-latest-large
 
 - <<: *enterprise-amazon2023-arm64-template
   name: enterprise-amazon2023-arm64-fuzzers
