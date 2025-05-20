@@ -643,6 +643,7 @@ index_builds: # authoritative: @10gen/server-index-builds
     - src/mongo/db/commands/vote*index_build*
     - src/mongo/dbtests/index_builds/*
     - src/mongo/dbtests/indexupdatetests.cpp
+    - src/mongo/s/commands/commit_quorum/cluster_set_index_commit_quorum_cmd.cpp
 
 key_string: # authoritative: @10gen/server-key-string
   meta:
