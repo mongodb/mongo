@@ -34,7 +34,7 @@ and x86-64. More detailed platform instructions can be found below.
 python buildscripts/install_bazel.py
 export PATH=~/.local/bin:$PATH
 bazel build install-dist-test
-bazel-bin/install/mongod --version
+bazel-bin/install/bin/mongod --version
 ```
 
 ## Bazel
