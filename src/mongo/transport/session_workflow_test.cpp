@@ -59,6 +59,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
@@ -73,6 +74,8 @@
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
+#include "mongo/transport/transport_options_gen.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -247,8 +250,14 @@ public:
         ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
     }
 
-    void initializeNewSession() {
-        _session = std::make_shared<CustomMockSession>(this);
+    /**
+     * This must be called before beginning a session workflow on a new session in the test. It
+     * updates the _session shared pointer to a fresh session.
+     */
+    void initializeNewSession(HostAndPort remote = HostAndPort(),
+                              SockAddr remoteAddr = SockAddr(),
+                              SockAddr localAddr = SockAddr()) {
+        _session = std::make_shared<CustomMockSession>(this, remote, remoteAddr, localAddr);
         _session->getTransportLayerCb = [this] {
             return _transportLayer;
         };
@@ -322,7 +331,11 @@ public:
 private:
     class CustomMockSession : public CallbackMockSession {
     public:
-        explicit CustomMockSession(SessionWorkflowTest* fixture) {
+        explicit CustomMockSession(SessionWorkflowTest* fixture,
+                                   HostAndPort remote,
+                                   SockAddr remoteAddr,
+                                   SockAddr localAddr)
+            : CallbackMockSession(remote, remoteAddr, localAddr) {
             endCb = [this] {
                 *_connected = false;
             };
@@ -552,6 +565,78 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
     // calls to the SEP for the cleanup "killCursors", and the next thing to happen
     // will be the end of the session.
     expect<Event::sepEndSession>();
+    joinSessions();
+}
+
+class ConnectionEstablishmentQueueingTest : public SessionWorkflowTest {
+private:
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagRateLimitIngressConnectionEstablishment", true};
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
+                                                          logv2::LogSeverity::Debug(4)};
+};
+
+TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisabled) {
+    sessionManager()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
+    sessionManager()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
+
+    // The first session gets a token successfully and calls sourceMessage.
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    // The next session fails to get a token and is closed because queueing is disabled.
+    initializeNewSession();
+    startSession();
+    expect<Event::sepEndSession>();
+
+    joinSessions();
+}
+
+TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
+    sessionManager()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
+    sessionManager()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
+    sessionManager()->getSessionEstablishmentRateLimiter().setMaxQueueDepth(10);
+
+    // The first session gets a token successfully and calls sourceMessage.
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    // The next session fails to get a token and queues until it is interrupted.
+    initializeNewSession();
+    startSession();
+    // TODO SERVER-104811: assert on the queued metric to ensure this session is queued.
+    getServiceContext()->setKillAllOperations();
+    expect<Event::sepEndSession>();
+
+    joinSessions();
+}
+
+TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
+    std::string ip = "127.0.0.1";
+    RAIIServerParameterControllerForTest exemptionsGuard(
+        "maxEstablishingConnectionsOverride", BSON("ranges" << BSONArray(BSON("0" << ip))));
+    sessionManager()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
+    sessionManager()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
+
+    // The first session gets a token successfully and calls sourceMessage.
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    // Non-exempt ips fail because there are no tokens available and queueing is disabled.
+    initializeNewSession(HostAndPort("192.168.0.53", 27017),
+                         SockAddr::create("192.168.0.53", 27017, AF_INET));
+    startSession();
+    expect<Event::sepEndSession>();
+
+    // Exempted ips get through.
+    initializeNewSession(HostAndPort(ip, 27017), SockAddr::create(ip, 27017, AF_INET));
+    startSession();
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
     joinSessions();
 }
 

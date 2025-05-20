@@ -140,8 +140,6 @@ const UserName kTenant2UserTest("userTenant2"_sd, "test"_sd, kTenantId2);
 const std::unique_ptr<UserRequest> kTenant2UserTestRequest =
     std::make_unique<UserRequestGeneral>(kTenant2UserTest, boost::none);
 
-const transport::TransportLayerMock transportLayer;
-
 TEST_F(AuthorizationSessionTest, MultiAuthSameUserAllowed) {
     ASSERT_OK(createUser(kUser1Test, {}));
     ASSERT_OK(
@@ -373,6 +371,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
 }
 
 void AuthorizationSessionTest::testInvalidateUser() {
+    transport::TransportLayerMock transportLayer;
     const std::shared_ptr<transport::Session> session =
         transport::MockSession::create(&transportLayer);
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
