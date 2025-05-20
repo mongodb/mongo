@@ -606,7 +606,11 @@ public:
         }
 
         if (normal_ret == WT_NOTFOUND) {
-            testutil_assert(range_ret == WT_NOTFOUND);
+            /*
+             * It's possible that the bounded cursor operations may return WT_ROLLBACK, so allow
+             * that here in addition to WT_NOTFOUND.
+             */
+            testutil_assert(range_ret == WT_NOTFOUND || range_ret == WT_ROLLBACK);
             return 0;
         }
         if (normal_ret != 0)
