@@ -83,10 +83,8 @@ assertWriteConcernError(abortRes);
 assert.eq(st.s.getDB(dbName).foo.find({x: -5}).itcount(), 0);
 
 // 3. Test that abortTransctions returns a WCE if we attempt to abort after a commit has succeeded
-// but failed write concern.
-// TODO SERVER-100943 abort transaction should wait for write concern if the transaction was
-// committed
-/*assert.commandWorked(st.s.getDB(dbName).runCommand({
+// but failed write concern
+assert.commandWorked(st.s.getDB(dbName).runCommand({
     insert: collName,
     documents: [{x: -1}, {x: 1}],
     lsid: {id: lsid},
@@ -115,7 +113,7 @@ abortRes = st.s.adminCommand({
     writeConcern: {w: 3, wtimeout: 1000}
 });
 assert.commandFailedWithCode(abortRes, ErrorCodes.TransactionCommitted);
-assertWriteConcernError(abortRes);*/
+assertWriteConcernError(abortRes);
 
 // *** 1 shard write commit optimization path tests ***
 

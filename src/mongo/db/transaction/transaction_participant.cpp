@@ -1639,7 +1639,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     }
 
     if (cmdName == "abortTransaction" &&
-        (o().txnState.isAbortedWithoutPrepare() || o().txnState.isInProgress())) {
+        (o().txnState.isAbortedWithoutPrepare() || o().txnState.isInProgress() ||
+         o().txnState.isCommitted())) {
         // Explicitly set lastOp so that the abort for an internal transaction waits for write
         // concern in the service entry point. This is used by internal transactions (via the
         // cleanup abort) to ensure that the speculative snapshot the transaction was operating on
@@ -1647,6 +1648,10 @@ void TransactionParticipant::Participant::unstashTransactionResources(
         //
         // Note that setLastOpToSystemLastOpTime() requires us to not be in a write unit of work,
         // and so it must be set before we set the write unit of work later in this function.
+        //
+        // We also want to wait to make sure a commit transaction entry has been replicated to
+        // secondaries before officially telling the client that the transaction has already been
+        // committed when we try to abort.
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     }
 
