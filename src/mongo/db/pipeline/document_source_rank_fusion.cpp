@@ -487,10 +487,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
         // If not, the default is one.
         double pipelineWeight = hybrid_scoring_util::getPipelineWeight(weights, name);
 
-        // TODO SERVER-100754 Replace isScoredPipeline() with generatesMetadataType(kScore)
         // We need to know if the pipeline generates "score" and "scoreDetails" metadata so we know
         // how to construct each pipeline's individual "scoreDetails" (see addScoreDetails()).
-        const bool inputGeneratesScore = hybrid_scoring_util::isScoredPipeline(*pipeline);
+        const bool inputGeneratesScore =
+            pipeline->generatesMetadataType(DocumentMetadataFields::kScore);
         const bool inputGeneratesScoreDetails =
             pipeline->generatesMetadataType(DocumentMetadataFields::kScoreDetails);
 

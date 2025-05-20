@@ -42,11 +42,6 @@ namespace mongo::hybrid_scoring_util {
 bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage);
 
 /**
- * Checks if this pipeline will generate score metadata.
- */
-bool isScoredPipeline(const Pipeline& pipeline);
-
-/**
  * Return pipeline's associated weight, if it exists. Otherwise, return a default of 1.
  */
 double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName);

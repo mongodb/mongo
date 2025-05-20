@@ -336,7 +336,8 @@ static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
             str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
             !sources.empty());
 
-    uassert(9402500, scorePipelineMsg, hybrid_scoring_util::isScoredPipeline(pipeline));
+    uassert(
+        9402500, scorePipelineMsg, pipeline.generatesMetadataType(DocumentMetadataFields::kScore));
 
     for (const auto& stage : sources) {
         if (stage->getSourceName() == DocumentSourceSearch::kStageName) {

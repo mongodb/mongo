@@ -931,6 +931,62 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyPipeline) {
                        9402503);
 }
 
+TEST_F(DocumentSourceScoreFusionTest, CheckSinglePipelineTextMatchAllowed) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    pipeOne: [
+                        {
+                            $match: {
+                                $text: {
+                                    $search: "coffee"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            }
+        }    
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelineTextMatchAllowed) {
+    NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
+    getExpCtx()->setResolvedNamespaces(
+        ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    pipeOne: [
+                        { $match : { author : "Agatha Christie" } },
+                        { $score: { score: "$age" } }
+                    ],
+                    pipeTwo: [
+                        {
+                            $match: {
+                                $text: {
+                                    $search: "coffee"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            }
+        }    
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
     NamespaceString fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
     getExpCtx()->setResolvedNamespaces(

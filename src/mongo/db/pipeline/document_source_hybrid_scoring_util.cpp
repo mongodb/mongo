@@ -52,25 +52,6 @@ bool isScoreStage(const boost::intrusive_ptr<DocumentSource>& stage) {
     return setMetadataTransform->getMetaType() == DocumentMetadataFields::MetaType::kScore;
 }
 
-// TODO SERVER-100754: A pipeline that begins with a $match stage that isTextQuery() should also
-// count.
-// TODO SERVER-100754 This custom logic should be able to be replaced by using DepsTracker to
-// walk the pipeline and see if "score" metadata is produced.
-bool isScoredPipeline(const Pipeline& pipeline) {
-    // Note that we don't check for $rankFusion and $scoreFusion explicitly because it will be
-    // desugared by this point.
-    static const std::set<StringData> implicitlyScoredStages{DocumentSourceVectorSearch::kStageName,
-                                                             DocumentSourceSearch::kStageName};
-    const auto& sources = pipeline.getSources();
-    if (sources.empty()) {
-        return false;
-    }
-
-    auto firstStageName = sources.front()->getSourceName();
-    return implicitlyScoredStages.contains(firstStageName) ||
-        std::any_of(sources.cbegin(), sources.cend(), isScoreStage);
-}
-
 double getPipelineWeight(const StringMap<double>& weights, const std::string& pipelineName) {
     // If no weight is provided, default to 1.
     return weights.contains(pipelineName) ? weights.at(pipelineName) : 1;

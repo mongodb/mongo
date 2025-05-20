@@ -14,6 +14,7 @@
  */
 
 const collName = "search_score_fusion";
+const coll = db[collName];
 
 const vectorSearchClauseAndSearchClause = {
     score1: [{
@@ -38,6 +39,10 @@ const searchMatchAsClause = {
 const scoreInputPipelines = {
     score3: [{$match: {author: "Agatha Christie"}}, {$score: {score: 50.0}}],
     score4: [{$match: {author: "dave"}}, {$score: {score: 10.0}}]
+};
+
+const textMatchClause = {
+    score5: [{$match: {$text: {$search: "coffee"}}}]
 };
 
 function runPipeline(pipeline) {
@@ -103,3 +108,17 @@ assert.commandWorked(runPipeline([{
         combination: {weights: {score3: 5, score4: 10}}
     }
 }]));
+
+// Check that $text match is valid.
+assert.commandWorked(coll.createIndex({text: "text"}));
+assert.commandWorked(
+    runPipeline([{$scoreFusion: {input: {pipelines: textMatchClause, normalization: "none"}}}]));
+
+// Check that unscored pipeline is invalid.
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {pipelines: {pipeOne: [{$limit: 2}]}, normalization: "none"},
+        }
+    }]),
+    9402500);
