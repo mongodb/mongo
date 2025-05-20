@@ -44,6 +44,8 @@
           - PeriodicKillSecondaries
       hooks:
         - class: PeriodicKillSecondaries
+        - class: CleanEveryN
+          n: 20
 
 - name: hooks_with_legacy_validate
   value:
