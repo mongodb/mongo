@@ -32,7 +32,6 @@
 
 #include "asio/detail/config.hpp"
 
-#include "asio/detail/push_options.hpp"
 #include "asio/detail/throw_error.hpp"
 #include "asio/error.hpp"
 
@@ -44,6 +43,9 @@
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/str.h"
+
+// This must be after all other includes
+#include "asio/detail/push_options.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

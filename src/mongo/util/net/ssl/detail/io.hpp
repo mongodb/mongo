@@ -22,6 +22,7 @@
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include <asio/write.hpp>
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {

@@ -36,10 +36,11 @@
 #include <cstddef>
 #include <memory>
 
+#include <asio/detail/assert.hpp>
+
+// This must be after all other includes
 #include "asio/detail/push_options.hpp"
 
-
-#include "asio/detail/assert.hpp"
 
 #define ASSERT_STATE_TRANSITION(orig, dest) ASIO_ASSERT(!(orig) || (dest));
 

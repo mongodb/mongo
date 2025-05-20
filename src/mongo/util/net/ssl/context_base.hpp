@@ -21,6 +21,7 @@
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {

@@ -21,7 +21,10 @@
 #include "mongo/util/net/ssl/stream_base.hpp"
 #include <asio/buffer.hpp>
 #include <asio/detail/static_mutex.hpp>
+#include <asio/error_code.hpp>
+#include <boost/optional.hpp>
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {

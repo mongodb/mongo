@@ -39,6 +39,7 @@
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/text.h"
 
+// This must be after all other includes
 #include "asio/detail/push_options.hpp"
 
 namespace asio {

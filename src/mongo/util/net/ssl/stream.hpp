@@ -33,6 +33,7 @@
 #include <asio/detail/noncopyable.hpp>
 #include <asio/detail/type_traits.hpp>
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {

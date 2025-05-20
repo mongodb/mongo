@@ -35,6 +35,7 @@
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context_base.hpp"
 
+// This must be after all other includes
 #include "asio/detail/push_options.hpp"
 
 namespace asio {

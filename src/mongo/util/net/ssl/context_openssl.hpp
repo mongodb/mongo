@@ -23,6 +23,7 @@
 #include <asio/io_context.hpp>
 #include <string>
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {

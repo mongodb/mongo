@@ -29,8 +29,8 @@
 
 #pragma once
 
-// Keeping this first to ensure it compiles by itself
 #include "mongo/util/future_impl.h"
+// Keeping this first to ensure it compiles by itself
 
 #include <boost/intrusive_ptr.hpp>
 #include <type_traits>

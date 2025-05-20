@@ -17,6 +17,7 @@
 
 #include <asio/detail/config.hpp>
 
+// This must be after all other includes
 #include <asio/detail/push_options.hpp>
 
 namespace asio {
