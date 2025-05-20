@@ -15,18 +15,22 @@ mongo_cc_library(
         "hello_metrics.cpp",
         "session.cpp",
         "transport_layer.cpp",
+        "transport_options.cpp",
+        "transport_options_gen",
     ],
     hdrs = [
         "hello_metrics.h",
         "session.h",
         "session_manager.h",
         "transport_layer.h",
+        "transport_options.h",
     ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
         "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/admission:rate_limiter",
         "//src/mongo/util:future_util",
         "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
     ],
@@ -82,8 +86,6 @@ mongo_cc_library(
     name = "transport_layer",
     srcs = [
         "proxy_protocol_header_parser.cpp",
-        ":transport_options.cpp",
-        ":transport_options_gen",
         "//src/mongo/transport/asio:asio_session_impl.cpp",
         "//src/mongo/transport/asio:asio_session_manager.cpp",
         "//src/mongo/transport/asio:asio_tcp_fast_open.cpp",

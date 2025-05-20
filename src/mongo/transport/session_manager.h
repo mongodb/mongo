@@ -33,11 +33,13 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/client.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -57,7 +59,10 @@ private:
     SessionManager& operator=(const SessionManager&) = delete;
 
 protected:
-    SessionManager() = default;
+    SessionManager()
+        : _sessionEstablishmentRateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
+                                           gIngressConnectionEstablishmentBurstSize.load(),
+                                           gIngressConnectionEstablishmentMaxQueueDepth.load()) {}
 
 public:
     virtual ~SessionManager() = default;
@@ -94,6 +99,25 @@ public:
         return std::numeric_limits<std::size_t>::max();
     }
 
+    /**
+     * Returns the rate limiter component used for session establishment. New, non-exempt
+     * sessions must acquire a token from the rate limiter to ensure that many concurrent
+     * session establishment attempts cannot overload the server.
+     */
+    admission::RateLimiter& getSessionEstablishmentRateLimiter() {
+        return _sessionEstablishmentRateLimiter;
+    }
+
+    /**
+     * Return a VersionedValue::Snapshot of the list of CIDR ranges and IPs exempt from session
+     * establishment rate-limiting.
+     */
+    auto& getSessionEstablishmentRateLimitExemptionList() {
+        serverGlobalParams.maxEstablishingConnsOverride.refreshSnapshot(
+            _maxEstablishingConnsOverride);
+        return _maxEstablishingConnsOverride;
+    }
+
     // Stats
 
     /**
@@ -125,6 +149,11 @@ protected:
     friend class Session;
     AtomicWord<std::size_t> _totalOperations{0};
     AtomicWord<std::size_t> _completedOperations{0};
+
+    // Rate limiter component for session establishment.
+    admission::RateLimiter _sessionEstablishmentRateLimiter;
+    decltype(ServerGlobalParams::maxEstablishingConnsOverride)::Snapshot
+        _maxEstablishingConnsOverride;
 };
 
 }  // namespace transport
