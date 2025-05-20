@@ -192,7 +192,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
             continue;
         }
 
-        if (resharding::gReshardingRemainingTimeEstimateAccountsForReplicationLag.load()) {
+        if (resharding::gReshardingRemainingTimeEstimateAccountsForRecipientReplicationLag.load()) {
             // The remaining time estimate should account for the replication lag since
             // transitioning to the "strict-consistency" state (or any state) requires waiting for
             // the write to the recipient state doc to be majority committed. If the replication lag
