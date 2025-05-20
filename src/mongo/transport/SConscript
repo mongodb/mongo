@@ -25,9 +25,12 @@ env.Library(
         'hello_metrics.cpp',
         'session.cpp',
         'transport_layer.cpp',
+        'transport_options.cpp',
+        'transport_options.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/admission/rate_limiter',
         '$BUILD_DIR/mongo/db/connection_health_metrics_parameter',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
@@ -91,8 +94,6 @@ tlEnv.Library(
         'asio/asio_transport_layer.cpp',
         'asio/asio_utils.cpp',
         'proxy_protocol_header_parser.cpp',
-        'transport_options.cpp',
-        'transport_options.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/system_error',

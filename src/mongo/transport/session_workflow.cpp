@@ -42,6 +42,7 @@
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/executor/split_timer.h"
@@ -54,6 +55,7 @@
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -281,9 +283,9 @@ using Metrics = NoopSessionWorkflowMetrics;
 
 /**
  * Given a request and its already generated response, checks for exhaust flags. If exhaust is
- * allowed, produces the subsequent request message, and modifies the response message to indicate
- * it is part of an exhaust stream. Returns the subsequent request message, which is known as a
- * 'synthetic' exhaust request. Returns an empty optional if exhaust is not allowed.
+ * allowed, produces the subsequent request message, and modifies the response message to
+ * indicate it is part of an exhaust stream. Returns the subsequent request message, which is
+ * known as a 'synthetic' exhaust request. Returns an empty optional if exhaust is not allowed.
  */
 boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& response) {
     if (!OpMsgRequest::isFlagSet(requestMsg, OpMsg::kExhaustSupported) ||
@@ -387,7 +389,8 @@ public:
     /*
      * Terminates the associated transport Session, regardless of tags.
      *
-     * This will not block on the session terminating cleaning itself up, it returns immediately.
+     * This will not block on the session terminating cleaning itself up, it returns
+     * immediately.
      */
     void terminate();
 
@@ -526,6 +529,8 @@ private:
         executor()->yieldIfAppropriate();
     }
 
+    void _waitForEstabilshmentRateLimit();
+
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
@@ -533,6 +538,8 @@ private:
 
     AtomicWord<bool> _isTerminated{false};
     ClientStrandPtr _clientStrand;
+
+    bool _inFirstIteration = true;
 
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
@@ -780,21 +787,29 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
             _cleanupSession(status);
             return;
         }
-        if (useDedicatedThread()) {
-            try {
+
+        try {
+            // If this is the first iteration of the session workflow, we must acquire an
+            // "establishment token" to respect connection establishment rate limits.
+            if (MONGO_unlikely(_inFirstIteration)) {
+                _waitForEstabilshmentRateLimit();
+                _inFirstIteration = false;
+            }
+
+            if (useDedicatedThread()) {
                 _doOneIteration().get();
                 _scheduleIteration();
-            } catch (const DBException& ex) {
-                _onLoopError(ex.toStatus());
+            } else {
+                _doOneIteration().getAsync([this, anchor = shared_from_this()](Status st) {
+                    if (!st.isOK()) {
+                        _onLoopError(st);
+                        return;
+                    }
+                    _scheduleIteration();
+                });
             }
-        } else {
-            _doOneIteration().getAsync([this, anchor = shared_from_this()](Status st) {
-                if (!st.isOK()) {
-                    _onLoopError(st);
-                    return;
-                }
-                _scheduleIteration();
-            });
+        } catch (const DBException& ex) {
+            _onLoopError(ex.toStatus());
         }
     }));
 } catch (const DBException& ex) {
@@ -804,6 +819,24 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                           "Unable to schedule a new loop for the session workflow",
                           "error"_attr = error);
     _onLoopError(error);
+}
+
+void SessionWorkflow::Impl::_waitForEstabilshmentRateLimit() {
+    auto sep = _serviceContext->getServiceEntryPoint();
+    auto exemptionsList = sep->getSessionEstablishmentRateLimitExemptionList();
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+
+    if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabledUseLatestFCVWhenUninitialized(
+            fcvSnapshot) &&
+        !(exemptionsList && isExemptedByCIDRList(session(), *exemptionsList))) {
+        // Create an opCtx for interruptibility and to make queued waiters return tokens when
+        // the client has disconnected.
+        auto establishmentOpCtx = client()->makeOperationContext();
+        establishmentOpCtx->markKillOnClientDisconnect();
+        // Acquire a token or block until one becomes available.
+        uassertStatusOK(
+            sep->getSessionEstablishmentRateLimiter().acquireToken(establishmentOpCtx.get()));
+    }
 }
 
 void SessionWorkflow::Impl::terminate() {

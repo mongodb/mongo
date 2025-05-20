@@ -32,10 +32,12 @@
 #include <limits>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -126,8 +128,36 @@ public:
     virtual void incrementLBConnections(){};
     virtual void decrementLBConnections(){};
 
+    /**
+     * Returns the rate limiter component used for session establishment. New, non-exempt
+     * sessions must acquire a token from the rate limiter to ensure that many concurrent
+     * session establishment attempts cannot overload the server.
+     */
+    admission::RateLimiter& getSessionEstablishmentRateLimiter() {
+        return _sessionEstablishmentRateLimiter;
+    }
+
+    /**
+     * Return a VersionedValue::Snapshot of the list of CIDR ranges and IPs exempt from session
+     * establishment rate-limiting.
+     */
+    auto& getSessionEstablishmentRateLimitExemptionList() {
+        serverGlobalParams.maxEstablishingConnsOverride.refreshSnapshot(
+            _maxEstablishingConnsOverride);
+        return _maxEstablishingConnsOverride;
+    }
+
 protected:
-    ServiceEntryPoint() = default;
+    ServiceEntryPoint()
+        : _sessionEstablishmentRateLimiter(
+              transport::gIngressConnectionEstablishmentRatePerSec.load(),
+              transport::gIngressConnectionEstablishmentBurstSize.load(),
+              transport::gIngressConnectionEstablishmentMaxQueueDepth.load()){};
+
+    // Rate limiter component for session establishment.
+    admission::RateLimiter _sessionEstablishmentRateLimiter;
+    decltype(ServerGlobalParams::maxEstablishingConnsOverride)::Snapshot
+        _maxEstablishingConnsOverride;
 };
 
 }  // namespace mongo

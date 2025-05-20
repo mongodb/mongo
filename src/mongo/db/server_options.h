@@ -91,7 +91,7 @@ struct ServerGlobalParams {
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
     std::vector<stdx::variant<CIDR, std::string>> maxIncomingConnsOverride;
-    VersionedValue<std::vector<std::variant<CIDR, std::string>>> maxEstablishingConnsOverride;
+    VersionedValue<std::vector<stdx::variant<CIDR, std::string>>> maxEstablishingConnsOverride;
     int reservedAdminThreads = 0;
 
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket

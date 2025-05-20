@@ -59,6 +59,14 @@ private:
 
 class CallbackMockSession : public MockSessionBase {
 public:
+    CallbackMockSession() = default;
+
+    CallbackMockSession(HostAndPort remote,
+                        HostAndPort local,
+                        SockAddr remoteAddr,
+                        SockAddr localAddr)
+        : MockSessionBase(remote, local, remoteAddr, localAddr) {}
+
     TransportLayer* getTransportLayer() const override {
         return getTransportLayerCb();
     }
