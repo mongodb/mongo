@@ -36,18 +36,8 @@
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/util/hash_utils.h"
 
 namespace mongo {
-template <typename H>
-H AbslHashValue(H h, const Value& value) {
-    return H::combine(std::move(h), ValueComparator{}.hash(value));
-}
-
-template <typename H>
-H AbslHashValue(H h, const TimeZone& value) {
-    return H::combine(std::move(h), value.toString());
-}
 
 template <typename H>
 class ExpressionHashVisitor : public ExpressionConstVisitor {
@@ -864,9 +854,43 @@ public:
     }
 
 private:
+    /** Fallback */
+    template <typename T>
+    static H _doHash(H h, const T& x) {
+        return H::combine(std::move(h), x);
+    }
+
+    static H _doHash(H h, const Value& value) {
+        return H::combine(std::move(h), ValueComparator{}.hash(value));
+    }
+
+    static H _doHash(H h, const TimeZone& tz) {
+        return H::combine(std::move(h), tz.toString());
+    }
+
+    template <typename T>
+    static H _doHash(H h, const boost::optional<T>& x) {
+        if (x)
+            h = _doHash(std::move(h), *x);
+        h = _doHash(std::move(h), bool{x});
+        return h;
+    }
+
+    template <typename T>
+    class PrivateHash {
+    private:
+        template <typename HH>
+        friend HH AbslHashValue(HH h, const PrivateHash& hashable) {
+            return _doHash(std::move(h), hashable.value);
+        }
+
+    public:
+        const T& value;
+    };
+
     template <typename... Ts>
     void combine(const Ts&... values) {
-        _hashState = H::combine(std::move(_hashState), values...);
+        _hashState = H::combine(std::move(_hashState), PrivateHash{values}...);
     }
 
     H _hashState;
