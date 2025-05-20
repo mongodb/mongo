@@ -100,7 +100,6 @@ mongo_cc_library(
     deps = [
         "storage_wiredtiger_customization_hooks",
         "//src/mongo/bson/dotted_path:dotted_path_support",
-        "//src/mongo/db:global_settings",
         "//src/mongo/db:mongod_options",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",
@@ -108,7 +107,6 @@ mongo_cc_library(
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/concurrency:exception_util",
-        "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/storage:backup_block",
         "//src/mongo/db/storage:capped_snapshots",
         "//src/mongo/db/storage:execution_context",

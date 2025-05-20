@@ -70,7 +70,6 @@ std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
         /*ephemeral=*/false,
         /*repair=*/false,
         getGlobalReplSettings().isReplSet(),
-        repl::ReplSettings::shouldSkipOplogSampling(),
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
         getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 }

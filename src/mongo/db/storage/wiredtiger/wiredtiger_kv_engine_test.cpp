@@ -132,7 +132,6 @@ private:
             false,
             _forRepair,
             getGlobalReplSettings().isReplSet(),
-            repl::ReplSettings::shouldSkipOplogSampling(),
             repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
             getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 

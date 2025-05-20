@@ -43,6 +43,8 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/global_settings.h"
+#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -414,8 +416,13 @@ StorageEngine::LastShutdownState startUpStorageEngineAndCollectionCatalog(
                                         std::make_unique<RecoveryUnitNoop>(),
                                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    auto lastShutdownState = initializeStorageEngine(
-        initializeStorageEngineOpCtx.get(), initFlags, startupTimeElapsedBuilder);
+    auto lastShutdownState =
+        initializeStorageEngine(initializeStorageEngineOpCtx.get(),
+                                initFlags,
+                                getGlobalReplSettings().isReplSet(),
+                                repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
+                                getReplSetMemberInStandaloneMode(getGlobalServiceContext()),
+                                startupTimeElapsedBuilder);
 
     Lock::GlobalWrite globalLk(initializeStorageEngineOpCtx.get());
     catalog::initializeCollectionCatalog(initializeStorageEngineOpCtx.get(),

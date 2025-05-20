@@ -69,6 +69,9 @@ constexpr StorageEngineInitFlags operator|(StorageEngineInitFlags a, StorageEngi
 StorageEngine::LastShutdownState initializeStorageEngine(
     OperationContext* opCtx,
     StorageEngineInitFlags initFlags,
+    bool isReplSet,
+    bool shouldRecoverFromOplogAsStandalone,
+    bool inStandaloneMode,
     BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 /**
@@ -88,6 +91,9 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service);
 StorageEngine::LastShutdownState reinitializeStorageEngine(
     OperationContext* opCtx,
     StorageEngineInitFlags initFlags,
+    bool isReplSet,
+    bool shouldRecoverFromOplogAsStandalone,
+    bool inStandaloneMode,
     std::function<void()> changeConfigurationCallback = [] {});
 
 /**

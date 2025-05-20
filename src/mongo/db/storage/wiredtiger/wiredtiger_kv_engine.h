@@ -299,7 +299,6 @@ public:
                        bool ephemeral,
                        bool repair,
                        bool isReplSet,
-                       bool shouldSkipOplogSampling,
                        bool shouldRecoverFromOplogAsStandalone,
                        bool inStandaloneMode);
 
@@ -847,7 +846,6 @@ private:
 
     // Replication settings, passed in from constructor to avoid dependency on repl
     bool _isReplSet;
-    bool _shouldSkipOplogSampling;
     bool _shouldRecoverFromOplogAsStandalone;
     bool _inStandaloneMode;
 };

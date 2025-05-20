@@ -52,7 +52,6 @@ public:
                                           const StorageGlobalParams& params,
                                           const StorageEngineLockFile* lockFile,
                                           bool isReplSet,
-                                          bool shouldSkipOplogSampling,
                                           bool shouldRecoverFromOplogAsStandalone,
                                           bool inStandaloneMode) const override {
         StorageEngineOptions options;

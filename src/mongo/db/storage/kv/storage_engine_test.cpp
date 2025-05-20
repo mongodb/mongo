@@ -1023,8 +1023,8 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
-    auto lastShutdownState =
-        reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&newPath] {
+    auto lastShutdownState = reinitializeStorageEngine(
+        opCtx.get(), StorageEngineInitFlags{}, false, false, false, [&newPath] {
             storageGlobalParams.dbpath = newPath;
         });
     {
@@ -1053,8 +1053,8 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
         catalog.onCloseCatalog();
         catalog.deregisterAllCollectionsAndViews(getServiceContext());
     });
-    lastShutdownState =
-        reinitializeStorageEngine(opCtx.get(), StorageEngineInitFlags{}, [&oldPath] {
+    lastShutdownState = reinitializeStorageEngine(
+        opCtx.get(), StorageEngineInitFlags{}, false, false, false, [&oldPath] {
             storageGlobalParams.dbpath = oldPath;
         });
     {

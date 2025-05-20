@@ -555,7 +555,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool ephemeral,
                                        bool repair,
                                        bool isReplSet,
-                                       bool shouldSkipOplogSampling,
                                        bool shouldRecoverFromOplogAsStandalone,
                                        bool inStandaloneMode)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)),
@@ -566,7 +565,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _ephemeral(ephemeral),
       _inRepairMode(repair),
       _isReplSet(isReplSet),
-      _shouldSkipOplogSampling(shouldSkipOplogSampling),
       _shouldRecoverFromOplogAsStandalone(shouldRecoverFromOplogAsStandalone),
       _inStandaloneMode(inStandaloneMode) {
     // When the storage engine is configured to be in-memory, it should also be ephemeral.

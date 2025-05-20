@@ -78,7 +78,6 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
         false,
         false,
         getGlobalReplSettings().isReplSet(),
-        repl::ReplSettings::shouldSkipOplogSampling(),
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
         getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 

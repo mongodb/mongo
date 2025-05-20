@@ -100,7 +100,6 @@ public:
             false,
             false,
             getGlobalReplSettings().isReplSet(),
-            repl::ReplSettings::shouldSkipOplogSampling(),
             repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
             getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
 
