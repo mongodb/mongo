@@ -15,3 +15,6 @@ filters:
   - "validate_compile_commands.py":
     approvers:
       - 10gen/devprod-build
+  - "packager_crypt_py_run.sh":
+    approvers:
+      - 10gen/devprod-build

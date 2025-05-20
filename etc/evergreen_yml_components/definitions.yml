@@ -2074,6 +2074,17 @@ functions:
         args:
           - "./src/evergreen/packager.py_run.sh"
 
+  "run packager_crypt.py":
+    - *get_version_expansions
+    - *apply_version_expansions
+    - *f_expansions_write
+    - command: subprocess.exec
+      display_name: "packager crypt py_run sh"
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/packager_crypt_py_run.sh"
+
   "do watchdog setup":
     - *f_expansions_write
     - command: subprocess.exec

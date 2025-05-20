@@ -320,6 +320,42 @@ tasks:
           content_type: ${content_type|application/tar}
           display_name: "Mongo crypt Library"
 
+  - name: crypt_lib_package
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "crypt",
+        "incompatible_aubsan",
+        "incompatible_community",
+        "incompatible_mac",
+        "incompatible_tsan",
+        "incompatible_windows",
+        "release_critical",
+        "requires_compile_variant",
+        "requires_large_host",
+      ]
+    depends_on:
+      - name: crypt_create_lib
+    commands:
+      - func: "run packager_crypt.py"
+      - command: archive.targz_pack
+        params:
+          target: "packages.tgz"
+          source_dir: "src"
+          include:
+            - "repo/**"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: packages.tgz
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Packages
+
   - name: package
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:

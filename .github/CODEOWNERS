@@ -206,6 +206,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/**/restore_git_history_and_tags.sh @10gen/devprod-correctness @svc-auto-approve-bot
 /evergreen/**/retry_git.sh @10gen/devprod-correctness @svc-auto-approve-bot
 /evergreen/**/validate_compile_commands.py @10gen/devprod-build @svc-auto-approve-bot
+/evergreen/**/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/OWNERS.yml
 /jstests/**/*analyze_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
