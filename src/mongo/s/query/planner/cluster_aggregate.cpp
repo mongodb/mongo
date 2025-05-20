@@ -558,7 +558,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                               : PipelineDataSource::kNormal;
 
     // If the routing table is not already taken by the higher level, fill it now.
-    if (!cri) {
+    if (!cri && !generatesOwnDataOnce) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
         // then either the database does not exist, or there are no shards in the cluster. In the
         // latter case, we always return an empty cursor. In the former case, if the requested
@@ -586,7 +586,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         if (executionNsRoutingInfoStatus.isOK()) {
             cri = executionNsRoutingInfoStatus.getValue();
-        } else if (!((hasChangeStream || generatesOwnDataOnce) &&
+        } else if (!(hasChangeStream &&
                      executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
             // To achieve parity with mongod-style responses, parse and validate the query
             // even though the namespace is not found.
@@ -617,6 +617,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             return Status::OK();
         }
     }
+
+    // We should never acquire a routing table for a collectionless aggregate, as the first stage
+    // generates its own data and has the pipeline has no shards part to target.
+    tassert(10337900,
+            "Cannot acquire a routing table for collectionless aggregate",
+            !(cri && generatesOwnDataOnce));
 
     // This is used later on as well.
     const auto routingTableIsAvailable = cri && cri->hasRoutingTable();

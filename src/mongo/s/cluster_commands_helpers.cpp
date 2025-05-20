@@ -262,14 +262,6 @@ AsyncRequestsSender::Request buildDatabaseVersionedRequest(
         return {shardId, cmdObj};
     }
 
-    if (shardId != cri.getDbPrimaryShardId()) {
-        // TODO (SERVER-101687): There are several places that call this API with a database version
-        // that does not match the targeted shard. This is an abuse of the database version
-        // protocol, and we should inspect each case and either use the correct routing information
-        // or not version the command.
-        return {shardId, cmdObj};
-    }
-
     tassert(
         10162102,
         fmt::format("Expected exactly one shard matching the database primary shard when no shard "
