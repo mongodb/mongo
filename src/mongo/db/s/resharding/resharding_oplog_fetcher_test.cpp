@@ -1577,7 +1577,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
     executor->join();
 }
 
-TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionTwice) {
+TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionMoreThanOnce) {
     const NamespaceString outputCollectionNss =
         NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
     const NamespaceString dataCollectionNss =
@@ -1612,13 +1612,13 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionTwice) {
             ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
         assertAggregateReadPreference(request, expectedReadPref);
 
+        fetcher.onEnteringCriticalSection();
+        fetcher.onEnteringCriticalSection();
+
         auto postBatchResumeToken = _fetchTimestamp + 1;
         return makeMockAggregateResponse(
             postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforeCriticalSection);
     });
-
-    fetcher.onEnteringCriticalSection();
-    fetcher.onEnteringCriticalSection();
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
     // fetcher does not schedule a getMore command after seeing the final oplog entry.
@@ -1635,6 +1635,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionTwice) {
     });
 
     ASSERT_OK(fetcherFuture.getNoThrow());
+    fetcher.onEnteringCriticalSection();
     executor->shutdown();
     executor->join();
 }
