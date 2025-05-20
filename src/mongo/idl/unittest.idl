@@ -418,6 +418,13 @@ structs:
         fields:
             value: any_basic_type
 
+    one_status_type:
+        description: UnitTest for a single status type
+        fields:
+            value:
+                type: error_status
+                optional: true
+
     ##################################################################################################
     #
     # Test a custom non-BSONElement deserialization and serialization methods for an object type

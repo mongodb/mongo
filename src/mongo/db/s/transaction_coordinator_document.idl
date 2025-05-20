@@ -47,15 +47,6 @@ types:
         deserializer: "::mongo::txn::readCommitDecisionEnumProperty"
         is_view: false
 
-    status:
-        bson_serialization_type: any
-        description: "Serializes/deserializes the general server Status type"
-        cpp_type: "::mongo::Status"
-        serializer: "::mongo::txn::writeStatusProperty"
-        deserializer: "::mongo::txn::readStatusProperty"
-        # Status is not a view type.
-        is_view: false
-
 structs:
     CoordinatorCommitDecision:
         description: "An object representing the coordinator's commit decision."
@@ -74,7 +65,7 @@ structs:
                     otherwise it will not be set"
             abortStatus:
                 optional: true
-                type: status
+                type: error_status
                 description:
                     "If the decision is 'abort', contains the reason the shard aborted,
                     otherwise it will not be set"

@@ -27,11 +27,25 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/error_status_idl.h"
 
-#include "mongo/db/query/client_cursor/release_memory_util.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
-namespace mongo {
+namespace mongo::idl {
 
-MONGO_FAIL_POINT_DEFINE(failReleaseMemoryAfterCursorCheckout);
+void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder) {
+    uassert(7418500, "Status must be an error", !status.isOK());
+    BSONObjBuilder sub{builder->subobjStart(fieldName)};
+    status.serialize(&sub);
+}
 
-}  // namespace mongo
+Status deserializeErrorStatus(const BSONElement& bsonElem) {
+    const auto& bsonObj = bsonElem.Obj();
+    long long code;
+    uassertStatusOK(bsonExtractIntegerField(bsonObj, "code", &code));
+    uassert(7418501, "Status must be an error", code != ErrorCodes::OK);
+    return getErrorStatusFromCommandResult(bsonElem.Obj());
+}
+
+}  // namespace mongo::idl

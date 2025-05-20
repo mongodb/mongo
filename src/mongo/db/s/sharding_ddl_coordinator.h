@@ -58,6 +58,7 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -507,7 +508,8 @@ protected:
         auto newDoc = _getDoc();
 
         auto coordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
-        coordinatorMetadata.setAbortReason(status);
+
+        coordinatorMetadata.setAbortReason(sharding_ddl_util::possiblyTruncateErrorStatus(status));
         newDoc.setShardingDDLCoordinatorMetadata(std::move(coordinatorMetadata));
 
         _updateStateDocument(opCtx, std::move(newDoc));

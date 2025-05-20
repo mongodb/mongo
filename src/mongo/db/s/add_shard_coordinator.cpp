@@ -36,8 +36,10 @@
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future_util.h"
 #include "src/mongo/db/list_collections_gen.h"
 
 namespace mongo {

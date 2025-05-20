@@ -188,6 +188,7 @@ mongo_cc_library(
         "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
+        "//src/mongo/rpc:command_status",
     ],
 )
 

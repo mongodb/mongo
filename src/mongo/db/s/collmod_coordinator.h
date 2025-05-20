@@ -50,6 +50,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"

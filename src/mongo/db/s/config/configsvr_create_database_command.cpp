@@ -49,6 +49,7 @@
 #include "mongo/db/s/create_database_coordinator_document_gen.h"
 #include "mongo/db/s/create_database_util.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_database_gen.h"

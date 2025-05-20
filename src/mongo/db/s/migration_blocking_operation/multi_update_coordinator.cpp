@@ -41,12 +41,14 @@
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_server_parameters_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/primary_only_service_helpers/pause_during_phase_transition_fail_point.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 
@@ -475,7 +477,10 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
             if (newPhase == Phase::kSuccess) {
                 newDocument.getMutableFields().setResult(_cmdResponse);
             } else if (newPhase == Phase::kFailure) {
-                newDocument.getMutableFields().setAbortReason(_abortReason);
+                if (_abortReason) {
+                    newDocument.getMutableFields().setAbortReason(
+                        sharding_ddl_util::possiblyTruncateErrorStatus(*_abortReason));
+                }
             }
             pauseDuringPhaseTransitions.evaluate(PhaseTransitionProgressEnum::kBefore, newPhase);
             _updateOnDiskState(opCtx.get(), newDocument);

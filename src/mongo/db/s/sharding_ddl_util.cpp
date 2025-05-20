@@ -120,43 +120,6 @@
 
 namespace mongo {
 
-static const size_t kSerializedErrorStatusMaxSizeBytes = 2048ULL;
-
-void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
-                                                  StringData fieldName,
-                                                  BSONObjBuilder* bsonBuilder) {
-    uassert(7418500, "Status must be an error", !status.isOK());
-
-    BSONObjBuilder tmpBuilder;
-    status.serialize(&tmpBuilder);
-
-    if (status != ErrorCodes::TruncatedSerialization &&
-        (size_t)tmpBuilder.asTempObj().objsize() > kSerializedErrorStatusMaxSizeBytes) {
-        const auto statusStr = status.toString();
-        const auto truncatedStatusStr =
-            str::UTF8SafeTruncation(statusStr, kSerializedErrorStatusMaxSizeBytes);
-        const Status truncatedStatus{ErrorCodes::TruncatedSerialization, truncatedStatusStr};
-
-        tmpBuilder.resetToEmpty();
-        truncatedStatus.serializeErrorToBSON(&tmpBuilder);
-    }
-
-    bsonBuilder->append(fieldName, tmpBuilder.obj());
-}
-
-Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonElem) {
-    const auto& bsonObj = bsonElem.Obj();
-
-    long long code;
-    uassertStatusOK(bsonExtractIntegerField(bsonObj, "code", &code));
-    uassert(7418501, "Status must be an error", code != ErrorCodes::OK);
-
-    std::string errmsg;
-    uassertStatusOK(bsonExtractStringField(bsonObj, "errmsg", &errmsg));
-
-    return {ErrorCodes::Error(code), errmsg, bsonObj};
-}
-
 namespace sharding_ddl_util {
 namespace {
 
@@ -329,6 +292,17 @@ void setAllowMigrations(OperationContext* opCtx,
 }
 
 }  // namespace
+
+Status possiblyTruncateErrorStatus(const Status& status) {
+    static const size_t kMaxSerializedStatusSize = 2048ULL;
+    auto possiblyTruncatedStatus = status;
+    if (const std::string statusStr = possiblyTruncatedStatus.toString();
+        statusStr.size() > kMaxSerializedStatusSize) {
+        possiblyTruncatedStatus = {ErrorCodes::TruncatedSerialization,
+                                   str::UTF8SafeTruncation(statusStr, kMaxSerializedStatusSize)};
+    }
+    return possiblyTruncatedStatus;
+}
 
 void linearizeCSRSReads(OperationContext* opCtx) {
     // Take advantage of ShardingLogging to perform a write to the configsvr with majority read

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

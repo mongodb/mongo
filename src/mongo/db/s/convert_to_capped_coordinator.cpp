@@ -37,6 +37,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/vector_clock_mutable.h"

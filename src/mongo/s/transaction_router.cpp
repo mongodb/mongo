@@ -66,7 +66,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"

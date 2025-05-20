@@ -103,6 +103,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"

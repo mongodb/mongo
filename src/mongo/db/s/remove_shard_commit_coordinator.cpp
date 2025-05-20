@@ -31,6 +31,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/s/remove_shard_exception.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/s/grid.h"
 
 #include "mongo/db/s/topology_change_helpers.h"
 

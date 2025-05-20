@@ -73,6 +73,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"

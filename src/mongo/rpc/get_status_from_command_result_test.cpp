@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -40,10 +40,4 @@ namespace mongo {
 // has checked out a cursor.
 extern FailPoint failReleaseMemoryAfterCursorCheckout;
 
-// TODO (SERVER-102771): Replace this custom utils with centralized utils.
-void serializeErrorStatusToBSON(const Status& status,
-                                StringData fieldName,
-                                BSONObjBuilder* builder);
-Status deserializeErrorStatusFromBSON(const BSONElement& bsonElem);
-
 }  // namespace mongo

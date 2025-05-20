@@ -59,11 +59,5 @@ using CommitDecision = PrepareVote;
 CommitDecision readCommitDecisionEnumProperty(StringData decision);
 StringData writeCommitDecisionEnumProperty(CommitDecision decision);
 
-/**
- * Optional serializer/deserializer for the generic server 'Status' type.
- */
-Status readStatusProperty(const BSONElement& statusBSON);
-void writeStatusProperty(const Status& status, StringData fieldName, BSONObjBuilder* builder);
-
 }  // namespace txn
 }  // namespace mongo

@@ -27,11 +27,21 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/db/query/client_cursor/release_memory_util.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
-namespace mongo {
+namespace mongo::idl {
 
-MONGO_FAIL_POINT_DEFINE(failReleaseMemoryAfterCursorCheckout);
+// Serializes an error status. OK statuses will throw.
+void serializeErrorStatus(const Status& status, StringData fieldName, BSONObjBuilder* builder);
 
-}  // namespace mongo
+// Deserializes an error status from the BSONElement which must hold an object.
+// OK status codes will throw. The BSON object may include fields "code" and "errmsg", which
+// are parsed into the returned Status.
+Status deserializeErrorStatus(const BSONElement& bsonElem);
+
+}  // namespace mongo::idl

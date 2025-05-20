@@ -45,14 +45,6 @@ types:
         deserializer: "mongo::BSONElement::_numberLong"
         is_view: false
 
-    status:
-        bson_serialization_type: any
-        description: "Status of a failed release memory for a specific cursor"
-        cpp_type: "::mongo::Status"
-        serializer: "::mongo::serializeErrorStatusToBSON"
-        deserializer: "::mongo::deserializeErrorStatusFromBSON"
-        is_view: false
-
 structs:
     ReleaseMemoryError:
         description: >-
@@ -62,7 +54,7 @@ structs:
             cursorId:
                 type: cursorId
             status:
-                type: status
+                type: error_status
                 optional: true
 
     ReleaseMemoryCommandReply:

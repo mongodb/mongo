@@ -55,6 +55,7 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/idl/error_status_idl.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -146,11 +147,10 @@ TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithoutExtraInfo) {
     const Status sample{ErrorCodes::ForTestingOptionalErrorExtraInfo, "Dummy reason"};
 
     BSONObjBuilder bsonBuilder;
-    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    idl::serializeErrorStatus(sample, "status", &bsonBuilder);
     const auto serialized = bsonBuilder.done();
 
-    const auto deserialized =
-        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+    const auto deserialized = idl::deserializeErrorStatus(serialized.firstElement());
 
     ASSERT_EQ(sample.code(), deserialized.code());
     ASSERT_EQ(sample.reason(), deserialized.reason());
@@ -164,11 +164,10 @@ TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithExtraInfo) {
         ErrorCodes::ForTestingOptionalErrorExtraInfo, "Dummy reason", fromjson("{data: 123}")};
 
     BSONObjBuilder bsonBuilder;
-    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    idl::serializeErrorStatus(sample, "status", &bsonBuilder);
     const auto serialized = bsonBuilder.done();
 
-    const auto deserialized =
-        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+    const auto deserialized = idl::deserializeErrorStatus(serialized.firstElement());
 
     ASSERT_EQ(sample.code(), deserialized.code());
     ASSERT_EQ(sample.reason(), deserialized.reason());
@@ -180,31 +179,27 @@ TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithExtraInfo) {
 TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusInvalid) {
     BSONObjBuilder bsonBuilder;
     ASSERT_THROWS_CODE(
-        sharding_ddl_util_serializeErrorStatusToBSON(Status::OK(), "status", &bsonBuilder),
-        DBException,
-        7418500);
+        idl::serializeErrorStatus(Status::OK(), "status", &bsonBuilder), DBException, 7418500);
 
     const auto okStatusBSON =
         BSON("status" << BSON("code" << ErrorCodes::OK << "codeName"
                                      << ErrorCodes::errorString(ErrorCodes::OK)));
     ASSERT_THROWS_CODE(
-        sharding_ddl_util_deserializeErrorStatusFromBSON(okStatusBSON.firstElement()),
-        DBException,
-        7418501);
+        idl::deserializeErrorStatus(okStatusBSON.firstElement()), DBException, 7418501);
 }
 
-TEST_F(ShardingDDLUtilTest, SerializeErrorStatusTooBig) {
+TEST_F(ShardingDDLUtilTest, TruncateBigErrorStatus) {
     const std::string longReason(1024 * 3, 'x');
     const Status sample{ErrorCodes::ForTestingOptionalErrorExtraInfo, longReason};
 
     BSONObjBuilder bsonBuilder;
-    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    idl::serializeErrorStatus(sample, "status", &bsonBuilder);
     const auto serialized = bsonBuilder.done();
 
-    const auto deserialized =
-        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+    const auto deserialized = idl::deserializeErrorStatus(serialized.firstElement());
+    const auto truncated = sharding_ddl_util::possiblyTruncateErrorStatus(deserialized);
 
-    ASSERT_EQ(ErrorCodes::TruncatedSerialization, deserialized.code());
+    ASSERT_EQ(ErrorCodes::TruncatedSerialization, truncated.code());
     ASSERT_EQ(
         "ForTestingOptionalErrorExtraInfo: "
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -230,8 +225,8 @@ TEST_F(ShardingDDLUtilTest, SerializeErrorStatusTooBig) {
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        deserialized.reason());
-    ASSERT(!deserialized.extraInfo());
+        truncated.reason());
+    ASSERT(!truncated.extraInfo());
 }
 
 // Test all combinations of rename acceptable preconditions:

@@ -659,6 +659,48 @@ TEST(IDLOneTypeTests, TestObjectTypeNegative) {
     }
 }
 
+TEST(IDLStatusType, ParseAndSerialize) {
+    ErrorExtraInfoExample::EnableParserForTest scoped;
+
+    IDLParserContext ctxt("");
+
+    const auto testErrorCode = ErrorCodes::ForTestingErrorExtraInfo;
+    const auto testErrMsg = "Test errmsg for IDL parsed Status";
+    const auto testStatusBSON =
+        BSON("code" << testErrorCode << "codeName" << "ForTestingErrorExtraInfo"
+                    << "errmsg" << testErrMsg << "data" << 1234);
+    const auto testDoc = BSON("value" << testStatusBSON);
+    const auto testStruct = One_status_type::parse(ctxt, testDoc);
+
+    const auto testStatus = Status(testErrorCode, testErrMsg, testStatusBSON);
+
+    // Check that the Status from the IDL parsed struct and the test Status are equal.
+    ASSERT_EQ(testStatus, testStruct.getValue());
+
+    // Check that the IDL parsed struct serializes to the same BSON value as the original BSON.
+    BSONObjBuilder builder;
+    testStruct.serialize(&builder);
+    auto serializedDoc = builder.obj();
+    ASSERT_BSONOBJ_EQ_UNORDERED(testDoc, serializedDoc);
+}
+
+TEST(IDLStatusType, OKNotAllowed) {
+    ErrorExtraInfoExample::EnableParserForTest scoped;
+
+    IDLParserContext ctxt("");
+
+    // Test that serialization of an OK status is not allowed.
+    const auto testDoc =
+        BSON("value" << BSON("ok" << 1 << "code" << ErrorCodes::OK << "codeName" << "OK"));
+    ASSERT_THROWS_CODE(One_status_type::parse(ctxt, testDoc), DBException, 7418501);
+
+    // Test that deserialization of an OK status is not allowed.
+    One_status_type statusStruct;
+    statusStruct.setValue(Status::OK());
+    BSONObjBuilder builder;
+    ASSERT_THROWS_CODE(statusStruct.serialize(&builder), DBException, 7418500);
+}
+
 // Trait check used in TestLoopbackVariant.
 template <typename T>
 struct IsVector : std::false_type {};

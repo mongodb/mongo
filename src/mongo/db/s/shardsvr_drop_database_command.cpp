@@ -48,6 +48,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"

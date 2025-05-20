@@ -41,6 +41,7 @@ global:
         - "mongo/bson/bson_time_support.h"
         - "mongo/util/uuid.h"
         - "mongo/idl/command_generic_argument.h"
+        - "mongo/idl/error_status_idl.h"
 
 types:
     string:
@@ -395,6 +396,14 @@ types:
         description: "modifies serializer/deserializer behavior based on caller context"
         cpp_type: "SerializationContext"
         internal_only: true
+        is_view: false
+
+    error_status:
+        bson_serialization_type: any
+        description: "Serializes/deserializes the Status type. The Status must represent an error."
+        cpp_type: "::mongo::Status"
+        serializer: "::mongo::idl::serializeErrorStatus"
+        deserializer: "::mongo::idl::deserializeErrorStatus"
         is_view: false
 
 enums:

@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
-class BSONObj;
-class Status;
 
 /**
  * Converts "result" into a Status object.  The input is expected to be the object returned
@@ -51,30 +52,5 @@ Status getStatusFromCommandResult(const BSONObj& result);
  * by running a command.  Assumes the result does not represent ok: 1.
  */
 Status getErrorStatusFromCommandResult(const BSONObj& result);
-
-
-/**
- * Extracts the write concern error from a command response.
- */
-Status getWriteConcernStatusFromCommandResult(const BSONObj& cmdResponse);
-
-
-/**
- * Extracts the first write error from a command response and converts it into a status. This
- * ignores all errors after the first and does not preserve the write error index, so it should not
- * be used with bulk writes.
- */
-Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse);
-
-/**
- * Extracts the first write error from a bulk write command response and converts it into a status.
- * This ignores all errors after the first.
- */
-Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse);
-
-/**
- * Extracts any type of error from a write command response.
- */
-Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse);
 
 }  // namespace mongo

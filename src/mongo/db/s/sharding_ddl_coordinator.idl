@@ -37,7 +37,6 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/s/database_version.idl"
-    - "mongo/s/error_status.idl"
 
 enums:
     DDLCoordinatorType:
@@ -144,5 +143,5 @@ structs:
                 optional: true
             abortReason:
                 description: "Error triggering the cleanup pipeline"
-                type: ErrorStatus
+                type: error_status
                 optional: true

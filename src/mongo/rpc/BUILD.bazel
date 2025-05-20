@@ -200,7 +200,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "command_status",
     srcs = [
-        "get_status_from_command_result.cpp",
+        "get_status_from_command_result_write_util.cpp",
         "write_concern_error_detail.cpp",
         "write_concern_error_detail.h",
         "write_concern_error_gen",

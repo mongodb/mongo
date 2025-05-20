@@ -25,7 +25,6 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/s:database_version_gen",
-        "//src/mongo/s:error_status_gen",
     ],
 )
 

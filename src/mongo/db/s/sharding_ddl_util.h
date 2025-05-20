@@ -68,13 +68,6 @@ namespace mongo {
 enum class AuthoritativeMetadataAccessLevelEnum : std::int32_t;
 class NamespacePlacementChanged;
 
-// TODO (SERVER-74481): Define these functions in the nested `sharding_ddl_util` namespace when the
-// IDL compiler will support the use case.
-void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
-                                                  StringData fieldName,
-                                                  BSONObjBuilder* bsonBuilder);
-Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonElem);
-
 namespace sharding_ddl_util {
 
 template <typename CommandType>
@@ -108,6 +101,11 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         throwOnError);
 }
+
+/**
+ * Given a Status, returns a new truncated version of the Status or a copy of the Status.
+ */
+Status possiblyTruncateErrorStatus(const Status& status);
 
 /**
  * Creates a barrier after which we are guaranteed that all writes to the config server performed by

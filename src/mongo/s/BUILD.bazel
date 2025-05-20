@@ -138,6 +138,7 @@ mongo_cc_library(
         "//src/mongo/db/session:session_catalog",
         "//src/mongo/db/session:sessions_collection",
         "//src/mongo/db/stats:transaction_stats",
+        "//src/mongo/rpc:command_status",
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
@@ -333,11 +334,6 @@ idl_generator(
 )
 
 idl_generator(
-    name = "error_status_gen",
-    src = "error_status.idl",
-)
-
-idl_generator(
     name = "mongod_and_mongos_server_parameters_gen",
     src = "mongod_and_mongos_server_parameters.idl",
     deps = [
@@ -458,7 +454,6 @@ mongo_cc_library(
         "chunk_manager.cpp",
         "cluster_umc_error_with_write_concern_error_info.cpp",
         "configure_query_analyzer_cmd_gen",
-        "error_status_gen",
         "mongod_and_mongos_server_parameters_gen",
         "refresh_query_analyzer_configuration_cmd_gen",
         "shard_cannot_refresh_due_to_locks_held_exception.cpp",
