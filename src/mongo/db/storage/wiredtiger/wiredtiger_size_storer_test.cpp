@@ -50,7 +50,8 @@ WT_CONNECTION* openConnection(const unittest::TempDir& tempDir) {
 class WiredTigerSizeStorerTest : public ServiceContextTest {
 protected:
     WiredTigerSizeStorerTest()
-        : _conn(openConnection(_tempDir), &_clockSource, /*sessionCacheMax=*/33000) {}
+        : _conn(openConnection(_tempDir), &_clockSource, /*sessionCacheMax=*/33000),
+          _session(&_conn) {}
 
     WiredTigerSizeStorer makeSizeStorer() {
         return {&_conn, "table:sizeStorer"};
@@ -60,6 +61,9 @@ private:
     unittest::TempDir _tempDir{"WiredTigerSizeStorerTest"};
     ClockSourceMock _clockSource;
     WiredTigerConnection _conn;
+
+protected:
+    WiredTigerSession _session;
 };
 
 TEST_F(WiredTigerSizeStorerTest, Store) {
@@ -70,13 +74,13 @@ TEST_F(WiredTigerSizeStorerTest, Store) {
 
     sizeStorer1.store(uri, sizeInfo);
 
-    auto loaded = sizeStorer1.load(uri);
+    auto loaded = sizeStorer1.load(_session, uri);
     ASSERT(loaded);
     ASSERT_EQ(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
     ASSERT_EQ(loaded->dataSize.load(), sizeInfo->dataSize.load());
 
-    loaded = sizeStorer2.load(uri);
+    loaded = sizeStorer2.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -84,13 +88,13 @@ TEST_F(WiredTigerSizeStorerTest, Store) {
 
     sizeStorer1.flush(false);
 
-    loaded = sizeStorer1.load(uri);
+    loaded = sizeStorer1.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
     ASSERT_EQ(loaded->dataSize.load(), sizeInfo->dataSize.load());
 
-    loaded = sizeStorer2.load(uri);
+    loaded = sizeStorer2.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
@@ -104,7 +108,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveBeforeFlush) {
 
     sizeStorer.store(uri, sizeInfo);
 
-    auto loaded = sizeStorer.load(uri);
+    auto loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_EQ(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
@@ -112,7 +116,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveBeforeFlush) {
 
     sizeStorer.remove(uri);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -120,7 +124,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveBeforeFlush) {
 
     sizeStorer.flush(false);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -135,7 +139,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveAfterFlush) {
     sizeStorer.store(uri, sizeInfo);
     sizeStorer.flush(false);
 
-    auto loaded = sizeStorer.load(uri);
+    auto loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
@@ -143,7 +147,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveAfterFlush) {
 
     sizeStorer.remove(uri);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -151,7 +155,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveAfterFlush) {
 
     sizeStorer.flush(false);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -165,7 +169,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveNonexistent) {
 
     sizeStorer.remove(uri);
 
-    auto loaded = sizeStorer.load(uri);
+    auto loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), 0);
@@ -173,7 +177,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveNonexistent) {
 
     sizeStorer.store(uri, sizeInfo);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_EQ(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());
@@ -181,7 +185,7 @@ TEST_F(WiredTigerSizeStorerTest, RemoveNonexistent) {
 
     sizeStorer.flush(false);
 
-    loaded = sizeStorer.load(uri);
+    loaded = sizeStorer.load(_session, uri);
     ASSERT(loaded);
     ASSERT_NE(loaded, sizeInfo);
     ASSERT_EQ(loaded->numRecords.load(), sizeInfo->numRecords.load());

@@ -32,9 +32,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -92,7 +92,7 @@ public:
      * Returns the size info for the given URI. Creates a default-initialized SizeInfo if there is
      * no existing size info for the given URI. Never returns nullptr.
      */
-    std::shared_ptr<SizeInfo> load(StringData uri) const;
+    std::shared_ptr<SizeInfo> load(WiredTigerSession& session, StringData uri) const;
 
     /**
      * Informs the size storer that the size information about the given ident should be removed

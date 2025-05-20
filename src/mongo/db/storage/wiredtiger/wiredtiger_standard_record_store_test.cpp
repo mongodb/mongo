@@ -73,43 +73,42 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
 }
 
 TEST(WiredTigerRecordStoreTest, SizeStorer1) {
-    std::unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    WiredTigerHarnessHelper harnessHelper;
+    std::string indexUri = WiredTigerUtil::kTableUriPrefix + "myindex";
+    WiredTigerSizeStorer ss(&harnessHelper.connection(), indexUri);
+
+    std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore());
+    checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
     std::string ident = rs->getIdent();
     std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
-    std::string indexUri = WiredTigerUtil::kTableUriPrefix + "myindex";
-    WiredTigerSizeStorer ss(&harnessHelper->connection(), indexUri);
-    checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
-
     int N = 12;
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
         auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
-        {
-            StorageWriteTransaction txn(ru);
-            for (int i = 0; i < N; i++) {
-                StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
-                ASSERT_OK(res.getStatus());
-            }
-            txn.commit();
+        StorageWriteTransaction txn(ru);
+        for (int i = 0; i < N; i++) {
+            StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
+            ASSERT_OK(res.getStatus());
         }
+        txn.commit();
     }
 
     ASSERT_EQUALS(N, rs->numRecords());
 
-    rs.reset(nullptr);
+    rs.reset();
 
     {
-        auto& info = *ss.load(uri);
+        WiredTigerSession session{&harnessHelper.connection()};
+        auto& info = *ss.load(session, uri);
         ASSERT_EQUALS(N, info.numRecords.load());
     }
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
         WiredTigerRecordStore::Params params;
         params.baseParams.ident = ident;
@@ -133,7 +132,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     ASSERT_EQUALS(N, rs->numRecords());
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
         auto& ru = *checked_cast<WiredTigerRecoveryUnit*>(
             shard_role_details::getRecoveryUnit(opCtx.get()));
@@ -149,44 +148,41 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     }
 
     {
-        WiredTigerSizeStorer ss2(&harnessHelper->connection(), indexUri);
-        auto info = ss2.load(uri);
+        WiredTigerSession session{&harnessHelper.connection()};
+        WiredTigerSizeStorer ss2(&harnessHelper.connection(), indexUri);
+        auto info = ss2.load(session, uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
-
-    rs.reset(nullptr);  // this has to be deleted before ss
 }
 
 class SizeStorerUpdateTest : public mongo::unittest::Test {
 private:
     void setUp() override {
-        harnessHelper.reset(new WiredTigerHarnessHelper());
-        sizeStorer.reset(new WiredTigerSizeStorer(&harnessHelper->connection(),
-                                                  WiredTigerUtil::kTableUriPrefix + "sizeStorer"));
-        rs = harnessHelper->newRecordStore();
+        rs = harnessHelper.newRecordStore();
         WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
-        wtRS->setSizeStorer(sizeStorer.get());
+        wtRS->setSizeStorer(&sizeStorer);
         ident = wtRS->getIdent();
         uri = wtRS->getURI();
     }
     void tearDown() override {
-        rs.reset(nullptr);
-        sizeStorer->flush(false);
-        sizeStorer.reset(nullptr);
-        harnessHelper.reset(nullptr);
+        rs.reset();
+        sizeStorer.flush(false);
     }
 
 protected:
-    long long getNumRecords() const {
-        return sizeStorer->load(uri)->numRecords.load();
+    long long getNumRecords() {
+        WiredTigerSession session{&harnessHelper.connection()};
+        return sizeStorer.load(session, uri)->numRecords.load();
     }
 
-    long long getDataSize() const {
-        return sizeStorer->load(uri)->dataSize.load();
+    long long getDataSize() {
+        WiredTigerSession session{&harnessHelper.connection()};
+        return sizeStorer.load(session, uri)->dataSize.load();
     }
 
-    std::unique_ptr<WiredTigerHarnessHelper> harnessHelper;
-    std::unique_ptr<WiredTigerSizeStorer> sizeStorer;
+    WiredTigerHarnessHelper harnessHelper;
+    WiredTigerSizeStorer sizeStorer{&harnessHelper.connection(),
+                                    WiredTigerUtil::kTableUriPrefix + "sizeStorer"};
     std::unique_ptr<RecordStore> rs;
     std::string ident;
     std::string uri;
@@ -194,7 +190,7 @@ protected:
 
 // Basic validation - size storer data is updated.
 TEST_F(SizeStorerUpdateTest, Basic) {
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
     long long val = 5;
     rs->updateStatsAfterRepair(val, val);
     ASSERT_EQUALS(getNumRecords(), val);
@@ -202,7 +198,7 @@ TEST_F(SizeStorerUpdateTest, Basic) {
 };
 
 TEST_F(SizeStorerUpdateTest, DataSizeModification) {
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     RecordId recordId;
@@ -259,7 +255,7 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
 // flush (simulating a shutdown). That is, that the rollback marks the size info as dirty, and is
 // properly flushed to disk.
 TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
-    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
 
     // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
@@ -280,21 +276,21 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
         ASSERT_EQ(getNumRecords(), 2);
         ASSERT_EQ(getDataSize(), 10);
         // Mark size info as clean, before rollback is done.
-        sizeStorer->flush(false);
+        sizeStorer.flush(false);
     }
 
     // Simulate a shutdown and restart, which loads the size storer from disk.
-    sizeStorer->flush(true);
-    sizeStorer.reset(new WiredTigerSizeStorer(&harnessHelper->connection(),
-                                              WiredTigerUtil::kTableUriPrefix + "sizeStorer"));
-    WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
-    wtRS->setSizeStorer(sizeStorer.get());
+    sizeStorer.flush(true);
+
+    WiredTigerSizeStorer sizeStorer(&harnessHelper.connection(),
+                                    WiredTigerUtil::kTableUriPrefix + "sizeStorer");
+    WiredTigerSession session{&harnessHelper.connection()};
 
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If
     // rollback does not properly mark the sizeInfo as dirty, on load sizeInfo will account for the
     // two operations, as the rollback sizeInfo update has not been flushed.
-    ASSERT_EQ(getNumRecords(), 1);
-    ASSERT_EQ(getDataSize(), 5);
+    ASSERT_EQ(sizeStorer.load(session, uri)->numRecords.load(), 1);
+    ASSERT_EQ(sizeStorer.load(session, uri)->dataSize.load(), 5);
 };
 
 }  // namespace

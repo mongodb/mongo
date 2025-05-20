@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -41,7 +42,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
@@ -86,7 +86,8 @@ void WiredTigerSizeStorer::store(StringData uri, std::shared_ptr<SizeInfo> sizeI
                 "entryUseCount"_attr = entry.use_count());
 }
 
-std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(StringData uri) const {
+std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
+    WiredTigerSession& session, StringData uri) const {
     {
         // Check if we can satisfy the read from the buffer.
         stdx::lock_guard<stdx::mutex> bufferLock(_bufferMutex);
@@ -95,8 +96,8 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(Strin
             return it->second ? it->second : std::make_shared<SizeInfo>();
     }
 
-    WiredTigerSession session{_conn};
     auto cursor = session.getNewCursor(_storageUri);
+    ON_BLOCK_EXIT([&] { session.closeCursor(cursor); });
 
     {
         WT_ITEM key = {uri.rawData(), uri.size()};
