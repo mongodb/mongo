@@ -523,7 +523,12 @@ private:
         static const JSPropertySpec properties[2] = {
             JS_STRING_SYM_PS(toStringTag, T::className, JSPROP_READONLY), JS_PS_END};
 
-        JS_DefineProperties(_context, _proto, properties);
+        if (JS_DefineProperties(_context, _proto, properties)) {
+            return;
+        }
+
+        throwCurrentJSException(
+            _context, ErrorCodes::JSInterpreterFailure, "Failed to define properties");
     }
 
     // This is for inheriting from something other than Object
