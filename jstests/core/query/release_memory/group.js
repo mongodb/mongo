@@ -117,6 +117,7 @@ for (const coll of [collFew, collMany]) {
     // Get all the results to use as a reference. Set 'allowDiskUse' to false to disable increased
     // spilling in debug builds.
     const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
+    const expectedResultsCount = expectedResults.length;
 
     {
         jsTest.log(`Running no spill in first batch`);
@@ -210,6 +211,40 @@ for (const coll of [collFew, collMany]) {
         jsTest.log.info("Running getMore");
         const results = cursor.toArray();
         assertArrayEq({actual: results, expected: expectedResults});
+    }
+
+    // Return all results in the first batch.
+    {
+        jsTest.log(`Return all results in the first batch`);
+
+        setServerParameter(sbeMemorySizeKnob, 100 * 1024 * 1024);
+        setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
+        let initialSpillCount = getSpillCounter();
+
+        // Retrieve the first batch without spilling.
+        jsTest.log.info("Running pipeline: ", pipeline[0]);
+
+        const cursor = coll.aggregate(
+            pipeline, {"allowDiskUse": true, cursor: {batchSize: expectedResultsCount}});
+        const cursorId = cursor.getId();
+        const newSpillCount = getSpillCounter();
+        assert.eq(newSpillCount, initialSpillCount);
+        initialSpillCount = newSpillCount;
+
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
+        assert.eq(initialSpillCount, getSpillCounter());
+
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
+        assertArrayEq({actual: results, expected: expectedResults});
+
+        setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
+        setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
     }
 }
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);

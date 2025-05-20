@@ -221,6 +221,13 @@ void GroupProcessor::spill() {
         return;
     }
 
+    // If _groupsReady is true, we may have already returned some results, so we should skip them.
+    auto groupsIt = _groupsReady ? _groupsIterator : _groups.begin();
+    if (groupsIt == _groups.end()) {
+        // There is nothing to spill.
+        return;
+    }
+
     uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
             "Exceeded memory limit for $group, but didn't allow external sort."
             " Pass allowDiskUse:true to opt in.",
@@ -235,10 +242,8 @@ void GroupProcessor::spill() {
     ptrs.reserve(_groups.size());
 
     int64_t spilledRecords = 0;
-    // If _groupsReady is true, we may have already returned some results, so we should skip them.
-    auto it = _groupsReady ? _groupsIterator : _groups.begin();
-    for (auto end = _groups.end(); it != end; ++it) {
-        ptrs.push_back(&*it);
+    for (auto end = _groups.end(); groupsIt != end; ++groupsIt) {
+        ptrs.push_back(&*groupsIt);
         ++spilledRecords;
     }
 

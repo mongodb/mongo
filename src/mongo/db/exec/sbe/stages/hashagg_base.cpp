@@ -181,6 +181,7 @@ void HashAggBaseStage<Derived>::spill() {
                     "All in memory data has been consumed. HashAgg stage has nothing to spill. "
                     "Clearing memory.");
         _ht->clear();
+        _htIt = _ht->end();
         return;
     }
 
