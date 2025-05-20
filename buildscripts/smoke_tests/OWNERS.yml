@@ -9,6 +9,9 @@ filters:
   - "rss_sydney.yml":
     approvers:
       - 10gen/server-rss-sydney
+  - "rss_sydney_backup.yml":
+    approvers:
+      - 10gen/server-rss-sydney
   - "server_collection_write_path.yml":
     approvers:
       - 10gen/server-collection-write-path
