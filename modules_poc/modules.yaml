@@ -391,6 +391,8 @@ transactions:
     - src/mongo/db/*txn*
     - src/mongo/db/s/*transaction*
     - src/mongo/db/s/*txn*
+    - src/mongo/s/commands/*transaction*
+    - src/mongo/s/commands/*txn*
     - src/mongo/s/*transaction*
     - src/mongo/db/session/
 
