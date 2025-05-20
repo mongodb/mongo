@@ -57,3 +57,6 @@ filters:
   - "api_version_helpers.js":
     approvers:
       - 10gen/query-optimization
+  - "mochalite.js":
+    approvers:
+      - 10gen/devprod-correctness

@@ -719,6 +719,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/search.js @10gen/query-integration-search @svc-auto-approve-bot
 /jstests/libs/**/shard_targeting_util.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/libs/**/api_version_helpers.js @10gen/query-optimization @svc-auto-approve-bot
+/jstests/libs/**/mochalite.js @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/libs/clustered_collections/OWNERS.yml
 /jstests/libs/clustered_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -1075,6 +1076,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/sharded_cluster_topology/OWNERS.yml
 /jstests/noPassthrough/sharded_cluster_topology/**/* @10gen/server-catalog-and-routing @10gen/server-cluster-scalability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/noPassthrough/shell/js/OWNERS.yml
+/jstests/noPassthrough/shell/js/**/* @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/shutdown/OWNERS.yml
 /jstests/noPassthrough/shutdown/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
