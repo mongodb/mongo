@@ -142,7 +142,7 @@ function scoreInRange(score, min, max) {
                         _id: 1,
                         single: 1,
                         double: 1,
-                        score: {$add: ["$single_score", "$double_score"]}
+                        score: {$avg: ["$single_score", "$double_score"]}
                     }
                 },
                 {$sort: {score: -1, _id: 1}}

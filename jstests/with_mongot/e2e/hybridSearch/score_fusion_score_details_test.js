@@ -80,7 +80,7 @@ function fieldPresent(field, containingObj) {
         "description" : "the value calculated by...",
         "normalization" : "none",
         "combination": {
-            "method" : "sum"
+            "method" : "average"
         },
         "details" : [
             {
@@ -88,7 +88,7 @@ function fieldPresent(field, containingObj) {
                 "inputPipelineRawScore" : 1.5521023273468018,
                 "weight" : 2,
                 "value" : 1.5521023273468018,
-                "description" : "sum of:",
+                "description" : "average of:",
                 "details" : [ {...} ]
             },
             {
@@ -118,7 +118,7 @@ for (const foundDoc of results) {
     assert.eq(details["normalization"], "none");
     const combination = details["combination"];
     assert(fieldPresent("method", combination), combination);
-    assert.eq(combination["method"], "sum");
+    assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),
@@ -179,7 +179,7 @@ results = coll.aggregate(testQuery).toArray();
         "description" : "the value calculated by...",
         "normalization" : "none",
         "combination" : {
-            "method" : "sum"
+            "method" : "average"
         },
         "details" : [
             {
@@ -215,7 +215,7 @@ for (const foundDoc of results) {
     assert.eq(details["normalization"], "none");
     const combination = details["combination"];
     assert(fieldPresent("method", combination), combination);
-    assert.eq(combination["method"], "sum");
+    assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),
@@ -287,7 +287,7 @@ results = coll.aggregate(testQuery).toArray();
         "description" : "the value calculated by...",
         "normalization" : "none",
         "combination" : {
-            "method" : "sum"
+            "method" : "average"
         },
         "details" : [
             {
@@ -323,7 +323,7 @@ for (const foundDoc of results) {
     assert.eq(details["normalization"], "none");
     const combination = details["combination"];
     assert(fieldPresent("method", combination), combination);
-    assert.eq(combination["method"], "sum");
+    assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
         assert(fieldPresent(field, obj),

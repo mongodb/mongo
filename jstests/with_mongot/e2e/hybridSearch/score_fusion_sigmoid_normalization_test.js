@@ -63,7 +63,7 @@ const coll = db[jsTestName()];
                     $project: {
                         _id: 1,
                         negative_score: 1,
-                        score: {$add: [{$sigmoid: {$sigmoid: "$negative_score"}}]}
+                        score: {$avg: [{$sigmoid: {$sigmoid: "$negative_score"}}]}
                     }
                 },
                 {$sort: {score: -1, _id: 1}},
@@ -128,7 +128,7 @@ const coll = db[jsTestName()];
     // $scoreFusion should have computed.
     const expectedResults =
         coll.aggregate([
-                {$project: {_id: 1, score_val: 1, score: {$add: [{$sigmoid: "$score_val"}]}}},
+                {$project: {_id: 1, score_val: 1, score: {$avg: [{$sigmoid: "$score_val"}]}}},
                 {$sort: {score: -1, _id: 1}},
                 {$project: {_id: 0}}
             ])
@@ -196,7 +196,7 @@ const coll = db[jsTestName()];
                         _id: 1,
                         single: 1,
                         double: 1,
-                        score: {$add: [{$sigmoid: "$single"}, {$sigmoid: "$double"}]}
+                        score: {$avg: [{$sigmoid: "$single"}, {$sigmoid: "$double"}]}
                     }
                 },
                 {$sort: {score: -1, _id: 1}}
@@ -274,7 +274,7 @@ const coll = db[jsTestName()];
                                             score_10: 1,
                                             score_50: 1,
                                             score: {
-                                                $add: [
+                                                $avg: [
                                                     {$sigmoid: {$sigmoid: "$score_10"}},
                                                     {$sigmoid: {$sigmoid: "$score_50"}}
                                                 ]

@@ -35,7 +35,6 @@ enums:
         description: Combination Method options
         type: string
         values:
-            kSum: "sum"
             kAvg: "avg"
             kExpression: "expression"
 structs:

@@ -106,8 +106,9 @@ public:
         ScoreFusionScoringOptions(const ScoreFusionSpec& spec) {
             _normalizationMethod = spec.getInput().getNormalization();
             auto& combination = spec.getCombination();
+            // The default combination method is avg if no combination method is specified.
             ScoreFusionCombinationMethodEnum combinationMethod =
-                ScoreFusionCombinationMethodEnum::kSum;
+                ScoreFusionCombinationMethodEnum::kAvg;
             boost::optional<IDLAnyType> combinationExpression = boost::none;
             if (combination.has_value() && combination->getMethod().has_value()) {
                 combinationMethod = combination->getMethod().get();
@@ -156,8 +157,6 @@ public:
                     return "custom expression";
                 case ScoreFusionCombinationMethodEnum::kAvg:
                     return "average";
-                case ScoreFusionCombinationMethodEnum::kSum:
-                    return "sum";
                 default:
                     // Only one of the above options can be specified for combination.method.
                     MONGO_UNREACHABLE_TASSERT(9467101);
@@ -172,7 +171,7 @@ public:
         // The default normalization value is ScoreFusionCombinationMethodEnum::kNone. The IDL
         // handles the default behavior.
         ScoreFusionNormalizationEnum _normalizationMethod;
-        // The default combination.method value is ScoreFusionCombinationMethodEnum::kSum. The IDL
+        // The default combination.method value is ScoreFusionCombinationMethodEnum::kAvg. The IDL
         // handles the default behavior.
         ScoreFusionCombinationMethodEnum _combinationMethod;
         // This field should only be populated when combination.method has the value

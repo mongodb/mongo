@@ -47,20 +47,20 @@ const coll = db[jsTestName()];
 
 // Test Explanation: Neither of the document's score fields (single and double) will be normalized
 // because the $score's normalization value is "none" and $scoreFusion's default normalization field
-// is "none." Each document's score value will be summed per the combination.method.
+// is "none." Each document's score value will be averaged per the combination.method.
 
 // The $scoreFusion pipeline sorts the documents in descending order by score (documents with
 // the highest computed scores ranked first). Assert that the documents are in the correct order
 // and have the correct values by asserting that the single, double, and score field's values match
 // the expected values which are computed via adding the non-normalized input scores.
 
-(function testCombinationMethodSumOnMultiplePipelinesWithNoNormalization() {
+(function testCombinationMethodAvgOnMultiplePipelinesWithNoNormalization() {
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
     const actualResults =
         coll.aggregate([
                 {
                     $scoreFusion:
-                        {input: {pipelines, normalization: "none"}, combination: {method: "sum"}}
+                        {input: {pipelines, normalization: "none"}, combination: {method: "avg"}}
                 },
                 {$project: {_id: 1, single: 1, double: 1, score: {$meta: "score"}}}
             ])
@@ -70,13 +70,13 @@ const coll = db[jsTestName()];
     // $scoreFusion should have computed.
     const expectedResults =
         coll.aggregate([
-                {$project: {_id: 1, single: 1, double: 1, score: {$add: ["$single", "$double"]}}},
+                {$project: {_id: 1, single: 1, double: 1, score: {$avg: ["$single", "$double"]}}},
                 {$sort: {score: -1, _id: 1}}
             ])
             .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
-    // "sum" combination.method.
+    // "avg" combination.method.
     assert.eq(actualResults, expectedResults);
 })();
 

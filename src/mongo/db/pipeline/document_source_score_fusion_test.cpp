@@ -258,7 +258,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationNone) 
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score"
                             ]
                         }
@@ -393,7 +393,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationSigmoi
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score"
                             ]
                         }
@@ -525,7 +525,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineAllowedNormalizationMinMax
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score"
                             ]
                         }
@@ -776,7 +776,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score"
                             ]
@@ -1074,7 +1074,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowed) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score"
                             ]
@@ -1330,7 +1330,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score"
                             ]
@@ -1444,7 +1444,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultipleStagesInPipelineAllowed) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score"
                             ]
                         }
@@ -1692,7 +1692,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score",
                                 "$name3_score"
@@ -1823,7 +1823,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
             },
             combination:  {
                 weights: "my bad",
-                method: "sum"
+                method: "avg"
             }
         }
     })");
@@ -1855,7 +1855,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
             },
             combination: {
                 weights: {},
-                method: "sum"
+                method: "avg"
             }
         }
     })");
@@ -1904,7 +1904,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                     name1: 5,
                     name2: 3.2
                 },
-                method: "sum"
+                method: "avg"
             }
         }
     })");
@@ -2021,7 +2021,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score"
                             ]
@@ -2070,7 +2070,7 @@ TEST_F(DocumentSourceScoreFusionTest, ScoreNullsIsRejected) {
                 weights: {
                     name1: 5
                 },
-                method: "sum"
+                method: "avg"
             },
             scoreNulls: 0
         }
@@ -2105,7 +2105,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorIfOptionalFieldsIncludedMoreThanOnce)
                 weights: {
                     name1: 5
                 },
-                method: "sum",
+                method: "avg",
                 method: "duplicate"
             }
         }
@@ -2443,7 +2443,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$name2_score"
                             ]
@@ -2875,7 +2875,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$matchDistance_score",
                                 "$matchGenres_score"
                             ]
@@ -2932,9 +2932,8 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInvalidCombinationMethodValue) {
                        ErrorCodes::BadValue);
 }
 
-// The 'sum' option for combination.method is tested in CheckIfWeightsArrayMixedIntsDecimals. The
-// remaining tests that specify "none" for combination.method desugar into the "sum" operation by
-// default.
+// The remaining tests that specify "none" for combination.method desugar into the "avg" operation
+// by default.
 TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedAvgMethod) {
     auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
     getExpCtx()->setResolvedNamespaces(
@@ -3168,7 +3167,7 @@ TEST_F(DocumentSourceScoreFusionTest,
                 normalization: "none"
             },
             combination: {
-                method: "sum",
+                method: "avg",
                 expression: {$sum: ["$$name1", 5.0]}
             }
         }
@@ -4285,7 +4284,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score"
                             ]
                         }
@@ -4325,7 +4324,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                             },
                             "combination": {
                                 "method": {
-                                    "$const": "sum"
+                                    "$const": "average"
                                 }
                             },
                             "details": "$calculatedScoreDetails"
@@ -4576,7 +4575,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$name1_score",
                                 "$searchPipe_score"
                             ]
@@ -4631,7 +4630,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                             },
                             "combination": {
                                 "method": {
-                                    "$const": "sum"
+                                    "$const": "average"
                                 }
                             },
                             "details": "$calculatedScoreDetails"
@@ -4883,7 +4882,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                 {
                     "$setMetadata": {
                         "score": {
-                            "$add": [
+                            "$avg": [
                                 "$search_score",
                                 "$vector_score"
                             ]
@@ -4938,7 +4937,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                             },
                             "combination": {
                                 "method": {
-                                    "$const": "sum"
+                                    "$const": "average"
                                 }
                             },
                             "details": "$calculatedScoreDetails"

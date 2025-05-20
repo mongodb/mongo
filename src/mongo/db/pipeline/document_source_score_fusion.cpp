@@ -402,9 +402,9 @@ BSONObj groupEachScore(
 }
 
 /**
- * Calculate the final score by summing the score fields on each input document and adding it as a
- * new field to the document.
- * { "$setMetadata": { "score": { "$add": ["$name1_score", "$name2_score"] } } },
+ * Calculate the final score by combining the score fields on each input document according to the
+ * $scoreFusion specification and adding it as a new field to the document.
+ * { "$setMetadata": { "score": { "$avg": [ "$name1_score", "$name2_score" ] } } }
  */
 boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
     const auto& expCtx,
@@ -412,7 +412,7 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
     const DocumentSourceScoreFusion::ScoreFusionScoringOptions scoreFusionScoringOptions) {
     ScoreFusionCombinationMethodEnum combinationMethod =
         scoreFusionScoringOptions.getCombinationMethod();
-    // Default is to sum the scores.
+    // Default is to average the scores.
     boost::intrusive_ptr<Expression> metadataExpression;
     switch (combinationMethod) {
         case ScoreFusionCombinationMethodEnum::kExpression: {
@@ -465,19 +465,6 @@ boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
                 expCtx.get(),
                 BSON("$avg" << expressionFieldPaths.arr()).firstElement(),
                 expCtx->variablesParseState);
-            break;
-        }
-        case ScoreFusionCombinationMethodEnum::kSum: {
-            Expression::ExpressionVector allInputScores;
-            for (auto pipeline_it = inputPipelines.begin(); pipeline_it != inputPipelines.end();
-                 pipeline_it++) {
-                std::string fieldScoreName = getScoreFieldFromPipelineName(pipeline_it->first);
-                allInputScores.push_back(ExpressionFieldPath::createPathFromString(
-                    expCtx.get(), fieldScoreName, expCtx->variablesParseState));
-            }
-
-            metadataExpression =
-                make_intrusive<ExpressionAdd>(expCtx.get(), std::move(allInputScores));
             break;
         }
         default:
@@ -731,7 +718,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     // The ScoreFusionScoringOptions class sets the combination.method and combination.expression to
     // the correct user input after performing the necessary error checks (ex: verify that if
     // combination.method is 'custom', then the combination.expression should've been specified).
-    // Sum is the default combination method if no other method is specified.
+    // Average is the default combination method if no other method is specified.
     DocumentSourceScoreFusion::ScoreFusionScoringOptions scoreFusionScoringOptions(spec);
     auto finalStages = buildScoreAndMergeStages(
         inputPipelines, scoreFusionScoringOptions, weights, includeScoreDetails, pExpCtx);
