@@ -6,6 +6,12 @@ export var MetadataConsistencyChecker = (function() {
         // The isTransientError() function is responsible for setting an error as transient and
         // abort the metadata consistency check to be retried in the future.
         const isTransientError = function(e) {
+            // TODO SERVER-105255 Remove the exception for ingress gRPC.
+            if (mongos.isGRPC() && e.code == ErrorCodes.CallbackCanceled) {
+                jsTest.log("Treating `CallbackCanceled` as transient for gRPC streams!");
+                return true;
+            }
+
             if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
                 ErrorCodes.isNetworkTimeoutError(e.code)) {
                 return true;
