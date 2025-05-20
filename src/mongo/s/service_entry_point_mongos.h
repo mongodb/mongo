@@ -52,6 +52,9 @@ public:
 
     void appendStats(BSONObjBuilder* bob) const override;
 
+    void incrementLBConnections() override;
+    void decrementLBConnections() override;
+
     void onClientConnect(Client* client) override;
     void derivedOnClientDisconnect(Client* client) override;
 

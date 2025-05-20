@@ -745,7 +745,7 @@ public:
 
             switch (port) {
                 case kLoadBalancerPort: {
-                    ASSERT_TRUE(st.session()->isFromLoadBalancer());
+                    ASSERT_TRUE(st.session()->isConnectedToLoadBalancerPort());
                     ASSERT_EQ(st.session()->getSourceRemoteEndpoint().host(), kSourceRemoteIP);
                     ASSERT_EQ(st.session()->getSourceRemoteEndpoint().port(), kSourceRemotePort);
                     ASSERT_EQ(st.session()->getProxiedDstEndpoint()->host(), kProxyIP);
@@ -753,7 +753,7 @@ public:
                     break;
                 }
                 case kMainPort: {
-                    ASSERT_FALSE(st.session()->isFromLoadBalancer());
+                    ASSERT_FALSE(st.session()->isConnectedToLoadBalancerPort());
                     ASSERT_FALSE(st.session()->getProxiedDstEndpoint());
                     break;
                 }

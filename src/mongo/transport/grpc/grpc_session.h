@@ -94,8 +94,18 @@ public:
      * For ingress sessions, we do not distinguish between load-balanced and non-load-balanced
      * streams. Egress sessions never originate from load-balancers.
      */
-    bool isFromLoadBalancer() const final {
+    bool isConnectedToLoadBalancerPort() const final {
         return false;
+    }
+
+    bool isLoadBalancerPeer() const final {
+        return false;
+    }
+
+    void setisLoadBalancerPeer(OperationContext* opCtx, bool helloHasLoadBalancedOption) final {
+        tassert(ErrorCodes::OperationFailed,
+                "Unable to set loadBalancer option on GRPC connection",
+                !helloHasLoadBalancedOption);
     }
 
     /**

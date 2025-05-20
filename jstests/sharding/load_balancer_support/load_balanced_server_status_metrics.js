@@ -1,12 +1,23 @@
 /**
  * Tests that load-balanced connections are reported correctly in server status metrics.
+ * @tags: [
+ *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_70,
+ *   temp_disabled_embedded_router_uncategorized,
+ * ]
  */
 
+const kProxyIngressPort = allocatePort();
+const kProxyEgressPort = allocatePort();
+const kProxyVersion = 2;
+
+if (_isWindows()) {
+    quit();
+}
+import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+
 (() => {
-    "use strict";
-
-    load('jstests/libs/fail_point_util.js');
-
     const numConnections = 10;
 
     function createTemporaryConnection(uri, dbName, collectionName) {
@@ -31,13 +42,17 @@
                     5 * 60000);
     }
 
-    var st = new ShardingTest({shards: 1, mongos: 1});
+    let proxy_server = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
+    proxy_server.start();
+
+    var st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        mongosOptions: {setParameter: {"loadBalancerPort": kProxyEgressPort}}
+    });
     let admin = st.s.getDB("admin");
 
-    assert.commandWorked(
-        admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
-
-    var uri = "mongodb://" + admin.getMongo().host + "/?loadBalanced=true";
+    var uri = `mongodb://127.0.0.1:${kProxyIngressPort}/?loadBalanced=true`;
 
     var testDB = 'connectionsOpenedTest';
     var signalCollection = 'keepRunning';
@@ -57,7 +72,6 @@
     }
     waitForConnections(admin, 0);
 
-    assert.commandWorked(
-        admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'off'}));
     st.stop();
+    proxy_server.stop();
 })();

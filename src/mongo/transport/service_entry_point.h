@@ -123,6 +123,9 @@ public:
      */
     virtual void onClientDisconnect(Client* client) {}
 
+    virtual void incrementLBConnections(){};
+    virtual void decrementLBConnections(){};
+
 protected:
     ServiceEntryPoint() = default;
 };

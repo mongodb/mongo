@@ -82,9 +82,15 @@ public:
         return true;
     }
 
-    bool isFromLoadBalancer() const override {
+    bool isLoadBalancerPeer() const override {
         return false;
-    }
+    };
+
+    bool isConnectedToLoadBalancerPort() const override {
+        return false;
+    };
+
+    void setisLoadBalancerPeer(OperationContext* opCtx, bool helloHasLoadBalancedOption) override{};
 
 #ifdef MONGO_CONFIG_SSL
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {

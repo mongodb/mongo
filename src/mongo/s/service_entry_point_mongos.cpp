@@ -218,15 +218,23 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     return handleRequestImpl(opCtx, message);
 }
 
+void ServiceEntryPointMongos::incrementLBConnections() {
+    _loadBalancedConnections.increment();
+}
+
+void ServiceEntryPointMongos::decrementLBConnections() {
+    _loadBalancedConnections.decrement();
+}
+
 void ServiceEntryPointMongos::onClientConnect(Client* client) {
-    if (load_balancer_support::isFromLoadBalancer(client)) {
-        _loadBalancedConnections.increment();
+    if (load_balancer_support::isLoadBalancerPeer(client)) {
+        incrementLBConnections();
     }
 }
 
 void ServiceEntryPointMongos::derivedOnClientDisconnect(Client* client) try {
-    if (load_balancer_support::isFromLoadBalancer(client)) {
-        _loadBalancedConnections.decrement();
+    if (load_balancer_support::isLoadBalancerPeer(client)) {
+        decrementLBConnections();
 
         auto killerOperationContext = client->makeOperationContext();
 

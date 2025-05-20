@@ -54,7 +54,7 @@ boost::optional<int> getLoadBalancerPort();
  */
 void handleHello(OperationContext* opCtx, BSONObjBuilder* result, bool helloHasLoadBalancedOption);
 
-bool isFromLoadBalancer(Client* client);
+bool isLoadBalancerPeer(Client* client);
 
 /**
  * Returns whether the feature flag for load balancer support is enabled.

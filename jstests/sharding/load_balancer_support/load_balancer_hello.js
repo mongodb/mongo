@@ -3,6 +3,11 @@
  * that have arrived through a load balancer affirm that they are
  * compatible with the way mongos handles load-balanced clients.
  * See `src/mongo/s/load_balancing_support.h`.
+ *
+ * @tags: [
+ *    requires_fcv_70,
+ * ]
+ *
  */
 (() => {
     "use strict";
@@ -22,18 +27,18 @@
         }
     };
 
-    var doHello = (admin, {lbConnection, lbHello, expectServiceId}) => {
+    var doHello = (admin, {lbConnection, lbHello}) => {
         if (lbConnection)
             assert.commandWorked(admin.adminCommand(
-                {configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
+                {configureFailPoint: 'clientIsConnectedToLoadBalancerPort', mode: 'alwaysOn'}));
         try {
             var helloDoc = {};
             if (lbHello)
                 helloDoc['loadBalanced'] = true;
             return admin.runCommand("hello", helloDoc);
         } finally {
-            assert.commandWorked(
-                admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'off'}));
+            assert.commandWorked(admin.adminCommand(
+                {configureFailPoint: 'clientIsConnectedToLoadBalancerPort', mode: 'off'}));
         }
     };
 
@@ -82,7 +87,6 @@
      * This is an error that should result in a disconnection.
      */
     runInShardingTest((admin) => {
-        var res = doHello(admin, {lbConnection: true});
-        assert.commandFailedWithCode(res, ErrorCodes.LoadBalancerSupportMismatch);
+        assertNoServiceId(doHello(admin, {lbConnection: true}));
     });
 })();

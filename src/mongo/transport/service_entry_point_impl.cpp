@@ -87,7 +87,10 @@ bool quiet() {
 /** Some diagnostic data that we will want to log about a Client after its death. */
 struct ClientSummary {
     explicit ClientSummary(const Client* c)
-        : uuid{c->getUUID()}, remote{c->session()->remote()}, id{c->session()->id()} {}
+        : uuid(c->getUUID()),
+          remote(c->session()->remote()),
+          id(c->session()->id()),
+          isLoadBalanced(c->session()->isLoadBalancerPeer()) {}
 
     friend auto logAttrs(const ClientSummary& m) {
         return logv2::multipleAttrs(
@@ -97,6 +100,7 @@ struct ClientSummary {
     UUID uuid;
     HostAndPort remote;
     transport::SessionId id;
+    bool isLoadBalanced;
 };
 }  // namespace
 
