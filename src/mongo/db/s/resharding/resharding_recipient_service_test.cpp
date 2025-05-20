@@ -556,8 +556,12 @@ public:
             CancellationSource cancelSource;
             SemiFuture<void> future =
                 notifyToStartCloningUsingCmd(cancelSource.token(), recipient, recipientDoc);
+            // There is a race here where the recipient can fulfill the future before cancelSource
+            // is canceled. Due to this we need to check for Status::OK() as well as
+            // CallbackCanceled.
             cancelSource.cancel();
-            ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
+            auto status = future.getNoThrow();
+            ASSERT_TRUE(status == ErrorCodes::CallbackCanceled || status == Status::OK()) << status;
         } else {
             _onReshardingFieldsChanges(
                 opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
