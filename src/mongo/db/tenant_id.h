@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
 
@@ -126,7 +127,7 @@ private:
     friend class NamespaceString;
     friend class DatabaseName;
 
-    OID _oid;
+    MONGO_MOD_NEEDS_REPLACEMENT OID _oid;
 };
 
 inline bool operator==(const TenantId& lhs, const TenantId& rhs) {

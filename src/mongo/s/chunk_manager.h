@@ -58,6 +58,7 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/uuid.h"
 
@@ -639,7 +640,7 @@ private:
           _chunkVersion(std::move(version)),
           _epochDisambiguatingSequenceNum(epochDisambiguatingSequenceNum) {}
 
-    void setChunkVersion(const ChunkVersion& version);
+    MONGO_MOD_NEEDS_REPLACEMENT void setChunkVersion(const ChunkVersion& version);
 
     uint64_t _forcedRefreshSequenceNum{0};
 

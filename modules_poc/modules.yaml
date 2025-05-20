@@ -19,15 +19,6 @@
 #   to send questions/tickets to initially, understanding that we can always send them
 #   somewhere else if needed.
 
-# This module is a temporary home for files that also match a less-specific
-# (currently defined as shorter) glob in some module that these files should not
-# belong to. As part of assigning files to modules we should move these globs to
-# the module they belong to and eventually remove this module.
-__NONE__:
-  files:
-    - src/mongo/idl/cluster_server_parameter*
-    - src/mongo/idl/cluster_parameter_synchronization_helpers*
-
 core:
   description: TODO
   meta:
@@ -99,7 +90,7 @@ core.servers:
     - src/mongo/db/mongod_options_general.*
     - src/mongo/db/mongod_options_legacy.idl
     - src/mongo/db/mongod_options_test.cpp
-    - src/mongo/db/service_context_d_test_fixture*
+    - src/mongo/db/service_context_d_test_fixture.*
     - src/mongo/db/global_settings*
     - src/mongo/db/mongod_options_sharding*
     - src/mongo/db/replica_set_endpoint*
@@ -214,19 +205,166 @@ query:
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/util/safe_num*
 
-catalog:
+shard_catalog:
   meta:
+    description: >-
+      This module represents the logical parts of a database/collection that are constrained to a
+      single shard's replica set. They provide clean APIs that higher-order modules use, for
+      instance, to build replica set and distributed DDL operations, but the module only concerns
+      themselves with the shard-local view and has no bearing on the global catalog.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
-    - src/mongo/db/catalog/
-    - src/mongo/db/catalog_raii*
-    - src/mongo/db/namespace_string*
-    - src/mongo/db/d_concurrency_* # TODO SERVER-104625 move to db/concurrency with siblings
-    - src/mongo/db/database_name*
-    - src/mongo/db/tenant_id* # needs to be same module as database_name.h
+    # The files below are grouped by the logical component/library that they (should) represent in
+    # the ideal state of the codebase.
+
+    # base: Fundamental, stateless value types that are used throughout the codebase (MongoS and MongoD).
+    - src/mongo/db/database_name[._]*
+    - src/mongo/db/namespace_string[._]*
+    - src/mongo/util/namespace_string[._]*
+
+    # lock_manager:
+    - src/mongo/db/concurrency/
+    - src/mongo/db/dump_lock_manager[._]*
+
+    # shard_role_api: The public Shard Role API that the rest of the teams use to build the shard
+    # side of distributed date applications.
+    - src/mongo/db/shard_role[._]*
+    - src/mongo/db/transaction_resources[._]*
+
+    # shard_role_api_cluster_part: Implementation detail of the public Shard Role API that contains
+    # the parts of the catalog that are projected on the Config Server and managed through the
+    # non-authoritative model.
+    - src/mongo/db/direct_shard_client_tracker[._]*
+    - src/mongo/db/direct_connection_util[._]*
+    - src/mongo/db/s/collection_metadata[._]*
+    - src/mongo/db/s/collection_sharding_state[._]*
+    - src/mongo/db/s/collection_sharding_runtime[._]*
+    - src/mongo/db/s/database_sharding_state[._]*
+    - src/mongo/db/s/database_sharding_runtime[._]*
+    - src/mongo/db/s/metadata_manager[._]*
+    - src/mongo/db/s/op_observer_sharding_test*
+
+    # shard_role_api_local_part: Implementation detail of the public Shard Role API that contains
+    # the parts of the catalog that are not projected on the Config Server.
+    - src/mongo/db/catalog/*
+    - src/mongo/db/catalog_raii[._]*
+    - src/mongo/db/db_raii[._]*
+    - src/mongo/db/d_concurrency_*
+    - src/mongo/dbtests/catalogtests.cpp
     - src/mongo/dbtests/indexcatalogtests.cpp
-    - src/mongo/util/namespace_string* # needs to be same module as db/namespace_string.h
+
+    # commands: Commands that belong to this module.
+    - src/mongo/db/s/sharding_server_status.cpp
+
+    # unit_testing_framework: Components that are used to implement unit-tests that require a
+    # functioning shard catalog.
+    - src/mongo/db/catalog/catalog_test_fixture.*
+
+    # unsorted: Everything else.
+    - src/mongo/db/service_entry_point_shard_role[._]*
+
+ddl:
+  meta:
+    description: >-
+      This module contains the global catalog, the commands exposed to external users and the
+      interfaces exposed to internal users (other modules) to run DDL operations, both for sharded
+      clusters and replica sets. Being more specific, for replica sets the DDL module contains the
+      entire DDL operation, excluding the shard-local function to support the DDL, which is in the
+      shard_local_catalog module. For sharded clusters, the DDL module contains everything,
+      including the cluster commit protocol.
+    slack: server-catalog-and-routing
+    jira: Catalog and Routing
+  files:
+    # The files below are grouped by the logical component/library that they (should) represent in
+    # the ideal state of the codebase.
+
+    # ddl_role_api: The public DDL Role API that the rest of the teams use to implement the shard
+    # side of DDL operations in a replicaset and sharded clusters.
+    - src/mongo/db/s/ddl_lock_manager[._]*
+    - src/mongo/db/s/sharding_ddl_coordinator[._]*
+    - src/mongo/db/s/sharding_util[._]*
+    - src/mongo/db/s/sharding_ddl_util[._]*
+
+    # commands: Commands that belong to this module.
+    - src/mongo/s/request_types/shardsvr_join_ddl_coordinators_request.idl
+    - src/mongo/db/s/shardsvr_join_ddl_coordinators_command.cpp
+    - src/mongo/db/s/config/configsvr_create_database_command.cpp
+
+    # unsorted: Everything else.
+    - src/mongo/s/cluster_ddl.*
+    - src/mongo/s/catalog/*
+    - src/mongo/db/s/config/sharding_catalog_manager*
+
+routing_and_topology:
+  meta:
+    description: >-
+      This module contains the topology of the cluster, including the operations to promote a
+      replica set to sharded cluster, demote a sharded cluster to replica set and to add/remove to
+      a sharded cluster. Apart from that, it also owns the Router Role, including protocols and
+      interfaces that ensure queries are routed to the correct subset of shards and that the entire
+      distributed operation executes with the correct consistency level.
+    slack: server-catalog-and-routing
+    jira: Catalog and Routing
+  files:
+    # base: Fundamental, stateless value types that are used throughout the codebase (MongoS and MongoD).
+    - src/mongo/db/cluster_role.*
+    - src/mongo/db/shard_id[._]*
+    - src/mongo/s/chunk_version[._]*
+    - src/mongo/s/index_version[._]*
+    - src/mongo/s/shard_version[._]*
+    - src/mongo/s/version_mongos[._]*
+    - src/mongo/s/stale_exception[._]*
+    - src/mongo/s/collection_uuid_mismatch.*
+
+    # sharding_environment: Fundamental mutable state that all sharding components rely.
+    - src/mongo/s/grid.*
+    - src/mongo/s/sharding_state.*
+    - src/mongo/db/s/sharding_initialization[._]*
+    # TODO: This file overlaps between shard_catalog, ddl and routing_and_topology. Putting it in
+    # this module because it is "generic infrastructure", but likely its contents need to be moved
+    # to each respective module.
+    - src/mongo/db/s/shard_server_op_observer[._]*
+    - src/mongo/db/s/config_server_op_observer[._]*
+
+    # vector_clock:
+    - src/mongo/db/vector_clock[._]*
+
+    # router_role_api:
+    - src/mongo/s/router_role[._]*
+    - src/mongo/s/routing_context[._]*
+    - src/mongo/s/catalog_cache[._]*
+    - src/mongo/s/client/shard_registry[._]*
+    - src/mongo/s/config_server_catalog_cache_loader[._]*
+
+    # cluster_server_parameters: Cluster server parameters are a special type of server parameter that
+    # are stored in the config server and are replicated to all shards. They are used to control
+    # the behavior of the cluster as a whole, rather than individual shards.
+    - src/mongo/idl/cluster_server_parameter*
+    - src/mongo/idl/cluster_parameter_synchronization_helpers*
+    - src/mongo/s/set_cluster_server_parameter_router_impl[._]*
+
+    # commands: Commands that belong to this module.
+    - src/mongo/s/request_types/add_shard.idl
+    - src/mongo/db/s/add_shard_coordinator[._]*
+    - src/mongo/db/s/config/configsvr_add_shard_command.cpp
+    - src/mongo/s/request_types/remove_shard.idl
+    - src/mongo/db/s/remove_shard_commit_coordinator[._]*
+    - src/mongo/db/s/config/configsvr_remove_shard_command.cpp
+    - src/mongo/s/s_sharding_server_status.cpp
+
+    # unit_testing_framework: Components that are used to implement unit-tests that require a
+    # functioning routing and topology environment.
+    - src/mongo/s/catalog_cache_test_fixture.*
+    - src/mongo/s/sharding_test_fixture_common.*
+    - src/mongo/db/vector_clock_test_fixture.*
+    - src/mongo/db/s/sharding_mongod_test_fixture.*
+    - src/mongo/db/s/shard_server_test_fixture.*
+    - src/mongo/db/s/config/config_server_test_fixture.*
+
+    # unsorted: Everything else.
+    - src/mongo/db/write_block_bypass[._]*
+    - src/mongo/s/cluster_identity_loader[._]*
 
 replication_coordinator:
   meta:
@@ -246,7 +384,10 @@ transactions:
     - src/mongo/db/commands/*transaction*
     - src/mongo/db/commands/*txn*
     - src/mongo/db/transaction/
-    - src/mongo/db/*transaction*
+    - src/mongo/db/cluster_transaction_api.*
+    - src/mongo/db/internal_transactions_feature_flag.idl
+    - src/mongo/db/periodic_runner_job_abort_expired_transactions.*
+    - src/mongo/db/transaction_validation.*
     - src/mongo/db/*txn*
     - src/mongo/db/s/*transaction*
     - src/mongo/db/s/*txn*
@@ -309,21 +450,6 @@ security:
     - src/mongo/db/modules/enterprise/src/kmip
     - src/mongo/db/modules/enterprise/src/ldap
     - src/mongo/db/modules/enterprise/src/sasl
-
-router_role:
-  meta:
-    slack: TODO
-    jira: TODO
-  files:
-    - src/mongo/s/
-
-shard_role:
-  meta:
-    slack: TODO
-    jira: TODO
-  files:
-    - src/mongo/db/s/
-    - src/mongo/db/service_entry_point_shard_role[._]*
 
 causal_consistency:
   meta:
