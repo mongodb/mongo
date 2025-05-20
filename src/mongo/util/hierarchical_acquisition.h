@@ -136,8 +136,8 @@ private:
     }
 
     explicit constexpr Level(ValueType value, IndexType index) : _value(value), _index(index) {
-        invariantForConstexpr(_value >= minValue());
-        invariantForConstexpr(_value <= maxValue());
+        invariant(_value >= minValue());
+        invariant(_value <= maxValue());
     }
 
     ValueType _value;

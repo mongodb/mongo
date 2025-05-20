@@ -62,7 +62,7 @@ namespace mongo {
 class [[nodiscard]] Status {
 public:
     /** This is the best way to construct an OK status. */
-    static Status OK() {
+    consteval static Status OK() {
         return {};
     }
 
@@ -160,11 +160,11 @@ public:
         return Status(*this).addContext(reasonPrefix);
     }
 
-    bool isOK() const {
+    constexpr bool isOK() const {
         return !_error;
     }
 
-    ErrorCodes::Error code() const {
+    constexpr ErrorCodes::Error code() const {
         return _error ? _error->code : ErrorCodes::OK;
     }
 
@@ -187,7 +187,7 @@ public:
 
     /** Returns a specific subclass of ErrorExtraInfo if the error code matches that type. */
     template <typename T>
-    std::shared_ptr<const T> extraInfo() const {
+    constexpr std::shared_ptr<const T> extraInfo() const {
         MONGO_STATIC_ASSERT(std::is_base_of_v<ErrorExtraInfo, T>);
         MONGO_STATIC_ASSERT(std::is_same_v<error_details::ErrorExtraInfoFor<T::code>, T>);
 
@@ -230,7 +230,7 @@ public:
     /**
      * Call this method to indicate that it is your intention to ignore a returned status.
      */
-    void ignore() const noexcept {}
+    constexpr void ignore() const noexcept {}
 
     /**
      * This method is a transitional tool, to facilitate transition to compile-time enforced status
@@ -246,25 +246,13 @@ public:
     void transitional_ignore() const& noexcept = delete;
 
     /** Only compares codes. Ignores reason strings. */
-    friend bool operator==(const Status& a, const Status& b) {
-        return a.code() == b.code();
-    }
-    friend bool operator!=(const Status& a, const Status& b) {
-        return !(a == b);
+    constexpr bool operator==(const Status& s) const {
+        return code() == s.code();
     }
 
     /** Status and ErrorCodes::Error are symmetrically EqualityComparable. */
-    friend bool operator==(const Status& a, ErrorCodes::Error b) {
-        return a.code() == b;
-    }
-    friend bool operator!=(const Status& a, ErrorCodes::Error b) {
-        return !(a == b);
-    }
-    friend bool operator==(ErrorCodes::Error a, const Status& b) {
-        return b == a;
-    }
-    friend bool operator!=(ErrorCodes::Error a, const Status& b) {
-        return b != a;
+    constexpr bool operator==(ErrorCodes::Error err) const {
+        return code() == err;
     }
 
     /**
@@ -309,7 +297,7 @@ private:
                                                                  std::string reason,
                                                                  const BSONObj& extraObj);
 
-    Status() = default;
+    constexpr Status() = default;
 
     // Private since it could result in a type mismatch between code and extraInfo.
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,

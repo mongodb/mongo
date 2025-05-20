@@ -133,13 +133,4 @@ constexpr void invariantWithContextAndLocation(const T& testOK,
 
 #define dassert MONGO_dassert
 
-constexpr void invariantForConstexprThrower(bool val) {
-    enum { AbortException };
-    val ? 0 : throw AbortException;
-}
-
-constexpr void invariantForConstexpr(bool val) noexcept {
-    invariantForConstexprThrower(val);
-}
-
 }  // namespace mongo

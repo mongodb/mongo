@@ -691,12 +691,68 @@ void mustNotCompile() {
 constexpr bool checkCanUseInvariantInConstexprCode = [] {
     invariant(true);
     invariant(true, "with message");
-
-    // TODO need to make intrusive_ptr constexpr-friendly first
-    // invariant(Status::OK(), "with message");
-    // invariant(StatusWith(1), "with message");
+    invariant(Status::OK());
+    invariant(StatusWith(1));
+    invariant(Status::OK(), "with message");
+    invariant(StatusWith(1), "with message");
 
     return true;
 }();
+
+constexpr bool checkCanUseUMITassertInConstexprCode = [] {
+    uassert(ErrorCodes::BadValue, "with message", true);
+    uassertStatusOK(Status::OK());
+    uassertStatusOK(StatusWith(1));
+    uassertStatusOKWithContext(Status::OK(), "context");
+    uassertStatusOKWithContext(StatusWith(1), "context");
+
+    massert(ErrorCodes::BadValue, "with message", true);
+    massertStatusOK(Status::OK());
+    massertStatusOK(StatusWith(1));
+
+    iassert(ErrorCodes::BadValue, "with message", true);
+    iassert(Status::OK());
+    iassert(StatusWith(1));
+
+    tassert(ErrorCodes::BadValue, "with message", true);
+    tassert(Status::OK());
+    tassert(StatusWith(1));
+
+    return true;
+}();
+
+#define isConstexpr(expr)                       \
+    [] {                                        \
+        static const bool b = [] {              \
+            if (std::is_constant_evaluated()) { \
+                (void)expr;                     \
+                return true;                    \
+            } else {                            \
+                return false;                   \
+            }                                   \
+        }();                                    \
+        return b;                               \
+    }()
+
+TEST(AssertUtils, FailuresAreNotConstexpr) {
+    // self-test of `isConstexpr`
+    ASSERT(isConstexpr(1));
+    ASSERT(!isConstexpr(std::terminate()));
+
+    ASSERT(isConstexpr(Status::OK()));
+    ASSERT(isConstexpr(StatusWith(1)));
+    ASSERT(isConstexpr(invariant(true)));
+    ASSERT(isConstexpr([] {
+        uassert(ErrorCodes::BadValue, "", true);
+    }()));
+
+    ASSERT(!isConstexpr(Status(ErrorCodes::BadValue, "")));
+    ASSERT(!isConstexpr(StatusWith<int>(ErrorCodes::BadValue, "")));
+    ASSERT(!isConstexpr(invariant(false)));
+    ASSERT(!isConstexpr([] {
+        uassert(ErrorCodes::BadValue, "", false);
+    }()));
+}
+
 }  // namespace
 }  // namespace mongo
