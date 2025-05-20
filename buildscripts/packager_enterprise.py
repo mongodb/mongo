@@ -31,6 +31,7 @@ import errno
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -206,12 +207,35 @@ class EnterpriseDistro(packager.Distro):
         return super(EnterpriseDistro, self).build_os(arch)
 
 
+def verify_args(args):
+    # If the crypt spec is specified, the tarball file must include the crypt library.
+    if args.crypt_spec:
+        if (
+            "lib/mongo_crypt_v1.so"
+            not in subprocess.run(
+                [
+                    "tar",
+                    "-tzf",
+                    args.tarball,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.split()
+        ):
+            raise ValueError(
+                "The tarball file %s does not contain the crypt library. Please use a tarball that contains the crypt library."
+                % args.tarball
+            )
+
+
 def main():
     """Execute Main program."""
 
     distros = [EnterpriseDistro(distro) for distro in DISTROS]
 
     args = packager.get_args(distros, ARCH_CHOICES)
+    verify_args(args)
 
     spec = get_enterprise_spec(args)
 
