@@ -33,16 +33,19 @@ TEST_CASE("Test functions for error handling in rollback workflows",
     SECTION(
       "Test WT_CACHE_OVERFLOW in __wti_evict_app_assist_worker - not safe to proceed with eviction")
     {
+
         // If the eviction server isn't running, then the threads have not been set up yet and it's
         // not safe to evict.
-        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true, 100) == 0);
+        CHECK(__wt_evict_app_assist_worker_check(session_impl, false, false, true, NULL) == 0);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
 
         // Set the eviction server as running.
         conn_impl->evict_server_running = true;
         // The eviction sever is running, but the application is busy and the cache is less than 100
         // percent full.
-        CHECK(__wti_evict_app_assist_worker(session_impl, true, false, true, 99) == 0);
+        conn_impl->cache_size = 10 * 1024 * 1024;
+        conn_impl->cache->bytes_inmem = 9 * 1024 * 1024;
+        CHECK(__wt_evict_app_assist_worker_check(session_impl, true, false, true, NULL) == 0);
         check_error_info(err_info, 0, WT_NONE, WT_ERROR_INFO_SUCCESS);
     }
 
@@ -59,7 +62,7 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         // Set transaction's update amount to 1 and ID to be equal to the oldest transaction ID.
         session_impl->txn->mod_count = 1;
         WT_SESSION_TXN_SHARED(session_impl)->id = S2C(session)->txn_global.oldest_id;
-        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true, 100) == WT_ROLLBACK);
+        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true) == WT_ROLLBACK);
         check_error_info(err_info, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION,
           "Transaction has the oldest pinned transaction ID");
 
@@ -84,7 +87,7 @@ TEST_CASE("Test functions for error handling in rollback workflows",
         cursor->set_key(cursor, "key");
         cursor->set_value(cursor, "value");
 
-        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true, 100) == WT_ROLLBACK);
+        CHECK(__wti_evict_app_assist_worker(session_impl, false, false, true) == WT_ROLLBACK);
         check_error_info(err_info, WT_ROLLBACK, WT_CACHE_OVERFLOW, "Cache capacity has overflown");
 
         // Drop the table.

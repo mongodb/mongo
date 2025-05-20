@@ -1432,6 +1432,15 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(__wt_log_flush(session, WT_LOG_FSYNC));
 
     /*
+     * Stress point to stop just before we sync the metadata file. Used to recreate log recovery
+     * scenarios with an incomplete checkpoint.
+     */
+    WT_STAT_CONN_SET(session, checkpoint_stop_stress_active, 1);
+    /* Wait prior to flush the checkpoint stop log record. */
+    __checkpoint_timing_stress(session, WT_TIMING_STRESS_CHECKPOINT_STOP, &tsp);
+    WT_STAT_CONN_SET(session, checkpoint_stop_stress_active, 0);
+
+    /*
      * Ensure that the metadata changes are durable before the checkpoint is resolved. Either
      * checkpointing the metadata or syncing the log file works. Recovery relies on the checkpoint
      * LSN in the metadata being updated by only checkpoints of all files, i.e. full checkpoints.
@@ -1458,11 +1467,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR(ret);
 
     __checkpoint_verbose_track(session, "metadata sync completed");
-
-    WT_STAT_CONN_SET(session, checkpoint_stop_stress_active, 1);
-    /* Wait prior to flush the checkpoint stop log record. */
-    __checkpoint_timing_stress(session, WT_TIMING_STRESS_CHECKPOINT_STOP, &tsp);
-    WT_STAT_CONN_SET(session, checkpoint_stop_stress_active, 0);
 
     /*
      * Now that the metadata is stable, re-open the metadata file for regular eviction by clearing
