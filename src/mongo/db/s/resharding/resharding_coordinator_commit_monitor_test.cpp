@@ -333,7 +333,7 @@ TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimesReplicationL
               "accountForReplLag"_attr = accountForReplLag);
 
         RAIIServerParameterControllerForTest batchSize{
-            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+            "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag", accountForReplLag};
 
         auto future = launchAsync([this] {
             ThreadClient tc(getServiceContext()->getService());
@@ -359,7 +359,7 @@ TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimesReplicationL
               "accountForReplLag"_attr = accountForReplLag);
 
         RAIIServerParameterControllerForTest batchSize{
-            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+            "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag", accountForReplLag};
 
         auto future = launchAsync([this] {
             ThreadClient tc(getServiceContext()->getService());
@@ -388,7 +388,7 @@ TEST_F(CoordinatorCommitMonitorTest,
               "accountForReplLag"_attr = accountForReplLag);
 
         RAIIServerParameterControllerForTest batchSize{
-            "reshardingRemainingTimeEstimateAccountsForReplicationLag", accountForReplLag};
+            "reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag", accountForReplLag};
 
         auto future = launchAsync([this] {
             ThreadClient tc(getServiceContext()->getService());
@@ -460,8 +460,8 @@ TEST_F(CoordinatorCommitMonitorTest, BlocksWhenRemainingMillisIsOmitted) {
 
 TEST_F(CoordinatorCommitMonitorTest,
        BlocksWhenRemainingMillisPlusReplicationLagNotWithinCommitThreshold) {
-    // Not set the reshardingRemainingTimeEstimateAccountsForReplicationLag to test that the
-    // default is true.
+    // Not set the reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag to test that
+    // the default is true.
     auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
     auto threshold = gRemainingReshardingOperationTimeThresholdMillis.load();
 
