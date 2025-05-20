@@ -23,7 +23,9 @@ export const $config = (function() {
                 // We expect any errors of query getting killed due to selected index for join is
                 // dropped. We also accept StaleConfig error that may be raised due to the slowness
                 // of MoveChunk in certain suites in debug build.
-                assert.contains(e.code, interruptedQueryErrors.concat(ErrorCodes.StaleConfig));
+                if (!interruptedQueryErrors.includes(e.code)) {
+                    throw e;
+                }
             }
         },
 

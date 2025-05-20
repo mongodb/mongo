@@ -199,13 +199,14 @@ export const $config = (function() {
                     // The getMore request can fail if the database, a collection, or an index was
                     // dropped. It can also fail if another thread kills it through killCursor or
                     // killOp.
-                    assert.contains(e.code,
-                                    [
-                                        ...interruptedQueryErrors,
-                                        ErrorCodes.NamespaceNotFound,
-                                        ErrorCodes.OperationFailed
-                                    ],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    const expectedErrors = [
+                        ErrorCodes.NamespaceNotFound,
+                        ErrorCodes.OperationFailed,
+                        ...interruptedQueryErrors
+                    ];
+                    if (!expectedErrors.includes(e.code)) {
+                        throw e;
+                    }
                 }
             }
         },

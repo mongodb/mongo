@@ -44,14 +44,12 @@ export const $config = (function() {
 
                     arr = cursor.toArray();
                 } catch (e) {
-                    if (TxnUtil.isTransientTransactionError(e)) {
-                        throw e;
-                    }
-                    if (TestData.runningWithShardStepdowns) {
-                        // When running with stepdowns, we expect to sometimes see the query
-                        // killed.
-                        assert.contains(e.code, interruptedQueryErrors);
-                    } else {
+                    // When running with stepdowns or with balancer, we expect to sometimes see
+                    // the query killed.
+                    const isExpectedError =
+                        (TestData.runningWithShardStepdowns || TestData.runningWithBalancer) &&
+                        interruptedQueryErrors.includes(e.code);
+                    if (!isExpectedError) {
                         throw e;
                     }
                 }
