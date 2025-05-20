@@ -3692,8 +3692,6 @@ mongo_cc_library(
     deps = [
         ":service_context_d",
         ":service_context_test_fixture",
-        "//src/mongo/db/auth:auth_impl_internal",
-        "//src/mongo/db/auth:authserver",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/commands:mongod",
         "//src/mongo/db/index_builds:index_builds_coordinator_mongod",

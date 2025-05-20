@@ -1075,8 +1075,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/client:clientdriver_network",
-        "//src/mongo/db/auth",
-        "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/util/net:network",
     ],
 )

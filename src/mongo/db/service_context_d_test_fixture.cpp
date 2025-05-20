@@ -31,12 +31,6 @@
 
 #include <type_traits>
 
-#include "mongo/db/auth/authorization_backend_interface.h"
-#include "mongo/db/auth/authorization_backend_mock.h"
-#include "mongo/db/auth/authorization_client_handle_shard.h"
-#include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_router_impl.h"
-#include "mongo/db/auth/authorization_router_impl_for_test.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"

@@ -241,10 +241,9 @@ mongo_cc_library(
         "sha1_block.cpp",
     ],
     hdrs = [
+        "hash_block.h",
         "sha1_block.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
+        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo:base",
@@ -258,10 +257,9 @@ mongo_cc_library(
         "sha256_block.cpp",
     ],
     hdrs = [
+        "hash_block.h",
         "sha256_block.h",
-    ],
-    header_deps = [
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
+        "//src/mongo:core_headers",
     ],
     deps = [
         "//src/mongo:base",
@@ -287,9 +285,7 @@ mongo_cc_library(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     hdrs = [
-        "hash_block.h",
         "sha512_block.h",
-        "//src/mongo:core_headers",
     ],
     local_defines = select({
         "//bazel/config:mongo_crypto_tom": ["LTC_NO_PROTOTYPES"],

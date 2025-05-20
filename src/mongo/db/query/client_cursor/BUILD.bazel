@@ -44,6 +44,9 @@ mongo_cc_library(
         "cursor_idl_validator.cpp",
         ":cursor_response_gen",
     ],
+    hdrs = [
+        "cursor_idl_validator.h",
+    ],
     deps = [
         "//src/mongo/db:server_base",
     ],
