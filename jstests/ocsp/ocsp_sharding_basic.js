@@ -72,7 +72,7 @@ sleep(2000);
 
 jsTest.log("Restart the mongos with MockOCSPServer and expect to have REVOKED response.");
 const err = assert.throws(() => {
-    st.restartMongos(0);
+    st.restartMongos(0, {restart: true, waitForConnect: true, waitForConnectTimeoutMS: 5000});
 });
 
 mock_ocsp.stop();
