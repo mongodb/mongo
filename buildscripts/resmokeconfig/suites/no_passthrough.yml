@@ -18,7 +18,7 @@ selector:
     # Self-tests for the Concurrency testing framework are run as part of this test suite.
     - jstests/concurrency/*.js
   exclude_files:
-    - jstests/noPassthrough/libs/*.js
+    - jstests/noPassthrough/libs/**/*.js
   exclude_with_any_tags:
 
 # noPassthrough tests start their own mongod's.
