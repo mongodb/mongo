@@ -230,27 +230,28 @@ constexpr auto kNumDurableCatalogScansDueToMissingMapping = "numScansDueToMissin
 class LatestCollectionCatalog {
 public:
     std::shared_ptr<CollectionCatalog> load() const {
-        std::shared_lock lk(_mutex);  // NOLINT
+        std::shared_lock lk(_readMutex);  // NOLINT
         return _catalog;
     }
 
-    bool compareAndSet(const std::shared_ptr<CollectionCatalog>& oldCatalog,
-                       std::shared_ptr<CollectionCatalog>&& newCatalog) {
-        std::lock_guard lk(_mutex);
-        if (oldCatalog != _catalog)
-            return false;
-        _catalog = std::move(newCatalog);
-        return true;
-    }
-
-    void store(std::shared_ptr<CollectionCatalog>&& newCatalog) {
-        std::lock_guard lk(_mutex);
-        _catalog = std::move(newCatalog);
+    void write(auto&& fn) {
+        // The funny scoping here is to destroy the old catalog after releasing the locks, as if no
+        // one else has a reference it can be mildly expensive and we don't want to block other
+        // threads while we do it
+        std::shared_ptr<CollectionCatalog> newCatalog;
+        {
+            std::lock_guard lk(_writeMutex);
+            newCatalog = fn(*_catalog);
+            std::lock_guard lk2(_readMutex);
+            _catalog.swap(newCatalog);
+        }
     }
 
 private:
-    mutable RWMutex _mutex;
-    // TODO SERVER-56428: Replace with std::atomic<std::shared_ptr> when supported in our toolchain
+    // TODO SERVER-56428: Replace _readMutex std::atomic<std::shared_ptr> when supported in our
+    // toolchain. _writeMutex should remain a mutex.
+    mutable RWMutex _readMutex;
+    mutable stdx::mutex _writeMutex;
     std::shared_ptr<CollectionCatalog> _catalog = std::make_shared<CollectionCatalog>();
 };
 const ServiceContext::Decoration<LatestCollectionCatalog> getCatalogStore =
@@ -497,7 +498,7 @@ public:
     }
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) noexcept override {
-        boost::container::small_vector<CollectionCatalog::CatalogWriteFn, kNumStaticActions>
+        boost::container::small_vector<unique_function<void(CollectionCatalog&)>, kNumStaticActions>
             writeJobs;
 
         // Create catalog write jobs for all updates registered in this WriteUnitOfWork
@@ -740,128 +741,16 @@ void CollectionCatalog::stash(OperationContext* opCtx,
 }
 
 void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
-    // It is potentially expensive to copy the collection catalog so we batch the operations by only
-    // having one concurrent thread copying the catalog and executing all the write jobs.
-
-    struct JobEntry {
-        JobEntry(CatalogWriteFn write) : job(std::move(write)) {}
-
-        CatalogWriteFn job;
-
-        struct CompletionInfo {
-            // Used to wait for job to complete by worker thread
-            stdx::mutex mutex;
-            stdx::condition_variable cv;
-
-            // Exception storage if we threw during job execution, so we can transfer the exception
-            // back to the calling thread
-            std::exception_ptr exception;
-
-            // The job is completed when the catalog we modified has been committed back to the
-            // storage or if we threw during its execution
-            bool completed = false;
-        };
-
-        // Shared state for completion info as JobEntry's gets deleted when we are finished
-        // executing. No shared state means that this job belongs to the same thread executing them.
-        std::shared_ptr<CompletionInfo> completion;
-    };
-
-    static std::list<JobEntry> queue;
-    static bool workerExists = false;
-    static stdx::mutex mutex;  // Protecting the two globals above
-
-    invariant(job);
-
-    // Current batch of jobs to execute
-    std::list<JobEntry> pending;
-    {
-        stdx::unique_lock lock(mutex);
-        queue.emplace_back(std::move(job));
-
-        // If worker already exists, then wait on our condition variable until the job is completed
-        if (workerExists) {
-            auto completion = std::make_shared<JobEntry::CompletionInfo>();
-            queue.back().completion = completion;
-            lock.unlock();
-
-            stdx::unique_lock completionLock(completion->mutex);
-            const bool& completed = completion->completed;
-            completion->cv.wait(completionLock, [&completed]() { return completed; });
-
-            // Throw any exception that was caught during execution of our job. Make sure we destroy
-            // the exception_ptr on the same thread that throws the exception to avoid a data race
-            // between destroying the exception_ptr and reading the exception.
-            auto ex = std::move(completion->exception);
-            if (ex)
-                std::rethrow_exception(ex);
-            return;
-        }
-
-        // No worker existed, then we take this responsibility
-        workerExists = true;
-        pending.splice(pending.end(), queue);
-    }
-
-    // Implementation for thread with worker responsibility below, only one thread at a time can be
-    // in here. Keep track of completed jobs so we can notify them when we've written back the
-    // catalog to storage
-    std::list<JobEntry> completed;
-    std::exception_ptr myException;
-
     auto& storage = getCatalogStore(svcCtx);
-    // hold onto base so if we need to delete it we can do it outside of the lock
-    auto base = storage.load();
-    // copy the collection catalog, this could be expensive, but we will only have one pending
-    // collection in flight at a given time
-    auto clone = std::make_shared<CollectionCatalog>(*base);
-
-    // Execute jobs until we drain the queue
-    while (true) {
-        for (auto&& current : pending) {
-            // Store any exception thrown during job execution so we can notify the calling thread
-            try {
-                current.job(*clone);
-            } catch (...) {
-                if (current.completion)
-                    current.completion->exception = std::current_exception();
-                else
-                    myException = std::current_exception();
-            }
-        }
-        // Transfer the jobs we just executed to the completed list
-        completed.splice(completed.end(), pending);
-
-        stdx::lock_guard lock(mutex);
-        if (queue.empty()) {
-            // Queue is empty, store catalog and relinquish responsibility of being worker thread
-            storage.store(std::move(clone));
-            workerExists = false;
-            break;
-        }
-
-        // Transfer jobs in queue to the pending list
-        pending.splice(pending.end(), queue);
-    }
-
-    for (auto&& entry : completed) {
-        if (!entry.completion) {
-            continue;
-        }
-
-        stdx::lock_guard completionLock(entry.completion->mutex);
-        entry.completion->completed = true;
-        entry.completion->cv.notify_one();
-    }
-    LOGV2_DEBUG(
-        5255601, 1, "Finished writing to the CollectionCatalog", "jobs"_attr = completed.size());
-    if (myException)
-        std::rethrow_exception(myException);
+    storage.write([&](auto& catalog) {
+        auto clone = std::make_shared<CollectionCatalog>(catalog);
+        job(*clone);
+        return clone;
+    });
 }
 
-void CollectionCatalog::write(OperationContext* opCtx,
-                              std::function<void(CollectionCatalog&)> job) {
-    write(opCtx->getServiceContext(), std::move(job));
+void CollectionCatalog::write(OperationContext* opCtx, CatalogWriteFn job) {
+    write(opCtx->getServiceContext(), job);
 }
 
 Status CollectionCatalog::createView(OperationContext* opCtx,
@@ -1676,9 +1565,13 @@ void CollectionCatalog::onCloseCatalog() {
         return;
     }
 
-    _shadowCatalog.emplace();
+    mongo::stdx::unordered_map<UUID, NamespaceString, UUID::Hash> shadowCatalog;
+    shadowCatalog.reserve(_catalog.size());
     for (auto& entry : _catalog)
-        _shadowCatalog->insert({entry.first, entry.second->ns()});
+        shadowCatalog.insert({entry.first, entry.second->ns()});
+    _shadowCatalog =
+        std::make_shared<const mongo::stdx::unordered_map<UUID, NamespaceString, UUID::Hash>>(
+            std::move(shadowCatalog));
 }
 
 void CollectionCatalog::onOpenCatalog() {

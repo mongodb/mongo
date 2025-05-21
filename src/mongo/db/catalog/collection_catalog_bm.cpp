@@ -65,15 +65,15 @@ ServiceContext* setupServiceContext() {
 void createCollections(OperationContext* opCtx, int numCollections) {
     Lock::GlobalLock globalLk(opCtx, MODE_X);
 
-    for (auto i = 0; i < numCollections; i++) {
-        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-            "collection_catalog_bm", std::to_string(i));
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        for (auto i = 0; i < numCollections; i++) {
+            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+                "collection_catalog_bm", std::to_string(i));
             catalog.registerCollection(opCtx,
                                        std::make_shared<CollectionMock>(nss),
                                        /*ts=*/boost::none);
-        });
-    }
+        }
+    });
 }
 
 }  // namespace
@@ -189,7 +189,7 @@ void BM_CollectionCatalogIterateCollections(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_CollectionCatalogWrite)->Ranges({{{1}, {100'000}}});
+BENCHMARK(BM_CollectionCatalogWrite)->Arg(1)->Arg(1000)->Arg(100'000);
 BENCHMARK(BM_CollectionCatalogCreateDropCollection)->Ranges({{{1}, {100'000}}});
 BENCHMARK(BM_CollectionCatalogCreateNCollections)->Ranges({{{1}, {32'768}}});
 BENCHMARK(BM_CollectionCatalogLookupCollectionByNamespace)->Ranges({{{1}, {100'000}}});
