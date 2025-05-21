@@ -3433,26 +3433,27 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
 
     auto& tsts = payload.getTextSearchTokenSets().value();
 
-    // Ensure the total tags will not overflow the 8-bit counter
-    uint8_t tagLimit = std::numeric_limits<uint8_t>::max() - 1;  // subtract one for exact match tag
+    // Ensure the total tags will not overflow the per-field tag limit.
+    uint32_t tagLimit = EncryptionInformationHelpers::kFLE2PerFieldTagLimit -
+        1;  // subtract one for exact match tag
 
     uassert(9784104,
             "InsertUpdatePayload substring token sets size is too large",
             tsts.getSubstringTokenSets().size() <= tagLimit);
-    uint8_t substrTagCount = static_cast<uint8_t>(tsts.getSubstringTokenSets().size());
+    uint32_t substrTagCount = static_cast<uint32_t>(tsts.getSubstringTokenSets().size());
     tagLimit -= substrTagCount;
 
     uassert(9784105,
             "InsertUpdatePayload suffix token sets size is too large",
             tsts.getSuffixTokenSets().size() <= tagLimit);
-    uint8_t suffixTagCount = static_cast<uint8_t>(tsts.getSuffixTokenSets().size());
+    uint32_t suffixTagCount = static_cast<uint32_t>(tsts.getSuffixTokenSets().size());
     tagLimit -= suffixTagCount;
 
     uassert(9784106,
             "InsertUpdatePayload prefix token sets size is too large",
             tsts.getPrefixTokenSets().size() <= tagLimit);
-    uint8_t totalTagCount = 1 + substrTagCount + suffixTagCount +
-        static_cast<uint8_t>(tsts.getPrefixTokenSets().size());
+    uint32_t totalTagCount = 1 + substrTagCount + suffixTagCount +
+        static_cast<uint32_t>(tsts.getPrefixTokenSets().size());
 
     uassert(9784113,
             "FLE2IndexedTextEncryptedValueV2 tags length must equal the total number of text "

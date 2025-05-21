@@ -2396,9 +2396,9 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         EDCServerPayloadInfo tmpPayload;
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(255, "s"_sd),
+                                      std::vector<StringData>(84000, "s"_sd),
                                       QueryTypeEnum::SubstringPreview);
-        tmpPayload.counts = std::vector<uint64_t>(256);
+        tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
                                tmpPayload.payload, tmpTags, tmpPayload.counts),
@@ -2410,11 +2410,12 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         EDCServerPayloadInfo tmpPayload;
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(127, "s"_sd),
+                                      std::vector<StringData>(42000, "s"_sd),
                                       QueryTypeEnum::SubstringPreview);
-        generateTextTokenSetsForIUPV2(
-            tmpPayload.payload, std::vector<StringData>(128, "s"_sd), QueryTypeEnum::SuffixPreview);
-        tmpPayload.counts = std::vector<uint64_t>(256);
+        generateTextTokenSetsForIUPV2(tmpPayload.payload,
+                                      std::vector<StringData>(42000, "s"_sd),
+                                      QueryTypeEnum::SuffixPreview);
+        tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
                                tmpPayload.payload, tmpTags, tmpPayload.counts),
@@ -2426,13 +2427,15 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
         EDCServerPayloadInfo tmpPayload;
         tmpPayload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
         generateTextTokenSetsForIUPV2(tmpPayload.payload,
-                                      std::vector<StringData>(85, "s"_sd),
+                                      std::vector<StringData>(28000, "s"_sd),
                                       QueryTypeEnum::SubstringPreview);
-        generateTextTokenSetsForIUPV2(
-            tmpPayload.payload, std::vector<StringData>(85, "s"_sd), QueryTypeEnum::SuffixPreview);
-        generateTextTokenSetsForIUPV2(
-            tmpPayload.payload, std::vector<StringData>(85, "s"_sd), QueryTypeEnum::PrefixPreview);
-        tmpPayload.counts = std::vector<uint64_t>(256);
+        generateTextTokenSetsForIUPV2(tmpPayload.payload,
+                                      std::vector<StringData>(28000, "s"_sd),
+                                      QueryTypeEnum::SuffixPreview);
+        generateTextTokenSetsForIUPV2(tmpPayload.payload,
+                                      std::vector<StringData>(28000, "s"_sd),
+                                      QueryTypeEnum::PrefixPreview);
+        tmpPayload.counts = std::vector<uint64_t>(84001);
         auto tmpTags = EDCServerCollection::generateTagsForTextSearch(tmpPayload);
         ASSERT_THROWS_CODE(FLE2IndexedTextEncryptedValue::fromUnencrypted(
                                tmpPayload.payload, tmpTags, tmpPayload.counts),
