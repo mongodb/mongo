@@ -273,6 +273,11 @@ public:
     bool hasCursorForShard_forTest(const ShardId& shardId) const;
 
     /**
+     * Returns the number of buffered remote responses.
+     */
+    std::size_t numberOfBufferedRemoteResponses_forTest() const;
+
+    /**
      * For sorted tailable cursors, returns the most recent available sort key. This guarantees that
      * we will never return any future results which precede this key. If no results are ready to be
      * returned, this method may cause the high water mark to advance to the lowest promised sortkey

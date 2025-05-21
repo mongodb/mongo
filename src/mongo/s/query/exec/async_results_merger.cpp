@@ -117,14 +117,6 @@ void processAdditionalTransactionParticipantFromResponse(
     }
 }
 
-void processAdditionalTransactionParticipantFromResponse(OperationContext* opCtx,
-                                                         const ShardId& shardId,
-                                                         const BSONObj& originalResponse) {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    processAdditionalTransactionParticipantFromResponse(
-        opCtx, shardId, originalResponse, fcvSnapshot);
-}
-
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
@@ -340,6 +332,11 @@ bool AsyncResultsMerger::hasCursorForShard_forTest(const ShardId& shardId) const
     return std::any_of(_remotes.begin(), _remotes.end(), [&shardId](const auto& remote) {
         return shardId == remote->shardId;
     });
+}
+
+std::size_t AsyncResultsMerger::numberOfBufferedRemoteResponses_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _remoteResponses.size();
 }
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
@@ -984,15 +981,29 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     remote->cbHandle = executor::TaskExecutor::CallbackHandle();
 
     if (parsedResponse.isOK()) {
-        // We store the original unprocessed response in order to process additional transaction
-        // participants when reading it. Additional transaction participants processing cannot occur
-        // here since access to the underlying transaction router is not thread-safe.
-        //
-        // To avoid memory issues we delay processing until the actual owner thread of the
-        // TransactionRouter reads the responses. As this operation can occur after a while the BSON
-        // must be owned since otherwise we would be pointing to invalid memory.
-        invariant(cbData.response.data.isOwned());
-        _remoteResponses.emplace(remote->shardId, cbData.response.data);
+        if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
+
+            if (_opCtx) {
+                // If we have an opCtx, we can process all currently queued responses for additional
+                // transaction participants. Additionally, we can process the response we just
+                // received, so there is no need to buffer it in memory for later.
+                _processAdditionalTransactionParticipants(_opCtx);
+                processAdditionalTransactionParticipantFromResponse(
+                    _opCtx, remote->shardId, cbData.response.data, fcvSnapshot);
+            } else {
+                // We store the original unprocessed response in order to process additional
+                // transaction participants when reading it. Additional transaction participants
+                // processing cannot occur here since access to the underlying transaction router is
+                // not thread-safe.
+                //
+                // To avoid memory issues we delay processing until the actual owner thread of the
+                // TransactionRouter reads the responses. As this operation can occur after a while
+                // the BSON must be owned since otherwise we would be pointing to invalid memory.
+                invariant(cbData.response.data.isOwned());
+                _remoteResponses.emplace(remote->shardId, cbData.response.data);
+            }
+        }
     }
 
     //  On shutdown, there is no need to process the response.

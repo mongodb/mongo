@@ -102,6 +102,55 @@ BSONObj makeResumeToken(Timestamp clusterTime, UUID uuid, BSONObj docKey) {
 
 using AsyncResultsMergerTest = ResultsMergerTestFixture;
 
+TEST_F(AsyncResultsMergerTest, ResponseReceivedWhileDetachedFromOperationContext) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // Schedule requests.
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(kTestNss, CursorId(0), batch);
+
+    arm->detachFromOperationContext();
+    ASSERT_EQ(0, arm->numberOfBufferedRemoteResponses_forTest());
+
+    scheduleNetworkResponses(std::move(responses));
+
+    // As the ARM is detached from the OperationContext, it cannot immediately process the recceived
+    // response. IT must instead buffer it, so it can process it later when it is attached to an
+    // OperationContext again.
+    ASSERT_EQ(1, arm->numberOfBufferedRemoteResponses_forTest());
+
+    arm->reattachToOperationContext(operationContext());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+
+    ASSERT_EQ(1, arm->numberOfBufferedRemoteResponses_forTest());
+
+    // ARM returns the correct results.
+    executor()->waitForEvent(readyEvent);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Buffered remote response must have been processes as part of 'nextReady()' call.
+    ASSERT_EQ(0, arm->numberOfBufferedRemoteResponses_forTest());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Number of buffered remote responses must remain at zero.
+    ASSERT_EQ(0, arm->numberOfBufferedRemoteResponses_forTest());
+
+    // After returning all the buffered results, ARM returns EOF immediately because the cursor was
+    // exhausted.
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
+}
+
 TEST_F(AsyncResultsMergerTest, SingleShardUnsorted) {
     std::vector<RemoteCursor> cursors;
     cursors.push_back(
