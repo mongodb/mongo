@@ -961,6 +961,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/libs/index_builds/OWNERS.yml
 /jstests/noPassthrough/libs/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/libs/query/OWNERS.yml
+/jstests/noPassthrough/libs/query/**/* @10gen/query @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/lock_file/OWNERS.yml
 /jstests/noPassthrough/lock_file/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 

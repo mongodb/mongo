@@ -1,17 +1,12 @@
 /**
  * Test which verifies that $out/$merge aggregations with secondary read preference which write
  * over 16 MB work as expected (especially with respect to producing correctly sized write batches).
- *
- * @tags: [uses_$out, assumes_read_preference_unchanged]
  */
-import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const dbName = "db";
-const collName = "movies";
-const targetCollName = "movies2";
+export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
+    const collName = "movies";
+    const targetCollName = "movies2";
 
-function testFn(db, awaitReplication) {
     const coll = db[collName];
     coll.drop();
     db[targetCollName].drop();
@@ -100,15 +95,3 @@ function testFn(db, awaitReplication) {
         mergeUpdateSetupFn,
         [ErrorCodes.DuplicateKey]);
 }
-
-jsTestLog("Testing against a replica set");
-const rst = new ReplSetTest({nodes: 2});
-rst.startSet();
-rst.initiate();
-testFn(new Mongo(rst.getURL()).getDB(dbName), () => rst.awaitReplication());
-rst.stopSet();
-
-jsTestLog("Testing against a sharded cluster");
-const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
-testFn(st.s.getDB(dbName), () => st.awaitReplicationOnShards());
-st.stop();
