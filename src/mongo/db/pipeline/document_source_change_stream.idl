@@ -222,6 +222,16 @@ structs:
                 optional: true
                 query_shape: parameter
 
+            supportedEvents:
+                type: array<string>
+                description:
+                    An array of additional events that can be produced by the change stream.
+                    These events can be created from "noop" oplog entries, which have any of the
+                    supported events as a field name inside their "o2" field value.
+                    All of these oplog entries must have the "uuid" field set as well.
+                optional: true
+                query_shape: literal
+
     DocumentSourceChangeStreamOplogMatchSpec:
         strict: true
         description:

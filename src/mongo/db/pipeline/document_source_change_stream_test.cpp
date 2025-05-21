@@ -54,6 +54,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -2622,6 +2623,214 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
                                     << repl::ReplicationCoordinator::newPrimaryMsg));  // o
 
     checkTransformation(noOp, boost::none);
+}
+
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSupportedEvents) {
+    auto expCtx = getExpCtx();
+
+    for (const auto& supportedEvents :
+         {BSONArray(),
+          BSON_ARRAY("singleEvent"),
+          BSON_ARRAY("CASE" << "case" << "Case" << "insensitive"),  //< Test case sensitivity.
+          BSON_ARRAY("someEvent" << "someOtherEvent" << "yetAnotherEvent")}) {
+        BSONObj spec =
+            BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
+                     "resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << supportedEvents));
+
+        auto expected = Value(supportedEvents).getArray();
+
+        auto stage =
+            DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), expCtx);
+        std::vector<Value> serialization;
+        stage->serializeToArray(serialization);
+        ASSERT_EQ(serialization.size(), 1UL);
+        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+
+        auto actualSupportedEvents = serialization[0]
+                                         .getDocument()
+                                         .getField(DocumentSourceChangeStreamTransform::kStageName)
+                                         .getDocument()
+                                         .getField("supportedEvents"_sd);
+        ASSERT_TRUE(actualSupportedEvents.isArray());
+        ASSERT_VALUE_EQ(Value(expected), Value(actualSupportedEvents.getArray()));
+    }
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseInvalidSupportedEvents) {
+    auto expCtx = getExpCtx();
+
+    for (const auto& supportedEvents : {
+             BSON_ARRAY("singleEvent" << "singleEvent"),
+             BSON_ARRAY("a" << "b" << "c" << "d" << "a"),
+             BSON_ARRAY(""),  //< Test invalid name.
+             BSON_ARRAY("a" << "b" << ""),
+         }) {
+        BSONObj spec =
+            BSON(DocumentSourceChangeStreamTransform::kStageName << BSON(
+                     "resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << supportedEvents));
+
+        ASSERT_THROWS_CODE(
+            DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx()),
+            AssertionException,
+            10498500);
+    }
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformCannotSetSupportedEventsOnRouter) {
+    auto expCtx = getExpCtx();
+    expCtx->setInRouter(true);
+
+    BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("resumeAfter"
+                     << makeResumeToken(kDefaultTs, Value(), Value(), DSChangeStream::kInsertOpType)
+                     << "supportedEvents" << BSON_ARRAY("eventType1")));
+
+    ASSERT_THROWS_CODE(
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        10498501);
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformSingleSupportedEvent) {
+    BSONObj spec =
+        BSON(DocumentSourceChangeStreamTransform::kStageName
+             << BSON("resumeAfter" << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                   << "supportedEvents" << BSON_ARRAY("eventType1")));
+
+    BSONObj operationDescription =
+        BSON("foo" << "bar" << "baz" << "qux" << "sub" << BSON("sub1" << true << "sub2" << false));
+
+    auto entry =
+        makeOplogEntry(OpTypeEnum::kNoop,
+                       nss,
+                       BSONObj(),
+                       testUuid(),
+                       false,
+                       BSON("eventType1" << "willBeRemoved").addFields(operationDescription));
+
+    Document expectedDoc{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescription, "eventType1"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, operationDescription}};
+
+    auto source =
+        DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto transformStage =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    transformStage->setSource(source.get());
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformTransformMultipleSupportedEvents) {
+    BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
+                        << BSON("resumeAfter"
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
+
+    BSONObj operationDescriptionEvent1 =
+        BSON("foo" << "bar" << "baz" << "qux" << "sub" << BSON("sub1" << true << "sub2" << false));
+    BSONObj operationDescriptionEvent2 =
+        BSON("some" << BSON("that" << "will" << "end" << "up" << "in" << "result"));
+
+    auto entry1 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType1" << BSON("will" << "be" << "removed" << "too"))
+                                     .addFields(operationDescriptionEvent1));
+
+    auto entry2 = makeOplogEntry(OpTypeEnum::kNoop,
+                                 nss,
+                                 BSONObj(),
+                                 testUuid(),
+                                 false,
+                                 BSON("eventType2" << true).addFields(operationDescriptionEvent2));
+
+    Document expectedDoc1{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent1, "eventType1"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType1"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, operationDescriptionEvent1}};
+
+    Document expectedDoc2{
+        {DSChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), operationDescriptionEvent2, "eventType2"_sd)},
+        {DSChangeStream::kOperationTypeField, "eventType2"_sd},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kCollectionUuidField, testUuid()},
+        {DSChangeStream::kWallTimeField, Date_t()},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kOperationDescriptionField, operationDescriptionEvent2}};
+
+    std::deque<exec::agg::GetNextResult> docs;
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    docs.push_back(Document{entry2.getEntry().toBSON()});
+    docs.push_back(Document{entry1.getEntry().toBSON()});
+    auto source = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto transformStage =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    transformStage->setSource(source.get());
+
+    auto next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc2);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDoc1);
+
+    next = transformStage->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+DEATH_TEST_REGEX_F(ChangeStreamStageTest,
+                   DocumentSourceChangeStreamTransformTransformUnknownSupportedEvent,
+                   "Tripwire assertion.*5052201") {
+    BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName
+                        << BSON("resumeAfter"
+                                << makeResumeToken(kDefaultTs, Value(), Value(), "eventType1"_sd)
+                                << "supportedEvents" << BSON_ARRAY("eventType1" << "eventType2")));
+
+    auto entry = makeOplogEntry(OpTypeEnum::kNoop,
+                                nss,
+                                BSONObj(),
+                                testUuid(),
+                                false,
+                                BSON("unsupportedEventType" << BSONObj()));
+
+    auto source =
+        DocumentSourceMock::createForTest({Document{entry.getEntry().toBSON()}}, getExpCtx());
+    auto transformStage =
+        DocumentSourceChangeStreamTransform::createFromBson(spec.firstElement(), getExpCtx());
+    transformStage->setSource(source.get());
+
+    ASSERT_THROWS_CODE(transformStage->getNext(), AssertionException, 5052201);
 }
 
 TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {

@@ -32,12 +32,11 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <initializer_list>
 #include <utility>
 #include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -216,7 +215,26 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
 ChangeStreamDefaultEventTransformation::ChangeStreamDefaultEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
-    : ChangeStreamEventTransformation(expCtx, spec) {}
+    : ChangeStreamEventTransformation(expCtx, spec) {
+    _supportedEvents = buildSupportedEvents();
+}
+
+ChangeStreamDefaultEventTransformation::SupportedEvents
+ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
+    SupportedEvents result;
+
+    // Check if field 'supportedEvents' is present, and handle it if so.
+    if (auto supportedEvents = _changeStreamSpec.getSupportedEvents()) {
+        // Ensure that event names in 'supportedEvents' are unique.
+        for (auto&& supportedEvent : *supportedEvents) {
+            uassert(10498500,
+                    "Expecting valid, unique event names in 'supportedEvents'",
+                    !supportedEvent.empty() && result.insert(supportedEvent).second);
+        }
+    }
+
+    return result;
+}
 
 std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDependencies() const {
     std::set<std::string> accessedFields = {
@@ -496,6 +514,15 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 break;
             }
 
+            // Check for dynamic events that were specified via the 'supportedEvents' change stream
+            // parameter.
+            if (auto result = handleSupportedEvent(o2Field)) {
+                // Apply returned event name and operationDescription.
+                operationType = result->first;
+                operationDescription = result->second;
+                break;
+            }
+
             // We should never see an unknown noop entry.
             MONGO_UNREACHABLE_TASSERT(5052201);
         }
@@ -505,6 +532,9 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     }
 
     // UUID should always be present except for a known set of types.
+    // All of the extra event types specified in the 'supportedEvents' change stream parameter
+    // require the UUID field to be set in their oplog entry. Otherwise the following tassert will
+    // trigger.
     tassert(7826901,
             "Saw a CRUD op without a UUID",
             !uuid.missing() || kOpsWithoutUUID.contains(operationType));
@@ -595,6 +625,18 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     return doc.freeze();
 }
 
+boost::optional<std::pair<StringData, Value>>
+ChangeStreamDefaultEventTransformation::handleSupportedEvent(const Document& o2Field) const {
+    for (auto&& supportedEvent : _supportedEvents) {
+        if (auto lookup = o2Field[supportedEvent]; !o2Field[supportedEvent].missing()) {
+            // Known event.
+            return std::make_pair(supportedEvent,
+                                  Value{copyDocExceptFields(o2Field, {supportedEvent})});
+        }
+    }
+    return boost::none;
+}
+
 ChangeStreamViewDefinitionEventTransformation::ChangeStreamViewDefinitionEventTransformation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec)
@@ -636,6 +678,10 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     // The 'o._id' is the full namespace string of the view.
     const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
 
+    // Note: we are intentionally *not* handling any configurable events from the 'supportedEvents'
+    // change stream parameter for view-type events here. Handling these events makes no sense here,
+    // as the view event transformer will only handle CRUD oplog events in the "system.views"
+    // namespace and cannot handle any "noop" oplog entries at all.
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
             operationType = DocumentSourceChangeStream::kCreateOpType;
@@ -669,7 +715,7 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
             // We shouldn't see an op other than insert, update or delete.
             MONGO_UNREACHABLE_TASSERT(6188600);
         }
-    };
+    }
 
     auto resumeTokenData = makeResumeToken(ts,
                                            input[DocumentSourceChangeStream::kTxnOpIndexField],
@@ -697,14 +743,13 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
 
 ChangeStreamEventTransformer::ChangeStreamEventTransformer(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec& spec) {
-    _defaultEventBuilder = std::make_unique<ChangeStreamDefaultEventTransformation>(expCtx, spec);
-    _viewNsEventBuilder =
-        std::make_unique<ChangeStreamViewDefinitionEventTransformation>(expCtx, spec);
-    _isSingleCollStream =
-        DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
-        DocumentSourceChangeStream::ChangeStreamType::kSingleCollection;
-}
+    const DocumentSourceChangeStreamSpec& spec)
+    : _defaultEventBuilder(std::make_unique<ChangeStreamDefaultEventTransformation>(expCtx, spec)),
+      _viewNsEventBuilder(
+          std::make_unique<ChangeStreamViewDefinitionEventTransformation>(expCtx, spec)),
+      _isSingleCollStream(
+          DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString()) ==
+          DocumentSourceChangeStream::ChangeStreamType::kSingleCollection) {}
 
 ChangeStreamEventTransformation* ChangeStreamEventTransformer::getBuilder(
     const Document& oplog) const {

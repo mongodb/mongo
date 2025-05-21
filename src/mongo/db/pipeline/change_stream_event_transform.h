@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 /**
@@ -52,7 +52,7 @@ public:
     ChangeStreamEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const DocumentSourceChangeStreamSpec& spec);
 
-    virtual ~ChangeStreamEventTransformation() {}
+    virtual ~ChangeStreamEventTransformation() = default;
 
     /**
      * Returns the change stream event build from an oplog entry.
@@ -89,15 +89,40 @@ protected:
  */
 class ChangeStreamDefaultEventTransformation final : public ChangeStreamEventTransformation {
 public:
+    using SupportedEvents = StringDataSet;
+
     ChangeStreamDefaultEventTransformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec);
 
     Document applyTransformation(const Document& fromDoc) const override;
     std::set<std::string> getFieldNameDependencies() const override;
+
+private:
+    /**
+     * Checks the 'o2Field' value of an oplog entry has any field name that is contained in
+     * '_supportedEvents'. If so, it returns the name of the field and the value mapped to the field
+     * in the oplog entry. Otherwise returns 'boost::none'.
+     */
+    boost::optional<std::pair<StringData, Value>> handleSupportedEvent(
+        const Document& o2Field) const;
+
+    /**
+     * Build the '_supportedEvents' container from the 'supportedEvents' change stream parameter.
+     * Can throw exceptions if 'supportedEvents' contains invalid values.
+     */
+    SupportedEvents buildSupportedEvents() const;
+
+    /**
+     * Additional supported events that this transformer can handle. These events can be created off
+     * of "noop" oplog entries which have any of the supported events as a field name inside their
+     * 'o2' field value.
+     */
+    SupportedEvents _supportedEvents;
 };
 
 /**
  * The event builder class to be used for oplog entries with the 'system.views' namespace.
+ * It only handles CRUD oplog entries ('insert', 'update', 'delete').
  */
 class ChangeStreamViewDefinitionEventTransformation final : public ChangeStreamEventTransformation {
 public:
