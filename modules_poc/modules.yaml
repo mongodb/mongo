@@ -184,6 +184,8 @@ query:
     - src/mongo/db/query/
     - src/mongo/db/s/query_analysis* # note the filename pattern
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
+    - src/mongo/db/s/shard_filtering_util*
+    - src/mongo/db/s/document_source_visitor_docs_needed_bounds.cpp
     - src/mongo/db/s/query_cmd
     - src/mongo/db/stats/
     - src/mongo/db/update/
@@ -200,6 +202,14 @@ query:
     - src/mongo/dbtests/plan_executor_invalidation_test.cpp
     - src/mongo/dbtests/query*
     - src/mongo/dbtests/updatetests.cpp
+    - src/mongo/s/cluster_cursor_stats.cpp
+    - src/mongo/s/cluster_write*
+    - src/mongo/s/commands/cluster_query_settings_cmds.cpp
+    - src/mongo/s/commands/cluster_query_without_shard_key_cmd.cpp
+    - src/mongo/s/commands/cluster_write_without_shard_key_cmd.cpp
+    - src/mongo/s/query/
+    - src/mongo/s/request_types/cluster_commands_without_shard_key.idl
+    - src/mongo/s/write_ops/
     - src/mongo/replay
     - src/mongo/scripting/
     - src/mongo/s/commands/query_cmd
