@@ -32,6 +32,7 @@
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 

@@ -29,6 +29,7 @@ mongo_cc_library(
         "//src/mongo/db:server_options_servers",
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:log_and_backoff",
     ],

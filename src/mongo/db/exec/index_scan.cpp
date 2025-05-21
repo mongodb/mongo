@@ -36,6 +36,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"

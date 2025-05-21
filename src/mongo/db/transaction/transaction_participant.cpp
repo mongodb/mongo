@@ -97,6 +97,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"

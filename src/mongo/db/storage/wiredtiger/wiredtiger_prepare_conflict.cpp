@@ -29,7 +29,7 @@
 
 #include <wiredtiger.h>
 
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"

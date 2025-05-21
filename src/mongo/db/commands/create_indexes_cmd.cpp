@@ -88,6 +88,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"

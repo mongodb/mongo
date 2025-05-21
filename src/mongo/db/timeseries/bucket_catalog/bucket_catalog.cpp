@@ -41,7 +41,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"

@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"

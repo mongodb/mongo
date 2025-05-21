@@ -41,7 +41,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -62,6 +61,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"

@@ -77,6 +77,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"

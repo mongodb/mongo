@@ -66,6 +66,7 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"

@@ -32,10 +32,10 @@
 #include <vector>
 
 
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/trial_stage.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

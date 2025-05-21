@@ -137,6 +137,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:bson_collection_catalog_entry",
         "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
     ],

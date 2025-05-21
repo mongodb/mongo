@@ -67,6 +67,14 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "exceptions",
+    srcs = [],
+    hdrs = [
+        "exceptions.h",
+    ],
+)
+
+mongo_cc_library(
     name = "remove_saver",
     srcs = [
         "remove_saver.cpp",

@@ -66,6 +66,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_operations.h"

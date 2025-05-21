@@ -71,6 +71,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"

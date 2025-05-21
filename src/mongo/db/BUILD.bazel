@@ -1360,6 +1360,7 @@ mongo_cc_library(
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/stats:latency_server_stats",
         "//src/mongo/db/stats:serveronly_stats",
+        "//src/mongo/db/storage:exceptions",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:timeseries_conversion_util",

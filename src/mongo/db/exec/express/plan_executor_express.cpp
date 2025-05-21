@@ -67,6 +67,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"

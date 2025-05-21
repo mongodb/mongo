@@ -6,9 +6,6 @@ filters:
   - "deferred_writer*":
     approvers:
       - 10gen/server-dbcheck
-  - "exception_util*": # note we also match the idl file with this rule
-    approvers:
-      - 10gen/server-storage-engine-integration
   - "flow_control_ticketholder*":
     approvers:
       - 10gen/server-workload-scheduling

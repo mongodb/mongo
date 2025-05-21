@@ -29,10 +29,7 @@
 
 #pragma once
 
-#include <string>
 #include <utility>
-
-#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -105,47 +102,6 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
 void convertToWCEAndRethrow(OperationContext* opCtx,
                             StringData opStr,
                             const ExceptionFor<ErrorCodes::TemporarilyUnavailable>& e);
-
-namespace error_details {
-/**
- * A faster alternative to `iasserted`, designed to throw exceptions for unexceptional events on the
- * critical execution path (e.g., `WriteConflict`).
- */
-template <ErrorCodes::Error ec>
-[[noreturn]] void throwExceptionFor(std::string reason) {
-    throw ExceptionFor<ec>({ec, std::move(reason)});
-}
-}  // namespace error_details
-
-/**
- * A `WriteConflictException` is thrown if during a write, two or more operations conflict with each
- * other. For example if two operations get the same version of a document, and then both try to
- * modify that document, this exception will get thrown by one of them.
- */
-[[noreturn]] inline void throwWriteConflictException(StringData context) {
-    error_details::throwExceptionFor<ErrorCodes::WriteConflict>(fmt::format(
-        "Caused by :: {} :: Please retry your operation or multi-document transaction.", context));
-}
-
-/**
- * A `TemporarilyUnavailableException` is thrown if an operation aborts due to the server being
- * temporarily unavailable, e.g. due to excessive load. For user-originating operations, this will
- * be retried internally by the `writeConflictRetry` helper a finite number of times before
- * eventually being returned.
- */
-[[noreturn]] inline void throwTemporarilyUnavailableException(std::string context) {
-    error_details::throwExceptionFor<ErrorCodes::TemporarilyUnavailable>(std::move(context));
-}
-
-/**
- * A `TransactionTooLargeForCache` is thrown if it has been determined that it is unlikely to
- * ever complete the operation because the configured cache is insufficient to hold all the
- * transaction state. This helps to avoid retrying, maybe indefinitely, a transaction which would
- * never be able to complete.
- */
-[[noreturn]] inline void throwTransactionTooLargeForCache(std::string context) {
-    error_details::throwExceptionFor<ErrorCodes::TransactionTooLargeForCache>(std::move(context));
-}
 
 /** Stateful object for executing the `writeConflictRetry` function below. */
 class WriteConflictRetryAlgorithm {
