@@ -490,7 +490,10 @@ buildvariants:
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
         --excludeWithAnyTags=tsan_incompatible
     tasks:
-      - name: .mongot_e2e_tests
+      - name: .mongot_e2e_tests !.requires_large_host
+      - name: .mongot_e2e_tests .requires_large_host
+        distros:
+          - *enterprise-rhel8-debug-tsan-large-distro-name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:

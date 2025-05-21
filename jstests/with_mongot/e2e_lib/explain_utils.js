@@ -316,21 +316,6 @@ export function verifyE2ESearchMetaExplainOutput(
 }
 
 /**
- * Generates an array of random values from [-1, 1). Useful for explain when the actual documents
- * and scoring for $vectorSearch does not matter.
- *
- * @param {*} n length of array
- * @returns array of random values from [-1, 1]
- */
-export function generateRandomVectorEmbedding(n) {
-    // Generates array of random values from [-1, 1)
-    let embedding = Array.from({length: n}, function() {
-        return Math.random() * 2 - 1;
-    });
-    return embedding;
-}
-
-/**
  * This function checks that the explain output for $vectorSearch queries from an e2e test contains
  * the information that it should.
  *

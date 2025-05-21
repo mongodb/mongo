@@ -1352,11 +1352,17 @@ tasks:
         "incompatible_ppc",
         "incompatible_s390x",
         "mongot_e2e_tests",
+        "requires_large_host",
       ]
     commands:
       - func: "do setup"
       - func: "get mongot version"
       - func: "run tests"
+        vars:
+          # This is set to 5 jobs as the default evergreen concurrency level (~10 jobs) can cause
+          # OOM errors when constructing a vector search index. This number was chosen based off
+          # heuristics to avoid OOM errors while not slowing down patch builds too much.
+          resmoke_jobs_max: 5
 
   - <<: *task_template
     name: mongot_community_e2e_single_node
