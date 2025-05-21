@@ -345,14 +345,6 @@ BSONObj copyFile(const BSONObj& args, void* data) {
     uassert(
         9663001, str::stream() << "failed to copy " << source << " to " << destination, success);
 
-    std::streamsize sourceFileSize = boost::filesystem::file_size(source);
-    std::streamsize destinationFileSize = boost::filesystem::file_size(destination);
-    uassert(10507900,
-            fmt::format("copyFile(): source file is {} bytes, destination file is {} bytes",
-                        sourceFileSize,
-                        destinationFileSize),
-            sourceFileSize == destinationFileSize);
-
     return undefinedReturn;
 }
 
