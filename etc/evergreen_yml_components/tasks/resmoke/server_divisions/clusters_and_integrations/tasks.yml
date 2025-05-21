@@ -1229,7 +1229,7 @@ tasks:
           # We need to set the jobs factor to less than 1 because otherwise resmoke will parallelize
           # based on the CPU count and so the memory available per job will remain roughly the same
           # as when the task is run on small distro.
-          resmoke_jobs_factor: 0.3
+          resmoke_jobs_factor: 0.1
 
   - <<: *benchmark_template
     name: benchmarks_sharding
