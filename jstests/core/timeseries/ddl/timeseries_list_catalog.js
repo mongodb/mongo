@@ -18,6 +18,8 @@ import {
     getTimeseriesCollForDDLOps
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
+assert.commandWorked(db.dropDatabase());
+
 const collName = 'coll';
 const timeFieldName = 'timestamp';
 const metaFieldName = 'metadata';
