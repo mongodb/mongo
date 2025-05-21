@@ -439,6 +439,26 @@ time-series update/delete.
 Time-series deletes support retryable writes with the existing mechanisms. For time-series updates,
 they are run through the Internal Transaction API to make sure the two writes to storage are atomic.
 
+### Errors When Staging and Committing Measurements
+
+We have three phases of a time-series write. Each phase of the time-series write has a distinct acquisition of the stripe lock:
+
+1. Staging - The bucket catalog represents the in-memory representation of buckets. Staging involves changing bucket metadata to prepare for the insertion of measurements into the bucket catalog, but doesn't involve compressing or inserting measurements into the bucket catalog.
+2. Committing - Compressing measurements into an appropriate bucket document and writing the bucket document to storage.
+3. Finish - Modifying the bucket catalog to reflect what was written to storage.
+
+> [!NOTE]
+> Retrying time-series writes within the server is a distinct process from retryable writes, which is retrying writes from the outside the server in the driver. This section discusses retries within the server, which also handles retryable writes (see contains retry in the image below).
+
+![SERVER-103329 Drawings (7)](https://github.com/user-attachments/assets/aceb7dfb-45f3-4aac-a0cb-744f080ead76)
+
+#### Error Examples
+
+- Continuable
+  - DuplicateKey: occurs when there is collision from OID generation when we attempt to perform a timeseries insert from a batch.
+- Non-continuable
+  - Exceptions: such as a StaleConfig exception when attempting to acquire the buckets collection.
+
 ### Calculating Memory Usage
 
 Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
