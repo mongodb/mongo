@@ -1,8 +1,7 @@
-set -o errexit verbose
+set -o errexit
+set -o verbose
 
-ROOT_DIR="$(dirname $(realpath ${BASH_SOURCE[0]}))"
-readonly ROOT_DIR
-source "${ROOT_DIR}/prelude.sh"
+source "$(dirname $(realpath ${BASH_SOURCE[0]}))"/prelude.sh
 
 activate_venv
 [[ "${has_packages}" != "true" ]] && exit 0
@@ -12,16 +11,16 @@ if [[ -z "${packager_script+x}" ]]; then
   exit 1
 fi
 
-pushd "${ROOT_DIR}/src/buildscripts" >&/dev/null
+pushd "src/buildscripts" >&/dev/null
 trap 'popd >& /dev/null' EXIT
 
 $python \
   ${packager_script} \
   --prefix $(pwd)/.. \
   --distros \
-  --crypt_spec \
   ${packager_distro} \
-  --tarball $(pwd)/../bazel-bin/mongo_crypt-stripped.tgz \
+  --crypt_spec \
+  --tarball $(pwd)/../mongo_crypt_shared_v1-${version}.${ext:-tgz} \
   -s ${version} \
   -m HEAD \
   -a ${packager_arch}

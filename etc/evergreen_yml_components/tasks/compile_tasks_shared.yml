@@ -337,6 +337,16 @@ tasks:
     depends_on:
       - name: crypt_create_lib
     commands:
+      - func: "do non-compile setup"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongo_crypt_shared_v1-${version}.${ext|tgz}
+          remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}"
+          bucket: mciuploads
       - func: "run packager_crypt.py"
       - command: archive.targz_pack
         params:
