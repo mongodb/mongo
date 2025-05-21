@@ -62,6 +62,8 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.throttleCursor");
 const uint8_t kTickDelay = 200;
+// Margin of error to be subtracted from test times to account for clock inconsistencies
+const Milliseconds kErrorMargin = Milliseconds(50);
 
 class ThrottleCursorTest : public CatalogTestFixture {
 private:
@@ -75,7 +77,7 @@ protected:
                                                 .getValueCopy();
 
     explicit ThrottleCursorTest(Milliseconds clockIncrement = Milliseconds{kTickDelay})
-        : CatalogTestFixture(Options{}.useMockClock(true, clockIncrement)) {}
+        : CatalogTestFixture() {}
 
 public:
     void setMaxMbPerSec(int maxMbPerSec);
@@ -166,7 +168,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 20);
-    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
+    ASSERT_LTE(end - start, Milliseconds(1000));
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
@@ -180,9 +182,10 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
     SeekableRecordThrottleCursor cursor =
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
-    // Using a throttle with a limit of 1MB per second, all operations should take at least 5
-    // seconds to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
-    // 2 records per second.
+    // We have 10 records, each of which is 0.5MB courtesy of the fail point. Using a throttle with
+    // a limit of 1MB per second, this will mean the data is processed as follows: 0s 1s 2s 5s |
+    // 0.5MB 0.5MB (sleep) | 0.5MB 0.5MB (sleep) | ... | 0.5MB 0.5MB (sleep) | All operations should
+    // take very close to 5 seconds to finish.
     {
         setMaxMbPerSec(1);
         Date_t start = getTime();
@@ -197,12 +200,12 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_GTE(end - start, Milliseconds(5000));
+        ASSERT_GTE(end - start, Milliseconds(5000) - kErrorMargin);
     }
 
-    // Using a throttle with a limit of 5MB per second, all operations should take at least 1
-    // second to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
-    // 10 records per second.
+    // Using a throttle with a limit of 5MB per second, all operations should take very close to 1
+    // second (or more) to finish. We have 10 records, each of which is 0.5MB courtesy of the fail
+    // point, so 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -217,7 +220,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_GTE(end - start, Milliseconds(1000));
+        ASSERT_GTE(end - start, Milliseconds(1000) - kErrorMargin);
     }
 }
 
@@ -232,9 +235,9 @@ TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1
     SeekableRecordThrottleCursor cursor =
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
-    // Using a throttle with a limit of 1MB per second, all operations should take at least 10
-    // seconds to finish. We scan 5 records, each of which is 2MB courtesy of the fail point, so
-    // 1 record every 2 seconds.
+    // Using a throttle with a limit of 1MB per second, all operations should take very close to 10
+    // seconds (or more) to finish. We scan 5 records, each of which is 2MB courtesy of the fail
+    // point, so 1 record every 2 seconds.
     setMaxMbPerSec(1);
     Date_t start = getTime();
 
@@ -249,7 +252,7 @@ TEST_F(ThrottleCursorTestFastClock, TestSeekableRecordThrottleCursorOnLargeDocs1
     Date_t end = getTime();
 
     ASSERT_EQ(scanRecords, 0);
-    ASSERT_GTE(end - start, Milliseconds(10 * 1000));
+    ASSERT_GTE(end - start, Milliseconds(10 * 1000) - kErrorMargin);
 }
 
 TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
@@ -263,15 +266,17 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
     SeekableRecordThrottleCursor cursor =
         SeekableRecordThrottleCursor(opCtx, coll->getRecordStore(), _dataThrottle.get());
 
-    // Using a throttle with a limit of 5MB per second, all operations should take at least 2
-    // second to finish. We scan 5 records, each of which is 2MB courtesy of the fail point, so
-    // 2.5 records per second.
+    // We have 6 records, each of which is 2MB courtesy of the fail point. Using a throttle with a
+    // limit of 5MB per second, this will mean the data is processed as follows:
+    // 0s                   1.2s                  2.4s
+    // | 2MB 2MB 2MB (sleep) | 2MB 2MB 2MB (sleep) |
+    // All operations should take at very close to 2.4 seconds (or more) to finish.
     setMaxMbPerSec(5);
     Date_t start = getTime();
 
-    // Seek to the first record, then iterate through 4 more.
+    // Seek to the first record, then iterate through 5 more.
     ASSERT_TRUE(cursor.seekExact(opCtx, RecordId(1)));
-    int scanRecords = 4;
+    int scanRecords = 5;
 
     while (scanRecords > 0 && cursor.next(opCtx)) {
         scanRecords--;
@@ -280,7 +285,7 @@ TEST_F(ThrottleCursorTest, TestSeekableRecordThrottleCursorOnLargeDocs5MBps) {
     Date_t end = getTime();
 
     ASSERT_EQ(scanRecords, 0);
-    ASSERT_GTE(end - start, Milliseconds(2000));
+    ASSERT_GTE(end - start, Milliseconds(2400) - kErrorMargin);
 }
 
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
@@ -306,7 +311,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 10);
-    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
+    ASSERT_LTE(end - start, Milliseconds(1000));
 }
 
 TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
@@ -319,9 +324,10 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
 
     SortedDataInterfaceThrottleCursor cursor = getIdIndex(coll);
 
-    // Using a throttle with a limit of 1MB per second, all operations should take at least 5
-    // seconds to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
-    // 2 records per second.
+    // We have 10 records, each of which is 0.5MB courtesy of the fail point. Using a throttle with
+    // a limit of 1MB per second, this will mean the data is processed as follows: 0s 1s 2s 5s |
+    // 0.5MB 0.5MB (sleep) | 0.5MB 0.5MB (sleep) | ... | 0.5MB 0.5MB (sleep) | All operations should
+    // take very close to 5 seconds to finish.
     {
         setMaxMbPerSec(1);
         Date_t start = getTime();
@@ -335,12 +341,12 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_GTE(end - start, Milliseconds(5000));
+        ASSERT_GTE(end - start, Milliseconds(5000) - kErrorMargin);
     }
 
-    // Using a throttle with a limit of 5MB per second, all operations should take at least 1
-    // second to finish. We have 10 records, each of which is 0.5MB courtesy of the fail point, so
-    // 10 records per second.
+    // Using a throttle with a limit of 5MB per second, all operations should take very close to 1
+    // second (or more) to finish. We have 10 records, each of which is 0.5MB courtesy of the fail
+    // point, so 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -355,7 +361,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 10);
-        ASSERT_GTE(end - start, Milliseconds(1000));
+        ASSERT_GTE(end - start, Milliseconds(1000) - kErrorMargin);
     }
 }
 
@@ -397,7 +403,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     Date_t end = getTime();
 
     ASSERT_EQ(numRecords, 30);
-    ASSERT_EQ(end - start, Milliseconds(kTickDelay * numRecords + kTickDelay));
+    ASSERT_LTE(end - start, Milliseconds(1000));
 }
 
 TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
@@ -413,9 +419,9 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
 
     SortedDataInterfaceThrottleCursor indexCursor = getIdIndex(coll);
 
-    // Using a throttle with a limit of 2MB per second, all operations should take at least 5
-    // seconds to finish. We have 20 records, each of which is 0.5MB courtesy of the fail point, so
-    // 4 records per second.
+    // Using a throttle with a limit of 2MB per second, all operations should take very close to 5
+    // seconds (or more) to finish. We have 20 records, each of which is 0.5MB courtesy of the fail
+    // point, so 4 records per second.
     {
         setMaxMbPerSec(2);
         Date_t start = getTime();
@@ -434,12 +440,12 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 20);
-        ASSERT_GTE(end - start, Milliseconds(5000));
+        ASSERT_GTE(end - start, Milliseconds(5000) - kErrorMargin);
     }
 
-    // Using a throttle with a limit of 5MB per second, all operations should take at least 2
-    // seconds to finish. We have 20 records, each of which is 0.5MB courtesy of the fail point, so
-    // 10 records per second.
+    // Using a throttle with a limit of 5MB per second, all operations should take very close to 2
+    // seconds (or more) to finish. We have 20 records, each of which is 0.5MB courtesy of the fail
+    // point, so 10 records per second.
     {
         setMaxMbPerSec(5);
         Date_t start = getTime();
@@ -456,7 +462,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         Date_t end = getTime();
 
         ASSERT_EQ(numRecords, 20);
-        ASSERT_GTE(end - start, Milliseconds(2000));
+        ASSERT_GTE(end - start, Milliseconds(2000) - kErrorMargin);
     }
 }
 
