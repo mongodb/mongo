@@ -3,6 +3,10 @@
 //   requires_non_retryable_writes,
 //   requires_multi_updates,
 //   requires_getmore,
+//   # Some queries may not complete if they exceed the duration of moveCollection
+//   # operations scheduled by the balancer, resulting in a timeout error.
+//   # TODO SERVER-88275: Remove the tag once moveCollection doesn't make queries fail.
+//   assumes_balancer_off,
 // ]
 
 //
