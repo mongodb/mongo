@@ -72,7 +72,7 @@ void insertOplogEntry(OperationContext* opCtx,
                     str::stream() << "Failed to create new oplog entry for oplog with opTime: "
                                   << oplogEntry.getOpTime().toString() << ": "
                                   << redact(oplogEntry.toBSON()),
-                    !oplogOpTime.isNull());
+                    !oplogOpTime.isNull() || !oplogEntry.getNss().isReplicated());
         }
         wunit.commit();
     });
