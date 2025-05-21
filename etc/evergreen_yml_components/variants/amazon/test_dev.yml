@@ -19,6 +19,7 @@ variables:
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
+      --//bazel/config:build_otel=True
     unittest_library_compile_flags: >-
       --linkstatic=False
     unittest_compile_flags: >-

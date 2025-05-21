@@ -35,7 +35,6 @@
 #include <opentelemetry/exporters/otlp/otlp_file_exporter_options.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
-#include <opentelemetry/sdk/trace/batch_span_processor_options.h>
 #include <opentelemetry/sdk/trace/processor.h>
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider.h>
@@ -122,6 +121,8 @@ Status initialize(std::string name) {
         return initializeFile(name, gOpenTelemetryTraceDirectory);
     } else {
         LOGV2(9859700, "Not initializing OpenTelemetry");
+        // Ensure there is no default No-Op TraceProvider.
+        opentelemetry::trace::Provider::SetTracerProvider({});
         return Status::OK();
     }
 }

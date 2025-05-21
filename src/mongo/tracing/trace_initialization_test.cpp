@@ -29,8 +29,6 @@
 
 #include "mongo/config.h"
 
-#ifdef MONGO_CONFIG_OTEL
-
 #include <opentelemetry/trace/noop.h>
 #include <opentelemetry/trace/provider.h>
 
@@ -63,12 +61,18 @@ TEST_F(TraceInitializationTest, NoTraceProvider) {
     ASSERT_OK(tracing::initialize("mongod"));
 
     auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    ASSERT_TRUE(isNoop(provider.get()));
+    ASSERT_FALSE(provider);
 }
 
 TEST_F(TraceInitializationTest, Shutdown) {
     tracing::shutdown();
 
+    ASSERT_TRUE(isNoop(opentelemetry::trace::Provider::GetTracerProvider().get()));
+
+    tracing::gOpenTelemetryTraceDirectory = "/tmp/";
+    tracing::shutdown();
+
+    // After calling shutdown, the NoOpTraceProvider is removed.
     ASSERT_FALSE(opentelemetry::trace::Provider::GetTracerProvider());
 }
 
@@ -99,5 +103,3 @@ TEST_F(TraceInitializationTest, HttpAndDirectory) {
 
 }  // namespace
 }  // namespace mongo
-
-#endif

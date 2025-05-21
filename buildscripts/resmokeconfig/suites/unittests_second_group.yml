@@ -3,8 +3,5 @@ test_kind: cpp_unit_test
 selector:
   root: bazel-bin/install/install-mongo_unittest_second_group_test_list.txt
 
-  exclude_files:
-    - bazel-bin/**/tracing_test*
-
 executor:
   config: {}
