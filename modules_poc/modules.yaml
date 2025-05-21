@@ -184,6 +184,7 @@ query:
     - src/mongo/db/query/
     - src/mongo/db/s/query_analysis* # note the filename pattern
     - src/mongo/db/s/*query*analyzer* # note the filename pattern
+    - src/mongo/db/s/query_cmd
     - src/mongo/db/stats/
     - src/mongo/db/update/
     - src/mongo/db/update_index_data*
@@ -201,6 +202,9 @@ query:
     - src/mongo/dbtests/updatetests.cpp
     - src/mongo/replay
     - src/mongo/scripting/
+    - src/mongo/s/commands/query_cmd
+    - src/mongo/s/shard_targeting_helpers*
+    - src/mongo/s/query/planner
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/util/safe_num*
 
