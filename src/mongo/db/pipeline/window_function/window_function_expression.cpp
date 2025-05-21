@@ -40,6 +40,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_expression_gen.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_n_traits.h"
@@ -275,23 +276,147 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
     }
 }
 
-boost::intrusive_ptr<Expression> ExpressionMinMaxScaler::parse(
-    BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
-    // TODO: SERVER-95508 use IDL to help with parsing of the BSONObj
-    auto topLevelKeys = ExpressionMinMaxScaler::parseTopLevelKeys(obj, sortBy, expCtx);
-    BSONElement minMaxScalerElem = topLevelKeys.first;
-    WindowBounds bounds = topLevelKeys.second;
+namespace {
+// Parse and validate the window bounds for $minMaxScaler.
+WindowBounds getMinMaxScalerWindowBoundsFromSpec(const MinMaxScalerSpec& spec,
+                                                 const boost::optional<SortPattern>& sortBy,
+                                                 ExpressionContext* expCtx) {
+    if (!spec.getWindow().has_value()) {
+        // No bounds were specified by this spec.
+        // Use the default ones (unbounded).
+        return WindowBounds::defaultBounds();
+    }
 
-    auto minMaxScalerArgs = ExpressionMinMaxScaler::parseMinMaxScalerArgs(minMaxScalerElem, expCtx);
-    boost::intrusive_ptr<::mongo::Expression> input = minMaxScalerArgs.first;
-    std::pair<Value, Value> sMinAndsMax = minMaxScalerArgs.second;
+    auto bounds =
+        WindowBounds::parse(BSON("" << spec.getWindow().value()).firstElement(), sortBy, expCtx);
 
-    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
-    return make_intrusive<ExpressionMinMaxScaler>(
-        expCtx, input, std::move(bounds), std::move(sMinAndsMax));
+    // If bounds have been specified, we must ensure that the configured window will always
+    // include the current document. This is because $minMaxScaler computes the relative
+    // percentage that each document is between the min and max of the window, thus the
+    // current document must be in the current window to ensure its bounded between the min
+    // and the max values. Practically, we check that the lower bound is not an
+    // index greater than the current document (0), and that the maximum is not an index
+    // less than the current document (0). The computation is equivalent for both document
+    // and range based bounds, because range based bounds always require that the numerical
+    // bounds tolerances are relative to the values that the documents are sorted by.
+    //
+    // Get a bound value as a number. The first value of the return is the bound value,
+    // the second value is whether or not the bound is numerically expressable.
+    // Non-numerical bounds ("current" / "unbounded") do not need to be checked as they
+    // will always include the current document in the window.
+    // Pass false to get the lower bound, and true to get the upper bound.
+    auto getBoundAsNumeric = [&](bool lower) -> std::pair<double, bool> {
+        return visit(
+            OverloadedVisitor{
+                [&](const WindowBounds::DocumentBased& docBounds) -> std::pair<double, bool> {
+                    return visit(OverloadedVisitor{
+                                     [&](const int bound) -> std::pair<double, bool> {
+                                         return {bound, true};
+                                     },
+                                     [&](const auto& bound) -> std::pair<double, bool> {
+                                         return {0, false};
+                                     },
+                                 },
+                                 lower ? docBounds.lower : docBounds.upper);
+                },
+                [&](const WindowBounds::RangeBased& rangeBounds) -> std::pair<double, bool> {
+                    return visit(OverloadedVisitor{
+                                     [&](const Value bound) -> std::pair<double, bool> {
+                                         return {bound.coerceToDouble(), true};
+                                     },
+                                     [&](const auto& bound) -> std::pair<double, bool> {
+                                         return {0, false};
+                                     },
+                                 },
+                                 lower ? rangeBounds.lower : rangeBounds.upper);
+                },
+            },
+            bounds.bounds);
+    };
+
+    auto lowerBound = getBoundAsNumeric(true);
+    if (lowerBound.second) {
+        uassert(ErrorCodes::FailedToParse,
+                "Lower specified bound cannot be greater than 0 (the current doc), as "
+                "$minMaxScaler must ensure that the current document being processed is always "
+                "within the configured window. Lower specified bound = " +
+                    std::to_string(lowerBound.first),
+                lowerBound.first <= 0);
+    }
+    auto upperBound = getBoundAsNumeric(false);
+    if (upperBound.second) {
+        uassert(ErrorCodes::FailedToParse,
+                "Upper specified bound cannot be less than 0 (the current doc), as "
+                "$minMaxScaler must ensure that the current document being processed is always "
+                "within the configured window. Upper specified bound = " +
+                    std::to_string(upperBound.first),
+                upperBound.first >= 0);
+    }
+
+    return bounds;
 }
 
-std::pair<BSONElement, WindowBounds> ExpressionMinMaxScaler::parseTopLevelKeys(
+// This struct represents the deserialized arguments to the $minMaxScaler window function.
+struct MinMaxScalerArguments {
+    // The input expression to calculate for $minMaxScaler.
+    boost::intrusive_ptr<::mongo::Expression> input;
+
+    // The first Value is the min, the second value is the max.
+    std::pair<Value, Value> minAndMax;
+};
+
+// Parse and validate the arguments of $minMaxScaler.
+MinMaxScalerArguments getMinMaxScalerArgumentsFromSpec(const MinMaxScalerSpec& spec,
+                                                       ExpressionContext* expCtx) {
+    auto minMaxScaler = spec.getMinMaxScaler();
+
+    boost::intrusive_ptr<::mongo::Expression> input = ::mongo::Expression::parseOperand(
+        expCtx, minMaxScaler.getInput().getElement(), expCtx->variablesParseState);
+
+    // This helper function takes in a constant numerical expression and evaluates it into a Value.
+    auto parseNumericalValueConstant = [&expCtx](StringData argName,
+                                                 BSONElement expressionElem) -> Value {
+        auto expr =
+            ::mongo::Expression::parseOperand(expCtx, expressionElem, expCtx->variablesParseState)
+                ->optimize();
+        ExpressionConstant* exprConst = dynamic_cast<ExpressionConstant*>(expr.get());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << argName << "' argument to $minMaxScaler must be a constant",
+                exprConst);
+        Value v = exprConst->getValue();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << argName
+                              << "' argument to $minMaxScaler must be a numeric type",
+                v.numeric());
+        return v;
+    };
+
+    uassert(ErrorCodes::FailedToParse,
+            "Only one of 'min' and 'max' were specified as an argument to $minMaxScaler."
+            " Neither or both must be specified",
+            // XNOR will be false iff one of the values are true.
+            !(minMaxScaler.getMin().has_value() ^ minMaxScaler.getMax().has_value()));
+
+    std::pair<Value, Value> sMinAndsMax{0, 1};
+    // Note that only one of getMin().has_value() or getMax().has_value() is necessary here as a
+    // conditional, because the two must have the same value (as checked above). However, for
+    // clarity in code reading, check both here.
+    if (minMaxScaler.getMin().has_value() && minMaxScaler.getMax().has_value()) {
+        sMinAndsMax.first = parseNumericalValueConstant(ExpressionMinMaxScaler::kMinArg,
+                                                        minMaxScaler.getMin()->getElement());
+        sMinAndsMax.second = parseNumericalValueConstant(ExpressionMinMaxScaler::kMaxArg,
+                                                         minMaxScaler.getMax()->getElement());
+        // Max must be strictly greater than min.
+        uassert(ErrorCodes::FailedToParse,
+                "the 'max' must be strictly greater than 'min', as arguments to $minMaxScaler",
+                Value::compare(sMinAndsMax.first, sMinAndsMax.second, nullptr) < 0);
+    }
+
+    return MinMaxScalerArguments{input, sMinAndsMax};
+}
+}  // namespace
+
+boost::intrusive_ptr<Expression> ExpressionMinMaxScaler::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
     // expected 'obj' format:
     // {
@@ -303,183 +428,14 @@ std::pair<BSONElement, WindowBounds> ExpressionMinMaxScaler::parseTopLevelKeys(
     //   window: {...} // optional, default ['unbounded', 'unbounded']
     // }
 
-    // Find 2 possible first-level keys on 'obj': '$minMaxScaler' & 'window'.
-    BSONElement minMaxScalerArgs;
-    boost::optional<WindowBounds> bounds = boost::none;
-    {
-        bool minMaxScalerArgsFound = false;
-        for (const auto& arg : obj) {
-            auto argName = arg.fieldNameStringData();
-            if (argName == kWindowArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "There can be only one 'window' field for $minMaxScaler",
-                        bounds == boost::none);
-                bounds = WindowBounds::parse(arg, sortBy, expCtx);
-            } else if (argName == kWindowFnName) {
-                uassert(ErrorCodes::FailedToParse,
-                        "There can be only one '$minMaxScaler' field for $minMaxScaler",
-                        minMaxScalerArgsFound == false);
-                minMaxScalerArgs = arg;
-                minMaxScalerArgsFound = true;
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "$minMaxScaler got unexpected argument: '" << argName << "'");
-            }
-        }
-        uassert(ErrorCodes::FailedToParse,
-                "$minMaxScaler parser called on object with no $minMaxScaler key",
-                minMaxScalerArgs.ok());
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "$minMaxScaler expects an object, but got a "
-                              << minMaxScalerArgs.type() << ": " << minMaxScalerArgs,
-                minMaxScalerArgs.type() == BSONType::Object);
-        if (!bounds) {
-            // Set bounds to default (unbounded), if not specified.
-            bounds = WindowBounds::defaultBounds();
-        } else {
-            // If bounds have been specified, we must ensure that the configured window will always
-            // include the current document. This is because $minMaxScaler computes the relative
-            // percentage that each document is between the min and max of the window, thus the
-            // current document must be in the current window to ensure its bounded between the min
-            // and the max values. Practically, we check that the lower bound is not an
-            // index greater than the current document (0), and that the maximum is not an index
-            // less than the current document (0). The computation is equivalent for both document
-            // and range based bounds, because range based bounds always require that the numerical
-            // bounds tolerances are relative to the values that the documents are sorted by.
-            //
-            // Get a bound value as a number. The first value of the return is the bound value,
-            // the second value is whether or not the bound is numerically expressable.
-            // Non-numerical bounds ("current" / "unbounded") do not need to be checked as they
-            // will always include the current document in the window.
-            // Pass false to get the lower bound, and true to get the upper bound.
-            auto getBoundAsNumeric = [&](bool lower) -> std::pair<double, bool> {
-                return visit(
-                    OverloadedVisitor{
-                        [&](const WindowBounds::DocumentBased& docBounds)
-                            -> std::pair<double, bool> {
-                            return visit(OverloadedVisitor{
-                                             [&](const int bound) -> std::pair<double, bool> {
-                                                 return {bound, true};
-                                             },
-                                             [&](const auto& bound) -> std::pair<double, bool> {
-                                                 return {0, false};
-                                             },
-                                         },
-                                         lower ? docBounds.lower : docBounds.upper);
-                        },
-                        [&](const WindowBounds::RangeBased& rangeBounds)
-                            -> std::pair<double, bool> {
-                            return visit(OverloadedVisitor{
-                                             [&](const Value bound) -> std::pair<double, bool> {
-                                                 return {bound.coerceToDouble(), true};
-                                             },
-                                             [&](const auto& bound) -> std::pair<double, bool> {
-                                                 return {0, false};
-                                             },
-                                         },
-                                         lower ? rangeBounds.lower : rangeBounds.upper);
-                        },
-                    },
-                    bounds->bounds);
-            };
-            auto lowerBound = getBoundAsNumeric(true);
-            if (lowerBound.second) {
-                uassert(
-                    ErrorCodes::FailedToParse,
-                    "Lower specified bound cannot be greater than 0 (the current doc), as "
-                    "$minMaxScaler must ensure that the current document being processed is always "
-                    "within the configured window. Lower specified bound = " +
-                        std::to_string(lowerBound.first),
-                    lowerBound.first <= 0);
-            }
-            auto upperBound = getBoundAsNumeric(false);
-            if (upperBound.second) {
-                uassert(
-                    ErrorCodes::FailedToParse,
-                    "Upper specified bound cannot be less than 0 (the current doc), as "
-                    "$minMaxScaler must ensure that the current document being processed is always "
-                    "within the configured window. Upper specified bound = " +
-                        std::to_string(upperBound.first),
-                    upperBound.first >= 0);
-            }
-        }
-    }
+    auto minMaxScalerSpec = MinMaxScalerSpec::parse(IDLParserContext("root"), obj);
+    auto bounds = getMinMaxScalerWindowBoundsFromSpec(minMaxScalerSpec, sortBy, expCtx);
+    auto minMaxArgs = getMinMaxScalerArgumentsFromSpec(minMaxScalerSpec, expCtx);
 
-    return {minMaxScalerArgs, *bounds};
+    expCtx->setSbeWindowCompatibility(SbeCompatibility::notCompatible);
+    return make_intrusive<ExpressionMinMaxScaler>(
+        expCtx, minMaxArgs.input, std::move(bounds), std::move(minMaxArgs.minAndMax));
 }
-
-std::pair<boost::intrusive_ptr<::mongo::Expression>, std::pair<Value, Value>>
-ExpressionMinMaxScaler::parseMinMaxScalerArgs(BSONElement minMaxScalerElem,
-                                              ExpressionContext* expCtx) {
-    // Parse the internals of '$minMaxScaler'.
-    boost::intrusive_ptr<::mongo::Expression> input;
-    // The first Value is the min, the second value is the max.
-    std::pair<Value, Value> sMinAndsMax{0, 1};
-    {
-        // Helper lambda to parse out numerical constants from BSON
-        auto parseNumericalValueConstant = [&expCtx](StringData argName,
-                                                     BSONElement expressionElem) -> Value {
-            auto expr = ::mongo::Expression::parseOperand(
-                            expCtx, expressionElem, expCtx->variablesParseState)
-                            ->optimize();
-            ExpressionConstant* exprConst = dynamic_cast<ExpressionConstant*>(expr.get());
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "'" << argName
-                                  << "' argument to $minMaxScaler must be a constant",
-                    exprConst);
-            Value v = exprConst->getValue();
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "'" << argName
-                                  << "' argument to $minMaxScaler must be a numeric type",
-                    v.numeric());
-            return v;
-        };
-
-        // If either the min or the max is specified, so must the other.
-        // Neither or both specified are valid states.
-        bool minSpecified = false;
-        bool maxSpecified = false;
-        for (const auto& arg : minMaxScalerElem.Obj()) {
-            auto argName = arg.fieldNameStringData();
-            if (argName == kInputArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'input' cannot be specified more than once to $minMaxScaler",
-                        !input);
-                input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
-            } else if (argName == kMinArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'min' cannot be specified more than once to $minMaxScaler",
-                        !minSpecified);
-                sMinAndsMax.first = parseNumericalValueConstant(kMinArg, arg);
-                minSpecified = true;
-            } else if (argName == kMaxArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'max' cannot be specified more than once to $minMaxScaler",
-                        !maxSpecified);
-                sMinAndsMax.second = parseNumericalValueConstant(kMaxArg, arg);
-                maxSpecified = true;
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "$minMaxScaler got unexpected internal argument: '"
-                                        << argName << "'");
-            }
-        }
-        uassert(ErrorCodes::FailedToParse, "$minMaxScaler requires an 'input' expression", input);
-        uassert(ErrorCodes::FailedToParse,
-                "Only one of 'min' and 'max' were specified as an argument to $minMaxScaler."
-                " Neither or both must be specified",
-                // XNOR will be false iff one of the values are true.
-                !(minSpecified ^ maxSpecified));
-        // Max must be strictly greater than min.
-        uassert(ErrorCodes::FailedToParse,
-                "the 'max' must be strictly greater than 'min', as arguments to $minMaxScaler",
-                Value::compare(sMinAndsMax.first, sMinAndsMax.second, nullptr) < 0);
-    }
-
-    return {input, sMinAndsMax};
-}
-
 
 template <typename WindowFunctionN, typename AccumulatorNType>
 Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(

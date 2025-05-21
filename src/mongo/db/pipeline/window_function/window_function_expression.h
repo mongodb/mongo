@@ -1035,21 +1035,6 @@ private:
     // Output domain Value is bounded between sMin and sMax (inclusive).
     // First value is min, second value is max.
     std::pair<Value, Value> _sMinAndsMax;
-
-    // Internal parsing helper functions.
-    //
-    // Parses the top level keys to the $minMaxScaler window function BSON.
-    // Expects a '$minMaxScaler' key, and optionally a 'window' key.
-    // First return value of the pair is the unparsed arguments to '$minMaxScaler'.
-    // Second return value of the pair is the parsed WindowBounds.
-    static std::pair<BSONElement, WindowBounds> parseTopLevelKeys(
-        BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx);
-    // Parses the BSON object that is the argument to the '$minMaxScaler' key.
-    // First return value of the pair is the parsed Expression of the 'input' key.
-    // Second return value is the pair representing the sMin and sMax arguments to the window
-    // function.
-    static std::pair<boost::intrusive_ptr<::mongo::Expression>, std::pair<Value, Value>>
-    parseMinMaxScalerArgs(BSONElement minMaxScalerElem, ExpressionContext* expCtx);
 };
 
 /**

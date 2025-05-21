@@ -32,7 +32,7 @@ expectFailureWithArgs(
             },
         }
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.IDLUnknownField);
 expectFailureWithArgs(
     // 'input' cannot be missing.
     {
@@ -44,7 +44,7 @@ expectFailureWithArgs(
             },
         }
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.IDLFailedToParse);
 expectFailureWithArgs(
     // 'min' must be a numerical type.
     {
@@ -112,6 +112,66 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {input: "$x", min: 11, max: 10},
+                window: {documents: ["current", "unbounded"]},
+            },
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
+    // 'max' must be strictly greater than 'min', even as expressions.
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x", min: {$multiply: [1, 20]}, max: {$divide: [20, 2]}},
+                window: {documents: ["current", "unbounded"]},
+            },
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
+    // 'min' must be a constant
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x", min: {$multiply: [1, "$x"]}, max: {$divide: [20, 2]}},
+                window: {documents: ["current", "unbounded"]},
+            },
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
+    // 'max' must be a constant
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x", min: {$multiply: [1, 1]}, max: {$divide: [20, "$x"]}},
+                window: {documents: ["current", "unbounded"]},
+            },
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
+    // 'min' must be numeric
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x", min: "hello", max: 2},
+                window: {documents: ["current", "unbounded"]},
+            },
+        }
+    },
+    ErrorCodes.FailedToParse);
+expectFailureWithArgs(
+    // 'max' must be numeric
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {input: "$x", min: 1, max: "hi"},
                 window: {documents: ["current", "unbounded"]},
             },
         }
@@ -239,6 +299,28 @@ expectSuccessWithArgs({
     output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
+            window: {range: ["unbounded", "unbounded"]}
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {input: "$x", min: {$multiply: [5, 0]}, max: {$subtract: [5, 4]}},
+            window: {range: ["unbounded", "unbounded"]}
+        },
+    }
+});
+expectSuccessWithArgs({
+    sortBy: {_id: 1},
+    output: {
+        "relativeXValue": {
+            $minMaxScaler: {
+                input: {$multiply: ["$x", "$x"]},
+                min: {$multiply: [5, 0]},
+                max: {$subtract: [5, 4]}
+            },
             window: {range: ["unbounded", "unbounded"]}
         },
     }
