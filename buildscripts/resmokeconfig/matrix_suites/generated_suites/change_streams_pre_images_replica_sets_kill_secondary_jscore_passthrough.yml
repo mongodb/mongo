@@ -40,8 +40,6 @@ executor:
     voting_secondaries: false
   hooks:
     - class: PeriodicKillSecondaries
-    - class: CleanEveryN
-      n: 20
     - class: ClusterParameter
       key: changeStreamOptions
       value:
