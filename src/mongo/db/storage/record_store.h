@@ -339,14 +339,6 @@ public:
          */
         long long oplogMaxSize{0};
 
-        /*
-         * True if the RecordStore is for a change collection.
-         *
-         * TODO SERVER-97046: Remove once no longer needed for ResourceConsumptionMetrics in
-         * 'WiredTigerRecordStore'.
-         */
-        bool isChangeCollection{false};
-
         /**
          * Whether or not the RecordStore allows allows writes to overwrite existing records with
          * the same RecordId.

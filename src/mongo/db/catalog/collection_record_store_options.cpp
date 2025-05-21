@@ -48,8 +48,6 @@ RecordStore::Options getRecordStoreOptions(const NamespaceString& nss,
         recordStoreOptions.oplogMaxSize = collectionOptions.cappedSize;
     }
 
-    recordStoreOptions.isChangeCollection = nss.isChangeCollection();
-
     bool isTimeseries = collectionOptions.timeseries.has_value();
     if (isTimeseries) {
         recordStoreOptions.customBlockCompressor =

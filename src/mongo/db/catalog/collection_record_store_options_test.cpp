@@ -45,7 +45,6 @@ BSONObj convertToBSON(const RecordStore::Options& opts) {
     bob.append("isCapped", opts.isCapped);
     bob.append("isOplog", opts.isOplog);
     bob.append("oplogMaxSize", opts.oplogMaxSize);
-    bob.append("isChangeCollection", opts.isChangeCollection);
     bob.append("allowOverwrite", opts.allowOverwrite);
     bob.append("forceUpdateWithFullDocument", opts.forceUpdateWithFullDocument);
     bob.append("customBlockCompressor", opts.customBlockCompressor.value_or("none"));
@@ -73,8 +72,6 @@ protected:
         ASSERT_EQ(expectedOpts.isOplog, actualOpts.isOplog)
             << errMsgDetails(expectedOpts, actualOpts);
         ASSERT_EQ(expectedOpts.oplogMaxSize, actualOpts.oplogMaxSize)
-            << errMsgDetails(expectedOpts, actualOpts);
-        ASSERT_EQ(expectedOpts.isChangeCollection, actualOpts.isChangeCollection)
             << errMsgDetails(expectedOpts, actualOpts);
         ASSERT_EQ(expectedOpts.allowOverwrite, actualOpts.allowOverwrite)
             << errMsgDetails(expectedOpts, actualOpts);

@@ -1728,7 +1728,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             // Record stores for clustered collections need to guarantee uniqueness by preventing
             // overwrites.
             .inMemory = _wtConfig.inMemory,
-            .isChangeCollection = options.isChangeCollection,
             .sizeStorer = _sizeStorer.get(),
             .tracksSizeAdjustments = true};
 
@@ -1871,7 +1870,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     params.baseParams.isLogged = isLogged;
     params.baseParams.forceUpdateWithFullDocument = false;
     params.inMemory = _wtConfig.inMemory;
-    params.isChangeCollection = false;
     // Temporary collections do not need to persist size information to the size storer.
     params.sizeStorer = nullptr;
     // Temporary collections do not need to reconcile collection size/counts.

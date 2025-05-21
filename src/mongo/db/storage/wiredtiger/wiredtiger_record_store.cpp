@@ -638,7 +638,6 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                                              Params params)
     : WiredTigerRecordStoreBase(std::move(params.baseParams)),
       _inMemory(params.inMemory),
-      _isChangeCollection(params.isChangeCollection),
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
@@ -1468,7 +1467,6 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
                           .isLogged = true,
                           .forceUpdateWithFullDocument = oplogParams.forceUpdateWithFullDocument},
               .inMemory = oplogParams.inMemory,
-              .isChangeCollection = false,
               .sizeStorer = oplogParams.sizeStorer,
               .tracksSizeAdjustments = oplogParams.tracksSizeAdjustments}),
       _maxSize(oplogParams.oplogMaxSize) {

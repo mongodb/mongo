@@ -233,7 +233,6 @@ public:
     struct Params {
         WiredTigerRecordStoreBase::Params baseParams;
         bool inMemory;
-        bool isChangeCollection;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;
     };
@@ -382,9 +381,6 @@ protected:
 
     // True if the storage engine is an in-memory storage engine
     const bool _inMemory;
-    // True if the namespace of this record store starts with "config.system.change_collection", and
-    // false otherwise.
-    const bool _isChangeCollection;
 
     // Protects initialization of the _nextIdNum.
     mutable stdx::mutex _initNextIdMutex;

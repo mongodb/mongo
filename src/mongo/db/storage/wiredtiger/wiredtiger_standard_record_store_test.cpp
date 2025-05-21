@@ -118,7 +118,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.baseParams.isLogged = false;
         params.baseParams.forceUpdateWithFullDocument = false;
         params.inMemory = false;
-        params.isChangeCollection = false;
         params.sizeStorer = &ss;
         params.tracksSizeAdjustments = true;
 

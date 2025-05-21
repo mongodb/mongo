@@ -682,7 +682,6 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     params.baseParams.forceUpdateWithFullDocument = false;
     params.inMemory = false;
-    params.isChangeCollection = false;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
 
