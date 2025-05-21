@@ -2,20 +2,24 @@
 // @tags: [requires_auth]
 
 // Variables for this test
-const recordingDir = MongoRunner.toRealDir("$dataDir/traffic_recording/");
-const recordingFile = "recording.txt";
-const recordingFilePath = MongoRunner.toRealDir(recordingDir + "/" + recordingFile);
-const replayFilePath = MongoRunner.toRealDir(recordingDir + "/replay.txt");
+const pathsep = _isWindows() ? "\\" : "/";
+const recordingDirGlobal = MongoRunner.toRealDir("$dataDir" + pathsep + "traffic_recording");
+const recordingDirCustom = "recordings";
+const recordingDir =
+    MongoRunner.toRealDir(recordingDirGlobal + pathsep + recordingDirCustom + pathsep);
 
 assert.throws(function() {
     convertTrafficRecordingToBSON("notarealfileatall");
 });
 
+jsTest.log("Creating a new directory: " + recordingDirGlobal);
+jsTest.log("Creating a new directory: " + recordingDir);
 // Create the recording directory if it does not already exist
-mkdir(recordingDir);
+assert(mkdir(recordingDirGlobal));
+assert(mkdir(recordingDir));
 
 // Create the options and run mongod
-var opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDir};
+var opts = {auth: "", setParameter: "trafficRecordingDirectory=" + recordingDirGlobal};
 let m = MongoRunner.runMongod(opts);
 
 // Get the port of the host
@@ -29,7 +33,8 @@ adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 adminDB.auth("admin", "pass");
 
 // Start recording traffic
-assert.commandWorked(adminDB.runCommand({'startRecordingTraffic': 1, 'filename': 'recording.txt'}));
+assert.commandWorked(
+    adminDB.runCommand({'startRecordingTraffic': 1, 'filename': recordingDirCustom}));
 
 // Run a few commands
 assert.commandWorked(testDB.runCommand({"serverStatus": 1}));
@@ -40,6 +45,10 @@ assert.eq("foo bar", coll.findOne({"name": "foo bar"}).name);
 assert.commandWorked(coll.deleteOne({}));
 assert.eq(1, coll.aggregate().toArray().length);
 assert.commandWorked(coll.update({}, {}));
+
+let serverStatus = testDB.runCommand({"serverStatus": 1});
+assert("trafficRecording" in serverStatus, serverStatus);
+let recordingFilePath = serverStatus["trafficRecording"]['recordingFile'];
 
 // Stop recording traffic
 assert.commandWorked(testDB.runCommand({'stopRecordingTraffic': 1}));
@@ -52,6 +61,7 @@ var numRequest = 0;
 var numResponse = 0;
 var opTypes = {};
 
+jsTest.log("Recording file path: " + recordingFilePath);
 // Pass filepath to traffic_reader helper method to get recorded info in BSON
 var res = convertTrafficRecordingToBSON(recordingFilePath);
 

@@ -1095,7 +1095,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/timeseries/query/**/timeseries_group* @10gen/query-execution-sbe @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/traffic_recording/OWNERS.yml
-/jstests/noPassthrough/traffic_recording/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/jstests/noPassthrough/traffic_recording/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/ttl/OWNERS.yml
 /jstests/noPassthrough/ttl/**/* @10gen/server-ttl @svc-auto-approve-bot

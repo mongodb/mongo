@@ -37,6 +37,7 @@
 #include <tuple>
 #include <utility>
 
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 
 #include "mongo/base/data_builder.h"
@@ -63,6 +64,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -111,7 +113,7 @@ public:
 
         _trafficStats.setRunning(true);
         _trafficStats.setBufferSize(options.getBufferSize());
-        _trafficStats.setRecordingFile(_path);
+        _trafficStats.setRecordingFile(_recordingFile);
         _trafficStats.setMaxFileSize(_maxLogSize);
     }
 
@@ -119,8 +121,19 @@ public:
         _thread = stdx::thread([consumer = std::move(_pcqPipe.consumer), this] {
             try {
                 DataBuilder db;
-                std::fstream out(_path,
-                                 std::ios_base::binary | std::ios_base::trunc | std::ios_base::out);
+                boost::filesystem::path recordingFile(boost::filesystem::absolute(_path));
+                if (!boost::filesystem::is_directory(recordingFile)) {
+                    boost::filesystem::create_directory(recordingFile);
+                }
+                recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+                boost::filesystem::ofstream out(recordingFile,
+                                                std::ios_base::binary | std::ios_base::trunc |
+                                                    std::ios_base::out);
+                {
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    _recordingFile = recordingFile.string();
+                    _trafficStats.setRecordingFile(_recordingFile);
+                }
 
                 while (true) {
                     std::deque<TrafficRecordingPacket> storage;
@@ -151,9 +164,26 @@ public:
                             _written += size;
                         }
 
-                        uassert(ErrorCodes::LogWriteFailed,
-                                "hit maximum log size",
-                                _written < _maxLogSize);
+                        if (_written >= _maxLogSize) {
+                            // The current recording file hits the maximum file size, open a new
+                            // recording file.
+                            boost::filesystem::path recordingFile(
+                                boost::filesystem::absolute(_path));
+                            recordingFile /= dateToISOStringLocal(Date_t::now());
+                            out.close();
+                            out.open(recordingFile,
+                                     std::ios_base::binary | std::ios_base::trunc |
+                                         std::ios_base::out);
+                            // We assume that the size of one packet message is greater than the max
+                            // file size. It's intentional to not assert if
+                            // 'size' >= '_maxLogSize' for testing purposes.
+                            {
+                                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                                _written = size;
+                                _recordingFile = recordingFile.string();
+                                _trafficStats.setRecordingFile(_recordingFile);
+                            }
+                        }
 
                         out.write(db.getCursor().data(), db.size());
                         out.write(toWrite.buf(), toWrite.size());
@@ -258,6 +288,7 @@ private:
     }
 
     const std::string _path;
+    std::string _recordingFile;
     const size_t _maxLogSize;
 
     MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
