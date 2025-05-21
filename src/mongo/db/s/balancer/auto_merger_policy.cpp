@@ -66,7 +66,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -263,8 +263,19 @@ void AutoMergerPolicy::_checkInternalUpdatesWithLock(OperationContext* opCtx, Wi
 std::map<ShardId, std::vector<NamespaceString>>
 AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* opCtx) {
     std::map<ShardId, std::vector<NamespaceString>> collectionsToMerge;
+    DBDirectClient client(opCtx);
 
-    const auto& shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    // First, get the list of all the shards of the cluster.
+    // Using the DbClient to avoid accessing the ShardRegistry while holding the mutex.
+    std::vector<ShardId> shardIds;
+    {
+        auto cursor = client.find(FindCommandRequest(NamespaceString::kConfigsvrShardsNamespace));
+        while (cursor->more()) {
+            const auto& doc = cursor->nextSafe();
+            shardIds.push_back(doc.getField(ShardType::name()).str());
+        }
+    }
+
     for (const auto& shard : shardIds) {
         // Build an aggregation pipeline to get the collections with mergeable chunks placed on a
         // specific shard
@@ -347,7 +358,6 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
             AggregateCommandRequest(CollectionType::ConfigNS, pipeline->serializeToBson());
         aggRequest.setReadConcern(repl::ReadConcernArgs::kMajority);
 
-        DBDirectClient client(opCtx);
         auto cursor = uassertStatusOKWithContext(
             DBClientCursor::fromAggregationRequest(
                 &client, aggRequest, true /* secondaryOk */, true /* useExhaust */),
