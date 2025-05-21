@@ -73,7 +73,7 @@ bool BackupBlock::isRequired() const {
     }
 
     // Check if this is a journal file.
-    if (StringData(filename).startsWith("WiredTigerLog.")) {
+    if (StringData(filename).starts_with("WiredTigerLog.")) {
         return true;
     }
 
@@ -85,7 +85,7 @@ bool BackupBlock::isRequired() const {
     // All files for the encrypted storage engine are required.
     boost::filesystem::path basePath(storageGlobalParams.dbpath);
     boost::filesystem::path keystoreBasePath(basePath / "key.store");
-    if (StringData(_filePath.string()).startsWith(keystoreBasePath.string())) {
+    if (StringData(_filePath.string()).starts_with(keystoreBasePath.string())) {
         return true;
     }
 

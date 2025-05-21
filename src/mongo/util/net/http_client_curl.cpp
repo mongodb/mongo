@@ -170,7 +170,7 @@ size_t ReadMemoryCallback(char* buffer, size_t size, size_t nitems, void* instre
         size_t readSize =
             std::min(size * nitems, static_cast<unsigned long>(bufReader->remaining()));
         auto buf = bufReader->readBytes(readSize);
-        memcpy(buffer, buf.rawData(), readSize);
+        memcpy(buffer, buf.data(), readSize);
         ret = readSize;
     }
 
@@ -635,7 +635,7 @@ HostAndPort exactHostAndPortFromUrl(StringData url) {
 
     auto hp = HostAndPort(url);
     if (!hp.hasPort()) {
-        if (url.startsWith("http://"_sd)) {
+        if (url.starts_with("http://"_sd)) {
             return HostAndPort(hp.host(), 80);
         }
 

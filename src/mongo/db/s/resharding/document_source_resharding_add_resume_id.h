@@ -79,7 +79,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return DocumentSourceReshardingAddResumeId::kStageName.rawData();
+        return DocumentSourceReshardingAddResumeId::kStageName.data();
     }
 
     static const Id& id;

@@ -110,8 +110,8 @@ public:
                                 std::vector<BSONArray> inputDocs,
                                 const mongo::BSONArray& expectedValue,
                                 std::unique_ptr<CollatorInterface> collator = nullptr) {
-        auto [resultsTag, resultsVal] = getSetWindowFieldsResults(
-            fromjson(windowSpec.rawData()), inputDocs, std::move(collator));
+        auto [resultsTag, resultsVal] =
+            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator));
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
 
         auto [expectedTag, expectedVal] = stage_builder::makeValue(expectedValue);
@@ -134,8 +134,8 @@ public:
         using namespace mongo::sbe::value;
 
         // Run the accumulator.
-        auto [resultsTag, resultsVal] = getSetWindowFieldsResults(
-            fromjson(windowSpec.rawData()), inputDocs, std::move(collator));
+        auto [resultsTag, resultsVal] =
+            getSetWindowFieldsResults(fromjson(windowSpec.data()), inputDocs, std::move(collator));
         ValueGuard resultGuard{resultsTag, resultsVal};
         ASSERT_EQ(resultsTag, TypeTags::Array);
         auto resultArr = getArrayView(resultsVal);

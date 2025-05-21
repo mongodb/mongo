@@ -84,7 +84,7 @@ FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
     arrayView->reserve(m.captureCount());
     for (size_t i = 0; i < m.captureCount(); ++i) {
         StringData cap = m[i + 1];
-        if (!cap.rawData()) {
+        if (!cap.data()) {
             arrayView->push_back(value::TypeTags::Null, 0);
         } else {
             auto [tag, val] = value::makeNewString(cap);

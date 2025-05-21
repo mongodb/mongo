@@ -260,7 +260,7 @@ public:
      */
     bool equalCaseInsensitive(const DatabaseName& other) const {
         return tenantIdView() == other.tenantIdView() &&
-            db(omitTenant).equalCaseInsensitive(other.db(omitTenant));
+            str::equalCaseInsensitive(db(omitTenant), other.db(omitTenant));
     }
 
     int compare(const DatabaseName& other) const {
@@ -645,7 +645,7 @@ protected:
             if (!collectionName.empty()) {
                 *(dataptr + dbStartIndex + db.size()) = '.';
                 std::memcpy(dataptr + dbStartIndex + db.size() + dotSize,
-                            collectionName.rawData(),
+                            collectionName.data(),
                             collectionName.size());
             }
 
@@ -787,8 +787,7 @@ constexpr auto makeDbData(const char* db) {
     p = std::copy_n(db, dbSize, p);
     return result;
 }
-#define DBNAME_CONSTANT(id, db) \
-    constexpr inline auto id##_data = makeDbData<db.size()>(db.rawData());
+#define DBNAME_CONSTANT(id, db) constexpr inline auto id##_data = makeDbData<db.size()>(db.data());
 #include "database_name_reserved.def.h"
 #undef DBNAME_CONSTANT
 }  // namespace dbname_detail::constexpr_data

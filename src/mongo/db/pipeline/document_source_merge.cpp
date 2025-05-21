@@ -229,7 +229,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          std::set<FieldPath> mergeOnFields,
                                          boost::optional<ChunkVersion> collectionPlacementVersion,
                                          bool allowMergeOnNullishValues)
-    : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
+    : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx),
       _mergeOnFields(std::move(mergeOnFields)),
       _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1) {
     _mergeProcessor.emplace(expCtx,

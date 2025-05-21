@@ -148,7 +148,7 @@ public:
     static constexpr auto kName = "$mergeObjects"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     AccumulatorMergeObjectsForBucketAuto(ExpressionContext* expCtx) : AccumulatorState(expCtx) {
@@ -236,7 +236,7 @@ public:
     static constexpr auto kName = "$push"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     AccumulatorPushForBucketAuto(ExpressionContext* expCtx,
@@ -264,7 +264,7 @@ public:
     static constexpr auto kName = "$concatArrays"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     AccumulatorConcatArraysForBucketAuto(ExpressionContext* expCtx,
@@ -419,7 +419,7 @@ void AccumulatorFirstLastNForBucketAuto<sense, single>::_processValue(const Valu
 
 template <FirstLastSense sense, bool single>
 const char* AccumulatorFirstLastNForBucketAuto<sense, single>::getOpName() const {
-    return AccumulatorFirstLastNForBucketAuto<sense, single>::getName().rawData();
+    return AccumulatorFirstLastNForBucketAuto<sense, single>::getName().data();
 }
 
 template <FirstLastSense sense, bool single>
@@ -582,10 +582,10 @@ AccumulationStatement replaceAccumulationStatementForBucketAuto(ExpressionContex
                                                                 AccumulationStatement&& stmt) {
 
     auto accName = stmt.expr.name;
-    if (!isPositionalAccumulator(accName.rawData())) {
+    if (!isPositionalAccumulator(accName.data())) {
         return std::move(stmt);
     }
-    if (!accName.endsWith("N")) {
+    if (!accName.ends_with("N")) {
         stmt.expr.initializer = ExpressionConstant::create(expCtx, Value(1));
     }
 

@@ -43,7 +43,7 @@ using namespace unittest::match;
 template <typename Stream>
 void writeToSocketAndPollForResponse(Stream& writeSocket, Stream& readSocket, StringData data) {
     // Write our payload to our socket.
-    asio::write(writeSocket, asio::const_buffer(data.rawData(), data.size()));
+    asio::write(writeSocket, asio::const_buffer(data.data(), data.size()));
 
     // Poll the other end of the connection for data before returning. Wait up to a second for data
     // to appear.

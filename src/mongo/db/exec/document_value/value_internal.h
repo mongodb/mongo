@@ -99,7 +99,7 @@ private:
     /** Use static `create()` instead. */
     explicit RCString(StringData s) : _size{s.size()} {
         if (_size)
-            memcpy(_data(), s.rawData(), _size);
+            memcpy(_data(), s.data(), _size);
         _data()[_size] = '\0';
     }
 

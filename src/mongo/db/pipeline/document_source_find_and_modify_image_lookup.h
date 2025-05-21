@@ -87,7 +87,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return DocumentSourceFindAndModifyImageLookup::kStageName.rawData();
+        return DocumentSourceFindAndModifyImageLookup::kStageName.data();
     }
 
     static const Id& id;

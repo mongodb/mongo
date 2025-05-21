@@ -1000,7 +1000,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
 Status WiredTigerKVEngine::_rebuildIdent(WiredTigerSession& session, const char* uri) {
     invariant(_inRepairMode);
 
-    invariant(std::string(uri).find(WiredTigerUtil::kTableUriPrefix.rawData()) == 0);
+    invariant(std::string(uri).find(WiredTigerUtil::kTableUriPrefix.data()) == 0);
 
     const std::string identName(uri + WiredTigerUtil::kTableUriPrefix.size());
     auto filePath = getDataFilePathForIdent(identName);
@@ -1714,7 +1714,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
                 return WiredTigerUtil::useTableLogging(
                     nss, _isReplSet, _shouldRecoverFromOplogAsStandalone);
             }
-            fassert(8423353, ident.startsWith("internal-"));
+            fassert(8423353, ident.starts_with("internal-"));
             return !_isReplSet && !_shouldRecoverFromOplogAsStandalone;
         }();
         WiredTigerRecordStore::Params params{

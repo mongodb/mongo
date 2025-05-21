@@ -63,8 +63,7 @@ std::vector<StmtId> parseZeroOneManyStmtId(const BSONElement& element) {
                 uassert(8109802,
                         "Array field name is bogus",
                         fieldNameResult.ec == std::errc{} &&
-                            fieldNameResult.ptr ==
-                                arrayFieldName.rawData() + arrayFieldName.size() &&
+                            fieldNameResult.ptr == arrayFieldName.data() + arrayFieldName.size() &&
                             fieldNumber == expectedFieldNumber++);
 
                 uassert(8109801,

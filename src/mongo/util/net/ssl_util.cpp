@@ -59,7 +59,7 @@ StatusWith<StringData> findPEMBlob(StringData blob,
 
     trailerPosition += trailer.size();
 
-    return StringData(blob.rawData() + headerPosition, trailerPosition - headerPosition);
+    return StringData(blob.data() + headerPosition, trailerPosition - headerPosition);
 }
 
 

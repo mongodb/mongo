@@ -162,8 +162,8 @@ TEST(PcreTest, MatchView) {
 TEST(PcreTest, MatchDataInputStorage) {
     Regex re{"hi"};
     const std::string in = "i";
-    ASSERT_NE(re.match(in).input().rawData(), in.data());
-    ASSERT_EQ(re.matchView(in).input().rawData(), in.data());
+    ASSERT_NE(re.match(in).input().data(), in.data());
+    ASSERT_EQ(re.matchView(in).input().data(), in.data());
 }
 
 TEST(PcreTest, StartPos) {
@@ -235,9 +235,9 @@ TEST(PcreTest, Captures) {
     ASSERT_EQ(m.captureCount(), 1);
     ASSERT_TRUE(!!m);
     ASSERT_EQ(m[0], "abbbc");
-    ASSERT_EQ(m[0].rawData(), subject.rawData() + 3);
+    ASSERT_EQ(m[0].data(), subject.data() + 3);
     ASSERT_EQ(m[1], "bbb");
-    ASSERT_EQ(m[1].rawData(), subject.rawData() + 4);
+    ASSERT_EQ(m[1].data(), subject.data() + 4);
     ASSERT_THROWS(m[2], ExceptionFor<ErrorCodes::NoSuchKey>);
 }
 
@@ -261,8 +261,8 @@ TEST(PcreTest, UnusedLastCapture) {
 
 TEST(PcreTest, NullCapture) {
     static constexpr auto sb = "b"_sd;
-    ASSERT_THAT(Regex("(a*)b").matchView(sb)[1].rawData(), Eq(sb.rawData())) << "Empty";
-    ASSERT_THAT(Regex("(?:b|(a))").matchView(sb)[1].rawData(), Eq(nullptr)) << "Null";
+    ASSERT_THAT(Regex("(a*)b").matchView(sb)[1].data(), Eq(sb.data())) << "Empty";
+    ASSERT_THAT(Regex("(?:b|(a))").matchView(sb)[1].data(), Eq(nullptr)) << "Null";
 }
 
 TEST(PcreTest, CapturesByName) {

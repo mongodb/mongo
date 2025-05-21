@@ -124,7 +124,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
         // if term is identical to the raw form of the
         // field (untokenized) give it a small boost.
         double adjustment = 1;
-        if (raw.size() == term.length() && raw.equalCaseInsensitive(term))
+        if (str::equalCaseInsensitive(raw, term))
             adjustment += 0.1;
 
         double& score = (*docScores)[term];

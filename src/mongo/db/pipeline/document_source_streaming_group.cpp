@@ -68,7 +68,7 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalStreamingGroup, DocumentSourceStreamingGrou
 constexpr StringData DocumentSourceStreamingGroup::kStageName;
 
 const char* DocumentSourceStreamingGroup::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceStreamingGroup::doGetNext() {

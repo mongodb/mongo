@@ -160,7 +160,7 @@ FTSIteratorValue FTSElementIterator::advance() {
                 // Only index strings on exact match or wildcard.
                 if (exactMatch || _spec.wildcard()) {
                     return FTSIteratorValue(
-                        elem.valueStringData().rawData(), _frame._language, weight);
+                        elem.valueStringData().data(), _frame._language, weight);
                 }
                 break;
 

@@ -118,7 +118,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
  **/
 StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
                                                           std::string* outputData) {
-    if (inputData.startsWith("m=")) {
+    if (inputData.starts_with("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
     }
     const std::vector<std::string> input =

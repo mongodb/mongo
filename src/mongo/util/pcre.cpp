@@ -249,7 +249,7 @@ public:
                                     static_cast<uint32_t>(trialOptions),
                                     (pcre2_match_data*)nullptr,
                                     (pcre2_match_context*)nullptr,
-                                    (PCRE2_SPTR)replacement.rawData(),
+                                    (PCRE2_SPTR)replacement.data(),
                                     replacement.size(),
                                     (PCRE2_UCHAR*)buf.data(),
                                     &bufSize);
@@ -397,7 +397,7 @@ public:
         _startPos = startPos;
         _data.reset(pcre2_match_data_create_from_pattern(_regex->code(), nullptr));
         int matched = pcre2_match(_regex->code(),
-                                  (PCRE2_SPTR)_input.rawData(),
+                                  (PCRE2_SPTR)_input.data(),
                                   _input.size(),
                                   startPos,
                                   static_cast<uint32_t>(options),

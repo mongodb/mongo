@@ -125,7 +125,7 @@ public:
     };
 
     const char* getSourceName() const final {
-        return DocumentSourceListLocalSessions::kStageName.rawData();
+        return DocumentSourceListLocalSessions::kStageName.data();
     }
 
     static const Id& id;

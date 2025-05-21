@@ -266,7 +266,7 @@ public:
         char* objdata = _allocator.allocate(2 + _fieldNameSize);
         objdata[0] = type;
         if (_fieldNameSize > 0) {
-            memcpy(objdata + 1, fieldName.rawData(), _fieldNameSize);
+            memcpy(objdata + 1, fieldName.data(), _fieldNameSize);
         }
         objdata[_fieldNameSize + 1] = '\0';
 

@@ -63,7 +63,7 @@ public:
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 
     const char* getSourceName() const final {
-        return DocumentSourceSequentialDocumentCache::kStageName.rawData();
+        return DocumentSourceSequentialDocumentCache::kStageName.data();
     }
 
     static const Id& id;

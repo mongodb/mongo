@@ -119,7 +119,7 @@ public:
     static constexpr auto kName = "$rank"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
     // Modern constructor.
     explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
@@ -140,7 +140,7 @@ public:
     static constexpr auto kName = "$documentNumber"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     // Modern constructor.
@@ -158,7 +158,7 @@ public:
     static constexpr auto kName = "$denseRank"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     // Modern constructor.
@@ -176,7 +176,7 @@ public:
     static constexpr auto kName = "$integral"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorIntegral(ExpressionContext* expCtx,
@@ -195,7 +195,7 @@ public:
     static constexpr auto kName = "$locf"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorLocf(ExpressionContext* expCtx);

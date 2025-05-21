@@ -85,7 +85,7 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
 }
 
 const char* DocumentSourceGeoNearCursor::getSourceName() const {
-    return DocumentSourceGeoNearCursor::kStageName.rawData();
+    return DocumentSourceGeoNearCursor::kStageName.data();
 }
 
 Document DocumentSourceGeoNearCursor::transformDoc(Document&& objInput) const {

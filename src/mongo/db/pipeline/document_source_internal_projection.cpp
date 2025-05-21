@@ -59,7 +59,7 @@ DocumentSourceInternalProjection::DocumentSourceInternalProjection(
           pExpCtx, _stageSpec.getSpec(), lookUpPolicies(_stageSpec.getPolicies()))) {}
 
 const char* DocumentSourceInternalProjection::getSourceName() const {
-    return kStageNameInternal.rawData();
+    return kStageNameInternal.data();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalProjection::doOptimizeAt(

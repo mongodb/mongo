@@ -313,7 +313,7 @@ Status canonicalizeSSLServerOptions(moe::Environment* params) {
             return ret;
         }
 
-        if (StringData(mode).endsWith("SSL")) {
+        if (StringData(mode).ends_with("SSL")) {
             mode.replace(mode.size() - 3, 3, "TLS");
         }
 

@@ -264,9 +264,9 @@ int ksDecodeMain(int argc, char* argv[]) try {
 
     if (environment.count("output")) {
         auto strVal = environment["output"].as<std::string>();
-        if (StringData(strVal).equalCaseInsensitive("explain")) {
+        if (str::equalCaseInsensitive(strVal, "explain")) {
             options.outputFormat = OutputFormat::kExplain;
-        } else if (StringData(strVal).equalCaseInsensitive("bson")) {
+        } else if (str::equalCaseInsensitive(strVal, "bson")) {
             options.outputFormat = OutputFormat::kBson;
         } else {
             exitWithUsage("Unknown output format");
@@ -284,11 +284,11 @@ int ksDecodeMain(int argc, char* argv[]) try {
 
     if (environment.count("recordId")) {
         std::string strVal = environment["recordId"].as<std::string>();
-        if (StringData(strVal).equalCaseInsensitive("string")) {
+        if (str::equalCaseInsensitive(strVal, "string")) {
             options.keyFormat.emplace(KeyFormat::String);
-        } else if (StringData(strVal).equalCaseInsensitive("long")) {
+        } else if (str::equalCaseInsensitive(strVal, "long")) {
             options.keyFormat.emplace(KeyFormat::Long);
-        } else if (!StringData(strVal).equalCaseInsensitive("none")) {
+        } else if (!str::equalCaseInsensitive(strVal, "none")) {
             exitWithUsage("Unknown RecordId format");
         }
     }

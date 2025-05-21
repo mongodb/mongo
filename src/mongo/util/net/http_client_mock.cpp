@@ -38,7 +38,7 @@ namespace mongo {
 HttpClient::HttpReply MockHttpClient::request(HttpMethod method,
                                               StringData url,
                                               ConstDataRange data) const {
-    if (url.startsWith("http://") && !url.startsWith("http://localhost")) {
+    if (url.starts_with("http://") && !url.starts_with("http://localhost")) {
         uassert(ErrorCodes::IllegalOperation,
                 "Unsafe and unexpected HTTP operation performed with mock HttpClient",
                 _allow);

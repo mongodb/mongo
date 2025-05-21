@@ -71,7 +71,7 @@ Status DataType::Handler<StringData>::store(
     }
 
     if (ptr) {
-        std::memcpy(ptr, sdata.rawData(), sdata.size());
+        std::memcpy(ptr, sdata.data(), sdata.size());
     }
 
     if (advanced) {

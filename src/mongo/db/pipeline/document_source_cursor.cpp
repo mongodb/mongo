@@ -69,7 +69,7 @@ using boost::intrusive_ptr;
 using std::string;
 
 const char* DocumentSourceCursor::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 bool DocumentSourceCursor::Batch::isEmpty() const {

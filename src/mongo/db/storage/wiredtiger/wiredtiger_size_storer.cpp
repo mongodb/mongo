@@ -100,7 +100,7 @@ std::shared_ptr<WiredTigerSizeStorer::SizeInfo> WiredTigerSizeStorer::load(
     ON_BLOCK_EXIT([&] { session.closeCursor(cursor); });
 
     {
-        WT_ITEM key = {uri.rawData(), uri.size()};
+        WT_ITEM key = {uri.data(), uri.size()};
         cursor->set_key(cursor, &key);
         int ret = cursor->search(cursor);
         if (ret == WT_NOTFOUND)

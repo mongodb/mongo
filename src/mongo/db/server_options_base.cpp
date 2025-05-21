@@ -43,6 +43,7 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/value.h"
+#include "mongo/util/str.h"
 
 namespace moe = mongo::optionenvironment;
 
@@ -102,10 +103,8 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 }
 
 Status validateSystemLogDestinationSetting(const std::string& value) {
-    constexpr auto kSyslog = "syslog"_sd;
-    constexpr auto kFile = "file"_sd;
-
-    if (!kSyslog.equalCaseInsensitive(value) && !kFile.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "syslog"_sd) ||
+          str::equalCaseInsensitive(value, "file"_sd))) {
         return {ErrorCodes::BadValue, "systemLog.destination expects one of 'syslog' or 'file'"};
     }
 

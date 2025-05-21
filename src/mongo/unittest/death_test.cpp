@@ -223,7 +223,7 @@ void stripOption(std::vector<std::string>& av, StringData opt) {
         if (sd == fmt::format("--{}", opt)) {
             if (i + 1 < av.size())
                 av.erase(av.begin() + i, av.begin() + i + 2);
-        } else if (sd.startsWith(fmt::format("--{}=", opt))) {
+        } else if (sd.starts_with(fmt::format("--{}=", opt))) {
             av.erase(av.begin() + i);
         } else {
             ++i;

@@ -576,7 +576,7 @@ const std::string& BucketSpec::timeField() const {
 }
 
 HashedFieldName BucketSpec::timeFieldHashed() const {
-    invariant(_timeFieldHashed->key().rawData() == _timeField.data());
+    invariant(_timeFieldHashed->key().data() == _timeField.data());
     invariant(_timeFieldHashed->key() == _timeField);
     return *_timeFieldHashed;
 }

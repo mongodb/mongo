@@ -223,7 +223,7 @@ public:
                     // Ignore cache collections as they will be dropped later in the restore
                     // procedure.
                     if (kConfigCollections.find(collName) == kConfigCollections.end() &&
-                        !collName.startsWith("cache")) {
+                        !collName.starts_with("cache")) {
                         LOGV2_FATAL(6863300,
                                     "Identified unknown collection in config server.",
                                     "collName"_attr = collName);

@@ -270,6 +270,16 @@ TEST(StringUtilsTest, ConvertDoubleToStringWithProperPrecision) {
     ASSERT_EQUALS(std::string("0.1"), convertDoubleToString(0.1 + 6E-8, 6));
 }
 
+TEST(StringUtilsTest, EqualCaseInsensitive) {
+    ASSERT(str::equalCaseInsensitive(StringData("abc"), "abc"));
+    ASSERT(str::equalCaseInsensitive(StringData("abc"), "ABC"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "abc"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "ABC"));
+    ASSERT(str::equalCaseInsensitive(StringData("ABC"), "AbC"));
+    ASSERT(!str::equalCaseInsensitive(StringData("ABC"), "AbCd"));
+    ASSERT(!str::equalCaseInsensitive(StringData("ABC"), "AdC"));
+}
+
 TEST(StringUtilsTest, UTF8SafeTruncation) {
     // Empty string and ASCII works like normal truncation
     ASSERT_EQUALS(UTF8SafeTruncation(""_sd, 10), ""_sd);

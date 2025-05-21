@@ -196,7 +196,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
 }
 
 const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
-    return kStageNameInternal.rawData();
+    return kStageNameInternal.data();
 }
 
 Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {

@@ -72,8 +72,8 @@ template <typename Seq>
 void strAppendJoin(std::string& out, StringData separator, const Seq& sequence) {
     StringData currSep;
     for (StringData str : sequence) {
-        out.append(currSep.rawData(), currSep.size());
-        out.append(str.rawData(), str.size());
+        out.append(currSep.data(), currSep.size());
+        out.append(str.data(), str.size());
         currSep = separator;
     }
 }

@@ -192,7 +192,7 @@ Position DocumentStorage::findFieldInCache(T requested) const {
         Position pos = _hashTab[bucket];
         while (pos.found()) {
             const ValueElement& elem = getField(pos);
-            if (elem.nameLen == reqSize && memcmp(requested.rawData(), elem._name, reqSize) == 0) {
+            if (elem.nameLen == reqSize && memcmp(requested.data(), elem._name, reqSize) == 0) {
                 return pos;
             }
 
@@ -201,7 +201,7 @@ Position DocumentStorage::findFieldInCache(T requested) const {
         }
     } else {  // linear scan
         for (auto it = iteratorCacheOnly(); !it.atEnd(); it.advance()) {
-            if (it->nameLen == reqSize && memcmp(requested.rawData(), it->_name, reqSize) == 0) {
+            if (it->nameLen == reqSize && memcmp(requested.data(), it->_name, reqSize) == 0) {
                 return it.position();
             }
         }
@@ -814,7 +814,7 @@ size_t Document::memUsageForSorter() const {
 void Document::hash_combine(size_t& seed, const StringDataComparator* stringComparator) const {
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         StringData name = it->nameSD();
-        boost::hash_range(seed, name.rawData(), name.rawData() + name.size());
+        boost::hash_range(seed, name.data(), name.data() + name.size());
         it->val.hash_combine(seed, stringComparator);
     }
 }

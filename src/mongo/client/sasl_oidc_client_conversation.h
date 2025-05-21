@@ -48,8 +48,8 @@ public:
                                StringData principalName,
                                StringData accessToken)
         : SaslClientConversation(clientSession),
-          _principalName(principalName.rawData()),
-          _accessToken(accessToken.rawData()) {}
+          _principalName(principalName.data()),
+          _accessToken(accessToken.data()) {}
 
     static void setOIDCIdPAuthCallback(std::function<oidcIdPAuthCallbackT> callback) {
         oidcClientGlobalParams.oidcIdPAuthCallback = std::move(callback);

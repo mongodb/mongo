@@ -1367,7 +1367,7 @@ bool isPathPrefixOf(StringData first, StringData second) {
         return false;
     }
 
-    return second.startsWith(first) && second[first.size()] == '.';
+    return second.starts_with(first) && second[first.size()] == '.';
 }
 
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>& filterMap) {

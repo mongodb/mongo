@@ -83,7 +83,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     GetNextResult doGetNext() override {

@@ -134,7 +134,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
         return badCount(1);
     }
     const auto gs2_cbind_flag = inputData.substr(0, gs2_cbind_comma);
-    if (gs2_cbind_flag.startsWith("p=")) {
+    if (gs2_cbind_flag.starts_with("p=")) {
         return Status(ErrorCodes::BadValue, "Server does not support channel binding");
     }
 
@@ -149,7 +149,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     }
     auto authzId = inputData.substr(gs2_cbind_comma + 1, gs2_header_comma - (gs2_cbind_comma + 1));
     if (authzId.size()) {
-        if (authzId.startsWith("a=")) {
+        if (authzId.starts_with("a=")) {
             authzId = authzId.substr(2);
         } else {
             return Status(ErrorCodes::BadValue,
@@ -158,7 +158,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     }
 
     const auto client_first_message_bare = inputData.substr(gs2_header_comma + 1);
-    if (client_first_message_bare.startsWith("m=")) {
+    if (client_first_message_bare.starts_with("m=")) {
         return Status(ErrorCodes::BadValue, "SCRAM mandatory extensions are not supported");
     }
 
@@ -338,7 +338,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     _authMessage += "," + client_final_message_without_proof.toString();
 
     const auto last_field = inputData.substr(last_comma + 1);
-    if ((last_field.size() < 3) || !last_field.startsWith("p=")) {
+    if ((last_field.size() < 3) || !last_field.starts_with("p=")) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Incorrect SCRAM ClientProof: " << last_field);
     }

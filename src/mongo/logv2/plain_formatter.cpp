@@ -186,7 +186,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     }
 
     buffer.resize(std::min(attributeMaxSize, buffer.size()));
-    if (StringData sd(buffer.data(), buffer.size()); sd.endsWith("\n"_sd))
+    if (StringData sd(buffer.data(), buffer.size()); sd.ends_with("\n"_sd))
         buffer.resize(buffer.size() - 1);
 }
 

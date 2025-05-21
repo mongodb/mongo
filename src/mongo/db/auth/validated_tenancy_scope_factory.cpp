@@ -210,9 +210,9 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseToken(Client* client,
             header.getAlgorithm() == "HS256"_sd);
 
     auto computed =
-        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
+        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.data()),
                                  secret.size(),
-                                 reinterpret_cast<const std::uint8_t*>(parsed.payload.rawData()),
+                                 reinterpret_cast<const std::uint8_t*>(parsed.payload.data()),
                                  parsed.payload.size());
     auto sigraw = base64url::decode(parsed.signature);
     auto signature = SHA256Block::fromBuffer(reinterpret_cast<const std::uint8_t*>(sigraw.data()),
@@ -298,11 +298,10 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(
                                       base64url::encode(tojson(header.toBSON())),
                                       base64url::encode(tojson(body.toBSON())));
 
-    auto computed =
-        SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.rawData()),
-                                 secret.size(),
-                                 reinterpret_cast<const std::uint8_t*>(payload.data()),
-                                 payload.size());
+    auto computed = SHA256Block::computeHmac(reinterpret_cast<const std::uint8_t*>(secret.data()),
+                                             secret.size(),
+                                             reinterpret_cast<const std::uint8_t*>(payload.data()),
+                                             payload.size());
 
     const std::string originalToken =
         fmt::format("{}.{}",

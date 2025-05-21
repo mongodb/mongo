@@ -74,7 +74,7 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
       _nDocsInColl(nDocsInCollection) {}
 
 const char* DocumentSourceSampleFromRandomCursor::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 namespace {

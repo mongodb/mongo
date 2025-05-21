@@ -50,7 +50,7 @@ namespace {
 TEST(Construction, Empty) {
     StringData strData;
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_TRUE(strData.rawData() == nullptr);
+    ASSERT_TRUE(strData.data() == nullptr);
 }
 
 TEST(Construction, FromStdString) {
@@ -71,7 +71,7 @@ TEST(Construction, FromNullCString) {
     char* c = nullptr;
     StringData strData(c);
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_TRUE(strData.rawData() == nullptr);
+    ASSERT_TRUE(strData.data() == nullptr);
 }
 
 TEST(Construction, FromUserDefinedLiteral) {
@@ -107,7 +107,7 @@ TEST(Construction, Constexpr) {
     constexpr StringData nully{nullptr, 0};
     ASSERT_EQUALS(nully, ""_sd);
     static_assert(!std::is_constructible_v<StringData, std::nullptr_t>);
-    constexpr StringData ptr{lit.rawData() + 1, 3};
+    constexpr StringData ptr{lit.data() + 1, 3};
     ASSERT_EQUALS(ptr, "234"_sd);
 }
 
@@ -335,47 +335,37 @@ TEST(Substr, Simple1) {
     SUBSTR_2_TEST_HELP(StringData("abcdeXXX", 5), "", 5, 1);
 }
 
-TEST(equalCaseInsensitiveTest, Simple1) {
-    ASSERT(StringData("abc").equalCaseInsensitive("abc"));
-    ASSERT(StringData("abc").equalCaseInsensitive("ABC"));
-    ASSERT(StringData("ABC").equalCaseInsensitive("abc"));
-    ASSERT(StringData("ABC").equalCaseInsensitive("ABC"));
-    ASSERT(StringData("ABC").equalCaseInsensitive("AbC"));
-    ASSERT(!StringData("ABC").equalCaseInsensitive("AbCd"));
-    ASSERT(!StringData("ABC").equalCaseInsensitive("AdC"));
-}
-
 TEST(StartsWith, Simple) {
-    ASSERT(StringData("").startsWith(""));
-    ASSERT(!StringData("").startsWith("x"));
-    ASSERT(StringData("abcde").startsWith(""));
-    ASSERT(StringData("abcde").startsWith("a"));
-    ASSERT(StringData("abcde").startsWith("ab"));
-    ASSERT(StringData("abcde").startsWith("abc"));
-    ASSERT(StringData("abcde").startsWith("abcd"));
-    ASSERT(StringData("abcde").startsWith("abcde"));
-    ASSERT(!StringData("abcde").startsWith("abcdef"));
-    ASSERT(!StringData("abcde").startsWith("abdce"));
-    ASSERT(StringData("abcde").startsWith(StringData("abcdeXXXX").substr(0, 4)));
-    ASSERT(!StringData("abcde").startsWith(StringData("abdef").substr(0, 4)));
-    ASSERT(!StringData("abcde").substr(0, 3).startsWith("abcd"));
+    ASSERT(StringData("").starts_with(""));
+    ASSERT(!StringData("").starts_with("x"));
+    ASSERT(StringData("abcde").starts_with(""));
+    ASSERT(StringData("abcde").starts_with("a"));
+    ASSERT(StringData("abcde").starts_with("ab"));
+    ASSERT(StringData("abcde").starts_with("abc"));
+    ASSERT(StringData("abcde").starts_with("abcd"));
+    ASSERT(StringData("abcde").starts_with("abcde"));
+    ASSERT(!StringData("abcde").starts_with("abcdef"));
+    ASSERT(!StringData("abcde").starts_with("abdce"));
+    ASSERT(StringData("abcde").starts_with(StringData("abcdeXXXX").substr(0, 4)));
+    ASSERT(!StringData("abcde").starts_with(StringData("abdef").substr(0, 4)));
+    ASSERT(!StringData("abcde").substr(0, 3).starts_with("abcd"));
 }
 
 TEST(EndsWith, Simple) {
     // ASSERT(StringData("").endsWith(""));
-    ASSERT(!StringData("").endsWith("x"));
+    ASSERT(!StringData("").ends_with("x"));
     // ASSERT(StringData("abcde").endsWith(""));
-    ASSERT(StringData("abcde").endsWith(StringData("e", 0)));
-    ASSERT(StringData("abcde").endsWith("e"));
-    ASSERT(StringData("abcde").endsWith("de"));
-    ASSERT(StringData("abcde").endsWith("cde"));
-    ASSERT(StringData("abcde").endsWith("bcde"));
-    ASSERT(StringData("abcde").endsWith("abcde"));
-    ASSERT(!StringData("abcde").endsWith("0abcde"));
-    ASSERT(!StringData("abcde").endsWith("abdce"));
-    ASSERT(StringData("abcde").endsWith(StringData("bcdef").substr(0, 4)));
-    ASSERT(!StringData("abcde").endsWith(StringData("bcde", 3)));
-    ASSERT(!StringData("abcde").substr(0, 3).endsWith("cde"));
+    ASSERT(StringData("abcde").ends_with(StringData("e", 0)));
+    ASSERT(StringData("abcde").ends_with("e"));
+    ASSERT(StringData("abcde").ends_with("de"));
+    ASSERT(StringData("abcde").ends_with("cde"));
+    ASSERT(StringData("abcde").ends_with("bcde"));
+    ASSERT(StringData("abcde").ends_with("abcde"));
+    ASSERT(!StringData("abcde").ends_with("0abcde"));
+    ASSERT(!StringData("abcde").ends_with("abdce"));
+    ASSERT(StringData("abcde").ends_with(StringData("bcdef").substr(0, 4)));
+    ASSERT(!StringData("abcde").ends_with(StringData("bcde", 3)));
+    ASSERT(!StringData("abcde").substr(0, 3).ends_with("cde"));
 }
 
 TEST(ConstIterator, StdCopy) {

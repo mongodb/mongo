@@ -1557,7 +1557,7 @@ inline CellBlock* getCellBlock(Value v) {
 
 inline bool canUseSmallString(StringData input) {
     auto length = input.size();
-    auto ptr = input.rawData();
+    auto ptr = input.data();
     auto end = ptr + length;
     return length <= kSmallStringMaxLength && std::find(ptr, end, '\0') == end;
 }
@@ -1571,14 +1571,14 @@ inline std::pair<TypeTags, Value> makeSmallString(StringData input) {
 
     Value smallString{0};
     auto buf = getRawStringView(TypeTags::StringSmall, smallString);
-    tassert(9462500, "'input.rawData()' can't be a nullptr", input.rawData());
-    memcpy(buf, input.rawData(), input.size());
+    tassert(9462500, "'input.data()' can't be a nullptr", input.data());
+    memcpy(buf, input.data(), input.size());
     return {TypeTags::StringSmall, smallString};
 }
 
 inline std::pair<TypeTags, Value> makeBigString(StringData input) {
     auto len = input.size();
-    auto ptr = input.rawData();
+    auto ptr = input.data();
 
     invariant(len < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
 

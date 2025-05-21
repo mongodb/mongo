@@ -2746,9 +2746,9 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromMemory(
     logv2::DynamicAttributes errorAttrs;
 
 #if OPENSSL_VERSION_NUMBER <= 0x1000114fL
-    UniqueBIO inBio(BIO_new_mem_buf(const_cast<char*>(buffer.rawData()), buffer.size()));
+    UniqueBIO inBio(BIO_new_mem_buf(const_cast<char*>(buffer.data()), buffer.size()));
 #else
-    UniqueBIO inBio(BIO_new_mem_buf(buffer.rawData(), buffer.size()));
+    UniqueBIO inBio(BIO_new_mem_buf(buffer.data(), buffer.size()));
 #endif
 
     if (!inBio) {

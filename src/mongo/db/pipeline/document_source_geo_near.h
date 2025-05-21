@@ -69,7 +69,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final {
-        return DocumentSourceGeoNear::kStageName.rawData();
+        return DocumentSourceGeoNear::kStageName.data();
     }
 
     static const Id& id;

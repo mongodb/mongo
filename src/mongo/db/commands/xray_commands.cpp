@@ -83,7 +83,7 @@ public:
                     __xray_log_get_current_mode() == nullptr);
 
 
-            auto selectStatus = __xray_log_select_mode(request().getMode().rawData());
+            auto selectStatus = __xray_log_select_mode(request().getMode().data());
             uassert(8638309,
                     str::stream() << "Failed to register XRay mode '" << request().getMode()
                                   << "' : " << selectStatus,
@@ -91,7 +91,7 @@ public:
 
 
             auto configStatus =
-                __xray_log_init_mode(request().getMode().rawData(), request().getFlags().rawData());
+                __xray_log_init_mode(request().getMode().data(), request().getFlags().data());
             uassert(8638308,
                     str::stream() << "Failed to initialize XRay logging '" << request().getFlags()
                                   << "' : " << configStatus,

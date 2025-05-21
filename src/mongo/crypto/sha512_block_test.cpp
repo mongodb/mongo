@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 ConstDataRange makeTestItem(StringData sd) {
-    return ConstDataRange(sd.rawData(), sd.size());
+    return ConstDataRange(sd.data(), sd.size());
 }
 
 // SHA-512 test vectors from http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf

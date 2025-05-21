@@ -74,7 +74,7 @@ REGISTER_DOCUMENT_SOURCE(unwind,
 ALLOCATE_DOCUMENT_SOURCE_ID(unwind, DocumentSourceUnwind::id)
 
 const char* DocumentSourceUnwind::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(

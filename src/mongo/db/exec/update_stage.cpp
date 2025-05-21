@@ -137,7 +137,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
                          const UpdateStageParams& params,
                          WorkingSet* ws,
                          CollectionAcquisition collection)
-    : RequiresWritableCollectionStage(kStageType.rawData(), expCtx, collection),
+    : RequiresWritableCollectionStage(kStageType.data(), expCtx, collection),
       _params(params),
       _ws(ws),
       _doc(params.driver->getDocument()),

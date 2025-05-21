@@ -853,7 +853,7 @@ std::vector<EdgeTokenSetV2> getEdgeTokenSet(
     std::vector<EdgeTokenSetV2> tokens;
 
     for (const auto& edge : edgesList) {
-        ConstDataRange cdr(edge.rawData(), edge.size());
+        ConstDataRange cdr(edge.data(), edge.size());
 
         EDCDerivedFromDataToken edcDatakey = EDCDerivedFromDataToken::deriveFrom(edcToken, cdr);
         ESCDerivedFromDataToken escDatakey = ESCDerivedFromDataToken::deriveFrom(escToken, cdr);
@@ -1608,7 +1608,7 @@ BSONObj runStateMachineForEncryption(mongocrypt_ctx_t* ctx,
                 uassert(7132300,
                         "Invalid command obtained from mongocrypt_ctx_mongo_op",
                         !opCmdName.empty());
-                if (opCmdName.equalCaseInsensitive("isMaster")) {
+                if (str::equalCaseInsensitive(opCmdName, "isMaster")) {
                     BSONObjBuilder bob;
                     auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
                     bob.append("maxWireVersion", wireSpec->incomingExternalClient.maxWireVersion);

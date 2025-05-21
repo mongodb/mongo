@@ -81,7 +81,7 @@ public:
     static UString fromUTF8(StringData str) {
         UErrorCode error = U_ZERO_ERROR;
         int32_t len = 0;
-        u_strFromUTF8(nullptr, 0, &len, str.rawData(), str.size(), &error);
+        u_strFromUTF8(nullptr, 0, &len, str.data(), str.size(), &error);
         uassert(ErrorCodes::BadValue, "Non UTF-8 data encountered", error != U_INVALID_CHAR_FOUND);
         uassert(50687,
                 str::stream() << "Error preflighting UTF-8 conversion: " << u_errorName(error),
@@ -89,7 +89,7 @@ public:
 
         error = U_ZERO_ERROR;
         UString ret(len);
-        u_strFromUTF8(ret.data(), ret.capacity(), &len, str.rawData(), str.size(), &error);
+        u_strFromUTF8(ret.data(), ret.capacity(), &len, str.data(), str.size(), &error);
         uassert(50688,
                 str::stream() << "Error converting UTF-8 string: " << u_errorName(error),
                 U_SUCCESS(error));

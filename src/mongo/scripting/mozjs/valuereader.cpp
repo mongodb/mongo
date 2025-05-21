@@ -287,7 +287,7 @@ void ValueReader::fromStringData(StringData sd) {
     // TODO: we have tests that involve dropping garbage in. Do we want to
     //       throw, or to take the lossy conversion?
     auto utf16 = JS::LossyUTF8CharsToNewTwoByteCharsZ(
-        _context, JS::UTF8Chars(sd.rawData(), sd.size()), &utf16Len, js::StringBufferArena);
+        _context, JS::UTF8Chars(sd.data(), sd.size()), &utf16Len, js::StringBufferArena);
 
     mozilla::UniquePtr<char16_t, JS::FreePolicy> utf16Deleter(utf16.get());
 

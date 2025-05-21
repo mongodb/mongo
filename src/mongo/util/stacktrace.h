@@ -90,7 +90,7 @@ public:
 
 private:
     void doWrite(StringData v) override {
-        _s.append(v.rawData(), v.size());
+        _s.append(v.data(), v.size());
     }
 
     std::string& _s;

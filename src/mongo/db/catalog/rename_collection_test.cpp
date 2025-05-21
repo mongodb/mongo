@@ -688,7 +688,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetEx
     const auto& tmpB =
         CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
-    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
+    ASSERT_TRUE(tmpB->coll().starts_with("tmp"));
     ASSERT_TRUE(*tmpB != collB);
 }
 
@@ -721,7 +721,7 @@ TEST_F(RenameCollectionTest,
         CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
-    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
+    ASSERT_TRUE(tmpB->coll().starts_with("tmp"));
     ASSERT_TRUE(_isTempCollection(_opCtx.get(), *tmpB));
 }
 
@@ -746,7 +746,7 @@ TEST_F(RenameCollectionTest,
         CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
-    ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
+    ASSERT_TRUE(tmpB->coll().starts_with("tmp"));
 }
 
 TEST_F(RenameCollectionTest,

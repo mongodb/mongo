@@ -168,7 +168,7 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
 }
 
 const char* DocumentSourceChangeStreamCheckResumability::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGetNext() {

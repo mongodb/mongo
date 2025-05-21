@@ -52,7 +52,7 @@ inline size_t murmur3(StringData str, size_t seed);
 template <>
 inline size_t murmur3<4>(StringData str, size_t seed) {
     char hash[4];
-    MurmurHash3_x86_32(str.rawData(), str.size(), seed, &hash);
+    MurmurHash3_x86_32(str.data(), str.size(), seed, &hash);
     return ConstDataView(hash).read<LittleEndian<std::uint32_t>>();
 }
 
@@ -64,7 +64,7 @@ inline size_t murmur3<4>(StringData str, size_t seed) {
 template <>
 inline size_t murmur3<8>(StringData str, size_t seed) {
     char hash[16];
-    MurmurHash3_x64_128(str.rawData(), str.size(), seed, hash);
+    MurmurHash3_x64_128(str.data(), str.size(), seed, hash);
     return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
 }
 
@@ -101,7 +101,7 @@ inline size_t murmur3<8>(ConstDataRange data, size_t seed) {
  * Writes the full output of the 128-bit version of MurmurHash to the given 'output' array.
  */
 inline void murmur3(StringData str, size_t seed, std::array<char, 16>& output) {
-    MurmurHash3_x64_128(str.rawData(), str.size(), seed, output.data());
+    MurmurHash3_x64_128(str.data(), str.size(), seed, output.data());
 }
 
 /**

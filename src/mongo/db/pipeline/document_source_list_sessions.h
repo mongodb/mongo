@@ -124,7 +124,7 @@ public:
     };
 
     const char* getSourceName() const final {
-        return DocumentSourceListSessions::kStageName.rawData();
+        return DocumentSourceListSessions::kStageName.data();
     }
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

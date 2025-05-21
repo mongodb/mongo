@@ -212,7 +212,7 @@ Status StorageEngineLockFile::writeString(StringData str) {
                                     << _filespec << ' ' << errorMessage(ec));
     }
 
-    int bytesWritten = ::write(_lockFileHandle->_fd, str.rawData(), str.size());
+    int bytesWritten = ::write(_lockFileHandle->_fd, str.data(), str.size());
     if (bytesWritten < 0) {
         auto ec = lastPosixError();
         return Status(ErrorCodes::FileStreamFailed,

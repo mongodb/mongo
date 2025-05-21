@@ -187,7 +187,7 @@ T extract(StringData& data) {
     }
 
     T result;
-    memcpy(&result, data.rawData(), numBytes);
+    memcpy(&result, data.data(), numBytes);
     data = data.substr(numBytes);
     return result;
 }
@@ -226,13 +226,13 @@ bool parseV1Buffer(StringData& buffer, boost::optional<ProxiedEndpoints>& endpoi
     static constexpr StringData kTcp4Prefix = " TCP4 "_sd;
     static constexpr StringData kTcp6Prefix = " TCP6 "_sd;
     int aFamily = AF_UNSPEC;
-    if (buffer.startsWith(kTcp4Prefix)) {
+    if (buffer.starts_with(kTcp4Prefix)) {
         aFamily = AF_INET;
         buffer = buffer.substr(kTcp4Prefix.size());
-    } else if (buffer.startsWith(kTcp6Prefix)) {
+    } else if (buffer.starts_with(kTcp6Prefix)) {
         aFamily = AF_INET6;
         buffer = buffer.substr(kTcp6Prefix.size());
-    } else if (buffer.startsWith(" UNKNOWN"_sd)) {
+    } else if (buffer.starts_with(" UNKNOWN"_sd)) {
         buffer = resultBuffer;
         endpoints = {};
         return true;
@@ -447,16 +447,16 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
 
     ParserResults results;
     bool complete = false;
-    if (buffer.startsWith(kV1Start)) {
+    if (buffer.starts_with(kV1Start)) {
         complete = parseV1Buffer(buffer, results.endpoints);
-    } else if (buffer.startsWith(kV2Start)) {
+    } else if (buffer.starts_with(kV2Start)) {
         complete = parseV2Buffer(buffer, results.endpoints);
     } else {
         uassert(ErrorCodes::FailedToParse,
                 fmt::format("Initial Proxy Protocol header bytes invalid: {}; "
                             "Make sure your proxy is configured to emit a Proxy Protocol header",
                             buffer),
-                kV1Start.startsWith(buffer) || kV2Start.startsWith(buffer));
+                kV1Start.starts_with(buffer) || kV2Start.starts_with(buffer));
     }
 
     if (complete) {
@@ -468,7 +468,7 @@ boost::optional<ParserResults> parseProxyProtocolHeader(StringData buffer) {
 }
 
 bool maybeProxyProtocolHeader(StringData buffer) {
-    return buffer.startsWith(kV1Start) || buffer.startsWith(kV2Start);
+    return buffer.starts_with(kV1Start) || buffer.starts_with(kV2Start);
 }
 
 }  // namespace mongo::transport

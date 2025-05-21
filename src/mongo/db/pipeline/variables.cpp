@@ -92,24 +92,24 @@ constexpr StringData kSearchMetaName = "SEARCH_META"_sd;
 constexpr StringData kUserRolesName = "USER_ROLES"_sd;
 
 const StringMap<Variables::Id> Variables::kBuiltinVarNameToId = {
-    {kRootName.rawData(), kRootId},
-    {kRemoveName.rawData(), kRemoveId},
-    {kNowName.rawData(), kNowId},
-    {kClusterTimeName.rawData(), kClusterTimeId},
-    {kJsScopeName.rawData(), kJsScopeId},
-    {kIsMapReduceName.rawData(), kIsMapReduceId},
-    {kSearchMetaName.rawData(), kSearchMetaId},
-    {kUserRolesName.rawData(), kUserRolesId}};
+    {kRootName.data(), kRootId},
+    {kRemoveName.data(), kRemoveId},
+    {kNowName.data(), kNowId},
+    {kClusterTimeName.data(), kClusterTimeId},
+    {kJsScopeName.data(), kJsScopeId},
+    {kIsMapReduceName.data(), kIsMapReduceId},
+    {kSearchMetaName.data(), kSearchMetaId},
+    {kUserRolesName.data(), kUserRolesId}};
 
 const std::map<Variables::Id, std::string> Variables::kIdToBuiltinVarName = {
-    {kRootId, kRootName.rawData()},
-    {kRemoveId, kRemoveName.rawData()},
-    {kNowId, kNowName.rawData()},
-    {kClusterTimeId, kClusterTimeName.rawData()},
-    {kJsScopeId, kJsScopeName.rawData()},
-    {kIsMapReduceId, kIsMapReduceName.rawData()},
-    {kSearchMetaId, kSearchMetaName.rawData()},
-    {kUserRolesId, kUserRolesName.rawData()}};
+    {kRootId, kRootName.data()},
+    {kRemoveId, kRemoveName.data()},
+    {kNowId, kNowName.data()},
+    {kClusterTimeId, kClusterTimeName.data()},
+    {kJsScopeId, kJsScopeName.data()},
+    {kIsMapReduceId, kIsMapReduceName.data()},
+    {kSearchMetaId, kSearchMetaName.data()},
+    {kUserRolesId, kUserRolesName.data()}};
 
 const std::map<StringData, std::function<void(const Value&)>> Variables::kSystemVarValidators = {
     {kNowName,

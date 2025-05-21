@@ -80,7 +80,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     Value doSerialize(const SerializationOptions& opts = SerializationOptions{}) const final;

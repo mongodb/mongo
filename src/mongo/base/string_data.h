@@ -318,32 +318,15 @@ public:
     STRING_DATA_DEFINE_FIND_OVERLOADS_(find_last_not_of, npos)
 #undef STRING_DATA_FIND_OVERLOADS_
 
-    //
-    // MongoDB extras
-    //
-
-    constexpr bool startsWith(StringData prefix) const noexcept {
-        return starts_with(prefix);
-    }
-
-    constexpr bool endsWith(StringData suffix) const noexcept {
-        return ends_with(suffix);
-    }
-
+    /** Deprecated: Use an explicit cast instead: `sd.toString()` => `std::string{sd}` */
     std::string toString() const {
         return std::string{_sv};
     }
 
-    constexpr const char* rawData() const noexcept {
-        return data();
-    }
-
-    /** Uses tolower, and therefore does not handle some languages correctly. */
-    bool equalCaseInsensitive(StringData other) const {
-        return size() == other.size() &&
-            std::equal(begin(), end(), other.begin(), other.end(), [](char a, char b) {
-                   return ctype::toLower(a) == ctype::toLower(b);
-               });
+    /** absl::Hash ADL hook (behave exactly as std::string_view). */
+    template <typename H>
+    friend H AbslHashValue(H h, StringData sd) {
+        return H::combine(std::move(h), std::string_view{sd});
     }
 
 private:

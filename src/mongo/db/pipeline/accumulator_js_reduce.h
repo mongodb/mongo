@@ -56,7 +56,7 @@ public:
     static constexpr auto kName = "$_internalJsReduce"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     static AccumulationExpression parseInternalJsReduce(ExpressionContext* expCtx,
@@ -91,7 +91,7 @@ public:
     static constexpr auto kName = "$accumulator"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     // An AccumulatorState instance only owns its "static" arguments: those that don't need to be

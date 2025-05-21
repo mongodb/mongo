@@ -83,7 +83,7 @@ DocumentSourceQueue::DocumentSourceQueue(DocumentSourceQueue::DeferredQueue resu
       _constraintsOverride(std::move(constraintsOverride)) {}
 
 const char* DocumentSourceQueue::getSourceName() const {
-    return _stageNameOverride.value_or(kStageName).rawData();
+    return _stageNameOverride.value_or(kStageName).data();
 }
 
 DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {

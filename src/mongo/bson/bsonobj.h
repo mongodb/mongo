@@ -950,8 +950,8 @@ public:
     BSONElement next() {
         if (_cur < static_cast<int>(_fields.size())) {
             const auto& fieldName = _fields.at(_cur++);
-            return BSONElement(fieldName.rawData() - 1,  // Include type byte
-                               fieldName.size() + 1,     // Add null terminator
+            return BSONElement(fieldName.data() - 1,  // Include type byte
+                               fieldName.size() + 1,  // Add null terminator
                                BSONElement::TrustedInitTag{});
         }
 

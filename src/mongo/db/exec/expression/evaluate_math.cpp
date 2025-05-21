@@ -1215,7 +1215,7 @@ private:
         uassert(ErrorCodes::ConversionFailure,
                 str::stream() << "Illegal hexadecimal input in $convert with no onError value: "
                               << stringValue,
-                !stringValue.startsWith("0x"));
+                !stringValue.starts_with("0x"));
 
         Status parseStatus = NumberParser().base(base)(stringValue, &result);
         uassert(ErrorCodes::ConversionFailure,

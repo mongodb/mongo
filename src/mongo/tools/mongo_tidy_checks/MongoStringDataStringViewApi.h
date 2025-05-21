@@ -26,26 +26,23 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/db/exec/agg/stage.h"
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
-namespace mongo {
-namespace exec {
-namespace agg {
+namespace mongo::tidy {
 
+/**
+ * Find uses of `StringData` features that are not in the
+ * union of `StringData` and `std::string_view` features.
+ * E.g. suggest `sd.rawData()` be changed to `sd.data()`.
+ */
+class MongoStringDataStringViewApi : public clang::tidy::ClangTidyCheck {
+public:
+    using clang::tidy::ClangTidyCheck::ClangTidyCheck;
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+};
 
-Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.data()) {
-    if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
-        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
-        } else {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
-    }
-}
-
-
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+}  // namespace mongo::tidy

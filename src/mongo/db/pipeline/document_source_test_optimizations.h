@@ -44,7 +44,7 @@ public:
         : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;
     const char* getSourceName() const override {
-        return DocumentSourceTestOptimizations::kStageName.rawData();
+        return DocumentSourceTestOptimizations::kStageName.data();
     }
 
     Id getId() const override {

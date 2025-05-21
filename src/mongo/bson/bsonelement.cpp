@@ -196,7 +196,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             break;
         case RegEx: {
             StringData pattern(regex());
-            g.writeRegex(buffer, pattern, StringData(pattern.rawData() + pattern.size() + 1));
+            g.writeRegex(buffer, pattern, StringData(pattern.data() + pattern.size() + 1));
         } break;
         case CodeWScope: {
             BSONObj scope = codeWScopeObject();

@@ -307,8 +307,8 @@ public:
         return _sd.copy(dest, len);
     }
 
-    constexpr const char* rawData() const noexcept {
-        return _sd.rawData();
+    constexpr const char* data() const noexcept {
+        return _sd.data();
     }
 
 private:
@@ -337,7 +337,7 @@ struct FieldNameHasher {
 
     std::size_t operator()(StringData sd) const {
         // Use the default absl string hasher.
-        return absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+        return absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     }
 
     std::size_t operator()(const std::string& s) const {

@@ -66,7 +66,7 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
             // parser
             bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
         } else if (elem.fieldNameStringData() == "$const" ||
-                   (elem.type() == mongo::String && elem.valueStringDataSafe().startsWith("$"))) {
+                   (elem.type() == mongo::String && elem.valueStringDataSafe().starts_with("$"))) {
             bob.append(elem);
         } else {
             bob.append(elem.fieldName(), BSON("$const" << elem));

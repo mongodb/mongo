@@ -176,7 +176,7 @@ BSONElementStorage::Element BSONElementStorage::allocate(BSONType type,
     // Write type and null terminator in the first two bytes
     block[0] = type;
     if (fieldNameSize != 0) {
-        memcpy(block + 1, fieldName.rawData(), fieldNameSize);
+        memcpy(block + 1, fieldName.data(), fieldNameSize);
     }
     block[fieldNameSize + 1] = '\0';
 

@@ -110,7 +110,7 @@ inline StringData _extractBase(StringData stringValue, int inputBase, int* outpu
     const auto hexPrefixUpper = "0X"_sd;
     if (inputBase == 0) {
         if (stringValue.size() > 2 &&
-            (stringValue.startsWith(hexPrefixLower) || stringValue.startsWith(hexPrefixUpper))) {
+            (stringValue.starts_with(hexPrefixLower) || stringValue.starts_with(hexPrefixUpper))) {
             *outputBase = 16;
             return stringValue.substr(2);
         }
@@ -123,7 +123,7 @@ inline StringData _extractBase(StringData stringValue, int inputBase, int* outpu
     } else {
         *outputBase = inputBase;
         if (inputBase == 16 &&
-            (stringValue.startsWith(hexPrefixLower) || stringValue.startsWith(hexPrefixUpper))) {
+            (stringValue.starts_with(hexPrefixLower) || stringValue.starts_with(hexPrefixUpper))) {
             return stringValue.substr(2);
         }
         return stringValue;

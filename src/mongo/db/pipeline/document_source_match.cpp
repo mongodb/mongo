@@ -121,7 +121,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
 }
 
 const char* DocumentSourceMatch::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Value DocumentSourceMatch::serialize(const SerializationOptions& opts) const {
@@ -355,7 +355,7 @@ Document redactSafePortionTopLevel(BSONObj query) {
     MutableDocument output;
     for (BSONElement field : query) {
         StringData fieldName = field.fieldNameStringData();
-        if (fieldName.startsWith("$")) {
+        if (fieldName.starts_with("$")) {
             if (fieldName == "$or") {
                 // $or must be all-or-nothing (line $in). Can't include subset of elements.
                 vector<Value> okClauses;

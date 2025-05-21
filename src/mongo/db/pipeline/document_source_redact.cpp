@@ -70,7 +70,7 @@ REGISTER_DOCUMENT_SOURCE(redact,
 ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)
 
 const char* DocumentSourceRedact::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 static const Value descendVal = Value("descend"_sd);

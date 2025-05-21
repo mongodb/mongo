@@ -2383,7 +2383,7 @@ Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* vari
 }
 
 const char* ExpressionInternalFLEEqual::getOpName() const {
-    return kInternalFleEq.rawData();
+    return kInternalFleEq.data();
 }
 
 /* ----------------------- ExpressionInternalFLEBetween ---------------------------- */
@@ -2443,7 +2443,7 @@ Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* va
 }
 
 const char* ExpressionInternalFLEBetween::getOpName() const {
-    return kInternalFleBetween.rawData();
+    return kInternalFleBetween.data();
 }
 
 /* ------------------------ ExpressionNary ----------------------------- */
@@ -2903,7 +2903,7 @@ Value ExpressionSortArray::evaluate(const Document& root, Variables* variables) 
 REGISTER_STABLE_EXPRESSION(sortArray, ExpressionSortArray::parse);
 
 const char* ExpressionSortArray::getOpName() const {
-    return kName.rawData();
+    return kName.data();
 }
 
 intrusive_ptr<Expression> ExpressionSortArray::optimize() {
@@ -4931,7 +4931,7 @@ Value ExpressionEncStrStartsWith::serialize(const SerializationOptions& options)
 }
 
 const char* ExpressionEncStrStartsWith::getOpName() const {
-    return kEncStrStartsWith.rawData();
+    return kEncStrStartsWith.data();
 }
 
 Value ExpressionEncStrStartsWith::evaluate(const Document& root, Variables* variables) const {
@@ -4976,7 +4976,7 @@ Value ExpressionEncStrEndsWith::serialize(const SerializationOptions& options) c
 }
 
 const char* ExpressionEncStrEndsWith::getOpName() const {
-    return kEncStrEndsWith.rawData();
+    return kEncStrEndsWith.data();
 }
 
 Value ExpressionEncStrEndsWith::evaluate(const Document& root, Variables* variables) const {
@@ -5022,7 +5022,7 @@ Value ExpressionEncStrContains::serialize(const SerializationOptions& options) c
 }
 
 const char* ExpressionEncStrContains::getOpName() const {
-    return kEncStrContains.rawData();
+    return kEncStrContains.data();
 }
 
 Value ExpressionEncStrContains::evaluate(const Document& root, Variables* variables) const {
@@ -5069,7 +5069,7 @@ Value ExpressionEncStrNormalizedEq::serialize(const SerializationOptions& option
 }
 
 const char* ExpressionEncStrNormalizedEq::getOpName() const {
-    return kEncStrNormalizedEq.rawData();
+    return kEncStrNormalizedEq.data();
 }
 
 Value ExpressionEncStrNormalizedEq::evaluate(const Document& root, Variables* variables) const {

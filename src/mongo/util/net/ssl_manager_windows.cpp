@@ -633,7 +633,7 @@ StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
     DWORD decodeLen{0};
 
     if (!CryptStringToBinaryA(
-            blob.rawData(), blob.size(), CRYPT_STRING_BASE64HEADER, NULL, &decodeLen, NULL, NULL)) {
+            blob.data(), blob.size(), CRYPT_STRING_BASE64HEADER, NULL, &decodeLen, NULL, NULL)) {
         auto ec = lastSystemError();
         if (ec != systemError(ERROR_MORE_DATA)) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
@@ -645,7 +645,7 @@ StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
     std::vector<BYTE> binaryBlobBuf;
     binaryBlobBuf.resize(decodeLen);
 
-    if (!CryptStringToBinaryA(blob.rawData(),
+    if (!CryptStringToBinaryA(blob.data(),
                               blob.size(),
                               CRYPT_STRING_BASE64HEADER,
                               binaryBlobBuf.data(),
@@ -723,7 +723,7 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
             return {std::move(certs)};
         }
 
-        pos = (blobBuf.rawData() + blobBuf.size()) - buffer.rawData();
+        pos = (blobBuf.data() + blobBuf.size()) - buffer.data();
 
         auto swCert = decodePEMBlob(blobBuf);
         if (!swCert.isOK()) {
@@ -789,7 +789,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     // Multiple certificates in a PEM file are not supported since these certs need to be in the ca
     // file.
     auto secondPublicKeyBlobPosition =
-        buf.find("CERTIFICATE", (publicKeyBlob.rawData() + publicKeyBlob.size()) - buf.data());
+        buf.find("CERTIFICATE", (publicKeyBlob.data() + publicKeyBlob.size()) - buf.data());
     std::vector<UniqueCertificate> extraCertificates;
     if (secondPublicKeyBlobPosition != std::string::npos) {
         // Read in extra certificates

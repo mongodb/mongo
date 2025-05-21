@@ -518,7 +518,7 @@ REGISTER_DOCUMENT_SOURCE(lookup,
 ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
 const char* DocumentSourceLookUp::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {

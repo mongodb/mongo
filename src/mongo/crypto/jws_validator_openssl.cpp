@@ -107,12 +107,12 @@ public:
         auto RSAKey = JWKRSA::parse(IDLParserContext("JWKRSA"), key);
 
         const auto* pubKeyNData =
-            reinterpret_cast<const unsigned char*>(RSAKey.getModulus().rawData());
+            reinterpret_cast<const unsigned char*>(RSAKey.getModulus().data());
         UniqueBIGNUM n(BN_bin2bn(pubKeyNData, RSAKey.getModulus().size(), nullptr));
         uassertOpenSSL("Failed creating modulus", n.get() != nullptr);
 
         const auto* pubKeyEData =
-            reinterpret_cast<const unsigned char*>(RSAKey.getPublicExponent().rawData());
+            reinterpret_cast<const unsigned char*>(RSAKey.getPublicExponent().data());
         UniqueBIGNUM e(BN_bin2bn(pubKeyEData, RSAKey.getPublicExponent().size(), nullptr));
         uassertOpenSSL("Failed creating exponent", e.get() != nullptr);
 
@@ -140,12 +140,12 @@ public:
         uassertOpenSSL(
             "DigestVerifyUpdate failed",
             EVP_DigestVerifyUpdate(ctx.get(),
-                                   reinterpret_cast<const unsigned char*>(payload.rawData()),
+                                   reinterpret_cast<const unsigned char*>(payload.data()),
                                    payload.size()) == 1);
 
         int verifyRes = EVP_DigestVerifyFinal(
             ctx.get(),
-            const_cast<unsigned char*>(reinterpret_cast<const unsigned char*>(signature.rawData())),
+            const_cast<unsigned char*>(reinterpret_cast<const unsigned char*>(signature.data())),
             signature.size());
         if (verifyRes == 0) {
             return {ErrorCodes::InvalidSignature, "OpenSSL: Signature is invalid"};

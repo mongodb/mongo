@@ -65,7 +65,7 @@ REGISTER_DOCUMENT_SOURCE(group,
 ALLOCATE_DOCUMENT_SOURCE_ID(group, DocumentSourceGroup::id)
 
 const char* DocumentSourceGroup::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(

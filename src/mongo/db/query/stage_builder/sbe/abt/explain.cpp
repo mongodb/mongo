@@ -131,7 +131,7 @@ public:
     }
 
     ExplainPrinterImpl& print(StringData s) {
-        print(s.empty() ? "<empty>" : s.rawData());
+        print(s.empty() ? "<empty>" : s.data());
         return *this;
     }
 

@@ -116,8 +116,8 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     auto deviceAuthorizationEndpoint = discoveryReply.getDeviceAuthorizationEndpoint().get();
     uassert(ErrorCodes::BadValue,
             "Device authorization endpoint in server reply must be an https endpoint or localhost",
-            deviceAuthorizationEndpoint.startsWith("https://"_sd) ||
-                deviceAuthorizationEndpoint.startsWith("http://localhost"_sd));
+            deviceAuthorizationEndpoint.starts_with("https://"_sd) ||
+                deviceAuthorizationEndpoint.starts_with("http://localhost"_sd));
 
     auto clientId = serverReply.getClientId();
     uassert(ErrorCodes::BadValue,
@@ -295,7 +295,7 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
     if (_accessToken.empty()) {
         // Currently, only device authorization flow is supported for token acquisition.
         // Parse device authorization endpoint from input.
-        ConstDataRange inputCdr(input.rawData(), input.size());
+        ConstDataRange inputCdr(input.data(), input.size());
         auto payload = inputCdr.read<Validated<BSONObj>>().val;
         auto serverReply = auth::OIDCMechanismServerStep1::parse(
             IDLParserContext{"oidcServerStep1Reply"}, payload);
@@ -310,8 +310,8 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
         uassert(ErrorCodes::BadValue,
                 "Missing or invalid token endpoint in server reply",
                 tokenEndpoint && !tokenEndpoint->empty() &&
-                    (tokenEndpoint->startsWith("https://"_sd) ||
-                     tokenEndpoint->startsWith("http://localhost"_sd)));
+                    (tokenEndpoint->starts_with("https://"_sd) ||
+                     tokenEndpoint->starts_with("http://localhost"_sd)));
 
         // Cache the token endpoint for potential reuse during the refresh flow.
         oidcClientGlobalParams.oidcTokenEndpoint = tokenEndpoint->toString();

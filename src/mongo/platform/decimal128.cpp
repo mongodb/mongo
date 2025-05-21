@@ -82,8 +82,8 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
-    bool isNanOrInf = noSign.equalCaseInsensitive("nan") || noSign.equalCaseInsensitive("inf") ||
-        noSign.equalCaseInsensitive("infinity");
+    bool isNanOrInf = str::equalCaseInsensitive(noSign, "nan") ||
+        str::equalCaseInsensitive(noSign, "inf") || str::equalCaseInsensitive(noSign, "infinity");
 
     if (isNanOrInf)
         return start + noSign.size();

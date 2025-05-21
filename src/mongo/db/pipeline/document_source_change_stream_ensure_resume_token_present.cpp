@@ -63,7 +63,7 @@ DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
 }
 
 const char* DocumentSourceChangeStreamEnsureResumeTokenPresent::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 

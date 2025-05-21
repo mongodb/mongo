@@ -121,7 +121,7 @@ inline Status makeShutdownTerminationStatus() {
 
     for (const auto& entry : clientMetadata) {
         const auto& key = entry.first;
-        if (key.startsWith(kReservedMetadataKeyPrefix) &&
+        if (key.starts_with(kReservedMetadataKeyPrefix) &&
             !kRecognizedClientMetadataKeys.contains(key)) {
             return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
                                   fmt::format("Unrecognized reserved metadata key: \"{}\"", key));

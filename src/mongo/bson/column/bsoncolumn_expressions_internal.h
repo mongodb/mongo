@@ -312,7 +312,7 @@ private:
     int _compareElementStringValues(StringData lhs, StringData rhs) {
         // we use memcmp as we allow zeros in UTF8 strings
         int common = std::min(lhs.size(), rhs.size());
-        int res = memcmp(lhs.rawData(), rhs.rawData(), common);
+        int res = memcmp(lhs.data(), rhs.data(), common);
         if (res)
             return res;
         // longer string is the greater one
@@ -715,7 +715,7 @@ private:
     int _compareElementStringValues(StringData lhs, StringData rhs) {
         // we use memcmp as we allow zeros in UTF8 strings
         int common = std::min(lhs.size(), rhs.size());
-        int res = memcmp(lhs.rawData(), rhs.rawData(), common);
+        int res = memcmp(lhs.data(), rhs.data(), common);
         if (res)
             return res;
         // longer string is the greater one

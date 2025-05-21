@@ -32,14 +32,13 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 inline Status validateShardingClusterRoleSetting(const std::string& value) {
-    constexpr auto kConfigSvr = "configsvr"_sd;
-    constexpr auto kShardSvr = "shardsvr"_sd;
-
-    if (!kConfigSvr.equalCaseInsensitive(value) && !kShardSvr.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "configsvr"_sd) ||
+          str::equalCaseInsensitive(value, "shardsvr"_sd))) {
         return {ErrorCodes::BadValue,
                 "sharding.clusterRole must be one of 'configsvr' or 'shardsvr'"};
     }

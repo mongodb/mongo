@@ -213,7 +213,7 @@ public:
     static constexpr auto kName = "$addToSet"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**
@@ -244,7 +244,7 @@ public:
     static constexpr auto kName = "$first"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorFirst(ExpressionContext* expCtx);
@@ -267,7 +267,7 @@ public:
     static constexpr auto kName = "$_internalConstructStats"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx,
@@ -292,7 +292,7 @@ public:
     static constexpr auto kName = "$last"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorLast(ExpressionContext* expCtx);
@@ -327,7 +327,7 @@ public:
     static boost::optional<Value> getConstantArgument(boost::intrusive_ptr<Expression> arg);
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorSum(ExpressionContext* expCtx);
@@ -404,7 +404,7 @@ public:
     static constexpr auto kName = "$max"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorMax(ExpressionContext* const expCtx)
@@ -416,7 +416,7 @@ public:
     static constexpr auto kName = "$min"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorMin(ExpressionContext* const expCtx)
@@ -428,7 +428,7 @@ public:
     static constexpr auto kName = "$push"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**
@@ -451,7 +451,7 @@ public:
     static constexpr auto kName = "$avg"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorAvg(ExpressionContext* expCtx);
@@ -502,7 +502,7 @@ public:
     static constexpr auto kName = "$stdDevPop"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorStdDevPop(ExpressionContext* const expCtx)
@@ -514,7 +514,7 @@ public:
     static constexpr auto kName = "$stdDevSamp"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     explicit AccumulatorStdDevSamp(ExpressionContext* const expCtx)
@@ -526,7 +526,7 @@ public:
     static constexpr auto kName = "$mergeObjects"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     AccumulatorMergeObjects(ExpressionContext* expCtx);
@@ -544,7 +544,7 @@ public:
     static constexpr auto kName = "$expMovingAvg"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     AccumulatorExpMovingAvg(ExpressionContext* expCtx, Decimal128 alpha);
@@ -565,7 +565,7 @@ public:
     static constexpr auto kName = "$concatArrays"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**
@@ -589,7 +589,7 @@ public:
     static constexpr auto kName = "$setUnion"_sd;
 
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**

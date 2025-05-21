@@ -389,7 +389,7 @@ class WiredTigerConfigParser {
 public:
     WiredTigerConfigParser(StringData config) {
         invariantWTOK(
-            wiredtiger_config_parser_open(nullptr, config.rawData(), config.size(), &_parser),
+            wiredtiger_config_parser_open(nullptr, config.data(), config.size(), &_parser),
             nullptr);
     }
 

@@ -796,7 +796,7 @@ public:
         const size_t prefixLength = prefixV2.length();
 
         // Check if the input starts with the prefix
-        if (StringData{line}.startsWith(prefixV2)) {
+        if (StringData{line}.starts_with(prefixV2)) {
             // cgroup v2.
             return fmt::format("/sys/fs/cgroup{}", line.substr(prefixLength));
         } else {

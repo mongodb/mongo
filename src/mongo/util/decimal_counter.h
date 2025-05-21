@@ -108,7 +108,7 @@ private:
         }
         ItoA startItoA(start);
         StringData startStr(startItoA);
-        std::memcpy(_digits, startStr.rawData(), startStr.size());
+        std::memcpy(_digits, startStr.data(), startStr.size());
         return startStr.size() - 1;
     }
 

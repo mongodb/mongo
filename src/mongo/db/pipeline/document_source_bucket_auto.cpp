@@ -90,7 +90,7 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
 }  // namespace
 
 const char* DocumentSourceBucketAuto::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {

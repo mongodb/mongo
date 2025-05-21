@@ -649,7 +649,7 @@ public:
     }
 
     const char* getOpName() const final {
-        return AccumulatorState::kName.rawData();
+        return AccumulatorState::kName.data();
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -672,7 +672,7 @@ public:
     }
 
     const char* getOpName() const {
-        return AccumulatorN::kName.rawData();
+        return AccumulatorN::kName.data();
     }
 
     Value serialize(const SerializationOptions& options = {}) const override {

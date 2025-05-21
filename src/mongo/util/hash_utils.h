@@ -36,20 +36,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/hasher.h"
 
-namespace mongo {
-/**
- * StringData's hash function compatible with absl::Hash.
- */
-template <typename H>
-H AbslHashValue(H h, StringData sd) {
-    if (sd.empty()) {
-        return H::combine(std::move(h), 9081739);
-    }
-
-    return H::combine_contiguous(std::move(h), sd.rawData(), sd.size());
-}
-}  // namespace mongo
-
 namespace boost {
 /**
  * boost::optional's hash function compatible with absl::Hash.

@@ -86,7 +86,7 @@ public:
     }
 
     const char* getSourceName() const final {
-        return DocumentSourceReshardingOwnershipMatch::kStageName.rawData();
+        return DocumentSourceReshardingOwnershipMatch::kStageName.data();
     }
 
     static const Id& id;

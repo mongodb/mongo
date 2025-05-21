@@ -200,7 +200,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
 
     unsigned numTokens = 0;
 
-    tokenizer->reset(raw.rawData(), FTSTokenizer::kFilterStopWords);
+    tokenizer->reset(raw.data(), FTSTokenizer::kFilterStopWords);
 
     while (tokenizer->moveNext()) {
         StringData term = tokenizer->get();
@@ -231,7 +231,7 @@ void FTSSpec::_scoreStringV2(FTSTokenizer* tokenizer,
         // if term is identical to the raw form of the
         // field (untokenized) give it a small boost.
         double adjustment = 1;
-        if (raw.size() == term.length() && raw.equalCaseInsensitive(term))
+        if (str::equalCaseInsensitive(raw, term))
             adjustment += 0.1;
 
         double& score = (*docScores)[term];
@@ -430,7 +430,7 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
                                 "weight cannot have empty path component"};
                     }
 
-                    if (part.startsWith("$")) {
+                    if (part.starts_with("$")) {
                         return {ErrorCodes::CannotCreateIndex,
                                 "weight cannot have path component with $ prefix"};
                     }

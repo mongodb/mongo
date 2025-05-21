@@ -266,11 +266,11 @@ inline unsigned count(const std::string& s, char c) {
 
 /** trim leading spaces. spaces only, not tabs etc. */
 inline mongo::StringData ltrim(mongo::StringData s) {
-    auto i = s.rawData();
-    auto end = s.rawData() + s.size();
+    auto i = s.data();
+    auto end = s.data() + s.size();
     for (; i != end && *i == ' '; ++i) {
     }
-    return s.substr(i - s.rawData());
+    return s.substr(i - s.data());
 }
 
 /**
@@ -361,7 +361,7 @@ Iterator UTF8SafeTruncation(Iterator begin, Iterator end, std::size_t maximum) {
 
 inline StringData UTF8SafeTruncation(StringData input, std::size_t maximum) {
     auto truncatedEnd = UTF8SafeTruncation(input.begin(), input.end(), maximum);
-    return StringData(input.rawData(), truncatedEnd - input.begin());
+    return StringData(input.data(), truncatedEnd - input.begin());
 }
 
 inline int caseInsensitiveCompare(const char* s1, const char* s2) {
@@ -370,6 +370,14 @@ inline int caseInsensitiveCompare(const char* s1, const char* s2) {
 #else
     return strcasecmp(s1, s2);
 #endif
+}
+
+/** Uses tolower, and therefore does not handle some languages correctly. */
+constexpr bool equalCaseInsensitive(StringData a, StringData b) {
+    return a.size() == b.size() &&
+        std::equal(a.begin(), a.end(), b.begin(), b.end(), [](char ac, char bc) {
+               return ctype::toLower(ac) == ctype::toLower(bc);
+           });
 }
 
 void splitStringDelim(const std::string& str, std::vector<std::string>* res, char delim);

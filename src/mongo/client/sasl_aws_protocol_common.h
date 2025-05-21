@@ -75,7 +75,7 @@ static constexpr auto kXAmzDateHeader = "X-Amz-Date"_sd;
  */
 template <typename T>
 T convertFromByteString(StringData rawString) {
-    ConstDataRange cdr(rawString.rawData(), rawString.size());
+    ConstDataRange cdr(rawString.data(), rawString.size());
 
     auto clientFirstBson = cdr.read<Validated<BSONObj>>();
 

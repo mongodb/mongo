@@ -80,18 +80,18 @@ const UUID kTestKeyId = UUID::parse("deadbeef-0000-0000-0000-0000deadbeef").getV
 
 
 void replace_str(std::string& str, StringData search, StringData replace) {
-    auto pos = str.find(search.rawData(), 0, search.size());
+    auto pos = str.find(search.data(), 0, search.size());
     if (pos == std::string::npos)
         return;
-    str.replace(pos, search.size(), replace.rawData(), replace.size());
+    str.replace(pos, search.size(), replace.data(), replace.size());
 }
 
 void replace_all(std::string& str, StringData search, StringData replace) {
-    auto pos = str.find(search.rawData(), 0, search.size());
+    auto pos = str.find(search.data(), 0, search.size());
     while (pos != std::string::npos) {
-        str.replace(pos, search.size(), replace.rawData(), replace.size());
+        str.replace(pos, search.size(), replace.data(), replace.size());
         pos += replace.size();
-        pos = str.find(search.rawData(), pos, search.size());
+        pos = str.find(search.data(), pos, search.size());
     }
 }
 

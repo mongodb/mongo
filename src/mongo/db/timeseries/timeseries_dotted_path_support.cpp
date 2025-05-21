@@ -536,7 +536,7 @@ boost::optional<BSONColumn> extractAllElementsAlongBucketPath(const BSONObj& obj
 
 bool haveArrayAlongBucketDataPath(const BSONObj& bucketObj, StringData path) {
     // Shortcut: if we aren't checking a `data.` path, then we don't care.
-    if (!path.startsWith(timeseries::kDataFieldNamePrefix)) {
+    if (!path.starts_with(timeseries::kDataFieldNamePrefix)) {
         return false;
     }
 

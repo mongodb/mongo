@@ -365,7 +365,7 @@ bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
         const SortKeyGenerator::SortKeyTreeNode* childNode = nullptr;
         for (auto& child : tree.children) {
             auto fieldNameSd = elt.fieldNameStringData();
-            if (tree.bloomFilter.maybeContains(fieldNameSd.rawData(), fieldNameSd.size())) {
+            if (tree.bloomFilter.maybeContains(fieldNameSd.data(), fieldNameSd.size())) {
                 // Could use a hash table, but sort patterns are small so brute force search is good
                 // enough.
                 if (child->name == fieldNameSd) {

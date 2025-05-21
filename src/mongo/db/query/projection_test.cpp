@@ -231,7 +231,7 @@ TEST(QueryProjectionTest, InvalidPositionalProjectionDefaultPathMatchExpression)
     const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx.get()).ns(kTestNss).build();
 
     unique_ptr<MatchExpression> queryMatchExpr(new AlwaysFalseMatchExpression());
-    ASSERT_EQ(nullptr, queryMatchExpr->path().rawData());
+    ASSERT_EQ(nullptr, queryMatchExpr->path().data());
 
     BSONObj projObj = fromjson("{'a.$': 1}");
     ASSERT_THROWS(projection_ast::parseAndAnalyze(

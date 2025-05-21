@@ -182,7 +182,7 @@ protected:
                                  const mongo::BSONArray& expectedValue,
                                  std::unique_ptr<CollatorInterface> collator = nullptr) {
         auto [resultsTag, resultsVal] =
-            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs, std::move(collator));
+            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator));
         sbe::value::ValueGuard resultGuard{resultsTag, resultsVal};
 
         auto [sortedResultsTag, sortedResultsVal] = sortResults(resultsTag, resultsVal);
@@ -233,7 +233,7 @@ protected:
 
         // Run the accumulator.
         auto [resultsTag, resultsVal] =
-            getResultsForAggregation(fromjson(groupSpec.rawData()), inputDocs, std::move(collator));
+            getResultsForAggregation(fromjson(groupSpec.data()), inputDocs, std::move(collator));
         ValueGuard resultGuard{resultsTag, resultsVal};
         ASSERT_EQ(resultsTag, TypeTags::Array);
 
@@ -2223,7 +2223,7 @@ class AccumulatorSBEIncompatible final : public AccumulatorState {
 public:
     static constexpr auto kName = "$incompatible"_sd;
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
     explicit AccumulatorSBEIncompatible(ExpressionContext* expCtx) : AccumulatorState(expCtx) {}
     void processInternal(const Value& input, bool merging) final {}

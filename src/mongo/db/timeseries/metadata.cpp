@@ -67,8 +67,8 @@ void normalizeObject(const BSONObj& obj, allocator_aware::BSONObjBuilder<Allocat
     // the same BSONElement from.
     struct Field {
         BSONElement element() const {
-            return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
-                               fieldName.size() + 1,     // Include null terminator after field name
+            return BSONElement(fieldName.data() - 1,  // Include type byte before field name
+                               fieldName.size() + 1,  // Include null terminator after field name
                                BSONElement::TrustedInitTag{});
         }
         bool operator<(const Field& rhs) const {

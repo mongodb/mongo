@@ -73,9 +73,9 @@ void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
                             "record",
                             "-g",
                             "-o",
-                            profile_name.rawData(),
+                            profile_name.data(),
                             "-p",
-                            parentPid.rawData(),
+                            parentPid.data(),
                             nullptr));
         } break;
         case PerfMode::counters: {
@@ -89,9 +89,9 @@ void runProfiler(StringData profile_name, PerfMode mode, StringData parentPid) {
                             "instructions,branch-misses,"
                             "dTLB-load-misses,dTLB-loads",
                             "-o",
-                            profile_name.rawData(),
+                            profile_name.data(),
                             "-p",
-                            parentPid.rawData(),
+                            parentPid.data(),
                             nullptr));
         } break;
     }

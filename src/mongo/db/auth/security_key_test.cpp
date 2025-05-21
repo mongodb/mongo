@@ -69,7 +69,7 @@ public:
         boost::filesystem::ofstream stream(_path, std::ios_base::out | std::ios_base::trunc);
         ASSERT_TRUE(stream.good());
 
-        stream.write(contents.rawData(), contents.size());
+        stream.write(contents.data(), contents.size());
         stream.close();
         if (fixPerms) {
             const auto perms = boost::filesystem::owner_read | boost::filesystem::owner_write;

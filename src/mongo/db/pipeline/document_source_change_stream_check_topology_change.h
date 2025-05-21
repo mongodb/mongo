@@ -73,7 +73,7 @@ public:
     }
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;

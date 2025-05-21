@@ -97,7 +97,7 @@ public:
                                        boost::optional<bool> sbeCompatible = boost::none);
 
     const char* getSourceName() const override {
-        return kStageNameInternal.rawData();
+        return kStageNameInternal.data();
     }
 
     static const Id& id;

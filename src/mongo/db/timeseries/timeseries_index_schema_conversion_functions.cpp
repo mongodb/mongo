@@ -72,8 +72,8 @@ namespace mongo::timeseries {
 namespace {
 
 bool isIndexOnControl(StringData field) {
-    return field.startsWith(timeseries::kControlMinFieldNamePrefix) ||
-        field.startsWith(timeseries::kControlMaxFieldNamePrefix);
+    return field.starts_with(timeseries::kControlMinFieldNamePrefix) ||
+        field.starts_with(timeseries::kControlMaxFieldNamePrefix);
 }
 
 /**
@@ -164,7 +164,7 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             }
 
             // Time-series indexes on sub-documents of the 'metaField' are allowed.
-            if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+            if (elem.fieldNameStringData().starts_with(*metaField + ".")) {
                 builder.appendAs(elem,
                                  str::stream()
                                      << timeseries::kBucketMetaFieldName << "."
@@ -271,7 +271,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
                 continue;
             }
 
-            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 builder.appendAs(elem,
                                  str::stream() << *metaField << "."
                                                << elem.fieldNameStringData().substr(
@@ -280,7 +280,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
             }
         }
 
-        if (elem.fieldNameStringData().startsWith(timeseries::kBucketDataFieldName + ".") &&
+        if (elem.fieldNameStringData().starts_with(timeseries::kBucketDataFieldName + ".") &&
             elem.valueStringDataSafe() == IndexNames::GEO_2DSPHERE_BUCKET) {
             builder.append(
                 elem.fieldNameStringData().substr(timeseries::kBucketDataFieldName.size() + 1),
@@ -430,7 +430,7 @@ boost::optional<BSONObj> createBucketsIndexSpecFromBucketsShardKeySpec(
             }
 
             // Time-series indexes on sub-documents of the 'metaField' are allowed.
-            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 builder.append(elem);
                 continue;
             }
@@ -534,7 +534,7 @@ bool shouldIncludeOriginalSpec(const TimeseriesOptions& timeseriesOptions,
                 continue;
             }
 
-            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+            if (elem.fieldNameStringData().starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 continue;
             }
         }
@@ -575,7 +575,7 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
 
         if (metaField) {
             if (name == timeseries::kBucketMetaFieldName ||
-                name.startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                name.starts_with(timeseries::kBucketMetaFieldName + ".")) {
                 return false;
             }
         }

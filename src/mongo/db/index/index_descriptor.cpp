@@ -320,8 +320,8 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
     // is set to false.
     auto maybeAppendFtsIndexField = [&]() {
         if (!hasSeenFtsOrFtsxFields) {
-            fieldNames.push_back(kFTSTerm.rawData());
-            fieldNames.push_back(kFTSWeight.rawData());
+            fieldNames.push_back(kFTSTerm.data());
+            fieldNames.push_back(kFTSWeight.data());
             hasSeenFtsOrFtsxFields = true;
         }
     };
@@ -338,7 +338,7 @@ std::vector<const char*> IndexDescriptor::getFieldNames() const {
             (fieldName == kFTSFieldName || fieldName == kFTSXFieldName)) {
             maybeAppendFtsIndexField();
         } else {
-            fieldNames.push_back(fieldName.rawData());
+            fieldNames.push_back(fieldName.data());
         }
     }
 

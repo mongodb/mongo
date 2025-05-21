@@ -40,6 +40,7 @@ mongo_cc_binary(
         "test_MongoStringDataConstRefCheck1.cpp",
         "test_MongoStringDataConstRefCheck2.cpp",
         "test_MongoStringDataConstRefCheck3.cpp",
+        "test_MongoStringDataStringViewApiCheck.cpp",
         "test_MongoInvariantStatusIsOKCheck.cpp",
     ],
     # These test files will purposefully be error prone, so we can disable warnings any warnings we expect

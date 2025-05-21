@@ -176,7 +176,7 @@ std::string terseCurrentTimeForFilename(bool appendZed) {
     const std::size_t expLen = appendZed ? 20 : 19;
 
     char buf[32];
-    fassert(16226, strftime(buf, sizeof(buf), fmt.rawData(), &t) == expLen);
+    fassert(16226, strftime(buf, sizeof(buf), fmt.data(), &t) == expLen);
     return buf;
 }
 

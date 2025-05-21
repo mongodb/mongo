@@ -67,7 +67,7 @@ public:
 
     const char* getSourceName() const final {
         // This is used in error reporting.
-        return DocumentSourceChangeStreamCheckInvalidate::kStageName.rawData();
+        return DocumentSourceChangeStreamCheckInvalidate::kStageName.data();
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

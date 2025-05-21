@@ -131,7 +131,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return DocumentSourcePlanCacheStats::kStageName.rawData();
+        return DocumentSourcePlanCacheStats::kStageName.data();
     }
 
     static const Id& id;

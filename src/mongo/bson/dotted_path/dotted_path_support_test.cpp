@@ -182,7 +182,7 @@ TEST(DottedPathSupport, ExtractElementsFromValueAndBSONObjBasedOnTemplate) {
 TEST(ExtractElementAtPathOrArrayAlongPath, ReturnsArrayEltWithEmptyPathWhenArrayIsAtEndOfPath) {
     BSONObj obj(fromjson("{a: {b: {c: [1, 2, 3]}}}"));
     StringData path("a.b.c");
-    const char* pathData = path.rawData();
+    const char* pathData = path.data();
     auto resultElt = bson::extractElementAtOrArrayAlongDottedPath(obj, pathData);
     ASSERT_BSONELT_EQ(resultElt, fromjson("{c: [1, 2, 3]}").firstElement());
     ASSERT(StringData(pathData).empty());
@@ -191,7 +191,7 @@ TEST(ExtractElementAtPathOrArrayAlongPath, ReturnsArrayEltWithEmptyPathWhenArray
 TEST(ExtractElementAtPathOrArrayAlongPath, ReturnsArrayEltWithNonEmptyPathForArrayInMiddleOfPath) {
     BSONObj obj(fromjson("{a: {b: [{c: 1}, {c: 2}]}}"));
     StringData path("a.b.c");
-    const char* pathData = path.rawData();
+    const char* pathData = path.data();
     auto resultElt = bson::extractElementAtOrArrayAlongDottedPath(obj, pathData);
     ASSERT_BSONELT_EQ(resultElt, fromjson("{b: [{c: 1}, {c: 2}]}").firstElement());
     ASSERT_EQ(StringData(pathData), StringData("c"));
@@ -200,7 +200,7 @@ TEST(ExtractElementAtPathOrArrayAlongPath, ReturnsArrayEltWithNonEmptyPathForArr
 TEST(ExtractElementAtPathOrArrayAlongPath, NumericalPathElementNotTreatedAsArrayIndex) {
     BSONObj obj(fromjson("{a: [{'0': 'foo'}]}"));
     StringData path("a.0");
-    const char* pathData = path.rawData();
+    const char* pathData = path.data();
     auto resultElt = bson::extractElementAtOrArrayAlongDottedPath(obj, pathData);
     ASSERT_BSONELT_EQ(resultElt, obj.firstElement());
     ASSERT_EQ(StringData(pathData), StringData("0"));
@@ -209,7 +209,7 @@ TEST(ExtractElementAtPathOrArrayAlongPath, NumericalPathElementNotTreatedAsArray
 TEST(ExtractElementAtPathOrArrayAlongPath, NumericalPathElementTreatedAsFieldNameForNestedObject) {
     BSONObj obj(fromjson("{a: {'0': 'foo'}}"));
     StringData path("a.0");
-    const char* pathData = path.rawData();
+    const char* pathData = path.data();
     auto resultElt = bson::extractElementAtOrArrayAlongDottedPath(obj, pathData);
     ASSERT_BSONELT_EQ(resultElt, fromjson("{'0': 'foo'}").firstElement());
     ASSERT(StringData(pathData).empty());

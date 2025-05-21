@@ -258,7 +258,7 @@ public:
 
     boost::optional<long long> getNumericProperty(StringData propertyName) const override {
         size_t value;
-        if (MallocExtension::instance()->GetNumericProperty(propertyName.rawData(), &value)) {
+        if (MallocExtension::instance()->GetNumericProperty(propertyName.data(), &value)) {
             return static_cast<long long>(value);
         }
 

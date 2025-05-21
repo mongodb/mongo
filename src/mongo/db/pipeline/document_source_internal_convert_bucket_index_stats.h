@@ -78,7 +78,7 @@ public:
         TimeseriesConversionOptions timeseriesOptions);
 
     const char* getSourceName() const override {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     static const Id& id;

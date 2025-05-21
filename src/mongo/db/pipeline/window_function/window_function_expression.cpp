@@ -95,7 +95,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
         // Check if window function is $-prefixed.
         auto fieldName = field.fieldNameStringData();
 
-        if (fieldName.startsWith("$"_sd)) {
+        if (fieldName.starts_with("$"_sd)) {
             auto exprName = field.fieldNameStringData();
             if (auto parserFCV = parserMap.find(exprName); parserFCV != parserMap.end()) {
                 // Found one valid window function. If there are multiple window functions they will

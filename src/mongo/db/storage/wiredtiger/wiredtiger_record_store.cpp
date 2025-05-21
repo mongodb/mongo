@@ -103,7 +103,7 @@ WiredTigerRecordStore::CursorKey makeCursorKey(const RecordId& rid, KeyFormat fo
         return rid.getLong();
     } else {
         auto str = rid.getStr();
-        return WiredTigerItem(str.rawData(), str.size());
+        return WiredTigerItem(str.data(), str.size());
     }
 }
 

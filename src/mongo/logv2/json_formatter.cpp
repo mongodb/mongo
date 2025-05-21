@@ -152,7 +152,7 @@ struct JSONValueExtractor {
     template <typename Period>
     void operator()(const char* name, const Duration<Period>& value) {
         // A suffix is automatically prepended
-        dassert(!StringData(name).endsWith(value.mongoUnitSuffix()));
+        dassert(!StringData(name).ends_with(value.mongoUnitSuffix()));
         fmt::format_to(std::back_inserter(_buffer),
                        FMT_COMPILE(R"({}"{}{}":{})"),
                        _separator,
@@ -266,7 +266,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         : (_maxAttributeSizeKB != 0 ? _maxAttributeSizeKB->loadRelaxed() * 1024
                                     : c::kDefaultMaxAttributeOutputSizeKB * 1024);
     auto write = [&](StringData s) {
-        buffer.append(s.rawData(), s.rawData() + s.size());
+        buffer.append(s.data(), s.data() + s.size());
     };
 
     struct CommaTracker {

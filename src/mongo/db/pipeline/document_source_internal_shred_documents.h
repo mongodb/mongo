@@ -49,7 +49,7 @@ public:
     DocumentSourceInternalShredDocuments(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     const char* getSourceName() const override {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     static const Id& id;

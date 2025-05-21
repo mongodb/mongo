@@ -119,7 +119,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
 }
 
 const char* DocumentSourceCurrentOp::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {

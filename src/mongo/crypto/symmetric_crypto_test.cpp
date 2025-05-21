@@ -338,7 +338,7 @@ TEST(SymmetricEncryptor, InsufficientOutputBuffer) {
     // Validate that encryption with zero output buffer does not succeed
     DataRange zeroOutputBuffer(cryptoBuffer.data(), 0);
     ASSERT_NOT_OK(
-        encryptor->update({plaintextMessage.rawData(), plaintextMessage.size()}, zeroOutputBuffer));
+        encryptor->update({plaintextMessage.data(), plaintextMessage.size()}, zeroOutputBuffer));
 
     auto swSize = encryptor->update(encodedPlaintext, cryptoCursor);
     ASSERT_OK(swSize);
@@ -494,7 +494,7 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     auto encryptor = uassertStatusOK(crypto::SymmetricEncryptor::create(key, mode, iv));
 
     constexpr auto kAAD = "Hello World"_sd;
-    ASSERT_OK(encryptor->addAuthenticatedData({kAAD.rawData(), kAAD.size()}));
+    ASSERT_OK(encryptor->addAuthenticatedData({kAAD.data(), kAAD.size()}));
 
     constexpr auto kPlaintextMessage = "01234567012345670123456701234567"_sd;
     constexpr auto kBufferSize = kPlaintextMessage.size() + (2 * crypto::aesBlockSize);
@@ -503,7 +503,7 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     {
         DataRangeCursor cipherTextCursor(cipherText);
         cipherLen = uassertStatusOK(encryptor->update(
-            {kPlaintextMessage.rawData(), kPlaintextMessage.size()}, cipherTextCursor));
+            {kPlaintextMessage.data(), kPlaintextMessage.size()}, cipherTextCursor));
         cipherTextCursor.advance(cipherLen);
         cipherLen += uassertStatusOK(encryptor->finalize(cipherTextCursor));
     }
@@ -520,7 +520,7 @@ void GCMAdditionalAuthenticatedDataHelper(bool succeed) {
     ASSERT_EQ(StringData(asChar(tag.data()), taglen), kExpectedTag);
 
     auto decryptor = uassertStatusOK(crypto::SymmetricDecryptor::create(key, mode, iv));
-    ASSERT_OK(decryptor->addAuthenticatedData({kAAD.rawData(), kAAD.size()}));
+    ASSERT_OK(decryptor->addAuthenticatedData({kAAD.data(), kAAD.size()}));
 
     std::array<std::uint8_t, kBufferSize> plainText;
     auto plainLen = uassertStatusOK(decryptor->update({cipherText.data(), cipherLen}, plainText));

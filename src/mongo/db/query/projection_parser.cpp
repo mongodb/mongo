@@ -207,7 +207,7 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
 }
 
 bool hasPositionalOperator(StringData path) {
-    return path.endsWith(".$");
+    return path.ends_with(".$");
 }
 
 bool isPrefixOf(StringData first, StringData second) {
@@ -215,7 +215,7 @@ bool isPrefixOf(StringData first, StringData second) {
         return false;
     }
 
-    return second.startsWith(first) && second[first.size()] == '.';
+    return second.starts_with(first) && second[first.size()] == '.';
 }
 
 struct ParseContext {
@@ -654,7 +654,7 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
     for (auto&& elem : obj) {
         if (elem.fieldNameStringData().starts_with("_")) {
             ctx.idSpecified |= elem.fieldNameStringData() == "_id" ||
-                elem.fieldNameStringData().startsWith("_id.");
+                elem.fieldNameStringData().starts_with("_id.");
         }
 
         parseElement(&ctx, elem, boost::none, &root);

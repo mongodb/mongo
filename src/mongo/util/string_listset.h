@@ -137,7 +137,7 @@ public:
 
     inline size_t findPos(StringData str) const {
         size_t len = str.size();
-        size_t fastHash = computeFastHash1(str.rawData(), len);
+        size_t fastHash = computeFastHash1(str.data(), len);
         size_t encodedIdx = 0;
 
         if (useFastHash()) {
@@ -152,7 +152,7 @@ public:
                     // If encodedIdx >= 2, then there is a single string in _strings to compare
                     // with. Compare 'str' with this single string.
                     if (len != _strings[encodedIdx - 2].size() ||
-                        memcmp(str.rawData(), _strings[encodedIdx - 2].data(), len) != 0) {
+                        memcmp(str.data(), _strings[encodedIdx - 2].data(), len) != 0) {
                         return npos;
                     }
 
@@ -172,7 +172,7 @@ public:
                 }
 
                 // If this was our first attempt, try again using computeFastHash2().
-                fastHash = computeFastHash2(str.rawData(), len, fastHash);
+                fastHash = computeFastHash2(str.data(), len, fastHash);
             }
         }
 

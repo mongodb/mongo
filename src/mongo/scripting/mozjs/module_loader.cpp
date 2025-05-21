@@ -500,7 +500,7 @@ JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
         size_t len = source->size();
         JS::UniqueTwoByteChars ucbuf(
             JS::LossyUTF8CharsToNewTwoByteCharsZ(
-                cx, JS::UTF8Chars(source->rawData(), len), &len, js::MallocArena)
+                cx, JS::UTF8Chars(source->data(), len), &len, js::MallocArena)
                 .get());
 
         JS::RootedString sourceValue(cx, JS_NewUCStringCopyN(cx, ucbuf.get(), len));

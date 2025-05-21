@@ -158,7 +158,7 @@ Status StorageEngineLockFile::writeString(StringData str) {
 
     DWORD bytesWritten = 0;
     if (::WriteFile(_lockFileHandle->_handle,
-                    static_cast<LPCVOID>(str.rawData()),
+                    static_cast<LPCVOID>(str.data()),
                     static_cast<DWORD>(str.size()),
                     &bytesWritten,
                     NULL) == FALSE) {

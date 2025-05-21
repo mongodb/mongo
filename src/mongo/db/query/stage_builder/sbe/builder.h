@@ -155,7 +155,7 @@ public:
     struct NameHasher {
         using is_transparent = void;
         size_t operator()(const UnownedSlotName& p) const noexcept {
-            auto h{std::pair{p.first, absl::string_view{p.second.rawData(), p.second.size()}}};
+            auto h{std::pair{p.first, absl::string_view{p.second.data(), p.second.size()}}};
             return absl::Hash<decltype(h)>{}(h);
         }
     };

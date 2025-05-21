@@ -342,7 +342,7 @@ SbExpr rehydrateIndexKey(StageBuilderState& state,
 template <typename T>
 inline const char* getRawStringData(const T& str) {
     if constexpr (std::is_same_v<T, StringData>) {
-        return str.rawData();
+        return str.data();
     } else {
         return str.data();
     }

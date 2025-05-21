@@ -80,7 +80,7 @@ TEST(BSONElement, BinDataToString) {
     builder.appendBinData("overlongUUID", sizeof(overlongUUID), newUUID, overlongUUID);
     builder.appendBinData("zeroLength", 0, BinDataGeneral, zeroLength);
     builder.appendBinData(
-        "unknownType", unknownType.size(), unknownBinDataType, unknownType.rawData());
+        "unknownType", unknownType.size(), unknownBinDataType, unknownType.data());
 
     BSONObj obj = builder.obj();
     ASSERT_EQ(obj["bintype0"].toString(), "bintype0: BinData(0, DEEABEEF01)");

@@ -106,8 +106,8 @@ public:
     }
 
     void append(StringData in) override {
-        if (canUseSmallString({in.rawData(), in.size()})) {
-            appendValue(makeSmallString({in.rawData(), in.size()}));
+        if (canUseSmallString({in.data(), in.size()})) {
+            appendValue(makeSmallString({in.data(), in.size()}));
         } else {
             appendValueBufferOffset(TypeTags::StringBig);
             _valueBufferBuilder->appendNum(static_cast<int32_t>(in.size() + 1));

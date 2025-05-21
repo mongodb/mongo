@@ -73,7 +73,7 @@ struct StringMapHasher {
 
     std::size_t operator()(StringData sd) const {
         // Use the default absl string hasher.
-        return absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+        return absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     }
 
     std::size_t operator()(const std::string& s) const {

@@ -498,6 +498,22 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoStringDataStringViewApiCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-stringdata-stringview-api'
+                WarningsAsErrors: '*'
+                """)
+        )
+
+        self.expected_output = [
+            "replace 'rawData' with 'data'",
+            "replace 'startsWith' with 'starts_with'",
+            "replace 'endsWith' with 'ends_with'",
+        ]
+
+        self.run_clang_tidy()
+
     def test_MongoInvariantStatusIsOKCheck(self):
         self.write_config(
             textwrap.dedent("""\

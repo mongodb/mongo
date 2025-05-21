@@ -188,7 +188,7 @@ BSONObj cat(const BSONObj& args, void* data) {
             mode |= std::ios::binary;
     }
 
-    ifstream f(filePath.valueStringDataSafe().rawData(), mode);
+    ifstream f(filePath.valueStringDataSafe().data(), mode);
     uassert(CANT_OPEN_FILE, fmt::format("couldn't open file {}", filePath.str()), f.is_open());
     std::streamsize fileSize = 0;
     // will throw on filesystem error
@@ -271,7 +271,7 @@ BSONObj copyFileRange(const BSONObj& args, void* data) {
 BSONObj md5sumFile(const BSONObj& args, void* data) {
     BSONElement e = singleArg(args);
     stringstream ss;
-    FILE* f = fopen(e.valueStringDataSafe().rawData(), "rb");
+    FILE* f = fopen(e.valueStringDataSafe().data(), "rb");
     uassert(CANT_OPEN_FILE, str::stream() << "couldn't open file " << e.str(), f);
     ON_BLOCK_EXIT([&] { fclose(f); });
 
@@ -508,7 +508,7 @@ BSONObj getFileMode(const BSONObj& a, void* data) {
             "getFileMode() takes one argument, the absolute path to a file",
             a.nFields() == 1 && a.firstElementType() == String);
     auto pathStr = a.firstElement().checkAndGetStringData();
-    boost::filesystem::path path(pathStr.rawData());
+    boost::filesystem::path path(pathStr.data());
     boost::system::error_code ec;
     auto fileStatus = boost::filesystem::status(path, ec);
     if (ec) {

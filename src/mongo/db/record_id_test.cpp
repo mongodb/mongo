@@ -318,7 +318,7 @@ TEST(RecordId, RecordIdBigStr) {
     RecordId bigCopy = bigId;
     ASSERT_FALSE(bigId.isInlineAllocated_forTest());
     ASSERT_FALSE(bigCopy.isInlineAllocated_forTest());
-    ASSERT_EQ(bigId.getStr().rawData(), bigCopy.getStr().rawData());
+    ASSERT_EQ(bigId.getStr().data(), bigCopy.getStr().data());
     ASSERT_EQ(bigId.getStr().size(), bigCopy.getStr().size());
     ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigCopy.memUsage());
 

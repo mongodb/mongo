@@ -481,7 +481,7 @@ StatusWith<SSLX509Name> parseDN(StringData sd) try {
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
 std::string x509OidToShortName(StringData name) {
-    const auto nid = OBJ_txt2nid(name.rawData());
+    const auto nid = OBJ_txt2nid(name.data());
     if (nid == 0) {
         return name.toString();
     }
@@ -499,7 +499,7 @@ using UniqueASN1Object =
 
 boost::optional<std::string> x509ShortNameToOid(StringData name) {
     // Converts the OID to an ASN1_OBJECT
-    UniqueASN1Object obj(OBJ_txt2obj(name.rawData(), 0));
+    UniqueASN1Object obj(OBJ_txt2obj(name.data(), 0));
     if (!obj) {
         return boost::none;
     }

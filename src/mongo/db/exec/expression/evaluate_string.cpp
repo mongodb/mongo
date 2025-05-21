@@ -406,9 +406,9 @@ Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* var
 
     std::vector<Value> output;
 
-    const char* needle = separator.rawData();
+    const char* needle = separator.data();
     const char* const needleEnd = needle + separator.size();
-    const char* remainingHaystack = input.rawData();
+    const char* remainingHaystack = input.data();
     const char* const haystackEnd = remainingHaystack + input.size();
 
     const char* it = remainingHaystack;
@@ -418,7 +418,7 @@ Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* var
         remainingHaystack = it + separator.size();
     }
 
-    StringData splitString(remainingHaystack, input.size() - (remainingHaystack - input.rawData()));
+    StringData splitString(remainingHaystack, input.size() - (remainingHaystack - input.data()));
     output.push_back(Value(splitString));
     return Value(std::move(output));
 }

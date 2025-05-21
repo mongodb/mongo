@@ -2260,7 +2260,7 @@ public:
     }
 
     void visit(const ExpressionInternalRawSortKey* expr) final {
-        unsupportedExpression(ExpressionInternalRawSortKey::kName.rawData());
+        unsupportedExpression(ExpressionInternalRawSortKey::kName.data());
     }
     void visit(const ExpressionMap* expr) final {
         unsupportedExpression("$map");

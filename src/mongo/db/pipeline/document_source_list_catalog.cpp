@@ -63,7 +63,7 @@ REGISTER_DOCUMENT_SOURCE(listCatalog,
 ALLOCATE_DOCUMENT_SOURCE_ID(listCatalog, DocumentSourceListCatalog::id)
 
 const char* DocumentSourceListCatalog::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(

@@ -267,7 +267,7 @@ public:
                 return true;
             }
 
-            if (collNss.coll().startsWith("tmp.mr.")) {
+            if (collNss.coll().starts_with("tmp.mr.")) {
                 // We skip any incremental map reduce collections as they also aren't
                 // replicated.
                 return true;

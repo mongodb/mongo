@@ -60,7 +60,7 @@ public:
                    std::vector<FieldPath> sortKeyMetaFields,
                    WorkingSet* ws,
                    std::unique_ptr<PlanStage> child)
-        : PlanStage(expCtx, std::move(child), kStageName.rawData()),
+        : PlanStage(expCtx, std::move(child), kStageName.data()),
           _ws(*ws),
           _sortKeyMetaFields(std::move(sortKeyMetaFields)) {}
 

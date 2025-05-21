@@ -207,7 +207,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
 
                     if (metaField &&
                         (keyElem.fieldNameStringData() == *metaField ||
-                         keyElem.fieldNameStringData().startsWith(*metaField + "."))) {
+                         keyElem.fieldNameStringData().starts_with(*metaField + "."))) {
                         continue;
                     }
 

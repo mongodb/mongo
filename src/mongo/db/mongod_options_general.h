@@ -32,14 +32,13 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
 inline Status validateSecurityAuthorizationSetting(const std::string& value) {
-    constexpr auto kEnabled = "enabled"_sd;
-    constexpr auto kDisabled = "disabled"_sd;
-
-    if (!kEnabled.equalCaseInsensitive(value) && !kDisabled.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "enabled"_sd) ||
+          str::equalCaseInsensitive(value, "disabled"_sd))) {
         return {ErrorCodes::BadValue,
                 "security.authorization expects either 'enabled' or 'disabled'"};
     }
@@ -48,12 +47,9 @@ inline Status validateSecurityAuthorizationSetting(const std::string& value) {
 }
 
 inline Status validateOperationProfilingModeSetting(const std::string& value) {
-    constexpr auto kOff = "off"_sd;
-    constexpr auto kSlowOp = "slowOp"_sd;
-    constexpr auto kAll = "all"_sd;
-
-    if (!kOff.equalCaseInsensitive(value) && !kSlowOp.equalCaseInsensitive(value) &&
-        !kAll.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "off"_sd) ||
+          str::equalCaseInsensitive(value, "slowOp"_sd) ||
+          str::equalCaseInsensitive(value, "all"_sd))) {
         return {ErrorCodes::BadValue, "operationProfiling.mode expects 'off', 'slowOp', or 'all'"};
     }
 

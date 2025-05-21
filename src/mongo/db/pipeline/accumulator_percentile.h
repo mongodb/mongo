@@ -61,7 +61,7 @@ public:
 
     static constexpr auto kName = "$percentile"_sd;
     const char* getOpName() const override {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**
@@ -154,7 +154,7 @@ class AccumulatorMedian : public AccumulatorPercentile {
 public:
     static constexpr auto kName = "$median"_sd;
     const char* getOpName() const final {
-        return kName.rawData();
+        return kName.data();
     }
 
     /**

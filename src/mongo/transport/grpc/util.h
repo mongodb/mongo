@@ -75,7 +75,7 @@ std::string toGRPCFormattedURI(const HostAndPort& address);
 
 // See: https://grpc.github.io/grpc/cpp/md_doc_naming.html
 inline bool isUnixSchemeGRPCFormattedURI(StringData uri) {
-    return uri.startsWith("unix:");
+    return uri.starts_with("unix:");
 }
 
 /**

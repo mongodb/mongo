@@ -367,7 +367,7 @@ BSONObjBuilder& operator<<(BSONObjBuilder::ValueStream& builder, const Value& va
             return builder << BSONDBRef(val._storage.getDBRef()->ns, val._storage.getDBRef()->oid);
 
         case BinData:
-            return builder << BSONBinData(val.getRawData().rawData(),  // looking for void*
+            return builder << BSONBinData(val.getRawData().data(),  // looking for void*
                                           val.getRawData().size(),
                                           val._storage.binDataType());
 
@@ -852,7 +852,7 @@ namespace {
  * Hashes the given 'StringData', combines the resulting hash with 'seed', and returns the result.
  */
 size_t hashStringData(StringData sd, size_t seed) {
-    size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+    size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.data(), sd.size()));
     boost::hash_combine(seed, strHash);
     return seed;
 }

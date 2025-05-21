@@ -131,7 +131,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     const char* getSourceName() const final {
-        return DocumentSourceFacet::kStageName.rawData();
+        return DocumentSourceFacet::kStageName.data();
     }
 
     static const Id& id;

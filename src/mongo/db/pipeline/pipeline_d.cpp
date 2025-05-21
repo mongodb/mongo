@@ -2096,7 +2096,7 @@ void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
             tassert(6434901,
                     "we must erase a $sort stage and replace it with a bounded sort stage",
                     strncmp((*iter)->getSourceName(),
-                            DocumentSourceSort::kStageName.rawData(),
+                            DocumentSourceSort::kStageName.data(),
                             DocumentSourceSort::kStageName.length()) == 0);
             pipeline->_sources.erase(iter);
             pipeline->stitch();

@@ -154,10 +154,10 @@ StatusWith<std::string> WiredTigerUtil::getMetadata(WiredTigerSession& session, 
 
 StatusWith<std::string> WiredTigerUtil::getSourceMetadata(WiredTigerSession& session,
                                                           StringData uri) {
-    if (uri.startsWith("file:")) {
+    if (uri.starts_with("file:")) {
         return getMetadata(session, uri);
     }
-    invariant(uri.startsWith("table:"));
+    invariant(uri.starts_with("table:"));
 
     WT_CURSOR* cursor = _getMaybeCachedCursor(session, "metadata:", kMetadataTableId);
     ScopeGuard releaser = [&] {
@@ -313,7 +313,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
 
     StringData config = configElem.valueStringData();
     // Do NOT allow embedded null characters
-    if (config.size() != strlen(config.rawData())) {
+    if (config.size() != strlen(config.data())) {
         return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
     }
 
@@ -331,7 +331,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     }
 
     Status status = wtRCToStatus(
-        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()),
+        wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.data()),
         nullptr);
     if (!status.isOK()) {
         StringBuilder errorMsg;

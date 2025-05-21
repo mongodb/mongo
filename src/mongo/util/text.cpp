@@ -128,24 +128,24 @@ std::string toUtf8String(const std::wstring& wide) {
 }
 
 std::wstring toWideStringFromStringData(StringData utf8String) {
-    int bufferSize = MultiByteToWideChar(CP_UTF8,               // Code page
-                                         0,                     // Flags
-                                         utf8String.rawData(),  // Input string
-                                         utf8String.size(),     // Count, -1 for NUL-terminated
-                                         nullptr,               // No output buffer
-                                         0  // Zero means "compute required size"
+    int bufferSize = MultiByteToWideChar(CP_UTF8,            // Code page
+                                         0,                  // Flags
+                                         utf8String.data(),  // Input string
+                                         utf8String.size(),  // Count, -1 for NUL-terminated
+                                         nullptr,            // No output buffer
+                                         0                   // Zero means "compute required size"
     );
     if (bufferSize == 0) {
         return std::wstring();
     }
     std::unique_ptr<wchar_t[]> tempBuffer(new wchar_t[bufferSize]);
     tempBuffer[0] = L'0';
-    MultiByteToWideChar(CP_UTF8,               // Code page
-                        0,                     // Flags
-                        utf8String.rawData(),  // Input string
-                        utf8String.size(),     // Count, -1 for NUL-terminated
-                        tempBuffer.get(),      // UTF-16 output buffer
-                        bufferSize             // Buffer size in wide characters
+    MultiByteToWideChar(CP_UTF8,            // Code page
+                        0,                  // Flags
+                        utf8String.data(),  // Input string
+                        utf8String.size(),  // Count, -1 for NUL-terminated
+                        tempBuffer.get(),   // UTF-16 output buffer
+                        bufferSize          // Buffer size in wide characters
     );
     return std::wstring(tempBuffer.get(), bufferSize);
 }

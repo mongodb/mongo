@@ -358,7 +358,7 @@ void validateTimeseriesShardKey(StringData timeFieldName,
                                      "part of shard key pattern",
                     metaFieldName &&
                         (elem.fieldNameStringData() == *metaFieldName ||
-                         elem.fieldNameStringData().startsWith(*metaFieldName + ".")));
+                         elem.fieldNameStringData().starts_with(*metaFieldName + ".")));
         }
     }
 }

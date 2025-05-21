@@ -533,12 +533,12 @@ inline Timestamp Value::getTimestamp() const {
 
 inline const char* Value::getRegex() const {
     MONGO_verify(getType() == RegEx);
-    return _storage.getString().rawData();  // this is known to be NUL terminated
+    return _storage.getString().data();  // this is known to be NUL terminated
 }
 inline const char* Value::getRegexFlags() const {
     MONGO_verify(getType() == RegEx);
-    const char* pattern = _storage.getString().rawData();  // this is known to be NUL terminated
-    const char* flags = pattern + strlen(pattern) + 1;     // first byte after pattern's NUL
+    const char* pattern = _storage.getString().data();  // this is known to be NUL terminated
+    const char* flags = pattern + strlen(pattern) + 1;  // first byte after pattern's NUL
     dassert(flags + strlen(flags) == pattern + _storage.getString().size());
     return flags;
 }
@@ -569,12 +569,12 @@ inline long long Value::getLong() const {
 inline UUID Value::getUuid() const {
     MONGO_verify(_storage.binDataType() == BinDataType::newUUID);
     auto stringData = _storage.getString();
-    return UUID::fromCDR({stringData.rawData(), stringData.size()});
+    return UUID::fromCDR({stringData.data(), stringData.size()});
 }
 
 inline BSONBinData Value::getBinData() const {
     MONGO_verify(getType() == BinData);
     auto stringData = _storage.getString();
-    return BSONBinData(stringData.rawData(), stringData.size(), _storage.binDataType());
+    return BSONBinData(stringData.data(), stringData.size(), _storage.binDataType());
 }
 }  // namespace mongo

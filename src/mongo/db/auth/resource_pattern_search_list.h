@@ -108,7 +108,7 @@ public:
                 }
                 _list[_size++] = ResourcePattern::forDatabaseName(nss.dbName());
             } else if ((nss.coll().size() > kSystemBucketsPrefix.size()) &&
-                       nss.coll().startsWith(kSystemBucketsPrefix)) {
+                       nss.coll().starts_with(kSystemBucketsPrefix)) {
                 // System bucket patterns behave similar to any/db/coll/exact patterns,
                 // But with a fixed "system.buckets." prefix to the collection name.
                 StringData coll = nss.coll().substr(kSystemBucketsPrefix.size());

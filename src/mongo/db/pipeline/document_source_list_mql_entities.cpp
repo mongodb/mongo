@@ -89,7 +89,7 @@ StageConstraints DocumentSourceListMqlEntities::constraints(Pipeline::SplitState
 }
 
 const char* DocumentSourceListMqlEntities::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceListMqlEntities::doOptimizeAt(

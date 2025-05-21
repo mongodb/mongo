@@ -48,7 +48,7 @@ Status errorCodeToStatus(const std::error_code& ec, StringData context) {
     // Add additional context string to Status reason if included.
     auto makeStatus = [&](ErrorCodes::Error code, StringData reason) {
         Status result(code, reason);
-        if (context.rawData())
+        if (context.data())
             result.addContext(context);
         return result;
     };

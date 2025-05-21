@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 ConstDataRange makeTestItem(StringData sd) {
-    return ConstDataRange(sd.rawData(), sd.size());
+    return ConstDataRange(sd.data(), sd.size());
 }
 
 // SHA-256 test vectors from tom crypt

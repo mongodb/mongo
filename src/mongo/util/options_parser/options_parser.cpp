@@ -577,10 +577,10 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
         ErrorCodes::OperationFailed, "No HTTP Client available in this build of MongoDB", client);
 
     // Expect https:// URLs unless we can be sure we're talking to localhost.
-    if (!url.startsWith("https://")) {
+    if (!url.starts_with("https://")) {
         uassert(ErrorCodes::BadValue,
                 "__rest configuration expansion only supports http/https",
-                url.startsWith("http://"));
+                url.starts_with("http://"));
         const auto start = strlen("http://");
         auto end = url.find('/', start);
         if (end == std::string::npos) {

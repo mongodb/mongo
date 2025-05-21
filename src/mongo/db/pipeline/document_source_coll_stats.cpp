@@ -70,7 +70,7 @@ void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
 }
 
 const char* DocumentSourceCollStats::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(

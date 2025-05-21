@@ -147,7 +147,7 @@ public:
                 fmt::format("Invalid namespace '{}.system.buckets.{}'",
                             nss.dbName().toStringForErrorMsg(),
                             nss.coll()),
-                !nss.coll().startsWith("system.buckets."));
+                !nss.coll().starts_with("system.buckets."));
         return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource, nss);
     }
 

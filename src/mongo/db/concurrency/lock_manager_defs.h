@@ -316,7 +316,7 @@ private:
     }
 
     static uint64_t hashStringData(StringData str) {
-        return absl::hash_internal::CityHash64(str.rawData(), str.size());
+        return absl::hash_internal::CityHash64(str.data(), str.size());
     }
 };
 

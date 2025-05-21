@@ -192,7 +192,7 @@ void FieldRef::reserialize() const {
         if (i > 0)
             nextDotted.append(1, '.');
         const StringData part = getPart(i);
-        nextDotted.append(part.rawData(), part.size());
+        nextDotted.append(part.data(), part.size());
     }
 
     // Make the new string our contents
@@ -430,7 +430,7 @@ bool FieldRef::equalsDottedField(StringData other) const {
     for (size_t i = 0; i < _parts.size(); i++) {
         StringData part = getPart(i);
 
-        if (!rest.startsWith(part))
+        if (!rest.starts_with(part))
             return false;
 
         if (i == _parts.size() - 1)

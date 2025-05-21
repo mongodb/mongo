@@ -277,7 +277,7 @@ BSONObj BSONObj::_jsonStringGenerator(const Generator& g,
                                       size_t writeLimit) const {
     if (isEmpty()) {
         const auto empty = isArray ? "[]"_sd : "{}"_sd;
-        buffer.append(empty.rawData(), empty.rawData() + empty.size());
+        buffer.append(empty.data(), empty.data() + empty.size());
         return BSONObj();
     }
     buffer.push_back(isArray ? '[' : '{');
@@ -558,7 +558,7 @@ Status BSONObj::storageValidEmbedded() const {
         StringData name = e.fieldNameStringData();
 
         // Cannot start with "$", unless dbref which must start with ($ref, $id)
-        if (name.startsWith("$")) {
+        if (name.starts_with("$")) {
             if (first &&
                 // $ref is a collection name and must be a String
                 (name == "$ref") && e.type() == String &&
@@ -574,7 +574,7 @@ Status BSONObj::storageValidEmbedded() const {
                 }
 
                 // Can't start with a "$", all other checks are done below (outside if blocks)
-                if (name.startsWith("$")) {
+                if (name.starts_with("$")) {
                     return Status(ErrorCodes::DollarPrefixedFieldName,
                                   str::stream() << name << " is not valid for storage.");
                 }

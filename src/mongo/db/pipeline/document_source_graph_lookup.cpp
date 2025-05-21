@@ -124,7 +124,7 @@ REGISTER_DOCUMENT_SOURCE(graphLookup,
 ALLOCATE_DOCUMENT_SOURCE_ID(graphLookup, DocumentSourceGraphLookUp::id)
 
 const char* DocumentSourceGraphLookUp::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceGraphLookUp::doGetNext() {

@@ -117,7 +117,7 @@ BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
     std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
     static const auto sha256HmacStringDataHasher = [](const std::string& key, StringData sd) {
         auto hashed = SHA256Block::computeHmac(
-            (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
+            (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.data(), sd.size());
         return hashed.toString();
     };
 

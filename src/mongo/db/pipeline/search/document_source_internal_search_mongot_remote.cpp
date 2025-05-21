@@ -106,7 +106,7 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
 }
 
 const char* DocumentSourceInternalSearchMongotRemote::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Value DocumentSourceInternalSearchMongotRemote::addMergePipelineIfNeeded(

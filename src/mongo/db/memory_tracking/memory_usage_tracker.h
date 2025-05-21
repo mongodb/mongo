@@ -224,7 +224,7 @@ public:
 
 private:
     static absl::string_view _key(StringData s) {
-        return {s.rawData(), s.size()};
+        return {s.data(), s.size()};
     }
 
     bool _allowDiskUse;

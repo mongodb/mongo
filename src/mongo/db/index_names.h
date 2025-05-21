@@ -96,7 +96,7 @@ struct WildcardNames {
     static constexpr StringData WILDCARD_FIELD_NAME_SUFFIX = ".$**"_sd;
 
     inline static bool isWildcardFieldName(StringData fieldName) {
-        return fieldName == WILDCARD_FIELD_NAME || fieldName.endsWith(WILDCARD_FIELD_NAME_SUFFIX);
+        return fieldName == WILDCARD_FIELD_NAME || fieldName.ends_with(WILDCARD_FIELD_NAME_SUFFIX);
     }
 };
 

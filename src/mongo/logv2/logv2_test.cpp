@@ -467,7 +467,7 @@ TEST_F(LogV2Test, MismatchAttrInLogging) {
     auto lines = makeLineCapture(PlainFormatter());
     if (!kDebugBuild) {
         LOGV2(4638203, "mismatch {name}", "not_name"_attr = 1);
-        ASSERT(StringData(lines->back()).startsWith("Exception during log"_sd));
+        ASSERT(StringData(lines->back()).starts_with("Exception during log"_sd));
     }
 }
 
@@ -475,7 +475,7 @@ TEST_F(LogV2Test, MissingAttrInLogging) {
     auto lines = makeLineCapture(PlainFormatter());
     if (!kDebugBuild) {
         LOGV2(6636803, "Log missing {attr}");
-        ASSERT(StringData(lines->back()).startsWith("Exception during log"_sd));
+        ASSERT(StringData(lines->back()).starts_with("Exception during log"_sd));
     }
 }
 
@@ -2060,7 +2060,7 @@ TEST_F(LogV2Test, StringTruncation) {
         std::string context = "Failed test: " + note;
 
         ASSERT_LTE(str.size(), maxLength) << context;
-        ASSERT(str.endsWith(suffix))
+        ASSERT(str.ends_with(suffix))
             << context << " - string " << str << " does not end with " << suffix;
 
         auto trunc = obj[constants::kTruncatedFieldName]["name"];

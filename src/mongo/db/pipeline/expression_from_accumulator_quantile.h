@@ -65,7 +65,7 @@ public:
     }
 
     const char* getOpName() const {
-        return TAccumulator::kName.rawData();
+        return TAccumulator::kName.data();
     }
 
     Value serialize(const SerializationOptions& options = {}) const final {

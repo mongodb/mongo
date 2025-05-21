@@ -193,7 +193,7 @@ Status dropCollections(OperationContext* opCtx,
     for (auto& uuid : toDrop) {
         CollectionWriter writer{opCtx, uuid};
         auto coll = writer.getWritableCollection(opCtx);
-        if (coll->ns().coll().startsWith(collectionNamePrefix)) {
+        if (coll->ns().coll().starts_with(collectionNamePrefix)) {
             // Drop all indexes in the collection.
             coll->getIndexCatalog()->dropAllIndexes(
                 opCtx, coll, /*includingIdIndex=*/true, /*onDropFn=*/{});

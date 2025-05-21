@@ -95,9 +95,9 @@ bool loggingInProgress() {
 void signalSafeWriteToStderr(StringData message) {
     while (!message.empty()) {
 #if defined(_WIN32)
-        auto ret = _write(_fileno(stderr), message.rawData(), message.size());
+        auto ret = _write(_fileno(stderr), message.data(), message.size());
 #else
-        auto ret = write(STDERR_FILENO, message.rawData(), message.size());
+        auto ret = write(STDERR_FILENO, message.data(), message.size());
 #endif
         if (ret == -1) {
             if (lastPosixError() == posixError(EINTR)) {

@@ -81,7 +81,7 @@ void assertStringEqual(StringData val, int128_t expected) {
 
     Simple8bTypeUtil::SmallString decodeResult = Simple8bTypeUtil::decodeString(*encodeResult);
     ASSERT_EQUALS(val.size(), decodeResult.size);
-    ASSERT_EQUALS(std::memcmp(val.rawData(), decodeResult.str.data(), val.size()), 0);
+    ASSERT_EQUALS(std::memcmp(val.data(), decodeResult.str.data(), val.size()), 0);
 }
 
 TEST(Simple8bTypeUtil, EncodeAndDecodePositiveSignedInt) {

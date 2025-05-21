@@ -61,7 +61,7 @@ void computeUpdateIndexData(const IndexCatalogEntry* entry,
             BSONObjIterator j(key);
             while (j.more()) {
                 StringData fieldName(j.next().fieldName());
-                if (!fieldName.endsWith("$**"_sd)) {
+                if (!fieldName.ends_with("$**"_sd)) {
                     outData->addPath(FieldRef{fieldName});
                 }
             }

@@ -59,8 +59,8 @@ std::shared_ptr<CollatorInterface> CollatorInterfaceICU::cloneShared() const {
 
 int CollatorInterfaceICU::compare(StringData left, StringData right) const {
     UErrorCode status = U_ZERO_ERROR;
-    auto compareResult = _collator->compareUTF8(icu::StringPiece(left.rawData(), left.size()),
-                                                icu::StringPiece(right.rawData(), right.size()),
+    auto compareResult = _collator->compareUTF8(icu::StringPiece(left.data(), left.size()),
+                                                icu::StringPiece(right.data(), right.size()),
                                                 status);
 
     // Any sequence of bytes, even invalid UTF-8, has defined comparison behavior in ICU (invalid
@@ -83,7 +83,7 @@ int CollatorInterfaceICU::compare(StringData left, StringData right) const {
 CollatorInterface::ComparisonKey CollatorInterfaceICU::getComparisonKey(
     StringData stringData) const {
     // A StringPiece is ICU's StringData. They are logically the same abstraction.
-    const icu::StringPiece stringPiece(stringData.rawData(), stringData.size());
+    const icu::StringPiece stringPiece(stringData.data(), stringData.size());
 
     UErrorCode status = U_ZERO_ERROR;
     icu::CollationKey icuKey;

@@ -50,7 +50,7 @@ bool valid(unsigned char x) {
 template <typename Mode, typename Writer>
 void encodeImpl(Writer&& write, StringData in) {
     static_assert(Mode::kEncodeTable.size() == 64, "Invalid encoding table");
-    const char* data = in.rawData();
+    const char* data = in.data();
     std::size_t size = in.size();
     auto readOctet = [&data] {
         return static_cast<std::uint8_t>(*data++);
@@ -115,7 +115,7 @@ void encodeImpl(Writer&& write, StringData in) {
 template <typename Mode, typename Writer>
 void decodeImpl(const Writer& write, StringData in) {
     static_assert(Mode::kDecodeTable.size() == 256, "Invalid decode table");
-    const char* data = in.rawData();
+    const char* data = in.data();
     std::size_t size = in.size();
     if (size == 0) {
         return;

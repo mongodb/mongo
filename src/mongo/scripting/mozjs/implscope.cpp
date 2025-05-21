@@ -1039,7 +1039,7 @@ bool MozJSImplScope::exec(StringData code,
 
         JS::SourceText<mozilla::Utf8Unit> srcBuf;
         bool success =
-            srcBuf.init(_context, code.rawData(), code.size(), JS::SourceOwnership::Borrowed);
+            srcBuf.init(_context, code.data(), code.size(), JS::SourceOwnership::Borrowed);
         if (_checkErrorState(success, reportError, assertOnError)) {
             return false;
         }

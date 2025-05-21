@@ -420,7 +420,7 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
         }
         case String: {
             auto str = ele.valueStringData();
-            SHA256Block::computeHash({ConstDataRange(str.rawData(), str.size())})
+            SHA256Block::computeHash({ConstDataRange(str.data(), str.size())})
                 .appendAsBinData(bob, ""_sd);
             break;
         }

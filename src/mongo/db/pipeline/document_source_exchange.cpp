@@ -104,7 +104,7 @@ constexpr size_t Exchange::kMaxBufferSize;
 constexpr size_t Exchange::kMaxNumberConsumers;
 
 const char* DocumentSourceExchange::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Value DocumentSourceExchange::serialize(const SerializationOptions& opts) const {

@@ -40,6 +40,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -70,13 +71,10 @@ Status WiredTigerGlobalOptions::store(const moe::Environment& params) {
 }
 
 Status WiredTigerGlobalOptions::validateWiredTigerCompressor(const std::string& value) {
-    constexpr auto kNone = "none"_sd;
-    constexpr auto kSnappy = "snappy"_sd;
-    constexpr auto kZlib = "zlib"_sd;
-    constexpr auto kZstd = "zstd"_sd;
-
-    if (!kNone.equalCaseInsensitive(value) && !kSnappy.equalCaseInsensitive(value) &&
-        !kZlib.equalCaseInsensitive(value) && !kZstd.equalCaseInsensitive(value)) {
+    if (!(str::equalCaseInsensitive(value, "none"_sd) ||
+          str::equalCaseInsensitive(value, "snappy"_sd) ||
+          str::equalCaseInsensitive(value, "zlib"_sd) ||
+          str::equalCaseInsensitive(value, "zstd"_sd))) {
         return {ErrorCodes::BadValue,
                 "Compression option must be one of: 'none', 'snappy', 'zlib', or 'zstd'"};
     }

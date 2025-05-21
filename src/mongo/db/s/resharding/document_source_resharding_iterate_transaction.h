@@ -99,7 +99,7 @@ public:
     }
 
     const char* getSourceName() const override {
-        return DocumentSourceReshardingIterateTransaction::kStageName.rawData();
+        return DocumentSourceReshardingIterateTransaction::kStageName.data();
     }
 
     static const Id& id;

@@ -181,7 +181,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
 }
 
 const char* DocumentSourceInternalSearchIdLookUp::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalSearchIdLookUp::doOptimizeAt(

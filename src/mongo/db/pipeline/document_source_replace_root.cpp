@@ -64,7 +64,7 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) c
     Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
     // The newRoot expression, if it exists, must evaluate to an object.
     uassert(40228,
-            fmt::format(kErrorTemplate.rawData(),
+            fmt::format(kErrorTemplate.data(),
                         _errMsgContextForNonObject,
                         newRoot.toString(),
                         typeName(newRoot.getType()),
@@ -256,7 +256,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
             newRootExpression,
             (stageName == kStageName) ? "'newRoot' expression " : "'replacement document' ",
             expCtx->getSbeCompatibility()),
-        kStageName.rawData(),
+        kStageName.data(),
         isIndependentOfAnyCollection);
 }
 
@@ -272,7 +272,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::create(
                                                     newRootExpression,
                                                     std::move(errMsgContextForNonObjects),
                                                     expCtx->getSbeCompatibility()),
-        kStageName.rawData(),
+        kStageName.data(),
         isIndependentOfAnyCollection);
 }
 }  // namespace mongo

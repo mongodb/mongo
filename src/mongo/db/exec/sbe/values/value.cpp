@@ -63,7 +63,7 @@ namespace {
 template <typename T>
 auto abslHash(const T& val) {
     if constexpr (std::is_same_v<T, StringData>) {
-        return absl::Hash<absl::string_view>{}(absl::string_view{val.rawData(), val.size()});
+        return absl::Hash<absl::string_view>{}(absl::string_view{val.data(), val.size()});
     } else if constexpr (IsEndian<T>::value) {
         return abslHash(val.value);
     } else {
@@ -100,8 +100,8 @@ std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags
     auto rawBuffer = buffer.get();
 
     // Copy pattern first and flags after it.
-    memcpy(rawBuffer, pattern.rawData(), pattern.size());
-    memcpy(rawBuffer + pattern.size() + 1, flags.rawData(), flags.size());
+    memcpy(rawBuffer, pattern.data(), pattern.size());
+    memcpy(rawBuffer + pattern.size() + 1, flags.data(), flags.size());
 
     // Ensure NULL byte is placed after each part.
     rawBuffer[pattern.size()] = '\0';
@@ -125,7 +125,7 @@ std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id
     ptr += sizeof(uint32_t);
 
     // Write 'ns' followed by a null terminator.
-    memcpy(ptr, ns.rawData(), nsLen);
+    memcpy(ptr, ns.data(), nsLen);
     ptr[nsLen] = '\0';
     ptr += nsLenWithNull;
 
@@ -152,7 +152,7 @@ std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* sc
     ptr += sizeof(uint32_t);
 
     // Write 'code' followed by a null terminator.
-    memcpy(ptr, code.rawData(), codeLen);
+    memcpy(ptr, code.data(), codeLen);
     ptr[codeLen] = '\0';
     ptr += codeLenWithNull;
 

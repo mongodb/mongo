@@ -139,7 +139,7 @@ DocumentSourceChangeStreamInjectControlEvents::createFromBson(
 }
 
 const char* DocumentSourceChangeStreamInjectControlEvents::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamInjectControlEvents::doGetNext() {

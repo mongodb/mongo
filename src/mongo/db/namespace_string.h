@@ -427,10 +427,10 @@ public:
         return isLocalDB() && coll() == "system.healthlog";
     }
     bool isSystem() const {
-        return coll().startsWith("system.");
+        return coll().starts_with("system.");
     }
     bool isNormalCollection() const {
-        return !isSystem() && !(isLocalDB() && coll().startsWith("replset."));
+        return !isSystem() && !(isLocalDB() && coll().starts_with("replset."));
     }
     bool isAdminDB() const {
         return db_deprecated() == DatabaseName::kAdmin.db(omitTenant);
@@ -477,7 +477,7 @@ public:
     }
 
     bool isOrphanCollection() const {
-        return isLocalDB() && coll().startsWith(kOrphanCollectionPrefix);
+        return isLocalDB() && coll().starts_with(kOrphanCollectionPrefix);
     }
 
     /**
@@ -609,7 +609,7 @@ public:
      * Returns true if the namespace string is for a "collectionless" cursor.
      */
     bool isCollectionlessCursorNamespace() const {
-        return coll().startsWith("$cmd."_sd);
+        return coll().starts_with("$cmd."_sd);
     }
 
     /**
@@ -661,7 +661,7 @@ public:
      * @return true if the ns is an oplog one, otherwise false.
      */
     static bool oplog(StringData ns) {
-        return ns.startsWith("local.oplog.");
+        return ns.starts_with("local.oplog.");
     }
 
 
@@ -999,7 +999,7 @@ constexpr auto makeNsData(const char* db, const char* coll) {
 
 #define NSS_CONSTANT(id, dbname, coll) \
     constexpr inline auto id##_data =  \
-        makeNsData<dbname.size(), coll.size()>(dbname.db(OmitTenant{}).rawData(), coll.rawData());
+        makeNsData<dbname.size(), coll.size()>(dbname.db(OmitTenant{}).data(), coll.data());
 #include "namespace_string_reserved.def.h"
 #undef NSS_CONSTANT
 }  // namespace namespace_string_data

@@ -338,7 +338,7 @@ Status _dropDatabase(OperationContext* opCtx,
                 // processed. Only non-replicated collections should be left to remove. Collections
                 // with the `tmp.mr` namespace may or may not be getting replicated; be conservative
                 // and assume they are not.
-                invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"));
+                invariant(!nss.isReplicated() || nss.coll().starts_with("tmp.mr"));
             }
 
             if (!abortIndexBuilds) {

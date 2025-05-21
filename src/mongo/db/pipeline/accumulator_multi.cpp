@@ -289,11 +289,11 @@ void AccumulatorMinMaxN::reset() {
 }
 
 const char* AccumulatorMinN::getName() {
-    return kName.rawData();
+    return kName.data();
 }
 
 const char* AccumulatorMaxN::getName() {
-    return kName.rawData();
+    return kName.data();
 }
 
 AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
@@ -392,11 +392,11 @@ Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
 }
 
 const char* AccumulatorFirstN::getName() {
-    return kName.rawData();
+    return kName.data();
 }
 
 const char* AccumulatorLastN::getName() {
-    return kName.rawData();
+    return kName.data();
 }
 
 // TODO SERVER-59327 Refactor other operators to use this parse function.
@@ -503,7 +503,7 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
 
 template <TopBottomSense sense, bool single>
 const char* AccumulatorTopBottomN<sense, single>::getOpName() const {
-    return AccumulatorTopBottomN<sense, single>::getName().rawData();
+    return AccumulatorTopBottomN<sense, single>::getName().data();
 }
 
 template <TopBottomSense sense, bool single>
@@ -577,7 +577,7 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     auto name = AccumulatorTopBottomN<sense, single>::getName();
     const auto [n, output, sortBy] =
-        accumulatorNParseArgs<single>(expCtx, elem, name.rawData(), true, vps);
+        accumulatorNParseArgs<single>(expCtx, elem, name.data(), true, vps);
     auto [sortPattern, sortFieldsExp, hasMeta] =
         parseAccumulatorTopBottomNSortBy<sense>(expCtx, *sortBy);
 

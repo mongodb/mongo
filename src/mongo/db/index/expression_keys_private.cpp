@@ -94,9 +94,9 @@ void ExpressionKeysPrivate::validateDocumentCommon(const CollectionPtr& collecti
                 StringData field = keyElem.fieldName();
                 StringData userField;
 
-                if (field.startsWith(timeseries::kControlMaxFieldNamePrefix)) {
+                if (field.starts_with(timeseries::kControlMaxFieldNamePrefix)) {
                     userField = field.substr(timeseries::kControlMaxFieldNamePrefix.size());
-                } else if (field.startsWith(timeseries::kControlMinFieldNamePrefix)) {
+                } else if (field.starts_with(timeseries::kControlMinFieldNamePrefix)) {
                     userField = field.substr(timeseries::kControlMinFieldNamePrefix.size());
                 }
 
@@ -158,7 +158,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
     key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
     for (auto&& indexEntry : keyPattern) {
         auto indexPath = indexEntry.fieldNameStringData();
-        auto* cstr = indexPath.rawData();
+        auto* cstr = indexPath.data();
         auto fieldVal = dps::extractElementAtOrArrayAlongDottedPath(obj, cstr);
 
         // If we hit an array while traversing the path, 'cstr' will point to the path component

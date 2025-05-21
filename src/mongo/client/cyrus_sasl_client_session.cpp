@@ -207,7 +207,7 @@ int saslClientGetSimple(void* context, int id, const char** result, unsigned* re
         if (!session->hasParameter(requiredParameterId))
             return SASL_FAIL;
         StringData value = session->getParameter(requiredParameterId);
-        *result = value.rawData();
+        *result = value.data();
         if (resultLen)
             *resultLen = static_cast<unsigned>(value.size());
         return SASL_OK;
@@ -312,7 +312,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
                                    &actualMechanism);
     } else {
         result = sasl_client_step(_saslConnection,
-                                  inputData.rawData(),
+                                  inputData.data(),
                                   static_cast<unsigned>(inputData.size()),
                                   nullptr,
                                   &output,

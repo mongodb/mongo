@@ -320,7 +320,7 @@ MongoURI::CaseInsensitiveString::CaseInsensitiveString(std::string str)
     : _original(std::move(str)), _lowercase(boost::algorithm::to_lower_copy(_original)) {}
 
 bool MongoURI::isMongoURI(StringData uri) {
-    return (uri.startsWith(kURIPrefix) || uri.startsWith(kURISRVPrefix));
+    return (uri.starts_with(kURIPrefix) || uri.starts_with(kURISRVPrefix));
 }
 
 std::string MongoURI::redact(StringData url) {
@@ -342,8 +342,8 @@ std::string MongoURI::redact(StringData url) {
 
 MongoURI MongoURI::parseImpl(StringData url) {
     // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
-    const bool isSeedlist = url.startsWith(kURISRVPrefix);
-    if (!(url.startsWith(kURIPrefix) || isSeedlist)) {
+    const bool isSeedlist = url.starts_with(kURISRVPrefix);
+    if (!(url.starts_with(kURIPrefix) || isSeedlist)) {
         return MongoURI(uassertStatusOK(ConnectionString::parse(url.toString())));
     }
 
@@ -395,7 +395,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
             continue;
         }
 
-        if ((host.find('/') != std::string::npos) && !StringData(host).endsWith(".sock")) {
+        if ((host.find('/') != std::string::npos) && !StringData(host).ends_with(".sock")) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
                           << "'" << host << "' in '" << url
@@ -569,7 +569,7 @@ std::string MongoURI::canonicalizeURIAsString() const {
             if (boost::count(hostAndPort.host(), ':') > 1) {
                 uri << delimeter << "[" << uriEncode(hostAndPort.host()) << "]"
                     << ":" << uriEncode(std::to_string(hostAndPort.port()));
-            } else if (StringData(hostAndPort.host()).endsWith(".sock")) {
+            } else if (StringData(hostAndPort.host()).ends_with(".sock")) {
                 uri << delimeter << uriEncode(hostAndPort.host());
             } else {
                 uri << delimeter << uriEncode(hostAndPort.host()) << ":"

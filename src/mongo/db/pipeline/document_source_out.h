@@ -147,7 +147,7 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     const char* getSourceName() const final {
-        return kStageName.rawData();
+        return kStageName.data();
     }
 
     static const Id& id;
@@ -173,7 +173,7 @@ private:
     DocumentSourceOut(NamespaceString outputNs,
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
+        : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx),
           _writeConcern(expCtx->getOperationContext()->getWriteConcern()),
           _timeseries(std::move(timeseries)) {}
 

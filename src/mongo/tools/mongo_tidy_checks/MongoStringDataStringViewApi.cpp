@@ -27,25 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/agg/stage.h"
+#include "MongoStringDataStringViewApi.h"
 
-namespace mongo {
-namespace exec {
-namespace agg {
+#include <array>
+#include <string>
 
+#include <clang/Tooling/Core/Replacement.h>
 
-Stage::Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pCtx)
-    : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.data()) {
-    if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
-        if (internalMeasureQueryExecutionTimeInNanoseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kNanos;
-        } else {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
+namespace mongo::tidy {
+
+using namespace clang;
+using namespace clang::ast_matchers;
+
+namespace {
+
+struct Replacement {
+    std::string oldName;
+    std::string newName;
+};
+
+const std::string klass = "mongo::StringData";
+
+const std::array replacements{
+    Replacement{"rawData", "data"},
+    Replacement{"startsWith", "starts_with"},
+    Replacement{"endsWith", "ends_with"},
+};
+
+}  // namespace
+
+void MongoStringDataStringViewApi::registerMatchers(MatchFinder* finder) {
+    for (auto&& r : replacements) {
+        finder->addMatcher(
+            cxxMemberCallExpr(callee(cxxMethodDecl(ofClass(hasName(klass)), hasName(r.oldName))))
+                .bind(r.oldName),
+            this);
     }
 }
 
+void MongoStringDataStringViewApi::check(const MatchFinder::MatchResult& result) {
+    for (auto&& r : replacements) {
+        auto call = result.Nodes.getNodeAs<clang::CXXMemberCallExpr>(r.oldName);
+        if (!call)
+            continue;
+        auto memberLoc = call->getExprLoc();
+        if (memberLoc.isInvalid())
+            continue;
+        diag(memberLoc, "replace '" + r.oldName + "' with '" + r.newName + "'")
+            << clang::FixItHint::CreateReplacement(clang::CharSourceRange::getTokenRange(memberLoc),
+                                                   r.newName);
+    }
+}
 
-}  // namespace agg
-}  // namespace exec
-}  // namespace mongo
+}  // namespace mongo::tidy

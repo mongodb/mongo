@@ -298,24 +298,24 @@ bool NamespaceString::isShardLocalNamespace() const {
 }
 
 bool NamespaceString::isConfigDotCacheDotChunks() const {
-    return db_deprecated() == "config" && coll().startsWith("cache.chunks.");
+    return db_deprecated() == "config" && coll().starts_with("cache.chunks.");
 }
 
 bool NamespaceString::isReshardingLocalOplogBufferCollection() const {
-    return db_deprecated() == "config" && coll().startsWith(kReshardingLocalOplogBufferPrefix);
+    return db_deprecated() == "config" && coll().starts_with(kReshardingLocalOplogBufferPrefix);
 }
 
 bool NamespaceString::isReshardingConflictStashCollection() const {
-    return db_deprecated() == "config" && coll().startsWith(kReshardingConflictStashPrefix);
+    return db_deprecated() == "config" && coll().starts_with(kReshardingConflictStashPrefix);
 }
 
 bool NamespaceString::isTemporaryReshardingCollection() const {
-    return coll().startsWith(kTemporaryTimeseriesReshardingCollectionPrefix) ||
-        coll().startsWith(kTemporaryReshardingCollectionPrefix);
+    return coll().starts_with(kTemporaryTimeseriesReshardingCollectionPrefix) ||
+        coll().starts_with(kTemporaryReshardingCollectionPrefix);
 }
 
 bool NamespaceString::isTimeseriesBucketsCollection() const {
-    return coll().startsWith(kTimeseriesBucketsCollectionPrefix);
+    return coll().starts_with(kTimeseriesBucketsCollectionPrefix);
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
@@ -335,14 +335,14 @@ bool NamespaceString::isConfigTransactionsCollection() const {
 }
 
 bool NamespaceString::isFLE2StateCollection() const {
-    return coll().startsWith(fle2Prefix) &&
-        (coll().endsWith(fle2EscSuffix) || coll().endsWith(fle2EcocSuffix) ||
-         coll().endsWith(fle2EcocCompactSuffix));
+    return coll().starts_with(fle2Prefix) &&
+        (coll().ends_with(fle2EscSuffix) || coll().ends_with(fle2EcocSuffix) ||
+         coll().ends_with(fle2EcocCompactSuffix));
 }
 
 bool NamespaceString::isFLE2StateCollection(StringData coll) {
-    return coll.startsWith(fle2Prefix) &&
-        (coll.endsWith(fle2EscSuffix) || coll.endsWith(fle2EcocSuffix));
+    return coll.starts_with(fle2Prefix) &&
+        (coll.ends_with(fle2EscSuffix) || coll.ends_with(fle2EcocSuffix));
 }
 
 bool NamespaceString::isOplogOrChangeCollection() const {
@@ -350,12 +350,12 @@ bool NamespaceString::isOplogOrChangeCollection() const {
 }
 
 bool NamespaceString::isSystemStatsCollection() const {
-    return coll().startsWith(kStatisticsCollectionPrefix);
+    return coll().starts_with(kStatisticsCollectionPrefix);
 }
 
 bool NamespaceString::isOutTmpBucketsCollection() const {
     return isTimeseriesBucketsCollection() &&
-        getTimeseriesViewNamespace().coll().startsWith(kOutTmpCollectionPrefix);
+        getTimeseriesViewNamespace().coll().starts_with(kOutTmpCollectionPrefix);
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {

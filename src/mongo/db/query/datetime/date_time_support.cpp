@@ -258,7 +258,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
     if (!format) {
         // Without a format, timelib will attempt to parse a string as best as it can, accepting a
         // variety of formats.
-        rawTime = timelib_strtotime(const_cast<char*>(dateString.rawData()),
+        rawTime = timelib_strtotime(const_cast<char*>(dateString.data()),
                                     dateString.size(),
                                     &rawErrors,
                                     _timeZoneDatabase.get(),
@@ -268,8 +268,8 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
             &kDateFromStringFormatMap[0],
             // Format specifiers must be prefixed by '%'.
             '%'};
-        rawTime = timelib_parse_from_format_with_map(const_cast<char*>(format->rawData()),
-                                                     const_cast<char*>(dateString.rawData()),
+        rawTime = timelib_parse_from_format_with_map(const_cast<char*>(format->data()),
+                                                     const_cast<char*>(dateString.data()),
                                                      dateString.size(),
                                                      &rawErrors,
                                                      _timeZoneDatabase.get(),

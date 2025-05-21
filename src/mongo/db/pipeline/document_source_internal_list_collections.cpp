@@ -154,7 +154,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalListCollections::doOpt
 }
 
 const char* DocumentSourceInternalListCollections::getSourceName() const {
-    return kStageNameInternal.rawData();
+    return kStageNameInternal.data();
 }
 
 void DocumentSourceInternalListCollections::serializeToArray(

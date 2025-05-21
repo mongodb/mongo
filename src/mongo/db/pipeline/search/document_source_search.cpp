@@ -78,7 +78,7 @@ REGISTER_DOCUMENT_SOURCE(searchBeta,
                          AllowedWithApiStrict::kNeverInVersion1);
 
 const char* DocumentSourceSearch::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {

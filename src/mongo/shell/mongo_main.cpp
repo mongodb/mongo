@@ -1051,7 +1051,7 @@ int mongo_main(int argc, char* argv[]) {
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('ignoreChildProcessErrorCode') && "
                     "TestData.ignoreChildProcessErrorCode === true; }"_sd;
-                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
                 ignoreChildProcessErrorCode = shellMainScope->getBoolean("__returnValue");
                 auto childProcessErrorCode = mongo::shell_utils::KillMongoProgramInstances();
 
@@ -1085,7 +1085,7 @@ int mongo_main(int argc, char* argv[]) {
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('ignoreUnterminatedProcesses') && "
                     "TestData.ignoreUnterminatedProcesses === true; }"_sd;
-                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
                 ignoreUnterminatedProcesses = shellMainScope->getBoolean("__returnValue");
 
                 if (!ignoreUnterminatedProcesses) {
@@ -1133,7 +1133,7 @@ int mongo_main(int argc, char* argv[]) {
                     "function() { return typeof TestData === 'object' && TestData !== null && "
                     "TestData.hasOwnProperty('cleanUpCoreDumpsFromExpectedCrash') && "
                     "TestData.cleanUpCoreDumpsFromExpectedCrash === true; }"_sd;
-                shellMainScope->invokeSafe(code.rawData(), nullptr, nullptr);
+                shellMainScope->invokeSafe(code.data(), nullptr, nullptr);
                 bool cleanUpCoreDumpsFromExpectedCrash =
                     shellMainScope->getBoolean("__returnValue");
 
@@ -1160,7 +1160,7 @@ int mongo_main(int argc, char* argv[]) {
 
         {
             const StringData parallelShellCode = "uncheckedParallelShellPidsString();"_sd;
-            shellMainScope->invokeSafe(parallelShellCode.rawData(), nullptr, nullptr);
+            shellMainScope->invokeSafe(parallelShellCode.data(), nullptr, nullptr);
             std::string ret = shellMainScope->getString("__returnValue");
             if (!ret.empty()) {
                 std::cout << "exiting due to parallel shells with unchecked return values. "

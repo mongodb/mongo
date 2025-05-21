@@ -91,7 +91,7 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
             uassert(ErrorCodes::BadValue,
                     str::stream() << "Field " << patternEl.fieldNameStringData()
                                   << " contains parts that start with '$'",
-                    !part.startsWith("$") ||
+                    !part.starts_with("$") ||
                         (i != 0 && (part == "$db" || part == "$id" || part == "$ref")));
         }
 

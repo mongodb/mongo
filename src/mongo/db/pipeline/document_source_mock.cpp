@@ -62,7 +62,7 @@ DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
 }
 
 const char* DocumentSourceMock::getSourceName() const {
-    return kStageName.rawData();
+    return kStageName.data();
 }
 
 size_t DocumentSourceMock::size() const {

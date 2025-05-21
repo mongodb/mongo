@@ -91,7 +91,7 @@ Status _applyOps(OperationContext* opCtx,
     // Apply each op in the given 'applyOps' command object.
     for (const auto& opObj : ops) {
         // Ignore 'n' operations.
-        const char* opType = opObj.getStringField("op").rawData();
+        const char* opType = opObj.getStringField("op").data();
         if (*opType == 'n')
             continue;
 

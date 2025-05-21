@@ -46,7 +46,7 @@ TEST(SorterChecksumCalculatorTest, CollisionCheck) {
         absl::flat_hash_set<size_t> seenValues;
         seenValues.insert(calculator.checksum());
         for (size_t i = 0; i < kTestCount; ++i) {
-            calculator.addData(kData.rawData(), kData.size());
+            calculator.addData(kData.data(), kData.size());
             size_t checksum = calculator.checksum();
             ASSERT_FALSE(seenValues.contains(checksum))
                 << "version: " << SorterChecksumVersion_serializer(version);
@@ -58,7 +58,7 @@ TEST(SorterChecksumCalculatorTest, CollisionCheck) {
 TEST(SorterChecksumCalculatorTest, RandomBitFlips) {
     for (auto version : {SorterChecksumVersion::v1, SorterChecksumVersion::v2}) {
         SorterChecksumCalculator fullCalculator(version);
-        fullCalculator.addData(kData.rawData(), kData.size());
+        fullCalculator.addData(kData.data(), kData.size());
         size_t expectedChecksum = fullCalculator.checksum();
 
         PseudoRandom random{static_cast<uint64_t>(expectedChecksum)};

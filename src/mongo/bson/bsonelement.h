@@ -1022,7 +1022,7 @@ private:
      * valueStringDataSafe(). You should use the string's size when performing any operations
      * on the data to disambiguate between potential embedded null's and the terminating null.
      * This function is only used in limited forms internally. Not to be exposed publicly.
-     * If a char* is desired use valueStringDataSafe().rawData().
+     * If a char* is desired use valueStringDataSafe().data().
      */
     const char* valuestr() const {
         return value() + 4;
