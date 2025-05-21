@@ -704,6 +704,22 @@ validate:
     - src/mongo/db/validate
     - src/mongo/dbtests/validate_tests.cpp
 
+dbhash:
+  meta:
+    slack: server-rss-sydney
+    jira: RSS Sydney
+  files:
+    - src/mongo/db/commands/dbhash*
+
+compact:
+  meta:
+    slack: server-rss-sydney
+    jira: RSS Sydney
+  files:
+    - src/mongo/db/catalog/collection_compact*
+    - src/mongo/db/commands/*compact*
+    - src/mongo/db/storage/compact_options*
+
 dbcheck:
   meta:
     slack: server-rss-sydney
@@ -726,16 +742,12 @@ server_backup_restore:
     - src/mongo/db/modules/enterprise/src/util/document_source_visitor_registry_enterprise.h
     - src/mongo/db/storage/backup*
 
-server_rss_sydney:
+cache_pressure:
   meta:
     slack: server-rss-sydney
     jira: RSS Sydney
   files:
     - src/mongo/db/periodic_runner_cache_pressure_rollback*
-    - src/mongo/db/catalog/collection_compact*
-    - src/mongo/db/commands/*compact*
-    - src/mongo/db/commands/dbhash*
-    - src/mongo/db/storage/compact_options*
 
 ttl: # authoritative: @10gen/server-ttl
   meta:
