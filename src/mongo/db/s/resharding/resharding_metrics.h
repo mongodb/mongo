@@ -49,7 +49,6 @@
 #include "mongo/db/s/metrics/with_phase_duration_management.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/metrics/with_state_management_for_instance_metrics.h"
-#include "mongo/db/s/metrics/with_typed_cumulative_metrics_provider.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
@@ -72,10 +71,9 @@ enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
 constexpr auto kNumTimedPhase = 4;
 
 namespace detail {
-using PartialBase1 = WithTypedCumulativeMetricsProvider<ShardingDataTransformInstanceMetrics,
-                                                        ReshardingCumulativeMetrics>;
-using PartialBase2 =
-    WithStateManagementForInstanceMetrics<PartialBase1, ReshardingCumulativeMetrics::AnyState>;
+
+using PartialBase2 = WithStateManagementForInstanceMetrics<ShardingDataTransformInstanceMetrics,
+                                                           ReshardingCumulativeMetrics::AnyState>;
 
 using PartialBaseFinal = WithPhaseDurationManagement<PartialBase2, TimedPhase, kNumTimedPhase>;
 

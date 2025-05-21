@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -290,6 +291,10 @@ void ShardingDataTransformInstanceMetrics::onCloningRemoteBatchRetrieval(Millise
 ShardingDataTransformCumulativeMetrics*
 ShardingDataTransformInstanceMetrics::getCumulativeMetrics() {
     return _cumulativeMetrics;
+}
+
+ReshardingCumulativeMetrics* ShardingDataTransformInstanceMetrics::getTypedCumulativeMetrics() {
+    return dynamic_cast<ReshardingCumulativeMetrics*>(getCumulativeMetrics());
 }
 
 ClockSource* ShardingDataTransformInstanceMetrics::getClockSource() const {

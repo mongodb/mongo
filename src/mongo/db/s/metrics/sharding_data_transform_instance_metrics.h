@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+class ReshardingCumulativeMetrics;
+
 class ShardingDataTransformInstanceMetrics {
 public:
     using Role = ShardingDataTransformMetrics::Role;
@@ -137,6 +139,7 @@ protected:
     virtual boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const = 0;
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
+    ReshardingCumulativeMetrics* getTypedCumulativeMetrics();
     ClockSource* getClockSource() const;
     UniqueScopedObserver registerInstanceMetrics();
 
