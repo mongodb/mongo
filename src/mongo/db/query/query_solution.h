@@ -76,7 +76,6 @@
 #include "mongo/db/query/timeseries/bucket_spec.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/hash_utils.h"
 #include "mongo/util/id_generator.h"
 #include "mongo/util/str.h"
 

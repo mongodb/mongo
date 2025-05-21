@@ -101,6 +101,19 @@ public:
         return sizeof(FTSQuery) + _query.size() + 1 + _language.size() + 1;
     }
 
+    /**
+     * FTSQuery's hash function compatible with absl::Hash. Designed be consistent with
+     * 'FTSQuery::equivalent()'.
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const FTSQuery& ftsQuery) {
+        return H::combine(std::move(h),
+                          ftsQuery.getQuery(),
+                          ftsQuery.getLanguage(),
+                          ftsQuery.getCaseSensitive(),
+                          ftsQuery.getDiacriticSensitive());
+    }
+
 private:
     std::string _query;
     std::string _language;

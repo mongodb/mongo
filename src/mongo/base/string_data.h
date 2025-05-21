@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include <absl/hash/hash.h>
 #include <algorithm>
 #include <cstring>
 #include <fmt/format.h>
+#include <functional>
 #include <iosfwd>
 #include <limits>
 #include <stdexcept>
@@ -416,6 +418,15 @@ constexpr StringData operator""_sd(const char* c, std::size_t len) {
 }  // namespace literals
 
 }  // namespace mongo
+
+namespace std {
+template <>
+struct hash<mongo::StringData> {
+    size_t operator()(mongo::StringData s) const noexcept {
+        return hash<std::string_view>{}(toStdStringViewForInterop(s));
+    }
+};
+}  // namespace std
 
 namespace fmt {
 template <>
