@@ -169,7 +169,6 @@ query:
     - src/mongo/db/change_stream*
     - src/mongo/db/op_observer/change_stream_pre_images_op_observer*
     - src/mongo/db/set_change_stream*
-    - src/mongo/db/fle_*
     - src/mongo/db/curop*
     - src/mongo/db/fts/
     - src/mongo/db/geo/
@@ -340,6 +339,7 @@ routing_and_topology:
     # cluster_server_parameters: Cluster server parameters are a special type of server parameter that
     # are stored in the config server and are replicated to all shards. They are used to control
     # the behavior of the cluster as a whole, rather than individual shards.
+    - src/mongo/db/commands/cluster_server_parameter_cmds.idl
     - src/mongo/idl/cluster_server_parameter*
     - src/mongo/idl/cluster_parameter_synchronization_helpers*
     - src/mongo/s/set_cluster_server_parameter_router_impl[._]*
@@ -364,6 +364,7 @@ routing_and_topology:
 
     # unsorted: Everything else.
     - src/mongo/db/write_block_bypass[._]*
+    - src/mongo/db/op_observer/user_write_block_mode*
     - src/mongo/s/cluster_identity_loader[._]*
 
 replication_coordinator:
@@ -419,10 +420,21 @@ fcv:
 
 access_control:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-security
+    jira: Server Security
   files:
     - src/mongo/db/auth/
+    - src/mongo/db/cluster_auth_mode_option.idl
+    - src/mongo/db/commands/authentication*
+    - src/mongo/db/commands/user_management*
+    - src/mongo/db/keyfile_option.idl
+    - src/mongo/db/modules/enterprise/src/kerberos
+    - src/mongo/db/modules/enterprise/src/ldap
+    - src/mongo/db/modules/enterprise/src/sasl
+    - src/mongo/db/modules/enterprise/src/util/gssapi*
+    - src/mongo/db/modules/enterprise/src/util/report.*
+    - src/mongo/s/commands/cluster_user_management_commands.cpp
+    - src/mongo/s/cluster_umc_error_with_write_concern_error_info*
 
 admission:
   meta:
@@ -439,19 +451,76 @@ workload_simulation:
   files:
     - src/mongo/tools/workload_simulation/
 
-security:
+native_tenant_data_isolation:
   meta:
-    slack: TODO
-    jira: TODO
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/tenant_id*
+    - src/mongo/db/multitenancy*
+    - src/mongo/db/auth/validated_tenancy_scope*
+    - src/mongo/s/initialize_tenant_to_shard_cache*
+
+crypto:
+  meta:
+    slack: server-security
+    jira: Server Security
   files:
     - src/mongo/crypto
+
+audit:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/audit*
     - src/mongo/db/modules/enterprise/src/audit
+    - src/mongo/rpc/metadata/audit*
+
+encrypted_storage_engine:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
     - src/mongo/db/modules/enterprise/src/encryptdb
+
+security:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/commands/connection_status.*
+    - src/mongo/db/commands/hashcmd.cpp
+    - src/mongo/db/commands/rotate_certificates*
     - src/mongo/db/modules/enterprise/src/fips
-    - src/mongo/db/modules/enterprise/src/kerberos
     - src/mongo/db/modules/enterprise/src/kmip
-    - src/mongo/db/modules/enterprise/src/ldap
-    - src/mongo/db/modules/enterprise/src/sasl
+    - src/mongo/db/system_index*
+
+field_level_encryption:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/commands/fle2_*
+    - src/mongo/db/fle_*
+    - src/mongo/db/s/*_structured_encryption_*
+    - src/mongo/s/commands/*fle2*
+    - src/mongo/db/commands/fle_compact_test.cpp
+
+field_level_encryption.cryptd:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/modules/enterprise/src/fle/commands
+    - src/mongo/util/cryptd
+
+field_level_encryption.crypt_shared:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/modules/enterprise/src/fle/lib
 
 causal_consistency:
   meta:
@@ -717,7 +786,8 @@ compact:
     jira: RSS Sydney
   files:
     - src/mongo/db/catalog/collection_compact*
-    - src/mongo/db/commands/*compact*
+    - src/mongo/db/commands/auto_compact*
+    - src/mongo/db/commands/compact*
     - src/mongo/db/storage/compact_options*
 
 dbcheck:
@@ -769,6 +839,14 @@ atlas-streams:
     jira: Atlas Streams
   files:
     - src/mongo/db/modules/enterprise/src/streams
+
+server_parameters:
+  meta:
+    slack: server-security
+    jira: Server Security
+  files:
+    - src/mongo/db/server_options*
+    - src/mongo/db/server_parameter*
 
 # This module doesn't really exist. It's files are only compiled on windows, and we don't
 # run the mod_scanner on a windows build. However, it is needed to ensure that all first-party
