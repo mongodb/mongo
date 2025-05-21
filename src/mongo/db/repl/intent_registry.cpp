@@ -171,6 +171,9 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
             default:
                 break;
         }
+
+        _waitForDrain(Intent::PreparedTransaction, std::chrono::milliseconds(0));
+
         if (intents) {
             for (auto intent : *intents) {
                 _killOperationsByIntent(intent);
@@ -180,8 +183,8 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
             for (auto intent : *intents) {
                 _waitForDrain(intent, timeout);
                 // Negative duration to cv::wait_for can cause undefined behavior
-                // Since timeout == 0 is a special case to enable untimed wait we prevent a non-zero
-                // timeout to ever drop to 0 by setting it to at least to 1ms
+                // Since timeout == 0 is a special case to enable untimed wait we prevent a
+                // non-zero timeout to ever drop to 0 by setting it to at least to 1ms
                 if (timeout.count()) {
                     timeout -= std::min(
                         std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
@@ -236,7 +239,7 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
             return false;
         case InterruptionType::StepDown:
         case InterruptionType::StepUp:
-            return intent != Intent::Write;
+            return intent != Intent::Write && intent != Intent::PreparedTransaction;
         default:
             return true;
     }
@@ -284,6 +287,8 @@ std::string IntentRegistry::_intentToString(IntentRegistry::Intent intent) {
             return "READ";
         case Intent::Write:
             return "WRITE";
+        case Intent::PreparedTransaction:
+            return "PREPARED_TRANSACTION";
         default:
             return "UNKNOWN";
     }

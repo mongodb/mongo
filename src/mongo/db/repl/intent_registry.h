@@ -88,6 +88,7 @@ public:
         Read,
         Write,
         LocalWrite,
+        PreparedTransaction,
         _NumDistinctIntents_,
     };
 
