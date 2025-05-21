@@ -7,7 +7,7 @@
 	"settings": {
 		"clangd.checkUpdates": true,
 		"clangd.path": "${workspaceFolder}/buildscripts/clangd_vscode.sh",
-		"clang-format.executable": "${workspaceRoot}/bazel-mongo/external/mongo_toolchain_v5/v5/bin/clang-format",
+		"clang-format.executable": "${workspaceRoot}/bazel-out/../../../external/mongo_toolchain_v5/v5/bin/clang-format",
 		"clang-tidy.executable": "buildscripts/clang_tidy_vscode.py",
 		"editor.codeActionsOnSave": {
 			"source.fixAll.eslint": "explicit"
@@ -160,7 +160,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
 			},
 			{
 				"name": "attach",
@@ -213,7 +213,7 @@
 						"ignoreFailures": false
 					},
 				],
-				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
 			},
 			{
 				"name": "coredump",
@@ -223,7 +223,7 @@
 				"program": "${workspaceFolder}/${input:runTargets}",
 				"args": [],
 				"MIMode": "gdb",
-				"miDebuggerPath": "${workspaceFolder}/bazel-mongo/external/gdb/v5/bin/gdb",
+				"miDebuggerPath": "${workspaceFolder}/bazel-${workspaceFolderBasename}/external/gdb/v5/bin/gdb",
 				"preLaunchTask": "_prelaunch_task",
 				"setupCommands": [
 					{

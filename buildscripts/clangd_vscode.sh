@@ -6,8 +6,8 @@ ARGS=("$@")
 # Ordered list of possible clangd locations
 CANDIDATES=(
   "$(command -v custom-clangd)"
-  ".compiledb/compiledb-mongo/external/mongo_toolchain_v5/v5/bin/clangd"
-  "bazel-mongo/external/mongo_toolchain_v5/v5/bin/clangd"
+  "$(find .compiledb/compiledb-*/external/mongo_toolchain_v5/v5/bin/clangd)"
+  "$(find bazel-*/external/mongo_toolchain_v5/v5/bin/clangd)"
   "/opt/mongodbtoolchain/v5/bin/clangd"
 )
 
