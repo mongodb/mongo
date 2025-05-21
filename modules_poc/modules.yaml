@@ -762,6 +762,7 @@ storage_engine_integration:
     - src/mongo/dbtests/dbhelper_tests.cpp
     - src/mongo/dbtests/dbtests*
     - src/mongo/dbtests/storage_debug_util*
+    - src/mongo/s/commands/storage_engine
 
 validate:
   meta:
