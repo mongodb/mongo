@@ -271,29 +271,32 @@ struct ExceptionForCodeDispatcher<code, CategoryList<categories...>> {
                                     ExceptionForCode<code, ExceptionForCat<categories>...>>;
 };
 
-template <auto codeOrCat>
+// Note: second template parameter shouldn't be necessary but is on MSVC.
+// It seems to be unable to disambiguate the partial specializations of an auto NTTP
+// with concrete types and needs a dummy type template parameter to do so.
+template <auto codeOrCat, typename = decltype(codeOrCat)>
 struct ExceptionForDispatcher;
 
 template <ErrorCodes::Error code>
-struct ExceptionForDispatcher<code> : ExceptionForCodeDispatcher<code> {};
+struct ExceptionForDispatcher<code, ErrorCodes::Error> : ExceptionForCodeDispatcher<code> {};
 
 template <>
-struct ExceptionForDispatcher<ErrorCodes::WriteConflict> {
+struct ExceptionForDispatcher<ErrorCodes::WriteConflict, ErrorCodes::Error> {
     using type = WriteConflictException;
 };
 
 template <>
-struct ExceptionForDispatcher<ErrorCodes::TemporarilyUnavailable> {
+struct ExceptionForDispatcher<ErrorCodes::TemporarilyUnavailable, ErrorCodes::Error> {
     using type = TemporarilyUnavailableException;
 };
 
 template <>
-struct ExceptionForDispatcher<ErrorCodes::TransactionTooLargeForCache> {
+struct ExceptionForDispatcher<ErrorCodes::TransactionTooLargeForCache, ErrorCodes::Error> {
     using type = TransactionTooLargeForCacheException;
 };
 
 template <ErrorCategory category>
-struct ExceptionForDispatcher<category> {
+struct ExceptionForDispatcher<category, ErrorCategory> {
     using type = ExceptionForCat<category>;
 };
 

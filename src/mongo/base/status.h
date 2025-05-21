@@ -62,7 +62,7 @@ namespace mongo {
 class [[nodiscard]] Status {
 public:
     /** This is the best way to construct an OK status. */
-    consteval static Status OK() {
+    constexpr static Status OK() {
         return {};
     }
 
