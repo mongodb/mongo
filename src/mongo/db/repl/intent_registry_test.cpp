@@ -399,7 +399,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsBackToBack) {
     auto killsd = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::StepDown, timeout_sec);
     // Killing all writes to let stepdown kill finish in separate thread
-    std::jthread killwrites = std::jthread([&] {
+    stdx::thread killwrites = stdx::thread([&] {
         for (auto& guard : guards) {
             if (guard->intent() == IntentRegistry::Intent::Write ||
                 guard->intent() == IntentRegistry::Intent::PreparedTransaction) {
@@ -414,7 +414,8 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsBackToBack) {
     auto killsh = _intentRegistry.killConflictingOperations(
         IntentRegistry::InterruptionType::Shutdown, timeout_sec);
     guards.clear();
-    killsh.get();
+    (void)killsh.get();
+    killwrites.join();
 }
 
 
