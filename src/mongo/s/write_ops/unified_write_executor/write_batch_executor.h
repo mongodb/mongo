@@ -30,53 +30,21 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <variant>
 
-#include "mongo/s/write_ops/batched_command_request.h"
-
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
 namespace mongo {
 namespace unified_write_executor {
-enum WriteType {
-    kInsert = BatchedCommandRequest::BatchType_Insert,
-    kUpdate = BatchedCommandRequest::BatchType_Update,
-    kDelete = BatchedCommandRequest::BatchType_Delete,
-    kFindAndMod,  // TODO SERVER-103949 will use this type or remove it.
-};
 
-using WriteOpId = size_t;
+using WriteBatchResponse = std::map<ShardId, StatusWith<executor::RemoteCommandResponse>>;
 
-class WriteOp {
+class WriteBatchExecutor {
 public:
-    WriteOp(const BulkWriteCommandRequest& request, int index) : _request(request), _index(index) {}
-
-    WriteOpId getId() const {
-        return _index;
-    }
-
-    const NamespaceString& getNss() const {
-        return BatchItemRef(&_request, _index).getNss();
-    }
-
-    WriteType getType() const {
-        return WriteType(BatchItemRef(&_request, _index).getOpType());
-    }
-
-    BatchItemRef getRef() const {
-        return BatchItemRef(&_request, _index);
-    }
-
-    BulkWriteOpVariant getBulkWriteOp() const {
-        return _request.getOps()[_index];
-    }
-
-    bool isMulti() const {
-        return BatchItemRef(&_request, _index).isMulti();
-    }
+    WriteBatchResponse execute(OperationContext* opCtx, const WriteBatch& batch);
 
 private:
-    const BulkWriteCommandRequest& _request;
-    int _index;
+    WriteBatchResponse _execute(OperationContext* opCtx, const SimpleWriteBatch& batch);
 };
 
 }  // namespace unified_write_executor
