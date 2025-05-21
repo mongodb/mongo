@@ -15,6 +15,7 @@ import traceback
 import geckodriver_autoinstaller
 from pathlib import Path
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support import expected_conditions as EC
@@ -55,6 +56,18 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
         # Enter username.
         username_input_box.send_keys(username)
         next_button.click()
+
+        # Click on "Use your password" button if it exists.
+        try:
+            use_password_button = WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//span[@role='button'][. = 'Use your password']")
+                )
+            )
+            use_password_button.click()
+        except TimeoutException:
+            # No "use your password" button, the password input should already be on-screen.
+            pass
 
         # Azure delivers two different HTML's so we try with both versions.
         password_input_box = None
