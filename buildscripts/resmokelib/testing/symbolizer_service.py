@@ -16,7 +16,10 @@ from buildscripts.resmokelib.testing.testcases.interface import TestCase
 
 # This lock prevents different resmoke jobs from symbolizing stacktraces concurrently,
 # which includes downloading the debug symbols, that can be reused by other resmoke jobs
-_lock = Lock()
+_symbolizer_lock = Lock()
+
+# A lock for avoiding concurrent access to PROCESSED_FILES_LIST_FILE_PATH
+_processed_files_lock = Lock()
 
 STACKTRACE_FILE_EXTENSION = ".stacktrace"
 SYMBOLIZE_RETRY_TIMEOUT_SECS = timedelta(minutes=4).total_seconds()
@@ -109,23 +112,23 @@ class ResmokeSymbolizer:
         if dbpath is None:
             return
 
-        with _lock:
-            test.logger.info("Looking for stacktrace files in '%s'", dbpath)
-            files = self.collect_stacktrace_files(dbpath)
-            if not files:
-                test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
-                return
+        test.logger.info("Looking for stacktrace files in '%s'", dbpath)
+        files = self.collect_stacktrace_files(dbpath)
+        if not files:
+            test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
+            return
 
-            test.logger.info("Found stacktrace files: %s", files)
-            # To avoid performing the same actions on these files again, we mark them as processed
-            self.file_service.add_to_processed_files(files)
-            self.file_service.write_processed_files(PROCESSED_FILES_LIST_FILE_PATH)
+        test.logger.info("Found stacktrace files: %s", files)
+        # To avoid performing the same actions on these files again, we mark them as processed
+        self.file_service.add_to_processed_files(files)
+        self.file_service.write_processed_files(PROCESSED_FILES_LIST_FILE_PATH)
 
-            if test.return_code == 0:
-                test.logger.info("Test succeeded, skipping symbolization")
-                return
+        if test.return_code == 0:
+            test.logger.info("Test succeeded, skipping symbolization")
+            return
 
-            test.logger.info("Symbolization process started.")
+        test.logger.info("Starting symbolization once no other tests are being symbolized.")
+        with _symbolizer_lock:
             test.logger.info("\nBEGIN Symbolization")
 
             start_time = time.perf_counter()
@@ -230,9 +233,10 @@ class FileService:
 
         :param: path to a file where we store processed files info.
         """
-        if os.path.exists(file_path):
-            with open(file_path, "r") as file:
-                return {line for line in set(file.readlines()) if line}
+        with _processed_files_lock:
+            if os.path.exists(file_path):
+                with open(file_path, "r") as file:
+                    return {line for line in set(file.readlines()) if line}
         return set()
 
     def add_to_processed_files(self, files: List[str]) -> None:
@@ -252,8 +256,9 @@ class FileService:
         :param file_path: path to a file where we store processed files info
         :return: None
         """
-        with open(file_path, "w") as file:
-            file.write("\n".join(self._processed_files))
+        with _processed_files_lock:
+            with open(file_path, "w") as file:
+                file.write("\n".join(self._processed_files))
 
     def is_processed(self, file: str) -> bool:
         """
