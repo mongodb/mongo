@@ -507,8 +507,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: fassertOnLockTimeoutForStepUpDown
-        # We set the default to 30 seconds explicitly to match sharding's defaultConfigCommandTimeout.
-        default: 30
+        default: 60
         validator:
             gte: 0
         redact: false
