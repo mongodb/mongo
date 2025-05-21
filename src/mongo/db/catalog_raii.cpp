@@ -468,10 +468,7 @@ struct CollectionWriter::SharedImpl {
 };
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisition* acquisition)
-    : _acquisition(acquisition),
-      _collection(&_storedCollection),
-      _managed(true),
-      _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    : _acquisition(acquisition), _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
@@ -489,9 +486,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, CollectionAcquisitio
 }
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
-    : _collection(&_storedCollection),
-      _managed(true),
-      _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
@@ -504,9 +499,7 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
 }
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceString& nss)
-    : _collection(&_storedCollection),
-      _managed(true),
-      _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
     // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(
@@ -520,20 +513,18 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
 }
 
 CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& autoCollection)
-    : _collection(&autoCollection.getCollection()),
-      _managed(true),
-      _sharedImpl(std::make_shared<SharedImpl>(this)) {
+    : _managed(true), _sharedImpl(std::make_shared<SharedImpl>(this)) {
 
-    _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
-        // TODO SERVER-99582: Using the CollectionWriter updates the AutoGetCollection object to
-        // point to the new writable instance. This is a legacy behaviour to maintain compatibility
-        // with existing code. We should ideally remove this if we can guarantee this is no longer
-        // the case.
+    // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
+    _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(autoCollection._coll.get());
+    _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
 
+    _sharedImpl->_writableCollectionInitializer = [originalColl = _storedCollection.get(),
+                                                   opCtx,
+                                                   &autoCollection]() {
         auto catalog = CollectionCatalog::get(opCtx);
         auto writableColl =
             catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, autoCollection.getNss());
-
         // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
         // the write unit of work finishes so we re-fetches and re-clones the Collection if a
         // new write unit of work is opened.
@@ -541,32 +532,36 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
             [&](OperationContext* opCtx, boost::optional<Timestamp> commitTime) {
                 // TODO(SERVER-103398): Investigate usage validity of
                 // CollectionPtr::CollectionPtr_UNSAFE
-                autoCollection._coll =
-                    CollectionPtr::CollectionPtr_UNSAFE(autoCollection._coll.get());
+                auto& nss = autoCollection.getNss();
+                // Restore with the just committed instance. This is safe because we still hold the
+                // lock on the collection after commit meaning we're the only ones that can modify
+                // the collection.
+                auto collection =
+                    CollectionCatalog::latest(opCtx)->lookupCollectionByNamespace(opCtx, nss);
+                autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(collection);
+                invariant(autoCollection._coll->ns() == nss);
+                // Make yieldable again
                 autoCollection._coll.makeYieldable(
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             },
-            [&autoCollection,
-             originalCollection = autoCollection._coll.get()](OperationContext* opCtx) {
+            [&autoCollection, originalColl](OperationContext* opCtx) {
                 // TODO(SERVER-103398): Investigate usage validity of
                 // CollectionPtr::CollectionPtr_UNSAFE
-                autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(originalCollection);
+                autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(originalColl);
                 autoCollection._coll.makeYieldable(
                     opCtx, LockedCollectionYieldRestore(opCtx, autoCollection._coll));
             });
 
-        // Set to writable collection. We are no longer yieldable.
-        // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        autoCollection._coll = CollectionPtr::CollectionPtr_UNSAFE(writableColl);
-
+        // Invalidate the collection pointer during modifications. This matches the behavior in the
+        // acquisition case
+        autoCollection._coll.reset();
         return writableColl;
     };
 }
 
 // TODO(SERVER-103398): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
 CollectionWriter::CollectionWriter(Collection* writableCollection)
-    : _collection(&_storedCollection),
-      _storedCollection(CollectionPtr::CollectionPtr_UNSAFE(writableCollection)),
+    : _storedCollection(CollectionPtr::CollectionPtr_UNSAFE(writableCollection)),
       _writableCollection(writableCollection),
       _managed(false) {}
 
@@ -585,9 +580,7 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
         // If we are using our stored Collection then we are not managed by an AutoGetCollection
         // and we need to manage lifetime here.
         if (_managed) {
-            bool usingStoredCollection = *_collection == _storedCollection;
-            auto rollbackCollection =
-                usingStoredCollection ? std::move(_storedCollection) : CollectionPtr();
+            auto rollbackCollection = std::move(_storedCollection);
 
             // Resets the writable Collection when the write unit of work finishes so we re-fetch
             // and re-clone the Collection if a new write unit of work is opened. Holds the back
@@ -615,11 +608,9 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                     }
                 });
 
-            if (usingStoredCollection) {
-                // TODO(SERVER-103398): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(_writableCollection);
-            }
+            // TODO(SERVER-103398): Investigate usage validity of
+            // CollectionPtr::CollectionPtr_UNSAFE
+            _storedCollection = CollectionPtr::CollectionPtr_UNSAFE(_writableCollection);
         }
     }
     return _writableCollection;

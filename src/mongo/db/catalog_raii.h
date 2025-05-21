@@ -426,7 +426,7 @@ public:
     }
 
     const CollectionPtr& get() const {
-        return *_collection;
+        return _storedCollection;
     }
 
     // Returns writable Collection, any previous Collection that has been returned may be
@@ -439,12 +439,8 @@ private:
     CollectionAcquisition* _acquisition = nullptr;
     std::unique_ptr<ScopedLocalCatalogWriteFence> _fence;
 
-    // If this class is instantiated with the constructors that take UUID or nss we need somewhere
-    // to store the CollectionPtr used. But if it is instantiated with an AutoGetCollection then the
-    // lifetime of the object is managed there. To unify the two code paths we have a pointer that
-    // points to either the CollectionPtr in an AutoGetCollection or to a stored CollectionPtr in
-    // this instance. This can also be used to determine how we were instantiated.
-    const CollectionPtr* _collection = nullptr;
+    // Points to the current collection instance to use that is either the old read-only instance or
+    // the one we're modyfing.
     CollectionPtr _storedCollection;
     Collection* _writableCollection = nullptr;
 
