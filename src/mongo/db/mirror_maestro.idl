@@ -34,8 +34,8 @@ imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-    MirroredReadsParameters:
-        description: "A struct representing how to mirror read command requests"
+    CommonMirroredReadsParameters:
+        description: "Options for mirroring reads shared across mirrored read types"
         strict: true
         fields:
             samplingRate:
@@ -53,6 +53,29 @@ structs:
                 default: 1000
                 validator:
                     gt: 0
+
+    TargetedMirroredReadsOptions:
+        description: "Options specific to targeted mirrored reads"
+        inline_chained_structs: true
+        chained_structs:
+            CommonMirroredReadsParameters: CommonMirroredReadsParameters
+        strict: true
+        fields:
+            tag:
+                description: The replica set tag used to identify the nodes to target
+                type: object_owned
+                default: "BSONObj()"
+
+    MirroredReadsParameters:
+        description: "A struct representing how to mirror read command requests"
+        inline_chained_structs: true
+        chained_structs:
+            CommonMirroredReadsParameters: CommonMirroredReadsParameters
+        fields:
+            targetedMirroring:
+                description: "Options to use for targeted mirrored reads"
+                type: TargetedMirroredReadsOptions
+                default: true
 
 server_parameters:
     mirrorReads:
