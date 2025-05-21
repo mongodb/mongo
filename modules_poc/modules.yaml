@@ -366,6 +366,8 @@ routing_and_topology:
     - src/mongo/db/write_block_bypass[._]*
     - src/mongo/db/op_observer/user_write_block_mode*
     - src/mongo/s/cluster_identity_loader[._]*
+    - src/mongo/s/service_entry_point_router_role[._]*
+    - src/mongo/s/commands/strategy*
 
 replication_coordinator:
   meta:
