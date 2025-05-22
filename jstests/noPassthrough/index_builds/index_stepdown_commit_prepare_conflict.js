@@ -42,7 +42,7 @@ assert.commandWorked(primaryColl.insert({_id: 1, x: 1}));
 assert.commandWorked(primary.adminCommand({clearLog: 'global'}));
 
 // Enable fail point which makes hybrid index build to hang.
-const failPoint = "hangAfterIndexBuildSecondDrain";
+const failPoint = "hangIndexBuildAfterSignalPrimaryForCommitReadiness";
 let res =
     assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 let timesEntered = res.count;

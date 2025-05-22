@@ -154,8 +154,8 @@ let runTest = function(config) {
             break;
         // Hang before the final drain and commit.
         case 4:
-            doDuringFailpoint("hangAfterIndexBuildSecondDrain",
-                              new RegExp("\"id\":20667"),
+            doDuringFailpoint("hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+                              new RegExp("\"id\":4841707"),
                               buildIndex,
                               doOperation);
             break;

@@ -43,11 +43,13 @@ a deletion of the key `1` and an insertion of the key `2`.
 Once the collection scan and bulk-load phases of the index build are complete, these intercepted
 keys are applied directly to the index in three phases:
 
-- While holding a collection IX lock to allow concurrent reads and writes
-  - Because writes are still accepted, new keys may appear at the end of the _side-writes_ table.
+- Drain the side table while holding a collection IX lock to allow concurrent reads and writes.
+  - Since writes are still accepted, new keys may appear at the end of the _side-writes_ table.
     They will be applied in subsequent steps.
-- While holding a collection S lock to block concurrent writes, but not reads
-- While holding a collection X lock to block all reads and writes
+    (Signal commit readiness to the primary)
+- Continue draining the side table while holding a collection IX lock to allow concurrent reads and
+  writes, while waiting for other replicas to become commit-ready.
+- Drain the side table while holding a collection X lock to block all reads and writes.
 
 See
 [IndexBuildInterceptor::sideWrite](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/index_build_interceptor.cpp#L403)

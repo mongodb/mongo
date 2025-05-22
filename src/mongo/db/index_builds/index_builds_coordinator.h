@@ -763,9 +763,6 @@ protected:
      */
     void _insertKeysFromSideTablesWithoutBlockingWrites(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState);
-    void _insertKeysFromSideTablesBlockingWrites(OperationContext* opCtx,
-                                                 std::shared_ptr<ReplIndexBuildState> replState,
-                                                 const IndexBuildOptions& indexBuildOptions);
 
     /**
      * Reads the commit ready members list for index build UUID in 'replState' from
@@ -911,7 +908,6 @@ protected:
 // These fail points are used to control index build progress. Declared here to be shared
 // temporarily between createIndexes command and IndexBuildsCoordinator.
 extern FailPoint hangAfterIndexBuildFirstDrain;
-extern FailPoint hangAfterIndexBuildSecondDrain;
 extern FailPoint hangAfterIndexBuildDumpsInsertsFromBulk;
 
 }  // namespace mongo

@@ -95,27 +95,25 @@ yieldFailPoint.off();
 // Wait for first drain to finish.
 firstDrainFailPoint.wait();
 
-// Phase 3: Second drain
-// Enable pause after second drain.
-const secondDrainFailPoint = configureFailPoint(testDB, "hangAfterIndexBuildSecondDrain");
+// Enable pause after voting commit.
+const hangAfterVoteCommit =
+    configureFailPoint(testDB, 'hangIndexBuildBeforeSignalPrimaryForCommitReadiness');
 
 // Add inserts that must be consumed in the second drain.
 crudOpsForPhase(testDB.hybrid, 3);
 assert.eq(totalDocs, testDB.hybrid.count());
 
-// Allow second drain to start.
+// Allow the commit readiness signal to be sent, and wait until it has been sent.
 firstDrainFailPoint.off();
+hangAfterVoteCommit.wait();
 
-// Wait for second drain to finish.
-secondDrainFailPoint.wait();
-
-// Phase 4: Final drain and commit.
+// Phase 3: Final drain and commit.
 // Add inserts that must be consumed in the final drain.
 crudOpsForPhase(testDB.hybrid, 4);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Allow final drain to start.
-secondDrainFailPoint.off();
+hangAfterVoteCommit.off();
 
 // Wait for build to complete.
 bgBuild();

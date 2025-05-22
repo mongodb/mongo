@@ -943,9 +943,9 @@ Status MultiIndexBlock::drainBackgroundWrites(
     invariant(!_buildIsCleanedUp);
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    // Background writes are drained three times (once without blocking writes and twice blocking
-    // writes), so we may either be coming from the bulk load phase or be already in the drain
-    // writes phase.
+    // Background writes are drained three times (twice in MODE_IX without blocking writes and once
+    // in MODE_X with blocking writes), so we may either be coming from the bulk load phase or be
+    // already in the drain writes phase.
     invariant(_phase == IndexBuildPhaseEnum::kBulkLoad ||
                   _phase == IndexBuildPhaseEnum::kDrainWrites,
               IndexBuildPhase_serializer(_phase).toString());

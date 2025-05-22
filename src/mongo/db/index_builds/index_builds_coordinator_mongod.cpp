@@ -97,8 +97,10 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(failIndexBuildWithErrorInSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterRegisteringIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalingPrimaryForAbort);
@@ -788,6 +790,11 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
+    if (MONGO_unlikely(hangIndexBuildBeforeSignalPrimaryForCommitReadiness.shouldFail())) {
+        LOGV2(10528500, "Hanging index build after signaling the primary for commit readiness");
+        hangIndexBuildBeforeSignalPrimaryForCommitReadiness.pauseWhileSet(opCtx);
+    }
+
     // Before voting see if we are eligible to skip voting and signal
     // to commit index build if the node is primary.
     if (_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
@@ -870,6 +877,8 @@ IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIs
     while (!waitUntilNextActionIsReady()) {
         _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     }
+    // Final chance to catch up before taking an X lock.
+    _insertKeysFromSideTablesWithoutBlockingWrites(opCtx, replState);
     return nextAction;
 }
 
@@ -880,6 +889,15 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
     LOGV2(3856203,
           "Index build: waiting for next action before completing final phase",
           "buildUUID"_attr = replState->buildUUID);
+
+    failIndexBuildWithErrorInSecondDrain.executeIf(
+        [](const BSONObj& data) {
+            uasserted(data["error"].safeNumberInt(),
+                      "failIndexBuildWithErrorInSecondDrain failpoint triggered");
+        },
+        [&](const BSONObj& data) {
+            return UUID::parse(data["buildUUID"]) == replState->buildUUID;
+        });
 
     while (true) {
         // Future wait should hold no locks.
