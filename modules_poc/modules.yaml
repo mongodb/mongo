@@ -294,19 +294,72 @@ ddl:
 
     # ddl_role_api: The public DDL Role API that the rest of the teams use to implement the shard
     # side of DDL operations in a replicaset and sharded clusters.
+    - src/mongo/db/s/config/configsvr_coordinator*
     - src/mongo/db/s/ddl_lock_manager[._]*
+    - src/mongo/db/s/shard_key*util*
+    - src/mongo/db/s/shard_metadata_util*
     - src/mongo/db/s/sharding_ddl_coordinator[._]*
+    - src/mongo/db/s/sharding_recovery_service*
     - src/mongo/db/s/sharding_util[._]*
     - src/mongo/db/s/sharding_ddl_util[._]*
 
+    # DDL operations
+    - src/mongo/db/s/*change_primary*
+    - src/mongo/db/s/*collmod*
+    - src/mongo/db/s/*convert_to_capped*
+    - src/mongo/db/s/*create*
+    - src/mongo/db/s/*drop*
+    - src/mongo/db/s/*merge*
+    - src/mongo/db/s/*metadata_consistency*
+    - src/mongo/db/s/*move_primary*
+    - src/mongo/db/s/*refine*
+    - src/mongo/db/s/*rename*
+    - src/mongo/db/s/*reshard_collection_coordinator*
+    - src/mongo/db/s/*set_allow_migrations*
+    - src/mongo/db/s/*split_chunk*
+    - src/mongo/db/s/*untrack*
+    - src/mongo/s/sessions_collection_sharded*
+
     # commands: Commands that belong to this module.
+    - src/mongo/s/commands/*change_primary*
+    - src/mongo/s/commands/*collection_mod*
+    - src/mongo/s/commands/*convert_to_capped*
+    - src/mongo/s/commands/*create*
+    - src/mongo/s/commands/*drop*
+    - src/mongo/s/commands/*enable_sharding*
+    - src/mongo/s/commands/*list*
+    - src/mongo/s/commands/*merge*
+    - src/mongo/s/commands/*move_collection*
+    - src/mongo/s/commands/*move_primary*
+    - src/mongo/s/commands/*metadata_consistency*
+    - src/mongo/s/commands/*placement_history*
+    - src/mongo/s/commands/*refine*
+    - src/mongo/s/commands/*rename*
+    - src/mongo/s/commands/*_shard_collection*
+    - src/mongo/s/commands/shard_collection*
+    - src/mongo/db/s/config/*metadata_consistency*
+    - src/mongo/db/s/config/*collmod*
+    - src/mongo/db/s/config/configsvr_coordinator*
+    - src/mongo/db/s/config/*configsvr*chunk*
+    - src/mongo/db/s/config/*move_primary*
+    - src/mongo/db/s/config/*placement_history*
+    - src/mongo/db/s/config/*refine*
+    - src/mongo/s/request_types/*drop_collection*
+    - src/mongo/s/request_types/*merge_chunk*
+    - src/mongo/s/request_types/*move_primary*
+    - src/mongo/s/request_types/*placement_history*
+    - src/mongo/s/request_types/*set_allow_migrations*
+    - src/mongo/s/request_types/sharded_ddl_commands.idl
+    - src/mongo/s/request_types/*untrack*
     - src/mongo/s/request_types/shardsvr_join_ddl_coordinators_request.idl
     - src/mongo/db/s/shardsvr_join_ddl_coordinators_command.cpp
     - src/mongo/db/s/config/configsvr_create_database_command.cpp
 
     # unsorted: Everything else.
+    - src/mongo/s/check_metadata_consistency.idl
     - src/mongo/s/cluster_ddl.*
     - src/mongo/s/catalog/*
+    - src/mongo/db/s/config/index_on_config*
     - src/mongo/db/s/config/sharding_catalog_manager*
 
 routing_and_topology:
@@ -342,6 +395,7 @@ routing_and_topology:
 
     # vector_clock:
     - src/mongo/db/vector_clock[._]*
+    - src/mongo/db/s/vector_clock*
 
     # router_role_api:
     - src/mongo/s/router_role[._]*
@@ -349,6 +403,11 @@ routing_and_topology:
     - src/mongo/s/catalog_cache[._]*
     - src/mongo/s/client/shard_registry[._]*
     - src/mongo/s/config_server_catalog_cache_loader[._]*
+    - src/mongo/s/*routing*
+
+    # FCV:
+    - src/mongo/db/version_context*
+    - src/mongo/s/commands/cluster_set_feature_compatibility_version_cmd.cpp
 
     # cluster_server_parameters: Cluster server parameters are a special type of server parameter that
     # are stored in the config server and are replicated to all shards. They are used to control
@@ -359,6 +418,7 @@ routing_and_topology:
     - src/mongo/s/set_cluster_server_parameter_router_impl[._]*
 
     # commands: Commands that belong to this module.
+    - src/mongo/s/commands/cluster_rwc_defaults_commands.cpp
     - src/mongo/s/request_types/add_shard.idl
     - src/mongo/db/s/add_shard_coordinator[._]*
     - src/mongo/db/s/config/configsvr_add_shard_command.cpp
@@ -534,10 +594,14 @@ data_movement:
     - src/mongo/db/s/migration* # note the filename pattern
     - src/mongo/db/s/active_migrations*
     - src/mongo/db/s/range_delet*
-    - src/mongo/db/s/balancer
+    - src/mongo/db/s/*balanc*
     - src/mongo/db/s/resharding
+    - src/mongo/db/s/config/configsvr_*balanc*
+    - src/mongo/s/balanc*
     - src/mongo/s/resharding
     - src/mongo/s/migration_blocking_operation*
+    - src/mongo/s/commands/*balanc*
+    - src/mongo/s/request_types/*balanc*
 
 observability:
   meta:
