@@ -46,7 +46,10 @@ bool containsAny(llvm::StringRef fullString, clang::ArrayRef<clang::StringRef> c
     return std::any_of(patterns.begin(), patterns.end(), [&](llvm::StringRef pattern) {
         // Ensure the pattern ends with a directory delimiter to avoid matching partial names.
         auto patternStr = pattern.str();
-        return fullString.contains(llvm::StringRef(std::filesystem::path(patternStr) / ""));
+        return fullString.contains(llvm::StringRef(std::filesystem::path(patternStr) / "")) ||
+            // also accept relative paths
+            fullString.contains(llvm::StringRef(std::filesystem::current_path() /
+                                                std::filesystem::path(patternStr) / ""));
     });
 }
 
@@ -141,14 +144,7 @@ MongoHeaderBracketCheck::MongoHeaderBracketCheck(llvm::StringRef Name,
                                                  clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context),
       mongoSourceDirs(clang::tidy::utils::options::parseStringList(
-          Options.get("mongoSourceDirs", "src/mongo"))) {
-    // Accept relative paths
-    int origLength = static_cast<int>(mongoSourceDirs.size());
-    for (int i = 0; i < origLength; i++) {
-        mongoSourceDirs.push_back(
-            llvm::StringRef(std::filesystem::current_path() / mongoSourceDirs[i].str()));
-    }
-}
+          Options.get("mongoSourceDirs", "src/mongo"))) {}
 
 void MongoHeaderBracketCheck::storeOptions(clang::tidy::ClangTidyOptions::OptionMap& Opts) {
     Options.store(

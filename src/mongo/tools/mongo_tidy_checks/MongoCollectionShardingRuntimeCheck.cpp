@@ -44,18 +44,6 @@ MongoCollectionShardingRuntimeCheck::MongoCollectionShardingRuntimeCheck(
           Options.get("exceptionDirs", "src/mongo/db/s"))),
       exceptionFiles(clang::tidy::utils::options::parseStringList(
           Options.get("exceptionFiles", "src/mongo/db/exec/query_shard_server_test_fixture.cpp"))) {
-    // Accept relative paths
-    int origLength = static_cast<int>(exceptionDirs.size());
-    for (int i = 0; i < origLength; i++) {
-        exceptionDirs.push_back(
-            llvm::StringRef(std::filesystem::current_path() / exceptionDirs[i].str()));
-    }
-
-    origLength = static_cast<int>(exceptionFiles.size());
-    for (int i = 0; i < origLength; i++) {
-        exceptionFiles.push_back(
-            llvm::StringRef(std::filesystem::current_path() / exceptionFiles[i].str()));
-    }
 }
 
 void MongoCollectionShardingRuntimeCheck::registerMatchers(MatchFinder* Finder) {
@@ -90,23 +78,23 @@ void MongoCollectionShardingRuntimeCheck::check(const MatchFinder::MatchResult& 
         return;
     }
 
-    std::string suffix = "_test.cpp";
     // Check if FilePath ends with the suffix "_test.cpp"
-    if (FilePath.size() > suffix.size() &&
-        FilePath.rfind(suffix) == FilePath.size() - suffix.size()) {
+    if (FilePath.ends_with("_test.cpp")) {
         return;
     }
 
     // If the file path is in an exception directory, skip the check.
     for (const auto& dir : this->exceptionDirs) {
-        if (FilePath.contains(dir)) {
+        if (FilePath.contains(dir) ||
+            FilePath.contains((std::filesystem::current_path() / dir.str()).string())) {
             return;
         }
     }
 
     // If the file path is one of the exception files, skip the check.
     for (const auto& file : this->exceptionFiles) {
-        if (FilePath == file) {
+        if (FilePath == file ||
+            FilePath == (std::filesystem::current_path() / file.str()).string()) {
             return;
         }
     }

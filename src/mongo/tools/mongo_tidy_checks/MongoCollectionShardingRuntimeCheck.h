@@ -53,7 +53,10 @@ public:
                                         clang::tidy::ClangTidyContext* Context);
     void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
     void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+
+    // used to store option `exceptionDirs`; supports both absolute and relative paths
     std::vector<llvm::StringRef> exceptionDirs;
+    // used to store option `exceptionFiles`; supports both absolute and relative paths
     std::vector<llvm::StringRef> exceptionFiles;
 };
 
