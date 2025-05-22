@@ -79,7 +79,17 @@ structs:
                 type: uuid
                 description: "The expected UUID of the collection, only set and used in C2C replication."
                 optional: true
+            # TODO SERVER-73741 remove the feature flag once 9.0 becomes last LTS.
+            changeStreamPreciseShardTargetingEnabled:
+                type: optionalBool
+                description:
+                    "When true, oplog entries matching the commit of the DDL are generated through a data bearing shard
+                    (as opposed to the primary shard), as expected by change stream readers V2."
+                default: false
+            # TODO SERVER-73741 remove reference to changeStreamPreciseShardTargetingEnabled once 9.0 becomes last LTS.
             changeStreamsNotifier:
                 type: shard_id
-                description: "The identity of the Shard that will be responsible to generate the op log entries supporting change stream readers."
+                description:
+                    "The identity of the Shard that will be responsible to generate the op log entries supporting change stream readers.
+                    Only set/consumed when changeStreamPreciseShardTargetingEnabled is true."
                 optional: true
