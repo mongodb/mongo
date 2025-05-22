@@ -78,7 +78,7 @@ alias(
 
 alias(
     name = "codeowners",
-    actual = "@bazel_rules_mongo//codeowners:codeowners_add_auto_approver",
+    actual = "@bazel_rules_mongo//codeowners:codeowners",
 )
 
 alias(

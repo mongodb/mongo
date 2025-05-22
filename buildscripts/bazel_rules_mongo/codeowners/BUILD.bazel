@@ -16,7 +16,17 @@ py_binary(
     env = {
         "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
         "CODEOWNERS_BINARY_PATH": "$(execpath @codeowners_binary//:codeowners)",
-    },
+    } | select({
+        ":add_auto_approve_user": {
+            "ADD_AUTO_APPROVE_USER": "true",
+        },
+        "//conditions:default": {},
+    }) | select({
+        ":dont_check_new_files": {
+            "CODEOWNERS_CHECK_NEW_FILES": "false",
+        },
+        "//conditions:default": {},
+    }),
     main = "codeowners_generate.py",
     visibility = ["//visibility:public"],
     deps = [
@@ -29,32 +39,16 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "codeowners_add_auto_approver",
-    srcs = [
-        "codeowners_generate.py",
-        "parsers/owners_v1.py",
-        "parsers/owners_v2.py",
-        "validate_codeowners.py",
-        "//utils:evergreen_git.py",
-    ],
-    data = [
-        "@codeowners_binary//:codeowners",
-        "@codeowners_validator//:codeowners-validator",
-    ],
-    env = {
-        "CODEOWNERS_VALIDATOR_PATH": "$(execpath @codeowners_validator//:codeowners-validator)",
-        "CODEOWNERS_BINARY_PATH": "$(execpath @codeowners_binary//:codeowners)",
-        "ADD_AUTO_APPROVE_USER": "true",
+config_setting(
+    name = "add_auto_approve_user",
+    define_values = {
+        "codeowners_add_auto_approve_user": "True",
     },
-    main = "codeowners_generate.py",
-    visibility = ["//visibility:public"],
-    deps = [
-        dependency(
-            "pyyaml",
-        ),
-        dependency(
-            "gitpython",
-        ),
-    ],
+)
+
+config_setting(
+    name = "dont_check_new_files",
+    define_values = {
+        "codeowners_dont_check_new_files": "True",
+    },
 )

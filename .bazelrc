@@ -342,6 +342,9 @@ coverage --fission=no
 # This is set in .bazelrc.evergreen:
 # coverage --config=no-remote-exec
 
+# code ownership configuration
+common --define codeowners_add_auto_approve_user=True
+
 # Don't detect the native toolchain on linux, only use the hermetic toolchains.
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1

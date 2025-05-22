@@ -298,6 +298,20 @@ def main():
         with open(output_file, "r") as file:
             old_contents = file.read()
 
+    # prioritize env var for check new file configuration
+    should_check_new_files = os.environ.get("CODEOWNERS_CHECK_NEW_FILES", None)
+    if should_check_new_files is not None:
+        if should_check_new_files.lower() == "false":
+            should_check_new_files = False
+        elif should_check_new_files.lower() == "true":
+            should_check_new_files = True
+        else:
+            raise RuntimeError(
+                f"Invalid value for CODEOWNERS_CHECK_NEW_FILES: {should_check_new_files}"
+            )
+    else:
+        should_check_new_files = args.check_new_files
+
     new_contents = "\n".join(output_lines)
     if check:
         if new_contents != old_contents:
@@ -309,7 +323,7 @@ def main():
             codeowners_validator_path,
             args.run_validation,
             codeowners_binary_path,
-            args.check_new_files,
+            should_check_new_files,
             args.expansions_file,
             args.branch,
             output_file,
@@ -324,7 +338,7 @@ def main():
         codeowners_validator_path,
         args.run_validation,
         codeowners_binary_path,
-        args.check_new_files,
+        should_check_new_files,
         args.expansions_file,
         args.branch,
         output_file,
