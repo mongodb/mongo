@@ -75,14 +75,19 @@ function runTest(connInfo) {
 
                 fp.wait();
 
-                // Stepdown the primary.
-                let initialPrimary = connInfo.getPrimary();
-                assert.commandWorked(
-                    initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
+                // Step down the primary and keep checking for a new primary
+                assert.soon(function() {
+                    jsTestLog("Stepping down primary");
+                    // Stepdown the primary.
+                    let initialPrimary = connInfo.getPrimary();
+                    assert.commandWorked(
+                        initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
 
-                // Wait for a new primary to be elected.
-                const newPrimary = connInfo.getPrimary();
-                assert.neq(newPrimary.port, initialPrimary.port);
+                    // Wait for a new primary to be elected.
+                    const newPrimary = connInfo.getPrimary();
+
+                    return newPrimary.port != initialPrimary.port;
+                }, "Failed to elect a new primary within the timeout period");
 
                 fp.off();
                 awaitAgg();
