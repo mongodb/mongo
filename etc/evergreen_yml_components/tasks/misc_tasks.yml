@@ -1178,7 +1178,7 @@ tasks:
       - func: "setup jstestfuzz"
       - func: "run jstestfuzz"
         vars:
-          jstestfuzz_vars: "--numGeneratedFiles 2 --jsTestsDir ../jstests"
+          jstestfuzz_vars: "--numGeneratedFiles 2 --jsTestsDir jstests"
           npm_command: "jstestfuzz"
       - func: "get engflow creds"
       - func: "bazel test"

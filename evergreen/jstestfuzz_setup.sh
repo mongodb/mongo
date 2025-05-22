@@ -6,12 +6,18 @@ cd src
 set -o errexit
 set -o verbose
 
-for i in {1..5}; do
-  git clone https://x-access-token:${github_token}@github.com/10gen/jstestfuzz.git && RET=0 && break || RET=$? && sleep 5
-  echo "Failed to clone github.com:10gen/jstestfuzz.git, retrying..."
-done
+if command -v docker > /dev/null 2>&1; then
+  echo "Docker is installed, using docker"
+  CONTAINER_RUNTIME=docker
 
-if [ $RET -ne 0 ]; then
-  echo "Failed to clone git@github.com:10gen/jstestfuzz.git"
-  exit $RET
+elif command -v podman > /dev/null 2>&1; then
+  echo "Podman is installed, using podman"
+  CONTAINER_RUNTIME=podman
+else
+  echo "Neither Docker nor Podman is installed. Please install one of them."
+  exit 1
 fi
+
+echo "CONTAINER_RUNTIME: ${CONTAINER_RUNTIME}" >> expansions.yml
+
+aws ecr get-login-password --region us-east-1 | $CONTAINER_RUNTIME login --username AWS --password-stdin 901841024863.dkr.ecr.us-east-1.amazonaws.com

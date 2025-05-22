@@ -1812,14 +1812,9 @@ functions:
 
   "setup jstestfuzz":
     - *f_expansions_write
-    - command: github.generate_token
+    - command: ec2.assume_role
       params:
-        owner: 10gen
-        repo: jstestfuzz
-        expansion_name: github_token
-        permissions:
-          metadata: read
-          contents: read
+        role_arn: "arn:aws:iam::901841024863:role/ecr-role-evergreen-ro"
     - command: subprocess.exec
       display_name: "jstestfuzz setup sh"
       params:
@@ -1827,7 +1822,13 @@ functions:
         args:
           - "./src/evergreen/jstestfuzz_setup.sh"
         include_expansions_in_env:
-          - github_token
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+    - command: expansions.update
+      params:
+        file: src/expansions.yml
+    - *f_expansions_write
 
   "setup query_tester test repos":
     - *f_expansions_write
@@ -1867,6 +1868,8 @@ functions:
         binary: bash
         args:
           - "src/evergreen/lint_fuzzer_sanity_patch.sh"
+        include_expansions_in_env:
+          - CONTAINER_RUNTIME
 
   "lint fuzzer sanity all":
     - *f_expansions_write
@@ -1876,6 +1879,8 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/lint_fuzzer_sanity_all.sh"
+        include_expansions_in_env:
+          - CONTAINER_RUNTIME
 
   "monitor mongo fork 10gen":
     - *f_expansions_write
@@ -1925,6 +1930,8 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/jstestfuzz_run.sh"
+        include_expansions_in_env:
+          - CONTAINER_RUNTIME
     - command: archive.targz_pack
       display_name: "archive jstests.tgz"
       params:

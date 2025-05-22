@@ -433,7 +433,7 @@ tasks:
           suite: generational_fuzzer
           use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0088cfcbef520f248803e17284677
 
   ## Standalone fuzzer for checking block_processing correctness ##
   - <<: *jstestfuzz_template
@@ -1120,7 +1120,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          jstestfuzz_vars: --jsTestsDir ../jstests
+          jstestfuzz_vars: --jsTestsDir jstests
           suite: jstestfuzz
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           npm_command: jstestfuzz
@@ -1601,7 +1601,7 @@ tasks:
           resmoke_args: >-
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
-          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0088cfcbef520f248803e17284677
 
   # jstestfuzz standalone update time-series generational fuzzer ##
   - <<: *jstestfuzz_template
@@ -1853,7 +1853,7 @@ tasks:
           suite: generational_fuzzer
           use_large_distro: "true"
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-          jstestfuzz_vars: --diffTestingMode optimization --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          jstestfuzz_vars: --diffTestingMode optimization --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0088cfcbef520f248803e17284677
 
   - <<: *task_template
     name: aggregation_repeat_queries_multiplan_single_solutions

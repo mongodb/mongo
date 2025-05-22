@@ -280,6 +280,10 @@ package-lock.json
 # jstestfuzz generated test directory
 /jstestfuzz/
 
+# docker volumes mapped in lint_fuzzer_sanity_patch.py
+/jstestfuzzinput
+/jstestfuzzoutput
+
 # Bazel-related work
 # (Note that each string does NOT terminate with a '/' so that gitignore works properly)
 bazel-*

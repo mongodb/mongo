@@ -43,7 +43,8 @@ buildvariants:
       - name: concurrency_replication_causal_consistency_gen
       - name: initial_sync_fuzzer_gen
       - name: .jscore .common !.decimal !.sharding
-      - name: .jstestfuzz .common !.feature_flag_guarded
+      # SERVER-105328: Enable this task once container support is added to Windows variants.
+      # - name: .jstestfuzz .common !.feature_flag_guarded
       - name: .read_write_concern .linearize !.durable_history
       - name: replica_sets_auth_gen
       - name: replica_sets_jscore_passthrough_gen

@@ -3,29 +3,16 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 set -evo pipefail
 
-cd src/jstestfuzz
-
 # Store 'jstestfuzz_vars' into 'vars'. We will use 'vars' instead of 'jstestfuzz_vars' for
 # the rest of this shell script.
 vars="${jstestfuzz_vars}"
 
-# If the "--jstestfuzzGitRev" option is present in 'vars', copy the option's value into
-# 'jstestfuzz_gitrev' and remove it from 'vars', and then reset the jstestfuzz repo to the
-# specified git revision.
+# # If the "--jstestfuzzGitRev" option is present in 'vars', copy the option's value into
+# # 'jstestfuzz_gitrev' and remove it from 'vars'.
 echo "${vars}" | grep -q -- '--jstestfuzzGitRev[ \t]\+[A-Za-z0-9]\+' && RET=0 || RET=$?
 if [ $RET -eq 0 ]; then
   jstestfuzz_gitrev=$(echo "${vars}" | sed -e 's/.*--jstestfuzzGitRev[ \t]\+\([A-Za-z0-9]\+\).*/\1/')
   vars=$(echo "${vars}" | sed -e 's/\(.*\)--jstestfuzzGitRev[ \t]\+[A-Za-z0-9]\+\(.*\)/\1\2/')
-
-  for i in {1..5}; do
-    git reset --hard "${jstestfuzz_gitrev}" && RET=0 && break || RET=$? && sleep 5
-    echo "Failed to reset jstestfuzz to git revision ${jstestfuzz_gitrev}, retrying..."
-  done
-
-  if [ $RET -ne 0 ]; then
-    echo "Failed to reset jstestfuzz to git revision ${jstestfuzz_gitrev}"
-    exit $RET
-  fi
 fi
 
 # If the "--metaSeed" option is present in 'vars', copy the option's value into 'meta_seed'
@@ -73,4 +60,10 @@ if [[ "${npm_command}" != "jstestfuzz" ]]; then
   maybe_use_es_modules="--useEsModules"
 fi
 
-./src/scripts/npm_run.sh ${npm_command} -- ${vars} ${generated_seed_flag} ${in_patch_build_flag} ${maybe_use_es_modules} --branch ${branch_name}
+mkdir -p ./src/jstestfuzz/out
+
+$CONTAINER_RUNTIME run --rm \
+  -v "./src/jstestfuzz/out:/app/out" \
+  -v "./src/jstests:/app/jstests" \
+  901841024863.dkr.ecr.us-east-1.amazonaws.com/mongodb-internal/jstestfuzz:${jstestfuzz_gitrev:-latest} \
+  npm run-script ${npm_command} -- ${vars} ${generated_seed_flag} ${in_patch_build_flag} ${maybe_use_es_modules} --branch ${branch_name}

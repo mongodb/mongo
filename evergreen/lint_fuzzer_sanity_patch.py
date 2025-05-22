@@ -40,18 +40,31 @@ for file in diffed_files:
     os.makedirs(copy_dest.parent, exist_ok=True)
     shutil.copy(file, copy_dest)
 
-OUTPUT_FULL_DIR = Path(os.getcwd()) / OUTPUT_DIR
-INPUT_FULL_DIR = Path(os.getcwd()) / INPUT_DIR
+CONTAINER_RUNTIME = os.environ.get("CONTAINER_RUNTIME")
+LOCAL_OUTPUT_FULL_DIR = Path(os.getcwd()) / OUTPUT_DIR
+LOCAL_INPUT_FULL_DIR = Path(os.getcwd()) / INPUT_DIR
+
+CONTAINER_INPUT_PATH = f"/app/{INPUT_DIR}"
+CONTAINER_OUTPUT_PATH = f"/app/{OUTPUT_DIR}"
 
 subprocess.run(
     [
-        "./src/scripts/npm_run.sh",
+        CONTAINER_RUNTIME,
+        "run",
+        "--rm",
+        "-v",
+        f"{LOCAL_INPUT_FULL_DIR}:{CONTAINER_INPUT_PATH}",
+        "-v",
+        f"{LOCAL_OUTPUT_FULL_DIR}:{CONTAINER_OUTPUT_PATH}",
+        "901841024863.dkr.ecr.us-east-1.amazonaws.com/mongodb-internal/jstestfuzz:latest",
+        "npm",
+        "run-script",
         "jstestfuzz",
         "--",
         "--jsTestsDir",
-        INPUT_FULL_DIR,
+        CONTAINER_INPUT_PATH,
         "--out",
-        OUTPUT_FULL_DIR,
+        CONTAINER_OUTPUT_PATH,
         "--numSourceFiles",
         str(min(num_changed_files, 100)),
         "--numGeneratedFiles",
@@ -63,7 +76,6 @@ subprocess.run(
         "10",
     ],
     check=True,
-    cwd="jstestfuzz",
 )
 
 
@@ -73,13 +85,27 @@ def _parse_jsfile(jsfile: Path) -> simple_report.Result:
 
     Returns what should be added to the report given to evergreen
     """
-    print(f"Trying to parse jsfile {jsfile}")
+    # Find the relative path to the jsfile in the volume on the container
+    relative_js_file_path = f"{INPUT_DIR}/{jsfile.relative_to(LOCAL_INPUT_FULL_DIR)}"
     start_time = time.time()
     proc = subprocess.run(
-        ["./src/scripts/npm_run.sh", "parse-jsfiles", "--", str(jsfile)],
+        [
+            CONTAINER_RUNTIME,
+            "run",
+            "--rm",
+            "-v",
+            f"{LOCAL_INPUT_FULL_DIR}:{CONTAINER_INPUT_PATH}",
+            "-v",
+            f"{LOCAL_OUTPUT_FULL_DIR}:{CONTAINER_OUTPUT_PATH}",
+            "901841024863.dkr.ecr.us-east-1.amazonaws.com/mongodb-internal/jstestfuzz:latest",
+            "npm",
+            "run-script",
+            "parse-jsfiles",
+            "--",
+            str(relative_js_file_path),
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        cwd="jstestfuzz",
     )
     end_time = time.time()
     status = "pass" if proc.returncode == 0 else "fail"
@@ -104,7 +130,7 @@ report = simple_report.Report(failures=0, results=[])
 with futures.ThreadPoolExecutor() as executor:
     parse_jsfiles_futures = [
         executor.submit(_parse_jsfile, Path(jsfile))
-        for jsfile in glob.iglob(str(OUTPUT_FULL_DIR / "**"), recursive=True)
+        for jsfile in glob.iglob(f"{LOCAL_INPUT_FULL_DIR}/**", recursive=True)
         if os.path.isfile(jsfile)
     ]
 
