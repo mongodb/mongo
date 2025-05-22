@@ -2575,6 +2575,26 @@ functions:
       include:
         - "./debugger*.*"
 
+  "save bazel run logs":
+    - command: archive.targz_pack
+      params:
+        target: "bazel_run_logs.tgz"
+        source_dir: "./src"
+        include:
+          - "./bazel_output.log"
+    - command: s3.put
+      display_name: "save bazel run logs"
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: bazel_run_logs.tgz
+        remote_file: ${project}/${build_variant}/${revision}/bazel_output_logs-${build_id}-${task_name}-${execution}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Bazel Run Logs
+        optional: true
+
   "archive hang analyzer debugger files": &archive_hang_analyzer_debugger_files
     command: s3.put
     display_name: "archive hang analyzer debugger files"

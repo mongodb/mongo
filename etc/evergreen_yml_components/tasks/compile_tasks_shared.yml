@@ -78,6 +78,7 @@ variables:
       - func: "f_expansions_write"
       - func: "run hang analyzer"
       - func: "wait for resmoke to shutdown"
+      - func: "save bazel run logs"
 
 task_groups:
   - <<: *compile_task_group_template

@@ -104,6 +104,7 @@ variables:
       - func: "f_expansions_write"
       - func: "run hang analyzer"
       - func: "wait for resmoke to shutdown"
+      - func: "save bazel run logs"
 
   # TODO: split this up into the user files.
   # List of all variants that make mongocryptd
