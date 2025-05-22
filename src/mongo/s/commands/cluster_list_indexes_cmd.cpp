@@ -125,6 +125,10 @@ public:
             return false;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         NamespaceString ns() const final {
             uassert(ErrorCodes::BadValue,
                     "Mongos requires a namespace for listIndexes command",

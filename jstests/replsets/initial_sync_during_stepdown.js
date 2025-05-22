@@ -1,7 +1,7 @@
 /**
  * Test that stepdown during collection cloning and oplog fetching does not interrupt initial sync.
  */
-import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -62,7 +62,7 @@ function setupTest({
 function finishTest(
     {failPoint, nss: nss = '', DocsCopiedByOplogFetcher: DocsCopiedByOplogFetcher = 0}) {
     jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");
-    waitForCurOpByFailPoint(primaryAdmin, new RegExp('^' + nss), failPoint);
+    waitForCurOpByFailPointNoNS(primaryAdmin, failPoint);
 
     jsTestLog("Making primary step down");
     const joinStepDownThread = startParallelShell(() => {

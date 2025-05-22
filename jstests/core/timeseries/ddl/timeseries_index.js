@@ -9,11 +9,20 @@
  *   requires_timeseries,
  * ]
  */
-import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps,
+    isShardedTimeseries,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = jsTestName() + '_';
@@ -53,8 +62,7 @@ TimeseriesTest.run((insert) => {
      */
     const runTest = function(spec, bucketSpec, isBackingShardKey = false) {
         const coll = db.getCollection(collNamePrefix + collCountPostfix++);
-        const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-        coll.drop();
+        coll.drop();  // implicitly drops bucketsColl.
 
         jsTestLog('Running test: collection: ' + coll.getFullName() +
                   ';\nindex spec key for createIndexes: ' + tojson(spec) +
@@ -66,7 +74,7 @@ TimeseriesTest.run((insert) => {
         // When the collection is sharded, there is 1 extra index for the shard key.
         const numExtraIndexes = (isShardedTimeseries(coll) ? 1 : 0) + 1;
         {
-            const indexes = bucketsColl.getIndexes();
+            const indexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
             assert.eq(numExtraIndexes,
                       indexes.length,
                       'unexpected number of indexes on the buckets collection: ' + tojson(indexes));
@@ -86,7 +94,6 @@ TimeseriesTest.run((insert) => {
         assert.eq(doc._id, bucketDoc.control.min._id, bucketDoc);
         assert.eq(roundDown(doc[timeFieldName]), bucketDoc.control.min[timeFieldName], bucketDoc);
         assert.docEq(doc[metaFieldName], bucketDoc.meta, bucketDoc);
-
         // Check that listIndexes against the time-series collection returns the index just created.
         //
         // Note: call the listIndexes command directly, rather than use a helper, so that we can
@@ -102,8 +109,12 @@ TimeseriesTest.run((insert) => {
 
         // Check that listIndexes against the buckets collection returns the index as hinted
         cursorDoc =
-            assert.commandWorked(db.runCommand({listIndexes: bucketsColl.getName()})).cursor;
-        assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
+            assert
+                .commandWorked(db.runCommand(Object.extend(
+                    {listIndexes: getTimeseriesCollForRawOps(coll).getName()}, kRawOperationSpec)))
+                .cursor;
+        assert.eq(
+            getTimeseriesCollForDDLOps(db, coll).getFullName(), cursorDoc.ns, tojson(cursorDoc));
         assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(bucketSpec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
@@ -134,47 +145,70 @@ TimeseriesTest.run((insert) => {
                              'failed to create index: ' + tojson(spec));
         assert.commandWorked(coll.dropIndexes(['myindex2']), 'failed to drop indexes: [myindex2]');
 
-        // Check that we are able to hide and unhide the index by name.
-        assert.commandWorked(coll.createIndex(spec, {name: 'hide1'}),
-                             'failed to create index: ' + tojson(spec));
-        assert.eq(
-            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
-        assert.eq(1, coll.find().hint(spec).toArray().length);
-        assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
-        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
-                                                             .find()
-                                                             .rawData()
-                                                             .hint(bucketSpec)
-                                                             .toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
-        assert.eq(
-            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
-        assert.eq(1, coll.find().hint(spec).toArray().length);
-        assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
+        // TODO SERVER-103323 enable the following test case also for viewless timeseries
+        if (!viewlessTimeseriesEnabled) {
+            // Check that we are able to hide and unhide the index by name.
+            assert.commandWorked(coll.createIndex(spec, {name: 'hide1'}),
+                                 'failed to create index: ' + tojson(spec));
+            assert.eq(1,
+                      getTimeseriesCollForRawOps(coll)
+                          .find()
+                          .rawData()
+                          .hint(bucketSpec)
+                          .toArray()
+                          .length);
+            assert.eq(1, coll.find().hint(spec).toArray().length);
+            assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
+            assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
+                                                                 .find()
+                                                                 .rawData()
+                                                                 .hint(bucketSpec)
+                                                                 .toArray()),
+                                                      ErrorCodes.BadValue);
+            assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
+                                                      ErrorCodes.BadValue);
+            assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
+            assert.eq(1,
+                      getTimeseriesCollForRawOps(coll)
+                          .find()
+                          .rawData()
+                          .hint(bucketSpec)
+                          .toArray()
+                          .length);
+            assert.eq(1, coll.find().hint(spec).toArray().length);
+            assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
 
-        // Check that we are able to hide and unhide the index by key.
-        assert.commandWorked(coll.createIndex(spec, {name: 'hide2'}),
-                             'failed to create index: ' + tojson(spec));
-        assert.eq(
-            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
-        assert.eq(1, coll.find().hint(spec).toArray().length);
-        assert.commandWorked(coll.hideIndex(spec), 'failed to hide index: hide2');
-        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
-                                                             .find()
-                                                             .rawData()
-                                                             .hint(bucketSpec)
-                                                             .toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
-                                                  ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide2');
-        assert.eq(
-            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
-        assert.eq(1, coll.find().hint(spec).toArray().length);
-        assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
+            // Check that we are able to hide and unhide the index by key.
+            assert.commandWorked(coll.createIndex(spec, {name: 'hide2'}),
+                                 'failed to create index: ' + tojson(spec));
+            assert.eq(1,
+                      getTimeseriesCollForRawOps(coll)
+                          .find()
+                          .rawData()
+                          .hint(bucketSpec)
+                          .toArray()
+                          .length);
+            assert.eq(1, coll.find().hint(spec).toArray().length);
+            assert.commandWorked(coll.hideIndex(spec), 'failed to hide index: hide2');
+            assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
+                                                                 .find()
+                                                                 .rawData()
+                                                                 .hint(bucketSpec)
+                                                                 .toArray()),
+                                                      ErrorCodes.BadValue);
+            assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
+                                                      ErrorCodes.BadValue);
+            assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide2');
+            assert.eq(1,
+                      getTimeseriesCollForRawOps(coll)
+                          .find()
+                          .rawData()
+                          .hint(bucketSpec)
+                          .toArray()
+                          .length);
+            assert.eq(1, coll.find().hint(spec).toArray().length);
+            assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
+        }
 
         // Check that we are able to create the index as hidden.
         assert.commandWorked(coll.createIndex(spec, {name: 'hide3', hidden: true}),
@@ -187,10 +221,18 @@ TimeseriesTest.run((insert) => {
                                                   ErrorCodes.BadValue);
         assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
-        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide3');
-        assert.eq(
-            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
-        assert.eq(1, coll.find().hint(spec).toArray().length);
+        // TODO SERVER-103323 enable the following test case also for viewless timeseries
+        if (!viewlessTimeseriesEnabled) {
+            assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide3');
+            assert.eq(1,
+                      getTimeseriesCollForRawOps(coll)
+                          .find()
+                          .rawData()
+                          .hint(bucketSpec)
+                          .toArray()
+                          .length);
+            assert.eq(1, coll.find().hint(spec).toArray().length);
+        }
         assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide3');
 
         // Check that user hints on queries will be allowed and will reference the indexes on the
@@ -199,6 +241,7 @@ TimeseriesTest.run((insert) => {
                              'failed to create index index_for_hint_test: ' + tojson(spec));
         // Specifying the index by name should work on both the time-series collection and the
         // underlying buckets collection.
+        assert.eq(1, coll.find().hint('index_for_hint_test').toArray().length);
         assert.eq(1,
                   getTimeseriesCollForRawOps(coll)
                       .find()
@@ -206,7 +249,6 @@ TimeseriesTest.run((insert) => {
                       .hint('index_for_hint_test')
                       .toArray()
                       .length);
-        assert.eq(1, coll.find().hint('index_for_hint_test').toArray().length);
         // Specifying the index by key pattern should work.
         assert.eq(
             1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
@@ -279,7 +321,10 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
     assert.commandWorked(coll.createIndex({not_metadata: 1}));
-    assert.commandWorked(coll.hideIndex({not_metadata: 1}));
+    // TODO SERVER-103323 enable the following test case also for viewless timeseries
+    if (!viewlessTimeseriesEnabled) {
+        assert.commandWorked(coll.hideIndex({not_metadata: 1}));
+    }
     assert.commandWorked(coll.dropIndex({not_metadata: 1}));
 
     // Index names are not transformed. dropIndexes passes the request along to the buckets
@@ -304,12 +349,15 @@ TimeseriesTest.run((insert) => {
 
     // If listIndexes fails to convert a non-conforming index on the bucket collection, it should
     // omit that index from the results.
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-    assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).createIndex({not_metadata: 1},
+                                                                      undefined /*options*/,
+                                                                      undefined /*commitQuarum*/,
+                                                                      kRawOperationSpec),
                          'failed to create index: ' + tojson({not_metadata: 1}));
     const numExtraIndexes = (isShardedTimeseries(coll) ? 1 : 0) + 1;
-    assert.eq(
-        1 + numExtraIndexes, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
+    assert.eq(1 + numExtraIndexes,
+              getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length,
+              tojson(getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec)));
     assert.eq(0 + numExtraIndexes, coll.getIndexes().length, tojson(coll.getIndexes()));
 
     // Cannot directly create a "2dsphere_bucket" index.

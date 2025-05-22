@@ -60,14 +60,17 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/write_concern_options.h"
@@ -155,24 +158,6 @@ BSONObj makeIndexSpec(const NamespaceString& nss,
     }
 
     return index.obj();
-}
-
-/**
- * Constructs the BSON specification document for the create indexes command using the given
- * namespace, index key and options.
- */
-BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
-                             const BSONObj& keys,
-                             const BSONObj& collation,
-                             bool unique,
-                             boost::optional<TimeseriesOptions> tsOpts) {
-    auto indexSpec = makeIndexSpec(nss, keys, collation, unique, tsOpts);
-    // The outer createIndexes command.
-    BSONObjBuilder createIndexes;
-    createIndexes.append("createIndexes", nss.coll());
-    createIndexes.append("indexes", BSON_ARRAY(indexSpec));
-    createIndexes.append("writeConcern", WriteConcernOptions::Majority);
-    return createIndexes.obj();
 }
 
 }  // namespace
@@ -455,9 +440,18 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
     boost::optional<TimeseriesOptions> tsOpts) const {
     BSONObj collation =
         defaultCollation && !defaultCollation->isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
-    auto createIndexesCmd = makeCreateIndexesCmd(nss, proposedKey, collation, unique, tsOpts);
+
+    auto indexSpec = makeIndexSpec(nss, proposedKey, collation, unique, tsOpts);
+    CreateIndexesCommand createIndexesCmd{nss};
+    createIndexesCmd.setIndexes({indexSpec});
+    createIndexesCmd.setWriteConcern(defaultMajorityWriteConcern());
+    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledUseLatestFCVWhenUninitialized(
+            VersionContext::getDecoration(_opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        createIndexesCmd.setRawData(true);
+    }
     BSONObj res;
-    _localClient->runCommand(nss.dbName(), createIndexesCmd, res);
+    _localClient->runCommand(nss.dbName(), createIndexesCmd.toBSON(), res);
     uassertStatusOK(getStatusFromCommandResult(res));
 }
 

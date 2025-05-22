@@ -114,176 +114,160 @@ BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
     return builder.obj();
 }
 
-CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
-                                                        const CreateIndexesCommand& origCmd,
-                                                        const TimeseriesOptions& options) {
-    const auto& origNs = origCmd.getNamespace();
-    const auto& origIndexes = origCmd.getIndexes();
+mongo::BSONObj translateIndexSpecFromLogicalToBuckets(OperationContext* opCtx,
+                                                      const NamespaceString& origNs,
+                                                      const BSONObj& origIndex,
+                                                      const TimeseriesOptions& options) {
+    BSONObjBuilder builder;
+    BSONObj keyField;
+    BSONObj originalKeyField;
+    bool isTTLIndex = false;
+    bool hasPartialFilterOnMetaField = false;
+    bool includeOriginalSpec = false;
 
-    std::vector<mongo::BSONObj> indexes;
-    for (const auto& origIndex : origIndexes) {
-        BSONObjBuilder builder;
-        BSONObj keyField;
-        BSONObj originalKeyField;
-        bool isTTLIndex = false;
-        bool hasPartialFilterOnMetaField = false;
-        bool includeOriginalSpec = false;
+    for (const auto& elem : origIndex) {
+        if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
+            includeOriginalSpec = true;
 
-        for (const auto& elem : origIndex) {
-            if (elem.fieldNameStringData() == IndexDescriptor::kPartialFilterExprFieldName) {
-                includeOriginalSpec = true;
+            BSONObj pred = elem.Obj();
 
-                BSONObj pred = elem.Obj();
+            // If the createIndexes command specifies a collation for this index, then that
+            // collation affects how we should interpret expressions in the partial filter
+            // ($gt, $lt, etc).
+            if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
+                uasserted(ErrorCodes::IndexOptionsConflict,
+                          std::string{"On a time-series collection, partialFilterExpression and "} +
+                              NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
+            }
+            // Since no collation was specified in the command, we know the index collation will
+            // match the collection's collation.
+            auto collationMatchesDefault = ExpressionContextCollationMatchesDefault::kYes;
 
-                // If the createIndexes command specifies a collation for this index, then that
-                // collation affects how we should interpret expressions in the partial filter
-                // ($gt, $lt, etc).
-                if (auto collatorSpec = origIndex[NewIndexSpec::kCollationFieldName]) {
-                    uasserted(
-                        ErrorCodes::IndexOptionsConflict,
-                        std::string{"On a time-series collection, partialFilterExpression and "} +
-                            NewIndexSpec::kCollationFieldName + " arguments are incompatible"_sd);
+            // Even though the index collation will match the collection's collation, we don't
+            // know whether or not that collation is simple. However, I think we can correctly
+            // rewrite the filter expression without knowing this... Looking up the correct
+            // value would require handling mongos and mongod separately.
+            auto expCtx = ExpressionContextBuilder{}
+                              .opCtx(opCtx)
+                              .ns(origNs)
+                              .collationMatchesDefault(collationMatchesDefault)
+                              .build();
+            // We can't know if there won't be extended range values in the collection, so
+            // assume there will be.
+            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+
+            // partialFilterExpression is evaluated against a collection, so there are no
+            // computed fields.
+            bool haveComputedMetaField = false;
+
+            // partialFilterExpression is evaluated against a collection, so there are no
+            // exclusions
+            bool includeMetaField = options.getMetaField().has_value();
+
+            // As part of building the index, we verify that the collection does not contain
+            // any mixed-schema buckets. So by the time the index is visible to the query
+            // planner, this will be true.
+            bool assumeNoMixedSchemaData = true;
+
+            // Fixed buckets is dependent on the time-series collection options not changing,
+            // this can change throughout the lifetime of the index.
+            bool fixedBuckets = false;
+
+            auto [hasMetricPred, bucketPred] =
+                BucketSpec::pushdownPredicate(expCtx,
+                                              options,
+                                              pred,
+                                              haveComputedMetaField,
+                                              includeMetaField,
+                                              assumeNoMixedSchemaData,
+                                              BucketSpec::IneligiblePredicatePolicy::kError,
+                                              fixedBuckets);
+
+            hasPartialFilterOnMetaField = !hasMetricPred;
+
+            builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
+            continue;
+        }
+
+        if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
+            // Sparse indexes are only allowed on the time and meta fields.
+            auto timeField = options.getTimeField();
+            auto metaField = options.getMetaField();
+
+            BSONObj keyPattern = origIndex.getField(NewIndexSpec::kKeyFieldName).Obj();
+            for (const auto& keyElem : keyPattern) {
+                if (keyElem.fieldNameStringData() == timeField) {
+                    continue;
                 }
-                // Since no collation was specified in the command, we know the index collation will
-                // match the collection's collation.
-                auto collationMatchesDefault = ExpressionContextCollationMatchesDefault::kYes;
 
-                // Even though the index collation will match the collection's collation, we don't
-                // know whether or not that collation is simple. However, I think we can correctly
-                // rewrite the filter expression without knowing this... Looking up the correct
-                // value would require handling mongos and mongod separately.
-                auto expCtx = ExpressionContextBuilder{}
-                                  .opCtx(opCtx)
-                                  .ns(origNs)
-                                  .collationMatchesDefault(collationMatchesDefault)
-                                  .build();
-                // We can't know if there won't be extended range values in the collection, so
-                // assume there will be.
-                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-
-                // partialFilterExpression is evaluated against a collection, so there are no
-                // computed fields.
-                bool haveComputedMetaField = false;
-
-                // partialFilterExpression is evaluated against a collection, so there are no
-                // exclusions
-                bool includeMetaField = options.getMetaField().has_value();
-
-                // As part of building the index, we verify that the collection does not contain
-                // any mixed-schema buckets. So by the time the index is visible to the query
-                // planner, this will be true.
-                bool assumeNoMixedSchemaData = true;
-
-                // Fixed buckets is dependent on the time-series collection options not changing,
-                // this can change throughout the lifetime of the index.
-                bool fixedBuckets = false;
-
-                auto [hasMetricPred, bucketPred] =
-                    BucketSpec::pushdownPredicate(expCtx,
-                                                  options,
-                                                  pred,
-                                                  haveComputedMetaField,
-                                                  includeMetaField,
-                                                  assumeNoMixedSchemaData,
-                                                  BucketSpec::IneligiblePredicatePolicy::kError,
-                                                  fixedBuckets);
-
-                hasPartialFilterOnMetaField = !hasMetricPred;
-
-                builder.append(IndexDescriptor::kPartialFilterExprFieldName, bucketPred);
-                continue;
-            }
-
-            if (elem.fieldNameStringData() == IndexDescriptor::kSparseFieldName) {
-                // Sparse indexes are only allowed on the time and meta fields.
-                auto timeField = options.getTimeField();
-                auto metaField = options.getMetaField();
-
-                BSONObj keyPattern = origIndex.getField(NewIndexSpec::kKeyFieldName).Obj();
-                for (const auto& keyElem : keyPattern) {
-                    if (keyElem.fieldNameStringData() == timeField) {
-                        continue;
-                    }
-
-                    if (metaField &&
-                        (keyElem.fieldNameStringData() == *metaField ||
-                         keyElem.fieldNameStringData().starts_with(*metaField + "."))) {
-                        continue;
-                    }
-
-                    uasserted(ErrorCodes::InvalidOptions,
-                              "Sparse indexes are not supported on time-series measurements");
+                if (metaField &&
+                    (keyElem.fieldNameStringData() == *metaField ||
+                     keyElem.fieldNameStringData().starts_with(*metaField + "."))) {
+                    continue;
                 }
+
+                uasserted(ErrorCodes::InvalidOptions,
+                          "Sparse indexes are not supported on time-series measurements");
             }
+        }
 
-            if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
-                isTTLIndex = true;
-                builder.append(elem);
-                continue;
-            }
-
-            if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Unique indexes are not supported on time-series collections",
-                        !elem.trueValue());
-            }
-
-            if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
-                originalKeyField = elem.Obj();
-
-                auto pluginName = IndexNames::findPluginName(originalKeyField);
-                uassert(ErrorCodes::InvalidOptions,
-                        "Text indexes are not supported on time-series collections",
-                        pluginName != IndexNames::TEXT);
-
-                auto bucketsIndexSpecWithStatus =
-                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options,
-                                                                              originalKeyField);
-                uassert(ErrorCodes::CannotCreateIndex,
-                        str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
-                                      << " Command request: " << redact(origCmd.toBSON()),
-                        bucketsIndexSpecWithStatus.isOK());
-
-                if (timeseries::shouldIncludeOriginalSpec(
-                        options,
-                        BSON(NewIndexSpec::kKeyFieldName
-                             << bucketsIndexSpecWithStatus.getValue()))) {
-                    includeOriginalSpec = true;
-                }
-                keyField = std::move(bucketsIndexSpecWithStatus.getValue());
-                continue;
-            }
-
-            // Any index option that's not explicitly banned, and not handled specially, we pass
-            // through unchanged.
+        if (elem.fieldNameStringData() == IndexDescriptor::kExpireAfterSecondsFieldName) {
+            isTTLIndex = true;
             builder.append(elem);
+            continue;
         }
 
-        if (isTTLIndex) {
+        if (elem.fieldNameStringData() == IndexDescriptor::kUniqueFieldName) {
             uassert(ErrorCodes::InvalidOptions,
-                    "TTL indexes on time-series collections require a partialFilterExpression on "
-                    "the metaField",
-                    hasPartialFilterOnMetaField);
-            keyField = convertToTTLTimeField(originalKeyField, options.getTimeField());
-        }
-        builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
-
-        if (includeOriginalSpec) {
-            // Store the original user index definition on the transformed index definition for the
-            // time-series buckets collection.
-            builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
+                    "Unique indexes are not supported on time-series collections",
+                    !elem.trueValue());
         }
 
-        indexes.push_back(builder.obj());
+        if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+            originalKeyField = elem.Obj();
+
+            auto pluginName = IndexNames::findPluginName(originalKeyField);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Text indexes are not supported on time-series collections",
+                    pluginName != IndexNames::TEXT);
+
+            auto bucketsIndexSpecWithStatus =
+                timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(options,
+                                                                          originalKeyField);
+            uassert(ErrorCodes::CannotCreateIndex,
+                    bucketsIndexSpecWithStatus.getStatus().toString(),
+                    bucketsIndexSpecWithStatus.isOK());
+
+            if (timeseries::shouldIncludeOriginalSpec(
+                    options,
+                    BSON(NewIndexSpec::kKeyFieldName << bucketsIndexSpecWithStatus.getValue()))) {
+                includeOriginalSpec = true;
+            }
+            keyField = std::move(bucketsIndexSpecWithStatus.getValue());
+            continue;
+        }
+
+        // Any index option that's not explicitly banned, and not handled specially, we pass
+        // through unchanged.
+        builder.append(elem);
     }
 
-    auto ns = makeTimeseriesBucketsNamespace(origNs);
-    auto cmd = CreateIndexesCommand(ns, std::move(indexes));
-    cmd.setV(origCmd.getV());
-    cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
-    cmd.setCommitQuorum(origCmd.getCommitQuorum());
-    cmd.setReturnOnStart(origCmd.getReturnOnStart());
+    if (isTTLIndex) {
+        uassert(ErrorCodes::InvalidOptions,
+                "TTL indexes on time-series collections require a partialFilterExpression on "
+                "the metaField",
+                hasPartialFilterOnMetaField);
+        keyField = convertToTTLTimeField(originalKeyField, options.getTimeField());
+    }
+    builder.append(NewIndexSpec::kKeyFieldName, std::move(keyField));
 
-    return cmd;
+    if (includeOriginalSpec) {
+        // Store the original user index definition on the transformed index definition for the
+        // time-series buckets collection.
+        builder.appendObject(IndexDescriptor::kOriginalSpecFieldName, origIndex.objdata());
+    }
+
+    return builder.obj();
 }
+
 }  // namespace mongo::timeseries

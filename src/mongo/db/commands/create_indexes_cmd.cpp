@@ -94,6 +94,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -508,6 +509,29 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                     cmd.getCollectionUUID()),
                                                 LockMode::MODE_IX);
 
+            // This assertion handles a specific race condition during index creation.
+            //
+            // The caller (`createIndexes typedRun`) is responsible for performing
+            // timeseries collection translation for the command. If a collection
+            // was already a timeseries collection when this translation occurred,
+            // its UUID would have been included in the command.
+            //
+            // Therefore, if we find that:
+            // 1. The collection now exists
+            // 2. The collection is currently a timeseries collection
+            // 3. The command *does not* contain a collection UUID
+            //
+            // This indicates that the collection was either not existing or it was a normal
+            // collection at translation time and now instead it exists and it is a timeseries
+            // collection.
+            uassert(10195200,
+                    fmt::format("Collection '{}' has been concurrently created as timeseries by "
+                                "another operation",
+                                ns.toStringForErrorMsg()),
+                    !collection.exists() ||
+                        !collection.getCollectionPtr()->isTimeseriesCollection() ||
+                        cmd.getCollectionUUID().has_value());
+
             checkEncryptedFieldIndexRestrictions(opCtx, collection.getCollectionPtr().get(), cmd);
 
             uassert(ErrorCodes::NotWritablePrimary,
@@ -732,6 +756,60 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     return reply;
 }
 
+
+boost::optional<CreateIndexesCommand> translateCommandForTimeseries(
+    OperationContext* opCtx, const CreateIndexesCommand& origCmd) {
+
+    auto [collAcq, wasNssTranslatedToBuckets] = timeseries::acquireCollectionWithBucketsLookup(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                origCmd.getNamespace(),
+                                                AcquisitionPrerequisites::OperationType::kRead,
+                                                origCmd.getCollectionUUID()),
+        LockMode::MODE_IS);
+
+    tassert(10195220,
+            fmt::format("Collection '{}' does not exists, a collection UUID was provided but "
+                        "collection acquisition didn't fail with CollectionUUIDMismatch",
+                        origCmd.getNamespace().toStringForErrorMsg()),
+            collAcq.exists() || !origCmd.getCollectionUUID());
+
+    if (!collAcq.exists() || !collAcq.getCollectionPtr()->isTimeseriesCollection()) {
+        // if the collection is not a timeseries collection we don't need to tranlsate the index
+        // specs
+        return boost::none;
+    }
+
+    const auto& targetNss = collAcq.nss();
+    const auto& targetCollUUID = collAcq.uuid();
+
+    const auto indexSpecs = [&] {
+        if (timeseries::isRawDataRequest(opCtx, origCmd)) {
+            return origCmd.getIndexes();
+        }
+
+        const auto& tsOptions = collAcq.getCollectionPtr()->getTimeseriesOptions().get();
+        auto bucketsIndexSpecs = origCmd.getIndexes();
+        std::transform(bucketsIndexSpecs.begin(),
+                       bucketsIndexSpecs.end(),
+                       bucketsIndexSpecs.begin(),
+                       [&](const BSONObj& origIndexSpec) {
+                           return timeseries::translateIndexSpecFromLogicalToBuckets(
+                               opCtx, origCmd.getNamespace(), origIndexSpec, tsOptions);
+                       });
+
+        return bucketsIndexSpecs;
+    }();
+
+    auto cmd = CreateIndexesCommand(targetNss, std::move(indexSpecs));
+    cmd.setCollectionUUID(targetCollUUID);
+    cmd.setV(origCmd.getV());
+    cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
+    cmd.setCommitQuorum(origCmd.getCommitQuorum());
+    cmd.setReturnOnStart(origCmd.getReturnOnStart());
+    return cmd;
+}
+
 /**
  * { createIndexes : "bar",
  *   indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ],
@@ -766,6 +844,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         NamespaceString ns() const final {
             return request().getNamespace();
         }
@@ -778,27 +860,18 @@ public:
         }
 
         CreateIndexesReply typedRun(OperationContext* opCtx) {
-            const auto& origCmd = request();
-            const auto* cmd = &origCmd;
-
             uassert(ErrorCodes::Error(8293400),
                     str::stream() << "Cannot create index on special internal config collection "
                                   << NamespaceString::kPreImagesCollectionName,
-                    !origCmd.getNamespace().isChangeStreamPreImagesCollection());
+                    !ns().isChangeStreamPreImagesCollection());
 
-            // If the request namespace refers to a time-series collection, transforms the user
-            // time-series index request to one on the underlying bucket.
-            boost::optional<CreateIndexesCommand> timeseriesCmdOwnership;
-            auto isCommandOnTimeseriesBucketNamespace =
-                origCmd.getIsTimeseriesNamespace() && *origCmd.getIsTimeseriesNamespace();
-            if (auto options = timeseries::getTimeseriesOptions(
-                    opCtx, origCmd.getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
-                checkCollectionUUIDMismatch(
-                    opCtx, origCmd.getNamespace(), nullptr, origCmd.getCollectionUUID());
-                timeseriesCmdOwnership =
-                    timeseries::makeTimeseriesCreateIndexesCommand(opCtx, origCmd, *options);
-                cmd = &timeseriesCmdOwnership.value();
-            }
+            const auto& cmd = [&] {
+                if (auto optTranslatedCmd = translateCommandForTimeseries(opCtx, request());
+                    optTranslatedCmd) {
+                    return *optTranslatedCmd;
+                }
+                return request();
+            }();
 
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index
             // specs, then we will wait for the build(s) to finish before trying again unless we are
@@ -806,7 +879,7 @@ public:
             bool shouldLogMessageOnAlreadyBuildingError = true;
             while (true) {
                 try {
-                    return runCreateIndexesWithCoordinator(opCtx, *cmd);
+                    return runCreateIndexesWithCoordinator(opCtx, cmd);
                 } catch (const DBException& ex) {
                     // We can only wait for an existing index build to finish if we are able to
                     // release our locks, in order to allow the existing index build to proceed. We
@@ -817,21 +890,21 @@ public:
                         throw;
                     }
 
-                    if (cmd->getReturnOnStart()) {
+                    if (cmd.getReturnOnStart()) {
                         auto coll = acquireCollectionMaybeLockFree(
                             opCtx,
                             CollectionAcquisitionRequest::fromOpCtx(
                                 opCtx,
-                                cmd->getNamespace(),
+                                cmd.getNamespace(),
                                 AcquisitionPrerequisites::OperationType::kRead));
                         if (coll.exists()) {
                             if (!coll.getCollectionPtr()
                                      ->getIndexCatalog()
-                                     ->removeExistingIndexes(opCtx,
-                                                             coll.getCollectionPtr(),
-                                                             parseAndValidateIndexSpecs(
-                                                                 opCtx, *cmd, cmd->getNamespace()),
-                                                             true)
+                                     ->removeExistingIndexes(
+                                         opCtx,
+                                         coll.getCollectionPtr(),
+                                         parseAndValidateIndexSpecs(opCtx, cmd, cmd.getNamespace()),
+                                         true)
                                      .empty()) {
                                 // A strict subset of the requested indexes are already in the
                                 // process of being built. In the spirit of returnOnStart, we simply
@@ -842,7 +915,7 @@ public:
 
                             CreateIndexesReply reply;
                             if (auto commitQuorum = parseAndGetCommitQuorum(
-                                    opCtx, determineProtocol(opCtx, cmd->getNamespace()), *cmd)) {
+                                    opCtx, determineProtocol(opCtx, cmd.getNamespace()), cmd)) {
                                 reply.setCommitQuorum(*commitQuorum);
                             }
                             return reply;
@@ -855,7 +928,7 @@ public:
                               "but found that at least one of the indexes is already being built."
                               "This request will wait for the pre-existing index build to finish "
                               "before proceeding",
-                              "indexesFieldName"_attr = cmd->getIndexes(),
+                              "indexesFieldName"_attr = cmd.getIndexes(),
                               "error"_attr = ex);
                         shouldLogMessageOnAlreadyBuildingError = false;
                     }

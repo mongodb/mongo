@@ -656,17 +656,17 @@ DBCollection.prototype._indexSpec = function(keys, options) {
     return ret;
 };
 
-DBCollection.prototype.createIndex = function(keys, options, commitQuorum) {
-    if (arguments.length > 3) {
-        throw new Error("createIndex accepts up to 3 arguments");
+DBCollection.prototype.createIndex = function(keys, options, commitQuorum, cmdArgs) {
+    if (arguments.length > 4) {
+        throw new Error("createIndex accepts up to 4 arguments");
     }
 
-    return this.createIndexes([keys], options, commitQuorum);
+    return this.createIndexes([keys], options, commitQuorum, cmdArgs);
 };
 
-DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
-    if (arguments.length > 3) {
-        throw new Error("createIndexes accepts up to 3 arguments");
+DBCollection.prototype.createIndexes = function(keys, options, commitQuorum, cmdArgs) {
+    if (arguments.length > 4) {
+        throw new Error("createIndexes accepts up to 4 arguments");
     }
 
     if (!Array.isArray(keys)) {
@@ -683,19 +683,24 @@ DBCollection.prototype.createIndexes = function(keys, options, commitQuorum) {
     }
 
     if (commitQuorum === undefined) {
-        return this._db.runCommand({createIndexes: this.getName(), indexes: indexSpecs});
+        return this._db.runCommand(
+            {createIndexes: this.getName(), indexes: indexSpecs, ...cmdArgs});
     }
-    return this._db.runCommand(
-        {createIndexes: this.getName(), indexes: indexSpecs, commitQuorum: commitQuorum});
+    return this._db.runCommand({
+        createIndexes: this.getName(),
+        indexes: indexSpecs,
+        commitQuorum: commitQuorum,
+        ...cmdArgs
+    });
 };
 
 DBCollection.prototype.reIndex = function() {
     return this._db.runCommand({reIndex: this.getName()});
 };
 
-DBCollection.prototype.dropIndexes = function(indexNames) {
+DBCollection.prototype.dropIndexes = function(indexNames, cmdArgs) {
     indexNames = indexNames || '*';
-    var res = this._db.runCommand({dropIndexes: this.getName(), index: indexNames});
+    let res = this._db.runCommand({dropIndexes: this.getName(), index: indexNames, ...cmdArgs});
     assert(res, "no result from dropIndex result");
     if (res.ok)
         return res;
@@ -803,8 +808,8 @@ DBCollection.prototype.getShardVersion = function() {
     return this._db._adminCommand({getShardVersion: this._fullName});
 };
 
-DBCollection.prototype.getIndexes = function() {
-    var res = this.runCommand("listIndexes");
+DBCollection.prototype.getIndexes = function(params) {
+    let res = this.runCommand("listIndexes", params);
 
     if (!res.ok) {
         if (res.code == ErrorCodes.NamespaceNotFound) {

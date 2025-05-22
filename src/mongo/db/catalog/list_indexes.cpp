@@ -66,20 +66,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 namespace mongo {
 
-StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
-                                           const NamespaceStringOrUUID& ns,
-                                           ListIndexesInclude additionalInclude) {
-    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, ns);
-    auto nss = collection.getNss();
-    if (!collection) {
-        return StatusWith<std::list<BSONObj>>(
-            ErrorCodes::NamespaceNotFound,
-            str::stream() << "ns does not exist: " << collection.getNss().toStringForErrorMsg());
-    }
-    return StatusWith<std::list<BSONObj>>(
-        listIndexesInLock(opCtx, collection.getCollection(), nss, additionalInclude));
-}
-
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
@@ -91,7 +77,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
     std::list<BSONObj> indexSpecs;
     collection->getAllIndexes(&indexNames);
 
-    if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+    if (collection->isClustered() && !collection->isTimeseriesCollection()) {
         BSONObj collation;
         if (auto collator = collection->getDefaultCollator()) {
             collation = collator->getSpec().toBSON();
@@ -166,7 +152,12 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
                                                  ListIndexesInclude additionalInclude) {
-    auto listStatus = listIndexes(opCtx, nss, additionalInclude);
-    return listStatus.isOK() ? std::move(listStatus.getValue()) : std::list<BSONObj>();
+    AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
+    if (!collection) {
+        return {};
+    }
+
+    return listIndexesInLock(
+        opCtx, collection.getCollection(), collection.getNss(), additionalInclude);
 }
 }  // namespace mongo

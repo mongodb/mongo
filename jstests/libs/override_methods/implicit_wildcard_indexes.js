@@ -174,20 +174,21 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
  * Hides any implicitly created wildcard indexes. Note that tests using {$indexStats} directly have
  * to be manually excluded from the suite, since they won't pass through this override.
  */
-DBCollection.prototype.getIndexes = function(filter) {
-    const res = this.aggregate([
-                        {$indexStats: {}},
-                        {$match: filter || {}},
-                        // Hide the implicitly created index(es) from tests that look
-                        // for indexes.
-                        {$addFields: {isHidden: isHiddenWildcardIndex}},
-                        {$match: {isHidden: false}},
-                        // The information listed in 'spec' is usually returned inline
-                        // at the root level.
-                        {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}},
-                        // This info isn't shown in 'getIndexes'.
-                        {$project: {host: 0, accesses: 0, spec: 0, isHidden: 0}},
-                    ])
+DBCollection.prototype.getIndexes = function(params) {
+    const res = this.aggregate(
+                        [
+                            {$indexStats: {}},
+                            // Hide the implicitly created index(es) from tests that look
+                            // for indexes.
+                            {$addFields: {isHidden: isHiddenWildcardIndex}},
+                            {$match: {isHidden: false}},
+                            // The information listed in 'spec' is usually returned inline
+                            // at the root level.
+                            {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}},
+                            // This info isn't shown in 'getIndexes'.
+                            {$project: {host: 0, accesses: 0, spec: 0, isHidden: 0}},
+                        ],
+                        params)
                     .toArray();
     return res;
 };

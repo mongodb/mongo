@@ -44,12 +44,6 @@ namespace mongo {
  */
 enum ListIndexesInclude { Nothing, BuildUUID, IndexBuildInfo };
 
-/**
- * Return a list of the indexes on the given collection.
- */
-StatusWith<std::list<BSONObj>> listIndexes(OperationContext* opCtx,
-                                           const NamespaceStringOrUUID& ns,
-                                           ListIndexesInclude additionalInclude);
 std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                                      const CollectionPtr& collection,
                                      const NamespaceString& nss,
