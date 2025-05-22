@@ -37,8 +37,8 @@
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/query/index_entry.h"
 
 namespace mongo {
@@ -76,10 +76,9 @@ public:
         return Type::IndexTag;
     }
 
-    void hashWithIndexEntry(absl::HashState state,
-                            const std::vector<IndexEntry>& indexes) const override {
+    void hash(absl::HashState& state, const MatchExpression::HashParam& param) const override {
         state = absl::HashState::combine(
-            std::move(state), indexes.at(index).identifier, pos, canCombineBounds);
+            std::move(state), param.indexes->at(index).identifier, pos, canCombineBounds);
     }
 
     // What index should we try to use for this leaf?
@@ -149,7 +148,7 @@ public:
         return ret;
     }
 
-    void hashWithIndexEntry(absl::HashState state, const std::vector<IndexEntry>&) const override {
+    void hash(absl::HashState& state, const MatchExpression::HashParam& param) const override {
         MONGO_UNREACHABLE_TASSERT(9766200);
     }
 
@@ -237,10 +236,9 @@ public:
         return Type::OrPushdownTag;
     }
 
-    void hashWithIndexEntry(absl::HashState state,
-                            const std::vector<IndexEntry>& indexes) const override {
+    void hash(absl::HashState& state, const MatchExpression::HashParam& param) const override {
         if (_indexTag) {
-            _indexTag->hashWithIndexEntry(std::move(state), indexes);
+            _indexTag->hash(state, param);
         }
     }
 

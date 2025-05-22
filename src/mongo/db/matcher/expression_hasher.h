@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
 /**
@@ -44,7 +45,7 @@ enum HashValuesOrParams {
     kHashIndexTags = 1 << 3,
 };
 
-struct MatchExpressionHashParams {
+struct MatchExpression::HashParam {
     const HashValuesOrParams hashValuesOrParams;
     // Required if 'kHashIndexTags' is set. Index tags refer to indexes by their positions in this
     // list. However we don't want index tags' hashes to change based on this property. For
@@ -61,7 +62,7 @@ struct MatchExpressionHashParams {
  * The function does not support $jsonSchema and will tassert() if provided an input that contains
  * any $jsonSchema-related nodes.
  */
-size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParams& params);
+size_t calculateHash(const MatchExpression& expr, const MatchExpression::HashParam& param);
 
 /**
  * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
@@ -69,8 +70,8 @@ size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParam
  * will tassert() if provided an input that contains any $jsonSchema-related nodes.
  */
 struct MatchExpressionHasher {
-    explicit MatchExpressionHasher(MatchExpressionHashParams params =
-                                       MatchExpressionHashParams{HashValuesOrParams::kHashValues})
+    explicit MatchExpressionHasher(MatchExpression::HashParam params =
+                                       MatchExpression::HashParam{HashValuesOrParams::kHashValues})
         : _params(std::move(params)) {}
 
     size_t operator()(const MatchExpression* expr) const {
@@ -78,7 +79,7 @@ struct MatchExpressionHasher {
     }
 
 private:
-    const MatchExpressionHashParams _params;
+    const MatchExpression::HashParam _params;
 };
 
 /**

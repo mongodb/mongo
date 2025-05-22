@@ -68,21 +68,14 @@ namespace mongo {
  */
 extern FailPoint disableMatchExpressionOptimization;
 
-class CollatorInterface;
-
-class MatchExpression;
-class TreeMatchExpression;
-
-// TODO(SERVER-105040): Avoid having to fwd declare this.
-struct IndexEntry;
-
-typedef StatusWith<std::unique_ptr<MatchExpression>> StatusWithMatchExpression;
-
 class MatchExpression {
     MatchExpression(const MatchExpression&) = delete;
     MatchExpression& operator=(const MatchExpression&) = delete;
 
 public:
+    /** In-name-only dependency. Defined in expression_hasher.h. */
+    struct HashParam;
+
     enum MatchType {
         // tree types
         AND,
@@ -445,12 +438,11 @@ public:
     class TagData {
     public:
         enum class Type { IndexTag, RelevantTag, OrPushdownTag };
-        virtual ~TagData() {}
+        virtual ~TagData() = default;
         virtual void debugString(StringBuilder* builder) const = 0;
         virtual TagData* clone() const = 0;
         virtual Type getType() const = 0;
-        virtual void hashWithIndexEntry(absl::HashState state,
-                                        const std::vector<IndexEntry>& indexes) const = 0;
+        virtual void hash(absl::HashState& state, const HashParam& param) const = 0;
     };
 
     /**
@@ -644,5 +636,7 @@ inline MatchExpression::Iterator end(MatchExpression& expr) {
 inline MatchExpression::ConstIterator end(const MatchExpression& expr) {
     return {&expr, expr.numChildren()};
 }
+
+using StatusWithMatchExpression = StatusWith<std::unique_ptr<MatchExpression>>;
 
 }  // namespace mongo

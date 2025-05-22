@@ -142,6 +142,10 @@ public:
         visitor->visit(this);
     }
 
+    const BSONObj& rawObjForHashing() const {
+        return _rawObj;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {
@@ -155,9 +159,6 @@ private:
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoExpression> _query;
     bool _canSkipValidation;
-
-    template <typename H>
-    friend class MatchExpressionHashVisitor;
 };
 
 
@@ -237,6 +238,10 @@ public:
         visitor->visit(this);
     }
 
+    const BSONObj& rawObjForHashing() const {
+        return _rawObj;
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) {
@@ -249,9 +254,6 @@ private:
 
     // Share ownership of our query with all of our clones
     std::shared_ptr<const GeoNearExpression> _query;
-
-    template <typename H>
-    friend class MatchExpressionHashVisitor;
 };
 
 /**

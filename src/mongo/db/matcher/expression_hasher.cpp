@@ -30,6 +30,7 @@
 #include "mongo/db/matcher/expression_hasher.h"
 
 #include <absl/hash/hash.h>
+#include <boost/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -67,60 +68,11 @@
 #include "mongo/db/pipeline/expression_hasher.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-/**
- * MatcherTypeSet's hash function compatible with absl::Hash.
- */
-template <typename H>
-H AbslHashValue(H h, const MatcherTypeSet& expr) {
-    return H::combine(std::move(h), expr.getBSONTypeMask(), expr.allNumbers);
-}
-
-/**
- * Collation's hash function compatible with absl::Hash.
- */
-template <typename H>
-H AbslHashValue(H h, const Collation& collation) {
-    return H::combine(std::move(h),
-                      collation.getLocale(),
-                      collation.getCaseLevel(),
-                      collation.getCaseFirst(),
-                      collation.getStrength(),
-                      collation.getNumericOrdering(),
-                      collation.getAlternate(),
-                      collation.getMaxVariable(),
-                      collation.getNormalization(),
-                      collation.getBackwards().value_or(false),
-                      collation.getVersion());
-}
-
-template <typename H>
-H AbslHashValue(H h, const Decimal128& dec) {
-    return H::combine(std::move(h), dec.getValue().low64, dec.getValue().high64);
-}
-
-template <typename H>
-H AbslHashValue(H h, const ExpressionWithPlaceholder& dec) {
-    return H::combine(std::move(h), MatchExpressionHasher{}(dec.getFilter()), dec.getPlaceholder());
-}
-
-template <typename H>
-H AbslHashValue(H h, const BSONElement& el) {
-    return H::combine_contiguous(std::move(h), el.rawdata(), el.size());
-}
-
-struct TagDataWithIndexEntries {
-    const MatchExpression::TagData& tagData;
-    const std::vector<IndexEntry>& indexes;
-};
-
-template <typename H>
-H AbslHashValue(H h, const TagDataWithIndexEntries& val) {
-    val.tagData.hashWithIndexEntry(absl::HashState::Create(&h), val.indexes);
-    return h;
-}
+namespace {
 
 /**
  * MatchExpression's hasher implementation compatible with absl::Hash.
@@ -128,9 +80,9 @@ H AbslHashValue(H h, const TagDataWithIndexEntries& val) {
 template <typename H>
 class MatchExpressionHashVisitor final : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionHashVisitor(H hashState, const MatchExpressionHashParams& hashParams)
+    MatchExpressionHashVisitor(H hashState, const MatchExpression::HashParam& hashParam)
         : _hashState(std::move(hashState)),
-          _params(hashParams),
+          _params(hashParam),
           _hashValues(_params.hashValuesOrParams & HashValuesOrParams::kHashValues),
           _hashParamIds(_params.hashValuesOrParams & HashValuesOrParams::kHashParamIds),
           _hashTags(_params.hashValuesOrParams & HashValuesOrParams::kHashIndexTags) {
@@ -179,8 +131,8 @@ public:
             // There cannot be regexes when InMatchExpression is parameterized.
             combine(expr->getInputParamId().get());
         } else if (_hashValues) {
-            // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
-            // evenly chosen equalities.
+            // Hash the size of equalities's list and up to a maximum of
+            // 'maxNumberOfHashedElements' evenly chosen equalities.
             BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                          expr->getCollator());
             const auto& equalities = expr->getEqualities();
@@ -191,8 +143,8 @@ public:
                 combine(eltCmp.hash(equalities[i]));
             }
 
-            // Hash the size of regexes's list and up to a maximum of 'maxNumberOfHashedElements'
-            // evenly chosen regexes.
+            // Hash the size of regexes's list and up to a maximum of
+            // 'maxNumberOfHashedElements' evenly chosen regexes.
             const auto& regexes = expr->getRegexes();
             const size_t regStep = std::max(static_cast<size_t>(1),
                                             regexes.size() / _params.maxNumberOfInElementsToHash);
@@ -210,7 +162,8 @@ public:
             // Either both parameter IDs are set, or neither are.
             combine(expr->getDivisorInputParamId().get(), expr->getRemainderInputParamId().get());
         } else if (_hashValues) {
-            // `equivalent()` function does not use DivisorInputParamId and RemainderInputParamId.
+            // `equivalent()` function does not use DivisorInputParamId and
+            // RemainderInputParamId.
             combine(expr->getDivisor(), expr->getRemainder());
         }
     }
@@ -237,8 +190,8 @@ public:
         if (_hashParamIds && expr->getInputParamId()) {
             combine(expr->getInputParamId().get());
         } else if (_hashValues) {
-            // `equivalent()` function does not use InputParamId. `getData()` returns value of size
-            // field.
+            // `equivalent()` function does not use InputParamId. `getData()` returns value of
+            // size field.
             combine(expr->getData());
         }
     }
@@ -282,11 +235,11 @@ public:
     }
     void visit(const GeoMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
+        combine(SimpleBSONObjComparator{}.hash(expr->rawObjForHashing()));
     }
     void visit(const GeoNearMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
-        combine(SimpleBSONObjComparator{}.hash(expr->_rawObj));
+        combine(SimpleBSONObjComparator{}.hash(expr->rawObjForHashing()));
     }
     void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
         hashCombineCommonProperties(expr);
@@ -421,13 +374,7 @@ public:
     }
 
 private:
-    void hashCombineCommonProperties(const MatchExpression* expr) {
-        combine(expr->matchType(), expr->path());
-
-        if (_hashTags && expr->getTag()) {
-            combine(TagDataWithIndexEntries{*expr->getTag(), *_params.indexes});
-        }
-    }
+    void hashCombineCommonProperties(const MatchExpression* expr);
 
     void hashCombineCollator(const CollatorInterface* ci) {
         if (ci) {
@@ -482,35 +429,132 @@ private:
     }
 
     template <typename... Ts>
-    void combine(const Ts&... values) {
-        _hashState = H::combine(std::move(_hashState), values...);
-    }
+    void combine(const Ts&... values);
 
     H _hashState;
 
-    const MatchExpressionHashParams& _params;
+    const MatchExpression::HashParam& _params;
     const bool _hashValues;
     const bool _hashParamIds;
     const bool _hashTags;
 };
 
+
+/** See `RefWithHashParam` for information about these `hash` functions. */
+namespace matcher_expression_hash {
+
+/** Fallback */
+template <typename H, typename T>
+H hash(H h, const MatchExpression::HashParam&, const T& x) {
+    return H::combine(std::move(h), x);
+}
+
 /**
- * A utility struct used to pass additional parameters to the MatchExpression's hasher.
+ * MatcherTypeSet's hash function compatible with absl::Hash.
  */
-struct AbslHashValueParams {
-    const MatchExpression& exprToHash;
-    const MatchExpressionHashParams& params;
+template <typename H>
+H hash(H h, const MatchExpression::HashParam&, const MatcherTypeSet& expr) {
+    return H::combine(std::move(h), expr.getBSONTypeMask(), expr.allNumbers);
+}
+
+/**
+ * Collation's hash function compatible with absl::Hash.
+ */
+template <typename H>
+H hash(H h, const MatchExpression::HashParam&, const Collation& collation) {
+    return H::combine(std::move(h),
+                      collation.getLocale(),
+                      collation.getCaseLevel(),
+                      collation.getCaseFirst(),
+                      collation.getStrength(),
+                      collation.getNumericOrdering(),
+                      collation.getAlternate(),
+                      collation.getMaxVariable(),
+                      collation.getNormalization(),
+                      collation.getBackwards().value_or(false),
+                      collation.getVersion());
+}
+
+template <typename H>
+H hash(H h, const MatchExpression::HashParam&, const Decimal128& dec) {
+    return H::combine(std::move(h), dec.getValue().low64, dec.getValue().high64);
+}
+
+template <typename H>
+H hash(H h, const MatchExpression::HashParam&, const ExpressionWithPlaceholder& dec) {
+    return H::combine(std::move(h), MatchExpressionHasher{}(dec.getFilter()), dec.getPlaceholder());
+}
+
+template <typename H>
+H hash(H h, const MatchExpression::HashParam&, const BSONElement& el) {
+    return H::combine_contiguous(std::move(h), el.rawdata(), el.size());
+}
+
+template <typename H>
+H hash(H h, const MatchExpression::HashParam& hashParams, const MatchExpression::TagData& x) {
+    auto state = absl::HashState::Create(&h);
+    x.hash(state, hashParams);
+    return h;
+}
+
+/** Absl-compatible boost::optional */
+template <typename H, typename T>
+H hash(H h, const MatchExpression::HashParam& params, const boost::optional<T>& value) {
+    if (value)
+        h = hash(std::move(h), params, *value);
+    return H::combine(std::move(h), bool{value});
+}
+
+template <typename H>
+H hash(H h, const MatchExpression::HashParam& hashParams, const MatchExpression& x) {
+    MatchExpressionHashVisitor<H> visitor{std::move(h), hashParams};
+    MatchExpressionWalker walker{&visitor, nullptr, nullptr};
+    tree_walker::walk<true, MatchExpression>(&x, &walker);
+    return visitor.extractHashState();
+}
+}  // namespace matcher_expression_hash
+
+/**
+ * `MatchExpression` uses `absl::Hash` but has a requirement to customize the hashing of some
+ * types. So we always hash values by combining instances of this wrapper type rather than
+ * combining them directly.
+ *
+ * All hash combining is performed by the `matcher_expression_hash::hash` overloads. These
+ * define custom hash behavior for several types that are defined outside of this API. These
+ * model a `hash(h, param, x)` function that takes an abstract absl hash state `H` and a
+ * `MatchExpression::HashParam param` as well as the `x` to be hashed. The `param` can be used
+ * to optionally augment the hashing of some types with auxiliary information.
+ */
+template <typename T>
+struct RefWithHashParam {
+    template <typename H>
+    friend H AbslHashValue(H h, const RefWithHashParam& x) {
+        // Deliberately qualified call to disable ADL.
+        return matcher_expression_hash::hash(std::move(h), x.hashParam, x.value);
+    }
+
+    const MatchExpression::HashParam& hashParam;
+    const T& value;
 };
 
 template <typename H>
-H AbslHashValue(H h, const AbslHashValueParams& toHash) {
-    MatchExpressionHashVisitor<H> visitor{std::move(h), toHash.params};
-    MatchExpressionWalker walker{&visitor, nullptr, nullptr};
-    tree_walker::walk<true, MatchExpression>(&toHash.exprToHash, &walker);
-    return visitor.extractHashState();
+template <typename... Ts>
+void MatchExpressionHashVisitor<H>::combine(const Ts&... values) {
+    _hashState = H::combine(std::move(_hashState), RefWithHashParam{_params, values}...);
 }
 
-size_t calculateHash(const MatchExpression& expr, const MatchExpressionHashParams& params) {
-    return absl::Hash<AbslHashValueParams>{}({expr, params});
+template <typename H>
+void MatchExpressionHashVisitor<H>::hashCombineCommonProperties(const MatchExpression* expr) {
+    combine(expr->matchType(), expr->path());
+
+    if (_hashTags && expr->getTag()) {
+        combine(RefWithHashParam{_params, *expr->getTag()});
+    }
+}
+
+}  // namespace
+
+size_t calculateHash(const MatchExpression& expr, const MatchExpression::HashParam& params) {
+    return absl::Hash<RefWithHashParam<MatchExpression>>{}({params, expr});
 }
 }  // namespace mongo

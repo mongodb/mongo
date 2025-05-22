@@ -142,7 +142,7 @@ Status tagOrChildAccordingToCache(const SolutionCacheData* branchCacheData,
 
 size_t hashTaggedMatchExpression(MatchExpression* expr, const std::vector<IndexEntry>& indexes) {
     const MatchExpressionHasher hash{
-        MatchExpressionHashParams{HashValuesOrParams::kHashIndexTags, &indexes}};
+        MatchExpression::HashParam{HashValuesOrParams::kHashIndexTags, &indexes}};
     return hash(expr);
 }
 
