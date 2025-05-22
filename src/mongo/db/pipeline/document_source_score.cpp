@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
@@ -52,7 +53,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-/** Register $score as a DocumentSource without feature flag and check that the hybrid scoring
+/**
+ * Register $score as a DocumentSource without feature flag and check that the hybrid scoring
  * feature flag is enabled in createFromBson() instead of via
  * REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG. This method of feature flag checking avoids hitting
  * QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests ($scoreFusion is
@@ -64,6 +66,9 @@ REGISTER_DOCUMENT_SOURCE(score,
                          AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
+static const std::string scoreScoreDetailsDescription =
+    "the score calculated from multiplying a weight in the range [0,1] with either a normalized or "
+    "nonnormalized value:";
 
 // Internal, intermediate top-level field name used for minMaxScaler normalization. The
 // $minMaxScaler is output into this field during intermediate processing, and then written back to
@@ -292,6 +297,58 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildWeightCalculationStages(
 
     return outputStages;
 }
+
+std::string getNormalizationString(ScoreNormalizeFunctionEnum normalization) {
+    switch (normalization) {
+        case ScoreNormalizeFunctionEnum::kSigmoid:
+            return "sigmoid";
+        case ScoreNormalizeFunctionEnum::kMinMaxScaler:
+            return "minMaxScaler";
+        case ScoreNormalizeFunctionEnum::kNone:
+            return "none";
+        default:
+            // Only one of the above options can be specified for normalization.
+            MONGO_UNREACHABLE_TASSERT(9467000);
+    }
+}
+
+/**
+ * Builds the scoreDetails metadata for $score.
+ *     {
+ *         $setMetadata: {
+ *             scoreDetails: {
+ *                 value: { $meta: "score" },
+ *                 description: { $const: "the score calculated from..." },
+ *                 rawScore: "$myScore", // user input to $score.score
+ *                 normalization: { $const: "none" }, // user input to $score.normalization
+ *                 weight: { $const: 1 }, // user input to $score.weight
+ *                 expression: "{ string: { $add: [ '$myScore', '$otherScore' ] } }",
+ *                 details: []
+ *             }
+ *         }
+ *     }
+ */
+boost::intrusive_ptr<DocumentSource> setScoreDetailsMetadata(
+    ScoreSpec spec, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    // To calculate the 'rawScore' field, we recompute the input score expression from scratch, even
+    // though we'd already computed it prior to normalization. It's possible to save this
+    // intermediate value to avoid recomputation. However, doing so would generate a more complex
+    // desugared output and implementation. Thus, we decided this approach is better overall.
+    boost::intrusive_ptr<DocumentSource> setScoreDetails = DocumentSourceSetMetadata::create(
+        pExpCtx,
+        Expression::parseObject(
+            pExpCtx.get(),
+            BSON("value" << BSON("$meta" << "score") << "description"
+                         << scoreScoreDetailsDescription << "rawScore"
+                         << spec.getScore().getElement() << "normalization"
+                         << getNormalizationString(spec.getNormalizeFunction()) << "weight"
+                         << spec.getWeight() << "expression"
+                         << hybrid_scoring_util::score_details::stringifyExpression(spec.getScore())
+                         << "details" << BSONArrayBuilder().arr()),
+            pExpCtx->variablesParseState),
+        DocumentMetadataFields::kScoreDetails);
+    return setScoreDetails;
+}
 }  // namespace
 
 std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
@@ -303,6 +360,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     outputStages.splice(outputStages.end(), buildRawScoreCalculationStages(spec, pExpCtx));
     outputStages.splice(outputStages.end(), buildNormalizationCalculationStages(spec, pExpCtx));
     outputStages.splice(outputStages.end(), buildWeightCalculationStages(spec, pExpCtx));
+
+    const bool includeScoreDetails = spec.getScoreDetails();
+    if (includeScoreDetails) {
+        outputStages.emplace_back(setScoreDetailsMetadata(spec, pExpCtx));
+    }
 
     return outputStages;
 }

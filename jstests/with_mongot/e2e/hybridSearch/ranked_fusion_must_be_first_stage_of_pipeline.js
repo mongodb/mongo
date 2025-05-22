@@ -78,12 +78,12 @@ function assertRankFusionMustBeFirstStageInPipeline(pipeline) {
 }
 
 // Simple case where a typical search-based $rankFusion is preceded by a filter (match stage).
-// The de-sugared output is an invalid pipeline anyways since $search would illegally appear not
+// The desugared output is an invalid pipeline anyways since $search would illegally appear not
 // as the first stage, but we should first identify the error that $rankFusion itself
 // must be the first stage.
 assertRankFusionMustBeFirstStageInPipeline([matchStage, rankFusionWithSearchStage, limitStage]);
 
-// In this case where the de-sugared output of the aggregation would be a valid query,
+// In this case where the desugared output of the aggregation would be a valid query,
 // but we should still reject because we catch that $rankFusion is the first stage.
 assertRankFusionMustBeFirstStageInPipeline([matchStage, rankFusionWithoutSearchStage, limitStage]);
 

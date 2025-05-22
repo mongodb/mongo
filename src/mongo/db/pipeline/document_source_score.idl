@@ -60,3 +60,7 @@ structs:
                 validator:
                     lte: 1.0
                     gte: 0.0
+            scoreDetails:
+                description: If true scoreDetails will be materialized. Will include sub-pipeline scoreDetails if they have them.
+                type: bool
+                default: false

@@ -100,7 +100,8 @@ const FirstStageOptions = Object.freeze({
             {input: {pipelines: {search: [searchStage]}, normalization: "none"}, scoreDetails: true}
     },
     SORT: {$sort: {a: -1}},
-    SCORE: {$score: {score: {$divide: [1, "$a"]}}}
+    SCORE: {$score: {score: {$divide: [1, "$a"]}}},
+    SCORE_W_DETAILS: {$score: {score: {$divide: [1, "$a"]}, scoreDetails: true}}
 });
 
 // The set of metadata fields that can be referenced inside $meta, alongside information used to
@@ -165,6 +166,7 @@ const MetaFields = Object.freeze({
             FirstStageOptions.SORT,
             FirstStageOptions.GEO_NEAR,
             FirstStageOptions.SCORE,
+            FirstStageOptions.SCORE_W_DETAILS,
             FirstStageOptions.SEARCH,
             FirstStageOptions.SEARCH_W_DETAILS,
             FirstStageOptions.RANK_FUSION,
@@ -213,6 +215,7 @@ const MetaFields = Object.freeze({
         firstStageRequired: [
             FirstStageOptions.FTS_MATCH,
             FirstStageOptions.SCORE,
+            FirstStageOptions.SCORE_W_DETAILS,
             FirstStageOptions.VECTOR_SEARCH,
             FirstStageOptions.SEARCH,
             FirstStageOptions.SEARCH_W_DETAILS,
@@ -230,6 +233,7 @@ const MetaFields = Object.freeze({
         firstStageRequired: [
             FirstStageOptions.SEARCH_W_DETAILS,
             FirstStageOptions.RANK_FUSION_W_DETAILS,
+            FirstStageOptions.SCORE_W_DETAILS,
             FirstStageOptions.SCORE_FUSION_W_DETAILS,
         ]
     }

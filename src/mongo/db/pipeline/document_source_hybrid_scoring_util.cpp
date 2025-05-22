@@ -274,5 +274,14 @@ boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
         "calculatedScoreDetails"_sd, std::move(arrayExpr), expCtx.get());
     return addFields;
 }
+
+std::string stringifyExpression(boost::optional<IDLAnyType> expression) {
+    BSONObjBuilder expressionBob;
+    expression->serializeToBSON("string", &expressionBob);
+    expressionBob.done();
+    std::string exprString = expressionBob.obj().toString();
+    std::replace(exprString.begin(), exprString.end(), '\"', '\'');
+    return exprString;
+}
 }  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util

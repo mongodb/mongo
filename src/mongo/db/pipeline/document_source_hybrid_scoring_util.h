@@ -132,5 +132,11 @@ boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
     const StringMap<double>& weights,
     bool isRankFusion,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+/**
+ * Returns the stringified verion of a given expression with the following format:
+ * "string": {"stringified expression"}
+ */
+std::string stringifyExpression(boost::optional<IDLAnyType> expression);
 }  // namespace score_details
 }  // namespace mongo::hybrid_scoring_util

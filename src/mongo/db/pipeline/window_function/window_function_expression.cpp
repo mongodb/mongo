@@ -156,7 +156,7 @@ void Expression::registerParser(std::string functionName,
                                 FeatureFlag* featureFlag,
                                 AllowedWithApiStrict allowedWithApi) {
     auto op = parserMap.find(functionName);
-    massert(10021101,
+    uassert(10021101,
             str::stream() << "Duplicate parsers (" << functionName << ") registered.",
             op == parserMap.end());
     ExpressionParserRegistration r{parser, featureFlag, allowedWithApi};

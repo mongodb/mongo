@@ -543,13 +543,9 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
                  scoreFusionScoringOptions.getCombinationMethod())));
     if (scoreFusionScoringOptions.getCombinationMethod() ==
         ScoreFusionCombinationMethodEnum::kExpression) {
-        BSONObjBuilder expressionBob;
-        scoreFusionScoringOptions.getCombinationExpression()->serializeToBSON("string",
-                                                                              &expressionBob);
-        expressionBob.done();
-        std::string exprString = expressionBob.obj().toString();
-        std::replace(exprString.begin(), exprString.end(), '\"', '\'');
-        combinationBob.append("expression", exprString);
+        combinationBob.append("expression",
+                              hybrid_scoring_util::score_details::stringifyExpression(
+                                  scoreFusionScoringOptions.getCombinationExpression()));
     }
     combinationBob.done();
     boost::intrusive_ptr<DocumentSource> setScoreDetails = DocumentSourceSetMetadata::create(
