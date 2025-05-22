@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 #
-# Replication Team Smoke Tests
+# Component/Team Smoke Tests
 #
 # To be run prior to submitting evergreen patches.
 # Runs the following locally and makes sure they pass:
 #   * clang format
 #   * clang tidy
 #   * build install-dist-test
-#   * replication unit tests
-#   * replication smoke tests
+#   * <component/team> unit tests
+#   * <component/team> smoke tests
 #
 # By default, notifies the locally configured Evergreen user
 # via slack once the smoke test are finished.
@@ -28,8 +28,8 @@ from typing import Any, Deque, Dict, List, Optional, Set, Union
 
 from rich.status import Status
 
-REPL = Path(__file__).resolve().parent
-ROOT = REPL.parent.parent.parent.parent
+SMOKE_TEST_DIR = Path(__file__).resolve().parent
+ROOT = SMOKE_TEST_DIR.parent.parent
 MONGO_PYTHON = ROOT.joinpath("python3-venv")
 MONGO_PYTHON_INTERPRETER = MONGO_PYTHON.joinpath("bin", "python")
 BAZEL = Path(shutil.which("bazel"))
@@ -57,15 +57,6 @@ def ensure_python3_venv():
 ensure_python3_venv()
 # can import these after verifying we're running with the correct venv
 from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
-
-
-def humanize_duration(x: float):
-    raw = int(x)
-    seconds = raw % 60
-    raw //= 60
-    minutes = raw % 60
-    hours = raw // 60
-    return f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
 
 
 @dataclass
@@ -126,7 +117,7 @@ def normalize_deps(x: Union[None, Node, Set[Node]]):
         return {x}
 
 
-def send_slack_notification(nodes: List[Node], total_elapsed: float):
+def send_slack_notification(nodes: List[Node], total_elapsed: float, component_name: str):
     overall_success = True
     lines = [
         "```",
@@ -143,12 +134,12 @@ def send_slack_notification(nodes: List[Node], total_elapsed: float):
         overall_success &= succeeded
         if succeeded:
             elapsed = node._finish_time - node._start_time
-            lines.append(f"{humanize_duration(elapsed)} {node.name} ✔")
+            lines.append(f"{time.strftime('%H:%M:%S', time.gmtime(elapsed))} {node.name} ✔")
         elif not finished:
             lines.append(f"            {node.name}")
         else:
             elapsed = node._finish_time - node._start_time
-            lines.append(f"{humanize_duration(elapsed)} {node.name} ✖")
+            lines.append(f"{time.strftime('%H:%M:%S', time.gmtime(elapsed))} {node.name} ✖")
             failure_lines.append(f"Command '{node.name}', rc={node._proc.returncode}:")
             failure_lines.append(f"```\n{command}\n```")
             failure_lines.append(f"Log: {node.log_file}")
@@ -159,11 +150,12 @@ def send_slack_notification(nodes: List[Node], total_elapsed: float):
     if overall_success:
         lines.insert(
             0,
-            f"SUCCESS - Replication smoke tests passed in {humanize_duration(total_elapsed)}",
+            f"SUCCESS - {component_name} smoke tests passed in {time.strftime('%H:%M:%S', time.gmtime(total_elapsed))}",
         )
     else:
         lines.insert(
-            0, f"FAILURE - Replication smoke tests failed in {humanize_duration(total_elapsed)}"
+            0,
+            f"FAILURE - {component_name} smoke tests failed in {time.strftime('%H:%M:%S', time.gmtime(total_elapsed))}",
         )
 
     evg = get_evergreen_api()
@@ -180,6 +172,7 @@ class CommandRunner:
         log_path: Path,
         notify_slack: bool,
         parallelism: int,
+        component_name: str,
     ):
         self._log_path = log_path
         self._parallelism = parallelism
@@ -188,10 +181,11 @@ class CommandRunner:
         self._finished: Set[Node] = set()
         self._ready: Deque[Node] = deque()
         self._running: Set[Node] = set()
-        self._status = Status(status="repl smoke tests")
+        self._status = Status(status=f"{component_name} smoke tests")
         self._start_time = time.monotonic()
         self._finish_time: Optional[float] = None
         self._notify_slack = notify_slack
+        self._component_name = component_name
 
     def _notify(self, event: str, node: Node):
         if event == "spawn":
@@ -204,7 +198,7 @@ class CommandRunner:
         ntot = len(self._nodes)
         elapsed = time.monotonic() - self._start_time
         self._status.update(
-            status=f"running {nrun}, completed {nfin}/{ntot} {humanize_duration(elapsed)}"
+            status=f"running {nrun}, completed {nfin}/{ntot} {time.strftime('%H:%M:%S', time.gmtime(elapsed))}"
         )
 
     def command(
@@ -276,6 +270,7 @@ class CommandRunner:
                 send_slack_notification(
                     nodes=sorted(self._nodes),
                     total_elapsed=elapsed,
+                    component_name=self._component_name,
                 )
             print(f"Completed {len(self._finished)}/{len(self._nodes)} in {elapsed:.3f}s.")
         except subprocess.CalledProcessError as cpe:
@@ -287,23 +282,87 @@ Failure:
             send_slack_notification(
                 nodes=sorted(self._nodes),
                 total_elapsed=time.monotonic() - self._start_time,
+                component_name=self._component_name,
             )
             raise
         finally:
             self._status.stop()
 
 
-def run_replication_smoke_tests(
+component_name_to_formal_name = {
+    "catalog-and-routing": "Catalog and Routing",
+    "replication": "Replication",
+    "rss-sydney": "RSS Sydney",
+    "server-programmability": "Server Programmability",
+    "server-bsoncolumn": "Server BSONColumn",
+    "server-collection-write-path": "Server Collection Write Path",
+    "server-external-sorter": "Server External Sorter",
+    "server-index-builds": "Server Index Builds",
+    "server-key-string": "Server Key String",
+    "server-storage-engine-integration": "Server Storage Engine Integration",
+    "server-timeseries-bucket-catalog": "Server Timeseries Bucket Catalog",
+    "server-ttl": "Server TTL",
+}
+
+
+component_name_to_integration_test_suite = {
+    "catalog-and-routing": "catalog_and_routing",
+    "replication": "replication",
+    "rss-sydney": "rss_sydney",
+    "server-collection-write-path": "server_collection_write_path",
+    "server-index-builds": "server_index_builds",
+    "server-programmability": "server_programmability",
+    "server-storage-engine-integration": "server_storage_engine_integration",
+    "server-ttl": "server_ttl",
+}
+
+component_name_to_unit_test_tag = {
+    "rss-sydney": "server-rss-sydney-smoke",
+    "replication": "mongo_unittest",
+    "server-bsoncolumn": "server-bsoncolumn",
+    "server-collection-write-path": "server-collection-write-path",
+    "server-external-sorter": "server-external-sorter",
+    "server-index-builds": "server-index-builds",
+    "server-key-string": "server-key-string",
+    "server-storage-engine-integration": "server-storage-engine-integration",
+    "server-timeseries-bucket-catalog": "server-timeseries-bucket-catalog",
+    "server-tracking-allocators": "server-tracking-allocators",
+    "server-ttl": "server-ttl",
+}
+
+
+def run_smoke_tests(
     *,
+    component_name,
     log_path: Path,
     upstream_branch: str,
     bazel_args: List[str],
+    run_clang_tidy: bool,
     send_slack_notification: bool,
 ):
     log_path = log_path.joinpath(REPO_UNIQUE_NAME)
     log_path.mkdir(parents=True, exist_ok=True)
 
+    integration_suite_name = (
+        component_name_to_integration_test_suite[component_name]
+        if component_name in component_name_to_integration_test_suite
+        else ""
+    )
+
+    unit_test_tag = (
+        component_name_to_unit_test_tag[component_name]
+        if component_name in component_name_to_unit_test_tag
+        else ""
+    )
+
+    unit_test_build_target = (
+        "//src/mongo/db/repl/..." if component_name == "replication" else "//src/mongo/..."
+    )
+
+    component_name_for_messages = component_name_to_formal_name[component_name]
+
     runner = CommandRunner(
+        component_name=component_name_for_messages,
         log_path=log_path,
         notify_slack=send_slack_notification,
         parallelism=os.cpu_count(),
@@ -319,17 +378,6 @@ def run_replication_smoke_tests(
                 upstream_branch,
             ],
             log_file="clang_format.log",
-        ),
-        runner.command(
-            name="starlark format",
-            args=[
-                MONGO_PYTHON_INTERPRETER,
-                ROOT.joinpath("buildscripts", "buildifier.py"),
-                "--generate-report",
-                "--binary-dir=./",
-                "lint-all",
-            ],
-            log_file="starlark_format.log",
         ),
         runner.command(
             name="python format",
@@ -364,53 +412,56 @@ def run_replication_smoke_tests(
         deps=formatters,
     )
 
-    smoke_tests = runner.command(
-        name="run repl smoke tests",
-        args=[
-            MONGO_PYTHON_INTERPRETER,
-            ROOT.joinpath("buildscripts", "run_smoke_tests.py"),
-            "--suites",
-            "replication",
-        ],
-        log_file="smoke_tests.log",
-        # these can run while clang tidy is running, but i think it conflicts with unittests
-        deps=install,
-    )
+    integration_tests = None
+    if integration_suite_name != "":
+        integration_tests = runner.command(
+            name=f"run {component_name} smoke tests",
+            args=[
+                MONGO_PYTHON_INTERPRETER,
+                ROOT.joinpath("buildscripts", "run_smoke_tests.py"),
+                "--suites",
+                integration_suite_name,
+            ],
+            log_file="smoke_tests.log",
+            deps=install,
+        )
 
-    unittests = runner.command(
-        name="run repl unittests",
-        args=[
-            BAZEL,
-            "test",
-            *bazel_args,
-            "--test_tag_filters=mongo_unittest",
-            "--test_output=summary",
-            "//src/mongo/db/repl/...",
-        ],
-        # NOTE: bazel already stores the real logs somewhere else
-        log_file="unittests.log",
-        # not a true dep, but bazel access has to be serialized
-        deps=install,
-    )
+    unittests = None
+    if unit_test_tag != "":
+        unittests = runner.command(
+            name=f"run {component_name} unittests",
+            args=[
+                BAZEL,
+                "test",
+                *bazel_args,
+                f"--test_tag_filters={unit_test_tag}",
+                "--test_output=summary",
+                unit_test_build_target,
+            ],
+            # NOTE: bazel already stores the real logs somewhere else
+            log_file="unittests.log",
+            # not a true dep, but bazel access has to be serialized
+            deps=install,
+        )
 
-    # unfortunately this shuffles bazel stuff around meaning we have to wait
-    # for our tests to finish so the executables for the smoke tests are still
-    # there
-    runner.command(
-        name="clang tidy",
-        args=[
-            BAZEL,
-            "build",
-            # NOTE: don't use user-provided bazel args for clang-tidy
-            "--config=clang-tidy",
-            "--verbose_failures",
-            "--keep_going",
-            "//src/mongo/...",
-        ],
-        log_file="clang_tidy.log",
-        # again not a true dep, just serializing bazel access
-        deps=(smoke_tests, unittests),
-    )
+    if run_clang_tidy:
+        runner.command(
+            name="clang tidy",
+            args=[
+                BAZEL,
+                "build",
+                # NOTE: don't use user-provided bazel args for clang-tidy
+                "--config=clang-tidy",
+                "--verbose_failures",
+                "--keep_going",
+                "//src/mongo/...",
+            ],
+            log_file="clang_tidy.log",
+            # serializes bazel access. Also prevents clang-tidy from changing
+            # the build config from under the smoke test suite before it's
+            # finished running.
+            deps=(integration_tests, unittests),
+        )
 
     runner.run()
 
@@ -421,10 +472,16 @@ def main():
     p = ArgumentParser()
 
     p.add_argument(
+        "component",
+        type=str,
+        help="Component that you wish to run the smoke test suite for. The available components are: catalog-and-routing, rss-sydney, replication, server-bsoncolumn, server-collection-write-path, server-external-sorter, server-index-builds, server-storage-engine-integration, server-timeseries-bucket-catalog, server-tracking-allocator, server-ttl",
+    )
+
+    p.add_argument(
         "--log-path",
         type=Path,
         help="Directory to place logs from smoke test stages",
-        default=Path("~/.logs/replication_smoke_tests").expanduser(),
+        default=Path("~/.logs/smoke_tests").expanduser(),
     )
     p.add_argument(
         "--upstream-branch",
@@ -432,6 +489,14 @@ def main():
         default="origin/master",
         help="Git branch to format diff against",
     )
+
+    p.add_argument(
+        "--run-clang-tidy",
+        type=bool,
+        default=False,
+        help="Run clang tidy. This might take a while to run, and will also change the build config to config=clang-tidy.",
+    )
+
     p.add_argument(
         "--send-slack-notification",
         type=int,
@@ -440,10 +505,12 @@ def main():
     )
 
     args, bazel_args = p.parse_known_args()
-    run_replication_smoke_tests(
+    run_smoke_tests(
+        component_name=args.component,
         log_path=args.log_path,
         upstream_branch=args.upstream_branch,
         bazel_args=bazel_args,
+        run_clang_tidy=args.run_clang_tidy,
         send_slack_notification=args.send_slack_notification,
     )
 
