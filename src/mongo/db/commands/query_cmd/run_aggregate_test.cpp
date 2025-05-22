@@ -78,6 +78,8 @@ public:
             new DocumentSourceTrackingMock{results, pExpCtx}};
     }
 
+    static const Id& id;
+
     Id getId() const override {
         return id;
     }
@@ -110,8 +112,6 @@ public:
     }
 
 private:
-    static const Id& id;
-
     /**
      * When constructing this stage, create the memory tracker with a factory method so that it
      * reports memory usage up to the operation-scoped memory tracker.
@@ -212,8 +212,8 @@ TEST_F(RunAggregateTest, MemoryTrackerWithinSubpipelineIsProperlyDestroyedOnKill
     for (size_t i = 0; i < 10; ++i) {
         docsBuilder.append(fromjson(fmt::format("{{id: {}, val: {}}}", i, i)));
     }
-    auto insertCmdObj =
-        BSON("insert" << "coll" << "documents" << docsBuilder.arr() << "ordered" << true);
+    auto insertCmdObj = BSON("insert" << "coll"
+                                      << "documents" << docsBuilder.arr() << "ordered" << true);
     BSONObj res = runCommand(insertCmdObj.getOwned());
     ASSERT_EQ(res["ok"].Number(), 1.0);
     ASSERT_EQ(res["n"].Int(), 10);
