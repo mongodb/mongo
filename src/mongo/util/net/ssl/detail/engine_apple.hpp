@@ -32,8 +32,11 @@
 
 #include <deque>
 
-#include "asio/buffer.hpp"
-#include "asio/detail/config.hpp"
+#include <asio/buffer.hpp>
+#include <asio/detail/config.hpp>
+#include <asio/error_code.hpp>
+#include <boost/optional.hpp>
+
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context_apple.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"

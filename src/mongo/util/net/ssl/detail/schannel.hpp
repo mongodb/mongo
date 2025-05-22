@@ -37,6 +37,8 @@
 #include <memory>
 
 #include <asio/detail/assert.hpp>
+#include <asio/error_code.hpp>
+#include <boost/optional.hpp>
 
 // This must be after all other includes
 #include "asio/detail/push_options.hpp"
