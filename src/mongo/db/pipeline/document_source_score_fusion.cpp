@@ -58,67 +58,13 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            &feature_flags::gFeatureFlagSearchHybridScoringFull);
 namespace {
-
 // Description that gets set as part of $scoreFusion's scoreDetails metadata.
 static const std::string scoreFusionScoreDetailsDescription =
     "the value calculated by combining the scores (either normalized or raw) across "
     "input pipelines from which this document is output from:";
 
-/**
- * Validates the weights inputs. If weights are specified by the user, there must be exactly one
- * weight per input pipeline.
- */
-static void scoreFusionWeightsValidator(
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines,
-    const StringMap<double>& weights) {
-    // The size of weights and pipelines should actually be equal, but if we have more pipelines
-    // than weights, we'll throw a more specific error below that specifies which pipeline is
-    // missing a weight.
-    uassert(9402201,
-            "$scoreFusion input has more weights than pipelines. If combination.weights is "
-            "specified, there must be only one weight per named input pipeline.",
-            weights.size() <= pipelines.size());
-
-    // TODO (SERVER-100194): Change $scoreFusion weights object to accept a specified subset of
-    // pipelines
-    // TODO (SERVER-100511): Add typo suggestion logic for incorrectly spelled weight pipelines
-    for (const auto& pipelineIt : pipelines) {
-        auto pipelineName = pipelineIt.first;
-        uassert(9402202,
-                str::stream()
-                    << "$scoreFusion input pipeline \"" << pipelineName
-                    << "\" is missing a weight, even though combination.weights is specified.",
-                weights.contains(pipelineName));
-    }
-}
-
-/**
- * Parses and validates the weights for pipelines that have been explicitly specified in the
- * ScoreFusionSpec. Returns a map from the pipeline name to the specified weight (as a double)
- * for that pipeline.
- */
-StringMap<double> extractAndValidateWeights(
-    const ScoreFusionSpec& spec,
-    const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& pipelines) {
-    StringMap<double> weights;
-
-    const auto& combinationSpec = spec.getCombination();
-    if (!combinationSpec.has_value() || !combinationSpec->getWeights().has_value()) {
-        return weights;
-    }
-
-    for (const auto& elem : *combinationSpec->getWeights()) {
-        // elem.Number() throws a uassert if non-numeric.
-        double weight = elem.Number();
-        uassert(9402200,
-                str::stream() << "Score fusion pipeline weight must be non-negative, but given "
-                              << weight,
-                weight >= 0);
-        weights[elem.fieldName()] = weight;
-    }
-    scoreFusionWeightsValidator(pipelines, weights);
-    return weights;
-}
+// Stage name without the '$' prefix
+static const std::string scoreFusionStageName = "scoreFusion";
 
 std::string getScoreFieldFromPipelineName(const StringData pipelineName,
                                           bool includeDollarSign = false) {
@@ -670,7 +616,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     const ScoreFusionSpec& spec,
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    StringMap<double> weights = extractAndValidateWeights(spec, inputPipelines);
+    StringMap<double> weights;
+    // If ScoreFusionCombinationSpec has no value (no weights specified), no work to do.
+    const auto& combinationSpec = spec.getCombination();
+    if (combinationSpec.has_value() && combinationSpec->getWeights().has_value()) {
+        weights = hybrid_scoring_util::validateWeights(
+            combinationSpec->getWeights()->getOwned(), inputPipelines, scoreFusionStageName);
+    }
     ScoreFusionNormalizationEnum normalization = spec.getInput().getNormalization();
     const bool includeScoreDetails = spec.getScoreDetails();
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;

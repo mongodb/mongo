@@ -82,6 +82,9 @@ static const std::string rankFusionScoreDetailsDescription =
     "value output by reciprocal rank fusion algorithm, computed as sum of (weight * (1 / "
     "(60 + rank))) across input pipelines from which this document is output, from:";
 
+// Stage name without the '$' prefix
+static const std::string rankFusionStageName = "rankFusion";
+
 /**
  * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
  * $search, $vectorSearch, $geoNear, $rankFusion, $scoreFusion (which have ordered output) or has an
@@ -462,7 +465,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     const auto& combinationSpec = spec.getCombination();
     if (combinationSpec.has_value()) {
         weights = hybrid_scoring_util::validateWeights(
-            combinationSpec->getWeights(), inputPipelines, "rankFusion");
+            combinationSpec->getWeights(), inputPipelines, rankFusionStageName);
     }
 
     // For now, the rankConstant is always 60.

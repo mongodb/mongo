@@ -1889,7 +1889,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfWeightsIsNotObject) {
                        ErrorCodes::TypeMismatch);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
+TEST_F(DocumentSourceScoreFusionTest, DoesNotErrorIfEmptyWeights) {
     auto spec = fromjson(R"({
         $scoreFusion: {
             input: {
@@ -1916,9 +1916,928 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfEmptyWeights) {
         }
     })");
 
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, DoesNotErrorIfOnlySomeWeights) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3
+                },
+                method: "avg"
+            }
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfMisnamedWeight) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenre: 2
+                }
+            }
+        }
+    })");
+
     ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9402202);
+                       9967500);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfExtraWeight) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenre: 2,
+                    matchGenres: 1
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460301);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNonNumericWeight) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                       {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 3,
+                    matchGenres: "0"
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       13118);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNegativeWeightValue) {
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: -1,
+                    matchGenres: 0
+                }
+            }
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9460300);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckWeightsApplied) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchAuthor: 5,
+                    matchGenres: 3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+// Same as CheckWeightsApplied but the ordering of fields doesn't match between input.pipelines and
+// combination.weights; checks that the weights are applied to the pipeline with the same name.
+TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedToCorrectPipeline) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchGenres: 3,
+                    matchAuthor: 5
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$matchAuthor_score",
+                                "$matchGenres_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
+}
+
+TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedMultiplePipelines) {
+    auto expCtx = getExpCtx();
+    expCtx->setResolvedNamespaces(ResolvedNamespaceMap{
+        {expCtx->getNamespaceString(), {expCtx->getNamespaceString(), std::vector<BSONObj>()}}});
+    auto spec = fromjson(R"({
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    matchAuthor: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        },
+                        { $match : { author : "dave" } }
+                    ],
+                    matchGenres: [
+                        {
+                            $search: {
+                                index: "search_index",
+                                text: {
+                                    query: "mystery",
+                                    path: "genres"
+                                }
+                            }
+                        }
+                    ],
+                    matchPlot: [
+                        {
+                            $vectorSearch: {
+                                queryVector: [1.0, 2.0, 3.0],
+                                path: "plot_embedding",
+                                numCandidates: 300,
+                                index: "vector_index",
+                                limit: 10
+                            }
+                        }
+                    ],
+                    matchDistance: [
+                        {$geoNear: {near: [20, 40]}},
+                        {$score: {score: {$meta: "geoNearDistance"}, normalizeFunction: "none"}}
+                    ]
+                },
+                normalization: "none"
+            },
+            combination: {
+                weights: {
+                    matchGenres: 3,
+                    matchDistance: 0,
+                    matchAuthor: 5,
+                    matchPlot: 0.3
+                }
+            }
+        }
+    })");
+
+    const auto desugaredList =
+        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
+    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
+    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "expectedStages": [
+                {
+                    "$search": {
+                        "mongotQuery": {
+                            "index": "search_index",
+                            "text": {
+                                "query": "mystery",
+                                "path": "genres"
+                            }
+                        },
+                        "requiresSearchSequenceToken": false,
+                        "requiresSearchMetaCursor": true
+                    }
+                },
+                {
+                    "$match": {
+                        "author": "dave"
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": {
+                            "docs": "$$ROOT"
+                        }
+                    }
+                },
+                {
+                    "$addFields": {
+                        "matchAuthor_score": {
+                            "$multiply": [
+                                {
+                                    "$meta": "score"
+                                },
+                                {
+                                    "$const": 5
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$geoNear": {
+                                    "near": [
+                                        {
+                                            "$const": 20
+                                        },
+                                        {
+                                            "$const": 40
+                                        }
+                                    ],
+                                    "spherical": false
+                                }
+                            },
+                            {
+                                "$setMetadata": {
+                                    "score": {
+                                        "$meta": "geoNearDistance"
+                                    }
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchDistance_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 0
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchGenres_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$unionWith": {
+                        "coll": "pipeline_test",
+                        "pipeline": [
+                            {
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
+                                }
+                            },
+                            {
+                                "$replaceRoot": {
+                                    "newRoot": {
+                                        "docs": "$$ROOT"
+                                    }
+                                }
+                            },
+                            {
+                                "$addFields": {
+                                    "matchPlot_score": {
+                                        "$multiply": [
+                                            {
+                                                "$meta": "score"
+                                            },
+                                            {
+                                                "$const": 0.3
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$docs._id",
+                        "docs": {
+                            "$first": "$docs"
+                        },
+                        "matchAuthor_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchAuthor_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchDistance_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchDistance_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchGenres_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchGenres_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "matchPlot_score": {
+                            "$max": {
+                                "$ifNull": [
+                                    "$matchPlot_score",
+                                    {
+                                        "$const": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "$willBeMerged": false
+                    }
+                },
+                {
+                    "$setMetadata": {
+                        "score": {
+                            "$avg": [
+                                "$matchAuthor_score",
+                                "$matchDistance_score",
+                                "$matchGenres_score",
+                                "$matchPlot_score"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "$sort": {
+                        "$computed0": {
+                            "$meta": "score"
+                        },
+                        "_id": 1
+                    }
+                },
+                {
+                    "$replaceRoot": {
+                        "newRoot": "$docs"
+                    }
+                }
+            ]
+        })",
+        asOneObj);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, CheckIfWeightsArrayMixedIntsDecimals) {
