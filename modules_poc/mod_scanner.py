@@ -263,7 +263,19 @@ class DecoratedCursor(Cursor):
 DETAIL_REGEX = re.compile(r"(detail|internal)s?$")
 
 
-def get_visibility(c: DecoratedCursor, scanning_parent=False):
+@dataclass
+class GetVisibilityResult:
+    attr: str
+    alt: str | None
+    parent: DecoratedCursor | None  # only None for UNKNOWN
+    non_ns_parent: DecoratedCursor | None
+
+
+def get_visibility(
+    c: DecoratedCursor, scanning_parent=False, last_non_ns_parent=None
+) -> GetVisibilityResult:
+    if c.kind != CursorKind.NAMESPACE:
+        last_non_ns_parent = c
     if c.has_attrs():
         for child in c.get_children():
             if child.kind != CursorKind.ANNOTATE_ATTR:
@@ -288,13 +300,13 @@ def get_visibility(c: DecoratedCursor, scanning_parent=False):
                     "file_private",
                     "needs_replacement",
                 )
-            return (attr, alt)
+            return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
 
     # Apply high-priority defaults that override parent's visibility
     if not scanning_parent:
         # TODO consider making PROTECTED also default to module private
         if c.access_specifier == AccessSpecifier.PRIVATE:
-            return ("private", None)
+            return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
         # TODO: Unfortunately these rules are violated on 64 declarations,
         # so it can't be enabled yet.
@@ -317,21 +329,23 @@ def get_visibility(c: DecoratedCursor, scanning_parent=False):
         #     declared public anyway?
         if 0:  # :(
             if c.spelling.endswith("forTest"):
-                return "private"
+                return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
             # details and internal namespaces
             if c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling):
-                return "private"
+                return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
     if c.normalized_parent:
-        parent_vis = get_visibility(c.normalized_parent, scanning_parent=True)
+        parent_vis = get_visibility(
+            c.normalized_parent, scanning_parent=True, last_non_ns_parent=last_non_ns_parent
+        )
     else:
-        parent_vis = ("UNKNOWN", None)  # break recursion
+        parent_vis = GetVisibilityResult("UNKNOWN", None, None, None)  # break recursion
 
     # Apply low-priority defaults that defer to parent's visibility
-    if not scanning_parent and parent_vis[0] == "UNKNOWN":
+    if not scanning_parent and parent_vis.attr == "UNKNOWN":
         if normpath_for_file(c) in complete_headers:
-            return ("private", None)
+            return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
     return parent_vis
 
@@ -405,6 +419,18 @@ def teams_for_file(f: ClangFile | str | None):
     return teams if teams else ["__NO_OWNER__"]
 
 
+def make_vis_from(c: DecoratedCursor | None):
+    if not c:
+        return None
+    return {
+        "usr": c.normalized_usr,
+        "display_name": fully_qualified(c),
+        "kind": c.kind.name,
+        "loc": pretty_location(c.location),
+        "mod": mod_for_file(c.location.file),
+    }
+
+
 @dataclass
 class Decl:
     display_name: str
@@ -419,6 +445,8 @@ class Decl:
     spelling: str
     visibility: str
     alt: str
+    vis_from: dict[str, str]
+    vis_from_non_ns: dict[str, str]
     sem_par: str
     lex_par: str
     used_from: dict[str, set[str]] = dataclasses.field(default_factory=dict, compare=False)
@@ -430,7 +458,7 @@ class Decl:
     def from_cursor(c: Cursor, mod=None):
         if not isinstance(c, DecoratedCursor):
             c = DecoratedCursor(c)
-        vis, alt = get_visibility(c)
+        vis = get_visibility(c)
         return Decl(
             display_name=fully_qualified(c),
             spelling=c.spelling,
@@ -442,8 +470,10 @@ class Decl:
             kind=c.kind.name,
             mod=mod or mod_for_file(c.location.file),
             defined=c.has_definition,
-            visibility=vis,
-            alt=alt,
+            visibility=vis.attr,
+            alt=vis.alt,
+            vis_from=make_vis_from(vis.parent),
+            vis_from_non_ns=make_vis_from(vis.non_ns_parent),
             sem_par=c.normalized_parent.normalized_usr if c.normalized_parent else None,
             lex_par=(
                 DecoratedCursor(c.lexical_parent).normalized_usr

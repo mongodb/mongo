@@ -1,0 +1,11 @@
+version: 1.0.0
+filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-programmability
+  - "*.py":
+    approvers:
+      - 10gen/server-programmability
+  - "*.jq":
+    approvers:
+      - 10gen/server-programmability

@@ -1372,6 +1372,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/with_mongot/OWNERS.yml
 /jstests/with_mongot/**/* @10gen/query-integration-search @svc-auto-approve-bot
 
+# The following patterns are parsed from ./modules_poc/OWNERS.yml
+/modules_poc/**/OWNERS.yml @10gen/server-programmability @svc-auto-approve-bot
+/modules_poc/**/*.py @10gen/server-programmability @svc-auto-approve-bot
+/modules_poc/**/*.jq @10gen/server-programmability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./rpm/OWNERS.yml
 /rpm/**/* @10gen/devprod-build @svc-auto-approve-bot
 
