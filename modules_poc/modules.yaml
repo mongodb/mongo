@@ -383,16 +383,6 @@ routing_and_topology:
     - src/mongo/s/service_entry_point_router_role[._]*
     - src/mongo/s/commands/strategy*
 
-replication_coordinator:
-  meta:
-    slack: server-replication
-    jira: Replication
-  files:
-    - src/mongo/db/repl/*replication_coordinator*
-    - src/mongo/db/repl/*external_state*
-    - src/mongo/db/repl/*heartbeat*
-    - src/mongo/db/repl/*topology_coordinator*
-
 transactions:
   meta:
     slack: server-replication
@@ -412,16 +402,6 @@ transactions:
     - src/mongo/s/commands/*txn*
     - src/mongo/s/*transaction*
     - src/mongo/db/session/
-
-recovery:
-  meta:
-    slack: server-replication
-    jira: Replication
-  files:
-    - src/mongo/db/repl/*replication_recovery*
-    - src/mongo/db/repl/*rollback*
-    - src/mongo/db/modules/enterprise/src/magic_restore
-    - src/mongo/dbtests/rollbacktests.cpp
 
 fcv:
   meta:
@@ -880,29 +860,6 @@ installer:
   files:
     - src/mongo/installer/
 
-initial_sync:
-  meta:
-    slack: server-replication
-    jira: Server Replication
-  files:
-    - src/mongo/db/modules/enterprise/src/fcbis/
-    - src/mongo/db/repl/initial_sync/
-
-oplog:
-  meta:
-    slack: server-replication
-    jira: Server Replication
-  files:
-    - src/mongo/db/op_observer/op_observer*
-    - src/mongo/db/op_observer/operation_logger*
-    - src/mongo/db/catalog/local_oplog_info*
-    - src/mongo/db/commands/oplog*
-    - src/mongo/db/commands/apply_ops*
-    - src/mongo/db/repl/*oplog*
-    - src/mongo/db/repl/*noop_writer*
-    - src/mongo/db/repl/*bgsync*
-    - src/mongo/db/repl/*sync_source*
-
 replication:
   meta:
     slack: server-replication
@@ -919,10 +876,67 @@ replication:
     - src/mongo/dbtests/repltests.cpp
     - src/mongo/dbtests/mock/mock_replica_set*
 
-rs_aware_service:
+replication.initial_sync:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/modules/enterprise/src/fcbis/
+    - src/mongo/db/repl/initial_sync/
+
+replication.oplog:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/op_observer/op_observer*
+    - src/mongo/db/op_observer/operation_logger*
+    - src/mongo/db/catalog/local_oplog_info*
+    - src/mongo/db/commands/oplog*
+    - src/mongo/db/commands/apply_ops*
+    - src/mongo/db/repl/*oplog*
+    - src/mongo/db/repl/*noop_writer*
+    - src/mongo/db/repl/*bgsync*
+    - src/mongo/db/repl/*sync_source*
+
+replication.server_rw_concerns:
+  meta:
+    slack: server-replication
+    jira: Server Replication
+  files:
+    - src/mongo/db/commands/read_write_concern_defaults_server_status.cpp
+    - src/mongo/db/read_concern*
+    - src/mongo/db/read_write_concern*
+    - src/mongo/db/repl/*read_concern*
+    - src/mongo/db/repl/*write_concern*
+    - src/mongo/db/stats/server_write_concern*
+    - src/mongo/db/stats/server_read_concern*
+    - src/mongo/db/write_concern*
+
+replication.rs_aware_service:
   meta:
     slack: server-replication
     jira: Server Replication
   files:
     - src/mongo/db/repl/*primary_only_service*
     - src/mongo/db/repl/*replica_set_aware_service*
+
+replication.replication_coordinator:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*replication_coordinator*
+    - src/mongo/db/repl/*external_state*
+    - src/mongo/db/repl/*heartbeat*
+    - src/mongo/db/repl/*topology_coordinator*
+
+replication.recovery:
+  meta:
+    slack: server-replication
+    jira: Replication
+  files:
+    - src/mongo/db/repl/*replication_recovery*
+    - src/mongo/db/repl/*rollback*
+    - src/mongo/db/modules/enterprise/src/magic_restore
+    - src/mongo/dbtests/rollbacktests.cpp
