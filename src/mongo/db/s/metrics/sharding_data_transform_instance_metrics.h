@@ -134,6 +134,12 @@ public:
         getTypedCumulativeMetrics()->template onStateTransition<T>(before, after);
     }
 
+    void onInsertApplied();
+    void onUpdateApplied();
+    void onDeleteApplied();
+    void onOplogEntriesFetched(int64_t numEntries);
+    void onOplogEntriesApplied(int64_t numEntries);
+
 protected:
     static constexpr auto kNoDate = Date_t::min();
     using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
@@ -170,6 +176,28 @@ protected:
     ClockSource* getClockSource() const;
     UniqueScopedObserver registerInstanceMetrics();
 
+    int64_t getInsertsApplied() const;
+    int64_t getUpdatesApplied() const;
+    int64_t getDeletesApplied() const;
+    int64_t getOplogEntriesFetched() const;
+    int64_t getOplogEntriesApplied() const;
+    void restoreInsertsApplied(int64_t count);
+    void restoreUpdatesApplied(int64_t count);
+    void restoreDeletesApplied(int64_t count);
+    void restoreOplogEntriesFetched(int64_t count);
+    void restoreOplogEntriesApplied(int64_t count);
+
+    template <typename FieldNameProvider>
+    void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
+                                            BSONObjBuilder* bob) const {
+
+        bob->append(names->getForOplogEntriesFetched(), getOplogEntriesFetched());
+        bob->append(names->getForOplogEntriesApplied(), getOplogEntriesApplied());
+        bob->append(names->getForInsertsApplied(), getInsertsApplied());
+        bob->append(names->getForUpdatesApplied(), getUpdatesApplied());
+        bob->append(names->getForDeletesApplied(), getDeletesApplied());
+    }
+
     const UUID _instanceId;
     const BSONObj _originalCommand;
     const NamespaceString _sourceNs;
@@ -197,6 +225,12 @@ private:
     AtomicWord<int64_t> _writesDuringCriticalSection;
 
     AtomicWord<ReshardingCumulativeMetrics::AnyState> _state;
+
+    AtomicWord<int64_t> _insertsApplied{0};
+    AtomicWord<int64_t> _updatesApplied{0};
+    AtomicWord<int64_t> _deletesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesFetched{0};
 };
 
 }  // namespace mongo

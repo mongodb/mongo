@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
-
 namespace mongo {
 
 template <typename Base>

@@ -43,8 +43,6 @@
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
-#include "mongo/db/s/metrics/with_oplog_application_count_metrics_also_updating_cumulative_metrics.h"
 #include "mongo/db/s/metrics/with_oplog_application_latency_metrics_interface_updating_cumulative_metrics.h"
 #include "mongo/db/s/metrics/with_phase_duration_management.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
@@ -74,9 +72,7 @@ namespace detail {
 using PartialBaseFinal =
     WithPhaseDurationManagement<ShardingDataTransformInstanceMetrics, TimedPhase, kNumTimedPhase>;
 
-using Base = WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics<
-    WithOplogApplicationCountMetricsAlsoUpdatingCumulativeMetrics<
-        WithOplogApplicationCountMetrics<detail::PartialBaseFinal>>>;
+using Base = WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics<PartialBaseFinal>;
 }  // namespace detail
 }  // namespace resharding_metrics
 

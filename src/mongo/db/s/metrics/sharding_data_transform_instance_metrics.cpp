@@ -321,9 +321,74 @@ void ShardingDataTransformInstanceMetrics::setLastOpEndingChunkImbalance(int64_t
     _cumulativeMetrics->setLastOpEndingChunkImbalance(imbalanceCount);
 }
 
+void ShardingDataTransformInstanceMetrics::onInsertApplied() {
+    _insertsApplied.fetchAndAdd(1);
+    getTypedCumulativeMetrics()->onInsertApplied();
+}
+
+void ShardingDataTransformInstanceMetrics::onUpdateApplied() {
+    _updatesApplied.fetchAndAdd(1);
+    getTypedCumulativeMetrics()->onUpdateApplied();
+}
+
+void ShardingDataTransformInstanceMetrics::onDeleteApplied() {
+    _deletesApplied.fetchAndAdd(1);
+    getTypedCumulativeMetrics()->onDeleteApplied();
+}
+
+void ShardingDataTransformInstanceMetrics::onOplogEntriesFetched(int64_t numEntries) {
+    _oplogEntriesFetched.fetchAndAdd(numEntries);
+    getTypedCumulativeMetrics()->onOplogEntriesFetched(numEntries);
+}
+
+void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.fetchAndAdd(numEntries);
+    getTypedCumulativeMetrics()->onOplogEntriesApplied(numEntries);
+}
+
 ShardingDataTransformInstanceMetrics::UniqueScopedObserver
 ShardingDataTransformInstanceMetrics::registerInstanceMetrics() {
     return _cumulativeMetrics->registerInstanceMetrics(_observer.get());
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getInsertsApplied() const {
+    return _insertsApplied.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getUpdatesApplied() const {
+    return _updatesApplied.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getDeletesApplied() const {
+    return _deletesApplied.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getOplogEntriesFetched() const {
+    return _oplogEntriesFetched.load();
+}
+
+int64_t ShardingDataTransformInstanceMetrics::getOplogEntriesApplied() const {
+    return _oplogEntriesApplied.load();
+}
+
+void ShardingDataTransformInstanceMetrics::restoreInsertsApplied(int64_t count) {
+    _insertsApplied.store(count);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreUpdatesApplied(int64_t count) {
+    _updatesApplied.store(count);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreDeletesApplied(int64_t count) {
+    _deletesApplied.store(count);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreOplogEntriesFetched(int64_t count) {
+    _oplogEntriesFetched.store(count);
+}
+
+void ShardingDataTransformInstanceMetrics::restoreOplogEntriesApplied(int64_t count) {
+    _oplogEntriesApplied.store(count);
 }
 
 }  // namespace mongo

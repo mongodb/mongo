@@ -125,6 +125,12 @@ public:
     void onCloningRemoteBatchRetrieval(Milliseconds elapsed);
     void onInsertsDuringCloning(int64_t count, int64_t bytes, const Milliseconds& elapsedTime);
 
+    void onInsertApplied();
+    void onUpdateApplied();
+    void onDeleteApplied();
+    void onOplogEntriesFetched(int64_t numEntries);
+    void onOplogEntriesApplied(int64_t numEntries);
+
 protected:
     const ShardingDataTransformCumulativeMetricsFieldNameProvider* getFieldNames() const;
 
@@ -132,6 +138,23 @@ protected:
     virtual void reportOldestActive(BSONObjBuilder* bob) const;
     virtual void reportLatencies(BSONObjBuilder* bob) const;
     virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
+
+    int64_t getInsertsApplied() const;
+    int64_t getUpdatesApplied() const;
+    int64_t getDeletesApplied() const;
+    int64_t getOplogEntriesFetched() const;
+    int64_t getOplogEntriesApplied() const;
+
+    template <typename FieldNameProvider>
+    void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
+                                            BSONObjBuilder* bob) const {
+
+        bob->append(names->getForOplogEntriesFetched(), getOplogEntriesFetched());
+        bob->append(names->getForOplogEntriesApplied(), getOplogEntriesApplied());
+        bob->append(names->getForInsertsApplied(), getInsertsApplied());
+        bob->append(names->getForUpdatesApplied(), getUpdatesApplied());
+        bob->append(names->getForDeletesApplied(), getDeletesApplied());
+    }
 
     const std::string _rootSectionName;
     AtomicWord<bool> _operationWasAttempted;
@@ -169,6 +192,12 @@ private:
     AtomicWord<int64_t> _collectionCloningTotalLocalBatchInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
     AtomicWord<int64_t> _writesToStashedCollections{0};
+
+    AtomicWord<int64_t> _insertsApplied{0};
+    AtomicWord<int64_t> _updatesApplied{0};
+    AtomicWord<int64_t> _deletesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesFetched{0};
 };
 
 }  // namespace mongo

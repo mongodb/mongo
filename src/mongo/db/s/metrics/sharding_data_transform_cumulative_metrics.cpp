@@ -222,6 +222,26 @@ void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder
     // Do nothing.
 }
 
+int64_t ShardingDataTransformCumulativeMetrics::getInsertsApplied() const {
+    return _insertsApplied.load();
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getUpdatesApplied() const {
+    return _updatesApplied.load();
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getDeletesApplied() const {
+    return _deletesApplied.load();
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getOplogEntriesFetched() const {
+    return _oplogEntriesFetched.load();
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getOplogEntriesApplied() const {
+    return _oplogEntriesApplied.load();
+}
+
 const ShardingDataTransformCumulativeMetrics::InstanceObserver*
 ShardingDataTransformCumulativeMetrics::getOldestOperation(WithLock, Role role) const {
     auto set = getMetricsSetForRole(role);
@@ -285,6 +305,26 @@ void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
     _bytesWritten.fetchAndAdd(bytes);
     _collectionCloningTotalLocalInsertTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
+}
+
+void ShardingDataTransformCumulativeMetrics::onInsertApplied() {
+    _insertsApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onUpdateApplied() {
+    _updatesApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onDeleteApplied() {
+    _deletesApplied.fetchAndAdd(1);
+}
+
+void ShardingDataTransformCumulativeMetrics::onOplogEntriesFetched(int64_t numEntries) {
+    _oplogEntriesFetched.fetchAndAdd(numEntries);
+}
+
+void ShardingDataTransformCumulativeMetrics::onOplogEntriesApplied(int64_t numEntries) {
+    _oplogEntriesApplied.fetchAndAdd(numEntries);
 }
 
 void ShardingDataTransformCumulativeMetrics::onReadDuringCriticalSection() {
