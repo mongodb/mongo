@@ -540,7 +540,7 @@ struct RefWithHashParam {
 template <typename H>
 template <typename... Ts>
 void MatchExpressionHashVisitor<H>::combine(const Ts&... values) {
-    _hashState = H::combine(std::move(_hashState), RefWithHashParam{_params, values}...);
+    _hashState = H::combine(std::move(_hashState), RefWithHashParam<Ts>{_params, values}...);
 }
 
 template <typename H>
@@ -548,7 +548,7 @@ void MatchExpressionHashVisitor<H>::hashCombineCommonProperties(const MatchExpre
     combine(expr->matchType(), expr->path());
 
     if (_hashTags && expr->getTag()) {
-        combine(RefWithHashParam{_params, *expr->getTag()});
+        combine(RefWithHashParam<MatchExpression::TagData>{_params, *expr->getTag()});
     }
 }
 
