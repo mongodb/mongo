@@ -101,6 +101,10 @@ public:
         return _collections;
     }
 
+    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
+        return _catalog;
+    }
+
     StatusWith<ResolvedView> resolveView(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -316,6 +320,10 @@ public:
 
     const MultipleCollectionAccessor& getCollections() const override {
         return _emptyMultipleCollectionAccessor;
+    }
+
+    std::shared_ptr<const CollectionCatalog> getCatalog() const override {
+        return _catalog;
     }
 
     StatusWith<ResolvedView> resolveView(
@@ -709,10 +717,48 @@ ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingI
     }
 }
 
+bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
+    const ResolvedNamespaceMap& resolvedNamespaces) const {
+    auto requiresExtendedRange = false;
+
+    // Check the in-memory collections.
+    getCollections().forEach([&](const CollectionPtr& coll) {
+        if (coll->getRequiresTimeseriesExtendedRangeSupport()) {
+            requiresExtendedRange = true;
+        }
+    });
+
+    // It's possible that an involved nss that resolves to a timeseries buckets collection requires
+    // extended range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
+    if (!requiresExtendedRange) {
+        for (auto& [_, resolvedNs] : resolvedNamespaces) {
+            const auto& nss = resolvedNs.ns;
+            if (nss.isTimeseriesBucketsCollection()) {
+                auto readTimestamp = shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
+                                         ->getPointInTimeReadTimestamp();
+                auto collPtr = CollectionPtr(getCatalog()->establishConsistentCollection(
+                    _aggExState.getOpCtx(), NamespaceStringOrUUID(nss), readTimestamp));
+                if (collPtr && collPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+                    requiresExtendedRange = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    return requiresExtendedRange;
+}
+
 boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext() {
     auto [collator, collationMatchesDefault] = resolveCollator();
     const bool canPipelineBeRejected =
         query_settings::canPipelineBeRejected(_aggExState.getRequest().getPipeline());
+
+    // If any involved collection contains extended-range data, set a flag which individual
+    // DocumentSource parsers can check.
+    const auto& resolvedNamespaces = uassertStatusOK(_aggExState.resolveInvolvedNamespaces());
+    auto requiresExtendedRange = requiresExtendedRangeSupportForTimeseries(resolvedNamespaces);
+
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(_aggExState.getOpCtx(),
                                    _aggExState.getRequest(),
@@ -723,19 +769,13 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
                       .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
                                                         : _aggExState.getExecutionNss())
-                      .resolvedNamespace(uassertStatusOK(_aggExState.resolveInvolvedNamespaces()))
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)
                       .canBeRejected(canPipelineBeRejected)
                       .explain(_aggExState.getVerbosity())
                       .build();
-
-    // If any involved collection contains extended-range data, set a flag which individual
-    // DocumentSource parsers can check.
-    getCollections().forEach([&](const CollectionPtr& coll) {
-        if (coll->getRequiresTimeseriesExtendedRangeSupport())
-            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-    });
 
     // If the pipeline contains $exchange, set a flag so the individual
     // DocumentSources can check. Pipelines containing $exchange are incompatible with reporting

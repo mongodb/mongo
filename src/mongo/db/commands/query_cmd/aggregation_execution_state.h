@@ -494,6 +494,11 @@ public:
     virtual const MultipleCollectionAccessor& getCollections() const = 0;
 
     /**
+     * Get the acquired catalog.
+     */
+    virtual std::shared_ptr<const CollectionCatalog> getCatalog() const = 0;
+
+    /**
      * Use the acquired catalog to resolve the view.
      */
     virtual StatusWith<ResolvedView> resolveView(
@@ -517,6 +522,13 @@ public:
     virtual void stashResources(TransactionResourcesStasher* transactionResourcesStasher) = 0;
 
     query_shape::CollectionType determineCollectionType() const;
+
+    /**
+     * Check if any namespaces referenced by the pipeline require extended range support for
+     * timeseries.
+     */
+    bool requiresExtendedRangeSupportForTimeseries(
+        const ResolvedNamespaceMap& resolvedNamespaces) const;
 
     /**
      * Create an ExpressionContext instance for this pipeline, which involves first resolving

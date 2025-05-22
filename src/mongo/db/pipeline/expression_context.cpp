@@ -242,6 +242,12 @@ ExpressionContextBuilder& ExpressionContextBuilder::allowGenericForeignDbLookup(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::requiresTimeseriesExtendedRangeSupport(
+    bool requiresTimeseriesExtendedRangeSupport) {
+    params.requiresTimeseriesExtendedRangeSupport = requiresTimeseriesExtendedRangeSupport;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::collUUID(boost::optional<UUID> collUUID) {
     params.collUUID = std::move(collUUID);
     return *this;
@@ -594,36 +600,38 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     // Some of the properties of expression context are not cloned (e.g runtimeConstants,
     // letParameters, view). In case new fields need to be cloned, they will need to be added in the
     // builder and the proper setter called here.
-    auto expCtx = ExpressionContextBuilder()
-                      .opCtx(_params.opCtx, _params.vCtx)
-                      .ifrContext(_params.ifrContext)
-                      .collator(std::move(collator))
-                      .mongoProcessInterface(_params.mongoProcessInterface)
-                      .ns(std::move(ns))
-                      .resolvedNamespace(_params.resolvedNamespaces)
-                      .mayDbProfile(_params.mayDbProfile)
-                      .fromRouter(_params.fromRouter)
-                      .needsMerge(_params.needsMerge)
-                      .forPerShardCursor(_params.forPerShardCursor)
-                      .allowDiskUse(_params.allowDiskUse)
-                      .bypassDocumentValidation(_params.bypassDocumentValidation)
-                      .collUUID(uuid)
-                      .explain(_params.explain)
-                      .inRouter(_params.inRouter)
-                      .tmpDir(_params.tmpDir)
-                      .serializationContext(_params.serializationContext)
-                      .inLookup(_params.inLookup)
-                      .isParsingViewDefinition(_params.isParsingViewDefinition)
-                      .exprUnstableForApiV1(_params.exprUnstableForApiV1)
-                      .exprDeprecatedForApiV1(_params.exprDeprecatedForApiV1)
-                      .jsHeapLimitMB(_params.jsHeapLimitMB)
-                      .changeStreamTokenVersion(_params.changeStreamTokenVersion)
-                      .changeStreamSpec(_params.changeStreamSpec)
-                      .originalAggregateCommand(_params.originalAggregateCommand)
-                      .subPipelineDepth(_params.subPipelineDepth)
-                      .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
-                      .view(view)
-                      .build();
+    auto expCtx =
+        ExpressionContextBuilder()
+            .opCtx(_params.opCtx, _params.vCtx)
+            .ifrContext(_params.ifrContext)
+            .collator(std::move(collator))
+            .mongoProcessInterface(_params.mongoProcessInterface)
+            .ns(std::move(ns))
+            .resolvedNamespace(_params.resolvedNamespaces)
+            .mayDbProfile(_params.mayDbProfile)
+            .fromRouter(_params.fromRouter)
+            .needsMerge(_params.needsMerge)
+            .forPerShardCursor(_params.forPerShardCursor)
+            .allowDiskUse(_params.allowDiskUse)
+            .bypassDocumentValidation(_params.bypassDocumentValidation)
+            .collUUID(uuid)
+            .explain(_params.explain)
+            .inRouter(_params.inRouter)
+            .tmpDir(_params.tmpDir)
+            .serializationContext(_params.serializationContext)
+            .inLookup(_params.inLookup)
+            .isParsingViewDefinition(_params.isParsingViewDefinition)
+            .exprUnstableForApiV1(_params.exprUnstableForApiV1)
+            .exprDeprecatedForApiV1(_params.exprDeprecatedForApiV1)
+            .jsHeapLimitMB(_params.jsHeapLimitMB)
+            .changeStreamTokenVersion(_params.changeStreamTokenVersion)
+            .changeStreamSpec(_params.changeStreamSpec)
+            .originalAggregateCommand(_params.originalAggregateCommand)
+            .subPipelineDepth(_params.subPipelineDepth)
+            .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
+            .view(view)
+            .requiresTimeseriesExtendedRangeSupport(_params.requiresTimeseriesExtendedRangeSupport)
+            .build();
 
     if (_collator.getIgnore()) {
         expCtx->setIgnoreCollator();

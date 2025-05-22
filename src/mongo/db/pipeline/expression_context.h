@@ -910,15 +910,6 @@ public:
         _gotTemporarilyUnavailableException = v;
     }
 
-    // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
-    // may contain extended-range dates.
-    void setRequiresTimeseriesExtendedRangeSupport(bool v) {
-        _requiresTimeseriesExtendedRangeSupport = v;
-    }
-    bool getRequiresTimeseriesExtendedRangeSupport() const {
-        return _requiresTimeseriesExtendedRangeSupport;
-    }
-
     // Sets a flag which tells DocumentSource parsers whether the pipeline contains an exchange
     // stage.
     void setIncompatibleWithMemoryTracking(bool v) {
@@ -1005,6 +996,15 @@ public:
 
     bool isRankFusion() const {
         return _params.isRankFusion;
+    }
+
+    // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
+    // may contain extended-range dates.
+    void setRequiresTimeseriesExtendedRangeSupport(bool v) {
+        _params.requiresTimeseriesExtendedRangeSupport = v;
+    }
+    bool getRequiresTimeseriesExtendedRangeSupport() const {
+        return _params.requiresTimeseriesExtendedRangeSupport;
     }
 
 protected:
@@ -1133,6 +1133,8 @@ protected:
         // over views.
         // TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
         bool isRankFusion = false;
+
+        bool requiresTimeseriesExtendedRangeSupport = false;
     };
 
     ExpressionContextParams _params;
@@ -1241,8 +1243,6 @@ private:
 
     bool _isCappedDelete = false;
 
-    bool _requiresTimeseriesExtendedRangeSupport = false;
-
     bool _isIncompatibleWithMemoryTracking = false;
 
     InterruptChecker _interruptChecker;
@@ -1334,6 +1334,7 @@ public:
     ExpressionContextBuilder& enabledCounters(bool);
     ExpressionContextBuilder& forcePlanCache(bool);
     ExpressionContextBuilder& allowGenericForeignDbLookup(bool);
+    ExpressionContextBuilder& requiresTimeseriesExtendedRangeSupport(bool);
     ExpressionContextBuilder& jsHeapLimitMB(boost::optional<int>);
     ExpressionContextBuilder& timeZoneDatabase(const TimeZoneDatabase*);
     ExpressionContextBuilder& changeStreamTokenVersion(int);
