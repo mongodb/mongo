@@ -44,9 +44,9 @@ namespace mongo {
 namespace resharding {
 
 /**
- * Allows blocking the coordinator of a resharding operation until all recipient shards can finish
- * within a predefined threshold. The monitoring is achieved by periodically querying the estimated
- * remaining operation time for each recipient shard.
+ * Used by the coordinator of a resharding operation to wait until the critical section can be
+ * entered and exited within same predefined threshold. The monitoring is achieved by periodically
+ * querying donor and recipient shards.
  *
  * The threshold is decided at the time of constructing a new `CoordinatorCommitMonitor`, and by
  * atomically fetching the value of `remainingReshardingOperationTimeThresholdMillis`.
@@ -71,11 +71,11 @@ public:
 
     CoordinatorCommitMonitor(std::shared_ptr<ReshardingMetrics> metrics,
                              NamespaceString ns,
+                             std::vector<ShardId> donorShards,
                              std::vector<ShardId> recipientShards,
                              TaskExecutorPtr executor,
                              CancellationToken cancelToken,
-                             int delayBeforeInitialQueryMillis,
-                             Milliseconds maxDelayBetweenQueries = kMaxDelayBetweenQueries);
+                             int delayBeforeInitialQueryMillis);
 
     SemiFuture<void> waitUntilRecipientsAreWithinCommitThreshold() const;
 
@@ -88,22 +88,22 @@ public:
      */
     void setNetworkExecutorForTest(TaskExecutorPtr networkExecutor);
 
-    RemainingOperationTimes queryRemainingOperationTimeForRecipients() const;
+    RemainingOperationTimes queryRemainingOperationTime() const;
 
 private:
     ExecutorFuture<void> _makeFuture(Milliseconds delayBetweenQueries) const;
 
     static constexpr auto kDiagnosticLogLevel = 0;
-    static constexpr auto kMaxDelayBetweenQueries = Seconds(30);
 
     std::shared_ptr<ReshardingMetrics> _metrics;
     const NamespaceString _ns;
-    const std::vector<ShardId> _recipientShards;
+    const std::set<ShardId> _donorShards;
+    const std::set<ShardId> _recipientShards;
+    const std::set<ShardId> _participantShards;
     const TaskExecutorPtr _executor;
     const CancellationToken _cancelToken;
 
     const Milliseconds _delayBeforeInitialQueryMillis;
-    const Milliseconds _maxDelayBetweenQueries;
 
     TaskExecutorPtr _networkExecutor;
 };

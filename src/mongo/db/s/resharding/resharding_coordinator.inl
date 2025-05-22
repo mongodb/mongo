@@ -1220,6 +1220,7 @@ void ReshardingCoordinator::_startCommitMonitor(
     _commitMonitor = std::make_shared<resharding::CoordinatorCommitMonitor>(
         _metrics,
         _coordinatorDoc.getSourceNss(),
+        resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards()),
         resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
         _ctHolder->getCommitMonitorToken(),

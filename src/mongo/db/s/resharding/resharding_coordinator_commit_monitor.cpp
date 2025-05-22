@@ -86,13 +86,20 @@ BSONObj makeCommandObj(const NamespaceString& ns) {
     return command.toBSON();
 }
 
-auto makeRequests(const BSONObj& cmdObj, const std::vector<ShardId>& recipientShards) {
-    invariant(!recipientShards.empty(), "The list of recipient shards cannot be empty");
+auto makeRequests(const BSONObj& cmdObj, const std::set<ShardId>& participantShards) {
+    invariant(!participantShards.empty(), "The list of participant shards cannot be empty");
     std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& recipient : recipientShards) {
-        requests.emplace_back(recipient, cmdObj);
+    for (const auto& participantShard : participantShards) {
+        requests.emplace_back(participantShard, cmdObj);
     }
     return requests;
+}
+
+Milliseconds add(const Milliseconds& lhs, const Milliseconds& rhs) {
+    if (lhs == Milliseconds::max() || rhs == Milliseconds::max()) {
+        return Milliseconds::max();
+    }
+    return lhs + rhs;
 }
 
 }  // namespace
@@ -100,18 +107,26 @@ auto makeRequests(const BSONObj& cmdObj, const std::vector<ShardId>& recipientSh
 CoordinatorCommitMonitor::CoordinatorCommitMonitor(
     std::shared_ptr<ReshardingMetrics> metrics,
     NamespaceString ns,
+    std::vector<ShardId> donorShards,
     std::vector<ShardId> recipientShards,
     CoordinatorCommitMonitor::TaskExecutorPtr executor,
     CancellationToken cancelToken,
-    int delayBeforeInitialQueryMillis,
-    Milliseconds maxDelayBetweenQueries)
+    int delayBeforeInitialQueryMillis)
     : _metrics{std::move(metrics)},
       _ns(std::move(ns)),
-      _recipientShards(std::move(recipientShards)),
+      _donorShards(donorShards.begin(), donorShards.end()),
+      _recipientShards(recipientShards.begin(), recipientShards.end()),
+      _participantShards([&] {
+          std::set<ShardId> participantShards(donorShards.begin(), donorShards.end());
+          participantShards.insert(_recipientShards.begin(), _recipientShards.end());
+          return participantShards;
+      }()),
       _executor(std::move(executor)),
       _cancelToken(std::move(cancelToken)),
-      _delayBeforeInitialQueryMillis(Milliseconds(delayBeforeInitialQueryMillis)),
-      _maxDelayBetweenQueries(maxDelayBetweenQueries) {}
+      _delayBeforeInitialQueryMillis(Milliseconds(delayBeforeInitialQueryMillis)) {
+    invariant(!_donorShards.empty(), "The list of donor shards cannot be empty");
+    invariant(!_recipientShards.empty(), "The list of recipient shards cannot be empty");
+}
 
 
 SemiFuture<void> CoordinatorCommitMonitor::waitUntilRecipientsAreWithinCommitThreshold() const {
@@ -140,13 +155,13 @@ void CoordinatorCommitMonitor::setNetworkExecutorForTest(TaskExecutorPtr network
 }
 
 CoordinatorCommitMonitor::RemainingOperationTimes
-CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
+CoordinatorCommitMonitor::queryRemainingOperationTime() const {
     const auto cmdObj = makeCommandObj(_ns);
-    const auto requests = makeRequests(cmdObj, _recipientShards);
+    const auto requests = makeRequests(cmdObj, _participantShards);
 
     LOGV2_DEBUG(5392001,
                 kDiagnosticLogLevel,
-                "Querying recipient shards for the remaining operation time",
+                "Querying participant shards to estimate the remaining operation time",
                 logAttrs(_ns));
 
     auto opCtx = CancelableOperationContext(cc().makeOperationContext(), _cancelToken, _executor);
@@ -162,8 +177,26 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 
     hangBeforeQueryingRecipients.pauseWhileSet();
 
-    auto minRemainingTime = Milliseconds::max();
-    auto maxRemainingTime = Milliseconds(0);
+    auto minTimeToEnterCriticalSection = Milliseconds::max();
+    auto maxTimeToEnterCriticalSection = Milliseconds(0);
+
+    auto minTimeToExitCriticalSection = Milliseconds::max();
+    auto maxTimeToExitCriticalSection = Milliseconds(0);
+
+    // Unless explicitly opted out, the remaining time estimate should account for the replication
+    // lag on each donor since transition to the "blocking-writes" state (or any state) involves:
+    // - Performing a shard version refresh which involves doing a noop write and waiting for the
+    //   write to be majority committed.
+    // - Processing the refreshed resharding fields which involves writing the configTime to the
+    //   config.vectorClock collection and waiting for the write to be majority committed.
+    bool accountForDonorReplLag =
+        resharding::gReshardingRemainingTimeEstimateAccountsForDonorReplicationLag.load();
+    // Unless explicitly opted out, the remaining time estimate should account for the replication
+    // lag on each recipient since transitioning to the "strict-consistency" state (or any state)
+    // involves waiting for the write to the recipient state doc to be majority committed.
+    bool accountForRecipientReplLag =
+        resharding::gReshardingRemainingTimeEstimateAccountsForRecipientReplicationLag.load();
+
     while (!ars.done()) {
         iassert(ErrorCodes::CallbackCanceled,
                 "The resharding commit monitor has been canceled",
@@ -180,33 +213,37 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
 
         auto parsedShardResponse = ShardsvrReshardingOperationTimeResponse::parse(
             IDLParserContext("CoordinatorCommitMonitor"), shardResponse.data);
-        auto remainingTime = parsedShardResponse.getRecipientRemainingMillis();
+        // If the replication lag info is not available which is expected in a mixed version
+        // cluster, assume that it is zero.
+        auto replicationLag =
+            parsedShardResponse.getMajorityReplicationLagMillis().value_or(Milliseconds(0));
 
-        // If any recipient omits the "remainingMillis" field of the response then
-        // we cannot conclude that it is safe to begin the critical section.
-        // It is possible that the recipient just had a failover and
-        // was not able to restore its metrics before it replied to the
-        // _shardsvrReshardingOperationTime command.
-        if (!remainingTime) {
-            maxRemainingTime = Milliseconds::max();
-            continue;
+        if (_donorShards.contains(response.shardId)) {
+            auto timeToEnterCriticalSection =
+                accountForDonorReplLag ? replicationLag : Milliseconds(0);
+            if (timeToEnterCriticalSection < minTimeToEnterCriticalSection) {
+                minTimeToEnterCriticalSection = timeToEnterCriticalSection;
+            }
+            if (timeToEnterCriticalSection > maxTimeToEnterCriticalSection) {
+                maxTimeToEnterCriticalSection = timeToEnterCriticalSection;
+            }
         }
 
-        if (resharding::gReshardingRemainingTimeEstimateAccountsForRecipientReplicationLag.load()) {
-            // The remaining time estimate should account for the replication lag since
-            // transitioning to the "strict-consistency" state (or any state) requires waiting for
-            // the write to the recipient state doc to be majority committed. If the replication lag
-            // info is not available which is expected in a mixed version cluster, assume that it is
-            // zero.
-            remainingTime = *remainingTime +
-                parsedShardResponse.getMajorityReplicationLagMillis().value_or(Milliseconds(0));
-        }
+        if (_recipientShards.contains(response.shardId)) {
+            // If any recipient omits the remaining time field of the response then we cannot
+            // conclude that it is safe to begin the critical section. It is possible that the
+            // recipient just had a failover and was not able to restore its metrics before it
+            // replied to the _shardsvrReshardingOperationTime command.
+            auto timeToExitCriticalSection =
+                add(parsedShardResponse.getRecipientRemainingMillis().value_or(Milliseconds::max()),
+                    accountForRecipientReplLag ? replicationLag : Milliseconds(0));
 
-        if (remainingTime.value() < minRemainingTime) {
-            minRemainingTime = remainingTime.value();
-        }
-        if (remainingTime.value() > maxRemainingTime) {
-            maxRemainingTime = remainingTime.value();
+            if (timeToExitCriticalSection < minTimeToExitCriticalSection) {
+                minTimeToExitCriticalSection = timeToExitCriticalSection;
+            }
+            if (timeToExitCriticalSection > maxTimeToExitCriticalSection) {
+                maxTimeToExitCriticalSection = timeToExitCriticalSection;
+            }
         }
     }
 
@@ -214,13 +251,28 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
         iasserted(Status(ErrorCodes::FailPointEnabled, "Querying resharding recipients failed"));
     });
 
+    auto minRemainingOperationTime =
+        add(minTimeToEnterCriticalSection, minTimeToExitCriticalSection);
+    auto maxRemainingOperationTime =
+        add(maxTimeToEnterCriticalSection, maxTimeToExitCriticalSection);
+
+    LOGV2_DEBUG(10430301,
+                kDiagnosticLogLevel,
+                "Finished querying participant shards to estimate the time to enter and exit the "
+                "critical section",
+                logAttrs(_ns),
+                "minTimeToEnter"_attr = minTimeToEnterCriticalSection,
+                "maxTimeToEnter"_attr = maxTimeToEnterCriticalSection,
+                "minTimeToExit"_attr = minTimeToExitCriticalSection,
+                "maxTimeToExit"_attr = maxTimeToExitCriticalSection);
+
     LOGV2_DEBUG(5392002,
                 kDiagnosticLogLevel,
-                "Finished querying recipient shards for the remaining operation time",
+                "Finished querying participant shards to estimate the remaining operation time",
                 logAttrs(_ns),
-                "remainingTime"_attr = maxRemainingTime);
+                "remainingTime"_attr = maxRemainingOperationTime);
 
-    return {minRemainingTime, maxRemainingTime};
+    return {minRemainingOperationTime, maxRemainingOperationTime};
 }
 
 ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBetweenQueries) const {
@@ -229,12 +281,14 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
     return AsyncTry([this, anchor = shared_from_this(), delay] {
                return _executor->sleepFor(*delay, _cancelToken)
                    .then([this, anchor = std::move(anchor)] {
-                       return queryRemainingOperationTimeForRecipients();
+                       return queryRemainingOperationTime();
                    });
            })
         .until([this, anchor = shared_from_this(), delay](
                    const StatusWith<RemainingOperationTimes> result) -> bool {
             auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
+            auto maxDelayBetweenQueries =
+                Milliseconds(gReshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis.load());
 
             RemainingOperationTimes remainingTimes;
             if (!result.isOK()) {
@@ -271,7 +325,7 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture(Milliseconds delayBet
             // The following ensures that the monitor would never sleep for more than a predefined
             // maximum delay between querying recipient shards. Thus, it can handle very large,
             // and potentially inaccurate estimates of the remaining operation time.
-            *delay = std::min(remainingTimes.max - threshold, _maxDelayBetweenQueries);
+            *delay = std::min(remainingTimes.max - threshold, maxDelayBetweenQueries);
 
             return false;
         })

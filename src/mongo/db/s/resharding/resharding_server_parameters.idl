@@ -263,13 +263,25 @@ server_parameters:
 
     reshardingDelayBeforeRemainingOperationTimeQueryMillis:
         description: >-
-            Initial delay before querying for remaining operation time from recipient shards.
+            The initial delay before querying for remaining operation time from participant shards.
             The delay allows for applying more oplog entries before calculating time remaining, giving
             a more accurate value.
             Note we will have this delay every time we happen to have a failover occur.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingDelayBeforeRemainingOperationTimeQueryMillis
+        default:
+            expr: 30 * 1000
+        validator:
+            gte: 0
+        redact: false
+
+    reshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis:
+        description: >-
+            The maximum delay between remaining operation time queries.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingMaxDelayBetweenRemainingOperationTimeQueriesMillis
         default:
             expr: 30 * 1000
         validator:
@@ -301,6 +313,17 @@ server_parameters:
             expr: 500
         validator:
             gte: 0
+        redact: false
+
+    reshardingRemainingTimeEstimateAccountsForDonorReplicationLag:
+        description: >-
+            Controls whether the remaining time estimate on the resharding coordinator, when trying
+            to engage the critical section and block incoming writes, should account for the
+            replication lag on the donors.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateAccountsForDonorReplicationLag
+        default: true
         redact: false
 
     reshardingRemainingTimeEstimateAccountsForRecipientReplicationLag:
