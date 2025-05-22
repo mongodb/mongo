@@ -30,28 +30,18 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <functional>
-#include <utility>
 
 #include <boost/none.hpp>
 
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/util/future.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
 struct Stripe;
 class BucketCatalog;
-
-/**
- * Function that should run validation against the bucket to ensure it's a proper bucket document.
- * Typically, this should execute Collection::checkValidation.
- */
-using BucketDocumentValidator =
-    std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
 
 /**
  * Information of a Bucket that got archived while performing an operation on the BucketCatalog.

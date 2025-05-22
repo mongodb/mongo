@@ -33,7 +33,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <functional>
 #include <string>
 #include <variant>
 
@@ -118,7 +117,6 @@ using DirectWriteCounter = std::int32_t;
  */
 struct BucketStateRegistry {
     using Era = std::uint64_t;
-    using ShouldClearFn = std::function<bool(const UUID&)>;
 
     mutable stdx::mutex mutex;
 

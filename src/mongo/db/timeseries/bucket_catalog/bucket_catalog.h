@@ -44,6 +44,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
@@ -62,7 +63,6 @@
 namespace mongo::timeseries::bucket_catalog {
 
 using StripeNumber = std::uint8_t;
-using ShouldClearFn = std::function<bool(const UUID&)>;
 // Tuple that stores a measurement, the time value for that measurement, and the index of the
 // measurement from the original insert request.
 using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
@@ -77,23 +77,6 @@ enum class AllowQueryBasedReopening { kAllow, kDisallow };
 struct WriteStageErrorAndIndex {
     Status error;
     size_t index;
-};
-
-/**
- * Bundle of information that gets passed down into 'insert' and functions below it that may create
- * a new bucket. It stores information that is used to decide which bucket to insert a measurement
- * into. Binding these values together is used to sort on measurement timestamps and keep track of
- * the original index in the user batch for error reporting.
- */
-struct InsertContext {
-    BucketKey key;
-    StripeNumber stripeNumber;
-    TimeseriesOptions options;
-    ExecutionStatsController stats;
-
-    bool operator==(const InsertContext& other) const {
-        return key == other.key;
-    };
 };
 
 /**
@@ -117,32 +100,11 @@ struct BatchedInsertContext {
 };
 
 /**
- * Return type indicating that a call to 'insert' or 'tryInsert' successfully staged the input
- * measurement for insertion. See 'insert' and 'tryInsert' for more information.
- */
-class SuccessfulInsertion {
-public:
-    SuccessfulInsertion() = default;
-    SuccessfulInsertion(SuccessfulInsertion&&) = default;
-    SuccessfulInsertion& operator=(SuccessfulInsertion&&) = default;
-    SuccessfulInsertion(const SuccessfulInsertion&) = delete;
-    SuccessfulInsertion& operator=(const SuccessfulInsertion&) = delete;
-    SuccessfulInsertion(std::shared_ptr<WriteBatch>&&);
-
-    std::shared_ptr<WriteBatch> batch;
-};
-
-/**
  * An insert or reopening operation can conflict with an outstanding 'ReopeningRequest' or a
  * prepared 'WriteBatch' for a bucket in the series (same metaField value). Caller should wait using
  * 'waitToInsert'.
  */
 using InsertWaiter = std::variant<std::shared_ptr<WriteBatch>, std::shared_ptr<ReopeningRequest>>;
-
-/**
- * Variant representing the possible outcomes of staging an insert.
- */
-using InsertResult = std::variant<SuccessfulInsertion, InsertWaiter>;
 
 /**
  * Struct to hold a portion of the buckets managed by the catalog.
@@ -239,10 +201,20 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog);
 void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builder);
 
 /**
- * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to
+ * If an insert or reopening returns a 'InsertWaiter' object, the caller should use this function to
  * wait before repeating their attempt.
  */
 void waitToInsert(InsertWaiter* waiter);
+
+/**
+ * Returns a conflicting operation that needs to be waited for archive-based reopening (when
+ * 'archivedCandidate' is passed) or query-based reopening.
+ */
+boost::optional<InsertWaiter> checkForReopeningConflict(
+    Stripe& stripe,
+    WithLock stripeLock,
+    const BucketKey& bucketKey,
+    boost::optional<OID> archivedCandidate = boost::none);
 
 /**
  * Prepares a batch for commit, transitioning it to an inactive state. Returns OK if the batch was
@@ -324,6 +296,26 @@ BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
  * collision.
  */
 void resetBucketOIDCounter();
+
+/**
+ * Generates an OID for the bucket _id field, setting the timestamp portion to a value determined by
+ * rounding 'time' based on 'options'.
+ */
+std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options);
+
+/**
+ * Retrieves the execution stats from the side bucket catalog.
+ * Assumes the side bucket catalog has the stats of one collection.
+ */
+std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+    BucketCatalog& sideBucketCatalog);
+
+/**
+ * Merges the execution stats of a collection into the bucket catalog.
+ */
+void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
+                                        tracking::shared_ptr<ExecutionStats> collStats,
+                                        const UUID& collectionUUID);
 
 /**
  * Appends the execution stats for the given namespace to the builder.

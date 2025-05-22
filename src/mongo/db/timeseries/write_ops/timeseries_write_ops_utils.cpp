@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 
@@ -61,7 +61,7 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
     auto res = uassertStatusOK(bucket_catalog::extractBucketingParameters(
         trackingContext, collectionUUID, options, measurements[0]));
     auto time = res.second;
-    auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
+    auto [oid, _] = bucket_catalog::generateBucketOID(time, options);
     write_ops_utils::BucketDocument bucketDoc =
         write_ops_utils::makeNewDocumentForWrite(nss,
                                                  collectionUUID,

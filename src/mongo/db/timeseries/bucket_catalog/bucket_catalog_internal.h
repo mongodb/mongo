@@ -43,19 +43,33 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
-#include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 
+namespace mongo::timeseries::bucket_catalog {
+struct Stripe;
+class BucketCatalog;
+struct BatchedInsertContext;
+}  // namespace mongo::timeseries::bucket_catalog
+
 namespace mongo::timeseries::bucket_catalog::internal {
+
+using StripeNumber = std::uint8_t;
+using BatchedInsertTuple = std::tuple<BSONObj, Date_t, UserBatchIndex>;
+/**
+ * Function that should run validation against the bucket to ensure it's a proper bucket document.
+ * Typically, this should execute Collection::checkValidation.
+ */
+using BucketDocumentValidator =
+    std::function<std::pair<Collection::SchemaValidationResult, Status>(const BSONObj&)>;
 
 /**
  * Mode to signal to 'removeBucket' what's happening to the bucket, and how to handle the bucket
@@ -163,6 +177,9 @@ BSONObj reopenQueriedBucket(OperationContext* opCtx,
                             const std::vector<BSONObj>& pipeline,
                             ExecutionStatsController& stats);
 
+using CompressAndWriteBucketFunc =
+    std::function<void(OperationContext*, const BucketId&, const NamespaceString&, StringData)>;
+
 /**
  * Compress and write the bucket document to storage with 'compressAndWriteBucketFunc'. Return the
  * error status and freeze the bucket if the compression fails.
@@ -268,14 +285,14 @@ std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
                                                 const Date_t& time);
 
 /**
- * Returns a conflicting operation that needs to be waited for archive-based reopening (when
- * 'archivedCandidate' is passed) or query-based reopening.
+ * Returns a prepared write batch matching the specified 'key' if one exists, by searching the set
+ * of open buckets associated with 'key'.
  */
-boost::optional<InsertWaiter> checkForReopeningConflict(
-    Stripe& stripe,
-    WithLock stripeLock,
-    const BucketKey& bucketKey,
-    boost::optional<OID> archivedCandidate = boost::none);
+std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
+                                              WithLock stripeLock,
+                                              const BucketKey& key,
+                                              boost::optional<OID> oid);
+
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
  * unprepared batches and remove the bucket from the catalog if there is no unprepared batch.
@@ -385,20 +402,6 @@ tracking::shared_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCat
  */
 std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(
     BucketCatalog& catalog, std::span<const UUID> collectionUUIDs);
-
-/**
- * Retrieves the execution stats from the side bucket catalog.
- * Assumes the side bucket catalog has the stats of one collection.
- */
-std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
-    BucketCatalog& sideBucketCatalog);
-
-/**
- * Merges the execution stats of a collection into the bucket catalog.
- */
-void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        tracking::shared_ptr<ExecutionStats> collStats,
-                                        const UUID& collectionUUID);
 
 /**
  * Generates a status with code TimeseriesBucketCleared and an appropriate error message.

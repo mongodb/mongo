@@ -48,6 +48,7 @@
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -137,8 +138,6 @@ void decideQueryBasedReopening(const RolloverReason& rolloverReason,
     MONGO_UNREACHABLE;
 }
 }  // namespace
-
-SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b) : batch{std::move(b)} {}
 
 Stripe::Stripe(TrackingContexts& trackingContexts)
     : openBucketsById(
@@ -242,6 +241,39 @@ void getDetailedMemoryUsage(const BucketCatalog& catalog, BSONObjBuilder& builde
         "measurementBatching",
         static_cast<long long>(catalog.trackingContexts.measurementBatching.allocated()));
 #endif
+}
+
+boost::optional<InsertWaiter> checkForReopeningConflict(Stripe& stripe,
+                                                        WithLock stripeLock,
+                                                        const BucketKey& bucketKey,
+                                                        boost::optional<OID> archivedCandidate) {
+    if (auto batch =
+            internal::findPreparedBatch(stripe, stripeLock, bucketKey, archivedCandidate)) {
+        return InsertWaiter{batch};
+    }
+
+    if (auto it = stripe.outstandingReopeningRequests.find(bucketKey);
+        it != stripe.outstandingReopeningRequests.end()) {
+        auto& requests = it->second;
+        invariant(!requests.empty());
+
+        if (!archivedCandidate.has_value()) {
+            // We are trying to perform a query-based reopening. This conflicts with any reopening
+            // for the key.
+            return InsertWaiter{requests.front()};
+        }
+
+        // We are about to attempt an archive-based reopening. This conflicts with any query-based
+        // reopening for the key, or another archive-based reopening for this bucket.
+        for (auto&& request : requests) {
+            if (!request->oid.has_value() ||
+                (request->oid.has_value() && request->oid.value() == archivedCandidate.value())) {
+                return InsertWaiter{request};
+            }
+        }
+    }
+
+    return boost::none;
 }
 
 void waitToInsert(InsertWaiter* waiter) {
@@ -466,6 +498,25 @@ void resetBucketOIDCounter() {
     internal::resetBucketOIDCounter();
 }
 
+std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options) {
+    return internal::generateBucketOID(time, options);
+}
+
+std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+    BucketCatalog& sideBucketCatalog) {
+    stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
+    invariant(sideBucketCatalog.executionStats.size() == 1);
+    return *sideBucketCatalog.executionStats.begin();
+}
+
+void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
+                                        tracking::shared_ptr<ExecutionStats> collStats,
+                                        const UUID& collectionUUID) {
+    ExecutionStatsController stats =
+        internal::getOrInitializeExecutionStats(catalog, collectionUUID);
+    addCollectionExecutionCounters(stats, *collStats);
+}
+
 void appendExecutionStats(const BucketCatalog& catalog,
                           const UUID& collectionUUID,
                           BSONObjBuilder& builder) {
@@ -474,32 +525,6 @@ void appendExecutionStats(const BucketCatalog& catalog,
     if (stats) {
         appendExecutionStatsToBuilder(*stats, builder);
     }
-}
-
-StatusWith<std::tuple<InsertContext, Date_t>> prepareInsert(BucketCatalog& catalog,
-                                                            const UUID& collectionUUID,
-                                                            const TimeseriesOptions& options,
-                                                            const BSONObj& measurementDoc) {
-    auto res = extractBucketingParameters(
-        getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsByKey),
-        collectionUUID,
-        options,
-        measurementDoc);
-    if (!res.isOK()) {
-        return res.getStatus();
-    }
-    auto& key = res.getValue().first;
-    auto time = res.getValue().second;
-
-    ExecutionStatsController stats =
-        internal::getOrInitializeExecutionStats(catalog, collectionUUID);
-
-    // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
-    // bucket to a stripe by hashing the BucketKey.
-    auto stripeNumber = internal::getStripeNumber(catalog, key);
-    InsertContext insertContext{std::move(key), stripeNumber, options, stats};
-
-    return {std::make_pair(std::move(insertContext), std::move(time))};
 }
 
 RolloverReason determineBucketRolloverForMeasurement(BucketCatalog& catalog,
@@ -876,12 +901,12 @@ StatusWith<Bucket*> potentiallyReopenBucket(
     if (const auto& archivedCandidate = internal::getArchiveReopeningCandidate(
             catalog, stripe, stripeLock, bucketKey, options, time)) {
         reopeningConflict =
-            internal::checkForReopeningConflict(stripe, stripeLock, bucketKey, archivedCandidate);
+            checkForReopeningConflict(stripe, stripeLock, bucketKey, archivedCandidate);
         if (!reopeningConflict) {
             reopeningCandidate = archivedCandidate.get();
         }
     } else if (allowQueryBasedReopening == AllowQueryBasedReopening::kAllow) {
-        reopeningConflict = internal::checkForReopeningConflict(stripe, stripeLock, bucketKey);
+        reopeningConflict = checkForReopeningConflict(stripe, stripeLock, bucketKey);
         if (!reopeningConflict) {
             reopeningCandidate = internal::getQueryReopeningCandidate(
                 catalog, stripe, stripeLock, bucketKey, options, storageCacheSizeBytes, time);

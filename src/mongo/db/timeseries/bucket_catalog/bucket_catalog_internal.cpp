@@ -59,7 +59,6 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
-#include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -145,31 +144,6 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
     }
 
     batch.promise.setError(status);
-}
-
-/**
- * Returns a prepared write batch matching the specified 'key' if one exists, by searching the set
- * of open buckets associated with 'key'.
- */
-std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
-                                              WithLock stripeLock,
-                                              const BucketKey& key,
-                                              boost::optional<OID> oid) {
-    auto it = stripe.openBucketsByKey.find(key);
-    if (it == stripe.openBucketsByKey.end()) {
-        // No open bucket for this metadata.
-        return {};
-    }
-
-    auto& openSet = it->second;
-    for (Bucket* potentialBucket : openSet) {
-        if (potentialBucket->preparedBatch &&
-            (!oid.has_value() || oid.value() == potentialBucket->bucketId.oid)) {
-            return potentialBucket->preparedBatch;
-        }
-    }
-
-    return {};
 }
 
 tracking::shared_ptr<ExecutionStats> getEmptyStats() {
@@ -853,36 +827,25 @@ std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
                                      bucketMaxSize);
 }
 
-boost::optional<InsertWaiter> checkForReopeningConflict(Stripe& stripe,
-                                                        WithLock stripeLock,
-                                                        const BucketKey& bucketKey,
-                                                        boost::optional<OID> archivedCandidate) {
-    if (auto batch = findPreparedBatch(stripe, stripeLock, bucketKey, archivedCandidate)) {
-        return InsertWaiter{batch};
+std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
+                                              WithLock stripeLock,
+                                              const BucketKey& key,
+                                              boost::optional<OID> oid) {
+    auto it = stripe.openBucketsByKey.find(key);
+    if (it == stripe.openBucketsByKey.end()) {
+        // No open bucket for this metadata.
+        return {};
     }
 
-    if (auto it = stripe.outstandingReopeningRequests.find(bucketKey);
-        it != stripe.outstandingReopeningRequests.end()) {
-        auto& requests = it->second;
-        invariant(!requests.empty());
-
-        if (!archivedCandidate.has_value()) {
-            // We are trying to perform a query-based reopening. This conflicts with any reopening
-            // for the key.
-            return InsertWaiter{requests.front()};
-        }
-
-        // We are about to attempt an archive-based reopening. This conflicts with any query-based
-        // reopening for the key, or another archive-based reopening for this bucket.
-        for (auto&& request : requests) {
-            if (!request->oid.has_value() ||
-                (request->oid.has_value() && request->oid.value() == archivedCandidate.value())) {
-                return InsertWaiter{request};
-            }
+    auto& openSet = it->second;
+    for (Bucket* potentialBucket : openSet) {
+        if (potentialBucket->preparedBatch &&
+            (!oid.has_value() || oid.value() == potentialBucket->bucketId.oid)) {
+            return potentialBucket->preparedBatch;
         }
     }
 
-    return boost::none;
+    return {};
 }
 
 void abort(BucketCatalog& catalog,
@@ -1269,20 +1232,6 @@ tracking::shared_ptr<ExecutionStats> getCollectionExecutionStats(const BucketCat
         return it->second;
     }
     return nullptr;
-}
-
-std::pair<UUID, tracking::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
-    BucketCatalog& sideBucketCatalog) {
-    stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
-    invariant(sideBucketCatalog.executionStats.size() == 1);
-    return *sideBucketCatalog.executionStats.begin();
-}
-
-void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        tracking::shared_ptr<ExecutionStats> collStats,
-                                        const UUID& collectionUUID) {
-    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, collectionUUID);
-    addCollectionExecutionCounters(stats, *collStats);
 }
 
 std::vector<tracking::shared_ptr<ExecutionStats>> releaseExecutionStatsFromBucketCatalog(

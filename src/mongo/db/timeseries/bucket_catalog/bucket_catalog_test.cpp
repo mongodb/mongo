@@ -110,7 +110,7 @@ protected:
         const boost::optional<unsigned long>& rehydrateEra = boost::none,
         const boost::optional<unsigned long>& loadBucketIntoCatalogEra = boost::none,
         const boost::optional<BucketKey>& bucketKey = boost::none,
-        const boost::optional<BucketDocumentValidator>& documentValidator = boost::none);
+        const boost::optional<internal::BucketDocumentValidator>& documentValidator = boost::none);
 
     BSONObj _getCompressedBucketDoc(const BSONObj& bucketDoc);
 
@@ -517,7 +517,7 @@ Status BucketCatalogTest::_reopenBucket(
     const boost::optional<unsigned long>& rehydrateEra,
     const boost::optional<unsigned long>& loadBucketIntoCatalogEra,
     const boost::optional<BucketKey>& bucketKey,
-    const boost::optional<BucketDocumentValidator>& documentValidator) {
+    const boost::optional<internal::BucketDocumentValidator>& documentValidator) {
     const NamespaceString ns = coll->ns().getTimeseriesViewNamespace();
     const UUID uuid = coll->uuid();
     const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
@@ -2365,12 +2365,13 @@ TEST_F(BucketCatalogTest, ReopeningFailedDueToMinMaxCalculation) {
         [](const BSONObj& document) -> std::pair<Collection::SchemaValidationResult, Status> {
         return {Collection::SchemaValidationResult::kPass, Status::OK()};
     };
-    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(),
-                                compressedBucketDoc,
-                                boost::none,
-                                boost::none,
-                                boost::none,
-                                boost::optional<BucketDocumentValidator>{alwaysPassValidator}));
+    ASSERT_NOT_OK(
+        _reopenBucket(autoColl.getCollection(),
+                      compressedBucketDoc,
+                      boost::none,
+                      boost::none,
+                      boost::none,
+                      boost::optional<internal::BucketDocumentValidator>{alwaysPassValidator}));
     auto stats = internal::getCollectionExecutionStats(*_bucketCatalog, _uuid1);
     ASSERT_EQ(1, stats->numBucketReopeningsFailedDueToMinMaxCalculation.load());
 }
