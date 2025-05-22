@@ -153,11 +153,16 @@ let explain;
                 tojson(lookupInto)
         });
 
-        let areCollectionsCollocated =
+        let areCollectionsColocated =
             FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        let areCollectionsStillColocated;
+        if (areCollectionsColocated) {
             explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
-            assertIndexJoinStrategy(explain);
+            areCollectionsStillColocated =
+                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+            if (areCollectionsStillColocated) {
+                assertIndexJoinStrategy(explain);
+            }
         }
 
         // Command-level collation overrides collection-level collation.
@@ -170,17 +175,25 @@ let explain;
                 tojson(lookupInto)
         });
 
-        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
-        if (areCollectionsCollocated) {
+        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsColocated) {
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {collation: caseInsensitive});
-            assertIndexJoinStrategy(explain);
+            areCollectionsStillColocated =
+                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+            if (areCollectionsStillColocated) {
+                assertIndexJoinStrategy(explain);
+            }
 
             // If no index is compatible with the requested collation and disk use is not allowed,
             // nested loop join will be chosen instead.
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {collation: {locale: "fr"}, allowDiskUse: false});
-            assertNestedLoopJoinStrategy(explain);
+            areCollectionsStillColocated =
+                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+            if (areCollectionsStillColocated) {
+                assertNestedLoopJoinStrategy(explain);
+            }
         }
     }
 })();
