@@ -313,7 +313,7 @@ tasks:
         "requires_large_host",
         "clang_tidy",
       ]
-    exec_timeout_secs: 1800 # 30 min timeout for the task overall
+    exec_timeout_secs: 3600 # 1 hr timeout for the task overall, commit queue has a more specific timeout
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
