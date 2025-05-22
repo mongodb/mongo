@@ -1,0 +1,5 @@
+Checks: '-*,mongo-collection-sharding-runtime-check'
+WarningsAsErrors: '*'
+CheckOptions:
+    - key:             mongo-collection-sharding-runtime-check.exceptionDirs
+      value:           'src/mongo/db/s'

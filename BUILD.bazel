@@ -86,6 +86,11 @@ alias(
     actual = "@bazel_rules_mongo//engflow_auth:engflow_auth",
 )
 
+alias(
+    name = "mongo-tidy-test",
+    actual = "//src/mongo/tools/mongo_tidy_checks/tests:MongoTidyCheck_unittest",
+)
+
 setup_mongo_toolchain_aliases()
 
 render_template(

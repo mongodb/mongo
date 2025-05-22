@@ -18,7 +18,13 @@ The bazel clang-tidy config will automatically build and use the custom checks m
 
 A simple unittest framework is included with the checks so that they will automatically be run in quick, isolated, and minimal fashion. This allows for faster development and ensures the checks continue working.
 
-The `test` directory contains the python unittest script, the test source files, and the BUILD.bazel which builds and runs the tests. NOTE: The python unittest script requires arguments to function correctly, you must supply compile_commands.json files matching the correct location and filename to the corresponding tests. For this reason, you should use the bazel build as the interface for running the tests as it will create the compile_commands files, and run the unittest script automatically with the correct arguments. To build and test the checks use the bazel command `bazel test //src/mongo/tools/mongo_tidy_checks/test:mongo_tidy_checks`.
+The `test` directory contains the python unittest script, the test source files, and the BUILD.bazel which builds and runs the tests. To run all the custom tidy rules unittests use:
+
+    bazel run mongo-tidy-test
+
+This will run all the tests serially. Eventually we can improve this and they can be run in parallel but currently they are serial. To run a specific test you can use python's unittest args, for example:
+
+bazel run mongo-tidy-test -- -k test_MongoInvariantStatusIsOKCheck
 
 #### Writing your own check checklist
 
@@ -28,10 +34,10 @@ Below is a checklist of all the steps to make sure to perform when writing a new
 2. Add the check's `#include` to the `MongoTidyModule.cpp`.
 3. Register the check class with a check name in the `MongoTidyModule.cpp`.
 4. Add the `.cpp` file to the source list in the `BUILD.bazel` file.
-5. Write a unittest file named `tests/test_{CHECK_NAME}.cpp` which minimally reproduces the issue.
-6. Add the test file to the list of test sources in `tests/BUILD.bazel`.
-7. Add a `def test_{CHECK_NAME}():` function to the `MongoTidyCheck_unittest.py` file which writes the config file, and finds the expected error output in the stdout. Reference the other check funcions for details.
-8. Run the bazel build with `bazel test //src/mongo/tools/mongo_tidy_checks/test:mongo_tidy_checks` to run the tests and see the detailed output of each test.
+5. Write a unittest file named `tests/test_{CHECK_NAME}.cpp` and a config file `tests/test_{CHECK_NAME}.tidy_config` which minimally reproduces the issue.
+6. Add the test to the list of tests in `tests/BUILD.bazel`.
+7. Add a `def test_{CHECK_NAME}():` function to the `MongoTidyCheck_unittest.py` file which finds the expected error output in the stdout. Reference the other check functions for details.
+8. Run the bazel build with `bazel run mongo-tidy-test -- -k test_{CHECK_NAME}` to run the newly created test.
 
 #### Questions and Troubleshooting
 

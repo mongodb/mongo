@@ -1,0 +1,2 @@
+Checks: '-*,mongo-cxx20-std-chrono-check'
+WarningsAsErrors: '*'

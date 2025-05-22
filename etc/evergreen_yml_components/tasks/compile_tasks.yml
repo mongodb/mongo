@@ -319,6 +319,10 @@ tasks:
         variant: generate-tasks-for-version
     commands:
       - func: "do bazel setup"
+      - func: "bazel run"
+        vars:
+          target: >-
+            mongo-tidy-test
       - func: "bazel compile"
         vars:
           # Note that we only run clang-tidy on the Mongo-authored targets, not on third-party code.

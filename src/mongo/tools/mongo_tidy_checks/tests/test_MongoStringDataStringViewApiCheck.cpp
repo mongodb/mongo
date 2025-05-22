@@ -18,7 +18,7 @@ int test() {
     StringData sd;
     sd.rawData();
     sd.endsWith("a");
-    sd.endsWith("a");
+    sd.startsWith("a");
     return 0;
 }
 }  // namespace

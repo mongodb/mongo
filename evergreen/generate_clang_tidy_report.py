@@ -8,7 +8,7 @@ failures = []
 
 for root, _, files in os.walk("bazel-bin"):
     for name in files:
-        if name.endswith(".clang-tidy.status"):
+        if name.endswith(".clang-tidy.status") and "mongo_tidy_checks/tests/" not in root:
             with open(os.path.join(root, name)) as f:
                 if f.read().strip() == "1":
                     tokens = name.split(".")

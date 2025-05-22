@@ -1,0 +1,2 @@
+Checks: '-*,mongo-polyfill-check'
+WarningsAsErrors: '*'
