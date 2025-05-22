@@ -58,6 +58,10 @@ class TicketHolder {
     friend class Ticket;
 
 public:
+    struct QueueStats;
+
+    using DelinquentCallback =
+        std::function<void(AdmissionContext*, int64_t, TicketHolder::QueueStats&)>;
     /**
      * Describes the algorithm used to update the TicketHolder when the size of the ticket pool
      * changes.
@@ -81,6 +85,7 @@ public:
                  int numTickets,
                  bool trackPeakUsed,
                  std::int32_t maxQueueDepth,
+                 DelinquentCallback delinquentCallback = nullptr,
                  ResizePolicy resizePolicy = ResizePolicy::kGradual);
 
     /**
@@ -194,6 +199,9 @@ public:
         AtomicWord<std::int64_t> totalStartedProcessing{0};
         AtomicWord<std::int64_t> totalCanceled{0};
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
+        AtomicWord<std::int32_t> totalDelinquentAcquisitions{0};
+        AtomicWord<std::int64_t> totalAcquisitionDelinquencyMillis{0};
+        AtomicWord<std::int64_t> maxAcquisitionDelinquencyMillis{0};
     };
 
     /**
@@ -259,6 +267,9 @@ private:
     Atomic<int32_t> _waiterCount{0};
     Atomic<int32_t> _outof;
     Atomic<int32_t> _peakUsed;
+    bool _enabledDelinquent{false};
+    Milliseconds _delinquentMs{0};
+    DelinquentCallback _reportDelinquentOpCallback{nullptr};
 };
 
 /**
@@ -313,6 +324,10 @@ public:
      */
     AdmissionContext::Priority getPriority() const {
         return _priority;
+    }
+
+    AdmissionContext* getAdmissionContext() const {
+        return _admissionContext;
     }
 
 private:

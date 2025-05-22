@@ -53,6 +53,7 @@ void IngressAdmissionController::init() {
                                                    gIngressAdmissionControllerTicketPoolSize.load(),
                                                    false,
                                                    gIngressAdmissionControllerMaxQueueDepth.load(),
+                                                   nullptr /* delinquentCallback */,
                                                    TicketHolder::ResizePolicy::kImmediate);
 }
 

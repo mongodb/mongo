@@ -31,9 +31,11 @@
 #include <concepts>
 #include <memory>
 
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/concurrency/ticketholder_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/packaged_task.h"
@@ -112,6 +114,7 @@ public:
                                               initialNumTickets,
                                               false /* trackPeakUsed */,
                                               TicketHolder::kDefaultMaxQueueDepth,
+                                              nullptr /* delinquentCallback */,
                                               TicketHolder::ResizePolicy::kImmediate);
     }
 
@@ -245,6 +248,81 @@ TEST_F(TicketHolderTest, BasicTimeout) {
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
+}
+
+TEST_F(TicketHolderTest, DelinquentAcquisitionStats) {
+    // Enable the feature flag for delinquent ticket metrics.
+    gFeatureFlagRecordDelinquentMetrics.setForServerParameter(true);
+
+    auto holder = std::make_unique<TicketHolder>(
+        getServiceContext(),
+        1 /* numTickets */,
+        false /* trackPeakUsed */,
+        TicketHolder::kDefaultMaxQueueDepth,
+        [](AdmissionContext* admCtx, int64_t delta, TicketHolder::QueueStats& queueStats) {
+            static_cast<MockAdmissionContext*>(admCtx)->recordDelinquentAcquisition(delta);
+            // Update aggregated metrics in QueueStats.
+            queueStats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
+            queueStats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delta);
+            queueStats.maxAcquisitionDelinquencyMillis.store(
+                std::max(queueStats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delta));
+        });
+    OperationContext* opCtx = _opCtx.get();
+    auto tickSource = getTickSource();
+    Stats stats(holder.get());
+    MockAdmissionContext admCtx{};
+    auto threshold = gDelinquentAcquisitionIntervalMillis.load();
+    {
+        // Ticket releases within the threshold, no delinquent metric is collected.
+        boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx);
+        tickSource->advance(Milliseconds{threshold / 2});
+        ticket.reset();
+
+        ASSERT_EQ(admCtx.delinquentAcquisitions, 0);
+        ASSERT_EQ(admCtx.totalAcquisitionDelinquencyMillis, 0);
+        ASSERT_EQ(admCtx.maxAcquisitionDelinquencyMillis, 0);
+
+        auto currentStats = stats.getNonTicketStats();
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 0);
+        ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(), 0);
+        ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(), 0);
+    }
+    {
+        // Ticket releases within the threshold, delinquent metric should be collected.
+        boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx);
+        tickSource->advance(Milliseconds{threshold * 2});
+        ticket.reset();
+
+        ASSERT_EQ(admCtx.delinquentAcquisitions, 1);
+        ASSERT_EQ(admCtx.totalAcquisitionDelinquencyMillis, threshold * 2);
+        ASSERT_EQ(admCtx.maxAcquisitionDelinquencyMillis, threshold * 2);
+
+        auto currentStats = stats.getNonTicketStats();
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 1);
+        ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(),
+                  threshold * 2);
+        ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(),
+                  threshold * 2);
+    }
+    {
+        // Ticket with a different AdmissionContext releases within the threshold, aggregated
+        // delinquent metric should be updated.
+        MockAdmissionContext admCtx2{};
+        boost::optional<Ticket> ticket = holder->waitForTicket(opCtx, &admCtx2);
+        tickSource->advance(Milliseconds{threshold * 5});
+        ticket.reset();
+
+        ASSERT_EQ(admCtx2.delinquentAcquisitions, 1);
+        ASSERT_EQ(admCtx2.totalAcquisitionDelinquencyMillis, threshold * 5);
+        ASSERT_EQ(admCtx2.maxAcquisitionDelinquencyMillis, threshold * 5);
+
+        auto currentStats = stats.getNonTicketStats();
+        ASSERT_EQ(currentStats["normalPriority"]["totalDelinquentAcquisitions"].Int(), 2);
+        ASSERT_EQ(currentStats["normalPriority"]["totalAcquisitionDelinquencyMillis"].Long(),
+                  threshold * 7);
+        ASSERT_EQ(currentStats["normalPriority"]["maxAcquisitionDelinquencyMillis"].Long(),
+                  threshold * 5);
+    }
 }
 
 /**
@@ -699,6 +777,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax0) {
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
                                                  maxNumberOfWaiters,
+                                                 nullptr /* delinquentCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -733,6 +812,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMax1) {
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
                                                  maxNumberOfWaiters,
+                                                 nullptr /* delinquentCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -795,6 +875,7 @@ TEST_F(TicketHolderImmediateResizeTest, WaitQueueMaxChange) {
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
                                                  TicketHolder::kDefaultMaxQueueDepth,
+                                                 nullptr /* delinquentCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
     // acquire 4 tickets
@@ -874,6 +955,7 @@ TEST_F(TicketHolderTestTick, TotalTimeQueueMicrosAccumulated) {
                                                  initialNumTickets,
                                                  false /* trackPeakUsed */,
                                                  TicketHolder::kDefaultMaxQueueDepth,
+                                                 nullptr /* delinquentCallback */,
                                                  TicketHolder::ResizePolicy::kImmediate);
 
 

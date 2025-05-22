@@ -41,4 +41,19 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCt
     return contextDecoration(opCtx);
 }
 
+ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionContext& other)
+    : AdmissionContext(other),
+      _delinquentAcquisitions(other._delinquentAcquisitions.load()),
+      _totalAcquisitionDelinquencyMillis(other._totalAcquisitionDelinquencyMillis.load()),
+      _maxAcquisitionDelinquencyMillis(other._maxAcquisitionDelinquencyMillis.load()) {}
+
+ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
+    const ExecutionAdmissionContext& other) {
+    AdmissionContext::operator=(other);
+    _delinquentAcquisitions.store(other._delinquentAcquisitions.load());
+    _totalAcquisitionDelinquencyMillis.store(other._totalAcquisitionDelinquencyMillis.load());
+    _maxAcquisitionDelinquencyMillis.store(other._maxAcquisitionDelinquencyMillis.load());
+    return *this;
+}
+
 }  // namespace mongo

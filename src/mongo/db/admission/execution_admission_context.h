@@ -40,11 +40,25 @@ class OperationContext;
 class ExecutionAdmissionContext : public AdmissionContext {
 public:
     ExecutionAdmissionContext() = default;
+    ExecutionAdmissionContext(const ExecutionAdmissionContext& other);
+    ExecutionAdmissionContext& operator=(const ExecutionAdmissionContext& other);
+
+    void recordDelinquentAcquisition(int64_t delay) {
+        _delinquentAcquisitions.fetchAndAddRelaxed(1);
+        _totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delay);
+        _maxAcquisitionDelinquencyMillis.storeRelaxed(
+            std::max(_maxAcquisitionDelinquencyMillis.loadRelaxed(), delay));
+    }
 
     /**
      * Retrieve the ExecutionAdmissionContext decoration the provided OperationContext
      */
     static ExecutionAdmissionContext& get(OperationContext* opCtx);
+
+private:
+    AtomicWord<int32_t> _delinquentAcquisitions{0};
+    AtomicWord<int64_t> _totalAcquisitionDelinquencyMillis{0};
+    AtomicWord<int64_t> _maxAcquisitionDelinquencyMillis{0};
 };
 
 }  // namespace mongo

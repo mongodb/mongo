@@ -30,8 +30,9 @@
 #include "mongo/util/concurrency/ticketholder.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/concurrency/ticketholder_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
@@ -44,13 +45,18 @@ TicketHolder::TicketHolder(ServiceContext* serviceContext,
                            int numTickets,
                            bool trackPeakUsed,
                            std::int32_t maxQueueDepth,
+                           DelinquentCallback delinquentCallback,
                            ResizePolicy resizePolicy)
     : _trackPeakUsed(trackPeakUsed),
       _resizePolicy(resizePolicy),
       _serviceContext(serviceContext),
       _tickets(numTickets),
       _maxQueueDepth(maxQueueDepth),
-      _outof(numTickets) {}
+      _outof(numTickets),
+      _reportDelinquentOpCallback(delinquentCallback) {
+    _enabledDelinquent = gFeatureFlagRecordDelinquentMetrics.isEnabled();
+    _delinquentMs = Milliseconds(gDelinquentAcquisitionIntervalMillis.load());
+}
 
 bool TicketHolder::resize(OperationContext* opCtx, int32_t newSize, Date_t deadline) {
     stdx::lock_guard<stdx::mutex> lk(_resizeMutex);
@@ -300,6 +306,11 @@ void TicketHolder::_appendQueueStats(BSONObjBuilder& b, const QueueStats& stats)
     b.append("canceled", stats.totalCanceled.loadRelaxed());
     b.append("newAdmissions", stats.totalNewAdmissions.loadRelaxed());
     b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
+    b.append("totalDelinquentAcquisitions", stats.totalDelinquentAcquisitions.loadRelaxed());
+    b.append("totalAcquisitionDelinquencyMillis",
+             stats.totalAcquisitionDelinquencyMillis.loadRelaxed());
+    b.append("maxAcquisitionDelinquencyMillis",
+             stats.maxAcquisitionDelinquencyMillis.loadRelaxed());
 }
 
 void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueStats,
@@ -309,6 +320,11 @@ void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueSta
     auto delta =
         tickSource->ticksTo<Microseconds>(tickSource->getTicks() - ticket._acquisitionTime);
     queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
+
+    if (_enabledDelinquent && _reportDelinquentOpCallback && delta > _delinquentMs) {
+        auto deltaCount = duration_cast<Milliseconds>(delta).count();
+        _reportDelinquentOpCallback(ticket.getAdmissionContext(), deltaCount, queueStats);
+    }
 }
 
 void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
