@@ -66,6 +66,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -129,7 +130,7 @@ void TLTypeFactory::shutdown() {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    std::unordered_map<std::string, int> counts;
+    stdx::unordered_map<std::string, int> counts;
     for (const Type* collar : _collars) {
         ++counts[demangleName(typeid(collar))];
     }

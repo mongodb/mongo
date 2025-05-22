@@ -132,7 +132,7 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
 stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
     IntentRegistry::InterruptionType interrupt, boost::optional<uint32_t> timeout_sec) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
-    auto timeOutSec = std::chrono::seconds(
+    auto timeOutSec = stdx::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
     {
         stdx::unique_lock<stdx::mutex> lock(_stateMutex);
@@ -172,14 +172,14 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 break;
         }
 
-        _waitForDrain(Intent::PreparedTransaction, std::chrono::milliseconds(0));
+        _waitForDrain(Intent::PreparedTransaction, stdx::chrono::milliseconds(0));
 
         if (intents) {
             for (auto intent : *intents) {
                 _killOperationsByIntent(intent);
             }
             Timer timer;
-            auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(timeOutSec);
+            auto timeout = stdx::chrono::duration_cast<stdx::chrono::milliseconds>(timeOutSec);
             for (auto intent : *intents) {
                 _waitForDrain(intent, timeout);
                 // Negative duration to cv::wait_for can cause undefined behavior
@@ -187,7 +187,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 // non-zero timeout to ever drop to 0 by setting it to at least to 1ms
                 if (timeout.count()) {
                     timeout -= std::min(
-                        std::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
+                        stdx::chrono::milliseconds(durationCount<Milliseconds>(timer.elapsed())),
                         timeout - 1ms);
                 }
             }
@@ -262,7 +262,7 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent) {
 }
 
 void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
-                                   std::chrono::milliseconds timeout) {
+                                   stdx::chrono::milliseconds timeout) {
     auto& tokenMap = _tokenMaps[(size_t)intent];
     stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
     if (timeout.count() &&

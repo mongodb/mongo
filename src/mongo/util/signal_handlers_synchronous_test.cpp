@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -268,7 +269,7 @@ DEATH_TEST_F(MallocFreeOStreamGuardTest, WithBlockedSignal, "[survived][sig<0>][
     auto h0 = handlerCount.load();
     blockSignal(sig<0>, false);
     while (handlerCount.load() == h0)
-        std::this_thread::yield();
+        stdx::this_thread::yield();
 }
 
 class BlockInsideSignalHandlerTest : public MallocFreeOStreamGuardTest {

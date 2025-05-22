@@ -43,12 +43,11 @@ namespace mongo::tidy {
  * flags the matched occurrences.
  */
 class MongoPolyFillCheck : public clang::tidy::ClangTidyCheck {
-
 public:
     MongoPolyFillCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
     void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
     void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
-    static std::vector<std::string> basePolyfillNames;
+    void checkBannedName(clang::SourceLocation loc, llvm::StringRef name);
 
 private:
     std::vector<std::string> fullyQualifiedPolyfillNames;

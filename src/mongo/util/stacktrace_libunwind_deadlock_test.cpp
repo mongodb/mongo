@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <chrono>
 #include <cstdlib>
 #include <functional>
-#include <future>
 #include <link.h>
 
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
@@ -52,13 +52,13 @@ public:
         return _f.wait();
     }
 
-    bool waitFor(std::chrono::milliseconds dur) const {
-        return _f.wait_for(dur) == std::future_status::ready;
+    bool waitFor(stdx::chrono::milliseconds dur) const {
+        return _f.wait_for(dur) == stdx::future_status::ready;
     }
 
 private:
-    std::promise<void> _p;                  // NOLINT
-    std::future<void> _f{_p.get_future()};  // NOLINT
+    stdx::promise<void> _p;
+    stdx::future<void> _f{_p.get_future()};
 };
 
 using OnPhdrFunc = std::function<int(dl_phdr_info*, size_t)>;
@@ -92,7 +92,7 @@ public:
     void wait() {
         return _paused.wait();
     }
-    bool waitFor(std::chrono::milliseconds dur) const {
+    bool waitFor(stdx::chrono::milliseconds dur) const {
         return _paused.waitFor(dur);
     }
 

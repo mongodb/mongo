@@ -37,6 +37,7 @@
 #include "mongo/db/storage/wiredtiger/spill_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -364,7 +365,7 @@ TEST_F(SpillRecordStoreTest, TableCreation) {
     }
 
     auto allIdents = _kvEngine->getAllIdents(wtRu);
-    std::unordered_set<std::string> allIdentsSet(allIdents.begin(), allIdents.end());
+    stdx::unordered_set<std::string> allIdentsSet(allIdents.begin(), allIdents.end());
     ASSERT_EQ(allIdentsSet.size(), 4);
     ASSERT_TRUE(allIdentsSet.contains("a.b"));
     for (int i = 0; i < 3; ++i) {

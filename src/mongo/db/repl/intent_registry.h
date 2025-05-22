@@ -36,6 +36,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -184,7 +185,7 @@ private:
     };
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent);
-    void _waitForDrain(Intent intent, std::chrono::milliseconds timeout);
+    void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
     static std::string _intentToString(Intent intent);
 
     bool _enabled = true;

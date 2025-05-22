@@ -406,12 +406,27 @@ class MongoTidyTests(unittest.TestCase):
                 """)
         )
 
+        test_names = [
+            "std::mutex myMutex",
+            "std::lock_guard lock{myMutex, std::adopt_lock}",
+            "std::adopt_lock",
+            "std::cv_status wait_result{std::cv_status::timeout}",
+            "std::cv_status::timeout",
+            "std::cv_status::timeout",
+            "std::this_thread::get_id",
+            "std::get_terminate()",
+            "std::chrono::seconds(1)",
+            "std::future<int> myFuture",
+            "std::condition_variable cv",
+            "std::unordered_map<int, int> myMap",
+            "boost::unordered_map<int, int> boostMap",
+        ]
+
         self.expected_output = [
-            "error: Illegal use of banned name from std::/boost:: for std::mutex, use mongo::stdx:: variant instead",
-            "error: Illegal use of banned name from std::/boost:: for std::future, use mongo::stdx:: variant instead",
-            "error: Illegal use of banned name from std::/boost:: for std::condition_variable, use mongo::stdx:: variant instead",
-            "error: Illegal use of banned name from std::/boost:: for std::unordered_map, use mongo::stdx:: variant instead",
-            "error: Illegal use of banned name from std::/boost:: for boost::unordered_map, use mongo::stdx:: variant instead",
+            "error: Illegal use of banned name from std::/boost:: for "
+            + name
+            + ". Consider using alternatives such as the polyfills from the mongo::stdx:: namespace."
+            for name in test_names
         ]
 
         self.run_clang_tidy()

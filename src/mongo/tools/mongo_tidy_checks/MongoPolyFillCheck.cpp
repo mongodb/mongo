@@ -29,97 +29,157 @@
 
 #include "MongoPolyFillCheck.h"
 
-#include <vector>
+#include <array>
+
+#include <clang/Lex/Lexer.h>
 
 namespace mongo::tidy {
 
 using namespace clang;
 using namespace clang::ast_matchers;
 
+namespace {
+
+// List of base polyfill type names from the std and boost namespaces to be checked
+constexpr std::initializer_list<llvm::StringRef> basePolyfillTypeNames = {
+    "condition_variable",
+    "condition_variable_any",
+    "cv_status",
+    "future",
+    "future_status",
+    "launch",
+    "packaged_task",
+    "promise",
+    "recursive_mutex",
+    "shared_mutex",
+    "shared_timed_mutex",
+    "thread",
+    "timed_mutex",
+    "unordered_map",
+    "unordered_multimap",
+    "unordered_multiset",
+    "unordered_set",
+};
+
+// List of base polyfill enum names from the std and boost namespaces to be checked
+constexpr std::initializer_list<llvm::StringRef> basePolyfillEnumNames = {
+    "cv_status",
+    "future_status",
+    "launch",
+};
+
+// List of base polyfill function names from the std and boost namespaces to be checked
+constexpr std::initializer_list<llvm::StringRef> basePolyfillFuncNames = {
+    "async",
+    "get_terminate",
+    "notify_all_at_thread_exit",
+    "set_terminate",
+};
+
+// List of base polyfill namespace names from the std and boost namespaces to be checked
+constexpr std::initializer_list<llvm::StringRef> basePolyfillNamespaces = {
+    "this_thread",
+    "chrono",
+};
+}  // namespace
+
 // Generate a list of fully qualified polyfill names by prefixing each name
 // in the input list with 'std::' and 'boost::'
 std::vector<std::string> generateQualifiedPolyfillNames(
-    const std::vector<std::string>& bannedNames) {
+    const std::vector<llvm::StringRef>& bannedNames) {
     std::vector<std::string> fullyBannedNames;
-    for (const auto& name : bannedNames) {
-        fullyBannedNames.push_back("std::" + name);
-        fullyBannedNames.push_back("boost::" + name);
+    for (auto&& name : bannedNames) {
+        fullyBannedNames.push_back("std::" + name.str());
+        fullyBannedNames.push_back("boost::" + name.str());
     }
     return fullyBannedNames;
 }
 
-// List of base polyfill names from the std and boost namespaces to be checked
-std::vector<std::string> MongoPolyFillCheck::basePolyfillNames = {"adopt_lock",
-                                                                  "async",
-                                                                  "chrono",
-                                                                  "condition_variable",
-                                                                  "condition_variable_any",
-                                                                  "cv_status",
-                                                                  "defer_lock",
-                                                                  "future",
-                                                                  "future_status",
-                                                                  "get_terminate",
-                                                                  "launch",
-                                                                  "lock_guard",
-                                                                  "mutex",
-                                                                  "notify_all_at_thread_exit",
-                                                                  "packaged_task",
-                                                                  "promise",
-                                                                  "recursive_mutex",
-                                                                  "set_terminate",
-                                                                  "shared_lock",
-                                                                  "shared_mutex",
-                                                                  "shared_timed_mutex",
-                                                                  "this_thread",
-                                                                  "thread",
-                                                                  "timed_mutex",
-                                                                  "try_to_lock",
-                                                                  "unique_lock",
-                                                                  "unordered_map",
-                                                                  "unordered_multimap",
-                                                                  "unordered_multiset",
-                                                                  "unordered_set"};
-
 MongoPolyFillCheck::MongoPolyFillCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context) {
+    std::vector<llvm::StringRef> basePolyfillNames;
+    basePolyfillNames.insert(
+        basePolyfillNames.end(), basePolyfillTypeNames.begin(), basePolyfillTypeNames.end());
+    basePolyfillNames.insert(
+        basePolyfillNames.end(), basePolyfillEnumNames.begin(), basePolyfillEnumNames.end());
+    basePolyfillNames.insert(
+        basePolyfillNames.end(), basePolyfillFuncNames.begin(), basePolyfillFuncNames.end());
+    basePolyfillNames.insert(
+        basePolyfillNames.end(), basePolyfillNamespaces.begin(), basePolyfillNamespaces.end());
     // Generate a list of fully polyfill names
     fullyQualifiedPolyfillNames = generateQualifiedPolyfillNames(basePolyfillNames);
 }
 
 
 void MongoPolyFillCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-    // Create an ArrayRef from the vector of banned names. This provides a
-    // lightweight, non-owning reference to the array of names.
-    std::vector<llvm::StringRef> basePolyfillNamesRefVector(basePolyfillNames.begin(),
-                                                            basePolyfillNames.end());
-    llvm::ArrayRef<llvm::StringRef> basePolyfillNamesRefArray(basePolyfillNamesRefVector);
-
-    // Register an AST Matcher to find type declarations that use any of the banned names
-    Finder->addMatcher(loc(hasUnqualifiedDesugaredType(recordType(
-                               hasDeclaration(namedDecl(hasAnyName(basePolyfillNamesRefArray))))))
-                           .bind("bannedNames"),
+    // Register AST Matchers to find any use of the banned names.
+    Finder->addMatcher(declRefExpr(hasDeclaration(enumConstantDecl(
+                                       hasParent(enumDecl(hasAnyName(basePolyfillEnumNames))))))
+                           .bind("bannedEnumConstants"),
+                       this);
+    Finder->addMatcher(declaratorDecl(hasType(namedDecl(hasAnyName(basePolyfillTypeNames))))
+                           .bind("bannedTypeNames"),
+                       this);
+    Finder->addMatcher(callExpr(callee(expr(hasDescendant(declRefExpr(hasDeclaration(
+                                    functionDecl(hasAnyName(basePolyfillFuncNames))))))))
+                           .bind("bannedFunctionNames"),
+                       this);
+    Finder->addMatcher(declRefExpr(hasDeclaration(namedDecl(hasParent(
+                                       namespaceDecl(hasAnyName(basePolyfillNamespaces))))))
+                           .bind("bannedNamespaceFromRef"),
+                       this);
+    Finder->addMatcher(expr(hasType(qualType(hasDeclaration(namedDecl(
+                                hasParent(namespaceDecl(hasAnyName(basePolyfillNamespaces))))))))
+                           .bind("bannedNamespaceFromType"),
+                       this);
+    Finder->addMatcher(declaratorDecl(hasParent(namespaceDecl(hasAnyName(basePolyfillNamespaces))))
+                           .bind("bannedNamespaceFromDecl"),
                        this);
 }
 
-void MongoPolyFillCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
-    const auto* MatchedTypeLoc = Result.Nodes.getNodeAs<TypeLoc>("bannedNames");
-    if (MatchedTypeLoc) {
-        auto typeStr = MatchedTypeLoc->getType().getAsString();
-        // we catch this_thread but not this_thread::at_thread_exit
-        if (typeStr.find("this_thread::at_thread_exit") != std::string::npos)
-            return;
+void MongoPolyFillCheck::checkBannedName(const SourceLocation loc, const llvm::StringRef name) {
+    // we catch this_thread but not this_thread::at_thread_exit
+    if (name.find("this_thread::at_thread_exit") != std::string::npos)
+        return;
 
-        // Check if the type string starts with 'std' or 'boost' and contains a banned name.
-        for (const auto& name : fullyQualifiedPolyfillNames) {
-            if ((typeStr.find("std") == 0 || typeStr.find("boost") == 0) &&
-                typeStr.find(name) != std::string::npos) {
-                auto location = MatchedTypeLoc->getBeginLoc();
-                if (location.isValid())
-                    diag(MatchedTypeLoc->getBeginLoc(),
-                         "Illegal use of banned name from std::/boost:: for %0, use mongo::stdx:: "
-                         "variant instead")
-                        << name;
-            }
+    // Check if the type string starts with 'std' or 'boost' and contains a banned name.
+    for (auto&& polyfillName : fullyQualifiedPolyfillNames) {
+        if ((name.starts_with("std::") || name.starts_with("boost::")) &&
+            name.find(polyfillName) != std::string::npos) {
+            if (loc.isValid())
+                diag(loc,
+                     "Illegal use of banned name from std::/boost:: for %0. Consider using "
+                     "alternatives such as the polyfills from the mongo::stdx:: namespace.")
+                    << name;
+        }
+    }
+}
+
+// Get full name as written in source from a clang node to ensure any alias makes it into the
+// returned string.
+template <typename Node>
+llvm::StringRef getFullName(const Node* node, const clang::ASTContext& Context) {
+    const clang::SourceManager& SM = Context.getSourceManager();
+    clang::SourceRange Range = node->getSourceRange();
+    return Lexer::getSourceText(CharSourceRange::getTokenRange(Range), SM, Context.getLangOpts());
+}
+
+void MongoPolyFillCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
+    for (auto&& matcher : {"bannedFunctionNames",
+                           "bannedEnumConstants",
+                           "bannedNamespaceFromRef",
+                           "bannedNamespaceFromType"}) {
+        if (const auto* matched = Result.Nodes.getNodeAs<Expr>(matcher)) {
+            auto name = getFullName(matched, *Result.Context);
+            checkBannedName(matched->getBeginLoc(), std::move(name));
+        }
+    }
+
+    // DeclaratorDecl inherits from Decl instead of Expr, so it's extracted separately.
+    for (auto&& matcher : {"bannedTypeNames", "bannedNamespaceFromDecl"}) {
+        if (const auto* matched = Result.Nodes.getNodeAs<DeclaratorDecl>(matcher)) {
+            auto name = getFullName(matched, *Result.Context);
+            checkBannedName(matched->getBeginLoc(), std::move(name));
         }
     }
 }

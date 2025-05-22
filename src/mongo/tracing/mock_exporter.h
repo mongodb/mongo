@@ -34,6 +34,8 @@
 #include <opentelemetry/sdk/trace/exporter.h>
 #include <opentelemetry/sdk/trace/recordable.h>
 
+#include "mongo/stdx/unordered_map.h"
+
 namespace mongo {
 namespace tracing {
 
@@ -76,7 +78,7 @@ public:
     opentelemetry::trace::SpanId parentId;
     opentelemetry::trace::StatusCode status = opentelemetry::trace::StatusCode::kUnset;
     std::string name;
-    std::unordered_map<std::string, opentelemetry::common::AttributeValue> attributes;
+    stdx::unordered_map<std::string, opentelemetry::common::AttributeValue> attributes;
 };
 
 class MockExporter : public opentelemetry::sdk::trace::SpanExporter {

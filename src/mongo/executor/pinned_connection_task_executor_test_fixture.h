@@ -39,6 +39,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/stdx/chrono.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
@@ -133,7 +134,7 @@ public:
             return true;
         }
 
-        return _readyRequestCV.wait_for(lk, std::chrono::seconds(10), [&] {
+        return _readyRequestCV.wait_for(lk, stdx::chrono::seconds(10), [&] {
             return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
         });
     }

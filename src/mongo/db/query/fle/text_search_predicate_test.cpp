@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/text_search_predicate.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -168,7 +169,7 @@ private:
     };
     // Key the tags for agg expressions based on values only, since we don't have access to the
     // field name. The Value in the map must contain BSONBinData type used for payloads.
-    std::unordered_map<Value, std::vector<PrfBlock>, KeyHash, KeyEqual> _exprTags;
+    stdx::unordered_map<Value, std::vector<PrfBlock>, KeyHash, KeyEqual> _exprTags;
 };
 
 class TextSearchPredicateRewriteTestWithFFP : public EncryptedPredicateRewriteTest {

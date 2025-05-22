@@ -29,6 +29,8 @@
 
 #include "mongo/db/repl/intent_guard.h"
 #include "mongo/db/repl/intent_registry_test_fixture.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/stdx/thread.h"
 
 
 namespace mongo {
@@ -143,7 +145,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {
             guard->reset();
         }
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
     {
         auto clientWritePrepared = serviceContext->getService()->makeClient("testClientWrite");
         auto opCtx = clientWritePrepared->makeOperationContext();
@@ -499,7 +501,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsShutdown) {
         }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Shutdown interruption should throw an
     // exception.
@@ -593,7 +595,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsRollback) {
             guard->reset();
         }
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
 
     // Any attempt to register an intent during a Rollback interruption should throw an
     // exception.
@@ -686,7 +688,7 @@ TEST_F(IntentRegistryTest, KillConflictingOperationsStepDown) {
             guard->reset();
         }
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(kPostInterruptSleepMs));
+    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(kPostInterruptSleepMs));
     {
         auto clientWritePrepared =
             serviceContext->getService()->makeClient("testClientWritePrepared");
