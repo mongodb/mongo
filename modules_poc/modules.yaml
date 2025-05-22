@@ -600,6 +600,8 @@ observability.commands:
   files:
     - src/mongo/db/commands/parse_log_component_settings*
     - src/mongo/db/commands/xray_commands*
+    - src/mongo/s/commands/cluster_ftdc_commands.cpp
+    - src/mongo/s/commands/cluster_netstat_cmd.cpp
 
 networking:
   meta:
@@ -640,6 +642,7 @@ networking.core:
     - src/mongo/rpc/
     - src/mongo/transport/
     - src/mongo/util/net/
+    - src/mongo/s/load_balancer_support*
 
 networking.commands:
   meta:
@@ -655,6 +658,8 @@ networking.commands:
     - src/mongo/db/commands/traffic_recording_cmds.cpp
     - src/mongo/db/commands/whats_my_sni_command.cpp
     - src/mongo/db/commands/whats_my_uri_cmd.cpp
+    - src/mongo/s/commands/cluster_hello_cmd.cpp
+    - src/mongo/s/commands/cluster_whats_my_uri_cmd.cpp
 
 networking.execution:
   meta:
@@ -670,6 +675,10 @@ networking.execution:
     - src/mongo/executor/executor_integration_test_*
     - src/mongo/executor/exhaust_response_reader_*
     - src/mongo/executor/pinned_connection_task_executor*
+    - src/mongo/s/append_raw_responses_test.cpp
+    - src/mongo/s/async_requests_sender*
+    - src/mongo/s/async_rpc_shard_retry_policy.h
+    - src/mongo/s/async_rpc_shard_targeter*
 
 networking.mirrored_reads:
   meta:
