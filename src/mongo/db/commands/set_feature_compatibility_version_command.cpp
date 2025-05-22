@@ -1716,14 +1716,6 @@ private:
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
                 }
-
-                // TODO (SERVER-73741): Remove once 9.0 becomes last lts.
-                if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kDropCollection);
-                }
             }
         }
 
@@ -1766,15 +1758,6 @@ private:
                     opCtx, [expectedOfcv](boost::optional<FCV> ofcv) -> bool {
                         return ofcv != expectedOfcv;
                     });
-        }
-
-        // TODO (SERVER-73741): Remove once 9.0 becomes last lts.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropCollection);
         }
 
         // The following draining of DDL coordinators are redundant if their feature flag is enabled
