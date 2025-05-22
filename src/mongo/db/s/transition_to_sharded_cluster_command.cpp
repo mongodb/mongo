@@ -32,8 +32,8 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_ready.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transition_to_sharded_cluster_gen.h"
-#include "mongo/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

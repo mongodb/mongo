@@ -43,8 +43,8 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 

@@ -14,7 +14,7 @@ It is not intended to be a tutorial on how to operate sharding as a user and it 
 - DDL operation: Comes from [Data Definition Language](https://en.wikipedia.org/wiki/Data_definition_language), and indicates operations which modify the catalog (e.g., create collection, create index, drop database) as opposed to CRUD, which modifies the data.
 - DSS: [Database Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/database_sharding_state.h#L42)
 - Routing Info: The subset of data stored in the [catalog containers](README_sharding_catalog.md#catalog-containers) which is used for making routing decisions. As of the time of this writing, the contents of _config.databases_, _config.collections_, _config.indexes_ and _config.chunks_.
-- SS: [Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/s/sharding_state.h#L51)
+- SS: [Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/sharding_state.h#L51)
 
 ## Sharding code architecture
 

@@ -332,7 +332,7 @@ routing_and_topology:
 
     # sharding_environment: Fundamental mutable state that all sharding components rely.
     - src/mongo/s/grid.*
-    - src/mongo/s/sharding_state.*
+    - src/mongo/db/s/sharding_state.*
     - src/mongo/db/s/sharding_initialization[._]*
     # TODO: This file overlaps between shard_catalog, ddl and routing_and_topology. Putting it in
     # this module because it is "generic infrastructure", but likely its contents need to be moved

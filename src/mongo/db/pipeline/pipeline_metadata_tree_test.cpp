@@ -63,7 +63,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_metadata_tree.h"
-#include "mongo/s/sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

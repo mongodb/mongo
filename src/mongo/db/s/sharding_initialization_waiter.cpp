@@ -30,8 +30,8 @@
 #include "mongo/db/s/sharding_initialization_waiter.h"
 
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 namespace {

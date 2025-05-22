@@ -281,7 +281,7 @@ filters:
   - "sharding_ready*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sharding_state_command.cpp":
+  - "sharding_state*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "sharding_statistics*":

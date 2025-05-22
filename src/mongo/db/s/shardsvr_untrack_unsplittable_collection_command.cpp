@@ -31,9 +31,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -96,9 +96,6 @@ filters:
   - "sharding_index_catalog_cache*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sharding_state*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "sharding_types.idl":
     approvers:
       - 10gen/server-catalog-and-routing

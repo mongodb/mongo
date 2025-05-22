@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 
 #include <boost/none.hpp>
 #include <utility>

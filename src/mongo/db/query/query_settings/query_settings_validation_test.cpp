@@ -31,8 +31,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 

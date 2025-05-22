@@ -29,7 +29,7 @@
 
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 
-#include "mongo/s/sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 
 namespace mongo {
 

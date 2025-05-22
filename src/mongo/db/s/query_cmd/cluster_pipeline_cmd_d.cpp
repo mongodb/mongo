@@ -49,10 +49,10 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/commands/query_cmd/cluster_pipeline_cmd.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 

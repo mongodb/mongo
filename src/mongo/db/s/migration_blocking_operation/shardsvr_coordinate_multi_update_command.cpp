@@ -31,8 +31,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
-#include "mongo/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -40,9 +40,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/commands/cluster_commit_transaction_cmd.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

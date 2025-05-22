@@ -80,6 +80,7 @@
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
@@ -94,7 +95,6 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/s/sharding_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
 #include "mongo/shell/mongo_main.h"

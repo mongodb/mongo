@@ -30,9 +30,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/clone_authoritative_metadata_coordinator.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_state.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

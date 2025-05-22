@@ -2353,7 +2353,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_initialization* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_mongod_test_fixture* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_ready* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/**/sharding_state_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_statistics* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_util* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_write_router* @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -2615,7 +2615,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/shard_key_pattern* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/shard_version* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/sharding_index_catalog_cache* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/s/**/sharding_state* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/sharding_types.idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/stale_exception* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/s/**/stale_shard_version_helpers* @10gen/server-catalog-and-routing @svc-auto-approve-bot
