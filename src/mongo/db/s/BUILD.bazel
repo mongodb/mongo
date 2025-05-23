@@ -1895,7 +1895,7 @@ mongo_cc_benchmark(
     tags = ["sharding_bm"],
     deps = [
         ":sharding_runtime_d",
-        "//src/mongo/db:service_context_non_d",
+        "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/s:sharding_test_fixture_common",

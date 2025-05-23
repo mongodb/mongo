@@ -42,7 +42,7 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/database_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
@@ -302,7 +302,7 @@ public:
         DatabaseHolder::set(getServiceContext(), std::make_unique<DatabaseHolderMock>());
 
         DatabaseShardingStateFactory::set(getServiceContext(),
-                                          std::make_unique<DatabaseShardingStateFactoryShard>());
+                                          std::make_unique<DatabaseShardingStateFactoryMock>());
     }
 
 protected:

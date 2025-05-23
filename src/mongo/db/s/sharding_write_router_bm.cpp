@@ -57,7 +57,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/database_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_mock.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
@@ -147,8 +147,8 @@ protected:
             CollectionShardingStateFactory::set(
                 serviceContext,
                 std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
-            DatabaseShardingStateFactory::set(
-                serviceContext, std::make_unique<DatabaseShardingStateFactoryShard>());
+            DatabaseShardingStateFactory::set(serviceContext,
+                                              std::make_unique<DatabaseShardingStateFactoryMock>());
 
             ShardingState::get(serviceContext)
                 ->setRecoveryCompleted({clusterId,

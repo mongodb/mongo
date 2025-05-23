@@ -173,10 +173,10 @@ public:
 
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
         if (nss.isDbOnly()) {
-            const auto scopedDss =
+            const auto scopedDsr =
                 DatabaseShardingRuntime::acquireShared(operationContext(), nss.dbName());
-            ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
-            ASSERT(!scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
+            ASSERT(!scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));
+            ASSERT(!scopedDsr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             const auto csr = CollectionShardingRuntime::acquireShared(operationContext(), nss);
             ASSERT(!csr->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite));

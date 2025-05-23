@@ -82,6 +82,7 @@ public:
     private:
         friend class DatabaseShardingState;
         friend class DatabaseShardingRuntime;
+        friend class DatabaseShardingStateMock;
 
         ScopedDatabaseShardingState(LockType lock, DatabaseShardingState* dss);
 

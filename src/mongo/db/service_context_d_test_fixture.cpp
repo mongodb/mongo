@@ -46,7 +46,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/database_sharding_state_factory_shard.h"
+#include "mongo/db/s/database_sharding_state_factory_mock.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
@@ -176,7 +176,7 @@ MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
     DatabaseShardingStateFactory::set(serviceContext,
-                                      std::make_unique<DatabaseShardingStateFactoryShard>());
+                                      std::make_unique<DatabaseShardingStateFactoryMock>());
     serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 
     if (options._indexBuildsCoordinator) {

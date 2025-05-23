@@ -37,7 +37,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/views/view_catalog_helpers.h"
@@ -59,16 +58,6 @@ protected:
 
     DatabaseVersion getDbVersion() {
         return _dbVersion;
-    }
-
-    // Install database metadata for the "test" database and fills the cache.
-    void installDatabaseMetadata(OperationContext* opCtx, const DatabaseVersion& dbVersion) {
-        AutoGetDb autoDb(opCtx, _dbName, MODE_X, {}, {});
-        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
-        scopedDsr->setDbInfo_DEPRECATED(opCtx, {_dbName, kMyShardName, dbVersion});
-        getCatalogCacheMock()->setDatabaseReturnValue(
-            _dbName, CatalogCacheMock::makeDatabaseInfo(_dbName, kMyShardName, dbVersion));
-        _dbVersion = dbVersion;
     }
 
     // Install sharded collection metadata for an unsharded collection and fills the cache.
@@ -341,7 +330,6 @@ void AggregationExecutionStateTest::setUp() {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
 
     auto dbType = createTestDatabase(UUID::gen(), Timestamp(1, 0));
-    installDatabaseMetadata(operationContext(), dbType.getVersion());
 
     Grid::get(operationContext())->setShardingInitialized();
 }

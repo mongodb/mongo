@@ -62,11 +62,6 @@ public:
         operationContext()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         DDLLockManager::get(getServiceContext())->setRecoverable(_recoverable.get());
-
-        AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
-        auto scopedDsr =
-            DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDsr->setDbInfo_DEPRECATED(operationContext(), {_dbName, kMyShardName, _dbVersion});
     }
 
 protected:

@@ -3687,9 +3687,13 @@ mongo_cc_library(
     name = "service_context_d_test_fixture",
     srcs = [
         "service_context_d_test_fixture.cpp",
+        "//src/mongo/db/s:database_sharding_state_factory_mock.cpp",
+        "//src/mongo/db/s:database_sharding_state_mock.cpp",
     ],
     hdrs = [
         "service_context_d_test_fixture.h",
+        "//src/mongo/db/s:database_sharding_state_factory_mock.h",
+        "//src/mongo/db/s:database_sharding_state_mock.h",
     ],
     deps = [
         ":service_context_d",

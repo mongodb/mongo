@@ -108,9 +108,6 @@ class MultipleCollectionAccessorTest : public ShardServerTestFixture {
 protected:
     void setUp() override;
 
-    void installDatabaseMetadata(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const DatabaseVersion& dbVersion);
     void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss);
     void installShardedCollectionMetadata(OperationContext* opCtx,
                                           const NamespaceString& nss,
@@ -146,9 +143,6 @@ void MultipleCollectionAccessorTest::setUp() {
     ShardServerTestFixture::setUp();
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::RouterServer};
 
-    // Setup test collections and metadata
-    installDatabaseMetadata(operationContext(), dbNameTestDb, dbVersionTestDb);
-
     // Create all the required collections
     for (const auto& nss : {mainNss, secondaryNss1, secondaryNss2}) {
         createTestCollection(operationContext(), nss);
@@ -168,15 +162,6 @@ void MultipleCollectionAccessorTest::setUp() {
     createTestView(operationContext(), secondaryView1, secondaryNss1, {});
     createTestView(operationContext(), secondaryView2, secondaryNss2, {});
 }
-
-void MultipleCollectionAccessorTest::installDatabaseMetadata(OperationContext* opCtx,
-                                                             const DatabaseName& dbName,
-                                                             const DatabaseVersion& dbVersion) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
-    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDsr->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
-}
-
 
 void MultipleCollectionAccessorTest::installShardedCollectionMetadata(
     OperationContext* opCtx,

@@ -221,7 +221,7 @@ public:
      */
     void resetDbMetadataRefreshFuture_DEPRECATED();
 
-private:
+protected:
     const DatabaseName _dbName;
 
     // This node's cached database info.
@@ -236,7 +236,7 @@ private:
     // otherwise.
     bool _movePrimaryInProgress{false};
 
-
+private:
     // DEPRECATED methods and attributes
 
     struct DbMetadataRefresh {

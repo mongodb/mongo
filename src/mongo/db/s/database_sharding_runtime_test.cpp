@@ -45,6 +45,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/database_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/shard_id.h"
@@ -81,6 +82,11 @@ public:
             targeter->setFindHostReturnValue(host);
             targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
         }
+
+        // Clear the previous instantiation of the DSSFactory to set up the DatabaseShardingRuntime.
+        DatabaseShardingStateFactory::clear(getServiceContext());
+        DatabaseShardingStateFactory::set(getServiceContext(),
+                                          std::make_unique<DatabaseShardingStateFactoryShard>());
     }
 
     void tearDown() override {

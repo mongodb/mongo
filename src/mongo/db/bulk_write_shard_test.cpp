@@ -59,7 +59,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_state_mock.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/shard_id.h"
@@ -146,14 +146,6 @@ void createTestCollection(OperationContext* opCtx, const NamespaceString& nss) {
     uassertStatusOK(createCollection(opCtx, nss.dbName(), BSON("create" << nss.coll())));
 }
 
-void installDatabaseMetadata(OperationContext* opCtx,
-                             const DatabaseName& dbName,
-                             const DatabaseVersion& dbVersion) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
-    auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDsr->setDbInfo_DEPRECATED(opCtx, {dbName, ShardId("this"), dbVersion});
-}
-
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     const auto unshardedCollectionMetadata = CollectionMetadata::UNTRACKED();
     AutoGetCollection coll(opCtx, nss, MODE_IX);
@@ -212,10 +204,6 @@ UUID getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
 
 void BulkWriteShardTest::setUp() {
     ShardServerTestFixture::setUp();
-
-    // Setup test collections and metadata
-    installDatabaseMetadata(opCtx(), dbNameTestDb1, dbVersionTestDb1);
-    installDatabaseMetadata(opCtx(), dbNameTestDb2, dbVersionTestDb2);
 
     // Create nssUnshardedCollection1
     createTestCollection(opCtx(), nssUnshardedCollection1);
@@ -515,6 +503,12 @@ TEST_F(BulkWriteShardTest, DeletesFailOrdered) {
 // After the first insert fails due to an incorrect database version, the rest
 // of the writes are skipped when operations are ordered.
 TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionOrdered) {
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb1,
+                                                                     incorrectDatabaseVersion);
+    }
+
     BulkWriteCommandRequest request(
         {BulkWriteInsertOp(0, BSON("x" << 1)),
          BulkWriteInsertOp(0, BSON("x" << -1)),
@@ -532,11 +526,20 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionOrdered) {
     ASSERT_EQ(1, summaryFields.nErrors);
 
     OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+    scopedDss->clearExpectedFailureDbVersionCheck();
 }
 
 // After the second insert fails due to an incorrect database version, the rest
 // of the writes are skipped when operations are unordered.
 TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionUnordered) {
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb1,
+                                                                     incorrectDatabaseVersion);
+    }
+
     BulkWriteCommandRequest request(
         {BulkWriteInsertOp(1, BSON("x" << 1)),
          BulkWriteInsertOp(0, BSON("x" << -1)),
@@ -556,6 +559,9 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionUnordered) {
     ASSERT_EQ(1, summaryFields.nErrors);
 
     OperationShardingState::get(opCtx()).resetShardingOperationFailedStatus();
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx(), dbNameTestDb1);
+    scopedDss->clearExpectedFailureDbVersionCheck();
 }
 
 }  // namespace

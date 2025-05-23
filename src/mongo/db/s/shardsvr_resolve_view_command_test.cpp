@@ -36,7 +36,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/database_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_state_mock.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
 #include "mongo/unittest/assert.h"
@@ -51,17 +51,6 @@ class ShardsvrResolveViewCommandTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
         ShardServerTestFixture::setUp();
-        installDatabaseMetadata(operationContext(), dbNameTestDb, dbVersionTestDb);
-    }
-
-    void installDatabaseMetadata(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const DatabaseVersion& dbVersion) {
-        AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
-        auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-
-        // Once locked, initialize the database version.
-        scopedDsr->setDbInfo_DEPRECATED(opCtx, {dbName, kMyShardName, dbVersion});
     }
 
     // Database and version information.
@@ -80,6 +69,12 @@ protected:
 TEST_F(ShardsvrResolveViewCommandTest, InvalidCommandWithWrongDBVersion) {
     OperationContext* opCtx = operationContext();
 
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(opCtx, dbNameTestDb);
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersionTestDb,
+                                                                     wrongDbVersion);
+    }
+
     ShardsvrResolveView cmd(nssView);
 
     DBDirectClient client(opCtx);
@@ -88,6 +83,9 @@ TEST_F(ShardsvrResolveViewCommandTest, InvalidCommandWithWrongDBVersion) {
     OperationShardingState::setShardRole(opCtx, nssView, shardVersion, wrongDbVersion);
     ASSERT_FALSE(client.runCommand(nssView.dbName(), cmd.toBSON(), response));
     ASSERT_EQ(response["code"].Int(), ErrorCodes::StaleDbVersion);
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(opCtx, dbNameTestDb);
+    scopedDss->clearExpectedFailureDbVersionCheck();
 }
 
 /**

@@ -62,7 +62,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/database_sharding_runtime.h"
+#include "mongo/db/s/database_sharding_state_mock.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -110,12 +110,6 @@ protected:
         bool justCreated = false;
         auto databaseHolder = DatabaseHolder::get(operationContext());
         auto db = databaseHolder->openDb(operationContext(), kTestNss.dbName(), &justCreated);
-        {
-            auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
-                operationContext(), kTestNss.dbName());
-            scopedDsr->setDbInfo_DEPRECATED(
-                operationContext(), DatabaseType{kTestNss.dbName(), ShardId("this"), dbVersion1});
-        }
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
 
@@ -307,20 +301,28 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
     // Using the latest dbVersion works
     {
         ScopedSetShardRole scopedSetShardRole{
-            operationContext(), kTestNss, shardVersion, dbVersion1};
+            operationContext(), kTestNss, boost::none, dbVersion1};
         onInsert();
         onUpdate();
         onDelete();
     }
 
+    {
+        auto scopedDss = DatabaseShardingStateMock::acquire(operationContext(), kTestNss.dbName());
+        scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(dbVersion1, dbVersion0);
+    }
+
     // Using the old dbVersion fails
     {
         ScopedSetShardRole scopedSetShardRole{
-            operationContext(), kTestNss, shardVersion, dbVersion0};
+            operationContext(), kTestNss, boost::none, dbVersion0};
         ASSERT_THROWS_CODE(onInsert(), AssertionException, ErrorCodes::StaleDbVersion);
         ASSERT_THROWS_CODE(onUpdate(), AssertionException, ErrorCodes::StaleDbVersion);
         ASSERT_THROWS_CODE(onDelete(), AssertionException, ErrorCodes::StaleDbVersion);
     }
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(operationContext(), kTestNss.dbName());
+    scopedDss->clearExpectedFailureDbVersionCheck();
 }
 
 }  // namespace
