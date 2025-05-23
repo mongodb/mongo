@@ -791,7 +791,7 @@ Collection::Validator CollectionImpl::parseValidator(
     LOGV2_DEBUG(6364301,
                 5,
                 "Combined match expression",
-                "expression"_attr = combinedMatchExpr->serialize());
+                "expression"_attr = combinedMatchExpr ? combinedMatchExpr->serialize() : BSONObj{});
 
     return Collection::Validator{validator, std::move(expCtx), std::move(combinedMatchExpr)};
 }
