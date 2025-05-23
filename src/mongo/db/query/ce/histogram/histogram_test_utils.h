@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,72 +29,49 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/query/ce/ce_test_utils.h"
+#include "mongo/db/query/ce/histogram/histogram_common.h"
+#include "mongo/db/query/ce/histogram/histogram_estimator.h"
 #include "mongo/db/query/stats/ce_histogram.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::ce {
 
-using stats::TypeCounts;
-using TypeTags = sbe::value::TypeTags;
+using stats::makeInt64Value;
 
-struct TypeProbability {
-    sbe::value::TypeTags typeTag;
+/**
+ * Test utility for helping with creation of manual histograms in the unit tests.
+ */
+struct BucketData {
+    Value _v;
+    double _equalFreq;
+    double _rangeFreq;
+    double _ndv;
 
-    // Type probability [0,100]
-    size_t typeProbability;
-
-    // Probability of NaN Value [0,1]
-    double nanProb = 0.0;
+    BucketData(Value v, double equalFreq, double rangeFreq, double ndv)
+        : _v(v), _equalFreq(equalFreq), _rangeFreq(rangeFreq), _ndv(ndv) {}
+    BucketData(const std::string& v, double equalFreq, double rangeFreq, double ndv)
+        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
+    BucketData(int v, double equalFreq, double rangeFreq, double ndv)
+        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
 };
 
-using TypeCombination = std::vector<TypeProbability>;
-using TypeCombinations = std::vector<TypeCombination>;
+double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
+                                                 int v,
+                                                 EstimationType type);
 
-enum DataDistributionEnum { kUniform, kNormal, kZipfian };
-enum QueryType { kPoint, kRange };
-
-static constexpr size_t kPredefinedArraySize = 15;
-
-struct QueryInfoAndResults {
-
-    boost::optional<stats::SBEValue> low;
-    boost::optional<stats::SBEValue> high;
-
-    size_t actualCardinality;
-    double estimatedCardinality;
+static double estimateCard(const stats::ScalarHistogram& hist,
+                           const int v,
+                           const EstimationType type) {
+    const auto [tag, val] = makeInt64Value(v);
+    return estimateCardinality(hist, tag, val, type).card;
 };
 
-struct ErrorCalculationSummary {
-    // query information and results.
-    std::vector<QueryInfoAndResults> queryResults;
-
-    // total executed queries.
-    size_t executedQueries = 0;
-};
+stats::ScalarHistogram makeHistogram(std::vector<stats::SBEValue>& randData, size_t nBuckets);
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
-
-/**
- * Calculate the frequency of a specific SBEValue as found in a vector of SBEValues.
- */
-size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                          stats::SBEValue valueToCalculate,
-                                          bool includeScalar);
-
-/**
- * Calculate the frequency of a specific TypeTag as found in a vector of SBEValues.
- */
-size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                              sbe::value::TypeTags type);
-
-/**
- * Calculate the frequency of a range in a given vector of values.
- * The range is always inclusive of the bounds.
- */
-static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                                    stats::SBEValue valueToCalculateLow,
-                                                    stats::SBEValue valueToCalculateHigh);
 
 void printResult(const DataDistributionEnum& dataDistribution,
                  const TypeCombination& typeCombination,
@@ -110,50 +87,6 @@ void printResult(const DataDistributionEnum& dataDistribution,
                  size_t seedQueriesHigh,
                  const std::vector<std::pair<TypeTags, sbe::value::Value>>& bounds,
                  ErrorCalculationSummary error);
-
-void generateDataUniform(size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         size_t seed,
-                         size_t ndv,
-                         std::vector<stats::SBEValue>& data,
-                         int arrayLength = 0);
-
-void generateDataNormal(size_t size,
-                        const std::pair<size_t, size_t>& interval,
-                        const TypeCombination& typeCombination,
-                        size_t seed,
-                        size_t ndv,
-                        std::vector<stats::SBEValue>& data,
-                        int arrayLength = 0);
-
-void generateDataZipfian(size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         size_t seed,
-                         size_t ndv,
-                         std::vector<stats::SBEValue>& data,
-                         int arrayLength = 0);
-/**
- * Generates query intervals randomly according to testing configuration.
- *
- * @param queryType The type of query intervals. It can be either kPoint or kRange.
- * @param interval A pair representing the overall range [min, max] within which all generated
- *                 query intervals' bounds will fall. Both the low and high bounds of each query
- *                 interval will be within this specified range.
- * @param numberOfQueries The number of query intervals to generate.
- * @param queryTypeInfo The type probability information used for generating query interval bounds.
- * @param seed A seed value for random number generation.
- * @return A vector of pairs, where each pair consists of two SBEValue representing the low and high
- *         bounds of an interval.
- */
-std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
-    QueryType queryType,
-    const std::pair<size_t, size_t>& interval,
-    size_t numberOfQueries,
-    const TypeProbability& queryTypeInfo,
-    size_t seedQueriesLow,
-    size_t seedQueriesHigh);
 
 /**
  * Executes a single query estimation based on the specified query type and parameters.
@@ -196,9 +129,6 @@ ErrorCalculationSummary runQueries(size_t size,
                                    bool useE2EAPI,
                                    size_t seedQueriesLow,
                                    size_t seedQueriesHigh);
-
-bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
-                        const TypeCombination& typeCombinationsData);
 
 void runAccuracyTestConfiguration(DataDistributionEnum dataDistribution,
                                   const TypeCombinations& typeCombinationsData,

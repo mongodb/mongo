@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/sampling_estimator.h"
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -43,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"

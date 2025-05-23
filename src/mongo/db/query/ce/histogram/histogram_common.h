@@ -29,32 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/value.h"
-
-#include "mongo/db/query/cost_based_ranker/estimates.h"
+#include "mongo/db/query/ce/ce_common.h"
+#include "mongo/db/query/stats/ce_histogram.h"
 
 namespace mongo::ce {
-
-using CardinalityType = cost_based_ranker::CardinalityType;
-using CardinalityEstimate = cost_based_ranker::CardinalityEstimate;
-using EstimationSource = cost_based_ranker::EstimationSource;
-
-struct EstimationResult {
-    double card;
-    double ndv;
-
-    EstimationResult operator-(const EstimationResult& other) const {
-        return {card - other.card, ndv - other.ndv};
-    }
-
-    EstimationResult& operator+=(const EstimationResult& other) {
-        this->card += other.card;
-        this->ndv += other.ndv;
-        return *this;
-    }
-};
-
-enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
 
 /**
  * Distinguish cardinality estimation algorithms for range queries over array values.
@@ -68,27 +46,5 @@ enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqu
  * the given interval.
  */
 enum class ArrayRangeEstimationAlgo { kConjunctArrayCE, kExactArrayCE };
-
-/**
- * Checks if an interval is in descending direction.
- */
-inline bool reversedInterval(sbe::value::TypeTags tagLow,
-                             sbe::value::Value valLow,
-                             sbe::value::TypeTags tagHigh,
-                             sbe::value::Value valHigh) {
-    auto [cmpTag, cmpVal] = sbe::value::compareValue(tagLow, valLow, tagHigh, valHigh);
-
-    // Compares 'cmpTag' to check if the comparison is successful.
-    if (cmpTag == sbe::value::TypeTags::NumberInt32) {
-        if (sbe::value::bitcastTo<int32_t>(cmpVal) == 1) {
-            return true;
-        }
-    }
-
-    // The comparison fails to tell which one is smaller or larger. This is not expected because we
-    // do not expect to see 'Nothing', 'ArraySet', 'ArrayMultiSet', 'MultiMap' in interval bounds.
-    uassert(8870501, "Unable to compare bounds", cmpTag == sbe::value::TypeTags::NumberInt32);
-    return false;
-}
 
 }  // namespace mongo::ce

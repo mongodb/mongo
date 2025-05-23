@@ -30,7 +30,7 @@
 #include "mongo/db/query/cost_based_ranker/cardinality_estimator.h"
 
 #include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
+#include "mongo/db/query/ce/histogram/histogram_estimator.h"
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stage_types.h"

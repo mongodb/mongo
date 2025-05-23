@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/stats/rand_utils.h"
@@ -41,7 +40,6 @@ namespace mongo::ce {
 namespace {
 namespace value = sbe::value;
 
-using stats::TypeCounts;
 using TypeTags = value::TypeTags;
 
 using stats::DataDistribution;
@@ -49,15 +47,11 @@ using stats::genFixedValueArray;
 using stats::getDataDistribution;
 using stats::makeInt64Value;
 using stats::ScalarHistogram;
+using stats::TypeCounts;
 
 const double kTolerance = 0.001;
 
 class HistogramTest : public ServiceContextTest {};
-
-static double estimateCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
-    const auto [tag, val] = makeInt64Value(v);
-    return estimateCardinality(hist, tag, val, type).card;
-};
 
 TEST_F(HistogramTest, BasicCreate) {
     std::vector<BucketData> data{{0, 1.0, 11.0, 1.0},

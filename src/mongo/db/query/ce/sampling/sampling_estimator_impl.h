@@ -30,7 +30,8 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/query/ce/sampling_estimator.h"
+#include "mongo/db/query/ce/histogram/histogram_common.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"

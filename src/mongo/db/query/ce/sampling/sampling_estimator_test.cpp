@@ -34,7 +34,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/sampling_estimator_impl.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
+#include "mongo/db/query/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -50,120 +51,6 @@ const NamespaceString kTestNss =
     NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 const size_t kSampleSize = 5;
 const int numChunks = 10;
-
-class SamplingEstimatorForTesting : public SamplingEstimatorImpl {
-public:
-    using SamplingEstimatorImpl::SamplingEstimatorImpl;
-
-    const std::vector<BSONObj>& getSample() {
-        return _sample;
-    }
-
-    static std::unique_ptr<CanonicalQuery> makeCanonicalQuery(const NamespaceString& nss,
-                                                              OperationContext* opCtx,
-                                                              size_t sampleSize) {
-        return SamplingEstimatorImpl::makeCanonicalQuery(nss, opCtx, sampleSize);
-    }
-
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError) {
-        return SamplingEstimatorImpl::calculateSampleSize(ci, marginOfError);
-    }
-
-    double getCollCard() {
-        return SamplingEstimatorImpl::getCollCard();
-    }
-
-    static bool matches(const OrderedIntervalList& oil, BSONElement val) {
-        return SamplingEstimatorImpl::matches(oil, val);
-    }
-
-    static std::vector<BSONObj> getIndexKeys(const IndexBounds& bounds, const BSONObj& doc) {
-        return SamplingEstimatorImpl::getIndexKeys(bounds, doc);
-    }
-
-    // Help function to compute the margin of error for the given sample size. The z parameter
-    // corresponds to the confidence %.
-    double marginOfError(double z) {
-        return z * sqrt(0.25 / getSampleSize());
-    }
-
-    // Help function to compute confidence interval for a cardinality value. The z parameter
-    // corresponds to the confidence %. Default value of z is for 95% confidence.
-    std::pair<CardinalityEstimate, CardinalityEstimate> confidenceInterval(double card,
-                                                                           double z = 1.96) {
-        auto moe = marginOfError(z);
-        double collCard = getCollCard();
-
-        double minCard = std::max(card - moe * collCard, 0.0);
-        // maxCard could be greater than collCard if we're estimating the index keys scanned.
-        double maxCard = card + moe * collCard;
-
-        CardinalityEstimate expectedEstimateMin(mongo::cost_based_ranker::CardinalityType{minCard},
-                                                mongo::cost_based_ranker::EstimationSource::Code);
-        CardinalityEstimate expectedEstimateMax(mongo::cost_based_ranker::CardinalityType{maxCard},
-                                                mongo::cost_based_ranker::EstimationSource::Code);
-        return std::make_pair(expectedEstimateMin, expectedEstimateMax);
-    }
-
-    void assertEstimateInConfidenceInterval(CardinalityEstimate estimate, double expectedCard) {
-        auto expectedInterval = confidenceInterval(expectedCard);
-        bool estimateInInterval =
-            (estimate >= expectedInterval.first && estimate <= expectedInterval.second);
-        if (!estimateInInterval) {
-            // This is a functionality test. Print the error in case the estimate is outside of the
-            // confidence interval.
-            double error = abs(estimate.cardinality().v() - expectedCard) / getCollCard();
-            std::cout << "=== " << estimate.toString() << ", Interval = ("
-                      << expectedInterval.first.cardinality().v() << ", "
-                      << expectedInterval.second.cardinality().v() << "), Error " << error * 100
-                      << "%" << std::endl;
-        }
-    }
-};
-
-class SamplingEstimatorTest : public CatalogTestFixture {
-public:
-    void setUp() override {
-        CatalogTestFixture::setUp();
-        ASSERT_OK(storageInterface()->createCollection(
-            operationContext(), kTestNss, CollectionOptions()));
-    }
-
-    void tearDown() override {
-        CatalogTestFixture::tearDown();
-    }
-
-    /*
-     * Insert documents to the default collection.
-     */
-    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj> docs) {
-        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
-        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
-        {
-            WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-            wuow.commit();
-        }
-    }
-
-    std::vector<BSONObj> createDocuments(int num) {
-        std::vector<BSONObj> docs;
-        for (int i = 0; i < num; i++) {
-            BSONObj obj = BSON("_id" << i << "a" << i % 100 << "b" << i % 10 << "arr"
-                                     << BSON_ARRAY(10 << 20 << 30 << 40 << 50) << "nil" << BSONNULL
-                                     << "obj" << BSON("nil" << BSONNULL));
-            docs.push_back(obj);
-        }
-        return docs;
-    }
-
-    static CardinalityEstimate makeCardinalityEstimate(
-        double estimate, EstimationSource source = EstimationSource::Code) {
-        return CardinalityEstimate(CardinalityType{estimate}, source);
-    }
-};
 
 TEST_F(SamplingEstimatorTest, SamplingCanonicalQueryTest) {
     const int64_t sampleSize = 500;

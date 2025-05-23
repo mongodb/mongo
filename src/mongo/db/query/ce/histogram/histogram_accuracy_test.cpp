@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
+#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
 
 using namespace mongo::ce;
 

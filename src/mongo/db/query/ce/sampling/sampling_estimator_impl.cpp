@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/sampling_estimator_impl.h"
-
 #include <cmath>
 
 #include "mongo/db/exec/matcher/matcher.h"
@@ -38,6 +36,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/cost_based_ranker/estimates.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_factory.h"

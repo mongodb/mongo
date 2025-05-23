@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,89 +27,76 @@
  *    it in the license file.
  */
 
-#include <sstream>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
+#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/query/ce/histogram/histogram_estimation_impl.h"
 #include "mongo/db/query/stats/max_diff.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
+#include "mongo/db/query/stats/value_utils.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::ce {
+namespace value = sbe::value;
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+using stats::CEHistogram;
+using stats::ScalarHistogram;
+using stats::TypeCounts;
 
-size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                          stats::SBEValue valueToCalculate,
-                                          bool includeScalar) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        if (value.getTag() == TypeTags::Array) {
-            auto array = sbe::value::getArrayView(value.getValue());
+auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
+auto kEqual = EstimationType::kEqual;
+auto kLess = EstimationType::kLess;
+auto kLessOrEqual = EstimationType::kLessOrEqual;
+auto kGreater = EstimationType::kGreater;
+auto kGreaterOrEqual = EstimationType::kGreaterOrEqual;
+auto Date = sbe::value::TypeTags::Date;
+auto TimeStamp = sbe::value::TypeTags::Timestamp;
 
-            bool matched = std::any_of(
-                array->values().begin(), array->values().end(), [&](const auto& element) {
-                    return mongo::stats::compareValues(element.first,
-                                                       element.second,
-                                                       valueToCalculate.getTag(),
-                                                       valueToCalculate.getValue()) == 0;
-                });
+stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
+    value::Array bounds;
+    std::vector<stats::Bucket> buckets;
 
-            if (matched) {
-                actualCard++;
-            }
-        } else {
-            if (includeScalar) {
-                if (mongo::stats::compareValues(value.getTag(),
-                                                value.getValue(),
-                                                valueToCalculate.getTag(),
-                                                valueToCalculate.getValue()) == 0) {
-                    actualCard++;
-                }
-            }
-        }
+    double cumulativeFreq = 0.0;
+    double cumulativeNDV = 0.0;
+
+    // Create a value vector & sort it.
+    std::vector<stats::SBEValue> values;
+    for (size_t i = 0; i < data.size(); i++) {
+        const auto& item = data[i];
+        const auto [tag, val] = sbe::value::makeValue(item._v);
+        values.emplace_back(tag, val);
     }
-    return actualCard;
+    sortValueVector(values);
+
+    for (size_t i = 0; i < values.size(); i++) {
+        const auto& val = values[i];
+        const auto [tag, value] = copyValue(val.getTag(), val.getValue());
+        bounds.push_back(tag, value);
+
+        const auto& item = data[i];
+        cumulativeFreq += item._equalFreq + item._rangeFreq;
+        cumulativeNDV += item._ndv + 1.0;
+        buckets.emplace_back(
+            item._equalFreq, item._rangeFreq, cumulativeFreq, item._ndv, cumulativeNDV);
+    }
+    return stats::ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
-size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                              sbe::value::TypeTags type) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        if (type == value.getTag()) {
-            actualCard++;
-        }
-    }
-    return actualCard;
-}
+double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
+                                                 const int v,
+                                                 const EstimationType type) {
+    const auto [tag, val] =
+        std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
+    return estimateCardinality(hist, tag, val, type).card;
+};
 
-static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                                    stats::SBEValue valueToCalculateLow,
-                                                    stats::SBEValue valueToCalculateHigh) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        // Higher OR equal to low AND lower OR equal to high.
-        if (((mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateLow.getTag(),
-                                          valueToCalculateLow.getValue()) > 0) ||
-             (mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateLow.getTag(),
-                                          valueToCalculateLow.getValue()) == 0)) &&
-            ((mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateHigh.getTag(),
-                                          valueToCalculateHigh.getValue()) < 0) ||
-             (mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateHigh.getTag(),
-                                          valueToCalculateHigh.getValue()) == 0))) {
-            actualCard++;
-        }
-    }
-    return actualCard;
+/**
+    Given a vector of values, create a histogram reflection the distribution of the vector
+    with the supplied number of buckets.
+*/
+ScalarHistogram makeHistogram(std::vector<stats::SBEValue>& randData, size_t nBuckets) {
+    sortValueVector(randData);
+    const stats::DataDistribution& dataDistrib = getDataDistribution(randData);
+    return genMaxDiffHistogram(dataDistrib, nBuckets);
 }
 
 void printResult(const DataDistributionEnum& dataDistribution,
@@ -228,242 +215,6 @@ void printResult(const DataDistributionEnum& dataDistribution,
     builder << "Estimation" << Estimation;
 
     LOGV2(8871202, "Accuracy experiment", ""_attr = builder.obj());
-}
-
-
-/**
- * Populates TypeDistrVector 'td' based on the input configuration.
- *
- * This function iterates over a given type combination and populates the provided 'td' with various
- * statistical distributions according to the specified types and their probabilities.
- *
- * This function supports data types: nothing, null, boolean, integer, string, and array. Note that
- * currently, arrays are only generated with integer elements.
- *
- * @param td The TypeDistrVector that will be populated.
- * @param interval A pair representing the inclusive minimum and maximum bounds for the data.
- * @param typeCombination The types and their associated probabilities presenting the distribution.
- * @param ndv The number of distinct values to generate.
- * @param seedArray A random number seed for generating array. Used only by TypeTags::Array.
- * @param mdd The distribution descriptor.
- * @param arrayLength The maximum length for array distributions, defaulting to 0.
- */
-void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
-                                                   const std::pair<size_t, size_t>& interval,
-                                                   const TypeCombination& typeCombination,
-                                                   const size_t ndv,
-                                                   std::mt19937_64& seedArray,
-                                                   stats::MixedDistributionDescriptor& mdd,
-                                                   int arrayLength = 0) {
-    for (auto type : typeCombination) {
-
-        switch (type.typeTag) {
-            case sbe::value::TypeTags::Nothing:
-            case sbe::value::TypeTags::Null:
-                td.push_back(
-                    std::make_unique<stats::NullDistribution>(mdd, type.typeProbability, ndv));
-                break;
-            case sbe::value::TypeTags::Boolean: {
-                bool includeFalse = false, includeTrue = false;
-                if (!(bool)interval.first || !(bool)interval.second) {
-                    includeFalse = true;
-                }
-                if ((bool)interval.first || (bool)interval.second) {
-                    includeTrue = true;
-                }
-                td.push_back(std::make_unique<stats::BooleanDistribution>(mdd,
-                                                                          type.typeProbability,
-                                                                          (int)includeFalse +
-                                                                              (int)includeTrue,
-                                                                          includeFalse,
-                                                                          includeTrue));
-                break;
-            }
-            case sbe::value::TypeTags::NumberInt32:
-            case sbe::value::TypeTags::NumberInt64:
-                td.push_back(std::make_unique<stats::IntDistribution>(mdd,
-                                                                      type.typeProbability,
-                                                                      ndv,
-                                                                      interval.first,
-                                                                      interval.second,
-                                                                      0 /*nullsRatio*/,
-                                                                      type.nanProb));
-                break;
-            case sbe::value::TypeTags::NumberDouble:
-                td.push_back(std::make_unique<stats::DoubleDistribution>(mdd,
-                                                                         type.typeProbability,
-                                                                         ndv,
-                                                                         interval.first,
-                                                                         interval.second,
-                                                                         0 /*nullsRatio*/,
-                                                                         type.nanProb));
-                break;
-            case sbe::value::TypeTags::StringSmall:
-            case sbe::value::TypeTags::StringBig:
-                td.push_back(std::make_unique<stats::StrDistribution>(
-                    mdd, type.typeProbability, ndv, interval.first, interval.second));
-                break;
-            case sbe::value::TypeTags::Array: {
-                stats::TypeDistrVector arrayData;
-                arrayData.push_back(std::make_unique<stats::IntDistribution>(
-                    mdd, type.typeProbability, ndv, interval.first, interval.second));
-                auto arrayDataDesc =
-                    std::make_unique<stats::DatasetDescriptorNew>(std::move(arrayData), seedArray);
-                td.push_back(std::make_unique<stats::ArrDistribution>(mdd,
-                                                                      1.0 /*weight*/,
-                                                                      10 /*ndv*/,
-                                                                      0 /*minArraLen*/,
-                                                                      arrayLength /*maxArrLen*/,
-                                                                      std::move(arrayDataDesc)));
-                break;
-            }
-            default:
-                MONGO_UNREACHABLE;
-                break;
-        }
-    }
-}
-
-void generateDataUniform(size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         const size_t seed,
-                         const size_t ndv,
-                         std::vector<stats::SBEValue>& data,
-                         int arrayLength) {
-    // Random value generator for actual data in histogram.
-    std::mt19937_64 seedArray(42);
-    std::mt19937_64 seedDataset(seed);
-
-    stats::MixedDistributionDescriptor uniform{{stats::DistrType::kUniform, 1.0}};
-    stats::TypeDistrVector td;
-
-    populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, uniform, arrayLength);
-
-    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
-    data = desc.genRandomDataset(size);
-}
-
-void generateDataNormal(size_t size,
-                        const std::pair<size_t, size_t>& interval,
-                        const TypeCombination& typeCombination,
-                        const size_t seed,
-                        const size_t ndv,
-                        std::vector<stats::SBEValue>& data,
-                        int arrayLength) {
-    // Random value generator for actual data in histogram.
-    std::mt19937_64 seedArray(42);
-    std::mt19937_64 seedDataset(seed);
-
-    stats::MixedDistributionDescriptor normal{{stats::DistrType::kNormal, 1.0}};
-    stats::TypeDistrVector td;
-
-    populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, normal, arrayLength);
-
-    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
-    data = desc.genRandomDataset(size);
-}
-
-void generateDataZipfian(const size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         const size_t seed,
-                         const size_t ndv,
-                         std::vector<stats::SBEValue>& data,
-                         int arrayLength) {
-    // Random value generator for actual data in histogram.
-    std::mt19937_64 seedArray(42);
-    std::mt19937_64 seedDataset(seed);
-
-    stats::MixedDistributionDescriptor zipfian{{stats::DistrType::kZipfian, 1.0}};
-    stats::TypeDistrVector td;
-
-    populateTypeDistrVectorAccordingToInputConfig(
-        td, interval, typeCombination, ndv, seedArray, zipfian, arrayLength);
-
-    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
-    data = desc.genRandomDataset(size);
-}
-
-std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
-    QueryType queryType,
-    const std::pair<size_t, size_t>& interval,
-    size_t numberOfQueries,
-    const TypeProbability& queryTypeInfo,
-    size_t seedQueriesLow,
-    size_t seedQueriesHigh) {
-    std::vector<stats::SBEValue> sbeValLow, sbeValHigh;
-    switch (queryType) {
-        case kPoint: {
-            // For ndv we set the number of values in the provided data interval. This may lead to
-            // re-running values the same values if the number of queries is larger than the size of
-            // the interval.
-            auto ndv = interval.second - interval.first;
-            if (queryTypeInfo.typeTag == sbe::value::TypeTags::StringSmall ||
-                queryTypeInfo.typeTag == sbe::value::TypeTags::StringBig) {
-                // Because 'interval' for strings is too small for 'ndv', set 'ndv' to
-                // 'numberOfQueries' to ensure there are enough distinct values.
-                ndv = numberOfQueries;
-            }
-            generateDataUniform(
-                numberOfQueries, interval, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
-            break;
-        }
-        case kRange: {
-            const std::pair<size_t, size_t> intervalLow{interval.first, interval.second};
-
-            const std::pair<size_t, size_t> intervalHigh{interval.first, interval.second};
-
-            // For ndv we set the number of values in the provided data interval. This may lead to
-            // re-running values the same values if the number of queries is larger than the size of
-            // the interval.
-            auto ndv = intervalLow.second - intervalLow.first;
-            if (queryTypeInfo.typeTag == sbe::value::TypeTags::StringSmall ||
-                queryTypeInfo.typeTag == sbe::value::TypeTags::StringBig) {
-                // Because 'interval' for strings is too small for 'ndv', set 'ndv' to
-                // 'numberOfQueries' to ensure there are enough distinct values.
-                ndv = numberOfQueries;
-            }
-            generateDataUniform(
-                numberOfQueries, intervalLow, {queryTypeInfo}, seedQueriesLow, ndv, sbeValLow);
-
-            generateDataUniform(
-                numberOfQueries, intervalHigh, {queryTypeInfo}, seedQueriesHigh, ndv, sbeValHigh);
-
-            for (size_t i = 0; i < sbeValLow.size(); i++) {
-                if (mongo::stats::compareValues(sbeValLow[i].getTag(),
-                                                sbeValLow[i].getValue(),
-                                                sbeValHigh[i].getTag(),
-                                                sbeValHigh[i].getValue()) > 0) {
-                    auto temp = sbeValHigh[i];
-                    sbeValHigh[i] = sbeValLow[i];
-                    sbeValLow[i] = temp;
-                } else if (mongo::stats::compareValues(sbeValLow[i].getTag(),
-                                                       sbeValLow[i].getValue(),
-                                                       sbeValHigh[i].getTag(),
-                                                       sbeValHigh[i].getValue()) == 0) {
-                    // Remove elements from both vectors
-                    sbeValLow.erase(sbeValLow.begin() + i);
-                    sbeValHigh.erase(sbeValHigh.begin() + i);
-                    i--;
-                }
-            }
-            break;
-        }
-    }
-
-    std::vector<std::pair<stats::SBEValue, stats::SBEValue>> intervals;
-    for (size_t i = 0; i < sbeValLow.size(); ++i) {
-        if (queryType == kPoint) {
-            // Copy the first argument and move the second argument.
-            intervals.emplace_back(sbeValLow[i], std::move(sbeValLow[i]));
-        } else {
-            intervals.emplace_back(std::move(sbeValLow[i]), std::move(sbeValHigh[i]));
-        }
-    }
-    return intervals;
 }
 
 EstimationResult runSingleQuery(QueryType queryType,

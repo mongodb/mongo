@@ -29,10 +29,8 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/stats/max_diff.h"
-#include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -55,18 +53,6 @@ auto kGreater = EstimationType::kGreater;
 auto kGreaterOrEqual = EstimationType::kGreaterOrEqual;
 auto Date = value::TypeTags::Date;
 auto TimeStamp = value::TypeTags::Timestamp;
-
-constexpr double kErrorBound = 0.01;
-
-/**
-    Given a vector of values, create a histogram reflection the distribution of the vector
-    with the supplied number of buckets.
-*/
-ScalarHistogram makeHistogram(std::vector<stats::SBEValue>& randData, size_t nBuckets) {
-    sortValueVector(randData);
-    const stats::DataDistribution& dataDistrib = getDataDistribution(randData);
-    return genMaxDiffHistogram(dataDistrib, nBuckets);
-}
 
 // --------------------- SCALAR HISTOGRAM ESTIMATION TESTS ---------------------
 // The tests included in this section of the file evaluate the functionality and correctness of the

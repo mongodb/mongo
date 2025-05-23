@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/sampling_estimator_impl.h"
 #include <boost/move/utility_core.hpp>
 #include <functional>
 #include <memory>
@@ -42,6 +41,7 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"

@@ -29,74 +29,24 @@
 
 #include <benchmark/benchmark.h>
 
-#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
+#include "mongo/db/query/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/stats/max_diff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::ce {
 
-enum DataType { kInt, kStringSmall, kString, kDouble, kBoolean, kNull, kNan, kArray };
-
-struct HistogramEstimationBenchmarkConfiguration {
+struct HistogramEstimationBenchmarkConfiguration : public BenchmarkConfiguration {
     int numberOfBuckets;
-    size_t size;
-    DataDistributionEnum dataDistribution;
-    DataType dataType;
-    QueryType queryType;
-
-    // Inclusive minimum and maximum bounds for randomly generated data, ensuring each data falls
-    // within these limits.
-    std::pair<size_t, size_t> dataInterval;
-    sbe::value::TypeTags sbeDataType;
-    double nanProb = 0;
-    size_t arrayTypeLength = 0;
     bool useE2EAPI = false;
 
     HistogramEstimationBenchmarkConfiguration(benchmark::State& state)
-        : numberOfBuckets(state.range(0)),
-          size(state.range(1)),
-          dataDistribution(static_cast<DataDistributionEnum>(state.range(2))),
-          dataType(static_cast<DataType>(state.range(3))),
-          queryType(static_cast<QueryType>(state.range(4))),
-          useE2EAPI(static_cast<bool>(state.range(5))) {
-        switch (dataType) {
-            case kInt:
-                sbeDataType = sbe::value::TypeTags::NumberInt64;
-                dataInterval = {0, 1000};
-                break;
-            case kStringSmall:
-                sbeDataType = sbe::value::TypeTags::StringSmall;
-                dataInterval = {1, 8};
-                break;
-            case kString:
-                sbeDataType = sbe::value::TypeTags::StringBig;
-                dataInterval = {16, 32};
-                break;
-            case kDouble:
-                sbeDataType = sbe::value::TypeTags::NumberDouble;
-                dataInterval = {0, 1000};
-                break;
-            case kBoolean:
-                sbeDataType = sbe::value::TypeTags::Boolean;
-                dataInterval = {0, 2};
-                break;
-            case kNull:
-                sbeDataType = sbe::value::TypeTags::Null;
-                dataInterval = {0, 1000};
-                break;
-            case kNan:
-                sbeDataType = sbe::value::TypeTags::NumberDouble;
-                dataInterval = {0, 1000};
-                nanProb = 1;
-                break;
-            case kArray:
-                sbeDataType = sbe::value::TypeTags::Array;
-                dataInterval = {0, 1000};
-                arrayTypeLength = 10;
-                break;
-        }
-    }
+        : BenchmarkConfiguration(state.range(1),
+                                 static_cast<DataDistributionEnum>(state.range(2)),
+                                 static_cast<DataType>(state.range(3)),
+                                 static_cast<QueryType>(state.range(4))),
+          numberOfBuckets(state.range(0)),
+          useE2EAPI(static_cast<bool>(state.range(5))) {}
 };
 
 void BM_CreateHistogram(benchmark::State& state) {

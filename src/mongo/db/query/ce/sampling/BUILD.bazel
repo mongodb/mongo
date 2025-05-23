@@ -1,0 +1,60 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "sampling_test_utils",
+    srcs = [
+    ],
+    hdrs = [
+        "sampling_test_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/ce:ce_test_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "sampling_estimator",
+    srcs = [
+        "sampling_estimator_impl.cpp",
+    ],
+    hdrs = [
+        "sampling_estimator.h",
+        "sampling_estimator_impl.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/query/cost_based_ranker:estimates",
+    ],
+)
+
+mongo_cc_library(
+    name = "sampling_estimator_interface",
+    hdrs = [
+        "sampling_estimator.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "sampling_estimator_test",
+    srcs = [
+        "sampling_estimator_test.cpp",
+    ],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/catalog:catalog_test_fixture",
+    ],
+)
