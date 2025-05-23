@@ -240,7 +240,7 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
                 }
 
                 newUpdateOp.setFilter(queryBuilder.obj());
-                newUpdateOp.setUpdate(0);
+                newUpdateOp.setNsInfoIdx(0);
                 bulkWriteRequest->setOps({newUpdateOp});
             } else {
                 // The delete case.
@@ -262,7 +262,7 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
                 }
 
                 newDeleteOp.setFilter(queryBuilder.obj());
-                newDeleteOp.setDeleteCommand(0);
+                newDeleteOp.setNsInfoIdx(0);
                 bulkWriteRequest->setOps({newDeleteOp});
             }
             bulkWriteRequest->setNsInfo({newNsEntry});

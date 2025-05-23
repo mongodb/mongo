@@ -386,7 +386,7 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'update' field which contains the index of the corresponding namespace.
-    estSize += BulkWriteUpdateOp::kUpdateFieldName.size() + kIntSize + kPerElementOverhead;
+    estSize += BulkWriteUpdateOp::kNsInfoIdxFieldName.size() + kIntSize + kPerElementOverhead;
 
     // Add the sizes of the 'multi' and 'upsert' fields.
     estSize += BulkWriteUpdateOp::kUpsertFieldName.size() + kBoolSize + kPerElementOverhead;
@@ -477,7 +477,7 @@ int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'delete' field which contains the index of the corresponding namespace.
-    estSize += BulkWriteDeleteOp::kDeleteCommandFieldName.size() + kIntSize + kPerElementOverhead;
+    estSize += BulkWriteDeleteOp::kNsInfoIdxFieldName.size() + kIntSize + kPerElementOverhead;
 
     // Add the size of the 'filter' field.
     estSize += BulkWriteDeleteOp::kFilterFieldName.size() + filter.objsize() + kPerElementOverhead;
@@ -507,7 +507,7 @@ int getBulkWriteInsertSizeEstimate(const mongo::BSONObj& document) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Adds the size of the 'insert' field which contains the index of the corresponding namespace.
-    estSize += BulkWriteInsertOp::kInsertFieldName.size() + kIntSize + kPerElementOverhead;
+    estSize += BulkWriteInsertOp::kNsInfoIdxFieldName.size() + kIntSize + kPerElementOverhead;
 
     // Add the size of the 'document' field.
     estSize +=

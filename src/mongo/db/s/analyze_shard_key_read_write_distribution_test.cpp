@@ -267,7 +267,7 @@ protected:
         std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& updateOp : updateOps) {
             BulkWriteUpdateOp op;
-            op.setUpdate(0);
+            op.setNsInfoIdx(0);
             op.setFilter(updateOp.getQ());
             op.setMulti(updateOp.getMulti());
             op.setConstants(updateOp.getC());
@@ -310,7 +310,7 @@ protected:
         std::vector<std::variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>> ops;
         for (const auto& deleteOp : deleteOps) {
             BulkWriteDeleteOp op;
-            op.setDeleteCommand(0);
+            op.setNsInfoIdx(0);
             op.setFilter(deleteOp.getQ());
             op.setMulti(deleteOp.getMulti());
             op.setHint(deleteOp.getHint());

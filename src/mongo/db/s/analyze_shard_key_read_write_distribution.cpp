@@ -339,7 +339,7 @@ void WriteDistributionMetricsCalculator::_addBulkWriteQuery(OperationContext* op
         auto opType = op.getType();
         if (opType == BulkWriteCRUDOp::kUpdate) {
             auto updateOp = op.getUpdate();
-            const auto nsIdx = updateOp->getUpdate();
+            const auto nsIdx = updateOp->getNsInfoIdx();
             const auto& nsEntry = nsInfo[nsIdx];
             _addUpdateQuery(opCtx,
                             nsEntry.getNs(),

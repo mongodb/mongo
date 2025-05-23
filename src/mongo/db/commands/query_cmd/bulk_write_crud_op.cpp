@@ -41,11 +41,9 @@ BulkWriteCRUDOp::OpType BulkWriteCRUDOp::getType() const {
 
 unsigned int BulkWriteCRUDOp::getNsInfoIdx() const {
     return visit(
-        OverloadedVisitor{[](const mongo::BulkWriteInsertOp& value) { return value.getInsert(); },
-                          [](const mongo::BulkWriteUpdateOp& value) { return value.getUpdate(); },
-                          [](const mongo::BulkWriteDeleteOp& value) {
-                              return value.getDeleteCommand();
-                          }},
+        OverloadedVisitor{
+            [](const auto& value) { return value.getNsInfoIdx(); },
+        },
         _op);
 }
 
@@ -87,11 +85,9 @@ const mongo::BulkWriteDeleteOp* BulkWriteCRUDOp::getDelete() const {
 
 mongo::BSONObj BulkWriteCRUDOp::toBSON() const {
     return visit(
-        OverloadedVisitor{[](const mongo::BulkWriteInsertOp& value) { return value.toBSON(); },
-                          [](const mongo::BulkWriteUpdateOp& value) { return value.toBSON(); },
-                          [](const mongo::BulkWriteDeleteOp& value) {
-                              return value.toBSON();
-                          }},
+        OverloadedVisitor{
+            [](const auto& value) { return value.toBSON(); },
+        },
         _op);
 }
 

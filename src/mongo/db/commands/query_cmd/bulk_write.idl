@@ -62,7 +62,8 @@ structs:
         strict: true
         fields:
             insert:
-                description: "Insert command which references the namespace index in 'nsInfo'."
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
                 type: safeInt
                 validator: {gte: 0}
                 stability: stable
@@ -76,7 +77,8 @@ structs:
         strict: true
         fields:
             update:
-                description: "Update command which references the namespace index in 'nsInfo'."
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
                 type: safeInt
                 validator: {gte: 0}
                 stability: stable
@@ -159,8 +161,8 @@ structs:
         strict: true
         fields:
             delete:
-                description: "Delete command which references the namespace index in 'nsInfo'."
-                cpp_name: deleteCommand # `delete` is a C++ keyword.
+                description: "references the namespace index in 'nsInfo'."
+                cpp_name: nsInfoIdx
                 type: safeInt
                 validator: {gte: 0}
                 stability: stable

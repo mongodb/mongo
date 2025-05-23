@@ -390,7 +390,7 @@ public:
      */
     bool group(const BulkWriteInsertOp* op, size_t currentOpIdx) {
         const auto& nsInfo = _req.getNsInfo();
-        auto nsIdx = op->getInsert();
+        auto nsIdx = op->getNsInfoIdx();
 
         if (!_firstOpIdx.has_value()) {
             // First op in this group.
@@ -688,7 +688,7 @@ bool handleGroupedInserts(OperationContext* opCtx,
     auto firstInsert = BulkWriteCRUDOp(ops[firstOpIdx]).getInsert();
     invariant(firstInsert);
 
-    const auto nsIdx = firstInsert->getInsert();
+    const auto nsIdx = firstInsert->getNsInfoIdx();
     const auto& nsEntry = nsInfo[nsIdx];
     const auto& nsString = nsEntry.getNs();
 
@@ -858,7 +858,7 @@ bool handleInsertOp(OperationContext* opCtx,
         return false;
     }
     const auto& nsInfo = req.getNsInfo();
-    auto idx = op->getInsert();
+    auto idx = op->getNsInfoIdx();
     const auto& ns = nsInfo[idx].getNs();
 
     validateNamespaceForWrites(opCtx, idx, ns, validatedNamespaces);
@@ -983,14 +983,14 @@ BSONObj makeSingleOpSampledBulkWriteCommandRequest(OperationContext* opCtx,
     visit(OverloadedVisitor{
               [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
               [&](mongo::BulkWriteUpdateOp& op) {
-                  op.setUpdate(0);
+                  op.setNsInfoIdx(0);
                   if (req.getOriginalQuery() || req.getOriginalCollation()) {
                       op.setFilter(req.getOriginalQuery().get_value_or({}));
                       op.setCollation(req.getOriginalCollation());
                   }
               },
               [&](mongo::BulkWriteDeleteOp& op) {
-                  op.setDeleteCommand(0);
+                  op.setNsInfoIdx(0);
                   if (req.getOriginalQuery() || req.getOriginalCollation()) {
                       op.setFilter(req.getOriginalQuery().get_value_or({}));
                       op.setCollation(req.getOriginalCollation());
@@ -1028,7 +1028,7 @@ bool handleDeleteOp(OperationContext* opCtx,
     }
 
     const auto& nsInfo = req.getNsInfo();
-    auto idx = op->getDeleteCommand();
+    auto idx = op->getNsInfoIdx();
     auto& nsEntry = nsInfo.at(idx);
     try {
         if (op->getMulti()) {
@@ -1308,7 +1308,7 @@ public:
         }
 
         DatabaseName getDBForReadMirroring() const final {
-            const auto nsIdx = _firstUpdateOp->getUpdate();
+            const auto nsIdx = _firstUpdateOp->getNsInfoIdx();
             const auto& nsInfo = request().getNsInfo().at(nsIdx);
 
             return nsInfo.getNs().dbName();
@@ -1318,7 +1318,7 @@ public:
             invariant(_firstUpdateOp);
 
             const auto& req = request();
-            const auto nsIdx = _firstUpdateOp->getUpdate();
+            const auto nsIdx = _firstUpdateOp->getNsInfoIdx();
             const auto& nsInfo = req.getNsInfo().at(nsIdx);
 
             bob->append("find", nsInfo.getNs().coll());
@@ -1581,7 +1581,7 @@ bool handleUpdateOp(OperationContext* opCtx,
     }
 
     const auto& nsInfo = req.getNsInfo();
-    const auto idx = op->getUpdate();
+    const auto idx = op->getNsInfoIdx();
     const auto& nsEntry = nsInfo[idx];
 
     try {

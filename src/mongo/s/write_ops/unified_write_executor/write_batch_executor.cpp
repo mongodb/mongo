@@ -68,13 +68,11 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
             // Reassigns the namespace index for the list of ops
             auto bulkOp = op.getBulkWriteOp();
-            visit(OverloadedVisitor{
-                      [&](mongo::BulkWriteInsertOp& value) { return value.setInsert(nsIndex); },
-                      [&](mongo::BulkWriteUpdateOp& value) { return value.setUpdate(nsIndex); },
-                      [&](mongo::BulkWriteDeleteOp& value) {
-                          return value.setDeleteCommand(nsIndex);
-                      }},
-                  bulkOp);
+            visit(
+                OverloadedVisitor{
+                    [&](auto& value) { return value.setNsInfoIdx(nsIndex); },
+                },
+                bulkOp);
             bulkOps.emplace_back(bulkOp);
         }
 

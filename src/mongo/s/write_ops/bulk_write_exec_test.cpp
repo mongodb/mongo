@@ -1691,7 +1691,7 @@ TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_NonTransientTransactionError) {
 
 BulkWriteOpVariant makeTestInsertOp(BSONObj document) {
     BulkWriteInsertOp op;
-    op.setInsert(0);
+    op.setNsInfoIdx(0);
     op.setDocument(document);
     return op;
 }
@@ -1705,7 +1705,7 @@ BulkWriteOpVariant makeTestUpdateOp(BSONObj filter,
                                     boost::optional<mongo::BSONObj> constants,
                                     boost::optional<mongo::BSONObj> collation) {
     BulkWriteUpdateOp op;
-    op.setUpdate(0);
+    op.setNsInfoIdx(0);
     op.setFilter(filter);
     op.setUpdateMods(updateMods);
     if (upsertSupplied.has_value()) {
@@ -1724,7 +1724,7 @@ BulkWriteOpVariant makeTestDeleteOp(BSONObj filter,
                                     mongo::BSONObj hint,
                                     boost::optional<mongo::BSONObj> collation) {
     BulkWriteDeleteOp op;
-    op.setDeleteCommand(0);
+    op.setNsInfoIdx(0);
     op.setFilter(filter);
     op.setHint(hint);
     op.setCollation(collation);
