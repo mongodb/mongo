@@ -51,7 +51,7 @@ Execution Engine: classic
 						"inputStage" : {
 							"inputStage" : {
 								"isEOF" : 0,
-								"nReturned" : 5,
+								"nReturned" : 24,
 								"stage" : "IXSCAN"
 							},
 							"isEOF" : 0,
@@ -65,12 +65,12 @@ Execution Engine: classic
 					},
 					"nReturned" : 0,
 					"totalDocsExamined" : 0,
-					"totalKeysExamined" : 5
+					"totalKeysExamined" : 24
 				}
 			],
 			"stage" : "SHARD_MERGE",
 			"totalDocsExamined" : 0,
-			"totalKeysExamined" : 10
+			"totalKeysExamined" : 29
 		}
 	}
 ]
@@ -129,7 +129,7 @@ Execution Engine: classic
 						"inputStage" : {
 							"inputStage" : {
 								"isEOF" : 1,
-								"nReturned" : 5,
+								"nReturned" : 9,
 								"stage" : "IXSCAN"
 							},
 							"isEOF" : 1,
@@ -143,13 +143,13 @@ Execution Engine: classic
 					},
 					"nReturned" : 0,
 					"totalDocsExamined" : 0,
-					"totalKeysExamined" : 5
+					"totalKeysExamined" : 9
 				}
 			],
 			"skipAmount" : 5,
 			"stage" : "SHARD_MERGE",
 			"totalDocsExamined" : 0,
-			"totalKeysExamined" : 9
+			"totalKeysExamined" : 13
 		}
 	}
 ]
@@ -209,7 +209,7 @@ Execution Engine: classic
 						"inputStage" : {
 							"inputStage" : {
 								"isEOF" : 0,
-								"nReturned" : 10,
+								"nReturned" : 29,
 								"stage" : "IXSCAN"
 							},
 							"isEOF" : 0,
@@ -223,13 +223,13 @@ Execution Engine: classic
 					},
 					"nReturned" : 0,
 					"totalDocsExamined" : 0,
-					"totalKeysExamined" : 10
+					"totalKeysExamined" : 29
 				}
 			],
 			"skipAmount" : 5,
 			"stage" : "SHARD_MERGE",
 			"totalDocsExamined" : 0,
-			"totalKeysExamined" : 20
+			"totalKeysExamined" : 39
 		}
 	}
 ]
@@ -289,7 +289,7 @@ Execution Engine: classic
 						"inputStage" : {
 							"inputStage" : {
 								"isEOF" : 1,
-								"nReturned" : 2,
+								"nReturned" : 3,
 								"stage" : "IXSCAN"
 							},
 							"isEOF" : 1,
@@ -303,12 +303,12 @@ Execution Engine: classic
 					},
 					"nReturned" : 0,
 					"totalDocsExamined" : 0,
-					"totalKeysExamined" : 2
+					"totalKeysExamined" : 3
 				}
 			],
 			"stage" : "SHARD_MERGE",
 			"totalDocsExamined" : 0,
-			"totalKeysExamined" : 3
+			"totalKeysExamined" : 4
 		}
 	}
 ]
@@ -369,7 +369,7 @@ Execution Engine: classic
 						"inputStage" : {
 							"inputStage" : {
 								"isEOF" : 1,
-								"nReturned" : 6,
+								"nReturned" : 9,
 								"stage" : "IXSCAN"
 							},
 							"isEOF" : 1,
@@ -383,13 +383,13 @@ Execution Engine: classic
 					},
 					"nReturned" : 0,
 					"totalDocsExamined" : 0,
-					"totalKeysExamined" : 6
+					"totalKeysExamined" : 9
 				}
 			],
 			"skipAmount" : 5,
 			"stage" : "SHARD_MERGE",
 			"totalDocsExamined" : 0,
-			"totalKeysExamined" : 9
+			"totalKeysExamined" : 12
 		}
 	}
 ]
