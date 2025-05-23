@@ -1,3 +1,10 @@
+/**
+ * @tags: [
+ * # This test adds the first shard after populating it, which is prohibited for config shards
+ * config_shard_incompatible,
+ * ]
+ */
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -64,11 +71,7 @@ var mongosConn = shardingTest.s;
 var testDB = mongosConn.getDB(testDBName);
 
 // Add replSet1 as only shard
-if (!TestData.configShard) {
-    assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
-} else {
-    assert.commandWorked(mongosConn.adminCommand({transitionFromDedicatedConfigServer: 1}));
-}
+assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 
 // Enable sharding on test db and its collection foo
 assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));

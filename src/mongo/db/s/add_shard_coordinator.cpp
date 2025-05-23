@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/add_shard_coordinator.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -98,19 +100,32 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     throw;
                 }
 
-                // TODO(SERVER-97997) Remove the check after promoting to
-                // sharded cluster is implemented correctly
-                if (!_isFirstShard(opCtx)) {
-                    if (!_doc.getIsConfigShard()) {
-                        auto level = _doc.getOriginalUserWriteBlockingLevel();
-                        if (!level.has_value()) {
-                            level = _getUserWritesBlockFromReplicaSet(opCtx, **executor);
-                            _doc.setOriginalUserWriteBlockingLevel(static_cast<int32_t>(*level));
-                            _updateStateDocument(opCtx, StateDoc(_doc));
+                // For the first shard we check if it's a promotion of a populated replicaset or
+                // adding a clean state replicaset.
+                // If the replicaset is the configserver or it's not the first shard, we always
+                // expect the replicaset to be clean.
+                // First we do an optimistic data check. If the replicaset is not empty, then it's a
+                // promotion. If the replicaset is empty, then we block the user writes to avoid
+                // race conditions, and do a second check. If the replicaset has data, then it's a
+                // promotion and we restore the user writes.
+                if (_isFirstShard(opCtx) && !_doc.getIsConfigShard()) {
+                    if (!_isPristineReplicaset(opCtx, targeter, **executor)) {
+                        _doc.setIsPromotion(true);
+                    } else {
+                        _blockUserWrites(opCtx, **executor);
+                        if (!_isPristineReplicaset(opCtx, targeter, **executor)) {
+                            _doc.setIsPromotion(true);
+                            _restoreUserWrites(opCtx, **executor);
                         }
+                    }
+                } else {
+                    if (!_doc.getIsConfigShard()) {
                         _blockUserWrites(opCtx, **executor);
                     }
-                    _checkExistingDataOnShard(opCtx, targeter, **executor);
+                    uassert(ErrorCodes::IllegalOperation,
+                            fmt::format("can't add shard '{}' because it's not empty.",
+                                        _doc.getConnectionString().toString()),
+                            _isPristineReplicaset(opCtx, targeter, **executor));
                 }
 
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
@@ -396,17 +411,11 @@ void AddShardCoordinator::_verifyInput() const {
             !_doc.getProposedName() || !_doc.getProposedName()->empty());
 }
 
-void AddShardCoordinator::_checkExistingDataOnShard(
+bool AddShardCoordinator::_isPristineReplicaset(
     OperationContext* opCtx,
     RemoteCommandTargeter& targeter,
     std::shared_ptr<executor::TaskExecutor> executor) const {
-    const auto dbNames =
-        topology_change_helpers::getDBNamesListFromReplicaSet(opCtx, targeter, executor);
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "can't add shard '" << _doc.getConnectionString().toString()
-                          << "' because it's not empty.",
-            dbNames.empty());
+    return topology_change_helpers::getDBNamesListFromReplicaSet(opCtx, targeter, executor).empty();
 }
 
 RemoteCommandTargeter& AddShardCoordinator::_getTargeter(OperationContext* opCtx) {
@@ -511,6 +520,12 @@ void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
 
 void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx,
                                            std::shared_ptr<executor::TaskExecutor> executor) {
+    auto level = _doc.getOriginalUserWriteBlockingLevel();
+    if (!level.has_value()) {
+        level = _getUserWritesBlockFromReplicaSet(opCtx, executor);
+        _doc.setOriginalUserWriteBlockingLevel(static_cast<int32_t>(*level));
+        _updateStateDocument(opCtx, StateDoc(_doc));
+    }
     topology_change_helpers::setUserWriteBlockingState(
         opCtx,
         _getTargeter(opCtx),

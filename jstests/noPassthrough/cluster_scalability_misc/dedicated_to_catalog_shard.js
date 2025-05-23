@@ -44,9 +44,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
 
 const configCS = st.configRS.getURL();
 
-//
 // Dedicated config server mode tests (pre addShard).
-//
 {
     // Can create user namespaces via direct writes.
     assert.commandWorked(st.configRS.getPrimary().getCollection(ns).insert({_id: 1, x: 1}));
@@ -65,13 +63,12 @@ const configCS = st.configRS.getURL();
     flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
 }
 
-//
 // Config shard mode tests (post addShard).
-//
 {
-    //
+    // Dropping user database as only empty replicasets are allowed to add
+    assert.commandWorked(st.configRS.getPrimary().getDB(dbName).dropDatabase());
+
     // Adding the config server as a shard works.
-    //
     assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 
     // More than once works.

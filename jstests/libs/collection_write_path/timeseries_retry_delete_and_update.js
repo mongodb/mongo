@@ -13,14 +13,16 @@
  * has the expected value and returns the amount by which that statistic was expected to increment.
  */
 export function runTimeseriesRetryDeleteAndUpdateTest(
-    conn, setUpCollection, checkRetriedCommandsCount, checkRetriedStatementsCount) {
+    conn, setUpCollection, checkRetriedCommandsCount, checkRetriedStatementsCount, shard0 = conn) {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const dateTime = ISODate("2021-07-12T16:00:00Z");
     let collCount = 0;
 
-    let retriedCommandsCount = 0;
-    let retriedStatementsCount = 0;
+    let retriedCommandsCount =
+        shard0.getDB(jsTestName()).serverStatus().transactions.retriedCommandsCount;
+    let retriedStatementsCount =
+        shard0.getDB(jsTestName()).serverStatus().transactions.retriedStatementsCount;
 
     /**
      * Verifies that a timeseries delete or update command supports retryable writes. The arguments

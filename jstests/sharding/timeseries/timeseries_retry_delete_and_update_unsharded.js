@@ -42,6 +42,7 @@ runTimeseriesRetryDeleteAndUpdateTest(
                       tojson(transactionsServerStatus));
 
         return statementsRetried;
-    });
+    },
+    st.shard0);
 
 st.stop();
