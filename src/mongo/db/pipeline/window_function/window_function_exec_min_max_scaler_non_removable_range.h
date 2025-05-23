@@ -71,11 +71,21 @@ public:
     }
 
     int64_t getMemUsage() final {
-        // TODO SERVER-102248: set memory tracker here.
-        return 0;
+        // The only memory used, regardless of window bound size, is the memory used by the two
+        // MinAndMax structs (one for the arguments, and one for the current values). Initialization
+        // state also does not affect memory usage, because MinAndMax is fully default constructed.
+        // Therefore, the memory usage of the MinMaxScaler non-removable range function is constant.
+        return kWindowFunctionExecMinMaxScalerNonRemovableRangeMemoryUsageBytes;
     }
 
 private:
+    // Declare memory usage as a static constexpr since it is a constant. The compiler may be able
+    // to make small optimizations for more performant code. However, it is likely that saving
+    // repetitive multiplications here will not impact the performance of $minMaxScaler in a
+    // noticeable way.
+    static constexpr int64_t kWindowFunctionExecMinMaxScalerNonRemovableRangeMemoryUsageBytes =
+        sizeof(min_max_scaler::MinAndMax) * 2;
+
     // Output domain Value is bounded between sMin and sMax (inclusive).
     // These are provided as arguments to $minMaxScaler, and do not change.
     const min_max_scaler::MinAndMax _sMinAndsMax;
