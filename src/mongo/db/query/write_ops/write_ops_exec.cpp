@@ -775,9 +775,6 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, nsString);
 
-    // TODO SERVER-50983: Create abstraction for creating collection when using
-    // AutoGetCollection Create the collection if it does not exist when performing an upsert
-    // because the update stage does not create its own collection
     if (!collection.exists() && upsert) {
         CollectionWriter collectionWriter(opCtx, &collection);
         uassertStatusOK(userAllowedCreateNS(opCtx, nsString));

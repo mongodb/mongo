@@ -190,8 +190,6 @@ Status createIndexOnCollection(OperationContext* opCtx,
                                const BSONObj& keys,
                                bool unique) {
     try {
-        // TODO SERVER-50983: Create abstraction for creating collection when using
-        // AutoGetCollection
         AutoGetCollection autoColl(opCtx, ns, MODE_X);
         const Collection* collection = autoColl.getCollection().get();
         if (!collection) {
