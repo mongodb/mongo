@@ -356,7 +356,7 @@ TEST_F(HashLookupUnwindStageTest, ForceSpillTest) {
             lookupStage->saveState();
 
             // Force spill.
-            lookupStage->forceSpill();
+            lookupStage->forceSpill(nullptr /*yieldPolicy*/);
 
             // Check stats to make sure it spilled
             stats = static_cast<const HashLookupStats*>(lookupStage->getSpecificStats());

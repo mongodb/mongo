@@ -99,7 +99,7 @@ public:
         stage->saveState();
 
         // Force spill.
-        stage->forceSpill();
+        stage->forceSpill(nullptr /*yieldPolicy*/);
 
         // Check stats to make sure it spilled
         auto stats = static_cast<const HashAggStats*>(stage->getSpecificStats());

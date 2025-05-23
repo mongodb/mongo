@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,63 +27,41 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/db/exec/plan_stage.h"
+#include <boost/optional.hpp>
+#include <memory>
+
+#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#include "mongo/db/yieldable.h"
 
 namespace mongo {
-void PlanStage::saveState() {
-    ++_commonStats.yields;
-    for (auto&& child : _children) {
-        child->saveState();
-    }
 
-    doSaveState();
-}
+/**
+ * PlanYieldPolicy specifically for releaseMemory command. It is required because this command
+ * can operate on a PlanExecutor in a "saved" state without calling restoreState().
+ */
+class PlanYieldPolicyReleaseMemory final : public PlanYieldPolicy {
+public:
+    PlanYieldPolicyReleaseMemory(OperationContext* opCtx,
+                                 PlanYieldPolicy::YieldPolicy policy,
+                                 std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                                 std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
-void PlanStage::restoreState(const RestoreContext& context) {
-    ++_commonStats.unyields;
-    for (auto&& child : _children) {
-        child->restoreState(context);
-    }
+    static std::unique_ptr<PlanYieldPolicyReleaseMemory> make(
+        OperationContext* opCtx,
+        PlanYieldPolicy::YieldPolicy policy,
+        const boost::optional<AutoGetCollectionForReadMaybeLockFree>& readLock,
+        NamespaceString nss);
 
-    doRestoreState(context);
-}
+private:
+    void saveState(OperationContext* opCtx) override;
 
-void PlanStage::detachFromOperationContext() {
-    invariant(_opCtx);
-    _opCtx = nullptr;
-
-    for (auto&& child : _children) {
-        child->detachFromOperationContext();
-    }
-
-    doDetachFromOperationContext();
-}
-
-void PlanStage::reattachToOperationContext(OperationContext* opCtx) {
-    invariant(_opCtx == nullptr);
-    _opCtx = opCtx;
-
-    for (auto&& child : _children) {
-        child->reattachToOperationContext(opCtx);
-    }
-
-    doReattachToOperationContext();
-}
-
-void PlanStage::forceSpill(PlanYieldPolicy* yieldPolicy) {
-    if (yieldPolicy && yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
-        uassertStatusOK(
-            yieldPolicy->yieldOrInterrupt(_opCtx, nullptr, RestoreContext::RestoreType::kYield));
-    }
-    doForceSpill();
-    for (const auto& child : _children) {
-        child->forceSpill(yieldPolicy);
-    }
-}
+    void restoreState(OperationContext* opCtx,
+                      const Yieldable* yieldable,
+                      RestoreContext::RestoreType restoreType) override;
+};
 
 }  // namespace mongo

@@ -144,8 +144,8 @@ public:
 
     void dispose(OperationContext* opCtx) override;
 
-    void forceSpill() override {
-        _root->forceSpill();
+    void forceSpill(PlanYieldPolicy* yieldPolicy) override {
+        _root->forceSpill(yieldPolicy);
     }
 
     void stashResult(const BSONObj& obj) override;

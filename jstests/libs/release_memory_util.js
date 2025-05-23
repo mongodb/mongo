@@ -25,6 +25,22 @@ export function assertReleaseMemoryFailedWithCode(result, cursorId, codes) {
 }
 
 /**
+ * Asserts that releaseMemory command worked for a given cursor.
+ */
+export function assertReleaseMemoryWorked(result, cursorId) {
+    if (!result.hasOwnProperty("cursorsReleased")) {
+        doassert("Command result does not contain 'cursorsReleased' field: " + tojson(result));
+    }
+    for (const releaseMemoryOk of result.cursorsReleased) {
+        if (releaseMemoryOk.compare(cursorId) === 0) {
+            return;
+        }
+    }
+    doassert("Releasing memory from cursor " + tojsononeline(cursorId) +
+             " did not succeed during release memory. Full command result: " + tojson(result));
+}
+
+/**
  * Accumulate metric from a server status
  */
 export function accumulateServerStatusMetric(db, metricGetter) {

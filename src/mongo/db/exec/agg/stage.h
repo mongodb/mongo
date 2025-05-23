@@ -150,6 +150,7 @@ public:
      * The stage spills its data and asks from all its children to spill their data as well.
      */
     void forceSpill() {
+        pExpCtx->checkForInterrupt();
         doForceSpill();
         if (pSource) {
             pSource->forceSpill();

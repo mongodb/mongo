@@ -188,7 +188,7 @@ public:
         _isDisposed = true;
     }
 
-    void forceSpill() override {
+    void forceSpill(PlanYieldPolicy* yieldPolicy) override {
         MONGO_UNREACHABLE;
     }
 

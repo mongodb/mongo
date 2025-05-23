@@ -458,7 +458,7 @@ TEST_F(WindowStageTest, ForceSpillWindowTest) {
             windowStage->saveState();
 
             // Force spill.
-            windowStage->forceSpill();
+            windowStage->forceSpill(nullptr /*yieldPolicy*/);
 
             // Check stats to make sure it spilled
             stats = static_cast<const WindowStats*>(windowStage->getSpecificStats());

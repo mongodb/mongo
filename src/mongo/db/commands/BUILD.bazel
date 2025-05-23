@@ -1503,6 +1503,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/process_interface:mongod_process_interfaces",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:explain_diagnostic_printer",
+        "//src/mongo/db/query:plan_yield_policy_release_memory",
         "//src/mongo/db/query:shard_key_diagnostic_printer",
         "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/query_settings:query_settings_service",

@@ -56,6 +56,7 @@ class ClockSource;
 class Collection;
 class CollectionPtr;
 class OperationContext;
+class PlanYieldPolicy;
 class RecordId;
 
 /**
@@ -231,12 +232,7 @@ public:
     /**
      * The stage spills its data and asks from all its children to spill their data as well.
      */
-    void forceSpill() {
-        doForceSpill();
-        for (const auto& child : _children) {
-            child->forceSpill();
-        }
-    }
+    void forceSpill(PlanYieldPolicy* yieldPolicy);
 
     /**
      * Returns true if no more work can be done on the query / out of results.

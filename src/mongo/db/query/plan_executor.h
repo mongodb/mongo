@@ -483,9 +483,11 @@ public:
     virtual void dispose(OperationContext* opCtx) = 0;
 
     /**
-     * Forces all stages in the execution plan that are able to spill their data.
+     * Forces all stages in the execution plan that are able to spill their data. Accepts a custom
+     * yield policy, because it can be called on an executor in a "saved" state without calling
+     * restoreState(). Can be nullptr if executor acquires locks internally.
      */
-    virtual void forceSpill() = 0;
+    virtual void forceSpill(PlanYieldPolicy* yieldPolicy) = 0;
 
     /**
      * Stash the BSONObj so that it gets returned from the PlanExecutor a subsequent call to

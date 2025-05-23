@@ -139,7 +139,10 @@ public:
         _pipeline->dispose(opCtx);
     }
 
-    void forceSpill() override {
+    void forceSpill(PlanYieldPolicy* yieldPolicy) override {
+        tassert(10450600,
+                "Pipelines acquire locks internally, so yieldPolicy must be nullptr",
+                yieldPolicy == nullptr);
         _pipeline->forceSpill();
     }
 

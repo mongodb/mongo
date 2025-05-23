@@ -252,7 +252,7 @@ public:
         _isDisposed = true;
     }
 
-    void forceSpill() override {
+    void forceSpill(PlanYieldPolicy* yieldPolicy) override {
         LOGV2_ERROR(9819200, "An attempt was made to force PlanExecutorExpress to spill.");
     }
 

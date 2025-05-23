@@ -320,6 +320,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "plan_yield_policy_release_memory",
+    srcs = [
+        "plan_yield_policy_release_memory.cpp",
+    ],
+    hdrs = [
+        "plan_yield_policy_release_memory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/query:plan_executor",
+        "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/util:clock_sources",
+    ],
+)
+
+mongo_cc_library(
     name = "plan_executor",
     srcs = [
         "plan_executor.cpp",

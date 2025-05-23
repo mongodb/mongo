@@ -179,8 +179,8 @@ public:
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;
-    void forceSpill() final {
-        _root->forceSpill();
+    void forceSpill(PlanYieldPolicy* yieldPolicy) final {
+        _root->forceSpill(yieldPolicy);
     }
     void stashResult(const BSONObj& obj) final;
 

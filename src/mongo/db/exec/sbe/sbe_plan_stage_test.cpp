@@ -214,7 +214,7 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
 
         if (forceSpill && resultsView->size() % 3 == 0) {
             // check the forceSpill stage
-            stage->forceSpill();
+            stage->forceSpill(nullptr /*yieldPolicy*/);
         }
     }
 
