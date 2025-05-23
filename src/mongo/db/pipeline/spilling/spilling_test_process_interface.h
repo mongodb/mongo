@@ -39,28 +39,27 @@ namespace mongo {
  */
 class SpillingTestMongoProcessInterface : public StubMongoProcessInterface {
 public:
-    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+    std::unique_ptr<SpillTable> createSpillTable(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const override;
 
-    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   RecordStore* rs,
-                                   std::vector<Record>* records,
-                                   const std::vector<Timestamp>& ts) const override;
+    void writeRecordsToSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  SpillTable& spillTable,
+                                  std::vector<Record>* records) const override;
 
-    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const RecordStore* rs,
-                                       RecordId rID) const override;
+    Document readRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const SpillTable& spillTable,
+                                      RecordId rID) const override;
 
-    bool checkRecordInRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const RecordStore* rs,
-                                  RecordId rID) const override;
+    bool checkRecordInSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const SpillTable& spillTable,
+                                 RecordId rID) const override;
 
-    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     RecordStore* rs,
-                                     RecordId rID) const override;
+    void deleteRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    SpillTable& spillTable,
+                                    RecordId rID) const override;
 
-    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             RecordStore* rs) const override;
+    void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            SpillTable& spillTable) const override;
 };
 
 }  // namespace mongo

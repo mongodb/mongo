@@ -45,6 +45,8 @@ class SpillTable {
 public:
     explicit SpillTable(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {}
 
+    virtual ~SpillTable() {}
+
     /**
      * The dataSize is an approximation of the sum of the sizes (in bytes) of the
      * documents or entries in the underlying SpillRecordStore.
@@ -55,6 +57,11 @@ public:
      * Total number of records in the SpillRecordStore.
      */
     long long numRecords() const;
+
+    /**
+     * Returns the storage size on disk of the spill table.
+     */
+    int64_t storageSize(RecoveryUnit& ru) const;
 
     /**
      * Inserts the specified records into the underlying SpillRecordStore by copying the provided

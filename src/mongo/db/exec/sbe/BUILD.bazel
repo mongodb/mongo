@@ -106,6 +106,7 @@ mongo_cc_library(
         "//src/mongo/db/sorter:sorter_base",
         "//src/mongo/db/sorter:sorter_stats",
         "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/db/storage:spill_table",
         "//src/mongo/util:field_set",
         "//src/third_party/snappy",
     ],

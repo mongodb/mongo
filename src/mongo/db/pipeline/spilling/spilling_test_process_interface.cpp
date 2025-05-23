@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-std::unique_ptr<TemporaryRecordStore> SpillingTestMongoProcessInterface::createTemporaryRecordStore(
+std::unique_ptr<SpillTable> SpillingTestMongoProcessInterface::createSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     shard_role_details::getRecoveryUnit(expCtx->getOperationContext())->abandonSnapshot();
     shard_role_details::getRecoveryUnit(expCtx->getOperationContext())
@@ -44,21 +44,20 @@ std::unique_ptr<TemporaryRecordStore> SpillingTestMongoProcessInterface::createT
         ->makeTemporaryRecordStore(expCtx->getOperationContext(), keyFormat);
 }
 
-void SpillingTestMongoProcessInterface::writeRecordsToRecordStore(
+void SpillingTestMongoProcessInterface::writeRecordsToSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    RecordStore* rs,
-    std::vector<Record>* records,
-    const std::vector<Timestamp>& ts) const {
+    SpillTable& spillTable,
+    std::vector<Record>* records) const {
 
     writeConflictRetry(
         expCtx->getOperationContext(),
-        "SpillingTestMongoProcessInterface::writeRecordsToRecordStore",
+        "SpillingTestMongoProcessInterface::writeRecordsToSpillTable",
         expCtx->getNamespaceString(),
         [&] {
             AutoGetCollection autoColl(
                 expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
             WriteUnitOfWork wuow(expCtx->getOperationContext());
-            auto writeResult = rs->insertRecords(expCtx->getOperationContext(), records, ts);
+            auto writeResult = spillTable.insertRecords(expCtx->getOperationContext(), records);
             tassert(5643014,
                     str::stream() << "Failed to write to disk because " << writeResult.reason(),
                     writeResult.isOK());
@@ -66,43 +65,46 @@ void SpillingTestMongoProcessInterface::writeRecordsToRecordStore(
         });
 }
 
-Document SpillingTestMongoProcessInterface::readRecordFromRecordStore(
+Document SpillingTestMongoProcessInterface::readRecordFromSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const RecordStore* rs,
+    const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
     AutoGetCollection autoColl(
         expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
-    auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
+    auto foundDoc =
+        spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(5643001, str::stream() << "Could not find document id " << rID, foundDoc);
     return Document::fromBsonWithMetaData(possibleRecord.toBson());
 }
 
-bool SpillingTestMongoProcessInterface::checkRecordInRecordStore(
+bool SpillingTestMongoProcessInterface::checkRecordInSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const RecordStore* rs,
+    const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
     AutoGetCollection autoColl(
         expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
-    return rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
+    return spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
 }
 
-void SpillingTestMongoProcessInterface::deleteRecordFromRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
+void SpillingTestMongoProcessInterface::deleteRecordFromSpillTable(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    SpillTable& spillTable,
+    RecordId rID) const {
     AutoGetCollection autoColl(
         expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
     WriteUnitOfWork wuow(expCtx->getOperationContext());
-    rs->deleteRecord(expCtx->getOperationContext(), rID);
+    spillTable.deleteRecord(expCtx->getOperationContext(), rID);
     wuow.commit();
 }
 
-void SpillingTestMongoProcessInterface::truncateRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
+void SpillingTestMongoProcessInterface::truncateSpillTable(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, SpillTable& spillTable) const {
     AutoGetCollection autoColl(
         expCtx->getOperationContext(), expCtx->getNamespaceString(), MODE_IS);
     WriteUnitOfWork wuow(expCtx->getOperationContext());
-    auto status = rs->truncate(expCtx->getOperationContext());
+    auto status = spillTable.truncate(expCtx->getOperationContext());
     tassert(5643015, "Unable to clear record store", status.isOK());
     wuow.commit();
 }

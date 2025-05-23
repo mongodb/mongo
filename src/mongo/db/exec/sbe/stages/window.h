@@ -284,7 +284,6 @@ private:
     static const long _batchSize = 1000;
     std::vector<Record> _records;
     std::vector<SharedBuffer> _recordBuffers;
-    std::vector<Timestamp> _recordTimestamps;
 
     /**
      * A memory estimator for the window state. Incrementally calculate the linear regression of the

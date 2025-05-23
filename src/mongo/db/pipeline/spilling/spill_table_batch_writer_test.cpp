@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
@@ -37,16 +37,14 @@ namespace {
 
 class RecordStoreBatchWriterTest : public SpillingTestFixture {
 public:
-    std::unique_ptr<TemporaryRecordStore> createRecordStore() const {
-        return _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(_expCtx,
-                                                                               KeyFormat::Long);
+    std::unique_ptr<SpillTable> createRecordStore() const {
+        return _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::Long);
     }
 
-    void assertRecordStoreContent(RecordStore* rs, std::vector<BSONObj> records) const {
+    void assertRecordStoreContent(SpillTable& spillTable, std::vector<BSONObj> records) const {
         for (size_t i = 0; i < records.size(); ++i) {
-            const auto docFromStore =
-                _expCtx->getMongoProcessInterface()->readRecordFromRecordStore(
-                    _expCtx, rs, RecordId{static_cast<int64_t>(i + 1)});
+            const auto docFromStore = _expCtx->getMongoProcessInterface()->readRecordFromSpillTable(
+                _expCtx, spillTable, RecordId{static_cast<int64_t>(i + 1)});
             ASSERT_DOCUMENT_EQ(Document{records[i]}, docFromStore);
         }
     }
@@ -81,7 +79,7 @@ TEST_F(RecordStoreBatchWriterTest, CanWriteUnownedDocuments) {
     }
 
     auto rs = createRecordStore();
-    RecordStoreBatchWriter writer{_expCtx.get(), rs->rs()};
+    SpillTableBatchWriter writer{_expCtx.get(), *rs};
 
     for (size_t i = 0; i < records.size(); ++i) {
         RecordId recordId{static_cast<int64_t>(i + 1)};
@@ -97,7 +95,7 @@ TEST_F(RecordStoreBatchWriterTest, CanWriteUnownedDocuments) {
     }
 
     writer.flush();
-    assertRecordStoreContent(rs->rs(), recordsCopy);
+    assertRecordStoreContent(*rs, recordsCopy);
 }
 
 }  // namespace

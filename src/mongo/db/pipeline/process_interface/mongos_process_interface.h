@@ -361,37 +361,36 @@ public:
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;
 
-    std::unique_ptr<TemporaryRecordStore> createTemporaryRecordStore(
+    std::unique_ptr<SpillTable> createSpillTable(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const final {
         MONGO_UNREACHABLE;
     }
-    void writeRecordsToRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   RecordStore* rs,
-                                   std::vector<Record>* records,
-                                   const std::vector<Timestamp>& ts) const final {
+    void writeRecordsToSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  SpillTable& spillTable,
+                                  std::vector<Record>* records) const final {
         MONGO_UNREACHABLE;
     }
 
-    Document readRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       const RecordStore* rs,
-                                       RecordId rID) const final {
+    Document readRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      const SpillTable& spillTable,
+                                      RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
 
-    bool checkRecordInRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const RecordStore* rs,
-                                  RecordId rID) const final {
+    bool checkRecordInSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 const SpillTable& spillTable,
+                                 RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
 
-    void deleteRecordFromRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                     RecordStore* rs,
-                                     RecordId rID) const final {
+    void deleteRecordFromSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    SpillTable& spillTable,
+                                    RecordId rID) const final {
         MONGO_UNREACHABLE;
     }
 
-    void truncateRecordStore(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                             RecordStore* rs) const final {
+    void truncateSpillTable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            SpillTable& spillTable) const final {
         MONGO_UNREACHABLE;
     }
 

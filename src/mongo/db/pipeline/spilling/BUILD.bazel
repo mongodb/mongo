@@ -21,12 +21,12 @@ mongo_cc_library(
 mongo_cc_library(
     name = "spilling",
     srcs = [
-        "//src/mongo/db/pipeline/spilling:record_store_batch_writer.cpp",
+        "//src/mongo/db/pipeline/spilling:spill_table_batch_writer.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_deque.cpp",
         "//src/mongo/db/pipeline/spilling:spillable_map.cpp",
     ],
     hdrs = [
-        "//src/mongo/db/pipeline/spilling:record_store_batch_writer.h",
+        "//src/mongo/db/pipeline/spilling:spill_table_batch_writer.h",
         "//src/mongo/db/pipeline/spilling:spillable_deque.h",
         "//src/mongo/db/pipeline/spilling:spillable_map.h",
     ],
@@ -35,6 +35,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/storage:spill_table",
         "//src/mongo/db/storage/key_string",
     ],
 )
@@ -61,7 +62,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_spilling_test",
     srcs = [
-        "record_store_batch_writer_test.cpp",
+        "spill_table_batch_writer_test.cpp",
         "spillable_deque_test.cpp",
         "spillable_map_test.cpp",
         "spilling_stats_test.cpp",

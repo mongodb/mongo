@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/recordid_deduplicator.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
@@ -69,13 +69,13 @@ bool RecordIdDeduplicator::insert(const RecordId& recordId) {
         recordId.withFormat([&](RecordId::Null _) -> bool { return hasNullRecordId; },
                             [&](int64_t rid) -> bool {
                                 return _diskStorageLong &&
-                                    _expCtx->getMongoProcessInterface()->checkRecordInRecordStore(
-                                        _expCtx, _diskStorageLong->rs(), recordId);
+                                    _expCtx->getMongoProcessInterface()->checkRecordInSpillTable(
+                                        _expCtx, *_diskStorageLong, recordId);
                             },
                             [&](const char* str, int size) -> bool {
                                 return _diskStorageString &&
-                                    _expCtx->getMongoProcessInterface()->checkRecordInRecordStore(
-                                        _expCtx, _diskStorageString->rs(), recordId);
+                                    _expCtx->getMongoProcessInterface()->checkRecordInSpillTable(
+                                        _expCtx, *_diskStorageString, recordId);
                             });
 
     if (foundInDisk) {
@@ -109,11 +109,11 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
     if (!_hashset.empty()) {
         // For string recordId.
         if (!_diskStorageString) {
-            _diskStorageString = _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(
-                _expCtx, KeyFormat::String);
+            _diskStorageString =
+                _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::String);
         }
 
-        RecordStoreBatchWriter writer{_expCtx, _diskStorageString->rs()};
+        SpillTableBatchWriter writer{_expCtx, *_diskStorageString};
         for (auto it = _hashset.begin(); it != _hashset.end(); ++it) {
             writer.write(*it, RecordData{});
         }
@@ -129,11 +129,11 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
     if (!_roaring.empty()) {
         // For long recordId.
         if (!_diskStorageLong) {
-            _diskStorageLong = _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(
-                _expCtx, KeyFormat::Long);
+            _diskStorageLong =
+                _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::Long);
         }
 
-        RecordStoreBatchWriter writer{_expCtx, _diskStorageLong->rs()};
+        SpillTableBatchWriter writer{_expCtx, *_diskStorageLong};
         for (auto it = _roaring.begin(); it != _roaring.end(); ++it) {
             writer.write(RecordId(*it), RecordData{});
         }
@@ -147,12 +147,12 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
     }
 
     if (_diskStorageLong) {
-        currentSpilledDataStorageSize += _diskStorageLong->rs()->storageSize(
+        currentSpilledDataStorageSize += _diskStorageLong->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()));
     };
 
     if (_diskStorageString) {
-        currentSpilledDataStorageSize += _diskStorageString->rs()->storageSize(
+        currentSpilledDataStorageSize += _diskStorageString->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()));
     };
 

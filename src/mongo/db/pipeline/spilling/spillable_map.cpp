@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/pipeline/spilling/spillable_map.h"
-#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
@@ -54,14 +54,14 @@ bool SpillableDocumentMapImpl::contains(const Value& id) const {
         return false;
     }
 
-    return _expCtx->getMongoProcessInterface()->checkRecordInRecordStore(
-        _expCtx, _diskMap->rs(), computeKey(id));
+    return _expCtx->getMongoProcessInterface()->checkRecordInSpillTable(
+        _expCtx, *_diskMap, computeKey(id));
 }
 
 void SpillableDocumentMapImpl::clear() {
     _memMap.erase(_memMap.begin(), _memMap.end());
     if (_diskMap) {
-        _expCtx->getMongoProcessInterface()->truncateRecordStore(_expCtx, _diskMap->rs());
+        _expCtx->getMongoProcessInterface()->truncateSpillTable(_expCtx, *_diskMap);
         _diskMapSize = 0;
     }
 }
@@ -87,7 +87,7 @@ void SpillableDocumentMapImpl::spillToDisk() {
         initDiskMap();
     }
 
-    RecordStoreBatchWriter writer(_expCtx, _diskMap->rs());
+    SpillTableBatchWriter writer(_expCtx, *_diskMap);
     while (!_memMap.empty()) {
         auto it = _memMap.begin();
         writer.write(computeKey(it->first), it->second.value().toBson());
@@ -100,7 +100,7 @@ void SpillableDocumentMapImpl::spillToDisk() {
         1,
         writer.writtenBytes(),
         writer.writtenRecords(),
-        static_cast<uint64_t>(_diskMap->rs()->storageSize(
+        static_cast<uint64_t>(_diskMap->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
 }
 
@@ -110,8 +110,7 @@ void SpillableDocumentMapImpl::initDiskMap() {
             "spilling",
             _expCtx->getAllowDiskUse());
 
-    _diskMap =
-        _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(_expCtx, KeyFormat::String);
+    _diskMap = _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::String);
     _diskMapSize = 0;
 }
 
@@ -123,7 +122,7 @@ RecordId SpillableDocumentMapImpl::computeKey(const Value& id) const {
 }
 
 void SpillableDocumentMapImpl::updateStorageSizeStat() {
-    _stats.updateSpilledDataStorageSize(_diskMap->rs()->storageSize(
+    _stats.updateSpilledDataStorageSize(_diskMap->storageSize(
         *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
@@ -131,7 +130,7 @@ template <bool IsConst>
 SpillableDocumentMapImpl::IteratorImpl<IsConst>::IteratorImpl(MapPointer map)
     : _map(map), _memIt(_map->_memMap.begin()) {
     if (_map->_diskMap != nullptr) {
-        _diskIt = _map->_diskMap->rs()->getCursor(_map->_expCtx->getOperationContext());
+        _diskIt = _map->_diskMap->getCursor(_map->_expCtx->getOperationContext());
         _diskItExhausted = false;
         saveDiskIt();
 

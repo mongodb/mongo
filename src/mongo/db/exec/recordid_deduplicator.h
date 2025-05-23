@@ -35,7 +35,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/spill_table.h"
 
 namespace mongo {
 
@@ -99,8 +99,8 @@ private:
     // consider records with id null to be the same.
     bool hasNullRecordId{false};
 
-    std::unique_ptr<TemporaryRecordStore> _diskStorageString;
-    std::unique_ptr<TemporaryRecordStore> _diskStorageLong;
+    std::unique_ptr<SpillTable> _diskStorageString;
+    std::unique_ptr<SpillTable> _diskStorageLong;
 
     SpillingStats _stats;
 };

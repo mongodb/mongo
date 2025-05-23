@@ -34,7 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/pipeline/spilling/spillable_deque.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
@@ -97,7 +97,7 @@ void SpillableDeque::freeUpTo(int id) {
 }
 void SpillableDeque::clear() {
     if (_diskCache) {
-        _expCtx->getMongoProcessInterface()->truncateRecordStore(_expCtx, _diskCache->rs());
+        _expCtx->getMongoProcessInterface()->truncateSpillTable(_expCtx, *_diskCache);
     }
     _memCache.clear();
     _diskWrittenIndex = 0;
@@ -119,8 +119,8 @@ void SpillableDeque::spillToDisk() {
                 "SpillableDeque attempted to write to disk in an environment without a storage "
                 "engine configured",
                 _expCtx->getOperationContext()->getServiceContext()->getStorageEngine());
-        _diskCache = _expCtx->getMongoProcessInterface()->createTemporaryRecordStore(
-            _expCtx, KeyFormat::Long);
+        _diskCache =
+            _expCtx->getMongoProcessInterface()->createSpillTable(_expCtx, KeyFormat::Long);
     }
 
     // Ensure there is sufficient disk space for spilling
@@ -133,7 +133,7 @@ void SpillableDeque::spillToDisk() {
         _diskWrittenIndex = _nextFreedIndex;
     }
 
-    RecordStoreBatchWriter writer{_expCtx, _diskCache->rs()};
+    SpillTableBatchWriter writer{_expCtx, *_diskCache};
     for (auto& memoryTokenWithDoc : _memCache) {
         RecordId recordId{++_diskWrittenIndex};
         auto bsonDoc = memoryTokenWithDoc.value().toBsonWithMetaData();
@@ -147,12 +147,12 @@ void SpillableDeque::spillToDisk() {
         1,
         writer.writtenBytes(),
         writer.writtenRecords(),
-        static_cast<uint64_t>(_diskCache->rs()->storageSize(
+        static_cast<uint64_t>(_diskCache->storageSize(
             *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext()))));
 }
 
 void SpillableDeque::updateStorageSizeStat() {
-    _stats.updateSpilledDataStorageSize(_diskCache->rs()->storageSize(
+    _stats.updateSpilledDataStorageSize(_diskCache->storageSize(
         *shard_role_details::getRecoveryUnit(_expCtx->getOperationContext())));
 }
 
@@ -161,8 +161,8 @@ Document SpillableDeque::readDocumentFromDiskById(int desired) {
             str::stream() << "Attempted to read id " << desired
                           << "from disk in SpillableDeque before writing",
             _diskCache && desired < _diskWrittenIndex);
-    return _expCtx->getMongoProcessInterface()->readRecordFromRecordStore(
-        _expCtx, _diskCache->rs(), RecordId(desired + 1));
+    return _expCtx->getMongoProcessInterface()->readRecordFromSpillTable(
+        _expCtx, *_diskCache, RecordId(desired + 1));
 }
 Document SpillableDeque::readDocumentFromMemCacheById(int desired) {
     // If we have only freed documents from disk, the index into '_memCache' is off by the number of

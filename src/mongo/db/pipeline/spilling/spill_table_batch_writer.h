@@ -27,41 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/spilling/record_store_batch_writer.h"
+#pragma once
+
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 
-void RecordStoreBatchWriter::write(RecordId recordId, BSONObj obj) {
-    _ownedObjects.push_back(obj.getOwned());
-    const BSONObj& ownedObj = _ownedObjects.back();
-    write(recordId, RecordData{ownedObj.objdata(), ownedObj.objsize()});
-}
+/**
+ * A class that writes records to a temporary record store. Performs writes in batches and
+ * accumulates statistics.
+ */
+class SpillTableBatchWriter {
+public:
+    SpillTableBatchWriter(ExpressionContext* expCtx, SpillTable& spillTable)
+        : _expCtx(expCtx), _spillTable(spillTable) {}
 
-void RecordStoreBatchWriter::write(RecordId recordId, RecordData recordData) {
-    _records.emplace_back(Record{std::move(recordId), recordData});
-    _batchSize += _records.back().id.memUsage() + _records.back().data.size();
-    if (_records.size() > kMaxWriteRecordCount || _batchSize > kMaxWriteRecordSize) {
-        flush();
+    void write(RecordId recordId, BSONObj obj);
+
+    /**
+     * The caller is the owner of the data in recordData and should make sure to keep it alive until
+     * the data has been flushed.
+     */
+    void write(RecordId recordId, RecordData recordData);
+
+    void flush();
+
+    int64_t writtenRecords() const {
+        return _writtenRecords;
     }
-}
 
-void RecordStoreBatchWriter::flush() {
-    if (_records.empty()) {
-        return;
+    int64_t writtenBytes() const {
+        return _writtenBytes;
     }
-    // By passing a vector of null timestamps, these inserts are not timestamped individually, but
-    // rather with the timestamp of the owning operation. We don't care about the timestamps.
-    std::vector<Timestamp> timestamps(_records.size());
 
-    _expCtx->getMongoProcessInterface()->writeRecordsToRecordStore(
-        _expCtx, _rs, &_records, timestamps);
+private:
+    static constexpr size_t kMaxWriteRecordCount = 1000;
+    static constexpr size_t kMaxWriteRecordSize = 16 * 1024 * 1024;
 
-    _writtenRecords += _records.size();
-    _writtenBytes += _batchSize;
+    ExpressionContext* _expCtx;
+    SpillTable& _spillTable;
 
-    _records.clear();
-    _ownedObjects.clear();
-    _batchSize = 0;
-}
+    std::vector<Record> _records;
+    std::vector<BSONObj> _ownedObjects;
+    size_t _batchSize = 0;
+
+    int64_t _writtenRecords = 0;
+    int64_t _writtenBytes = 0;
+};
 
 }  // namespace mongo

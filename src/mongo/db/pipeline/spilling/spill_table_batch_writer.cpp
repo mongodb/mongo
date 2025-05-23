@@ -27,55 +27,37 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <vector>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/storage/record_store.h"
+#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 
 namespace mongo {
 
-/**
- * A class that writes records to a temporary record store. Performs writes in batches and
- * accumulates statistics.
- */
-class RecordStoreBatchWriter {
-public:
-    RecordStoreBatchWriter(ExpressionContext* expCtx, RecordStore* rs) : _expCtx(expCtx), _rs(rs) {}
+void SpillTableBatchWriter::write(RecordId recordId, BSONObj obj) {
+    _ownedObjects.push_back(obj.getOwned());
+    const BSONObj& ownedObj = _ownedObjects.back();
+    write(recordId, RecordData{ownedObj.objdata(), ownedObj.objsize()});
+}
 
-    void write(RecordId recordId, BSONObj obj);
+void SpillTableBatchWriter::write(RecordId recordId, RecordData recordData) {
+    _records.emplace_back(Record{std::move(recordId), recordData});
+    _batchSize += _records.back().id.memUsage() + _records.back().data.size();
+    if (_records.size() > kMaxWriteRecordCount || _batchSize > kMaxWriteRecordSize) {
+        flush();
+    }
+}
 
-    /**
-     * The caller is the owner of the data in recordData and should make sure to keep it alive until
-     * the data has been flushed.
-     */
-    void write(RecordId recordId, RecordData recordData);
-
-    void flush();
-
-    int64_t writtenRecords() const {
-        return _writtenRecords;
+void SpillTableBatchWriter::flush() {
+    if (_records.empty()) {
+        return;
     }
 
-    int64_t writtenBytes() const {
-        return _writtenBytes;
-    }
+    _expCtx->getMongoProcessInterface()->writeRecordsToSpillTable(_expCtx, _spillTable, &_records);
 
-private:
-    static constexpr size_t kMaxWriteRecordCount = 1000;
-    static constexpr size_t kMaxWriteRecordSize = 16 * 1024 * 1024;
+    _writtenRecords += _records.size();
+    _writtenBytes += _batchSize;
 
-    ExpressionContext* _expCtx;
-    RecordStore* _rs;
-
-    std::vector<Record> _records;
-    std::vector<BSONObj> _ownedObjects;
-    size_t _batchSize = 0;
-
-    int64_t _writtenRecords = 0;
-    int64_t _writtenBytes = 0;
-};
+    _records.clear();
+    _ownedObjects.clear();
+    _batchSize = 0;
+}
 
 }  // namespace mongo

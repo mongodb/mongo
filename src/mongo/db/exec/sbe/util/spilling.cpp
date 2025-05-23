@@ -42,6 +42,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
@@ -89,7 +90,12 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
 }
 
 SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
-    _recordStore =
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(opCtx, format);
+        return;
+    }
+
+    _spillTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx, format);
 
     _spillingUnit = opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit();
@@ -149,14 +155,19 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
     auto result = mongo::Status::OK();
 
     storageUnavailableRetry(opCtx, "SpillingStore::upsertToRecordStore", [&] {
-        WriteUnitOfWork wuow(opCtx);
-        if (update) {
-            result = rs()->updateRecord(opCtx, key, buf.buf(), buf.len());
-        } else {
-            auto status = rs()->insertRecord(opCtx, key, buf.buf(), buf.len(), Timestamp{});
-            result = status.getStatus();
+        boost::optional<WriteUnitOfWork> wuow;
+        if (_originalUnit) {
+            wuow.emplace(opCtx);
         }
-        wuow.commit();
+        if (update) {
+            result = _spillTable->updateRecord(opCtx, key, buf.buf(), buf.len());
+        } else {
+            std::vector<Record> records = {{key, {buf.buf(), buf.len()}}};
+            result = _spillTable->insertRecords(opCtx, &records);
+        }
+        if (wuow) {
+            wuow->commit();
+        }
     });
 
     if (!result.isOK()) {
@@ -166,9 +177,7 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
     return buf.len();
 }
 
-Status SpillingStore::insertRecords(OperationContext* opCtx,
-                                    std::vector<Record>* inOutRecords,
-                                    const std::vector<Timestamp>& timestamps) {
+Status SpillingStore::insertRecords(OperationContext* opCtx, std::vector<Record>* inOutRecords) {
     assertIgnorePrepareConflictsBehavior(opCtx);
 
     switchToSpilling(opCtx);
@@ -176,9 +185,14 @@ Status SpillingStore::insertRecords(OperationContext* opCtx,
     auto status = Status::OK();
 
     storageUnavailableRetry(opCtx, "SpillingStore::insertRecords", [&] {
-        WriteUnitOfWork wuow(opCtx);
-        status = rs()->insertRecords(opCtx, inOutRecords, timestamps);
-        wuow.commit();
+        boost::optional<WriteUnitOfWork> wuow;
+        if (_originalUnit) {
+            wuow.emplace(opCtx);
+        }
+        status = _spillTable->insertRecords(opCtx, inOutRecords);
+        if (wuow) {
+            wuow->commit();
+        }
     });
     return status;
 }
@@ -193,7 +207,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
     storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", [&] {
-        found = rs()->findRecord(opCtx, rid, &record);
+        found = _spillTable->findRecord(opCtx, rid, &record);
     });
 
     if (found) {
@@ -209,12 +223,17 @@ bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, Rec
     bool found = false;
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
-    storageUnavailableRetry(
-        opCtx, "SpillingStore::findRecord", [&] { found = rs()->findRecord(opCtx, loc, out); });
+    storageUnavailableRetry(opCtx, "SpillingStore::findRecord", [&] {
+        found = _spillTable->findRecord(opCtx, loc, out);
+    });
     return found;
 }
 
 void SpillingStore::switchToSpilling(OperationContext* opCtx) {
+    if (!_spillingUnit) {
+        return;
+    }
+
     invariant(!_originalUnit);
     ClientLock lk(opCtx->getClient());
     _originalUnit = shard_role_details::releaseRecoveryUnit(opCtx, lk);
@@ -222,6 +241,10 @@ void SpillingStore::switchToSpilling(OperationContext* opCtx) {
         shard_role_details::setRecoveryUnit(opCtx, std::move(_spillingUnit), _spillingState, lk);
 }
 void SpillingStore::switchToOriginal(OperationContext* opCtx) {
+    if (!_originalUnit) {
+        return;
+    }
+
     invariant(!_spillingUnit);
     ClientLock lk(opCtx->getClient());
     _spillingUnit = shard_role_details::releaseRecoveryUnit(opCtx, lk);
@@ -235,11 +258,13 @@ int64_t SpillingStore::storageSize(OperationContext* opCtx) {
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
-    return rs()->storageSize(*shard_role_details::getRecoveryUnit(opCtx));
+    return _spillTable->storageSize(*shard_role_details::getRecoveryUnit(opCtx));
 }
 
 void SpillingStore::saveState() {
-    _spillingUnit->abandonSnapshot();
+    if (_spillingUnit) {
+        _spillingUnit->abandonSnapshot();
+    }
 }
 void SpillingStore::restoreState() {
     // We do not have to do anything.

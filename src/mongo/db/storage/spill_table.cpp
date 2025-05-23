@@ -43,6 +43,10 @@ long long SpillTable::numRecords() const {
     return _rs->numRecords();
 }
 
+int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
+    return _rs->storageSize(ru);
+}
+
 Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* records) {
     std::vector<Timestamp> timestamps(records->size());
     return _rs->insertRecords(opCtx, records, timestamps);

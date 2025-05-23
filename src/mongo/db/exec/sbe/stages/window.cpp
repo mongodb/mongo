@@ -81,10 +81,6 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
 
     _records.reserve(_batchSize);
     _recordBuffers.reserve(_batchSize);
-    _recordTimestamps.reserve(_batchSize);
-    for (size_t i = 0; i < _batchSize; i++) {
-        _recordTimestamps.push_back(Timestamp{});
-    }
 }
 
 std::unique_ptr<PlanStage> WindowStage::clone() const {
@@ -176,7 +172,7 @@ void WindowStage::spill() {
     }
 
     auto writeBatch = [&]() {
-        auto status = _recordStore->insertRecords(_opCtx, &_records, _recordTimestamps);
+        auto status = _recordStore->insertRecords(_opCtx, &_records);
         tassert(7870901, "Failed to spill records in the window stage", status.isOK());
         _records.clear();
         _recordBuffers.clear();

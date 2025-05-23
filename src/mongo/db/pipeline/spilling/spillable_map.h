@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/spill_table.h"
 
 namespace mongo {
 
@@ -210,7 +210,7 @@ private:
     ValueFlatUnorderedMap<MemoryUsageTokenWith<Document>> _memMap =
         ValueComparator::kInstance.makeFlatUnorderedValueMap<MemoryUsageTokenWith<Document>>();
 
-    std::unique_ptr<TemporaryRecordStore> _diskMap = nullptr;
+    std::unique_ptr<SpillTable> _diskMap = nullptr;
     size_t _diskMapSize = 0;
 
     mutable key_string::Builder _builder{key_string::Version::kLatestVersion};

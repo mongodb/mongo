@@ -37,7 +37,7 @@
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
-#include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/storage/spill_table.h"
 
 namespace mongo {
 
@@ -159,7 +159,7 @@ private:
     ExpressionContext* _expCtx;
     std::deque<MemoryUsageTokenWith<Document>> _memCache;
 
-    std::unique_ptr<TemporaryRecordStore> _diskCache = nullptr;
+    std::unique_ptr<SpillTable> _diskCache = nullptr;
     // The number of documents we've written to disk, as well as the recordID of the last document
     // written. Zero is an invalid RecordID, so writing will start with RecordId(1).
     int _diskWrittenIndex = 0;

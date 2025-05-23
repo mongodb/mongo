@@ -102,6 +102,7 @@
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -1090,21 +1091,20 @@ boost::optional<TimeseriesOptions> CommonMongodProcessInterface::_getTimeseriesO
     return mongo::timeseries::getTimeseriesOptions(opCtx, ns, true /*convertToBucketsNamespace*/);
 }
 
-void CommonMongodProcessInterface::writeRecordsToRecordStore(
+void CommonMongodProcessInterface::writeRecordsToSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    RecordStore* rs,
-    std::vector<Record>* records,
-    const std::vector<Timestamp>& ts) const {
+    SpillTable& spillTable,
+    std::vector<Record>* records) const {
     tassert(5643012, "Attempted to write to record store with nullptr", records);
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(
         expCtx->getOperationContext(),
-        "MPI::writeRecordsToRecordStore",
+        "MPI::writeRecordsToSpillTable",
         expCtx->getNamespaceString(),
         [&] {
             Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
             WriteUnitOfWork wuow(expCtx->getOperationContext());
-            auto writeResult = rs->insertRecords(expCtx->getOperationContext(), records, ts);
+            auto writeResult = spillTable.insertRecords(expCtx->getOperationContext(), records);
             tassert(5643002,
                     str::stream() << "Failed to write to disk because " << writeResult.reason(),
                     writeResult.isOK());
@@ -1112,60 +1112,69 @@ void CommonMongodProcessInterface::writeRecordsToRecordStore(
         });
 }
 
-std::unique_ptr<TemporaryRecordStore> CommonMongodProcessInterface::createTemporaryRecordStore(
+std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        return expCtx->getOperationContext()
+            ->getServiceContext()
+            ->getStorageEngine()
+            ->makeSpillTable(expCtx->getOperationContext(), keyFormat);
+    }
     return expCtx->getOperationContext()
         ->getServiceContext()
         ->getStorageEngine()
         ->makeTemporaryRecordStore(expCtx->getOperationContext(), keyFormat);
 }
 
-Document CommonMongodProcessInterface::readRecordFromRecordStore(
+Document CommonMongodProcessInterface::readRecordFromSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const RecordStore* rs,
+    const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
-    auto foundDoc = rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
+    auto foundDoc =
+        spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
     return Document::fromBsonWithMetaData(possibleRecord.toBson());
 }
 
-bool CommonMongodProcessInterface::checkRecordInRecordStore(
+bool CommonMongodProcessInterface::checkRecordInSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const RecordStore* rs,
+    const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
-    return rs->findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
+    return spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
 }
 
-void CommonMongodProcessInterface::deleteRecordFromRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs, RecordId rID) const {
+void CommonMongodProcessInterface::deleteRecordFromSpillTable(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    SpillTable& spillTable,
+    RecordId rID) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->getOperationContext(),
-                       "MPI::deleteFromRecordStore",
+                       "MPI::deleteRecordFromSpillTable",
                        expCtx->getNamespaceString(),
                        [&] {
                            Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
                            WriteUnitOfWork wuow(expCtx->getOperationContext());
-                           rs->deleteRecord(expCtx->getOperationContext(), rID);
+                           spillTable.deleteRecord(expCtx->getOperationContext(), rID);
                            wuow.commit();
                        });
 }
 
-void CommonMongodProcessInterface::truncateRecordStore(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, RecordStore* rs) const {
+void CommonMongodProcessInterface::truncateSpillTable(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, SpillTable& spillTable) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     writeConflictRetry(expCtx->getOperationContext(),
-                       "MPI::truncateRecordStore",
+                       "MPI::truncateSpillTable",
                        expCtx->getNamespaceString(),
                        [&] {
                            Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
                            WriteUnitOfWork wuow(expCtx->getOperationContext());
-                           auto status = rs->truncate(expCtx->getOperationContext());
+                           auto status = spillTable.truncate(expCtx->getOperationContext());
                            tassert(5643000, "Unable to clear record store", status.isOK());
                            wuow.commit();
                        });
