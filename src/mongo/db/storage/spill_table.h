@@ -66,6 +66,8 @@ public:
     /**
      * Inserts the specified records into the underlying RecordStore by copying the provided record
      * data.
+     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
+     * WriteUnitOfWork.
      */
     Status insertRecords(OperationContext* opCtx, std::vector<Record>* records);
 
@@ -80,11 +82,15 @@ public:
     /**
      * Updates the record with id 'rid', replacing its contents with those described by
      * 'data' and 'len'.
+     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
+     * WriteUnitOfWork.
      */
     Status updateRecord(OperationContext* opCtx, const RecordId& rid, const char* data, int len);
 
     /**
      * Deletes the record with id 'rid'.
+     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
+     * WriteUnitOfWork.
      */
     void deleteRecord(OperationContext* opCtx, const RecordId& rid);
 
@@ -98,6 +104,8 @@ public:
 
     /**
      * Removes all records.
+     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
+     * WriteUnitOfWork.
      */
     Status truncate(OperationContext* opCtx);
 
@@ -106,6 +114,8 @@ public:
      * arguments serve as a hint to the record store of how much data will be truncated. This is
      * necessary to avoid reading the data between the two RecordIds in order to update numRecords
      * and dataSize correctly.
+     * When `featureFlagCreateSpillKVEngine` is enabled, this should not be explicitly called in a
+     * WriteUnitOfWork.
      */
     Status rangeTruncate(OperationContext* opCtx,
                          const RecordId& minRecordId = RecordId(),
