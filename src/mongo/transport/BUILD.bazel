@@ -21,6 +21,7 @@ mongo_cc_library(
     hdrs = [
         "hello_metrics.h",
         "session.h",
+        "session_establishment_rate_limiter.h",
         "session_manager.h",
         "transport_layer.h",
         "transport_options.h",

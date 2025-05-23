@@ -16,7 +16,11 @@ import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
-// TODO SERVER-104811: Update this test with assertions on metrics as well.
+const getConnectionStats = (conn) => {
+    const connStats = assert.commandWorked(conn.adminCommand({serverStatus: 1}))["connections"];
+    jsTestLog(`Connection stats: ${tojson(connStats)}`);
+    return connStats;
+};
 
 const ingressPort = allocatePort();
 const egressPort = allocatePort();
@@ -48,11 +52,15 @@ rs.initiate();
     proxy_server.egress_address = nonExemptIP;
     proxy_server.start();
 
+    const numConnections = 10;
     // Make sure multiple connections can get through past the rate limit.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < numConnections; i++) {
         const conn = new Mongo(`mongodb://${exemptIP}:${ingressPort}`);
         assert.neq(null, conn, 'Client was unable to connect');
     }
+
+    assert.gte(getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalExempted"],
+               numConnections);
 
     proxy_server.stop();
 }
@@ -91,6 +99,8 @@ rs.getPrimary().adminCommand({
         }
         return false;
     });
+
+    assert.eq(1, getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalRejected"]);
 
     proxy_server.stop();
 }

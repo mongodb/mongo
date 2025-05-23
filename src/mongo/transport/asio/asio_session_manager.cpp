@@ -89,17 +89,19 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
         bob->append(n, static_cast<int>(v));
     };
 
-    appendInt("current", sessionCount);
+    appendInt("current", sessionCount - _sessionEstablishmentRateLimiter.queued());
     appendInt("available", maxOpenSessions() - sessionCount);
     appendInt("totalCreated", numCreatedSessions());
-    appendInt("rejected", numRejectedSessions());
+    appendInt("rejected", numRejectedSessions() + _sessionEstablishmentRateLimiter.rejected());
 
-    appendInt("active", getActiveOperations());
+    appendInt("active", getActiveOperations() - _sessionEstablishmentRateLimiter.queued());
+
+    _sessionEstablishmentRateLimiter.appendStats(bob);
 
     // Historically, this number may have differed from "current" since
     // some sessions would have used the non-threaded ServiceExecutorFixed.
     // Currently all sessions are threaded, so this number is redundant.
-    appendInt("threaded", sessionCount);
+    appendInt("threaded", sessionCount - _sessionEstablishmentRateLimiter.queued());
     auto maxIncomingConnsOverride = serverGlobalParams.maxIncomingConnsOverride.makeSnapshot();
     if (maxIncomingConnsOverride && !maxIncomingConnsOverride->empty()) {
         appendInt("limitExempt", serviceExecutorStats.limitExempt.load());
