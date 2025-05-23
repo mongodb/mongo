@@ -39,11 +39,20 @@ namespace mongo {
 namespace SnapshotHelper {
 
 /**
+ * Returns whether changeReadSourceIfNeeded would change the read source to last applied or not
+ * without actually modifying the read source.
+ */
+bool wouldChangeReadSourceToLastApplied(OperationContext* opCtx,
+                                        boost::optional<const NamespaceString&> nss);
+
+/**
  * Changes the read source in the recovery unit if needed depending on server state. If reading at
  * last applied is needed and we already have that read source set, refresh the lastApplied
  * timestamp.
  *
- * Returns true if the state is such that we should read at last applied, false otherwise.
+ * Returns true if the state is such that we should read at last applied, false otherwise. Note that
+ * returning true does not mean that the read source was actually changed and only indicates that
+ * in certain situations, the specified namespace should read at lastApplied.
  */
 bool changeReadSourceIfNeeded(OperationContext* opCtx, boost::optional<const NamespaceString&> nss);
 }  // namespace SnapshotHelper

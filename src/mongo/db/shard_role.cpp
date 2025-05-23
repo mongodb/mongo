@@ -644,6 +644,28 @@ void checkShardingPlacement(OperationContext* opCtx,
     }
 }
 
+void checkReadSourceCompatible(
+    OperationContext* opCtx,
+    const ResolvedNamespaceOrViewAcquisitionRequests& acquisitionRequests) {
+    for (auto& ar : acquisitionRequests) {
+        auto& prerequisites = ar.prerequisites;
+        if (SnapshotHelper::wouldChangeReadSourceToLastApplied(opCtx, prerequisites.nss)) {
+            // TODO (SERVER-103165): enable assertions outside of testing environment once we are
+            // confident there are no instances of this behavior.
+            if (TestingProctor::instance().isEnabled()) {
+                tasserted(10141601,
+                          "Cannot change the read source after another acquisition has already "
+                          "potentially used the existing snapshot");
+            } else {
+                LOGV2_WARNING(10141602,
+                              "Changing the read source after another acquisition has already "
+                              "potentially used the existing snapshot",
+                              "nss"_attr = prerequisites.nss);
+            }
+        }
+    }
+}
+
 ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock(
     OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     invariant(!acquisitionRequests.empty());
@@ -1252,6 +1274,12 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 
         auto sortedAcquisitionRequests = shard_role_details::generateSortedAcquisitionRequests(
             opCtx, *catalog, acquisitionRequests, lockFreeReadsResources);
+
+        // Make sure that we won't change the read source after already acquiring a snapshot.
+        if (!openSnapshot) {
+            checkReadSourceCompatible(opCtx, sortedAcquisitionRequests);
+        }
+
         return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
             opCtx, *catalog, sortedAcquisitionRequests);
     } catch (...) {
