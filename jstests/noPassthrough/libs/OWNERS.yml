@@ -9,3 +9,6 @@ filters:
   - "*proxy_protocol*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "net.*":
+    approvers:
+      - 10gen/server-networking-and-observability

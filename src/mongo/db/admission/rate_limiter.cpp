@@ -36,6 +36,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo::admission {
+MONGO_FAIL_POINT_DEFINE(hangInRateLimiter);
+
 namespace {
 Milliseconds doubleToMillis(double t) {
     return duration_cast<Milliseconds>(
@@ -101,7 +103,9 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     // bucket balance), and returns how long the consumer should nap until their token
     // reservation becomes valid.
     double waitForTokenSecs;
-    {
+    if (MONGO_unlikely(hangInRateLimiter.shouldFail())) {
+        waitForTokenSecs = 60 * 60;  // 1 hour
+    } else {
         auto lk = _impl->rwMutex.readLock();
         waitForTokenSecs = _impl->tokenBucket.consumeWithBorrowNonBlocking(1.0).value_or(0);
     }
