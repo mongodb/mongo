@@ -28,12 +28,15 @@
  */
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace unified_write_executor {
 
 boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
-                                                                RoutingContext& routingCtx) {
+                                                                const RoutingContext& routingCtx) {
     auto writeOp = _producer.peekNext();
     if (!writeOp) {
         return boost::none;
@@ -97,6 +100,114 @@ boost::optional<WriteBatch> OrderedWriteOpBatcher::getNextBatch(OperationContext
         default: {
             MONGO_UNREACHABLE;
         }
+    }
+}
+
+namespace {
+bool isNewBatchRequired(SimpleWriteBatch& writeBatch,
+                        NamespaceString nss,
+                        std::vector<ShardEndpoint>& shardsAffected) {
+    for (const auto& shard : shardsAffected) {
+        auto it = writeBatch.requestByShardId.find(shard.shardName);
+        if (it != writeBatch.requestByShardId.end()) {
+            auto versionFound = it->second.versionByNss.find(nss);
+            // If the namespace is already in the batch, the shard version must be the same. If it's
+            // not, we need a new batch.
+            if (versionFound != it->second.versionByNss.end() && versionFound->second != shard) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void addSingleShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
+                                  WriteOp& writeOp,
+                                  std::vector<ShardEndpoint>& shardsAffected) {
+    const auto shard = shardsAffected.front();
+    const auto shardName = shard.shardName;
+
+    tassert(10387000,
+            "Single shard write type should only target a single shard",
+            shardsAffected.size() == 1);
+
+    auto it = writeBatch.requestByShardId.find(shardName);
+    if (it != writeBatch.requestByShardId.end()) {
+        SimpleWriteBatch::ShardRequest& request = it->second;
+        request.ops.push_back(writeOp);
+
+        auto nss = writeOp.getNss();
+        auto versionFound = request.versionByNss.find(nss);
+        if (versionFound != request.versionByNss.end()) {
+            tassert(10387001,
+                    "Shard version for the same namespace need to be the same",
+                    versionFound->second == shardsAffected.front());
+        }
+        request.versionByNss.emplace_hint(versionFound, nss, shardsAffected.front());
+    } else {
+        writeBatch.requestByShardId.emplace(
+            shardName,
+            SimpleWriteBatch::ShardRequest{std::map<NamespaceString, ShardEndpoint>{
+                                               {writeOp.getNss(), shardsAffected.front()}},
+                                           std::vector<WriteOp>{writeOp}});
+    }
+}
+
+void addMultiShardWriteOpToBatch(SimpleWriteBatch& writeBatch,
+                                 WriteOp& writeOp,
+                                 std::vector<ShardEndpoint>& shardsAffected) {
+    const auto shard = shardsAffected.front();
+    const auto shardName = shard.shardName;
+
+    for (const auto& shardEndpoint : shardsAffected) {
+        std::vector<ShardEndpoint> shardEndpoints{shardEndpoint};
+        addSingleShardWriteOpToBatch(writeBatch, writeOp, shardEndpoints);
+    }
+}
+
+void addWriteOpToBatch(SimpleWriteBatch& writeBatch, WriteOp& writeOp, Analysis& analysis) {
+    switch (analysis.type) {
+        case kSingleShard:
+            addSingleShardWriteOpToBatch(writeBatch, writeOp, analysis.shardsAffected);
+            break;
+        case kMultiShard:
+            addMultiShardWriteOpToBatch(writeBatch, writeOp, analysis.shardsAffected);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+}  // namespace
+
+boost::optional<WriteBatch> UnorderedWriteOpBatcher::getNextBatch(
+    OperationContext* opCtx, const RoutingContext& routingCtx) {
+    SimpleWriteBatch batch;
+    while (true) {
+        auto writeOp = _producer.peekNext();
+        if (!writeOp) {
+            // If there are no more operations, return the batch or boost::none.
+            if (!batch.requestByShardId.empty()) {
+                return WriteBatch{std::move(batch)};
+            } else {
+                return boost::none;
+            }
+        }
+        auto analysis = _analyzer.analyze(opCtx, routingCtx, *writeOp);
+
+        // A new batch is required if we're targeting a namespace with a shard endpoint that is
+        // different to the one in the current batch.
+        // TODO SERVER-104264: Revisit this logic once we account for
+        // 'OnlyTargetDataOwningShardsForMultiWritesParam' cluster parameter.
+        if (isNewBatchRequired(batch, writeOp->getNss(), analysis.shardsAffected)) {
+            LOGV2_DEBUG(10387002,
+                        4,
+                        "New batch required as this namespace was already targeted with a "
+                        "different shard version",
+                        "nss"_attr = writeOp->getNss());
+            return WriteBatch{std::move(batch)};
+        }
+        _producer.advance();
+        addWriteOpToBatch(batch, *writeOp, analysis);
     }
 }
 

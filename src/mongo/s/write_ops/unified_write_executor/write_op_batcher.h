@@ -65,7 +65,7 @@ public:
      * batched up, this function returns none.
      */
     virtual boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                                     RoutingContext& routingCtx) = 0;
+                                                     const RoutingContext& routingCtx) = 0;
 
     /**
      * Mark a list of write ops to be reprocessed, which will in turn be reanalyzed and rebatched.
@@ -87,7 +87,16 @@ public:
         : WriteOpBatcher(producer, analyzer) {}
 
     boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
-                                             RoutingContext& routingCtx) override;
+                                             const RoutingContext& routingCtx) override;
+};
+
+class UnorderedWriteOpBatcher : public WriteOpBatcher {
+public:
+    UnorderedWriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
+        : WriteOpBatcher(producer, analyzer) {}
+
+    boost::optional<WriteBatch> getNextBatch(OperationContext* opCtx,
+                                             const RoutingContext& routingCtx) override;
 };
 
 }  // namespace unified_write_executor
