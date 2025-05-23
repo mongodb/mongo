@@ -271,6 +271,7 @@ render_template(
 
 MONGOJS_CPP_JSFILES = [
     "assert.js",
+    "assert_global.js",
     "bulk_api.js",
     "check_log.js",
     "collection.js",

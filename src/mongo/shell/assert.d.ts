@@ -75,26 +75,6 @@ declare function formatErrorMsg(msg: string, attr?: object, serializeFn?: functi
 
 declare module assert {
 
-    /**
-     * Assert equality.
-     *
-     * Equality is based on '`==`', with a fallthrough to comparing JSON representations.
-     * This is not a strict equality (`===`) assertion.
-     * 
-     * @param a Left-hand side operand
-     * @param b Right-hand side operand
-     * @param msg Failure message, displayed when the assertion fails.
-     *            If a function, it is invoked and its result is used as the failure message.
-     *            If an object, its conversion to json is used as the failure message.
-     * @param attr Additional attributes to be included in failure messages.
-     * 
-     * @throws {Error} if assertion is not satisfied.
-     * 
-     * @example
-     * const actual = getValue();
-     * const expected = 'foobar';
-     * assert.eq(actual, expected);
-     */
     function eq(a, b, msg?: string | function | object, attr?: object): void
 
     /**

@@ -2798,25 +2798,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/scripting/mozjs/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/shell/OWNERS.yml
+/src/mongo/shell/**/* @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/kms* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/encrypted* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/shell/**/keyvault.js @10gen/server-security @svc-auto-approve-bot
-/src/mongo/shell/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/assert.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/bench* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/bridge.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/check_log.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/collection.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/db.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/explainable.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/linenoise* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/mk_wcwidth* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/mongo* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/program_runner* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/shell* @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/session.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/types.js @10gen/devprod-correctness @svc-auto-approve-bot
-/src/mongo/shell/**/utils* @10gen/devprod-correctness @svc-auto-approve-bot
 /src/mongo/shell/**/named_pipe_test_helper* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/shell/**/feature_compatibility_version.js @10gen/server-fcv @svc-auto-approve-bot
 
