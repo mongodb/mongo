@@ -59,7 +59,7 @@ TEST_F(DiskSpaceMonitorTest, Threshold) {
     OperationContext* opCtx = nullptr;
     auto action = std::make_unique<SimpleAction>();
     auto actionPtr = action.get();
-    monitor.registerAction(std::move(action));
+    int64_t actionId = monitor.registerAction(std::move(action));
 
     monitor.takeAction(opCtx, 2000);
     ASSERT_EQ(0, actionPtr->hits);
@@ -72,6 +72,43 @@ TEST_F(DiskSpaceMonitorTest, Threshold) {
 
     monitor.takeAction(opCtx, 2000);
     ASSERT_EQ(2, actionPtr->hits);
+
+    monitor.deregisterAction(actionId);
 }
+
+TEST_F(DiskSpaceMonitorTest, TwoActions) {
+    OperationContext* opCtx = nullptr;
+    auto action1 = std::make_unique<SimpleAction>();
+    auto action2 = std::make_unique<SimpleAction>();
+    auto action1Ptr = action1.get();
+    auto action2Ptr = action2.get();
+    int64_t action1Id = monitor.registerAction(std::move(action1));
+    int64_t action2Id = monitor.registerAction(std::move(action2));
+
+    // Check both actions don't get incremented.
+    monitor.takeAction(opCtx, 2000);
+    ASSERT_EQ(0, action1Ptr->hits);
+    ASSERT_EQ(0, action2Ptr->hits);
+
+    // Check both actions get incremented.
+    monitor.takeAction(opCtx, 1024);
+    ASSERT_EQ(1, action1Ptr->hits);
+    ASSERT_EQ(1, action2Ptr->hits);
+
+    // Deregister action1.
+    monitor.deregisterAction(action1Id);
+
+    // Check that we increment action2, and that action1 remains unchanged.
+    monitor.takeAction(opCtx, 1000);
+    ASSERT_EQ(1, action1Ptr->hits);
+    ASSERT_EQ(2, action2Ptr->hits);
+
+    // Check both actions remain unchanged.
+    monitor.takeAction(opCtx, 2000);
+    ASSERT_EQ(1, action1Ptr->hits);
+    ASSERT_EQ(2, action2Ptr->hits);
+    monitor.deregisterAction(action2Id);
+}
+
 }  // namespace
 }  // namespace mongo
