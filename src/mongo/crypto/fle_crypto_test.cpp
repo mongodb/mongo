@@ -2240,9 +2240,17 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     EDCServerPayloadInfo payload;
     auto& iupayload = payload.payload = generateTestIUPV2ForTextSearch(doc.firstElement());
 
-    const std::vector<StringData> substrs = {"s", "ss", "sss", "ssss", "fake", "fake"};
-    const std::vector<StringData> suffixes = {"s", "ss", "fake", "fake"};
-    const std::vector<StringData> prefixes = {"s", "ss", "sss", "fake", "fake"};
+    std::vector<StringData> substrs = {"s", "ss", "sss", "ssss"};
+    std::vector<StringData> suffixes = {"s", "ss"};
+    std::vector<StringData> prefixes = {"s", "ss", "sss"};
+
+    // Append fake padding strings > 255 to ensure tag counts over 8 bits long are ok.
+    for (int i = 1; i <= 300; i++) {
+        substrs.push_back("fake"_sd);
+        suffixes.push_back("fake"_sd);
+        prefixes.push_back("fake"_sd);
+    }
+
     const size_t tagCount = 1 + substrs.size() + suffixes.size() + prefixes.size();
 
     generateTextTokenSetsForIUPV2(iupayload, substrs, QueryTypeEnum::SubstringPreview);
@@ -2300,7 +2308,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
     mblocks.insert(mblocks.end(), prefixBlks.begin(), prefixBlks.end());
 
     // verify metadata blocks have the correct tags
-    for (int i = 0; i < parsed.getTagCount(); i++) {
+    for (uint32_t i = 0; i < parsed.getTagCount(); i++) {
         auto swMeta =
             FLE2TagAndEncryptedMetadataBlock::decryptAndParse(serverDataTokens[i], mblocks[i]);
         ASSERT(swMeta.isOK());

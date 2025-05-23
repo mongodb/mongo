@@ -3566,19 +3566,19 @@ ConstDataRange FLE2IndexedTextEncryptedValue::getServerEncryptedValue() const {
     return MongoCryptBuffer::borrow(&_value->ServerEncryptedValue).toCDR();
 }
 
-uint8_t FLE2IndexedTextEncryptedValue::getTagCount() const {
+uint32_t FLE2IndexedTextEncryptedValue::getTagCount() const {
     return _value->edge_count;
 }
 
-uint8_t FLE2IndexedTextEncryptedValue::getSubstringTagCount() const {
+uint32_t FLE2IndexedTextEncryptedValue::getSubstringTagCount() const {
     return _value->substr_tag_count;
 }
 
-uint8_t FLE2IndexedTextEncryptedValue::getSuffixTagCount() const {
+uint32_t FLE2IndexedTextEncryptedValue::getSuffixTagCount() const {
     return _value->suffix_tag_count;
 }
 
-uint8_t FLE2IndexedTextEncryptedValue::getPrefixTagCount() const {
+uint32_t FLE2IndexedTextEncryptedValue::getPrefixTagCount() const {
     auto otherTagCount = getSubstringTagCount() + getSuffixTagCount() + 1;
     dassert(getTagCount() >= otherTagCount);
     return getTagCount() - otherTagCount;

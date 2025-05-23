@@ -894,10 +894,10 @@ public:
     UUID getKeyId() const;
     BSONType getBsonType() const;
     ConstDataRange getServerEncryptedValue() const;
-    uint8_t getTagCount() const;
-    uint8_t getSubstringTagCount() const;
-    uint8_t getSuffixTagCount() const;
-    uint8_t getPrefixTagCount() const;
+    uint32_t getTagCount() const;
+    uint32_t getSubstringTagCount() const;
+    uint32_t getSuffixTagCount() const;
+    uint32_t getPrefixTagCount() const;
     FLE2TagAndEncryptedMetadataBlockView getExactStringMetadataBlock() const;
     std::vector<FLE2TagAndEncryptedMetadataBlockView> getSubstringMetadataBlocks() const;
     std::vector<FLE2TagAndEncryptedMetadataBlockView> getSuffixMetadataBlocks() const;
