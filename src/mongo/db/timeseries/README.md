@@ -212,6 +212,16 @@ Queries should instead match on specific nested fields.
 CRUD operations can interact directly with the bucketed data format by setting the `rawData` command
 parameter.
 
+## Batched Inserts
+
+When a batch of inserts is processed by the write path, this typically comes from an `insertMany` command,
+the batch is [organized by meta value and sorted](https://github.com/10gen/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L506-L527) in time ascending order to ensure efficient bucketing
+and insertion. Prior versions would perform bucket targeting for each measurement in the order the user
+specified. This could lead to poor insert performance and very sub-optimal bucketing behavior if the user's
+batch was in time descending order. This change in batching also significantly reduces the number of stripe
+lock acquisitions which in turn reduces contention on the stripe lock. The stripe lock is acquired roughly
+once per batch per meta, instead of per measurement during the staging phase of a write.
+
 ## Indexes
 
 In order to support queries on the time-series collection that could benefit from indexed access
@@ -310,9 +320,9 @@ the index does not exist, then query-based reopening will not be used.
 
 When we reopen compressed buckets, in order to avoid fully decompressing and then fully re-compressing
 the bucket we instantiate the bucket's BSONColumnBuilders from the existing BSONColumn binaries. Currently
-this only supports scalar values; if the interleave mode (the mode where we are dealing with different types)
-is detected in the input BSONColumn binary, we will fully decompress and re-compress the bucket we are
-reopening.
+BSONColumn only supports optimized instantiation for scalar values; if an object or array type is
+[detected](https://github.com/mongodb/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/bson/column/bsoncolumnbuilder.cpp#L1380) in the input BSONColumn binary, the BSONColumnBuilder will fully decompress and re-create the
+BSONColumn for the metric we are reopening.
 
 ### Bucket Closure and Archival
 
