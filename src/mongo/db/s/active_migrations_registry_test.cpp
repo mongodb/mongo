@@ -150,71 +150,31 @@ TEST_F(MoveChunkRegistration, SecondMigrationWithSameArgumentsJoinsFirst) {
               secondScopedDonateChunk.waitForCompletion(opCtx));
 }
 
-TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
-    stdx::promise<void> blockDonate;
-    stdx::promise<void> readyToLock;
-    stdx::promise<void> inLock;
-
-    // Registry thread.
-    auto result = stdx::async(stdx::launch::async, [&] {
-        // 2. Lock the registry so that starting to donate will block.
-        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
-        auto opCtxHolder = tc->makeOperationContext();
-        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-        _registry.lock(opCtxHolder.get(), "dummy");
-
-        // 3. Signal the donate thread that the donate is ready to be started.
-        readyToLock.set_value();
-
-        // 4. Wait for the donate thread to start blocking because the registry is locked.
-        blockDonate.get_future().wait();
-
-        // 9. Unlock the registry to signal the donate thread.
-        _registry.unlock("dummy");
-    });
-
-    // Donate thread.
-    auto lockReleased = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc("donate thread", getGlobalServiceContext()->getService());
-        auto opCtx = tc->makeOperationContext();
-
-        auto baton = opCtx->getBaton();
-        baton->schedule([&inLock](Status) {
-            // 7. This is called when the donate is blocking. We let the test method know
-            // that we're blocked on the donate so that it can tell the registry thread to unlock
-            // the registry.
-            inLock.set_value();
-        });
-
-        // 5. This is woken up by the registry thread.
-        readyToLock.get_future().wait();
-
-        // 6. Now that we're woken up by the registry thread, let's attempt to start to donate.
-        // This will block and call the lambda set on the baton above.
-        auto scopedDonateChunk = _registry.registerDonateChunk(
-            opCtx.get(),
-            createMoveRangeRequest(
-                NamespaceString::createNamespaceString_forTest("TestDB", "TestColl")));
-
-        ASSERT_OK(scopedDonateChunk.getStatus());
-        scopedDonateChunk.getValue().signalComplete(Status::OK());
-
-        // 10. Destroy the ScopedDonateChunk and return.
-    });
-
-    // 1. Wait for the donate thread to start blocking.
-    inLock.get_future().wait();
-
-    // 8. Tell the registry thread to unlock the registry. That will signal the donate thread to
-    // continue.
-    blockDonate.set_value();
-
-    // 11. The donate thread has returned and this future is set.
-    lockReleased.wait();
+TEST_F(MoveChunkRegistration, TestDonateChunkIsRejectedWhenRegistryIsLocked) {
+    _registry.lock(_opCtx, "dummy");
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerDonateChunk(
+                  _opCtx,
+                  createMoveRangeRequest(
+                      NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"))));
+    _registry.unlock("dummy");
 }
 
-TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
+TEST_F(MoveChunkRegistration, TestReceiveChunkIsRejectedWhenRegistryIsLocked) {
+    _registry.lock(_opCtx, "dummy");
+    ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress,
+              _registry.registerReceiveChunk(
+                  _opCtx,
+                  NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
+                  ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+                  ShardId("shard0001"),
+                  false /* waitForCompletionOfConflictingOps */));
+    _registry.unlock("dummy");
+}
+
+
+TEST_F(MoveChunkRegistration,
+       TestReceiveChunkWithWaitForConflictingOpsIsBlockedWhenRegistryIsLocked) {
     stdx::promise<void> blockReceive;
     stdx::promise<void> readyToLock;
     stdx::promise<void> inLock;
@@ -261,7 +221,7 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
             NamespaceString::createNamespaceString_forTest("TestDB", "TestColl"),
             ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
             ShardId("shard0001"),
-            false);
+            true /* waitForCompletionOfConflictingOps */);
 
         ASSERT_OK(scopedReceiveChunk.getStatus());
 
