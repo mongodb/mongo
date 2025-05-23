@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
@@ -117,15 +118,26 @@ public:
                 DatabaseProfileSettings::get(opCtx->getServiceContext())
                     .getDatabaseProfileLevel(ns().dbName()));
 
-            auto coordinatorDoc = DropCollectionCoordinatorDocument();
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
-            coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
+            std::shared_ptr<DropCollectionCoordinator> dropCollCoordinator;
+            {
+                auto coordinatorDoc = DropCollectionCoordinatorDocument();
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto dropCollCoordinator =
-                checked_pointer_cast<DropCollectionCoordinator>(service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
+                FixedFCVRegion fcvRegion(opCtx);
+                coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                    {{ns(), DDLCoordinatorTypeEnum::kDropCollection}});
+                coordinatorDoc.setCollectionUUID(request().getCollectionUUID());
+                const auto changeStreamReadersV2Enabled =
+                    feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                        VersionContext::getDecoration(opCtx), fcvRegion->acquireFCVSnapshot());
+
+                coordinatorDoc.setChangeStreamPreciseShardTargetingEnabled(
+                    changeStreamReadersV2Enabled);
+
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                dropCollCoordinator =
+                    checked_pointer_cast<DropCollectionCoordinator>(service->getOrCreateInstance(
+                        opCtx, coordinatorDoc.toBSON(), FixedFCVRegion{opCtx}));
+            }
 
             dropCollCoordinator->getCompletionFuture().get(opCtx);
         }

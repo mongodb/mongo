@@ -4,7 +4,7 @@
  * as defined by the protocol that supports V2 change stream readers.
  *
  * @tags: [
- *   requires_fcv_82,
+ *   featureFlagChangeStreamPreciseShardTargeting,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
