@@ -7,7 +7,7 @@
  *   does_not_support_stepdowns,
  *   # Explain for the aggregate command cannot run within a multi-document transaction.
  *   does_not_support_transactions,
- *   requires_fcv_81,
+ *   requires_fcv_82,
  * ]
  */
 
@@ -74,6 +74,7 @@ assertContainsIndexScan({x: {$in: [2]}}, {hint: {x: 1}});
 // when an index on `x` is available.
 assertContainsEof({x: {$in: []}});
 assertContainsEof({x: {$in: []}, y: {$gt: 9}});
+assertContainsEof({x: {$elemMatch: {y: {$in: []}}}});
 // No relevant index should still produce an EOF plan.
 assertContainsEof({y: {$in: []}});
 // Hinting an index should allow EOF plan generation.
