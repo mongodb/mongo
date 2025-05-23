@@ -35,26 +35,26 @@
 namespace mongo {
 
 class RecoveryUnit;
-class SpillKVEngine;
+class SpillWiredTigerKVEngine;
 
 /**
  * WiredTigerRecordStoreBase implementation for temporary tables that are used for spilling
  * in-memory state to disk. Temporary tables are tables that don't need to be retained after a
- * restart. Use SpillKVEngine to create an instance of this class.
+ * restart. Use SpillWiredTigerKVEngine to create an instance of this class.
  *
  * This class is not thread-safe. A single thread must be interacting with this RecordStore or any
  * cursors created from it at any given time. This class creates its own RecoveryUnit instance and
  * uses it for all operations performed through this class.
  */
-class SpillRecordStore : public WiredTigerRecordStoreBase {
+class SpillWiredTigerRecordStore : public WiredTigerRecordStoreBase {
 public:
     struct Params {
         WiredTigerRecordStoreBase::Params baseParams;
     };
 
-    SpillRecordStore(SpillKVEngine* kvEngine, Params params);
+    SpillWiredTigerRecordStore(SpillWiredTigerKVEngine* kvEngine, Params params);
 
-    ~SpillRecordStore() override;
+    ~SpillWiredTigerRecordStore() override;
 
     long long dataSize() const override;
 
@@ -166,21 +166,21 @@ private:
      */
     void _changeNumRecordsAndDataSize(int64_t numRecordDiff, int64_t dataSizeDiff);
 
-    SpillKVEngine* _kvEngine{nullptr};
+    SpillWiredTigerKVEngine* _kvEngine{nullptr};
     std::unique_ptr<SpillRecoveryUnit> _wtRu;
     WiredTigerSizeStorer::SizeInfo _sizeInfo;
 };
 
 /**
- * WiredTigerRecordStoreCursorBase implementation for SpillRecordStore. It uses the
+ * WiredTigerRecordStoreCursorBase implementation for SpillWiredTigerRecordStore. It uses the
  * provided RecoveryUnit instance for all operations performed through this class.
  */
-class SpillRecordStoreCursor final : public WiredTigerRecordStoreCursorBase {
+class SpillWiredTigerRecordStoreCursor final : public WiredTigerRecordStoreCursorBase {
 public:
-    SpillRecordStoreCursor(OperationContext* opCtx,
-                           const SpillRecordStore& rs,
-                           bool forward,
-                           SpillRecoveryUnit* wtRu);
+    SpillWiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                     const SpillWiredTigerRecordStore& rs,
+                                     bool forward,
+                                     SpillRecoveryUnit* wtRu);
 
 protected:
     RecoveryUnit& getRecoveryUnit() const override;

@@ -36,19 +36,19 @@ namespace mongo {
 class ClockSource;
 
 /**
- * WiredTigerKVEngineBase implementation for creating SpillRecordStores. This class uses its own
- * WiredTiger instance called "spill" WiredTiger instance. Journaling is disabled for this
+ * WiredTigerKVEngineBase implementation for creating SpillWiredTigerRecordStores. This class uses
+ * its own WiredTiger instance called "spill" WiredTiger instance. Journaling is disabled for this
  * WiredTiger instance. The cache size of this WiredTiger instance is also configured to be very
  * small.
  */
-class SpillKVEngine final : public WiredTigerKVEngineBase {
+class SpillWiredTigerKVEngine final : public WiredTigerKVEngineBase {
 public:
-    SpillKVEngine(const std::string& canonicalName,
-                  const std::string& path,
-                  ClockSource* clockSource,
-                  WiredTigerConfig wtConfig);
+    SpillWiredTigerKVEngine(const std::string& canonicalName,
+                            const std::string& path,
+                            ClockSource* clockSource,
+                            WiredTigerConfig wtConfig);
 
-    ~SpillKVEngine() override;
+    ~SpillWiredTigerKVEngine() override;
 
     std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
                                                          StringData ident,

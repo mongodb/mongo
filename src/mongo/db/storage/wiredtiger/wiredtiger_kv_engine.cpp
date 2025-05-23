@@ -3096,8 +3096,8 @@ Status WiredTigerKVEngine::_drop(WiredTigerSession& session, const char* uri, co
 }
 
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
-    bool usingSpillKVEngine) {
-    // TODO(SERVER-103279): Optimally configure SpillKVEngine.
+    bool usingSpillWiredTigerKVEngine) {
+    // TODO(SERVER-103279): Optimally configure SpillWiredTigerKVEngine.
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig;
     wtConfig.sessionMax = wiredTigerGlobalOptions.sessionMax;
     wtConfig.evictionDirtyTargetMB = wiredTigerGlobalOptions.evictionDirtyTargetGB * 1024;
@@ -3109,11 +3109,11 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.statisticsLogWaitSecs = wiredTigerGlobalOptions.statisticsLogDelaySecs;
     wtConfig.zstdCompressorLevel = wiredTigerGlobalOptions.zstdCompressorLevel;
 
-    if (!usingSpillKVEngine) {
-        // Config fuzzer tests fail for SpillKVEngine due to eviction thresholds being higher than
-        // the cache size.
+    if (!usingSpillWiredTigerKVEngine) {
+        // Config fuzzer tests fail for SpillWiredTigerKVEngine due to eviction thresholds being
+        // higher than the cache size.
         // TODO(SERVER-103279): Fix this issue by appropriately configuring these thresholds for
-        // SpillKVEngine.
+        // SpillWiredTigerKVEngine.
         wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
 
         if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {
@@ -3129,8 +3129,8 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
 }
 
 WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
-    bool usingSpillKVEngine) {
-    // TODO(SERVER-103279): Optimally configure SpillRecordStore.
+    bool usingSpillWiredTigerKVEngine) {
+    // TODO(SERVER-103279): Optimally configure SpillWiredTigerRecordStore.
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig;
     wtTableConfig.blockCompressor = wiredTigerGlobalOptions.collectionBlockCompressor;
     return wtTableConfig;

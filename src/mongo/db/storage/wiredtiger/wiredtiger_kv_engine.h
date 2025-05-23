@@ -861,12 +861,12 @@ std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerC
  * startup.
  */
 WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
-    bool usingSpillKVEngine = false);
+    bool usingSpillWiredTigerKVEngine = false);
 
 /**
  * Returns a WiredTigerTableConfig populated with config values provided at startup.
  */
 WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
-    bool usingSpillKVEngine = false);
+    bool usingSpillWiredTigerKVEngine = false);
 
 }  // namespace mongo

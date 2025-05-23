@@ -56,7 +56,7 @@
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"

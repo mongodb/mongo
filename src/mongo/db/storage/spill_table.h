@@ -34,12 +34,12 @@
 namespace mongo {
 
 /**
- * SpillTable provides an interface for interacting with a SpillRecordStore used for spilling
+ * SpillTable provides an interface for interacting with a RecordStore used for spilling
  * intermediate data during query execution or other processing workflows.
  *
  * This class is not thread-safe. A single thread must be interacting with a SpillTable instance or
- * any cursors created from it at any given time. Note that the underlying SpillRecordStore creates
- * its own RecoveryUnit instance and uses it for all operations performed through this class.
+ * any cursors created from it at any given time. Note that the underlying RecordStore creates its
+ * own RecoveryUnit instance and uses it for all operations performed through this class.
  */
 class SpillTable {
 public:
@@ -48,13 +48,13 @@ public:
     virtual ~SpillTable() {}
 
     /**
-     * The dataSize is an approximation of the sum of the sizes (in bytes) of the
-     * documents or entries in the underlying SpillRecordStore.
+     * The dataSize is an approximation of the sum of the sizes (in bytes) of the documents or
+     * entries in the underlying RecordStore.
      */
     long long dataSize() const;
 
     /**
-     * Total number of records in the SpillRecordStore.
+     * Total number of records in the RecordStore.
      */
     long long numRecords() const;
 
@@ -64,14 +64,14 @@ public:
     int64_t storageSize(RecoveryUnit& ru) const;
 
     /**
-     * Inserts the specified records into the underlying SpillRecordStore by copying the provided
-     * record data.
+     * Inserts the specified records into the underlying RecordStore by copying the provided record
+     * data.
      */
     Status insertRecords(OperationContext* opCtx, std::vector<Record>* records);
 
     /**
-     * Finds the record with the specified RecordId in the underlying SpillRecordStore. Returns true
-     * iff the record is found.
+     * Finds the record with the specified RecordId in the underlying RecordStore. Returns true iff
+     * the record is found.
      *
      * If unowned data is returned, it is valid until the next modification.
      */
@@ -89,7 +89,7 @@ public:
     void deleteRecord(OperationContext* opCtx, const RecordId& rid);
 
     /**
-     * Returns a new cursor over the underlying SpillRecordStore.
+     * Returns a new cursor over the underlying RecordStore.
      *
      * The cursor is logically positioned before the first (or last if !forward) record in the
      * collection so that a record will be returned on the first call to next().

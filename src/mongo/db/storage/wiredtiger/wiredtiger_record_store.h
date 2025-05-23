@@ -82,7 +82,7 @@
 namespace mongo {
 
 class RecoveryUnit;
-class SpillKVEngine;
+class SpillWiredTigerKVEngine;
 class WiredTigerConnection;
 class WiredTigerKVEngine;
 class WiredTigerSizeStorer;

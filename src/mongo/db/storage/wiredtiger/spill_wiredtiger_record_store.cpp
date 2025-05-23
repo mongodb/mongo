@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/spill_record_store.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/transaction_resources.h"
@@ -43,38 +43,39 @@
 
 namespace mongo {
 
-SpillRecordStore::SpillRecordStore(SpillKVEngine* kvEngine, Params params)
+SpillWiredTigerRecordStore::SpillWiredTigerRecordStore(SpillWiredTigerKVEngine* kvEngine,
+                                                       Params params)
     : WiredTigerRecordStoreBase(std::move(params.baseParams)),
       _kvEngine(kvEngine),
       _wtRu(std::make_unique<SpillRecoveryUnit>(&kvEngine->getConnection())),
       _sizeInfo(0, 0) {}
 
-SpillRecordStore::~SpillRecordStore() {
+SpillWiredTigerRecordStore::~SpillWiredTigerRecordStore() {
     // TODO(SERVER-103273): Truncate and drop the table here.
     LOGV2_DEBUG(10158010,
                 1,
-                "~SpillRecordStore for temporary ident: {getIdent}",
+                "~SpillWiredTigerRecordStore for temporary ident: {getIdent}",
                 "getIdent"_attr = getIdent());
 }
 
-std::unique_ptr<SeekableRecordCursor> SpillRecordStore::getCursor(OperationContext* opCtx,
-                                                                  bool forward) const {
-    return std::make_unique<SpillRecordStoreCursor>(opCtx, *this, forward, _wtRu.get());
+std::unique_ptr<SeekableRecordCursor> SpillWiredTigerRecordStore::getCursor(OperationContext* opCtx,
+                                                                            bool forward) const {
+    return std::make_unique<SpillWiredTigerRecordStoreCursor>(opCtx, *this, forward, _wtRu.get());
 }
 
-long long SpillRecordStore::dataSize() const {
+long long SpillWiredTigerRecordStore::dataSize() const {
     auto dataSize = _sizeInfo.dataSize.load();
     return dataSize > 0 ? dataSize : 0;
 }
 
-long long SpillRecordStore::numRecords() const {
+long long SpillWiredTigerRecordStore::numRecords() const {
     auto numRecords = _sizeInfo.numRecords.load();
     return numRecords > 0 ? numRecords : 0;
 }
 
-int64_t SpillRecordStore::storageSize(RecoveryUnit& ru,
-                                      BSONObjBuilder* extraInfo,
-                                      int infoLevel) const {
+int64_t SpillWiredTigerRecordStore::storageSize(RecoveryUnit& ru,
+                                                BSONObjBuilder* extraInfo,
+                                                int infoLevel) const {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     WiredTigerSession* session = wtRu.getSessionNoTxn();
     auto result = WiredTigerUtil::getStatisticsValue(
@@ -83,20 +84,20 @@ int64_t SpillRecordStore::storageSize(RecoveryUnit& ru,
     return result.getValue();
 }
 
-RecoveryUnit& SpillRecordStore::getRecoveryUnit(OperationContext* opCtx) const {
+RecoveryUnit& SpillWiredTigerRecordStore::getRecoveryUnit(OperationContext* opCtx) const {
     return *_wtRu;
 }
 
-void SpillRecordStore::_deleteRecord(OperationContext* opCtx, const RecordId& id) {
+void SpillWiredTigerRecordStore::_deleteRecord(OperationContext* opCtx, const RecordId& id) {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     OpStats opStats{};
     wtDeleteRecord(opCtx, wtRu, id, opStats);
     _changeNumRecordsAndDataSize(-1, -opStats.oldValueLength);
 }
 
-Status SpillRecordStore::_insertRecords(OperationContext* opCtx,
-                                        std::vector<Record>* records,
-                                        const std::vector<Timestamp>&) {
+Status SpillWiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
+                                                  std::vector<Record>* records,
+                                                  const std::vector<Timestamp>&) {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
@@ -120,10 +121,10 @@ Status SpillRecordStore::_insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status SpillRecordStore::_updateRecord(OperationContext* opCtx,
-                                       const RecordId& id,
-                                       const char* data,
-                                       int len) {
+Status SpillWiredTigerRecordStore::_updateRecord(OperationContext* opCtx,
+                                                 const RecordId& id,
+                                                 const char* data,
+                                                 int len) {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     OpStats opStats{};
     auto status = wtUpdateRecord(opCtx, wtRu, id, data, len, opStats);
@@ -136,7 +137,7 @@ Status SpillRecordStore::_updateRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status SpillRecordStore::_truncate(OperationContext* opCtx) {
+Status SpillWiredTigerRecordStore::_truncate(OperationContext* opCtx) {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     auto status = wtTruncate(opCtx, wtRu);
     if (!status.isOK()) {
@@ -147,11 +148,11 @@ Status SpillRecordStore::_truncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status SpillRecordStore::_rangeTruncate(OperationContext* opCtx,
-                                        const RecordId& minRecordId,
-                                        const RecordId& maxRecordId,
-                                        int64_t hintDataSizeDiff,
-                                        int64_t hintNumRecordsDiff) {
+Status SpillWiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
+                                                  const RecordId& minRecordId,
+                                                  const RecordId& maxRecordId,
+                                                  int64_t hintDataSizeDiff,
+                                                  int64_t hintNumRecordsDiff) {
     auto& wtRu = SpillRecoveryUnit::get(getRecoveryUnit(nullptr));
     auto status = wtRangeTruncate(opCtx, wtRu, minRecordId, maxRecordId);
     if (!status.isOK()) {
@@ -162,20 +163,22 @@ Status SpillRecordStore::_rangeTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-void SpillRecordStore::_changeNumRecordsAndDataSize(int64_t numRecordDiff, int64_t dataSizeDiff) {
+void SpillWiredTigerRecordStore::_changeNumRecordsAndDataSize(int64_t numRecordDiff,
+                                                              int64_t dataSizeDiff) {
     _sizeInfo.numRecords.addAndFetch(numRecordDiff);
     _sizeInfo.dataSize.addAndFetch(dataSizeDiff);
 }
 
-SpillRecordStoreCursor::SpillRecordStoreCursor(OperationContext* opCtx,
-                                               const SpillRecordStore& rs,
-                                               bool forward,
-                                               SpillRecoveryUnit* wtRu)
+SpillWiredTigerRecordStoreCursor::SpillWiredTigerRecordStoreCursor(
+    OperationContext* opCtx,
+    const SpillWiredTigerRecordStore& rs,
+    bool forward,
+    SpillRecoveryUnit* wtRu)
     : WiredTigerRecordStoreCursorBase(opCtx, rs, forward), _wtRu(wtRu) {
     init();
 }
 
-RecoveryUnit& SpillRecordStoreCursor::getRecoveryUnit() const {
+RecoveryUnit& SpillWiredTigerRecordStoreCursor::getRecoveryUnit() const {
     return *_wtRu;
 }
 

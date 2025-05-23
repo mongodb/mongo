@@ -56,7 +56,7 @@
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -156,7 +156,7 @@ public:
         kv->setRecordStoreExtraOptions(wiredTigerGlobalOptions.collectionConfig);
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
-        std::unique_ptr<SpillKVEngine> spillKVEngine;
+        std::unique_ptr<SpillWiredTigerKVEngine> spillWiredTigerKVEngine;
         if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
             boost::system::error_code ec;
             boost::filesystem::remove_all(params.getSpillDbPath(), ec);
@@ -167,16 +167,16 @@ public:
             }
 
             WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-                getWiredTigerConfigFromStartupOptions(true /* usingSpillKVEngine */);
+                getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
             // TODO(SERVER-103753): Compute cache size properly.
             wtConfig.cacheSizeMB = 100;
             wtConfig.inMemory = params.inMemory;
             wtConfig.logEnabled = false;
-            spillKVEngine =
-                std::make_unique<SpillKVEngine>(getCanonicalName().toString(),
-                                                params.getSpillDbPath(),
-                                                getGlobalServiceContext()->getFastClockSource(),
-                                                std::move(wtConfig));
+            spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
+                getCanonicalName().toString(),
+                params.getSpillDbPath(),
+                getGlobalServiceContext()->getFastClockSource(),
+                std::move(wtConfig));
         }
 
         // We're using the WT engine; register the ServerStatusSection for it.
@@ -195,7 +195,7 @@ public:
         options.forRestore = params.restore;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
         return std::make_unique<StorageEngineImpl>(
-            opCtx, std::move(kv), std::move(spillKVEngine), options);
+            opCtx, std::move(kv), std::move(spillWiredTigerKVEngine), options);
     }
 
     StringData getCanonicalName() const override {

@@ -32,7 +32,7 @@
 #define NVALGRIND
 #endif
 
-#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -41,7 +41,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/wiredtiger/spill_record_store.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -67,10 +67,10 @@ constexpr bool kThreadSanitizerEnabled = false;
 
 }  // namespace
 
-SpillKVEngine::SpillKVEngine(const std::string& canonicalName,
-                             const std::string& path,
-                             ClockSource* clockSource,
-                             WiredTigerConfig wtConfig)
+SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalName,
+                                                 const std::string& path,
+                                                 ClockSource* clockSource,
+                                                 WiredTigerConfig wtConfig)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)) {
     if (!_wtConfig.inMemory) {
         if (!boost::filesystem::exists(path)) {
@@ -102,11 +102,12 @@ SpillKVEngine::SpillKVEngine(const std::string& canonicalName,
     // TODO(SERVER-103209): Add support for configuring the spill WiredTiger instance at runtime.
 }
 
-SpillKVEngine::~SpillKVEngine() {
+SpillWiredTigerKVEngine::~SpillWiredTigerKVEngine() {
     cleanShutdown();
 }
 
-void SpillKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {
+void SpillWiredTigerKVEngine::_openWiredTiger(const std::string& path,
+                                              const std::string& wtOpenConfig) {
     auto wtEventHandler = _eventHandler.getWtEventHandler();
 
     int ret = wiredtiger_open(path.c_str(), wtEventHandler, wtOpenConfig.c_str(), &_conn);
@@ -117,10 +118,9 @@ void SpillKVEngine::_openWiredTiger(const std::string& path, const std::string& 
     }
 }
 
-std::unique_ptr<RecordStore> SpillKVEngine::getTemporaryRecordStore(OperationContext* opCtx,
-                                                                    StringData ident,
-                                                                    KeyFormat keyFormat) {
-    SpillRecordStore::Params params;
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(
+    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+    SpillWiredTigerRecordStore::Params params;
     params.baseParams.uuid = boost::none;
     params.baseParams.ident = ident.toString();
     params.baseParams.engineName = _canonicalName;
@@ -129,16 +129,15 @@ std::unique_ptr<RecordStore> SpillKVEngine::getTemporaryRecordStore(OperationCon
     // We don't log writes to spill tables.
     params.baseParams.isLogged = false;
     params.baseParams.forceUpdateWithFullDocument = false;
-    return std::make_unique<SpillRecordStore>(this, std::move(params));
+    return std::make_unique<SpillWiredTigerRecordStore>(this, std::move(params));
 }
 
-std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
-                                                                     StringData ident,
-                                                                     KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
+    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
-        getWiredTigerTableConfigFromStartupOptions(true /* usingSpillKVEngine */);
+        getWiredTigerTableConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
@@ -156,20 +155,20 @@ std::unique_ptr<RecordStore> SpillKVEngine::makeTemporaryRecordStore(OperationCo
     return getTemporaryRecordStore(opCtx, ident, keyFormat);
 }
 
-bool SpillKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
+bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
     return _wtHasUri(*SpillRecoveryUnit::get(ru).getSession(),
                      WiredTigerUtil::buildTableUri(ident));
 }
 
-std::vector<std::string> SpillKVEngine::getAllIdents(RecoveryUnit& ru) const {
+std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
     auto& wtRu = SpillRecoveryUnit::get(ru);
     return _wtGetAllIdents(wtRu);
 }
 
-Status SpillKVEngine::dropIdent(RecoveryUnit* ru,
-                                StringData ident,
-                                bool identHasSizeInfo,
-                                const StorageEngine::DropIdentCallback& onDrop) {
+Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
+                                          StringData ident,
+                                          bool identHasSizeInfo,
+                                          const StorageEngine::DropIdentCallback& onDrop) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
     auto& wtRu = SpillRecoveryUnit::get(*ru);
@@ -188,8 +187,8 @@ Status SpillKVEngine::dropIdent(RecoveryUnit* ru,
     return status;
 }
 
-void SpillKVEngine::cleanShutdown() {
-    LOGV2(10158003, "SpillKVEngine shutting down");
+void SpillWiredTigerKVEngine::cleanShutdown() {
+    LOGV2(10158003, "SpillWiredTigerKVEngine shutting down");
 
     if (!_conn) {
         return;
@@ -212,7 +211,7 @@ void SpillKVEngine::cleanShutdown() {
     auto startTime = Date_t::now();
     LOGV2(10158006, "Closing spill WiredTiger", "closeConfig"_attr = closeConfig);
     // WT_CONNECTION::close() takes a checkpoint. To ensure this is fast, we delete the tables
-    // created by this KVEngine in SpillRecordStore destructor.
+    // created by this KVEngine in SpillWiredTigerRecordStore destructor.
     invariantWTOK(_conn->close(_conn, closeConfig.c_str()), nullptr);
     LOGV2(10158007, "Closed spill WiredTiger ", "duration"_attr = Date_t::now() - startTime);
     _conn = nullptr;

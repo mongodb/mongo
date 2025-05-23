@@ -501,9 +501,9 @@ public:
 
     /**
      * Creates a temporary table that can be used for spilling in-memory state to disk. A table
-     * created using this API uses a separate SpillKVEngine instance and thus does not interfere
-     * with the reads/writes happening on the main KVEngine instance. This table is automatically
-     * dropped when the returned handle is destructed.
+     * created using this API does not interfere with the reads/writes happening on the main
+     * KVEngine instance. This table is automatically dropped when the returned handle is
+     * destructed.
      */
     virtual std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
                                                        KeyFormat keyFormat) = 0;

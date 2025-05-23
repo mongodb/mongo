@@ -33,8 +33,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/spill_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/spill_record_store.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/unordered_set.h"
@@ -43,27 +43,28 @@
 namespace mongo {
 namespace {
 
-class SpillRecordStoreTest : public ServiceContextTest {
+class SpillWiredTigerRecordStoreTest : public ServiceContextTest {
 protected:
-    SpillRecordStoreTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
+    SpillWiredTigerRecordStoreTest() : _dbpath("wt_test"), _opCtx(makeOperationContext()) {
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
-            getWiredTigerConfigFromStartupOptions(true /* usingSpillKVEngine */);
+            getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
         wtConfig.cacheSizeMB = 1;
         wtConfig.inMemory = true;
         wtConfig.logEnabled = false;
-        _kvEngine = std::make_unique<SpillKVEngine>(
+        _kvEngine = std::make_unique<SpillWiredTigerKVEngine>(
             std::string{kWiredTigerEngineName}, _dbpath.path(), &_clockSource, std::move(wtConfig));
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
         ASSERT_TRUE(_kvEngine->hasIdent(_recordStore->getRecoveryUnit(nullptr), "a.b"));
     }
 
-    std::unique_ptr<SpillRecordStore> makeTemporaryRecordStore(const std::string& ns,
-                                                               KeyFormat keyFormat) {
+    std::unique_ptr<SpillWiredTigerRecordStore> makeTemporaryRecordStore(const std::string& ns,
+                                                                         KeyFormat keyFormat) {
         StringData ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         auto rs = _kvEngine->makeTemporaryRecordStore(_opCtx.get(), ident, keyFormat);
-        return std::unique_ptr<SpillRecordStore>(dynamic_cast<SpillRecordStore*>(rs.release()));
+        return std::unique_ptr<SpillWiredTigerRecordStore>(
+            dynamic_cast<SpillWiredTigerRecordStore*>(rs.release()));
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() {
@@ -72,13 +73,13 @@ protected:
 
     unittest::TempDir _dbpath;
     ClockSourceMock _clockSource;
-    std::unique_ptr<SpillKVEngine> _kvEngine;
-    std::unique_ptr<SpillRecordStore> _recordStore;
+    std::unique_ptr<SpillWiredTigerKVEngine> _kvEngine;
+    std::unique_ptr<SpillWiredTigerRecordStore> _recordStore;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
 // Test that insertRecord() works as expected.
-TEST_F(SpillRecordStoreTest, InsertRecord) {
+TEST_F(SpillWiredTigerRecordStoreTest, InsertRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -106,7 +107,7 @@ TEST_F(SpillRecordStoreTest, InsertRecord) {
 }
 
 // Test that updateRecord() works as expected.
-TEST_F(SpillRecordStoreTest, UpdateRecord) {
+TEST_F(SpillWiredTigerRecordStoreTest, UpdateRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -144,7 +145,7 @@ TEST_F(SpillRecordStoreTest, UpdateRecord) {
 }
 
 // Test that deleteRecord() works as expected.
-TEST_F(SpillRecordStoreTest, DeleteRecord) {
+TEST_F(SpillWiredTigerRecordStoreTest, DeleteRecord) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -182,7 +183,7 @@ TEST_F(SpillRecordStoreTest, DeleteRecord) {
 }
 
 // Test that truncate() works as expected.
-TEST_F(SpillRecordStoreTest, Truncate) {
+TEST_F(SpillWiredTigerRecordStoreTest, Truncate) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -215,7 +216,7 @@ TEST_F(SpillRecordStoreTest, Truncate) {
 }
 
 // Test that rangeTruncate() works as expected.
-TEST_F(SpillRecordStoreTest, RangeTruncate) {
+TEST_F(SpillWiredTigerRecordStoreTest, RangeTruncate) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -257,7 +258,7 @@ TEST_F(SpillRecordStoreTest, RangeTruncate) {
 }
 
 // Test that RecordCursor works as expected.
-TEST_F(SpillRecordStoreTest, RecordCursor) {
+TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -353,10 +354,10 @@ TEST_F(SpillRecordStoreTest, RecordCursor) {
 }
 
 // Test that tables get created and deleted as expected.
-TEST_F(SpillRecordStoreTest, TableCreation) {
+TEST_F(SpillWiredTigerRecordStoreTest, TableCreation) {
     SpillRecoveryUnit wtRu(&_kvEngine->getConnection());
 
-    std::vector<std::unique_ptr<SpillRecordStore>> recordStores;
+    std::vector<std::unique_ptr<SpillWiredTigerRecordStore>> recordStores;
     for (int i = 0; i < 3; ++i) {
         auto ident = "a." + std::to_string(i + 1);
         auto recordStore = makeTemporaryRecordStore(ident, KeyFormat::Long);
