@@ -5,11 +5,13 @@
  *
  * @tags: [ requires_fcv_81, featureFlagMongotIndexedViews ]
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    createSearchIndexesAndExecuteTests,
+    validateSearchExplain,
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
-
 const publications = testDb.publications;
 const authors = testDb.authors;
 const universities = testDb.universities;
@@ -217,204 +219,286 @@ const authorsIndexName = "authorsIndex";
 const universitiesIndexName = "universitiesIndex";
 const conferencesIndexName = "conferencesIndex";
 const keywordsIndexName = "keywordsIndex";
-createSearchIndex(publicationsView,
-                  {name: publicationsIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(authorsView, {name: authorsIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(universitiesView,
-                  {name: universitiesIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(conferencesView,
-                  {name: conferencesIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(keywordsView, {name: keywordsIndexName, definition: {mappings: {dynamic: true}}});
-
-/**
- * This pipeline contains a deeply nested $lookup with search queries at each level:
- * 1. The top level searches for publications with "Machine Learning" in their title
- * 2. First $lookup finds authors who have "Deep Learning" in their research areas
- * 3. Second $lookup finds universities with "Computer Science" departments
- * 4. Third $lookup finds conferences related to "Machine Learning"
- * 5. Final $lookup finds "very-popular" keywords in the "AI" category
- *
- * The pipeline applies $match stages at each level to filter out results where inner lookups would
- * return empty arrays. This ensures we only get publications that:
- * - Contain "Machine Learning" in the title
- * - Have at least one author who researches "Deep Learning"
- * - That author works at a university with a "Computer Science" department
- * - That university is associated with conferences about "Machine Learning"
- * - Those conferences feature "very-popular" AI keywords
- *
- * The expected results are publications 1 ("Advances in Machine Learning Algorithms") and 5
- * ("Deep Learning in Computer Vision"), with their complete nested document structure.
- */
-const pipeline = [
-    {$search: {index: publicationsIndexName, text: {query: "Machine Learning", path: "title"}}},
+const indexConfigs = [
     {
-        $lookup: {
-            from: authorsView.getName(),
-            localField: "author_ids",
-            foreignField: "_id",
-            as: "authors_info",
-            pipeline: [
-                {
-                    $search: {
-                        index: authorsIndexName,
-                        text: {
-                            query: "Deep Learning",
-                            path: "research_areas"
-                        }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: universitiesView.getName(),
-                        localField: "university_id",
-                        foreignField: "_id",
-                        as: "university_info",
-                        pipeline: [
-                            {
-                                $search: {
-                                    index: universitiesIndexName,
-                                    text: {
-                                        query: "Computer Science",
-                                        path: "departments"
-                                    }
-                                }
-                            },
-                            {
-                                $lookup: {
-                                    from: conferencesView.getName(),
-                                    pipeline: [
-                                        {
-                                            $search: {
-                                                index: conferencesIndexName,
-                                                text: {
-                                                    query: "Machine Learning",
-                                                    path: "name"
-                                                }
-                                            }
-                                        },
-                                        {
-                                            $lookup: {
-                                                from: keywordsView.getName(),
-                                                pipeline: [
-                                                    {
-                                                        $search: {
-                                                            index: keywordsIndexName,
-                                                            text: {
-                                                                query: "AI",
-                                                                path: "category"
-                                                            }
-                                                        }
-                                                    },
-                                                    {
-                                                        $match: {
-                                                            popularity: "very-popular"
-                                                        }
-                                                    },
-                                                    {$sort: {_id: 1}}
-                                                ],
-                                                as: "relevant_keywords"
-                                            }
-                                        },
-                                        {
-                                            $match: {
-                                                "relevant_keywords": { $ne: [] }
-                                            }
-                                        }
-                                    ],
-                                    as: "related_conferences"
-                                }
-                            },
-                            {
-                                $match: {
-                                    "related_conferences": { $ne: [] }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    $match: {
-                        "university_info": { $ne: [] }
-                    }
-                },
-                {$sort: {_id: 1}}
-            ]
-        }
+        coll: publicationsView,
+        definition: {name: publicationsIndexName, definition: {mappings: {dynamic: true}}}
     },
     {
-        $match: {
-            "authors_info": { $ne: [] }
-        }
+        coll: authorsView,
+        definition: {name: authorsIndexName, definition: {mappings: {dynamic: true}}}
     },
-    {$sort: {_id: 1}}
+    {
+        coll: universitiesView,
+        definition: {name: universitiesIndexName, definition: {mappings: {dynamic: true}}}
+    },
+    {
+        coll: conferencesView,
+        definition: {name: conferencesIndexName, definition: {mappings: {dynamic: true}}}
+    },
+    {
+        coll: keywordsView,
+        definition: {name: keywordsIndexName, definition: {mappings: {dynamic: true}}}
+    }
 ];
 
-// Assert that the top-level view definition is applied correctly in the explain output.
-const explain = assert.commandWorked(publicationsView.explain().aggregate(pipeline));
-assertViewAppliedCorrectly(explain, pipeline, publicationsViewPipeline);
-
-const results = publicationsView.aggregate(pipeline).toArray();
-const expectedResults = [
-    {
-        _id: 1,
-        title: "Advances in Machine Learning Algorithms",
-        year: 2020,
-        author_ids: [101, 102],
-        conference_id: 1,
-        keyword_ids: [501, 502, 503],
-        formatted_title: "\"Advances in Machine Learning Algorithms\" (2020)",
-        is_recent: true,
-        authors_info: [
+const lookupNestedDeepTestCases = (isStoredSource) => {
+    // This pipeline contains a deeply nested $lookup with search queries at each level:
+    //  1. The top level searches for publications with "Machine Learning" in their title
+    //  2. First $lookup finds authors who have "Deep Learning" in their research areas
+    //  3. Second $lookup finds universities with "Computer Science" departments
+    //  4. Third $lookup finds conferences related to "Machine Learning"
+    //  5. Final $lookup finds "very-popular" keywords in the "AI" category
+    //
+    //  The pipeline applies $match stages at each level to filter out results where inner lookups
+    //  would return empty arrays. This ensures we only get publications that:
+    //  - Contain "Machine Learning" in the title
+    //  - Have at least one author who researches "Deep Learning"
+    //  - That author works at a university with a "Computer Science" department
+    //  - That university is associated with conferences about "Machine Learning"
+    //  - Those conferences feature "very-popular" AI keywords
+    //
+    //  The expected results are publications 1 ("Advances in Machine Learning Algorithms") and 5
+    //  ("Deep Learning in Computer Vision"), with their complete nested document structure.
+    const pipeline = [
             {
-                _id: 101,
-                name: "Dr. Jane Smith",
-                university_id: 201,
-                research_areas: ["AI", "Machine Learning", "Quantum Computing"],
-                display_name: "Dr. Jane Smith (AI)",
-                primary_area: "AI",
-                university_info: [{
-                    _id: 201,
-                    name: "Stanford University",
-                    location: "California, USA",
-                    departments: ["Computer Science", "Mathematics", "Physics"],
-                    full_name: "Stanford University (California, USA)",
-                    related_conferences: [{
-                        _id: 1,
-                        name: "International Conference on Machine Learning",
-                        acronym: "ICML",
-                        year: 2020,
-                        location: "Vienna, Austria",
-                        full_name: "International Conference on Machine Learning (ICML)",
-                        relevant_keywords: [
-                            {
-                                _id: 501,
-                                term: "Machine Learning",
-                                category: "AI",
-                                papers_count: 4500,
-                                display_term: "Machine Learning (AI)",
-                                popularity: "very-popular"
-                            },
-                            {
-                                _id: 502,
-                                term: "Deep Learning",
-                                category: "AI",
-                                papers_count: 3200,
-                                display_term: "Deep Learning (AI)",
-                                popularity: "very-popular"
-                            },
-                            {
-                                _id: 509,
-                                term: "Computer Vision",
-                                category: "AI",
-                                papers_count: 4100,
-                                display_term: "Computer Vision (AI)",
-                                popularity: "very-popular"
-                            }
-                        ]
-                    }]
-                }]
+                $search: {
+                    index: publicationsIndexName, 
+                    text: {
+                        query: "Machine Learning", 
+                        path: "title"
+                    }, 
+                    returnStoredSource: isStoredSource
+                }
             },
             {
+                $lookup: {
+                    from: authorsView.getName(),
+                    localField: "author_ids",
+                    foreignField: "_id",
+                    as: "authors_info",
+                    pipeline: [
+                        {
+                            $search: {
+                                index: authorsIndexName,
+                                text: {
+                                    query: "Deep Learning",
+                                    path: "research_areas"
+                                },
+                                returnStoredSource: isStoredSource
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: universitiesView.getName(),
+                                localField: "university_id",
+                                foreignField: "_id",
+                                as: "university_info",
+                                pipeline: [
+                                    {
+                                        $search: {
+                                            index: universitiesIndexName,
+                                            text: {
+                                                query: "Computer Science",
+                                                path: "departments"
+                                            },
+                                            returnStoredSource: isStoredSource
+                                        }
+                                    },
+                                    {
+                                        $lookup: {
+                                            from: conferencesView.getName(),
+                                            pipeline: [
+                                                {
+                                                    $search: {
+                                                        index: conferencesIndexName,
+                                                        text: {
+                                                            query: "Machine Learning",
+                                                            path: "name"
+                                                        },
+                                                        returnStoredSource: isStoredSource
+                                                    }
+                                                },
+                                                {
+                                                    $lookup: {
+                                                        from: keywordsView.getName(),
+                                                        pipeline: [
+                                                            {
+                                                                $search: {
+                                                                    index: keywordsIndexName,
+                                                                    text: {
+                                                                        query: "AI",
+                                                                        path: "category"
+                                                                    },
+                                                                    returnStoredSource: isStoredSource
+                                                                }
+                                                            },
+                                                            {
+                                                                $match: {
+                                                                    popularity: "very-popular"
+                                                                }
+                                                            },
+                                                            {$sort: {_id: 1}}
+                                                        ],
+                                                        as: "relevant_keywords"
+                                                    }
+                                                },
+                                                {
+                                                    $match: {
+                                                        "relevant_keywords": { $ne: [] }
+                                                    }
+                                                }
+                                            ],
+                                            as: "related_conferences"
+                                        }
+                                    },
+                                    {
+                                        $match: {
+                                            "related_conferences": { $ne: [] }
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $match: {
+                                "university_info": { $ne: [] }
+                            }
+                        },
+                        {$sort: {_id: 1}}
+                    ]
+                }
+            },
+            {
+                $match: {
+                    "authors_info": { $ne: [] }
+                }
+            },
+            {$sort: {_id: 1}}
+        ];
+
+    const expectedResults = [
+        {
+            _id: 1,
+            title: "Advances in Machine Learning Algorithms",
+            year: 2020,
+            author_ids: [101, 102],
+            conference_id: 1,
+            keyword_ids: [501, 502, 503],
+            formatted_title: "\"Advances in Machine Learning Algorithms\" (2020)",
+            is_recent: true,
+            authors_info: [
+                {
+                    _id: 101,
+                    name: "Dr. Jane Smith",
+                    university_id: 201,
+                    research_areas: ["AI", "Machine Learning", "Quantum Computing"],
+                    display_name: "Dr. Jane Smith (AI)",
+                    primary_area: "AI",
+                    university_info: [{
+                        _id: 201,
+                        name: "Stanford University",
+                        location: "California, USA",
+                        departments: ["Computer Science", "Mathematics", "Physics"],
+                        full_name: "Stanford University (California, USA)",
+                        related_conferences: [{
+                            _id: 1,
+                            name: "International Conference on Machine Learning",
+                            acronym: "ICML",
+                            year: 2020,
+                            location: "Vienna, Austria",
+                            full_name: "International Conference on Machine Learning (ICML)",
+                            relevant_keywords: [
+                                {
+                                    _id: 501,
+                                    term: "Machine Learning",
+                                    category: "AI",
+                                    papers_count: 4500,
+                                    display_term: "Machine Learning (AI)",
+                                    popularity: "very-popular"
+                                },
+                                {
+                                    _id: 502,
+                                    term: "Deep Learning",
+                                    category: "AI",
+                                    papers_count: 3200,
+                                    display_term: "Deep Learning (AI)",
+                                    popularity: "very-popular"
+                                },
+                                {
+                                    _id: 509,
+                                    term: "Computer Vision",
+                                    category: "AI",
+                                    papers_count: 4100,
+                                    display_term: "Computer Vision (AI)",
+                                    popularity: "very-popular"
+                                }
+                            ]
+                        }]
+                    }]
+                },
+                {
+                    _id: 102,
+                    name: "Prof. John Davis",
+                    university_id: 202,
+                    research_areas:
+                        ["Deep Learning", "Natural Language Processing", "Computer Vision"],
+                    display_name: "Prof. John Davis (Deep Learning)",
+                    primary_area: "Deep Learning",
+                    university_info: [{
+                        _id: 202,
+                        name: "Massachusetts Institute of Technology",
+                        location: "Massachusetts, USA",
+                        departments: ["Computer Science", "Electrical Engineering", "Mathematics"],
+                        full_name: "Massachusetts Institute of Technology (Massachusetts, USA)",
+                        related_conferences: [{
+                            _id: 1,
+                            name: "International Conference on Machine Learning",
+                            acronym: "ICML",
+                            year: 2020,
+                            location: "Vienna, Austria",
+                            full_name: "International Conference on Machine Learning (ICML)",
+                            relevant_keywords: [
+                                {
+                                    _id: 501,
+                                    term: "Machine Learning",
+                                    category: "AI",
+                                    papers_count: 4500,
+                                    display_term: "Machine Learning (AI)",
+                                    popularity: "very-popular"
+                                },
+                                {
+                                    _id: 502,
+                                    term: "Deep Learning",
+                                    category: "AI",
+                                    papers_count: 3200,
+                                    display_term: "Deep Learning (AI)",
+                                    popularity: "very-popular"
+                                },
+                                {
+                                    _id: 509,
+                                    term: "Computer Vision",
+                                    category: "AI",
+                                    papers_count: 4100,
+                                    display_term: "Computer Vision (AI)",
+                                    popularity: "very-popular"
+                                }
+                            ]
+                        }]
+                    }]
+                }
+            ]
+        },
+        {
+            _id: 5,
+            title: "Deep Learning in Computer Vision",
+            year: 2022,
+            author_ids: [102, 104, 105],
+            conference_id: 1,
+            keyword_ids: [501, 502, 509],
+            formatted_title: "\"Deep Learning in Computer Vision\" (2022)",
+            is_recent: true,
+            authors_info: [{
                 _id: 102,
                 name: "Prof. John Davis",
                 university_id: 202,
@@ -462,74 +546,14 @@ const expectedResults = [
                         ]
                     }]
                 }]
-            }
-        ]
-    },
-    {
-        _id: 5,
-        title: "Deep Learning in Computer Vision",
-        year: 2022,
-        author_ids: [102, 104, 105],
-        conference_id: 1,
-        keyword_ids: [501, 502, 509],
-        formatted_title: "\"Deep Learning in Computer Vision\" (2022)",
-        is_recent: true,
-        authors_info: [{
-            _id: 102,
-            name: "Prof. John Davis",
-            university_id: 202,
-            research_areas: ["Deep Learning", "Natural Language Processing", "Computer Vision"],
-            display_name: "Prof. John Davis (Deep Learning)",
-            primary_area: "Deep Learning",
-            university_info: [{
-                _id: 202,
-                name: "Massachusetts Institute of Technology",
-                location: "Massachusetts, USA",
-                departments: ["Computer Science", "Electrical Engineering", "Mathematics"],
-                full_name: "Massachusetts Institute of Technology (Massachusetts, USA)",
-                related_conferences: [{
-                    _id: 1,
-                    name: "International Conference on Machine Learning",
-                    acronym: "ICML",
-                    year: 2020,
-                    location: "Vienna, Austria",
-                    full_name: "International Conference on Machine Learning (ICML)",
-                    relevant_keywords: [
-                        {
-                            _id: 501,
-                            term: "Machine Learning",
-                            category: "AI",
-                            papers_count: 4500,
-                            display_term: "Machine Learning (AI)",
-                            popularity: "very-popular"
-                        },
-                        {
-                            _id: 502,
-                            term: "Deep Learning",
-                            category: "AI",
-                            papers_count: 3200,
-                            display_term: "Deep Learning (AI)",
-                            popularity: "very-popular"
-                        },
-                        {
-                            _id: 509,
-                            term: "Computer Vision",
-                            category: "AI",
-                            papers_count: 4100,
-                            display_term: "Computer Vision (AI)",
-                            popularity: "very-popular"
-                        }
-                    ]
-                }]
             }]
-        }]
-    }
-];
-assert.eq(expectedResults, results);
+        }
+    ];
 
-// Clean up search indexes.
-dropSearchIndex(publicationsView, {name: publicationsIndexName});
-dropSearchIndex(authorsView, {name: authorsIndexName});
-dropSearchIndex(universitiesView, {name: universitiesIndexName});
-dropSearchIndex(conferencesView, {name: conferencesIndexName});
-dropSearchIndex(keywordsView, {name: keywordsIndexName});
+    validateSearchExplain(publicationsView, pipeline, isStoredSource, publicationsViewPipeline);
+
+    const results = publicationsView.aggregate(pipeline).toArray();
+    assertArrayEq({actual: results, expected: expectedResults});
+};
+
+createSearchIndexesAndExecuteTests(indexConfigs, lookupNestedDeepTestCases);

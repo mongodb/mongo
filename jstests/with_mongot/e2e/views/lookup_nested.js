@@ -4,11 +4,13 @@
  *
  * @tags: [ requires_fcv_81, featureFlagMongotIndexedViews ]
  */
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {assertViewAppliedCorrectly} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {
+    createSearchIndexesAndExecuteTests,
+    validateSearchExplain,
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
-
 const movies = testDb.movies;
 const users = testDb.users;
 const ratings = testDb.ratings;
@@ -94,178 +96,185 @@ const ratingsView = testDb.ratingsView;
 const moviesIndexName = "moviesIndex";
 const usersIndexName = "usersIndex";
 const ratingsIndexName = "ratingsIndex";
-createSearchIndex(moviesView, {name: moviesIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(usersView, {name: usersIndexName, definition: {mappings: {dynamic: true}}});
-createSearchIndex(ratingsView, {name: ratingsIndexName, definition: {mappings: {dynamic: true}}});
-
-/**
- * This pipeline demonstrates a nested lookup structure with search queries at each level:
- * 1. The top level searches for movies with "Drama" in their genres
- * 2. First $lookup finds ratings with "excellent" or "good" rating_text
- * 3. Second $lookup finds users who have "Drama" as a favorite genre
- *
- * The pipeline applies $match stages to filter out results where the inner lookups
- * returned empty arrays. This ensures we only get movies that:
- * - Have "Drama" in their genres
- * - Have at least one "excellent" or "good" rating
- * - That rating was made by a user who has "Drama" as a favorite genre
- *
- * The expected results are movies 1 ("The Shawshank Redemption"), 2 ("The Godfather"),
- * and 5 ("Fight Club") - each with their complete nested document structure showing
- * the relevant ratings and user information. Finally, the view definitions are applied to each
- * respective document.
- */
-const pipeline = [
+const indexConfigs = [
     {
-        $search: {
-            index: moviesIndexName,
-            text: {
-                query: "Drama",
-                path: "genres"
-            }
-        }
+        coll: moviesView,
+        definition: {name: moviesIndexName, definition: {mappings: {dynamic: true}}}
     },
+    {coll: usersView, definition: {name: usersIndexName, definition: {mappings: {dynamic: true}}}},
     {
-        $lookup: {
-            from: ratingsView.getName(),
-            localField: "_id",
-            foreignField: "movie_id",
-            as: "user_ratings",
-            pipeline: [
-                {
-                    $search: {
-                        index: ratingsIndexName,
-                        text: {
-                            query: "excellent good",
-                            path: "rating_text"
-                        }
-                    }
-                },
-                {
-                    $lookup: {
-                        from: usersView.getName(),
-                        localField: "user_id",
-                        foreignField: "_id",
-                        as: "user_info",
-                        pipeline: [
-                            {
-                                $search: {
-                                    index: usersIndexName,
-                                    text: {
-                                        query: "Drama",
-                                        path: "favorite_genres"
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    $match: {
-                        "user_info": { $ne: [] }
-                    }
-                },
-                {
-                    $project: {
-                        _id: 0
-                    }
-                }
-            ]
-        }
-    },
-    {
-        $match: {
-            "user_ratings": { $ne: [] }
-        }
-    },
-    {$sort: {_id: 1}}
-];
-
-// Ensure that the top-level view exists as expected in the explain output.
-const explain = assert.commandWorked(moviesView.explain().aggregate(pipeline));
-assertViewAppliedCorrectly(explain, pipeline, moviesViewPipeline);
-
-const results = moviesView.aggregate(pipeline).toArray();
-const expectedResults = [
-    {
-        _id: 1,
-        title: "The Shawshank Redemption",
-        genres: ["Drama"],
-        year: 1994,
-        display_title: "The Shawshank Redemption (1994)",
-        decade: "1990s",
-        runtime_minutes: 142,
-        user_ratings: [{
-            user_id: 101,
-            movie_id: 1,
-            rating: 5,
-            rating_text: "excellent",
-            is_recommended: true,
-            user_info: [{
-                _id: 101,
-                name: "Alice",
-                favorite_genres: ["Drama", "Crime"],
-                age: 35,
-                age_group: "middle-aged",
-                primary_genre: "Drama",
-                full_name: "ALICE, viewer"
-            }]
-        }]
-    },
-    {
-        _id: 2,
-        title: "The Godfather",
-        genres: ["Crime", "Drama"],
-        year: 1972,
-        display_title: "The Godfather (1972)",
-        decade: "1970s",
-        runtime_minutes: 175,
-        user_ratings: [{
-            user_id: 101,
-            movie_id: 2,
-            rating: 4,
-            rating_text: "good",
-            is_recommended: true,
-            user_info: [{
-                _id: 101,
-                name: "Alice",
-                favorite_genres: ["Drama", "Crime"],
-                age: 35,
-                age_group: "middle-aged",
-                primary_genre: "Drama",
-                full_name: "ALICE, viewer"
-            }]
-        }]
-    },
-    {
-        _id: 5,
-        title: "Fight Club",
-        genres: ["Drama"],
-        year: 1999,
-        display_title: "Fight Club (1999)",
-        decade: "1990s",
-        runtime_minutes: 142,
-        user_ratings: [{
-            user_id: 103,
-            movie_id: 5,
-            rating: 5,
-            rating_text: "excellent",
-            is_recommended: true,
-            user_info: [{
-                _id: 103,
-                name: "Charlie",
-                favorite_genres: ["Drama"],
-                age: 28,
-                age_group: "young adult",
-                primary_genre: "Drama",
-                full_name: "CHARLIE, viewer"
-            }]
-        }]
+        coll: ratingsView,
+        definition: {name: ratingsIndexName, definition: {mappings: {dynamic: true}}}
     }
 ];
-assert.eq(expectedResults, results);
 
-// Clean up search indexes.
-dropSearchIndex(moviesView, {name: moviesIndexName});
-dropSearchIndex(usersView, {name: usersIndexName});
-dropSearchIndex(ratingsView, {name: ratingsIndexName});
+const lookupNestedTestCases = (isStoredSource) => {
+    // This pipeline demonstrates a nested lookup structure with search queries at each level:
+    // 1. The top level searches for movies with "Drama" in their genres
+    // 2. First $lookup finds ratings with "excellent" or "good" rating_text
+    // 3. Second $lookup finds users who have "Drama" as a favorite genre
+    //
+    // The pipeline applies $match stages to filter out results where the inner lookups returned
+    // empty arrays. This ensures we only get movies that:
+    // - Have "Drama" in their genres
+    // - Have at least one "excellent" or "good" rating
+    // - That rating was made by a user who has "Drama" as a favorite genre
+    //
+    // The expected results are movies 1 ("The Shawshank Redemption"), 2 ("The Godfather"),
+    // and 5 ("Fight Club") - each with their complete nested document structure showing the
+    // relevant ratings and user information. Finally, the view definitions are applied to each
+    // respective document.
+    const pipeline = [
+            {
+                $search: {
+                    index: moviesIndexName,
+                    text: {
+                        query: "Drama",
+                        path: "genres"
+                    },
+                    returnStoredSource: isStoredSource
+                }
+            },
+            {
+                $lookup: {
+                    from: ratingsView.getName(),
+                    localField: "_id",
+                    foreignField: "movie_id",
+                    as: "user_ratings",
+                    pipeline: [
+                        {
+                            $search: {
+                                index: ratingsIndexName,
+                                text: {
+                                    query: "excellent good",
+                                    path: "rating_text"
+                                },
+                                returnStoredSource: isStoredSource
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: usersView.getName(),
+                                localField: "user_id",
+                                foreignField: "_id",
+                                as: "user_info",
+                                pipeline: [
+                                    {
+                                        $search: {
+                                            index: usersIndexName,
+                                            text: {
+                                                query: "Drama",
+                                                path: "favorite_genres"
+                                            },
+                                            returnStoredSource: isStoredSource
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $match: {
+                                "user_info": { $ne: [] }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 0
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                $match: {
+                    "user_ratings": { $ne: [] }
+                }
+            },
+            {$sort: {_id: 1}}
+        ];
+
+    const expectedResults = [
+        {
+            _id: 1,
+            title: "The Shawshank Redemption",
+            genres: ["Drama"],
+            year: 1994,
+            display_title: "The Shawshank Redemption (1994)",
+            decade: "1990s",
+            runtime_minutes: 142,
+            user_ratings: [{
+                user_id: 101,
+                movie_id: 1,
+                rating: 5,
+                rating_text: "excellent",
+                is_recommended: true,
+                user_info: [{
+                    _id: 101,
+                    name: "Alice",
+                    favorite_genres: ["Drama", "Crime"],
+                    age: 35,
+                    age_group: "middle-aged",
+                    primary_genre: "Drama",
+                    full_name: "ALICE, viewer"
+                }]
+            }]
+        },
+        {
+            _id: 2,
+            title: "The Godfather",
+            genres: ["Crime", "Drama"],
+            year: 1972,
+            display_title: "The Godfather (1972)",
+            decade: "1970s",
+            runtime_minutes: 175,
+            user_ratings: [{
+                user_id: 101,
+                movie_id: 2,
+                rating: 4,
+                rating_text: "good",
+                is_recommended: true,
+                user_info: [{
+                    _id: 101,
+                    name: "Alice",
+                    favorite_genres: ["Drama", "Crime"],
+                    age: 35,
+                    age_group: "middle-aged",
+                    primary_genre: "Drama",
+                    full_name: "ALICE, viewer"
+                }]
+            }]
+        },
+        {
+            _id: 5,
+            title: "Fight Club",
+            genres: ["Drama"],
+            year: 1999,
+            display_title: "Fight Club (1999)",
+            decade: "1990s",
+            runtime_minutes: 142,
+            user_ratings: [{
+                user_id: 103,
+                movie_id: 5,
+                rating: 5,
+                rating_text: "excellent",
+                is_recommended: true,
+                user_info: [{
+                    _id: 103,
+                    name: "Charlie",
+                    favorite_genres: ["Drama"],
+                    age: 28,
+                    age_group: "young adult",
+                    primary_genre: "Drama",
+                    full_name: "CHARLIE, viewer"
+                }]
+            }]
+        }
+    ];
+
+    validateSearchExplain(moviesView, pipeline, isStoredSource, moviesViewPipeline);
+
+    const results = moviesView.aggregate(pipeline).toArray();
+    assertArrayEq({actual: results, expected: expectedResults});
+};
+
+createSearchIndexesAndExecuteTests(indexConfigs, lookupNestedTestCases);

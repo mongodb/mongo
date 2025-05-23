@@ -2,8 +2,13 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
+import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {getMovieData} from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
+import {
+    assertViewAppliedCorrectly,
+    assertViewNotApplied
+} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 /**
  * This function is used in place of direct assertions between expected and actual document array
@@ -277,4 +282,104 @@ export function buildExpectedResults(idArray, dataset) {
         results.push(data[id]);
     }
     return results;
+}
+
+/**
+ * Creates one or more search indexes with the specified storedSource option attached and returns a
+ * cleanup function to delete the search indexes.
+ *
+ * @param {Object|Array} config - Either a single {collection, definition} object or an array of
+ *     such objects.
+ * @param {boolean} isStoredSource - Whether storedSource should be enabled on the search indexes.
+ * @returns {Function} A unified cleanup function for all created indexes.
+ */
+export function createSearchIndexesWithCleanup(config, isStoredSource = true) {
+    // Normalize input to array format.
+    const configs = Array.isArray(config) ? config : [config];
+    const cleanupFunctions = [];
+
+    configs.forEach(({coll, definition}) => {
+        // Deep copy to avoid modifying the original.
+        const indexDef = JSON.parse(JSON.stringify(definition));
+
+        // Ensure required structure exists.
+        if (!indexDef.definition) {
+            indexDef.definition = {};
+        }
+        if (!indexDef.definition.mappings) {
+            indexDef.definition.mappings = {dynamic: true};
+        }
+
+        // Set storedSource value.
+        indexDef.definition.storedSource = isStoredSource;
+
+        // Create the index.
+        createSearchIndex(coll, indexDef);
+
+        // Add cleanup function.
+        cleanupFunctions.push(() => {
+            dropSearchIndex(coll, {name: indexDef.name});
+        });
+    });
+
+    // Return a unified cleanup function.
+    return () => {
+        cleanupFunctions.forEach(cleanupFn => {
+            cleanupFn();
+        });
+    };
+}
+
+/**
+ * Executes a test function with search indexes two times: once with storedSource and once without.
+ * Cleanup of search indexes will occur even if a test fails. This utility encapsulates the common
+ * try/finally pattern used in search-on-view tests.
+ *
+ * @param {Object|Array} indexConfig - Index configuration to pass to
+ *     createSearchIndexesWithCleanup.
+ * @param {Function} testFn - The test function to execute with the created indexes. This function
+ *     must take in one parameter which specifies whether the tests are storedSource or not.
+ */
+export function createSearchIndexesAndExecuteTests(
+    indexConfig, testFn, runWithStoredSource = true) {
+    // Create indexes with cleanup function.
+    const cleanup = createSearchIndexesWithCleanup(indexConfig);
+    try {
+        if (runWithStoredSource) {
+            testFn(true);
+        }
+        testFn(false);
+    } finally {
+        cleanup();
+    }
+}
+
+/**
+ * Executes a search pipeline and handles validation based on storedSource setting and specified
+ * explain validation function.
+ *
+ * @param {Object} coll - The collection to query.
+ * @param {Array} userPipeline - User pipeline to run on the collection.
+ * @param {boolean} isStoredSource - Whether storedSource is enabled.
+ * @param {Array} viewPipeline - Optional view pipeline's definition for validation.
+ * @param {Function} explainValidationFn - Optional additional function to validate explain output.
+ */
+export function validateSearchExplain(
+    coll, userPipeline, isStoredSource, viewPipeline = null, explainValidationFn = null) {
+    const explain = assert.commandWorked(coll.explain().aggregate(userPipeline));
+
+    // If coll is a view, assert that the view is applied correctly based on the storedSource value
+    // specified.
+    if (viewPipeline) {
+        if (isStoredSource) {
+            assertViewNotApplied(explain, userPipeline, viewPipeline);
+        } else {
+            assertViewAppliedCorrectly(explain, userPipeline, viewPipeline);
+        }
+    }
+
+    // Validate explain output if a function was provided.
+    if (explainValidationFn) {
+        explainValidationFn(explain);
+    }
 }

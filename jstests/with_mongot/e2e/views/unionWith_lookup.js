@@ -6,23 +6,19 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
-    checkSbeFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
-import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {
-    assertLookupInExplain,
     assertUnionWithSearchSubPipelineAppliedViews,
-    assertViewAppliedCorrectly
 } from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {
+    createSearchIndexesAndExecuteTests,
+    validateSearchExplain,
+} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
-const bestPictureColl = db["best_picture"];
-const bestActressColl = db["best_actress"];
+const testDb = db.getSiblingDB(jsTestName());
+const bestPictureColl = testDb.best_picture;
+const bestActressColl = testDb.best_actress;
 bestPictureColl.drop();
 bestActressColl.drop();
-
-const isSbeFullyEnabled = checkSbeFullyEnabled(db);
 
 assert.commandWorked(bestActressColl.insertMany([
     {title: "Klute", year: 1971, recipient: "Jane Fonda"},
@@ -37,9 +33,9 @@ assert.commandWorked(bestActressColl.insertMany([
 let viewName = "bestActressAwardsAfter1979";
 const bestActressViewPipeline =
     [{"$match": {"$expr": {'$and': [{'$gt': ['$year', 1979]}, {'$lt': ['$year', 1997]}]}}}];
-assert.commandWorked(db.createView(viewName, bestActressColl.getName(), bestActressViewPipeline));
-const bestActressView = db[viewName];
-createSearchIndex(bestActressView, {name: "default", definition: {"mappings": {"dynamic": true}}});
+assert.commandWorked(
+    testDb.createView(viewName, bestActressColl.getName(), bestActressViewPipeline));
+const bestActressView = testDb[viewName];
 
 assert.commandWorked(bestPictureColl.insertMany([
     {title: "The French Connection", year: 1971, rotten_tomatoes_score: "96%"},
@@ -55,13 +51,11 @@ assert.commandWorked(bestPictureColl.insertMany([
 viewName = "bestPictureAwardsWithRottenTomatoScore";
 const bestPicturesViewPipeline =
     [{"$addFields": {rotten_tomatoes_score: {$ifNull: ['$rotten_tomatoes_score', '62%']}}}];
-assert.commandWorked(db.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
-const bestPictureView = db[viewName];
-createSearchIndex(bestPictureView, {name: "default", definition: {"mappings": {"dynamic": true}}});
+assert.commandWorked(
+    testDb.createView(viewName, bestPictureColl.getName(), bestPicturesViewPipeline));
+const bestPictureView = testDb[viewName];
 
-// $lookup and $unionWith.
-// Create nominations collection to call $lookup on.
-const nominationsColl = db["nominations"];
+const nominationsColl = testDb["nominations"];
 nominationsColl.drop();
 
 assert.commandWorked(nominationsColl.insertMany([
@@ -69,63 +63,79 @@ assert.commandWorked(nominationsColl.insertMany([
     {title: "Moonstruck", year: 1987, category: "Best Picture"}
 ]));
 
-const lookupStage = {
-    $lookup: {
-        from: nominationsColl.getName(),
-        localField: "title",
-        foreignField: "title",
-        as: "nominations"
+// Create search indexes with on both views.
+const indexConfigs = [
+    {
+        coll: bestPictureView,
+        definition: {name: "default", definition: {"mappings": {"dynamic": true}}}
+    },
+    {
+        coll: bestActressView,
+        definition: {name: "default", definition: {"mappings": {"dynamic": true}}}
     }
+];
+
+const unionWithLookupTestCases = (isStoredSource) => {
+    // Create nominations collection to call $lookup on.
+    const lookupStage = {
+            $lookup: {
+                from: nominationsColl.getName(),
+                localField: "title",
+                foreignField: "title",
+                as: "nominations"
+            }
+        };
+
+    const pipeline = [
+        // Join with the nomination's collection based on title.
+        lookupStage,
+        // Flatten results.
+        {$unwind: "$nominations"},
+        {$project: {_id: 0, "nominations.category": 1, title: 1, year: 1}},
+        {
+            $unionWith: {
+                coll: bestPictureView.getName(),
+                pipeline: [
+                    // Search bestPictureView.
+                    {
+                        $search: {
+                            text: {query: 'Terms of Endearment', path: 'title'},
+                            returnStoredSource: isStoredSource
+                        }
+                    },
+                    {$set: {source: bestPictureView.getName()}},
+                    {$project: {_id: 0}}
+                ]
+            }
+        }
+    ];
+
+    const expectedResults = [
+        {
+            title: "Terms of Endearment",
+            year: 1983,
+            nominations: {category: "Best Picture"},
+        },
+        {title: "Moonstruck", year: 1987, nominations: {category: "Best Picture"}},
+        {
+            title: "Terms of Endearment",
+            year: 1983,
+            rotten_tomatoes_score: "62%",
+            source: "bestPictureAwardsWithRottenTomatoScore"
+        }
+    ];
+
+    validateSearchExplain(
+        bestActressView, pipeline, isStoredSource, bestActressViewPipeline, (explain) => {
+            assertUnionWithSearchSubPipelineAppliedViews(explain,
+                                                         bestPictureColl,
+                                                         bestPictureView,
+                                                         bestPicturesViewPipeline,
+                                                         isStoredSource);
+        });
+
+    const results = bestActressView.aggregate(pipeline).toArray();
+    assertArrayEq({actual: results, expected: expectedResults});
 };
 
-const pipeline = [
-    // Join with the nomination's collection based on title.
-    lookupStage,
-    // Flatten results.
-    {$unwind: "$nominations"},
-    {$project: {_id: 0, "nominations.category": 1, title: 1, year: 1}},
-    {
-        $unionWith: {
-            coll: bestPictureView.getName(),
-            pipeline: [
-                // Search bestPictureView.
-                {$search: {text: {query: 'Terms of Endearment', path: 'title'}}},
-                {$set: {source: bestPictureView.getName()}},
-                {$project: {_id: 0}}
-            ]
-        }
-    }
-];
-
-const expectedResults = [
-    {
-        title: "Terms of Endearment",
-        year: 1983,
-        nominations: {category: "Best Picture"},
-    },
-    {title: "Moonstruck", year: 1987, nominations: {category: "Best Picture"}},
-    {
-        title: "Terms of Endearment",
-        year: 1983,
-        rotten_tomatoes_score: "62%",
-        source: "bestPictureAwardsWithRottenTomatoScore"
-    }
-];
-
-// Assert that the outer view definition is applied correctly, the $unionWith view defintion is
-// applied correctly, and the lookup stage exists in the explain output.
-const explain = assert.commandWorked(bestActressView.explain().aggregate(pipeline));
-assertViewAppliedCorrectly(explain, pipeline, bestActressViewPipeline[0]);
-assertUnionWithSearchSubPipelineAppliedViews(
-    explain, bestPictureColl, bestPictureView, bestPicturesViewPipeline);
-
-// $lookup won't exist in the explain output if SBE is fully enabled.
-if (!isSbeFullyEnabled || FixtureHelpers.numberOfShardsForCollection(bestActressColl) > 1) {
-    assertLookupInExplain(explain, lookupStage);
-}
-
-const results = bestActressView.aggregate(pipeline).toArray();
-assertArrayEq({actual: results, expected: expectedResults});
-
-dropSearchIndex(bestActressView, {name: "default"});
-dropSearchIndex(bestPictureView, {name: "default"});
+createSearchIndexesAndExecuteTests(indexConfigs, unionWithLookupTestCases);

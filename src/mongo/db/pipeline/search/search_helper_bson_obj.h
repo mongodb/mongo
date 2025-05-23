@@ -51,13 +51,10 @@ inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
 }
 
 inline bool isStoredSource(const std::vector<BSONObj> pipeline) {
-
     if (pipeline.size() >= 1 && pipeline[0][DocumentSourceSearch::kStageName]) {
         auto searchStage = pipeline[0][DocumentSourceSearch::kStageName];
-        if (searchStage.isABSONObj() && searchStage.Obj().hasField("returnStoredSource") &&
-            searchStage["returnStoredSource"]) {
-            return true;
-        }
+        auto storedSourceElem = searchStage[mongot_cursor::kReturnStoredSourceArg];
+        return !storedSourceElem.eoo() && storedSourceElem.Bool();
     }
     return false;
 }

@@ -3,6 +3,7 @@
  * results provide meta data on the enriched collection, they don't have/display the enriched fields
  * themselves. On an implementation level, $searchMeta doesn't desugar to $_internalSearchIdLookup
  * (which performs view transforms for other mongot operators).
+ *
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
@@ -28,11 +29,13 @@ const viewPipeline = [{"$addFields": {totalPrice: {$add: ['$cleaningFee', "$room
 assert.commandWorked(testDb.createView(viewName, 'hotelAccounting', viewPipeline));
 const totalPriceView = testDb[viewName];
 
+// Create a search index on the view.
 createSearchIndex(totalPriceView, {
     name: "totalPriceIndex",
     definition: {"mappings": {"dynamic": false, "fields": {"totalPrice": {"type": "numberFacet"}}}}
 });
-// This query creates three buckets for totalPrice field: [300-399], [400-499], [500-599]
+
+// This query creates three buckets for totalPrice field: [300-399], [400-499], [500-599].
 const facetQuery = [{
     $searchMeta: {
         index: "totalPriceIndex",
@@ -47,7 +50,7 @@ const facetQuery = [{
 
 // Verify that the explain output doesn't contain the view pipeline.
 let explain = assert.commandWorked(totalPriceView.explain().aggregate(facetQuery));
-assertViewNotApplied(explain, viewPipeline);
+assertViewNotApplied(explain, facetQuery, viewPipeline);
 
 let expectedResults = [{
     count: {lowerBound: NumberLong(5)},
@@ -71,15 +74,12 @@ collBase.drop();
 assert.commandWorked(collBase.insert({_id: 0}));
 assert.commandWorked(collBase.insert({_id: 1}));
 
-/**
- * $lookup doesn't include any details about its subpipeline in the explain output. Therefore there
- * isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
- * output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
- */
-
+// $lookup doesn't include any details about its subpipeline in the explain output. Therefore there
+// isn't any chance that the $lookup subpipeline will include the view pipeline in the explain
+// output. Instead, we just verify that the top-level agg doesn't contain the view transforms.
 const lookupPipeline = [{$lookup: {from: "totalPrice", pipeline: facetQuery, as: "meta_facet"}}];
 explain = collBase.explain().aggregate(lookupPipeline);
-assertViewNotApplied(explain, viewPipeline);
+assertViewNotApplied(explain, lookupPipeline, viewPipeline);
 assertLookupInExplain(explain, lookupPipeline[0]);
 
 expectedResults = [
