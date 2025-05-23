@@ -65,6 +65,11 @@ public:
                 "$minMaxScaler window function must be provided with the value of the current "
                 "document",
                 current.has_value());
+        uassert(10487000,
+                str::stream()
+                    << "'input' argument to $minMaxScaler must evaluate to a numeric type, got: "
+                    << typeName(current->getType()),
+                current->numeric());
         tassert(9459902,
                 "There must always be documents in the current window for $minMaxScaler",
                 !_values.empty());

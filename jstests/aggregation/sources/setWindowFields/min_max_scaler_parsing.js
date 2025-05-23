@@ -6,6 +6,16 @@
 const coll = db[jsTestName()];
 coll.drop();
 
+// Add some documents to the collection, to test simple runtime user assertions.
+// (for example asserting that the 'input' argument evaluates to
+// a numeric type can only be caught at execution time)
+const bulk = coll.initializeUnorderedBulkOp();
+const nDocs = 10;
+for (let i = 1; i <= nDocs; i++) {
+    bulk.insert({_id: i, "x": i, "str": i.toString()});
+}
+assert.commandWorked(bulk.execute());
+
 // Helper functions to assert which $setWindowField args are expected to pass
 // and which are expected to fail.
 function expectSuccessWithArgs(setWindowFieldsArgs) {
@@ -232,6 +242,111 @@ expectFailureWithArgs(
         }
     },
     ErrorCodes.FailedToParse);
+
+// Tests to assert that input arg must evaluate to a numeric.
+expectFailureWithArgs(
+    // Removable document based bounds, input evaluates to a string (from a constant).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
+                window: {documents: [0, "unbounded"]}
+            },
+        }
+    },
+    10487000);
+
+expectFailureWithArgs(
+    // Removable document based bounds, input evaluates to a string (from document field).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": "$str", min: 0, max: 10},
+                window: {documents: [0, "unbounded"]}
+            },
+        }
+    },
+    10487000);
+
+expectFailureWithArgs(
+    // Removable range based bounds, input evaluates to a string (from a constant).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
+                window: {range: [0, "unbounded"]}
+            },
+        }
+    },
+    10487000);
+
+expectFailureWithArgs(
+    // Removable range based bounds, input evaluates to a string (from document field).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": "$str", min: 0, max: 10},
+                window: {range: [0, "unbounded"]}
+            },
+        }
+    },
+    10487000);
+
+expectFailureWithArgs(
+    // Non-removable document based bounds, input evaluates to a string (from a constant).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
+                window: {documents: ["unbounded", "unbounded"]}
+            },
+        }
+    },
+    10487001);
+
+expectFailureWithArgs(
+    // Non-removable document based bounds, input evaluates to a string (from document field).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": "$str", min: 0, max: 10},
+                window: {documents: ["unbounded", "unbounded"]}
+            },
+        }
+    },
+    10487001);
+
+expectFailureWithArgs(
+    // Non-removable range based bounds, input evaluates to a string (from a constant).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
+                window: {range: ["unbounded", "unbounded"]}
+            },
+        }
+    },
+    10487004);
+
+expectFailureWithArgs(
+    // Non-removable range based bounds, input evaluates to a string (from document field).
+    {
+        sortBy: {_id: 1},
+        output: {
+            "relativeXValue": {
+                $minMaxScaler: {"input": "$str", min: 0, max: 10},
+                window: {range: ["unbounded", "unbounded"]}
+            },
+        }
+    },
+    10487004);
 
 // $setWindowFields args that should succeed.
 expectSuccessWithArgs({

@@ -54,6 +54,11 @@ public:
           _sMinAndsMax(sMinAndsMax.first, sMinAndsMax.second) {};
 
     void updateWindow(const Value& input) final {
+        uassert(10487001,
+                str::stream()
+                    << "'input' argument to $minMaxScaler must evaluate to a numeric type, got: "
+                    << typeName(input.getType()),
+                input.numeric());
         _windowMinAndMax.update(input);
     }
 
@@ -62,10 +67,22 @@ public:
     }
 
     Value getWindowValue(boost::optional<Document> current) final {
-        return min_max_scaler::computeResult(
-            _input->evaluate(*current, &_input->getExpressionContext()->variables),
-            _windowMinAndMax,
-            _sMinAndsMax);
+        tassert(10487002,
+                "$minMaxScaler window function must be provided with the value of the current "
+                "document",
+                current.has_value());
+
+        const Value& inputValue =
+            _input->evaluate(*current, &_input->getExpressionContext()->variables);
+        // This is a tassert, not a uassert, because the same value should always already be
+        // present in the current window, where it would have been caught as a non-numeric.
+        tassert(10487003,
+                str::stream()
+                    << "'input' argument to $minMaxScaler must evaluate to a numeric type, got: "
+                    << typeName(inputValue.getType()),
+                inputValue.numeric());
+
+        return min_max_scaler::computeResult(inputValue, _windowMinAndMax, _sMinAndsMax);
     }
 
     int64_t getMemUsage() final {
