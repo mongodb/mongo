@@ -39,7 +39,7 @@ assert.commandWorked(setParameter(
     db, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", isSbeEnabled ? 129 : 392));
 // Spilling memory threshold for $bucketAuto
 assert.commandWorked(setParameter(db, "internalDocumentSourceBucketAutoMaxMemoryBytes", 1));
-// Spilling memory threshold for $lookup
+// Spilling memory threshold for $lookup and $lookup-$unwind
 assert.commandWorked(setParameter(
     db, "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", 1));
 // Spilling memory threshold for $graphLookup
@@ -51,19 +51,23 @@ for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(foreignColl.insert({_id: i}));
 }
 
-const stages = {
-    sort: {$sort: {a: 1}},
-    group: {$group: {_id: "$_id", a: {$sum: "$_id"}}},
-    setWindowFields: {
+const pipelines = {
+    sort: [{$sort: {a: 1}}],
+    group: [{$group: {_id: "$_id", a: {$sum: "$_id"}}}],
+    setWindowFields: [{
         $setWindowFields: {
             partitionBy: "$_id",
             sortBy: {_id: 1},
             output: {b: {$sum: "$_id", window: {documents: [0, 0]}}}
         }
+    }],
+    lookup: [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}}],
+    "lookup-unwind": [{
+        $lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}
     },
-    lookup: {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}},
-    bucketAuto: {$bucketAuto: {groupBy: "$_id", buckets: 2, output: {count: {$sum: 1}}}},
-    graphLookup: {
+    {$unwind: "$c"}],
+    bucketAuto: [{$bucketAuto: {groupBy: "$_id", buckets: 2, output: {count: {$sum: 1}}}}],
+    graphLookup: [{
         $graphLookup: {
             from: foreignCollName,
             startWith: "$_id",
@@ -71,35 +75,35 @@ const stages = {
             connectFromField: "_id",
             as: "c",
         }
-    },
+    }],
 };
 
 function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
-    if (stageName === '$sort') {
+    if (stageName === 'sort') {
         const sortMetrics = serverStatus.metrics.query.sort;
         return {
             spills: sortMetrics.spillToDisk,
             spilledBytes: sortMetrics.spillToDiskBytes,
         };
-    } else if (stageName === '$group') {
+    } else if (stageName === 'group') {
         const group = serverStatus.metrics.query.group;
         return {
             spills: group.spills,
             spilledBytes: group.spilledBytes,
         };
-    } else if (stageName === '$setWindowFields') {
+    } else if (stageName === 'setWindowFields') {
         const setWindowFieldsMetrics = serverStatus.metrics.query.setWindowFields;
         return {
             spills: setWindowFieldsMetrics.spills,
             spilledBytes: setWindowFieldsMetrics.spilledBytes,
         };
-    } else if (stageName === '$bucketAuto') {
+    } else if (stageName === 'bucketAuto') {
         const bucketAutoMetrics = serverStatus.metrics.query.bucketAuto;
         return {
             spills: bucketAutoMetrics.spills,
             spilledBytes: bucketAutoMetrics.spilledBytes,
         };
-    } else if (stageName === '$lookup') {
+    } else if (stageName === 'lookup' || stageName === 'lookup-unwind') {
         const lookupMetrics = serverStatus.metrics.query.lookup;
         if (getLegacy === true) {
             return {
@@ -112,7 +116,7 @@ function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
                 spilledBytes: lookupMetrics.hashLookupSpilledBytes,
             };
         }
-    } else if (stageName === "$graphLookup") {
+    } else if (stageName === "graphLookup") {
         const graphLookupMetrics = serverStatus.metrics.query.graphLookup;
         return {
             spills: graphLookupMetrics.spills,
@@ -127,16 +131,18 @@ function getServerStatusSpillingMetrics(serverStatus, stageName, getLegacy) {
 }
 
 function testSpillingMetrics(
-    {stage, expectedSpillingMetrics, expectedSbeSpillingMetrics, getLegacy = false}) {
+    {stageName, expectedSpillingMetrics, expectedSbeSpillingMetrics, getLegacy = false}) {
+    const pipeline = pipelines[stageName];
+
     // Check whether the aggregation uses SBE.
-    const explain = db[collName].explain().aggregate([stage]);
+    const explain = db[collName].explain().aggregate(pipeline);
     jsTestLog(explain);
     const queryPlanner = getQueryPlanner(explain);
     const isSbe = queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan");
     const isCollScan = getPlanStages(getWinningPlanFromExplain(explain), "COLLSCAN").length > 0;
 
     // Collect the serverStatus metrics before the aggregation runs.
-    const stageName = Object.keys(stage)[0];
+    jsTestLog(stageName);
     const spillingMetrics = [];
     spillingMetrics.push(getServerStatusSpillingMetrics(db.serverStatus(), stageName, getLegacy));
 
@@ -144,11 +150,11 @@ function testSpillingMetrics(
     const failPointName =
         isSbe ? "hangScanGetNext" : (isCollScan ? "hangCollScanDoWork" : "hangFetchDoWork");
     const failPoint = configureFailPoint(db, failPointName, {} /* data */, {"skip": nDocs / 2});
-    const awaitShell = startParallelShell(funWithArgs((stage, collName) => {
+    const awaitShell = startParallelShell(funWithArgs((pipeline, collName) => {
                                               const results =
-                                                  db[collName].aggregate([stage]).toArray();
+                                                  db[collName].aggregate(pipeline).toArray();
                                               assert.gt(results.length, 0, results);
-                                          }, stage, collName), conn.port);
+                                          }, pipeline, collName), conn.port);
 
     // Collect the serverStatus metrics once the aggregation hits the fail point.
     failPoint.wait();
@@ -174,39 +180,51 @@ function testSpillingMetrics(
 }
 
 testSpillingMetrics({
-    stage: stages['sort'],
+    stageName: 'sort',
     expectedSpillingMetrics: {spills: 19, spilledBytes: 654},
     expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 935}
 });
 testSpillingMetrics({
-    stage: stages['group'],
+    stageName: 'group',
     expectedSpillingMetrics: {spills: 10, spilledBytes: 410},
     expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 450}
 });
 testSpillingMetrics({
-    stage: stages['setWindowFields'],
+    stageName: 'setWindowFields',
     expectedSpillingMetrics: {spills: 10, spilledBytes: 500},
     expectedSbeSpillingMetrics: {spills: 9, spilledBytes: 500},
 });
 if (isSbeEnabled) {
+    // Each new aggregations increases the 'lookup' metrics by
+    // 20 spills and 471 spilledByes.
     testSpillingMetrics({
-        stage: stages['lookup'],
+        stageName: 'lookup',
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 471},
         getLegacy: true,
     });
     testSpillingMetrics({
-        stage: stages['lookup'],
+        stageName: 'lookup',
         expectedSbeSpillingMetrics: {spills: 40, spilledBytes: 942},
+        getLegacy: false,
+    });
+    testSpillingMetrics({
+        stageName: 'lookup-unwind',
+        expectedSbeSpillingMetrics: {spills: 60, spilledBytes: 1413},
+        getLegacy: true,
+    });
+    testSpillingMetrics({
+        stageName: 'lookup-unwind',
+        expectedSbeSpillingMetrics: {spills: 80, spilledBytes: 1884},
         getLegacy: false,
     });
 }
 testSpillingMetrics({
-    stage: stages['bucketAuto'],
+    stageName: 'bucketAuto',
     expectedSpillingMetrics: {spills: 19, spilledBytes: 4224},
     expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 4224},
 });
 testSpillingMetrics({
-    stage: stages['graphLookup'],
+    stageName: 'graphLookup',
     expectedSpillingMetrics: {spills: 30, spilledBytes: 1460},
     expectedSbeSpillingMetrics: {spills: 30, spilledBytes: 1460},
 });
@@ -214,23 +232,24 @@ testSpillingMetrics({
 /*
  * Tests that query fails when attempting to spill with insufficient disk space
  */
-function testSpillingQueryFailsWithLowDiskSpace(stage) {
+function testSpillingQueryFailsWithLowDiskSpace(pipeline) {
     const simulateAvailableDiskSpaceFp =
         configureFailPoint(db, 'simulateAvailableDiskSpace', {bytes: 450 * 1024 * 1024});
 
     // Query should fail with OutOfDiskSpace error
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: collName, pipeline: [stage], cursor: {}}),
+        db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}),
         ErrorCodes.OutOfDiskSpace);
 
     simulateAvailableDiskSpaceFp.off();
 }
 
-testSpillingQueryFailsWithLowDiskSpace(stages['sort']);
-testSpillingQueryFailsWithLowDiskSpace(stages['group']);
-testSpillingQueryFailsWithLowDiskSpace(stages['setWindowFields']);
+testSpillingQueryFailsWithLowDiskSpace(pipelines['sort']);
+testSpillingQueryFailsWithLowDiskSpace(pipelines['group']);
+testSpillingQueryFailsWithLowDiskSpace(pipelines['setWindowFields']);
 if (isSbeEnabled) {
-    testSpillingQueryFailsWithLowDiskSpace(stages['lookup']);
+    testSpillingQueryFailsWithLowDiskSpace(pipelines['lookup']);
+    testSpillingQueryFailsWithLowDiskSpace(pipelines['lookup-unwind']);
 }
 
 // Simulate available disk space to be more than `internalQuerySpillingMinAvailableDiskSpaceBytes`
@@ -242,7 +261,7 @@ const simulateAvailableDiskSpaceFp =
     configureFailPoint(db, 'simulateAvailableDiskSpace', {bytes: 20});
 
 assert.commandFailedWithCode(
-    db.runCommand({aggregate: collName, pipeline: [stages['sort']], cursor: {}}),
+    db.runCommand({aggregate: collName, pipeline: pipelines['sort'], cursor: {}}),
     ErrorCodes.OutOfDiskSpace);
 
 MongoRunner.stopMongod(conn);
