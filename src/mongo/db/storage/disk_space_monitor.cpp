@@ -96,22 +96,15 @@ void DiskSpaceMonitor::_stop() {
     }
 }
 
-int64_t DiskSpaceMonitor::registerAction(std::unique_ptr<Action> action) {
+void DiskSpaceMonitor::registerAction(std::unique_ptr<Action> action) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_actions.try_emplace(_actionId, std::move(action)).second);
-    return _actionId++;
-}
-
-void DiskSpaceMonitor::deregisterAction(int64_t actionId) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(actionId >= 0 && actionId < _actionId);
-    invariant(_actions.erase(actionId));
+    _actions.push_back(std::move(action));
 }
 
 void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableBytes) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    for (auto&& [id, action] : _actions) {
+    for (auto& action : _actions) {
         if (availableBytes <= action->getThresholdBytes()) {
             action->act(opCtx, availableBytes);
             tookAction.increment();
