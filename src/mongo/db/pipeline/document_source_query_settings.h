@@ -31,8 +31,14 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/query_settings/query_settings_service.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/util/deferred.h"
 
 namespace mongo {
+using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHash,
+                                                       query_settings::QueryShapeConfiguration,
+                                                       QueryShapeHashHasher>;
 
 /**
  * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster.
@@ -45,6 +51,17 @@ public:
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
+    /**
+     * The possible states of the stage. First we are reading all the 'config.representativeQueries'
+     * collection and return all QueryShapeConfigurations that have representative queries. Once the
+     * cursor is exhausted, we iterate over the remaining configurations in the
+     * '_queryShapeConfigsMap'.
+     */
+    enum class State {
+        kReadingFromQueryShapeRepresentativeQueriesColl,
+        kReadingFromQueryShapeConfigsMap
+    };
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -88,7 +105,6 @@ public:
     };
 
     DocumentSourceQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                std::vector<query_settings::QueryShapeConfiguration> configs,
                                 bool showDebugQueryShape);
 
     /**
@@ -128,13 +144,46 @@ public:
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
+    void detachFromOperationContext() final;
+
+    void reattachToOperationContext(OperationContext* opCtx) final;
+
 private:
     GetNextResult doGetNext() final;
 
-    std::vector<query_settings::QueryShapeConfiguration> _configs;
-    std::vector<query_settings::QueryShapeConfiguration>::const_iterator _iterator;
+    /**
+     * DocumentSource that holds a cursor over the 'queryShapeRepresentativeQueries' collection:
+     * - either on local node if we are in the replica set
+     * - or on the configsvr if we are in the sharded cluster deployment.
+     *
+     * If gFeatureFlagPQSBackfill is disabled, returns empty DocumentSourceQueue.
+     */
+    boost::intrusive_ptr<DocumentSource> createQueryShapeRepresentativeQueriesCursor(
+        OperationContext* opCtx);
+
+    DeferredFn<QueryShapeConfigurationMap> _queryShapeConfigsMap{[this]() {
+        // Get all query shape configurations owned by 'tenantId'.
+        auto tenantId = getContext()->getNamespaceString().tenantId();
+        auto* opCtx = getContext()->getOperationContext();
+        auto configs = query_settings::QuerySettingsService::get(opCtx)
+                           .getAllQueryShapeConfigurations(tenantId)
+                           .queryShapeConfigurations;
+
+        QueryShapeConfigurationMap map;
+        for (auto&& config : configs) {
+            map.emplace(config.getQueryShapeHash(), std::move(config));
+        }
+        return map;
+    }};
+    QueryShapeConfigurationMap::const_iterator _iterator;
+
+    DeferredFn<boost::intrusive_ptr<DocumentSource>> _queryShapeRepresentativeQueriesCursor{
+        [this]() {
+            return createQueryShapeRepresentativeQueriesCursor(getContext()->getOperationContext());
+        }};
 
     bool _showDebugQueryShape;
+    State _state = State::kReadingFromQueryShapeRepresentativeQueriesColl;
 };
 
 }  // namespace mongo

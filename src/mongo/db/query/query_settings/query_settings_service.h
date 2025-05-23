@@ -35,8 +35,23 @@
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/stdx/trusted_hasher.h"
 
-namespace mongo::query_settings {
+namespace mongo {
+/**
+ * Truncates the 256 bit QueryShapeHash by taking only the first sizeof(size_t) bytes.
+ */
+class QueryShapeHashHasher {
+public:
+    size_t operator()(const query_shape::QueryShapeHash& hash) const {
+        return ConstDataView(reinterpret_cast<const char*>(hash.data())).read<size_t>();
+    }
+};
+
+template <>
+struct IsTrustedHasher<QueryShapeHashHasher, query_shape::QueryShapeHash> : std::true_type {};
+
+namespace query_settings {
 using QueryInstance = BSONObj;
 
 /**
@@ -230,13 +245,6 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
     const boost::optional<QuerySettings>& querySettingsFromOriginalCommand);
 
 /**
- * Returns all the query shape configurations and the timestamp of the last modification.
- */
-QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId);
-
-
-/**
  * Returns the name of the cluster parameter that stores QuerySettings for all QueryShapes.
  */
 std::string getQuerySettingsClusterParameterName();
@@ -257,4 +265,5 @@ bool allowQuerySettingsFromClient(Client* client);
  * Returns true if given QuerySettings instance contains only default values.
  */
 bool isDefault(const QuerySettings& querySettings);
-}  // namespace mongo::query_settings
+}  // namespace query_settings
+}  // namespace mongo

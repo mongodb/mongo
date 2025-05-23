@@ -164,6 +164,13 @@ struct Helpers {
                          const CollectionAcquisition& coll,
                          const BSONObj& doc);
 
+    /**
+     * Deletes document from collection 'coll' via RecordId 'rid'.
+     */
+    static void deleteByRid(OperationContext* opCtx,
+                            const CollectionAcquisition& coll,
+                            RecordId rid);
+
     // TODO: this should be somewhere else probably
     /* Takes object o, and returns a new object with the
      * same field elements but the names stripped out.

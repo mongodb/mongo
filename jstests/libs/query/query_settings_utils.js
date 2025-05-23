@@ -141,16 +141,15 @@ export class QuerySettingsUtils {
             expectedQueryShapeConfigurations.map(config => {
                 return {...config, settings: this.wrapIndexHintsIntoArrayIfNeeded(config.settings)};
             });
-        assert.soon(
+        assert.soonNoExcept(
             () => {
-                let currentQueryShapeConfigurationWo = this.getQuerySettings();
-                currentQueryShapeConfigurationWo.sort(bsonWoCompare);
-                rewrittenExpectedQueryShapeConfigurations.sort(bsonWoCompare);
-                return bsonWoCompare(currentQueryShapeConfigurationWo,
-                                     rewrittenExpectedQueryShapeConfigurations) == 0;
+                assert.sameMembers(this.getQuerySettings(),
+                                   rewrittenExpectedQueryShapeConfigurations);
+                return true;
             },
-            "current query settings = " + tojson(this.getQuerySettings()) +
-                ", expected query settings = " + tojson(rewrittenExpectedQueryShapeConfigurations));
+            () => "current query settings = " + toJsonForLog(this.getQuerySettings()) +
+                ", expected query settings = " +
+                toJsonForLog(rewrittenExpectedQueryShapeConfigurations));
 
         if (shouldRunExplain) {
             const settingsArray = this.getQuerySettings({showQueryShapeHash: true});
@@ -201,20 +200,34 @@ export class QuerySettingsUtils {
      * 'runTest' anonymous function which will be executed once the provided query settings have
      * been propagated throughout the cluster.
      */
-    withQuerySettings(representativeQuery, settings, runTest) {
+    withQuerySettings(setQuerySettings, settings, runTest) {
         let queryShapeHash = undefined;
+        let representativeQuery = undefined;
         try {
-            const setQuerySettingsCmd = {setQuerySettings: representativeQuery, settings: settings};
-            queryShapeHash =
-                assert.commandWorked(this._db.adminCommand(setQuerySettingsCmd)).queryShapeHash;
-            assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
-            for (const hook of this._onSetQuerySettingsHooks) {
-                hook();
+            const setQuerySettingsCmd = {setQuerySettings, settings};
+            const response = assert.commandWorked(this._db.adminCommand(setQuerySettingsCmd));
+            queryShapeHash = response.queryShapeHash;
+            representativeQuery = response.representativeQuery;
+
+            // Assert that the 'expectedQueryShapeConfiguration' is present in the system.
+            const expectedQueryShapeConfiguration = {queryShapeHash, settings: response.settings};
+            if (representativeQuery) {
+                expectedQueryShapeConfiguration.representativeQuery = representativeQuery;
             }
+            assert.soonNoExcept(() => {
+                const settings =
+                    this.getQuerySettings({filter: {queryShapeHash}, showQueryShapeHash: true});
+                assert.sameMembers(settings, [expectedQueryShapeConfiguration]);
+                return true;
+            });
+
+            this._onSetQuerySettingsHooks.forEach(hook => hook());
             return runTest();
         } finally {
             if (queryShapeHash) {
-                const removeQuerySettingsCmd = {removeQuerySettings: representativeQuery};
+                const removeQuerySettingsCmd = {
+                    removeQuerySettings: representativeQuery ?? queryShapeHash
+                };
                 assert.commandWorked(this._db.adminCommand(removeQuerySettingsCmd));
                 assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
             }

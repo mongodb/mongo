@@ -596,11 +596,6 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
         expCtx, deferredShape, nss, querySettingsFromOriginalCommand);
 }
 
-QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    return QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations(tenantId);
-}
-
 std::string getQuerySettingsClusterParameterName() {
     return kQuerySettingsClusterParameterName.toString();
 }

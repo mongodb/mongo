@@ -344,3 +344,21 @@ testQuerySettingsParameterized({
     assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHash}));
     qsutils.assertQueryShapeConfiguration([]);
 }
+
+// Test that $querySettings works correctly with batchSize 1.
+{
+    const queryA = qsutils.makeFindQueryInstance({filter: {a: 15}});
+    const queryB = qsutils.makeFindQueryInstance({filter: {b: 15}});
+    const queryC = qsutils.makeFindQueryInstance({filter: {c: 15}});
+
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryA, settings: {reject: true}}));
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryB, settings: {reject: true}}));
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryC, settings: {reject: true}}));
+
+    assert.sameMembers(
+        [queryA, queryB, queryC],
+        db.getSiblingDB("admin")
+            .aggregate([{$querySettings: {}}, {$replaceRoot: {newRoot: "$representativeQuery"}}],
+                       {cursor: {batchSize: 1}})
+            .toArray());
+}

@@ -14,7 +14,14 @@
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
+
+if (FeatureFlagUtil.isEnabled(db, "PQSBackfill")) {
+    jsTest.log.info(
+        "The test is skipped as it requires a huge number of settings for hitting 16MB limit");
+    quit();
+}
 
 const dbName = db.getName();
 const collName = jsTestName();

@@ -217,17 +217,20 @@ mongo_cc_library(
     ],
     hdrs = [
         "//src/mongo/db/pipeline:document_source_query_settings.h",
+        "//src/mongo/s/query/exec:async_results_merger_params_gen",
     ],
     deps = [
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:commands",
         "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db/catalog:catalog_helpers",
         "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
         "//src/mongo/db/commands:set_cluster_parameter_impl",
         "//src/mongo/db/query/plan_cache:query_plan_cache",
         "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_shape",
         "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/s:grid",
     ],
 )
 

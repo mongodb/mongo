@@ -121,7 +121,8 @@ public:
                        std::vector<QueryShapeConfiguration> queryShapeConfigurations)
         : _opCtx(opCtx),
           _previousQueryShapeConfigurationsWithTimestamp(
-              getAllQueryShapeConfigurations(opCtx, boost::none /* tenantId */)) {
+              QuerySettingsService::get(opCtx).getAllQueryShapeConfigurations(
+                  boost::none /* tenantId */)) {
         LogicalTime newTime = _previousQueryShapeConfigurationsWithTimestamp.clusterParameterTime;
         newTime.addTicks(1);
 

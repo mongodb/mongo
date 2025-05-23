@@ -204,32 +204,44 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion,
     bool shouldReturnEofOnFilterMismatch) {
-    const auto& collectionPtr = collection.getCollectionPtr();
+    return collectionScan({opCtx,
+                           collection,
+                           yieldPolicy,
+                           direction,
+                           resumeAfterRecordId,
+                           minRecord,
+                           maxRecord,
+                           boundInclusion,
+                           shouldReturnEofOnFilterMismatch});
+}
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
+    CreateCollectionScanParams&& params) {
+    const auto& collectionPtr = params.collection.getCollectionPtr();
     invariant(collectionPtr);
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
-    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(collectionPtr->ns()).build();
+    auto expCtx = ExpressionContextBuilder{}.opCtx(params.opCtx).ns(collectionPtr->ns()).build();
     auto collScanParams = createCollectionScanParams(expCtx,
                                                      ws.get(),
                                                      &collectionPtr,
-                                                     direction,
-                                                     resumeAfterRecordId,
-                                                     std::move(minRecord),
-                                                     std::move(maxRecord),
-                                                     boundInclusion,
-                                                     shouldReturnEofOnFilterMismatch);
+                                                     params.direction,
+                                                     params.resumeAfterRecordId,
+                                                     std::move(params.minRecord),
+                                                     std::move(params.maxRecord),
+                                                     params.boundInclusion,
+                                                     params.shouldReturnEofOnFilterMismatch);
 
-    auto cs = _collectionScan(expCtx, ws.get(), &collectionPtr, collScanParams);
+    auto cs = _collectionScan(expCtx, ws.get(), params.collection, collScanParams);
 
     // Takes ownership of 'ws' and 'cs'.
-    auto statusWithPlanExecutor =
-        plan_executor_factory::make(expCtx,
-                                    std::move(ws),
-                                    std::move(cs),
-                                    collection,
-                                    yieldPolicy,
-                                    false /* whether owned BSON must be returned */);
+    auto statusWithPlanExecutor = plan_executor_factory::make(expCtx,
+                                                              std::move(ws),
+                                                              std::move(cs),
+                                                              params.collection,
+                                                              params.yieldPolicy,
+                                                              params.plannerOptions);
     invariant(statusWithPlanExecutor.getStatus());
     return std::move(statusWithPlanExecutor.getValue());
 }
@@ -508,12 +520,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     WorkingSet* ws,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     const CollectionScanParams& params,
     const MatchExpression* filter) {
 
-    const auto& collection = *coll;
-    invariant(collection);
+    tassert(10397702, "Collection pointer must be initialized", coll.getCollectionPtr());
 
     return std::make_unique<CollectionScan>(expCtx.get(), coll, params, ws, filter);
 }

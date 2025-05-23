@@ -54,20 +54,7 @@
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/trusted_hasher.h"
 
-namespace mongo {
-/**
- * Truncates the 256 bit QueryShapeHash by taking only the first sizeof(size_t) bytes.
- */
-class QueryShapeHashHasher {
-public:
-    size_t operator()(const query_shape::QueryShapeHash& hash) const {
-        return ConstDataView(reinterpret_cast<const char*>(hash.data())).read<size_t>();
-    }
-};
-template <>
-struct IsTrustedHasher<QueryShapeHashHasher, query_shape::QueryShapeHash> : std::true_type {};
-
-namespace query_settings {
+namespace mongo::query_settings {
 
 using QueryInstance = BSONObj;
 
@@ -180,5 +167,4 @@ private:
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>
         _tenantIdToVersionedQueryShapeConfigurationsMap;
 };
-};  // namespace query_settings
-}  // namespace mongo
+};  // namespace mongo::query_settings

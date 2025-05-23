@@ -335,6 +335,14 @@ Status Helpers::insert(OperationContext* opCtx,
         opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
 }
 
+void Helpers::deleteByRid(OperationContext* opCtx,
+                          const CollectionAcquisition& coll,
+                          RecordId rid) {
+    OldClientContext context(opCtx, coll.nss());
+    return collection_internal::deleteDocument(
+        opCtx, coll.getCollectionPtr(), kUninitializedStmtId, rid, &CurOp::get(opCtx)->debug());
+}
+
 void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll, BSONObj obj) {
     OldClientContext context(opCtx, coll.nss());
 

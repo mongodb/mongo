@@ -307,7 +307,8 @@ public:
                 // Update the query shape configurations by adding a new one, which will be used for
                 // the lookup.
                 auto queryShapeConfigurationsWithTimestamp =
-                    query_settings::getAllQueryShapeConfigurations(opCtx.get(), tid);
+                    query_settings::QuerySettingsService::get(opCtx.get())
+                        .getAllQueryShapeConfigurations(tid);
                 auto&& queryShapeConfigurations =
                     queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
