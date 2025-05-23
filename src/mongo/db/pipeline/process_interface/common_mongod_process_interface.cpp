@@ -206,13 +206,11 @@ void listDurableCatalog(OperationContext* opCtx,
                         StringData shardName,
                         std::deque<BSONObj>* docs,
                         std::vector<NamespaceStringOrUUID>* systemViewsNamespaces) {
-    auto durableCatalog = DurableCatalog::get(opCtx);
-    auto rs = durableCatalog->getRecordStore();
-    if (!rs) {
+    auto cursor = MDBCatalog::get(opCtx)->getCursor(opCtx);
+    if (!cursor) {
         return;
     }
 
-    auto cursor = rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
 
@@ -427,7 +425,7 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
         return boost::none;
     }
     const auto& collPtr = acquisition.getCollectionPtr();
-    auto obj = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, collPtr->getCatalogId());
+    auto obj = MDBCatalog::get(opCtx)->getRawCatalogEntry(opCtx, collPtr->getCatalogId());
 
     return createCommonNsFields(VersionContext::getDecoration(opCtx), getShardName(opCtx), ns, obj)
         .obj();

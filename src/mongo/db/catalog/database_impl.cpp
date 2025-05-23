@@ -79,7 +79,6 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -148,7 +147,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     }
 }
 
-// Utilizes the DurableCatalog to allocate and track storage resources for the new collection.
+// Utilizes the durable_catalog to allocate and track storage resources for the new collection.
 std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -159,8 +158,8 @@ std::pair<RecordId, std::unique_ptr<RecordStore>> durablyTrackNewCollection(
 
     const auto ident =
         ident::generateNewCollectionIdent(nss.dbName(), directoryPerDB, directoryPerIndexes);
-    auto createResult =
-        storageEngine->getDurableCatalog()->createCollection(opCtx, nss, ident, collectionOptions);
+    auto createResult = durable_catalog::createCollection(
+        opCtx, nss, ident, collectionOptions, storageEngine->getMDBCatalog());
     if (createResult == ErrorCodes::ObjectAlreadyExists) {
         // Each new ident must uniquely identify the collection's underlying table in the storage
         // engine. A scenario where the ident collides with a pre-existing ident should never happen
@@ -768,14 +767,15 @@ Collection* DatabaseImpl::_createCollection(
                 durablyTrackNewCollection(opCtx, nss, optionsWithUUID);
             auto& catalogId = catalogIdRecordStorePair.first;
 
-            auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+            auto catalogEntry =
+                durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
             auto metadata = catalogEntry->metadata;
 
             return Collection::Factory::get(opCtx)->make(
                 opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         } else {
             // Virtual collection stays only in memory and its metadata need not persist on disk and
-            // therefore we bypass DurableCatalog.
+            // therefore we bypass durable_catalog.
             return VirtualCollectionImpl::make(opCtx, nss, optionsWithUUID, *vopts);
         }
     }();

@@ -69,6 +69,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -120,7 +121,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_TRUE(idents.find(swCollInfo.getValue().ident) != idents.end());
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
-    // Drop the `db.coll1` table, while leaving the DurableCatalog entry.
+    // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
     ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
                         swCollInfo.getValue().ident,
                         /*identHasSizeInfo=*/true));
@@ -149,7 +150,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kUnclean);
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }
 
@@ -219,11 +220,11 @@ protected:
             ASSERT_OK(startIndexBuild(opCtx, ns, indexName, buildUUID));
             wuow.commit();
         }
-        auto md =
-            _storageEngine->getDurableCatalog()->getParsedCatalogEntry(opCtx, catalogId)->metadata;
+        auto mdbCatalog = _storageEngine->getMDBCatalog();
+        auto md = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog)->metadata;
         auto offset = md->findIndexOffset(indexName);
         indexSpec = md->indexes[offset].spec;
-        return _storageEngine->getDurableCatalog()->getIndexIdent(opCtx, catalogId, indexName);
+        return mdbCatalog->getIndexIdent(opCtx, catalogId, indexName);
     }
 
     // Makes an internal table that contains index-resume metadata, where |pretendSideTable| is an
@@ -614,7 +615,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
         wuow.commit();
     }
 
-    const auto indexIdent = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdent = _storageEngine->getMDBCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexName);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -660,9 +661,9 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
         }
     }
 
-    const auto indexIdentA = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdentA = _storageEngine->getMDBCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexA);
-    const auto indexIdentB = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdentB = _storageEngine->getMDBCatalog()->getIndexIdent(
         opCtx.get(), swCollInfo.getValue().catalogId, indexB);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
@@ -707,7 +708,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
         catalog::closeCatalog(opCtx.get());
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }
 
@@ -757,15 +758,14 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // the actual drop in storage engine.
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getDurableCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getMDBCatalog()));
         wuow.commit();
     }
 
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
-    // When in a repair context, loadDurableCatalog() recreates catalog entries for orphaned idents.
-    _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+    // When in a repair context, loadMDBCatalog() recreates catalog entries for orphaned idents.
+    _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
     catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     auto identNs = swCollInfo.getValue().ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
@@ -793,17 +793,16 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     {
         AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getDurableCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getMDBCatalog()));
         wuow.commit();
     }
     ASSERT(!collectionExists(opCtx.get(), collNs));
 
-    // When in a normal startup context, loadDurableCatalog() does not recreate catalog entries for
+    // When in a normal startup context, loadMDBCatalog() does not recreate catalog entries for
     // orphaned idents.
     {
         Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
-        _storageEngine->loadDurableCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
+        _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }
     // reconcileCatalogAndIdents() drops orphaned idents.
@@ -1092,7 +1091,7 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
 
     // Drop the index ident, but leave it in the catalog. This can happen if the process is killed
     // while we're restarting an index build (as we drop and recreate the ident).
-    const auto indexIdent = _storageEngine->getDurableCatalog()->getIndexIdent(
+    const auto indexIdent = _storageEngine->getMDBCatalog()->getIndexIdent(
         opCtx.get(), coll.getValue().catalogId, indexName);
     ASSERT_OK(dropIdent(
         shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent, /*identHasSizeInfo=*/true));

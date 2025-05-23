@@ -33,15 +33,16 @@
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 namespace mongo {
-
+namespace durable_catalog {
 /**
  * Parsed catalog entry of a single `_mdb_catalog` document.
  */
-struct DurableCatalogEntry {
+struct CatalogEntry {
     RecordId catalogId;
     std::string ident;
     const BSONObj indexIdents;
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata;
 };
 
+}  // namespace durable_catalog
 }  // namespace mongo

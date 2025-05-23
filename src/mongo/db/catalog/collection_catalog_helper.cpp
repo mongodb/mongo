@@ -48,6 +48,7 @@
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/transaction_resources.h"
@@ -222,8 +223,6 @@ void removeIndex(OperationContext* opCtx,
                  Collection* collection,
                  std::shared_ptr<IndexCatalogEntry> entry,
                  DataRemoval dataRemoval) {
-    auto durableCatalog = DurableCatalog::get(opCtx);
-
     std::shared_ptr<Ident> ident = [&]() -> std::shared_ptr<Ident> {
         if (!entry) {
             return nullptr;
@@ -236,7 +235,7 @@ void removeIndex(OperationContext* opCtx,
     // users to finish.
     if (!ident) {
         ident = std::make_shared<Ident>(
-            durableCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexName));
+            MDBCatalog::get(opCtx)->getIndexIdent(opCtx, collection->getCatalogId(), indexName));
     }
 
     // Run the first phase of drop to remove the catalog entry.
@@ -321,7 +320,8 @@ Status dropCollection(OperationContext* opCtx,
     invariant(ident);
 
     // Run the first phase of drop to remove the catalog entry.
-    Status status = DurableCatalog::get(opCtx)->dropCollection(opCtx, collectionCatalogId);
+    Status status =
+        durable_catalog::dropCollection(opCtx, collectionCatalogId, MDBCatalog::get(opCtx));
     if (!status.isOK()) {
         return status;
     }

@@ -68,6 +68,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -138,9 +139,9 @@ void initializeCollectionCatalog(OperationContext* opCtx,
         setMinVisibleToOldestFailpointSet = true;
     }
 
-    std::vector<DurableCatalog::EntryIdentifier> catalogEntries =
-        engine->getDurableCatalog()->getAllCatalogEntries(opCtx);
-    for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
+    std::vector<MDBCatalog::EntryIdentifier> catalogEntries =
+        engine->getMDBCatalog()->getAllCatalogEntries(opCtx);
+    for (MDBCatalog::EntryIdentifier entry : catalogEntries) {
         // If there's no recovery timestamp, every collection is available.
         auto collectionMinValidTs = minValidTs;
         if (MONGO_unlikely(stableTs && setMinVisibleToOldestFailpointSet)) {
@@ -186,15 +187,15 @@ void initCollectionObject(OperationContext* opCtx,
                           const NamespaceString& nss,
                           bool forRepair,
                           Timestamp minValidTs) {
-    auto catalog = engine->getDurableCatalog();
-    const auto catalogEntry = catalog->getParsedCatalogEntry(opCtx, catalogId);
+    const auto mdbCatalog = engine->getMDBCatalog();
+    const auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
     const auto md = catalogEntry->metadata;
     uassert(ErrorCodes::MustDowngrade,
             str::stream() << "Collection does not have UUID in KVCatalog. Collection: "
                           << nss.toStringForErrorMsg(),
             md->options.uuid);
 
-    auto ident = catalog->getEntry(catalogId).ident;
+    auto ident = mdbCatalog->getEntry(catalogId).ident;
 
     std::unique_ptr<RecordStore> rs;
     if (forRepair) {
@@ -1073,7 +1074,8 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         return latestCollection->getCatalogId();
     }();
 
-    auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+    auto catalogEntry =
+        durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
 
     const NamespaceString& nss = [&]() {
         if (nssOrUUID.isNamespaceString()) {
@@ -1214,7 +1216,8 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // base when available as it might contain an index that is about to be added. Dropped indexes
     // can be found through other means in the drop pending state.
     invariant(latestCollection || pendingCollection);
-    auto durableCatalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+    auto durableCatalogEntry =
+        durable_catalog::getParsedCatalogEntry(opCtx, catalogId, MDBCatalog::get(opCtx));
     invariant(durableCatalogEntry);
     auto compatibleCollection =
         _createCompatibleCollection(opCtx,
@@ -1299,7 +1302,7 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
     return nullptr;
 }
 
-boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
+boost::optional<durable_catalog::CatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
@@ -1310,35 +1313,39 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
         return boost::none;
     }
 
-    auto writeCatalogIdAfterScan = [&](const boost::optional<DurableCatalogEntry>& catalogEntry) {
-        if (!catalogEntry) {
-            if (nssOrUUID.isNamespaceString()) {
-                if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.nss())) {
-                    return;
-                }
-            } else {
-                if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.uuid())) {
-                    return;
+    auto writeCatalogIdAfterScan =
+        [&](const boost::optional<durable_catalog::CatalogEntry>& catalogEntry) {
+            if (!catalogEntry) {
+                if (nssOrUUID.isNamespaceString()) {
+                    if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.nss())) {
+                        return;
+                    }
+                } else {
+                    if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.uuid())) {
+                        return;
+                    }
                 }
             }
-        }
 
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            // Insert catalogId for both the namespace and UUID if the catalog entry is found.
-            if (catalogEntry) {
-                catalog._catalogIdTracker.recordExistingAtTime(
-                    catalogEntry->metadata->nss,
-                    *catalogEntry->metadata->options.uuid,
-                    catalogEntry->catalogId,
-                    *readTimestamp);
-            } else if (nssOrUUID.isNamespaceString()) {
-                catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.nss(), *readTimestamp);
-            } else {
-                catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.uuid(), *readTimestamp);
-            }
-        });
-    };
+            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+                // Insert catalogId for both the namespace and UUID if the catalog entry is found.
+                if (catalogEntry) {
+                    catalog._catalogIdTracker.recordExistingAtTime(
+                        catalogEntry->metadata->nss,
+                        *catalogEntry->metadata->options.uuid,
+                        catalogEntry->catalogId,
+                        *readTimestamp);
+                } else if (nssOrUUID.isNamespaceString()) {
+                    catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.nss(),
+                                                                      *readTimestamp);
+                } else {
+                    catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.uuid(),
+                                                                      *readTimestamp);
+                }
+            });
+        };
 
+    auto mdbCatalog = MDBCatalog::get(opCtx);
     if (result == HistoricalCatalogIdTracker::LookupResult::Existence::kUnknown) {
         // We shouldn't receive kUnknown when we don't have a timestamp since no timestamp means
         // we're operating on the latest.
@@ -1347,21 +1354,21 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
         gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAddRelaxed(1);
         auto catalogEntry = nssOrUUID.isNamespaceString()
-            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss())
-            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
+            ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
+            : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
 
-    auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+    auto catalogEntry = durable_catalog::getParsedCatalogEntry(opCtx, catalogId, mdbCatalog);
     if (!catalogEntry ||
         (nssOrUUID.isNamespaceString() && nssOrUUID.nss() != catalogEntry->metadata->nss)) {
         invariant(readTimestamp);
         // If no entry is found or the entry contains a different namespace, the mapping might be
         // incorrect since it is incomplete after startup; scans durable catalog to confirm.
         auto catalogEntry = nssOrUUID.isNamespaceString()
-            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss())
-            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
+            ? durable_catalog::scanForCatalogEntryByNss(opCtx, nssOrUUID.nss(), mdbCatalog)
+            : durable_catalog::scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid(), mdbCatalog);
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
@@ -1372,7 +1379,7 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     OperationContext* opCtx,
     const std::shared_ptr<const Collection>& latestCollection,
     boost::optional<Timestamp> readTimestamp,
-    const DurableCatalogEntry& catalogEntry) const {
+    const durable_catalog::CatalogEntry& catalogEntry) const {
     // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
     std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
         const std::weak_ptr<Collection>* dropPending =
@@ -1436,7 +1443,7 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
 std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
     OperationContext* opCtx,
     boost::optional<Timestamp> readTimestamp,
-    const DurableCatalogEntry& catalogEntry) const {
+    const durable_catalog::CatalogEntry& catalogEntry) const {
     // The ident is expired, but it still may not have been dropped by the reaper. Try to mark it as
     // in use.
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();

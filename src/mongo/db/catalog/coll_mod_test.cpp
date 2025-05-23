@@ -59,6 +59,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -227,8 +228,8 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     // Test that the backwards compatible option has been properly set
     auto coll =
         CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), bucketsColl);
-    auto catalogEntry =
-        DurableCatalog::get(opCtx.get())->getParsedCatalogEntry(opCtx.get(), coll->getCatalogId());
+    auto catalogEntry = durable_catalog::getParsedCatalogEntry(
+        opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
     boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
         metadata->options.storageEngine,
@@ -283,15 +284,16 @@ TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {
     auto catalogId = CollectionCatalog::get(opCtx.get())
                          ->lookupCollectionByNamespace(opCtx.get(), bucketsColl)
                          ->getCatalogId();
+    auto mdbCatalog = MDBCatalog::get(opCtx.get());
 
     // Set the `md.timeseriesBucketingParametersHaveChanged` field through the durable catalog
     // (as this option is deprecated and can't be set anymore through other means).
     {
         WriteUnitOfWork wuow{opCtx.get()};
-        auto durableCatalog = DurableCatalog::get(opCtx.get());
-        auto catalogEntry = durableCatalog->getParsedCatalogEntry(opCtx.get(), catalogId);
+        auto catalogEntry =
+            durable_catalog::getParsedCatalogEntry(opCtx.get(), catalogId, mdbCatalog);
         catalogEntry->metadata->timeseriesBucketingParametersHaveChanged_DO_NOT_USE = false;
-        durableCatalog->putMetaData(opCtx.get(), catalogId, *catalogEntry->metadata);
+        durable_catalog::putMetaData(opCtx.get(), catalogId, *catalogEntry->metadata, mdbCatalog);
         wuow.commit();
     }
 
@@ -304,7 +306,7 @@ TEST_F(CollModTest, TimeseriesLegacyBucketingParameterChangedRemoval) {
 
     {
         auto catalogEntry =
-            DurableCatalog::get(opCtx.get())->getParsedCatalogEntry(opCtx.get(), catalogId);
+            durable_catalog::getParsedCatalogEntry(opCtx.get(), catalogId, mdbCatalog);
         ASSERT_FALSE(catalogEntry->metadata->timeseriesBucketingParametersHaveChanged_DO_NOT_USE);
     }
 }
@@ -339,8 +341,8 @@ TEST_F(CollModTest, CollModTimeseriesMixedSchemaData) {
     // Test that both backwards compatibles option and legacy parameter have been properly set
     auto coll =
         CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), bucketsColl);
-    auto catalogEntry =
-        DurableCatalog::get(opCtx.get())->getParsedCatalogEntry(opCtx.get(), coll->getCatalogId());
+    auto catalogEntry = durable_catalog::getParsedCatalogEntry(
+        opCtx.get(), coll->getCatalogId(), MDBCatalog::get(opCtx.get()));
     auto metadata = catalogEntry->metadata;
     boost::optional<bool> optBackwardsCompatibleFlag = getFlagFromStorageEngineBson(
         metadata->options.storageEngine,

@@ -12,11 +12,27 @@ See the [Storage Engine API](../storage/README.md) for relevant information.
 
 ## Durable Catalog
 
-The durable catalog is persisted as a table with the `_mdb_catalog`
-[ident](../storage/README.md#idents). Each entry in this table is indexed with a 64-bit `RecordId`,
-referred to as the catalog ID, and contains a BSON document that describes the properties of a
-collection and its indexes. The `DurableCatalog` class allows read and write access to the durable
-data.
+Catalog information is persisted as storage table with the `_mdb_catalog` [ident](../storage/README.md#idents). Each entry in this table is indexed with a 64-bit `RecordId`, referred to as the `Catalog ID`, and contains a BSON document that describes the properties of a collection and its indexes.
+
+To manage the `_mdb_catalog` data efficiently and maintain correct layering between components, the server divides responsibilities between two key modules:
+
+- `MDBCatalog` class
+
+  - Persistence Layer: Manages the physical storage of the `_mdb_catalog` table.
+  - BSON Entries: Reads and writes entries as raw BSON documents.
+  - Field Awareness: Knows only about top-level BSON fields such as `ident`, `idxIdent`, `md`, and `ns`. It does not interpret or validate higher-level semantics of an `_mdb_catalog` entry.
+
+- `durable_catalog` namespace
+
+  - Parsing & Serialization: Knows how to interpret and generate the BSON documents for the `_mdb_catalog` entries, translating between server abstractions (like `CollectionOptions`) and the on-disk format.
+  - Abstraction Layer: Serves as the main entry point for server components to interact with the `_mdb_catalog`, abstracting away BSON parsing and storage details.
+
+**Example Flow**: Creating a Collection
+
+- The user issues `db.createCollection(<collName>, <options>)`.
+- The 'options' are represented internally as ['CollectionOptions'](https://github.com/mongodb/mongo/blob/88c79d8e8221cb2a73cc324b0bc21e7f3211fa63/src/mongo/db/catalog/collection_options.h).
+- The `durable_catalog` translates information about the new collection (such as `CollectionOptions` and other details from the command path) into a properly formatted BSON document suitable for storage in the `_mdb_catalog`. It dispatches the document and `RecordStore::Options` for the new collection to the `MDBCatalog`.
+- The `MDBCatalog` writes the document directly to the `_mdb_catalog`. It then uses the `RecordStore::Options` to create a `RecordStore` which allocates space for the new collection on disk.
 
 Starting in v5.2, catalog entries for time-series collections have a new flag called
 `timeseriesBucketsMayHaveMixedSchemaData` in the `md` field. Time-series collections upgraded from
@@ -27,7 +43,7 @@ part of the upgrade process and is removed as part of the downgrade process thro
 Starting in v7.1, catalog entries for time-series collections have a new flag called
 `timeseriesBucketingParametersHaveChanged` in the `md` field.
 
-**Example**: an entry in the durable catalog for a collection `test.employees` with an in-progress
+**Example**: an entry in the mdb catalog for a collection `test.employees` with an in-progress
 index build on `{lastName: 1}`:
 
 ```
@@ -227,7 +243,7 @@ point in time during each command invocation.
 #### Examples of differences between listIndexes and $listCatalog results
 
 The `$listCatalog` operator does not format its results with the IDL-derived formatters generated for the `listIndexes` command.
-This has implications for applications that read the durable catalog using $listCatalog rather than the recommended listIndexes
+This has implications for applications that read the mdb catalog using $listCatalog rather than the recommended listIndexes
 command. Below are a few examples where the `listIndexes` results may differ from `$listCatalog`.
 
 | Index Type                                                          | Index Option                                                                                                                                     | createIndexes                                                 | listIndexes                                                                               | $listCatalog                                                                                 |
@@ -366,7 +382,8 @@ points in time to use different `Collection` objects.
 
 Notable properties of `Collection` objects are:
 
-- catalog ID - to look up or change information from the DurableCatalog.
+- catalog ID - to look up or change information from the '\_mdb_catalog' (either through the
+  'MDBCatalog' directly, or through the 'durable_catalog' namespace when parsing is helpful).
 - UUID - Identifier that remains for the lifetime of the underlying MongoDb collection, even across
   DDL operations such as renames, and is consistent between different nodes and shards in a
   cluster.

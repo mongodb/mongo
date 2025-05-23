@@ -85,7 +85,7 @@ public:
 
     Status initFromExisting(OperationContext*,
                             const std::shared_ptr<const Collection>&,
-                            const DurableCatalogEntry&,
+                            const durable_catalog::CatalogEntry&,
                             boost::optional<Timestamp>) override {
         MONGO_UNREACHABLE;
     }

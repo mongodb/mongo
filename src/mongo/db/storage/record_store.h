@@ -306,7 +306,7 @@ private:
  * an OperationContext may throw a WriteConflictException.
  *
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
- * methods must be thread safe, see DurableCatalog.
+ * methods must be thread safe, see MDBCatalog.
  */
 class RecordStore {
 public:

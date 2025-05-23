@@ -68,7 +68,7 @@
 
 namespace mongo {
 
-class DurableCatalog;
+class MDBCatalog;
 class KVEngine;
 
 struct StorageEngineOptions {
@@ -210,16 +210,16 @@ public:
 
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const override;
 
-    DurableCatalog* getDurableCatalog() override;
+    MDBCatalog* getMDBCatalog() override;
 
-    const DurableCatalog* getDurableCatalog() const override;
+    const MDBCatalog* getMDBCatalog() const override;
 
     /**
-     * When loading after an unclean shutdown, this performs cleanup on the DurableCatalog.
+     * When loading after an unclean shutdown, this performs cleanup on the MDBCatalog.
      */
-    void loadDurableCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final;
+    void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final;
 
-    void closeDurableCatalog(OperationContext* opCtx) final;
+    void closeMDBCatalog(OperationContext* opCtx) final;
 
     TimestampMonitor* getTimestampMonitor() const {
         return _timestampMonitor.get();
@@ -288,7 +288,7 @@ private:
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
-     * whose entry is present in the DurableCatalog, but missing from the KVEngine. Returns an
+     * whose entry is present in the MDBCatalog, but missing from the KVEngine. Returns an
      * error Status if called outside of a repair context or the implementation of
      * KVEngine::recoverOrphanedIdent returns an error other than DataModifiedByRepair.
      *
@@ -306,7 +306,7 @@ private:
      * the given catalog entry.
      */
     void _checkForIndexFiles(OperationContext* opCtx,
-                             const DurableCatalog::EntryIdentifier& entry,
+                             const MDBCatalog::EntryIdentifier& entry,
                              std::vector<std::string>& identsKnownToStorageEngine) const;
 
     void _dumpCatalog(OperationContext* opCtx);
@@ -349,7 +349,7 @@ private:
     const bool _supportsCappedCollections;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
-    std::unique_ptr<DurableCatalog> _catalog;
+    std::unique_ptr<MDBCatalog> _catalog;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;

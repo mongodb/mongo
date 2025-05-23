@@ -113,7 +113,7 @@ public:
     void init(OperationContext* opCtx) final;
     Status initFromExisting(OperationContext* opCtx,
                             const std::shared_ptr<const Collection>& collection,
-                            const DurableCatalogEntry& catalogEntry,
+                            const durable_catalog::CatalogEntry& catalogEntry,
                             boost::optional<Timestamp> readTimestamp) final;
     bool isInitialized() const final;
 
@@ -420,7 +420,7 @@ public:
 
 private:
     /**
-     * Writes metadata to the DurableCatalog. Func should have the function signature
+     * Writes metadata through durable_catalog. Func should have the function signature
      * 'void(BSONCollectionCatalogEntry::MetaData&)'
      */
     template <typename Func>
@@ -495,7 +495,7 @@ private:
     UUID _uuid;
     std::shared_ptr<SharedState> _shared;
 
-    // Collection metadata cached from the DurableCatalog. Is kept separate from the SharedState
+    // Collection metadata cached from the durable_catalog. Is kept separate from the SharedState
     // because it may be updated.
     std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> _metadata;
 

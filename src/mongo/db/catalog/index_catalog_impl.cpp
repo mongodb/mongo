@@ -628,7 +628,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     auto engine = opCtx->getServiceContext()->getStorageEngine();
-    std::string ident = engine->getDurableCatalog()->getIndexIdent(
+    std::string ident = engine->getMDBCatalog()->getIndexIdent(
         opCtx, collection->getCatalogId(), descriptor.indexName());
 
     bool isReadyIndex = CreateIndexEntryFlags::kIsReady & flags;
@@ -1395,16 +1395,15 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
         return status;
     }
 
-    // Recreate the ident on-disk. DurableCatalog::createIndex() will lookup the ident internally
+    // Recreate the ident on-disk. durable_catalog::createIndex() will lookup the ident internally
     // using the catalogId and index name.
     const auto indexDescriptor = released->descriptor();
-    status = DurableCatalog::get(opCtx)->createIndex(
-        opCtx,
-        collection->getCatalogId(),
-        collection->ns(),
-        collection->uuid(),
-        indexDescriptor->toIndexConfig(),
-        collection->getCollectionOptions().indexOptionDefaults.getStorageEngine());
+    status = durable_catalog::createIndex(opCtx,
+                                          collection->getCatalogId(),
+                                          collection->ns(),
+                                          collection->getCollectionOptions(),
+                                          indexDescriptor->toIndexConfig(),
+                                          MDBCatalog::get(opCtx));
     if (!status.isOK()) {
         return status;
     }

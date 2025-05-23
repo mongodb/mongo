@@ -132,7 +132,7 @@ protected:
         const auto indexName = indexSpec.getStringField("name");
 
         const auto durableCatalogEntry =
-            DurableCatalog::get(opCtx())->scanForCatalogEntryByNss(opCtx(), nss);
+            durable_catalog::scanForCatalogEntryByNss(opCtx(), nss, MDBCatalog::get(opCtx()));
         ASSERT(durableCatalogEntry);
         const auto collMetaData = durableCatalogEntry->metadata;
         const auto idxOffset = collMetaData->findIndexOffset(indexName);
@@ -1111,7 +1111,8 @@ protected:
         SimpleClient client(opCtx());
         client.createColl(nss);
         createIndex(nss, spec);
-        auto catalogEntry = DurableCatalog::get(opCtx())->scanForCatalogEntryByNss(opCtx(), nss);
+        auto catalogEntry =
+            durable_catalog::scanForCatalogEntryByNss(opCtx(), nss, MDBCatalog::get(opCtx()));
         ASSERT(catalogEntry);
 
         const int nDocs = 10;

@@ -89,7 +89,7 @@ public:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-class DurableCatalogTest : public ServiceContextTest {
+class MDBCatalogTest : public ServiceContextTest {
 protected:
     void setUp() override {
         helper = KVHarnessHelper::create(getServiceContext());
@@ -106,10 +106,10 @@ protected:
     }
 
     // Callers are responsible for managing the lifetime of 'catalogRS'.
-    std::unique_ptr<DurableCatalog> createDurableCatalog(RecordStore* catalogRS,
-                                                         bool directoryPerDB = false,
-                                                         bool directoryForIndexes = false) {
-        return std::make_unique<DurableCatalog>(
+    std::unique_ptr<MDBCatalog> createMDBCatalog(RecordStore* catalogRS,
+                                                 bool directoryPerDB = false,
+                                                 bool directoryForIndexes = false) {
+        return std::make_unique<MDBCatalog>(
             catalogRS, directoryPerDB, directoryForIndexes, helper->getEngine());
     }
 
@@ -129,36 +129,45 @@ protected:
                                       UUID::gen());
     }
 
+    // Adds a new entry to the MDBCatalog without initializing a backing RecordStore.
     RecordId addNewCatalogEntry(OperationContext* opCtx,
-                                const NamespaceString& ns,
-                                const CollectionOptions& options,
-                                DurableCatalog* catalog) {
-        Lock::DBLock dbLk(opCtx, ns.dbName(), MODE_IX);
+                                const NamespaceString& nss,
+                                const CollectionOptions& collectionOptions,
+                                MDBCatalog* mdbCatalog) {
+        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
+
         // TODO SERVER-103136: Evaluate the better way to test idents generated with different
-        // <Directory<PerDb/ForIndexes>> options without relying on the DurableCatalog's tracking of
+        // <Directory<PerDb/ForIndexes>> options without relying on the MDBCatalog's tracking of
         // the parameters.
-        const auto ident = ident::generateNewCollectionIdent(
-            ns.dbName(), catalog->_directoryPerDb, catalog->_directoryForIndexes);
-        auto swEntry = catalog->_addEntry(opCtx, ns, ident, options);
+        const auto ident =
+            ident::generateNewCollectionIdent(nss.dbName(),
+                                              mdbCatalog->isUsingDirectoryPerDb(),
+                                              mdbCatalog->isUsingDirectoryForIndexes());
+        auto md = durable_catalog::internal::createMetaDataForNewCollection(nss, collectionOptions);
+        auto rawMDBCatalogEntry = durable_catalog::internal::buildRawMDBCatalogEntry(
+            ident, BSONObj() /* idxIdent */, md, NamespaceStringUtil::serializeForCatalog(nss));
+
+        // An 'orphaned' entry is one without a RecordStore explicitly created to back it.
+        auto swEntry = mdbCatalog->addOrphanedEntry(opCtx, ident, nss, rawMDBCatalogEntry);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
 
-    Status dropCollection(OperationContext* opCtx, RecordId catalogId, DurableCatalog* catalog) {
+    Status dropCollection(OperationContext* opCtx, RecordId catalogId, MDBCatalog* catalog) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
-        return catalog->_removeEntry(opCtx, catalogId);
+        return catalog->removeEntry(opCtx, catalogId);
     }
 
     void putMetaData(OperationContext* opCtx,
-                     DurableCatalog* catalog,
+                     MDBCatalog* mdbCatalog,
                      RecordId catalogId,
                      BSONCollectionCatalogEntry::MetaData& md) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
-        catalog->putMetaData(opCtx, catalogId, md);
+        durable_catalog::putMetaData(opCtx, catalogId, md, mdbCatalog);
     }
 
     std::string getIndexIdent(OperationContext* opCtx,
-                              DurableCatalog* catalog,
+                              MDBCatalog* catalog,
                               RecordId catalogId,
                               StringData idxName) {
         Lock::GlobalLock globalLk(opCtx, MODE_IS);
@@ -974,9 +983,9 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, CommitBehindStable, "Fatal assertion.*39
     }
 }
 
-TEST_F(DurableCatalogTest, Coll1) {
+TEST_F(MDBCatalogTest, Coll1) {
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog = createDurableCatalog(catalogRS.get());
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
     RecordId catalogId;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
@@ -997,7 +1006,7 @@ TEST_F(DurableCatalogTest, Coll1) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
         WriteUnitOfWork uow(opCtx);
-        catalog = createDurableCatalog(catalogRS.get());
+        catalog = createMDBCatalog(catalogRS.get());
         catalog->init(opCtx);
         uow.commit();
     }
@@ -1018,9 +1027,9 @@ TEST_F(DurableCatalogTest, Coll1) {
     ASSERT_NOT_EQUALS(ident, catalog->getEntry(newCatalogId).ident);
 }
 
-TEST_F(DurableCatalogTest, Idx1) {
+TEST_F(MDBCatalogTest, Idx1) {
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog = createDurableCatalog(catalogRS.get());
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
 
     RecordId catalogId;
     {
@@ -1093,12 +1102,12 @@ TEST_F(DurableCatalogTest, Idx1) {
     }
 }
 
-TEST_F(DurableCatalogTest, DirectoryPerDb1) {
+TEST_F(MDBCatalogTest, DirectoryPerDb1) {
     const bool directoryPerDB = true;
     const bool directoryForIndexes = false;
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog =
-        createDurableCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
+    std::unique_ptr<MDBCatalog> catalog =
+        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
 
     RecordId catalogId;
     {  // collection
@@ -1135,12 +1144,12 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
     }
 }
 
-TEST_F(DurableCatalogTest, Split1) {
+TEST_F(MDBCatalogTest, Split1) {
     const bool directoryPerDB = false;
     const bool directoryForIndexes = true;
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog =
-        createDurableCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
+    std::unique_ptr<MDBCatalog> catalog =
+        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryForIndexes);
 
     RecordId catalogId;
     {
@@ -1177,12 +1186,12 @@ TEST_F(DurableCatalogTest, Split1) {
     }
 }
 
-TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
+TEST_F(MDBCatalogTest, DirectoryPerAndSplit1) {
     const bool directoryPerDB = true;
     const bool directoryPerIndexes = true;
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog =
-        createDurableCatalog(catalogRS.get(), directoryPerDB, directoryPerIndexes);
+    std::unique_ptr<MDBCatalog> catalog =
+        createMDBCatalog(catalogRS.get(), directoryPerDB, directoryPerIndexes);
 
     RecordId catalogId;
     {
@@ -1219,19 +1228,19 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
     }
 }
 
-TEST_F(DurableCatalogTest, BackupImplemented) {
+TEST_F(MDBCatalogTest, BackupImplemented) {
     KVEngine* engine = helper->getEngine();
     ASSERT(engine);
     ASSERT_OK(engine->beginBackup());
     engine->endBackup();
 }
 
-TEST_F(DurableCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
+TEST_F(MDBCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
     gMultitenancySupport = true;
     std::unique_ptr<RecordStore> catalogRS = createCatalogRS();
-    std::unique_ptr<DurableCatalog> catalog = createDurableCatalog(catalogRS.get());
+    std::unique_ptr<MDBCatalog> catalog = createMDBCatalog(catalogRS.get());
 
-    // Insert an entry into the DurableCatalog, and ensure the tenantId is stored on the nss in the
+    // Insert an entry into the MDBCatalog, and ensure the tenantId is stored on the nss in the
     // entry.
     RecordId catalogId;
     auto tenantId = TenantId(OID::gen());
@@ -1246,7 +1255,7 @@ TEST_F(DurableCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
     ASSERT_EQUALS(nss.tenantId(), catalog->getEntry(catalogId).nss.tenantId());
     ASSERT_EQUALS(nss, catalog->getEntry(catalogId).nss);
 
-    // Re-initialize the DurableCatalog (as if it read from disk). Ensure the tenantId is still
+    // Re-initialize the MDBCatalog (as if it read from disk). Ensure the tenantId is still
     // stored on the nss in the entry.
     std::string ident = catalog->getEntry(catalogId).ident;
     {
@@ -1255,7 +1264,7 @@ TEST_F(DurableCatalogTest, EntryIncludesTenantIdInMultitenantEnv) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
         WriteUnitOfWork uow(opCtx);
-        createDurableCatalog(catalogRS.get());
+        createMDBCatalog(catalogRS.get());
         catalog->init(opCtx);
         uow.commit();
     }

@@ -81,7 +81,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/disk_space_util.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
@@ -808,8 +808,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
     invariant(collection);
-    auto durableCatalog = DurableCatalog::get(opCtx);
-
+    const auto mdbCatalog = MDBCatalog::get(opCtx);
     for (const auto& spec : specs) {
         std::string indexName =
             spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
@@ -832,8 +831,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
                               << durableBuildUUID,
                 durableBuildUUID == buildUUID);
 
-        auto indexIdent =
-            durableCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexName);
+        auto indexIdent = mdbCatalog->getIndexIdent(opCtx, collection->getCatalogId(), indexName);
         uassert(
             4841703,
             str::stream() << "No index ident found on disk that matches the index build to resume: "

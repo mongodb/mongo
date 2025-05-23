@@ -417,7 +417,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
                                         const std::shared_ptr<const Collection>& collection,
-                                        const DurableCatalogEntry& catalogEntry,
+                                        const durable_catalog::CatalogEntry& catalogEntry,
                                         boost::optional<Timestamp> readTimestamp) {
     if (collection) {
         // Use the shared state from the existing collection.
@@ -1535,8 +1535,8 @@ Status CollectionImpl::rename(OperationContext* opCtx, const NamespaceString& ns
     metadata->nss = nss;
     if (!stayTemp)
         metadata->options.temp = false;
-    Status status =
-        DurableCatalog::get(opCtx)->renameCollection(opCtx, getCatalogId(), nss, *metadata);
+    Status status = durable_catalog::renameCollection(
+        opCtx, getCatalogId(), nss, *metadata, MDBCatalog::get(opCtx));
     if (!status.isOK()) {
         return status;
     }
@@ -1668,7 +1668,6 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
                                             boost::optional<UUID> buildUUID) {
 
-    auto durableCatalog = DurableCatalog::get(opCtx);
     BSONCollectionCatalogEntry::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;
@@ -1701,13 +1700,12 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
             md.insertIndex(std::move(indexMetaData));
         });
 
-    return durableCatalog->createIndex(
-        opCtx,
-        getCatalogId(),
-        ns(),
-        uuid(),
-        spec->toIndexConfig(),
-        getCollectionOptions().indexOptionDefaults.getStorageEngine());
+    return durable_catalog::createIndex(opCtx,
+                                        getCatalogId(),
+                                        ns(),
+                                        getCollectionOptions(),
+                                        spec->toIndexConfig(),
+                                        MDBCatalog::get(opCtx));
 }
 
 boost::optional<UUID> CollectionImpl::getIndexBuildUUID(StringData indexName) const {
@@ -1772,7 +1770,7 @@ bool CollectionImpl::isIndexMultikey(OperationContext* opCtx,
     // reading between the multikey write committing in the storage engine but before its onCommit
     // handler made the write visible for readers.
     const auto catalogEntry =
-        DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
+        durable_catalog::getParsedCatalogEntry(opCtx, getCatalogId(), MDBCatalog::get(opCtx));
     const auto snapshotMetadata = catalogEntry->metadata;
     int snapshotOffset = snapshotMetadata->findIndexOffset(indexName);
     invariant(snapshotOffset >= 0,
@@ -1870,6 +1868,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     BSONCollectionCatalogEntry::MetaData* metadata = nullptr;
     bool hasSetMultikey = false;
 
+    auto mdbCatalog = MDBCatalog::get(opCtx);
     if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
         metadata = &it->second;
         hasSetMultikey = setMultikey(*metadata);
@@ -1879,7 +1878,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         // committed a multikey change concurrently to the storage engine without being able to
         // observe it if its onCommit handlers haven't run yet.
         const auto catalogEntry =
-            DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
+            durable_catalog::getParsedCatalogEntry(opCtx, getCatalogId(), mdbCatalog);
         auto metadataLocal = *catalogEntry->metadata;
         // When reading from the durable catalog the index offsets are different because when
         // removing indexes in-memory just zeros out the slot instead of actually removing it. We
@@ -1908,7 +1907,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
-    DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
+    durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, mdbCatalog);
 
     // RAII Helper object to ensure we decrement the concurrent counter if and only if we
     // incremented it in a preCommit handler.
@@ -2003,7 +2002,7 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, uncommittedMultikeys](OperationContext*) { uncommittedMultikeys->erase(this); });
 
-    DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
+    durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx));
 
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
         [this, uncommittedMultikeys, forceSetMultikey = std::move(forceSetMultikey)](
@@ -2069,7 +2068,7 @@ bool CollectionImpl::isIndexReady(StringData indexName) const {
 
 void CollectionImpl::replaceMetadata(OperationContext* opCtx,
                                      std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) {
-    DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *md);
+    durable_catalog::putMetaData(opCtx, getCatalogId(), *md, MDBCatalog::get(opCtx));
     _setMetadata(std::move(md));
 }
 
@@ -2101,7 +2100,7 @@ void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     }
 
     // Store in durable catalog and replace pointer with our copied instance.
-    DurableCatalog::get(opCtx)->putMetaData(opCtx, getCatalogId(), *metadata);
+    durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx));
     _metadata = std::move(metadata);
 }
 

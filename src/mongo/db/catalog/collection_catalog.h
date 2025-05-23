@@ -79,7 +79,7 @@ namespace catalog {
 class CatalogControlUtils;
 
 /**
- * Must be called after DurableCatalog is loaded.
+ * Must be called after MDBCatalog is loaded.
  */
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
@@ -781,7 +781,7 @@ private:
     /**
      * Searches for a catalog entry at a point-in-time.
      */
-    boost::optional<DurableCatalogEntry> _fetchPITCatalogEntry(
+    boost::optional<durable_catalog::CatalogEntry> _fetchPITCatalogEntry(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nssOrUUID,
         boost::optional<Timestamp> readTimestamp) const;
@@ -794,7 +794,7 @@ private:
         OperationContext* opCtx,
         const std::shared_ptr<const Collection>& latestCollection,
         boost::optional<Timestamp> readTimestamp,
-        const DurableCatalogEntry& catalogEntry) const;
+        const durable_catalog::CatalogEntry& catalogEntry) const;
 
     /**
      * Creates a Collection instance from scratch if the ident has not yet been dropped.
@@ -802,7 +802,7 @@ private:
     std::shared_ptr<Collection> _createNewPITCollection(
         OperationContext* opCtx,
         boost::optional<Timestamp> readTimestamp,
-        const DurableCatalogEntry& catalogEntry) const;
+        const durable_catalog::CatalogEntry& catalogEntry) const;
 
     /**
      * Retrieves the views for a given database, including any uncommitted changes for this

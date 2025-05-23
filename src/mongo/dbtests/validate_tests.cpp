@@ -81,6 +81,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
@@ -4119,8 +4120,8 @@ public:
         // of a pre-3.4 index.
         {
             beginTransaction();
-            auto collMetadata = DurableCatalog::get(&_opCtx)
-                                    ->getParsedCatalogEntry(&_opCtx, coll()->getCatalogId())
+            auto collMetadata = durable_catalog::getParsedCatalogEntry(
+                                    &_opCtx, coll()->getCatalogId(), MDBCatalog::get(&_opCtx))
                                     ->metadata;
             int offset = collMetadata->findIndexOffset(indexName);
             ASSERT_GTE(offset, 0);

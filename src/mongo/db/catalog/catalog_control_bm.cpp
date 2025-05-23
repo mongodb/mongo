@@ -51,7 +51,7 @@ void BM_CatalogControlReopen(benchmark::State& state) {
     auto svcCtx = opCtx->getServiceContext();
 
     {
-        auto durableCatalog = svcCtx->getStorageEngine()->getDurableCatalog();
+        auto mdbCatalog = svcCtx->getStorageEngine()->getMDBCatalog();
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
 
         WriteUnitOfWork wuow(opCtx.get());
@@ -61,7 +61,8 @@ void BM_CatalogControlReopen(benchmark::State& state) {
             CollectionOptions options;
             options.uuid = UUID::gen();
             const auto ident = ident::generateNewCollectionIdent(nss.dbName(), false, false);
-            uassertStatusOK(durableCatalog->createCollection(opCtx.get(), nss, ident, options));
+            uassertStatusOK(
+                durable_catalog::createCollection(opCtx.get(), nss, ident, options, mdbCatalog));
         }
         wuow.commit();
     }

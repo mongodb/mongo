@@ -313,8 +313,8 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     // If the index is not visible within the side transaction, the index may have been created,
     // but not committed, in the parent transaction. Therefore, we abandon the side transaction
     // and set the multikey flag in the parent transaction.
-    if (!DurableCatalog::get(opCtx)->isIndexPresent(
-            opCtx, _shared->_catalogId, _descriptor.indexName())) {
+    if (!durable_catalog::isIndexPresent(
+            opCtx, _shared->_catalogId, _descriptor.indexName(), MDBCatalog::get(opCtx))) {
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
@@ -682,7 +682,7 @@ std::unique_ptr<const IndexCatalogEntry> IndexCatalogEntryImpl::cloneWithDiffere
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {
-    return DurableCatalog::get(opCtx)->getNSSFromCatalog(opCtx, _shared->_catalogId);
+    return MDBCatalog::get(opCtx)->getNSSFromCatalog(opCtx, _shared->_catalogId);
 }
 
 bool IndexCatalogEntryImpl::_catalogIsMultikey(OperationContext* opCtx,

@@ -50,8 +50,8 @@ public:
     bool isEphemeral() const override {
         return true;
     }
-    void loadDurableCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
-    void closeDurableCatalog(OperationContext* opCtx) final {}
+    void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final {}
+    void closeMDBCatalog(OperationContext* opCtx) final {}
     void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) final {}
     Status beginBackup() final {
         return Status(ErrorCodes::CommandNotSupported,
@@ -196,10 +196,10 @@ public:
     const KVEngine* getEngine() const final {
         return nullptr;
     }
-    DurableCatalog* getDurableCatalog() final {
+    MDBCatalog* getMDBCatalog() final {
         return nullptr;
     }
-    const DurableCatalog* getDurableCatalog() const final {
+    const MDBCatalog* getMDBCatalog() const final {
         return nullptr;
     }
 

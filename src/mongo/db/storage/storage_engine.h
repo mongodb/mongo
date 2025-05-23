@@ -51,7 +51,7 @@ namespace mongo {
 
 class BackupBlock;
 class JournalListener;
-class DurableCatalog;
+class MDBCatalog;
 class KVEngine;
 class OperationContext;
 class RecoveryUnit;
@@ -243,9 +243,8 @@ public:
      * caller. For example, on starting from a previous unclean shutdown, we may try to recover
      * orphaned idents, which are known to the storage engine but not referenced in the catalog.
      */
-    virtual void loadDurableCatalog(OperationContext* opCtx,
-                                    LastShutdownState lastShutdownState) = 0;
-    virtual void closeDurableCatalog(OperationContext* opCtx) = 0;
+    virtual void loadMDBCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) = 0;
+    virtual void closeMDBCatalog(OperationContext* opCtx) = 0;
 
     /**
      * Checkpoints the data to disk.
@@ -827,8 +826,8 @@ public:
 
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
-    virtual DurableCatalog* getDurableCatalog() = 0;
-    virtual const DurableCatalog* getDurableCatalog() const = 0;
+    virtual MDBCatalog* getMDBCatalog() = 0;
+    virtual const MDBCatalog* getMDBCatalog() const = 0;
 
     /**
      * A service that would like to pin the oldest timestamp registers its request here. If the
