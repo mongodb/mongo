@@ -75,10 +75,10 @@ RUN ./src/scripts/npm_run.sh jstestfuzz -- --help
 WORKDIR /mongo
 
 # Copy mongodb python deps first
-COPY src/pyproject.toml src/poetry.lock ./
+COPY src/pyproject.toml src/poetry.lock src/poetry_requirements.txt ./
 
 # Install mongodb python deps with poetry
-RUN python -m pip install 'poetry==2.0.0'
+RUN python -m pip install -r poetry_requirements.txt
 RUN python -m poetry install --no-root --sync
 
 # Add the poetry venv to the $PATH so that it's activated by default

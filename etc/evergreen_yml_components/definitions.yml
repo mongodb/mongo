@@ -816,6 +816,7 @@ functions:
     - *add_git_tag
     - *kill_processes
     - *cleanup_environment
+    - *set_up_venv
 
   "do non-compile setup":
     - command: manifest.load

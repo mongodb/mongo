@@ -121,6 +121,7 @@ tasks:
     depends_on: []
     commands:
       - func: "do pre workstation setup"
+      - func: "get engflow creds"
       - func: "set up then check workstation script"
 
   - <<: *gen_burn_in_task_template

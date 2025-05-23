@@ -77,7 +77,7 @@ if [[ "${allow_no_venv}" != 1 ]]; then
     # Exploit pip's own enforcement of virtualenv.
     pip_opts+=('--require-virtualenv')
 fi
-run "${py3}" -m pip install "${pip_opts[@]}" "poetry==${poetry_version}"
+run "${py3}" -m pip install "${pip_opts[@]}" -r poetry_requirements.txt
 
 run env \
     PYTHON_KEYRING_BACKEND="keyring.backends.null.Keyring" \

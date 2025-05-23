@@ -35,7 +35,7 @@ export POETRY_DATA_DIR="$poetry_dir/data"
 export POETRY_CACHE_DIR="$poetry_dir/cache"
 export PIP_CACHE_DIR="$poetry_dir/pip_cache"
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m pip install "poetry==2.0.0" && RET=0 && break || RET=$? && sleep 1
+  $POETRY_VENV_PYTHON -m pip install -r src/poetry_requirements.txt && RET=0 && break || RET=$? && sleep 1
   echo "Python failed to install poetry, retrying..."
 done
 

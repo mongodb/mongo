@@ -38,7 +38,14 @@ class SetUpEC2Instance(PowercycleCommand):
 
         # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
-        files = ["etc", "buildscripts", "dist-test/bin", "poetry.lock", "pyproject.toml"]
+        files = [
+            "etc",
+            "buildscripts",
+            "dist-test/bin",
+            "poetry.lock",
+            "pyproject.toml",
+            "poetry_requirements.txt",
+        ]
 
         shared_libs = "dist-test/lib"
         if os.path.isdir(shared_libs):
@@ -63,7 +70,7 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
-        cmds = f"{cmds}; python3 -m pip install 'poetry==2.0.0'"
+        cmds = f"{cmds}; pushd $remote_dir && python3 -m pip install -r poetry_requirements.txt && popd"
         cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync && popd"
 
         self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)

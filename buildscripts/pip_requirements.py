@@ -39,8 +39,12 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
     # This is so the user will have an easier time diagnosing the problem
     try:
         import poetry  # noqa: F401
-    except ModuleNotFoundError as ex:
-        raiseSuggestion(ex, "'poetry==2.0.0'")
+    except ModuleNotFoundError:
+        raise MissingRequirements(
+            f"Detected one or more packages are out of date. "
+            f"Try running:\n"
+            f"    buildscripts/poetry_sync.sh -p '{executable}'\n"
+        )
 
     verbose("Checking required python packages...")
 

@@ -22,6 +22,7 @@ package.json @10gen/devprod-correctness @svc-auto-approve-bot
 pnpm-lock.yaml @10gen/devprod-correctness @svc-auto-approve-bot
 poetry.lock @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 pyproject.toml @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
+poetry_requirements.txt @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 sbom.json @10gen/server-security @svc-auto-approve-bot
 MODULE.bazel* @10gen/devprod-build @svc-auto-approve-bot
 WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot

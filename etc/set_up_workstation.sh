@@ -70,7 +70,7 @@ setup_poetry() {
     if command -v poetry &> /dev/null; then
         echo "'poetry' command exists; skipping setup"
     else
-        pipx install poetry==2.0.0
+        pipx install poetry --pip-args="-r $(pwd)/poetry_requirements.txt"
         echo "Finished installing poetry..."
     fi
 }
