@@ -215,6 +215,22 @@ TEST_F(ErrorLabelBuilderTest, NonTransientTransactionErrorsHaveNoTransientTransa
     ASSERT_FALSE(builder.isTransientTransactionError());
 }
 
+TEST_F(ErrorLabelBuilderTest, SystemOverloadedErrorLabel) {
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    std::string commandName = "find";
+    ErrorLabelBuilder builder(opCtx(),
+                              sessionInfo,
+                              commandName,
+                              ErrorCodes::AdmissionQueueOverflow,
+                              boost::none,
+                              false /* isInternalClient */,
+                              false /* isMongos */,
+                              false /* isComingFromRouter */,
+                              repl::OpTime{},
+                              repl::OpTime{});
+    ASSERT_TRUE(builder.isSystemOverloadedError());
+}
+
 TEST_F(ErrorLabelBuilderTest, TransientTransactionErrorsHaveTransientTransactionErrorLabel) {
     OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
     sessionInfo.setTxnNumber(1);
@@ -761,6 +777,25 @@ TEST_F(ErrorLabelBuilderTest, NoWritesPerformedLabelNotAppliedIfUnknown) {
                               repl::OpTime{},
                               repl::OpTime{});
     ASSERT_FALSE(builder.isErrorWithNoWritesPerformed());
+}
+
+TEST_F(ErrorLabelBuilderTest, SystemOverloadedErrorLabelApplied) {
+    OperationSessionInfoFromClient sessionInfo{LogicalSessionFromClient(UUID::gen())};
+    sessionInfo.setTxnNumber(1);
+    std::string commandName = "find";
+    auto actualErrorLabels = getErrorLabels(opCtx(),
+                                            sessionInfo,
+                                            commandName,
+                                            ErrorCodes::AdmissionQueueOverflow,
+                                            boost::none,
+                                            false /* isInternalClient */,
+                                            false /* isMongos */,
+                                            false /* isComingFromRouter */,
+                                            kOpTime,
+                                            kOpTime);
+    BSONArrayBuilder expectedLabelArray;
+    expectedLabelArray << ErrorLabel::kSystemOverloadedError;
+    ASSERT_BSONOBJ_EQ(actualErrorLabels, BSON(kErrorLabelsFieldName << expectedLabelArray.arr()));
 }
 
 TEST_F(ErrorLabelBuilderTest, NoWritesPerformedAndRetryableWriteAppliesBothLabels) {

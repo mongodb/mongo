@@ -221,6 +221,10 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
         labels << ErrorLabel::kNonResumableChangeStream;
     }
 
+    if (isSystemOverloadedError()) {
+        labels << ErrorLabel::kSystemOverloadedError;
+    }
+
 #ifdef MONGO_CONFIG_STREAMS
     if (_commandName == "streams_startStreamProcessor" ||
         _commandName == "streams_listStreamProcessors") {
