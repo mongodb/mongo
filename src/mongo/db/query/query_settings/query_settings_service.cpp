@@ -443,8 +443,11 @@ public:
                 setQueryShapeHash(opCtx, hash);
 
                 // Return the found query settings or an empty one.
-                return _manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId())
-                    .get_value_or({});
+                auto result = _manager.getQuerySettingsForQueryShapeHash(hash, nss.tenantId());
+                if (!result.has_value()) {
+                    return QuerySettings();
+                }
+                return std::move(result->querySettings);
             } catch (const DBException& ex) {
                 LOGV2_WARNING_OPTIONS(10153400,
                                       {logv2::LogComponent::kQuery},

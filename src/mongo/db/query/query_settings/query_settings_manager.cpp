@@ -45,15 +45,23 @@ auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsA
     QueryShapeConfigurationsMap queryShapeConfigurationMap;
     queryShapeConfigurationMap.reserve(settingsArray.size());
     for (auto&& queryShapeConfiguration : settingsArray) {
-        queryShapeConfigurationMap.insert({queryShapeConfiguration.getQueryShapeHash(),
-                                           {queryShapeConfiguration.getSettings(),
-                                            queryShapeConfiguration.getRepresentativeQuery()}});
+        queryShapeConfigurationMap.insert(
+            {queryShapeConfiguration.getQueryShapeHash(),
+             QueryShapeConfigCachedEntry{
+                 .querySettings = queryShapeConfiguration.getSettings(),
+                 .representativeQuery_deprecated = queryShapeConfiguration.getRepresentativeQuery(),
+                 // Initially assume that no representative query is present. If one is present in
+                 // "config.queryShapeRepresentativeQueries", the next backfill attempt will update
+                 // this flag to reflect the correct state.
+                 // TODO SERVER-105065 Populate this flag with the correct state.
+                 .hasRepresentativeQuery = false,
+             }});
     }
     return queryShapeConfigurationMap;
 }
 }  // namespace
 
-boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQueryShapeHash(
+boost::optional<QuerySettingsLookupResult> QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     const query_shape::QueryShapeHash& queryShapeHash,
     const boost::optional<TenantId>& tenantId) const {
     auto readLock = _mutex.readLock();
@@ -65,8 +73,8 @@ boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQuerySha
         _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
         return boost::none;
     }
-    const auto& queryShapeHashToQueryShapeConfigurationsMap =
-        versionedQueryShapeConfigurationsIt->second.queryShapeHashToQueryShapeConfigurationsMap;
+    const auto& [queryShapeHashToQueryShapeConfigurationsMap, clusterParameterTime] =
+        versionedQueryShapeConfigurationsIt->second;
 
     // Lookup the query shape configuration by the query shape hash.
     const auto queryShapeConfigurationsIt =
@@ -74,7 +82,12 @@ boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQuerySha
     if (queryShapeHashToQueryShapeConfigurationsMap.end() == queryShapeConfigurationsIt) {
         return boost::none;
     }
-    return queryShapeConfigurationsIt->second.first;
+
+    const auto& queryShapeConfiguration = queryShapeConfigurationsIt->second;
+    return QuerySettingsLookupResult{.querySettings = queryShapeConfiguration.querySettings,
+                                     .hasRepresentativeQuery =
+                                         queryShapeConfiguration.hasRepresentativeQuery,
+                                     .clusterParameterTime = clusterParameterTime};
 }
 
 void QuerySettingsManager::setAllQueryShapeConfigurations(
@@ -146,8 +159,9 @@ std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfi
     for (const auto& [queryShapeHash, queryShapeConfiguration] :
          queryShapeHashToQueryShapeConfigurationsMap) {
         auto& newConfiguration =
-            configurations.emplace_back(queryShapeHash, queryShapeConfiguration.first);
-        newConfiguration.setRepresentativeQuery(queryShapeConfiguration.second);
+            configurations.emplace_back(queryShapeHash, queryShapeConfiguration.querySettings);
+        newConfiguration.setRepresentativeQuery(
+            queryShapeConfiguration.representativeQuery_deprecated);
     }
     return configurations;
 }

@@ -71,10 +71,19 @@ namespace query_settings {
 
 using QueryInstance = BSONObj;
 
-using QueryShapeConfigurationsMap =
-    absl::flat_hash_map<query_shape::QueryShapeHash,
-                        std::pair<QuerySettings, boost::optional<QueryInstance>>,
-                        QueryShapeHashHasher>;
+/**
+ * The in-memory representation for the data stored in QueryShapeConfiguration.
+ */
+struct QueryShapeConfigCachedEntry {
+    QuerySettings querySettings;
+
+    // TODO SERVER-105064 Remove this property once 9.0 is last-lts.
+    boost::optional<QueryInstance> representativeQuery_deprecated;
+    bool hasRepresentativeQuery;
+};
+
+using QueryShapeConfigurationsMap = absl::
+    flat_hash_map<query_shape::QueryShapeHash, QueryShapeConfigCachedEntry, QueryShapeHashHasher>;
 
 /**
  * Stores all query shape configurations for a tenant, containing the same information as the
@@ -89,6 +98,26 @@ struct VersionedQueryShapeConfigurations {
 
     /**
      * Cluster time of the current version of the QuerySettingsClusterParameter.
+     */
+    LogicalTime clusterParameterTime;
+};
+
+/**
+ * Result structure for 'QuerySettingsManager::getQuerySettingsForQueryShapeHash()'.
+ */
+struct QuerySettingsLookupResult {
+    /**
+     * The query settings associated with the given query shape hash.
+     */
+    QuerySettings querySettings;
+
+    /**
+     * Whether the given query shape hash has an associated representative query.
+     */
+    bool hasRepresentativeQuery;
+
+    /**
+     * Cluster time representing the current version of the QuerySettingsClusterParameter.
      */
     LogicalTime clusterParameterTime;
 };
@@ -112,7 +141,7 @@ public:
      * Returns QuerySettings associated with a query which query shape hash is 'queryShapeHash' for
      * the given tenant.
      */
-    boost::optional<QuerySettings> getQuerySettingsForQueryShapeHash(
+    boost::optional<QuerySettingsLookupResult> getQuerySettingsForQueryShapeHash(
         const query_shape::QueryShapeHash& queryShapeHash,
         const boost::optional<TenantId>& tenantId) const;
 

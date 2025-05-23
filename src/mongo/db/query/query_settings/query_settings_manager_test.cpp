@@ -143,9 +143,10 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
               boost::none);
 
     // Ensure QuerySettingsManager returns a valid QuerySettings on lookup.
-    ASSERT_EQ(
-        manager().getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId1),
-        configs[1].getSettings());
+    ASSERT_EQ(manager()
+                  .getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId1)
+                  ->querySettings,
+              configs[1].getSettings());
 
     // Ensure QuerySettingsManager does not return a valid QuerySettings of 'tenantId1', when
     // performing lookup as 'tenantId2'.
