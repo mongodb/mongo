@@ -35,7 +35,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: bool
         cpp_varname: gThrowLoggingEnabled
-        default: true
+        default: false
         redact: false
     throwLoggingExceptionName:
         description: "Log the stack when the named exception is thrown. The provided name must match the (platform dependent) name given by std::type_info::name()."
