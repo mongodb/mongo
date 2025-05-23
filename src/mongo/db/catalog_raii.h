@@ -323,9 +323,6 @@ public:
     }
 
 protected:
-    // TODO SERVER-99582: Using the CollectionWriter updates the AutoGetCollection object to point
-    // to the new writable instance. We should ideally remove this if we can guarantee this is no
-    // longer necessary in order to bring parity with CollectionAcquisition.
     friend class CollectionWriter;
 
     AutoGetCollection(OperationContext* opCtx,
