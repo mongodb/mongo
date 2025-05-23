@@ -57,6 +57,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -529,8 +530,6 @@ private:
         executor()->yieldIfAppropriate();
     }
 
-    void _waitForEstabilshmentRateLimit();
-
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* _sep;
@@ -789,10 +788,17 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
 
         try {
-            // If this is the first iteration of the session workflow, we must acquire an
-            // "establishment token" to respect connection establishment rate limits.
+            // If this is the first iteration of the session workflow, we must call into
+            // "throttleIfNeeded" to respect connection establishment rate limits.
             if (MONGO_unlikely(_inFirstIteration)) {
-                _waitForEstabilshmentRateLimit();
+                const auto fcvSnapshot =
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+                if (gFeatureFlagRateLimitIngressConnectionEstablishment
+                        .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
+                    uassertStatusOK(_serviceContext->getServiceEntryPoint()
+                                        ->getSessionEstablishmentRateLimiter()
+                                        .throttleIfNeeded(client()));
+                }
                 _inFirstIteration = false;
             }
 
@@ -819,24 +825,6 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                           "Unable to schedule a new loop for the session workflow",
                           "error"_attr = error);
     _onLoopError(error);
-}
-
-void SessionWorkflow::Impl::_waitForEstabilshmentRateLimit() {
-    auto sep = _serviceContext->getServiceEntryPoint();
-    auto exemptionsList = sep->getSessionEstablishmentRateLimitExemptionList();
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-
-    if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabledUseLatestFCVWhenUninitialized(
-            fcvSnapshot) &&
-        !(exemptionsList && isExemptedByCIDRList(session(), *exemptionsList))) {
-        // Create an opCtx for interruptibility and to make queued waiters return tokens when
-        // the client has disconnected.
-        auto establishmentOpCtx = client()->makeOperationContext();
-        establishmentOpCtx->markKillOnClientDisconnect();
-        // Acquire a token or block until one becomes available.
-        uassertStatusOK(
-            sep->getSessionEstablishmentRateLimiter().acquireToken(establishmentOpCtx.get()));
-    }
 }
 
 void SessionWorkflow::Impl::terminate() {

@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

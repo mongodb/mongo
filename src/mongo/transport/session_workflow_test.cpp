@@ -54,6 +54,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
@@ -510,6 +511,22 @@ TEST_F(SessionWorkflowTest, CleanupFromGetMore) {
 }
 
 class ConnectionEstablishmentQueueingTest : public SessionWorkflowTest {
+public:
+    BSONObj getConnectionStats() {
+        BSONObjBuilder bob;
+        sep()->appendStats(&bob);
+        auto stats = bob.obj();
+        LOGV2(10481100, "Connection stats", "stats"_attr = stats);
+        return stats;
+    }
+
+    void waitUntil(std::function<bool(void)> pred) {
+        auto retries = 0;
+        while (!pred() && retries < 5) {
+            sleepmillis(pow(5, ++retries));
+        }
+    }
+
 private:
     RAIIServerParameterControllerForTest featureFlagController{
         "featureFlagRateLimitIngressConnectionEstablishment", true};
@@ -518,11 +535,18 @@ private:
 };
 
 TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisabled) {
-    sep()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
-    sep()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
+    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
+                                                     1.0};
+    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
     startSession();
+    expect<Event::sessionSourceMessage>(makeOpMsg());
+    waitUntil([&] { return getConnectionStats()["active"].numberLong() == 1; });
+    ASSERT_EQ(getConnectionStats()["active"].numberLong(), 1);
+    ASSERT_EQ(getConnectionStats()["current"].numberLong(), 1);
+    expect<Event::sepHandleRequest>(makeResponse(makeOpMsg()));
+    expect<Event::sessionSinkMessage>(Status::OK());
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
 
@@ -531,13 +555,22 @@ TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisab
     startSession();
     expect<Event::sepEndSession>();
 
+    // Rejected connections should be counted in both server status sections.
+    ASSERT_EQ(getConnectionStats()["rejected"].numberLong(), 1);
+    ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["totalRejected"].numberLong(), 1);
+    ASSERT_EQ(getConnectionStats()["queued"].numberLong(), 0);
+    ASSERT_EQ(getConnectionStats()["totalCreated"].numberLong(), 2);
+
     joinSessions();
 }
 
 TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
-    sep()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
-    sep()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
-    sep()->getSessionEstablishmentRateLimiter().setMaxQueueDepth(10);
+    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
+                                                     1.0};
+    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
+    RAIIServerParameterControllerForTest maxQueueDepth{
+        "ingressConnectionEstablishmentMaxQueueDepth", 10};
+    const auto initialAvailable = getConnectionStats()["available"].numberLong();
 
     // The first session gets a token successfully and calls sourceMessage.
     startSession();
@@ -547,9 +580,22 @@ TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
     // The next session fails to get a token and queues until it is interrupted.
     initializeNewSession();
     startSession();
-    // TODO SERVER-104811: assert on the queued metric to ensure this session is queued.
+
+    // Ensure the session queues.
+    waitUntil([&] { return getConnectionStats()["queued"].numberLong() == 1; });
+    // Queued connections should be counted in "queued", "totalCreated", and "available" stats.
+    ASSERT_EQ(getConnectionStats()["queued"].numberLong(), 1);
+    ASSERT_EQ(getConnectionStats()["available"].numberLong(), initialAvailable - 1);
+    ASSERT_EQ(getConnectionStats()["totalCreated"].numberLong(), 2);
+
+    // Queued connections shouldn't be counted as active or current.
+    ASSERT_EQ(getConnectionStats()["active"].numberLong(), 0);
+    ASSERT_EQ(getConnectionStats()["current"].numberLong(), 0);
+
     getServiceContext()->setKillAllOperations();
     expect<Event::sepEndSession>();
+
+    ASSERT_EQ(getConnectionStats()["queued"].numberLong(), 0);
 
     joinSessions();
 }
@@ -558,8 +604,9 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     std::string ip = "127.0.0.1";
     RAIIServerParameterControllerForTest exemptionsGuard(
         "maxEstablishingConnectionsOverride", BSON("ranges" << BSONArray(BSON("0" << ip))));
-    sep()->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(.01);
-    sep()->getSessionEstablishmentRateLimiter().setBurstSize(1.0);
+    RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
+                                                     1.0};
+    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
     startSession();
@@ -571,12 +618,14 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
                          SockAddr::create("192.168.0.53", 27017, AF_INET));
     startSession();
     expect<Event::sepEndSession>();
+    ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["totalRejected"].numberLong(), 1);
 
     // Exempted ips get through.
     initializeNewSession(HostAndPort(ip, 27017), SockAddr::create(ip, 27017, AF_INET));
     startSession();
     expect<Event::sessionSourceMessage>(kClosedSessionError);
     expect<Event::sepEndSession>();
+    ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["totalExempted"].numberLong(), 1);
 
     joinSessions();
 }

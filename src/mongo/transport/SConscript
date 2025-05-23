@@ -153,6 +153,7 @@ env.Library(
     source=[
         'service_entry_point_impl.cpp',
         'service_entry_point_impl.idl',
+        'service_entry_point_utils.cpp',
         'session_workflow.cpp',
     ],
     LIBDEPS=[

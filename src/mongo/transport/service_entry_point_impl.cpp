@@ -53,6 +53,7 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
+#include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_gen.h"
@@ -113,40 +114,6 @@ struct ClientSummary {
     bool isLoadBalanced;
 };
 }  // namespace
-
-bool isExemptedByCIDRList(const std::shared_ptr<transport::Session>& session,
-                          const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
-    if (exemptions.empty())
-        return false;
-
-    boost::optional<CIDR> remoteCIDR;
-    if (const auto& ra = session->getProxiedSrcRemoteAddr(); ra.isValid() && ra.isIP())
-        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
-
-#ifndef _WIN32
-    boost::optional<std::string> localPath;
-    if (const auto& la = session->localAddr(); la.isValid())
-        localPath = la.getAddr();
-#endif
-
-    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
-        return stdx::visit(
-            [&](auto&& ex) {
-                using Alt = std::decay_t<decltype(ex)>;
-                if constexpr (std::is_same_v<Alt, CIDR>)
-                    return remoteCIDR && ex.contains(*remoteCIDR);
-#ifndef _WIN32
-                // Otherwise the exemption is a UNIX path and we should check the local path
-                // (the remoteAddr == "anonymous unix socket") against the exemption string.
-                // On Windows we don't check this at all and only CIDR ranges are supported.
-                if constexpr (std::is_same_v<Alt, std::string>)
-                    return localPath && *localPath == ex;
-#endif
-                return false;
-            },
-            exemption);
-    });
-}
 
 size_t getSupportedMax() {
     const auto supportedMax = [] {
@@ -455,20 +422,23 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
         bob->append(n, static_cast<int>(v));
     };
 
-    appendInt("current", sessionCount);
+    appendInt("current", sessionCount - _sessionEstablishmentRateLimiter.queued());
     appendInt("available", _maxSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
 
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        appendInt("rejected", _rejectedSessions);
+        appendInt("rejected", _rejectedSessions + _sessionEstablishmentRateLimiter.rejected());
     }
 
     invariant(_svcCtx);
-    appendInt("active", _svcCtx->getActiveClientOperations());
+    appendInt("active",
+              _svcCtx->getActiveClientOperations() - _sessionEstablishmentRateLimiter.queued());
+
+    _sessionEstablishmentRateLimiter.appendStats(bob);
 
     const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
-    appendInt("threaded", seStats.usesDedicated);
+    appendInt("threaded", seStats.usesDedicated - _sessionEstablishmentRateLimiter.queued());
     if (!serverGlobalParams.maxIncomingConnsOverride.empty())
         appendInt("limitExempt", seStats.limitExempt);
 
