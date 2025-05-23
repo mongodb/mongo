@@ -216,7 +216,15 @@ query:
     - src/mongo/s/shard_targeting_helpers*
     - src/mongo/s/query/planner
     - src/mongo/db/namespace_spec.idl # only used by query
+    - src/mongo/s/commands/*document_shard_key_*
     - src/mongo/util/safe_num*
+    - src/mongo/db/s/*analyze_shard_key*
+    - src/mongo/s/*analyze_shard_key*
+    - src/mongo/s/*query_analyze*
+    - src/mongo/s/commands/*analyze_shard_key*
+    - src/mongo/s/commands/*query_analyze*
+    - src/mongo/db/s/migration_blocking_operation/*multi_update*
+    - src/mongo/s/request_types/*multi_update*
 
 shard_catalog:
   meta:
@@ -302,6 +310,7 @@ ddl:
     - src/mongo/db/s/sharding_recovery_service*
     - src/mongo/db/s/sharding_util[._]*
     - src/mongo/db/s/sharding_ddl_util[._]*
+    - src/mongo/db/s/*reshard_collection_coordinator*
 
     # DDL operations
     - src/mongo/db/s/*change_primary*
@@ -354,6 +363,10 @@ ddl:
     - src/mongo/s/request_types/shardsvr_join_ddl_coordinators_request.idl
     - src/mongo/db/s/shardsvr_join_ddl_coordinators_command.cpp
     - src/mongo/db/s/config/configsvr_create_database_command.cpp
+    - src/mongo/s/commands/cluster_create_unsplittable_collections_command.cpp
+    - src/mongo/s/commands/*move_collection*
+    - src/mongo/s/commands/*reshard*
+    - src/mongo/s/request_types/*reshard_collection*
 
     # unsorted: Everything else.
     - src/mongo/s/check_metadata_consistency.idl
@@ -361,6 +374,9 @@ ddl:
     - src/mongo/s/catalog/*
     - src/mongo/db/s/config/index_on_config*
     - src/mongo/db/s/config/sharding_catalog_manager*
+    - src/mongo/db/s/migration_blocking_operation/*blocking*
+    - src/mongo/s/request_types/migration_blocking_operation*
+    - src/mongo/s/migration_blocking_operation*
 
 routing_and_topology:
   meta:
@@ -416,6 +432,7 @@ routing_and_topology:
     - src/mongo/idl/cluster_server_parameter*
     - src/mongo/idl/cluster_parameter_synchronization_helpers*
     - src/mongo/s/set_cluster_server_parameter_router_impl[._]*
+    - src/mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters.idl
 
     # commands: Commands that belong to this module.
     - src/mongo/s/commands/cluster_rwc_defaults_commands.cpp
@@ -425,7 +442,10 @@ routing_and_topology:
     - src/mongo/s/request_types/remove_shard.idl
     - src/mongo/db/s/remove_shard_commit_coordinator[._]*
     - src/mongo/db/s/config/configsvr_remove_shard_command.cpp
+    - src/mongo/db/s/config/*transition*dedicated_config*
     - src/mongo/s/s_sharding_server_status.cpp
+    - src/mongo/s/commands/*transition*dedicated_config*
+    - src/mongo/s/request_types/transition*
 
     # unit_testing_framework: Components that are used to implement unit-tests that require a
     # functioning routing and topology environment.
@@ -436,12 +456,16 @@ routing_and_topology:
     - src/mongo/db/s/shard_server_test_fixture.*
     - src/mongo/db/s/config/config_server_test_fixture.*
 
+    # replica_set_endpoint: will be deleted eventually
+    - src/mongo/db/s/replica_set_endpoint*
+
     # unsorted: Everything else.
     - src/mongo/db/write_block_bypass[._]*
     - src/mongo/db/op_observer/user_write_block_mode*
     - src/mongo/s/cluster_identity_loader[._]*
     - src/mongo/s/service_entry_point_router_role[._]*
     - src/mongo/s/commands/strategy*
+    - src/mongo/db/s/sharding_runtime_d*
 
 transactions:
   meta:
@@ -462,6 +486,7 @@ transactions:
     - src/mongo/s/commands/*txn*
     - src/mongo/s/*transaction*
     - src/mongo/db/session/
+    - src/mongo/s/session_catalog_router*
 
 fcv:
   meta:
@@ -590,18 +615,50 @@ data_movement:
     slack: server-sharding
     jira: Cluster Scalability
   files:
-    - src/mongo/db/cloner*
-    - src/mongo/db/s/migration* # note the filename pattern
+    # resharding
+    - src/mongo/db/s/*reshard*
+    - src/mongo/db/s/config/*reshard*
+    - src/mongo/s/*reshard*
+    - src/mongo/db/s/metrics/**
+    - src/mongo/s/request_types/resharding_operation_time.idl
+
+    # chunk operations
+    - src/mongo/db/s/migration_chunk*
+    - src/mongo/db/s/migration_batch*
+    - src/mongo/db/s/migration*manager*
+    - src/mongo/db/s/migration*session*
+    - src/mongo/db/s/session*migration*
+    - src/mongo/db/s/migration_recipient*
+    - src/mongo/db/s/migration_coordinator*
+    - src/mongo/db/s/migration_util*
+    - src/mongo/db/s/migration_chunk*
     - src/mongo/db/s/active_migrations*
     - src/mongo/db/s/range_delet*
+    - src/mongo/db/s/chunk*
+    - src/mongo/db/s/start_chunk*
+    - src/mongo/db/s/*move_range*
+    - src/mongo/db/s/move_timing*
+    - src/mongo/db/s/config/*move_range*
+    - src/mongo/db/s/*split_vector*
+    - src/mongo/db/s/cleanup_orphaned_cmd.cpp
+    - src/mongo/s/commands/*move_range*
+    - src/mongo/s/request_types/move_range_request.idl
+    - src/mongo/s/commands/*split_vector*
+    - src/mongo/s/commands/*split_cmd*
+    - src/mongo/s/commands/*move_chunk*
+    - src/mongo/s/request_types/auto_split_vector.idl
+    - src/mongo/s/request_types/migration_secondary_throttle*
+    - src/mongo/s/request_types/repair_sharded_collection_chunks_history.idl
+    - src/mongo/s/request_types/cleanup_orphaned.idl
+
+    # balancer
     - src/mongo/db/s/*balanc*
-    - src/mongo/db/s/resharding
     - src/mongo/db/s/config/configsvr_*balanc*
     - src/mongo/s/balanc*
-    - src/mongo/s/resharding
-    - src/mongo/s/migration_blocking_operation*
     - src/mongo/s/commands/*balanc*
     - src/mongo/s/request_types/*balanc*
+
+    - src/mongo/db/cloner*
 
 observability:
   meta:
@@ -831,6 +888,7 @@ storage_engine_integration:
     - src/mongo/dbtests/dbtests*
     - src/mongo/dbtests/storage_debug_util*
     - src/mongo/s/commands/storage_engine
+    - src/mongo/s/commands/*fsync*
 
 validate:
   meta:
