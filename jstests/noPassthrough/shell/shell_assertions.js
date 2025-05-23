@@ -155,7 +155,7 @@ tests.push(function assertShouldThrowExceptionForFalseWithDefaultMessagePrefix()
 });
 
 tests.push(function assertShouldNotCallMsgFunctionsOnSuccess() {
-    var called = false;
+    let called = false;
 
     assert(true, () => {
         called = true;
@@ -165,7 +165,7 @@ tests.push(function assertShouldNotCallMsgFunctionsOnSuccess() {
 });
 
 tests.push(function assertShouldCallMsgFunctionsOnFailure() {
-    var called = false;
+    let called = false;
 
     assert.throws(() => {
         assert(false, () => {
@@ -211,7 +211,7 @@ tests.push(function eqShouldFailWhenNotEqual() {
 });
 
 tests.push(function eqShouldNotCallMsgFunctionOnSuccess() {
-    var called = false;
+    let called = false;
 
     assert.doesNotThrow(() => {
         assert.eq(3, 3, () => {
@@ -223,7 +223,7 @@ tests.push(function eqShouldNotCallMsgFunctionOnSuccess() {
 });
 
 tests.push(function eqShouldCallMsgFunctionOnFailure() {
-    var called = false;
+    let called = false;
 
     assert.throws(() => {
         assert.eq(1, 3, () => {
@@ -335,7 +335,7 @@ tests.push(function soonFailsIfMethodNeverPasses() {
 });
 
 tests.push(function soonPassesIfMethodEventuallyPasses() {
-    var count = 0;
+    let count = 0;
     assert.doesNotThrow(() => {
         assert.soon(() => {
             count += 1;
@@ -347,7 +347,7 @@ tests.push(function soonPassesIfMethodEventuallyPasses() {
 /* assert.soonNoExcept tests */
 
 tests.push(function soonNoExceptEventuallyPassesEvenWithExceptions() {
-    var count = 0;
+    let count = 0;
     assert.doesNotThrow(() => {
         assert.soonNoExcept(() => {
             count += 1;
@@ -360,7 +360,7 @@ tests.push(function soonNoExceptEventuallyPassesEvenWithExceptions() {
 });
 
 tests.push(function soonNoExceptFailsIfExceptionAlwaysThrown() {
-    var count = 0;
+    let count = 0;
     assert.throws(() => {
         assert.soonNoExcept(() => {
             throw new Error('failed');
@@ -371,7 +371,7 @@ tests.push(function soonNoExceptFailsIfExceptionAlwaysThrown() {
 /* assert.retry tests */
 
 tests.push(function retryPassesAfterAFewAttempts() {
-    var count = 0;
+    let count = 0;
 
     assert.doesNotThrow(() => {
         assert.retry(() => {
@@ -394,7 +394,7 @@ tests.push(function retryFailsAfterMaxAttempts() {
 /* assert.retryNoExcept tests */
 
 tests.push(function retryNoExceptPassesAfterAFewAttempts() {
-    var count = 0;
+    let count = 0;
 
     assert.doesNotThrow(() => {
         assert.retryNoExcept(() => {

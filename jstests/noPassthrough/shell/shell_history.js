@@ -2,15 +2,15 @@
 // appropriate permissions (where relevant).
 
 // Use dataPath because it includes the trailing "/" or "\".
-var tmpHome = MongoRunner.dataPath;
+let tmpHome = MongoRunner.dataPath;
 // Ensure it exists and is a dir (eg. if running without resmoke.py and /data/db doesn't exist).
 mkdir(tmpHome);
 removeFile(tmpHome + ".dbshell");
 
-var args = [];
-var cmdline = "mongo --nodb";
-var redirection = "";
-var env = {};
+let args = [];
+let cmdline = "mongo --nodb";
+let redirection = "";
+let env = {};
 if (_isWindows()) {
     args.push("cmd.exe");
     args.push("/c");
@@ -23,14 +23,15 @@ if (_isWindows()) {
     // USERPROFILE set to the tmp homedir.
     // Since NUL is a character device, isatty() will return true, which means that .mongorc.js
     // will be created in the HOMEDRIVE + HOMEPATH location, so we must set them also.
+    let tmpHomeDrive, tmpHomePath;
     if (tmpHome.match("^[a-zA-Z]:")) {
-        var tmpHomeDrive = tmpHome.substr(0, 2);
-        var tmpHomePath = tmpHome.substr(2);
+        tmpHomeDrive = tmpHome.substr(0, 2);
+        tmpHomePath = tmpHome.substr(2);
     } else {
-        var _pwd = pwd();
+        let _pwd = pwd();
         assert(_pwd.match("^[a-zA-Z]:"), "pwd must include drive");
-        var tmpHomeDrive = _pwd.substr(0, 2);
-        var tmpHomePath = tmpHome;
+        tmpHomeDrive = _pwd.substr(0, 2);
+        tmpHomePath = tmpHome;
     }
     env = {USERPROFILE: tmpHome, HOMEDRIVE: tmpHomeDrive, HOMEPATH: tmpHomePath};
 
@@ -60,16 +61,16 @@ if (_isWindows()) {
 cmdline += " " + redirection;
 args.push(cmdline);
 jsTestLog("Running args:\n    " + tojson(args) + "\nwith env:\n    " + tojson(env));
-var pid = _startMongoProgram({args, env});
-var rc = waitProgram(pid);
+let pid = _startMongoProgram({args, env});
+let rc = waitProgram(pid);
 
 assert.eq(rc, 0);
 
-var files = listFiles(tmpHome);
+let files = listFiles(tmpHome);
 jsTestLog(tojson(files));
 
-var findFile = function(baseName) {
-    for (var i = 0; i < files.length; i++) {
+let findFile = function(baseName) {
+    for (let i = 0; i < files.length; i++) {
         if (files[i].baseName === baseName) {
             return files[i];
         }
@@ -77,8 +78,8 @@ var findFile = function(baseName) {
     return undefined;
 };
 
-var targetFile = ".dbshell";
-var file = findFile(targetFile);
+let targetFile = ".dbshell";
+let file = findFile(targetFile);
 
 assert.neq(typeof (file), "undefined", targetFile + " should exist, but it doesn't");
 assert.eq(file.isDirectory, false, targetFile + " should not be a directory, but it is");
@@ -91,11 +92,11 @@ if (!_isWindows()) {
     // `ls -l` is POSIX, so this is the best that we have.
     // Check for exactly "-rw-------".
     clearRawMongoProgramOutput();
-    var rc = runProgram("ls", "-l", file.name);
+    let rc = runProgram("ls", "-l", file.name);
     assert.eq(rc, 0);
 
-    var output = rawMongoProgramOutput(".*");
-    var fields = output.split(" ");
+    let output = rawMongoProgramOutput(".*");
+    let fields = output.split(" ");
     // First field is the prefix, second field is the `ls -l` permissions.
     assert.eq(fields[1].substr(0, 10), "-rw-------", targetFile + " has bad permissions");
 }

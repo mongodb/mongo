@@ -6,8 +6,8 @@
 // times from the registry
 // Verify that an invariant failure doesn't occur in the program registry
 try {
-    var cleanup = startParallelShell("MongoRunner.runningChildPids();", undefined, true);
-    var cleanup2 = startParallelShell("MongoRunner.runningChildPids();", undefined, true);
+    let cleanup = startParallelShell("MongoRunner.runningChildPids();", undefined, true);
+    let cleanup2 = startParallelShell("MongoRunner.runningChildPids();", undefined, true);
     sleep(5000);
 
     try {

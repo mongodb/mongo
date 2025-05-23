@@ -44,7 +44,7 @@ tests.push(function checkTestDataWithFunc() {
             // We cannot directly compare testData & TestData because the func object
             // has extra whitespace and line control.
             assert.eq(Object.keys(TestData), Object.keys(testData));
-            for (var property in TestData) {
+            for (let property in TestData) {
                 if (TestData.hasOwnProperty(property) && !(TestData.property instanceof Code)) {
                     assert.eq(TestData.property, testData.property);
                 }

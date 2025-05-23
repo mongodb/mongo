@@ -1,12 +1,12 @@
-var checkShell = function(retCode) {
-    var args = [
+let checkShell = function(retCode) {
+    let args = [
         "mongo",
         "--nodb",
         "--eval",
         "quit(" + retCode + ");",
     ];
 
-    var actualRetCode = _runMongoProgram.apply(null, args);
+    let actualRetCode = _runMongoProgram.apply(null, args);
     assert.eq(retCode, actualRetCode);
 };
 

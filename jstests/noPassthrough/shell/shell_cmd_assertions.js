@@ -39,8 +39,8 @@ tests.push(function rawCommandOk() {
 
 function _assertMsgFunctionExecution(
     assertFunc, assertParameter, {expectException: expectException = false} = {}) {
-    var msgFunctionCalled = false;
-    var expectedAssert = assert.doesNotThrow;
+    let msgFunctionCalled = false;
+    let expectedAssert = assert.doesNotThrow;
 
     if (expectException) {
         expectedAssert = assert.throws;
@@ -63,7 +63,7 @@ tests.push(function msgFunctionOnlyCalledOnFailure() {
         assert.commandWorkedIgnoringWriteErrors, res, {expectException: false});
     _assertMsgFunctionExecution(assert.commandFailed, res, {expectException: true});
 
-    var msgFunctionCalled = false;
+    let msgFunctionCalled = false;
     assert.throws(() => assert.commandFailedWithCode(res, 0, () => {
         msgFunctionCalled = true;
     }));

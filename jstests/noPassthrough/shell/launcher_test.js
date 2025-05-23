@@ -5,13 +5,13 @@
 const numLines = 300;
 const lineContents = "lots of super fun text\n".repeat(numLines).trim();
 
-var echoTest = function() {
+let echoTest = function() {
     clearRawMongoProgramOutput();
 
     // This will produce `numLines` + 1 lines of output because echo isn't being called with
     // `-n`. This will block until the program exits.
-    var exitCode = runProgram("echo", lineContents);
-    var output = rawMongoProgramOutput(".*");
+    let exitCode = runProgram("echo", lineContents);
+    let output = rawMongoProgramOutput(".*");
 
     assert.eq(0, exitCode);
 
@@ -22,6 +22,6 @@ var echoTest = function() {
 
 // The motivating failure for the test was a race in runProgram. Empirically, 10 runs has always
 // been sufficient for this to fail. 16 gives the test some leeway.
-for (var i = 0; i < 16; i++) {
+for (let i = 0; i < 16; i++) {
     echoTest();
 }

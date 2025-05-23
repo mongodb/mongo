@@ -11,7 +11,7 @@ rst.initiate();
 const collName = "shell_uses_transaction_read_concern";
 const primary = rst.getPrimary();
 const db = primary.getDB("test");
-var coll = db.getCollection(collName);
+let coll = db.getCollection(collName);
 const testDoc = {
     "test": "doc",
     "_id": 0

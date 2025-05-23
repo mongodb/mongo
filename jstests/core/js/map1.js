@@ -1,9 +1,9 @@
 
 function basic1(key, lookup, shouldFail) {
-    var m = new BSONAwareMap();
+    let m = new BSONAwareMap();
     m.put(key, 17);
 
-    var out = m.get(lookup || key);
+    let out = m.get(lookup || key);
 
     if (!shouldFail) {
         assert.eq(17, out, "basic1 missing: " + tojson(key));

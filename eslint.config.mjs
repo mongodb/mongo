@@ -389,4 +389,11 @@ export default [
             "mongodb/no-tojson-fn": 0,
         },
     },
+    {
+        // Shell-specific: extra strict!
+        files: ["jstests/core/js/**", "jstests/noPassthrough/shell/**"],
+        rules: {
+            "no-var": 2,
+        },
+    },
 ];

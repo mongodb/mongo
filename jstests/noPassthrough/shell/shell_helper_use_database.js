@@ -4,7 +4,7 @@
 
 // We explicitly declare the global 'db' object since the rest of the test runs with strict-mode
 // enabled.
-var db;
+var db;  // eslint-disable-line no-var
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
