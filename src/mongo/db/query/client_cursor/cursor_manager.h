@@ -148,6 +148,7 @@ public:
     StatusWith<ClientCursorPin> pinCursor(
         OperationContext* opCtx,
         CursorId id,
+        StringData commandName,
         const std::function<void(const ClientCursor&)>& checkPinAllowed = {},
         AuthCheck checkSessionAuth = kCheckSession);
 

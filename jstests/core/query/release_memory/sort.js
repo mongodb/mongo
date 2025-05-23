@@ -14,7 +14,6 @@
  */
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode

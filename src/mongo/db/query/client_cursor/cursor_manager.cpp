@@ -48,6 +48,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -200,6 +201,7 @@ std::vector<CursorId> CursorManager::getCursorIdsForNamespace(const NamespaceStr
 StatusWith<ClientCursorPin> CursorManager::pinCursor(
     OperationContext* opCtx,
     CursorId id,
+    StringData commandName,
     const std::function<void(const ClientCursor&)>& checkPinAllowed,
     AuthCheck checkSessionAuth) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
@@ -210,8 +212,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
 
     ClientCursor* cursor = it->second;
     if (cursor->_operationUsingCursor) {
-        return {ErrorCodes::CursorInUse,
-                str::stream() << "cursor id " << id << " is already in use"};
+        return Status{CursorInUseInfo{cursor->_commandUsingCursor},
+                      str::stream() << "cursor id " << id << " is already in use"};
     }
     if (cursor->getExecutor()->isMarkedAsKilled()) {
         // This cursor was killed while it was idle.
@@ -250,6 +252,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     CurOp::get(opCtx)->debug().isChangeStreamQuery = cursor->_isChangeStreamQuery;
 
     cursor->_operationUsingCursor = opCtx;
+    cursor->_commandUsingCursor = commandName.toString();
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).

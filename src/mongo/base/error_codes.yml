@@ -210,7 +210,12 @@ error_codes:
   - {code: 140, name: InvalidSSLConfiguration}
   - {code: 141, name: SSLHandshakeFailed}
   - {code: 142, name: JSUncatchableError}
-  - {code: 143, name: CursorInUse}
+  - {
+      code: 143,
+      name: CursorInUse,
+      extra: CursorInUseInfo,
+      extraIsOptional: true,
+    }
   - {code: 144, name: IncompatibleCatalogManager}
   - {code: 145, name: PooledConnectionsDropped}
   - {code: 146, name: ExceededMemoryLimit}

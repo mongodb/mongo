@@ -361,8 +361,8 @@ public:
         {
             // Check that a cursor has been registered with the global cursor manager, and has
             // already returned its first batch of results.
-            auto pinnedCursor =
-                unittest::assertGet(CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId));
+            auto pinnedCursor = unittest::assertGet(
+                CursorManager::get(&_opCtx)->pinCursor(&_opCtx, cursorId, "getMore"));
             ASSERT_EQUALS(1ull, pinnedCursor.getCursor()->getNBatches());
         }
 

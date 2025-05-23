@@ -316,3 +316,6 @@ filters:
   - "validate_api_parameters*":
     approvers:
       - 10gen/query-optimization
+  - "cursor_in_use_info*":
+    approvers:
+      - 10gen/query-execution

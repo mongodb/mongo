@@ -466,6 +466,8 @@ private:
     // 1) You have a lock on the appropriate partition in CursorManager.
     // 2) You know you have the cursor pinned.
     OperationContext* _operationUsingCursor;
+    // The name of the command that is using the cursor.
+    std::string _commandUsingCursor;
 
     Date_t _lastUseDate;
     Date_t _createdDate;

@@ -322,7 +322,7 @@ TEST_F(CursorManagerTest, MarkedAsKilledCursorsShouldBeDeletedOnCursorPin) {
 
     // Pinning the cursor should fail with the same error code that interrupted the OpCtx. The
     // cursor should no longer be present in the manager.
-    ASSERT_EQ(_cursorManager.pinCursor(_opCtx.get(), cursorId).getStatus(),
+    ASSERT_EQ(_cursorManager.pinCursor(_opCtx.get(), cursorId, "getMore").getStatus(),
               ErrorCodes::InternalError);
     ASSERT_EQ(0UL, _cursorManager.numCursors());
 }
@@ -397,7 +397,8 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     clock->advance(Milliseconds(1));
 
     // Touch the cursor with id 'usedCursorId' to advance its time of last use.
-    _cursorManager.pinCursor(_opCtx.get(), usedCursorId).status_with_transitional_ignore();
+    _cursorManager.pinCursor(_opCtx.get(), usedCursorId, "getMore")
+        .status_with_transitional_ignore();
 
     // We should be able to time out the unused cursor, but the one we used should stay alive.
     ASSERT_EQ(2UL, _cursorManager.numCursors());

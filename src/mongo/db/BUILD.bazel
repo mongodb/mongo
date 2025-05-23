@@ -2078,12 +2078,14 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "common",
     srcs = [
+        "cursor_in_use_info.cpp",
         "field_parser.cpp",
         "field_ref.cpp",
         "field_ref_set.cpp",
         "txn_retry_counter_too_old_info.cpp",
     ],
     hdrs = [
+        "cursor_in_use_info.h",
         "field_parser.h",
         "field_ref.h",
         "field_ref_set.h",

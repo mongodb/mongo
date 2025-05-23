@@ -1664,6 +1664,18 @@ server_parameters:
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
+
+    internalQueryGetMoreMaxCursorPinRetryAttempts:
+        description: >-
+            Max number of attempts to pin cursor by getMore command before failing in cases where
+            cursor is already pinned by releaseMemory command.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryGetMoreMaxCursorPinRetryAttempts"
+        cpp_vartype: AtomicWord<long long>
+        default: 10
+        redact: false
+        validator:
+            gte: 1
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

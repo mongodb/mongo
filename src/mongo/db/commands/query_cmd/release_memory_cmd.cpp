@@ -91,7 +91,8 @@ public:
             };
 
             for (CursorId cursorId : request().getCommandParameter()) {
-                auto cursorPin = CursorManager::get(opCtx)->pinCursor(opCtx, cursorId);
+                auto cursorPin =
+                    CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, definition()->getName());
                 if (cursorPin.isOK()) {
                     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
                         cursorPin.getValue().getCursor(), opCtx);

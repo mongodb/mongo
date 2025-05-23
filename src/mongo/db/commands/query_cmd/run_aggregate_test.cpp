@@ -170,7 +170,8 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
             // the end of this block. We need a new block here so the cursor isn't considered as
             // being in use when we call getMore() below.
             CursorManager* cursorManager = CursorManager::get(opCtx->getServiceContext());
-            ClientCursorPin pin = unittest::assertGet(cursorManager->pinCursor(opCtx, cursorId));
+            ClientCursorPin pin =
+                unittest::assertGet(cursorManager->pinCursor(opCtx, cursorId, "getMore"));
             OperationMemoryUsageTracker* tracker =
                 OperationMemoryUsageTracker::getFromClientCursor_forTest(pin.getCursor());
             ASSERT(tracker);

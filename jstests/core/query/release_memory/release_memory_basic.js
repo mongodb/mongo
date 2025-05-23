@@ -14,9 +14,19 @@
  * ]
  */
 
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+
+function getServerParameter(knob) {
+    return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
+}
+
+function setServerParameter(knob, value) {
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), knob, value);
+}
 
 function setupCollection(coll) {
     const docs = [];
@@ -26,17 +36,17 @@ function setupCollection(coll) {
     assert.commandWorked(coll.insertMany(docs));
 }
 
-function waitForLog(logId, cursorId) {
+function waitForLog(predicate) {
     assert.soon(() => {
         const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-        if (findMatchingLogLine(globalLog.log, {id: logId, cursorId: cursorId})) {
+        if (findMatchingLogLine(globalLog.log, predicate)) {
             return true;
         }
         return false;
     });
 }
 
-function assertGetMore(cursorId, collName, sessionId, txnNumber) {
+function assertGetMore(cursorId, collName, sessionId, txnNumber, times) {
     let getMoreCmd = {
         getMore: cursorId,
         collection: collName,
@@ -47,8 +57,10 @@ function assertGetMore(cursorId, collName, sessionId, txnNumber) {
     if (txnNumber != -1) {
         getMoreCmd.txnNumber = txnNumber;
     }
-    jsTest.log.info("Running getMore in parallel shell: ", getMoreCmd);
-    assert.commandWorked(db.runCommand(getMoreCmd));
+    for (let i = 0; i < times; ++i) {
+        jsTest.log.info("Running getMore in parallel shell: ", getMoreCmd);
+        assert.commandWorked(db.runCommand(getMoreCmd));
+    }
 }
 
 db.dropDatabase();
@@ -56,61 +68,115 @@ const coll = db[jsTestName()];
 setupCollection(coll);
 
 const createInactiveCursor = function(coll) {
-    const findCmd = {find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 5};
+    const findCmd = {find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 1};
     jsTest.log.info("Running findCmd: ", findCmd);
     const cmdRes = coll.getDB().runCommand(findCmd);
     assert.commandWorked(cmdRes);
     return cmdRes.cursor.id;
 };
 
-const cursorToReleaseId = createInactiveCursor(coll);
-const cursorNotFoundId = NumberLong("123");
+{
+    const cursorToReleaseId = createInactiveCursor(coll);
+    const cursorNotFoundId = NumberLong("123");
 
-const session = db.getMongo().startSession();
-const cursorCurrentlyPinnedId =
-    createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
-const getMoreFailpoint = configureFailPoint(db, "getMoreHangAfterPinCursor");
+    const session = db.getMongo().startSession();
+    const cursorCurrentlyPinnedId =
+        createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
+    const getMoreFailpoint = configureFailPoint(db, "getMoreHangAfterPinCursor");
 
-const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
-                                                   cursorCurrentlyPinnedId,
-                                                   coll.getName(),
-                                                   session.getSessionId(),
-                                                   session.getTxnNumber_forTesting()));
+    const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
+                                                       cursorCurrentlyPinnedId,
+                                                       coll.getName(),
+                                                       session.getSessionId(),
+                                                       session.getTxnNumber_forTesting(),
+                                                       1 /*times*/));
 
-getMoreFailpoint.wait();
-waitForLog(20477, cursorCurrentlyPinnedId);
+    getMoreFailpoint.wait();
+    waitForLog({id: 20477, cursorId: cursorCurrentlyPinnedId});
 
-const releaseMemoryCmd = {
-    releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId]
-};
-jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-assert.commandWorked(releaseMemoryRes);
+    const releaseMemoryCmd = {
+        releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId]
+    };
+    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+    assert.commandWorked(releaseMemoryRes);
 
-assert.eq(releaseMemoryRes.cursorsReleased, [cursorToReleaseId], releaseMemoryRes);
-assert.eq(releaseMemoryRes.cursorsNotFound, [cursorNotFoundId], releaseMemoryRes);
-assert.eq(releaseMemoryRes.cursorsCurrentlyPinned, [cursorCurrentlyPinnedId], releaseMemoryRes);
+    assert.eq(releaseMemoryRes.cursorsReleased, [cursorToReleaseId], releaseMemoryRes);
+    assert.eq(releaseMemoryRes.cursorsNotFound, [cursorNotFoundId], releaseMemoryRes);
+    assert.eq(releaseMemoryRes.cursorsCurrentlyPinned, [cursorCurrentlyPinnedId], releaseMemoryRes);
 
-getMoreFailpoint.off();
-joinGetMore();
+    getMoreFailpoint.off();
+    joinGetMore();
+}
 
-const coll2 = db[jsTestName() + "2"];
-setupCollection(coll2);
+const getMoreRetriesKnob = "internalQueryGetMoreMaxCursorPinRetryAttempts";
+const originalKnobValue = getServerParameter(getMoreRetriesKnob);
 
-const cursorIdForGetMore = createInactiveCursor(coll);
+{
+    const cursorIdForGetMore = createInactiveCursor(coll);
 
-const releaseMemoryFailPoint = configureFailPoint(db, "releaseMemoryHangAfterPinCursor");
+    const releaseMemoryFailPoint = configureFailPoint(db, "releaseMemoryHangAfterPinCursor");
 
-const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
-    const releaseMemoryCmd = {releaseMemory: [cursorId]};
-    jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
-    assert.commandWorked(db.runCommand(releaseMemoryCmd));
-}, cursorIdForGetMore));
+    const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
+        assert.commandWorked(db.runCommand(releaseMemoryCmd));
+    }, cursorIdForGetMore));
 
-releaseMemoryFailPoint.wait();
+    releaseMemoryFailPoint.wait();
 
-assert.commandFailedWithCode(db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}),
-                             [ErrorCodes.CursorInUse]);
+    // getMore retries pinning the cursor if releaseMemory holds the pin, but it does it for a
+    // limited amount of retries.
+    setServerParameter(getMoreRetriesKnob, 2);
+    assert.commandFailedWithCode(
+        db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}),
+        [ErrorCodes.CursorInUse]);
 
-releaseMemoryFailPoint.off();
-joinReleaseMemory();
+    releaseMemoryFailPoint.off();
+    joinReleaseMemory();
+}
+
+{  // Run getMore and releaseMemory a lot in parallel to ensure that getMore can retry pinning the
+   // cursor.
+    // Set the knob to a very high value to ensure practically infinite retries.
+    setServerParameter(getMoreRetriesKnob, 1000000000);
+
+    db.setLogLevel(3, "query");
+
+    const session = db.getMongo().startSession();
+    const cursorId = createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
+
+    const releaseMemoryFailPoint = configureFailPoint(db, "releaseMemoryHangAfterPinCursor");
+
+    const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
+        for (let i = 0; i < 200; ++i) {
+            const res = db.runCommand(releaseMemoryCmd);
+            assert.commandWorked(res);
+            if (res.cursorsReleased.length > 0) {
+                assert.eq(res.cursorsReleased, [cursorId], res);
+            } else {
+                assert.eq(res.cursorsCurrentlyPinned, [cursorId], res);
+            }
+        }
+    }, cursorId));
+
+    releaseMemoryFailPoint.wait();
+
+    const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
+                                                       cursorId,
+                                                       coll.getName(),
+                                                       session.getSessionId(),
+                                                       session.getTxnNumber_forTesting(),
+                                                       150 /*times*/));
+
+    // Assert that at least one retry happened.
+    waitForLog({id: 10116501});
+    releaseMemoryFailPoint.off();
+
+    joinReleaseMemory();
+    joinGetMore();
+}
+
+setServerParameter(getMoreRetriesKnob, originalKnobValue);

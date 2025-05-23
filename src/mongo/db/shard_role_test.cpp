@@ -2259,7 +2259,8 @@ TEST_F(ShardRoleTest, YieldAndRestoreCursor) {
     auto newOpCtxHolder = acr->makeOperationContext();
     auto* newOpCtx = newOpCtxHolder.get();
 
-    auto clientCursorPin = assertGet(CursorManager::get(newOpCtx)->pinCursor(newOpCtx, cursorId));
+    auto clientCursorPin =
+        assertGet(CursorManager::get(newOpCtx)->pinCursor(newOpCtx, cursorId, "getMore"));
 
     ON_BLOCK_EXIT([&] {
         ASSERT_FALSE(

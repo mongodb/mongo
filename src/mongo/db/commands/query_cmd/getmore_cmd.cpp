@@ -61,6 +61,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -711,6 +712,49 @@ public:
             }
         }
 
+        ClientCursorPin pinCursorWithRetry(OperationContext* opCtx,
+                                           CursorId cursorId,
+                                           const NamespaceString& nss) {
+            // Perform validation checks which don't cause the cursor to be deleted on failure.
+            auto pinCheck = [&](const ClientCursor& cc) {
+                validateLSID(opCtx, cursorId, &cc);
+                validateTxnNumber(opCtx, cursorId, &cc);
+                validateAuthorization(opCtx, cc);
+                validateNamespace(nss, cc);
+                validateMaxTimeMS(_cmd.getMaxTimeMS(), cc);
+            };
+
+            Backoff retryBackoff{Seconds(1), Milliseconds::max()};
+
+            const size_t maxAttempts = internalQueryGetMoreMaxCursorPinRetryAttempts.loadRelaxed();
+            for (size_t attempt = 1; attempt <= maxAttempts; ++attempt) {
+                auto statusWithCursorPin = CursorManager::get(opCtx)->pinCursor(
+                    opCtx, cursorId, definition()->getName(), pinCheck);
+                auto status = statusWithCursorPin.getStatus();
+                if (status.isOK()) {
+                    return std::move(statusWithCursorPin.getValue());
+                }
+                // We only return CursorInUse errors if the command that is holding the cursor is
+                // "releaseMemory".
+                if (attempt == maxAttempts || status.code() != ErrorCodes::CursorInUse) {
+                    uassertStatusOK(status);
+                }
+                auto extraInfo = status.extraInfo<CursorInUseInfo>();
+                if (extraInfo == nullptr || extraInfo->commandName() != "releaseMemory") {
+                    uassertStatusOK(status);
+                }
+                Milliseconds sleepDuration = retryBackoff.nextSleep();
+                LOGV2_DEBUG(10116501,
+                            3,
+                            "getMore failed to pin cursor, because it is held by releaseMemory "
+                            "command. Will retry after sleep.",
+                            "sleepDuration"_attr = sleepDuration,
+                            "attempt"_attr = attempt);
+                opCtx->sleepFor(sleepDuration);
+            }
+            MONGO_UNREACHABLE_TASSERT(101165);
+        }
+
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Gets the number of write ops in the current multidocument transaction.
             auto getNumTxnOps = [opCtx]() -> boost::optional<size_t> {
@@ -763,17 +807,8 @@ public:
                 curOp->debug().queryStatsInfo.metricsRequested = true;
             }
 
-            // Perform validation checks which don't cause the cursor to be deleted on failure.
-            auto pinCheck = [&](const ClientCursor& cc) {
-                validateLSID(opCtx, cursorId, &cc);
-                validateTxnNumber(opCtx, cursorId, &cc);
-                validateAuthorization(opCtx, cc);
-                validateNamespace(nss, cc);
-                validateMaxTimeMS(_cmd.getMaxTimeMS(), cc);
-            };
+            ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
 
-            auto cursorPin =
-                uassertStatusOK(CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, pinCheck));
             // Transfer memory tracker ownership from the cursor back to the OpCtx so memory usage
             // is tracked for the duration of this getMore().
             OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursorPin.getCursor(), opCtx);
