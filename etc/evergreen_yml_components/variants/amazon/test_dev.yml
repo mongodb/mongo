@@ -98,13 +98,17 @@ buildvariants:
       # Boost the priority on remote execution since this is the longest running task chain in
       # the required patch build. This priority is still lower than the priority on developer
       # workstation builds.
+      #
+      # This variant can also handle a higher number of remote execution jobs concurrently
+      # since it's running on a c6g.16xlarge
       bazel_compile_flags: >-
         --remote_execution_priority=3
+        --jobs=800
     tasks:
       - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
         distros:
-          - amazon2023-arm64-latest-large-localstorage
+          - amazon2023-arm64-latest-xlarge
       - name: compile_all_but_not_unittests_TG
         distros:
           - amazon2023-arm64-latest-large-localstorage
