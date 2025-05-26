@@ -32,17 +32,22 @@
 #include <fmt/format.h>
 
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/topology_change_helpers.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_gen.h"
+#include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
-#include "src/mongo/db/list_collections_gen.h"
 
 namespace mongo {
 
@@ -50,6 +55,18 @@ namespace {
 static constexpr size_t kMaxFailedRetryCount = 3;
 static const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 }  // namespace
+
+AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
+                                         const BSONObj& initialState)
+    : RecoverableShardingDDLCoordinator(service, "AddShardCoordinator", initialState) {
+    auto net = executor::makeNetworkInterface("AddShardCoordinator-TaskExecutor");
+    auto netPtr = net.get();
+    _executorWithoutGossip =
+        executor::ShardingTaskExecutor::create(executor::ThreadPoolTaskExecutor::create(
+            std::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net)));
+    _executorWithoutGossip->startup();
+}
+
 
 ExecutorFuture<void> AddShardCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -87,7 +104,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                                                          targeter,
                                                                          _doc.getConnectionString(),
                                                                          _doc.getIsConfigShard(),
-                                                                         **executor);
+                                                                         _executorWithoutGossip);
                         },
                         executor,
                         token);
@@ -109,23 +126,23 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 // race conditions, and do a second check. If the replicaset has data, then it's a
                 // promotion and we restore the user writes.
                 if (_isFirstShard(opCtx) && !_doc.getIsConfigShard()) {
-                    if (!_isPristineReplicaset(opCtx, targeter, **executor)) {
+                    if (!_isPristineReplicaset(opCtx, targeter)) {
                         _doc.setIsPromotion(true);
                     } else {
-                        _blockUserWrites(opCtx, **executor);
-                        if (!_isPristineReplicaset(opCtx, targeter, **executor)) {
+                        _blockUserWrites(opCtx);
+                        if (!_isPristineReplicaset(opCtx, targeter)) {
                             _doc.setIsPromotion(true);
-                            _restoreUserWrites(opCtx, **executor);
+                            _restoreUserWrites(opCtx);
                         }
                     }
                 } else {
                     if (!_doc.getIsConfigShard()) {
-                        _blockUserWrites(opCtx, **executor);
+                        _blockUserWrites(opCtx);
                     }
                     uassert(ErrorCodes::IllegalOperation,
                             fmt::format("can't add shard '{}' because it's not empty.",
                                         _doc.getConnectionString().toString()),
-                            _isPristineReplicaset(opCtx, targeter, **executor));
+                            _isPristineReplicaset(opCtx, targeter));
                 }
 
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
@@ -136,7 +153,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                           currentFCV == multiversion::GenericFCV::kLastContinuous ||
                           currentFCV == multiversion::GenericFCV::kLastLTS);
 
-                _setFCVOnReplicaSet(opCtx, currentFCV, **executor);
+                _setFCVOnReplicaSet(opCtx, currentFCV);
 
                 const auto host = uassertStatusOK(
                     Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter()->findHost(
@@ -147,13 +164,13 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                         [&]() {
                             ShardsvrCheckCanConnectToConfigServer cmd(host);
                             cmd.setDbName(DatabaseName::kAdmin);
-                            uassertStatusOK(
-                                topology_change_helpers::runCommandForAddShard(opCtx,
-                                                                               _getTargeter(opCtx),
-                                                                               DatabaseName::kAdmin,
-                                                                               cmd.toBSON(),
-                                                                               **executor)
-                                    .commandStatus);
+                            uassertStatusOK(topology_change_helpers::runCommandForAddShard(
+                                                opCtx,
+                                                _getTargeter(opCtx),
+                                                DatabaseName::kAdmin,
+                                                cmd.toBSON(),
+                                                _executorWithoutGossip)
+                                                .commandStatus);
                         },
                         executor,
                         token);
@@ -171,20 +188,20 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                                              _getTargeter(opCtx),
                                                              _doc.getIsConfigShard(),
                                                              _doc.getProposedName(),
-                                                             **executor);
+                                                             _executorWithoutGossip);
 
                 _doc.setChosenName(shardName);
             }))
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
             [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
-            [this, _ = shared_from_this(), executor](auto* opCtx) {
+            [this, _ = shared_from_this()](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
-                _dropSessionsCollection(opCtx, **executor);
+                _dropSessionsCollection(opCtx);
 
                 topology_change_helpers::getClusterTimeKeysFromReplicaSet(
-                    opCtx, targeter, **executor);
+                    opCtx, targeter, _executorWithoutGossip);
 
                 boost::optional<APIParameters> apiParameters;
                 if (const auto params = _doc.getApiParams(); params.has_value()) {
@@ -194,10 +211,14 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 const auto shardIdentity = topology_change_helpers::createShardIdentity(
                     opCtx, _doc.getChosenName()->toString());
 
-                topology_change_helpers::installShardIdentity(
-                    opCtx, shardIdentity, targeter, apiParameters, _osiGenerator(), **executor);
+                topology_change_helpers::installShardIdentity(opCtx,
+                                                              shardIdentity,
+                                                              targeter,
+                                                              apiParameters,
+                                                              _osiGenerator(),
+                                                              _executorWithoutGossip);
 
-                _standardizeClusterParameters(opCtx, executor);
+                _standardizeClusterParameters(opCtx);
             }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
@@ -205,7 +226,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 auto& targeter = _getTargeter(opCtx);
 
                 auto dbList = topology_change_helpers::getDBNamesListFromReplicaSet(
-                    opCtx, targeter, **executor);
+                    opCtx, targeter, _executorWithoutGossip);
 
                 topology_change_helpers::blockDDLCoordinatorsAndDrain(
                     opCtx, /*persistRecoveryDocument*/ false);
@@ -274,9 +295,9 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kCleanup,
-            [this, _ = shared_from_this(), executor](auto* opCtx) {
+            [this, _ = shared_from_this()](auto* opCtx) {
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
-                    opCtx, _getTargeter(opCtx), **executor);
+                    opCtx, _getTargeter(opCtx), _executorWithoutGossip);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
                                                                 /*removeRecoveryDocument*/ false);
             }))
@@ -310,17 +331,17 @@ ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const Status& status) noexcept {
-    return ExecutorFuture<void>(**executor)
-        .then([this, token, status, executor, _ = shared_from_this()] {
-            const auto opCtxHolder = makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
-                _restoreUserWrites(opCtx, **executor);
-            }
-            topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                            /*removeRecoveryDocument*/ false);
-            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
-        });
+    return ExecutorFuture<void>(**executor).then([this, token, status, _ = shared_from_this()] {
+        const auto opCtxHolder = makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+
+        if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
+            _restoreUserWrites(opCtx);
+        }
+        topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                        /*removeRecoveryDocument*/ false);
+        topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
+    });
 }
 
 void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
@@ -411,11 +432,11 @@ void AddShardCoordinator::_verifyInput() const {
             !_doc.getProposedName() || !_doc.getProposedName()->empty());
 }
 
-bool AddShardCoordinator::_isPristineReplicaset(
-    OperationContext* opCtx,
-    RemoteCommandTargeter& targeter,
-    std::shared_ptr<executor::TaskExecutor> executor) const {
-    return topology_change_helpers::getDBNamesListFromReplicaSet(opCtx, targeter, executor).empty();
+bool AddShardCoordinator::_isPristineReplicaset(OperationContext* opCtx,
+                                                RemoteCommandTargeter& targeter) const {
+    return topology_change_helpers::getDBNamesListFromReplicaSet(
+               opCtx, targeter, _executorWithoutGossip)
+        .empty();
 }
 
 RemoteCommandTargeter& AddShardCoordinator::_getTargeter(OperationContext* opCtx) {
@@ -464,8 +485,7 @@ AddShardCoordinator::_osiGenerator() {
         [this](OperationContext* opCtx) -> OperationSessionInfo { return getNewSession(opCtx); });
 }
 
-void AddShardCoordinator::_standardizeClusterParameters(
-    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+void AddShardCoordinator::_standardizeClusterParameters(OperationContext* opCtx) {
     ConfigsvrCoordinatorService::getService(opCtx)->waitForAllOngoingCoordinatorsOfType(
         opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter);
 
@@ -484,13 +504,16 @@ void AddShardCoordinator::_standardizeClusterParameters(
             });
         if (clusterParameterDocsEmpty) {
             auto parameters = topology_change_helpers::getClusterParametersFromReplicaSet(
-                opCtx, _getTargeter(opCtx), **executor);
+                opCtx, _getTargeter(opCtx), _executorWithoutGossip);
             topology_change_helpers::setClusterParametersLocally(opCtx, parameters);
             return;
         }
     }
-    topology_change_helpers::setClusterParametersOnReplicaSet(
-        opCtx, _getTargeter(opCtx), configSvrClusterParameterDocs, _osiGenerator(), **executor);
+    topology_change_helpers::setClusterParametersOnReplicaSet(opCtx,
+                                                              _getTargeter(opCtx),
+                                                              configSvrClusterParameterDocs,
+                                                              _osiGenerator(),
+                                                              _executorWithoutGossip);
 }
 
 bool AddShardCoordinator::_isFirstShard(OperationContext* opCtx) {
@@ -500,8 +523,7 @@ bool AddShardCoordinator::_isFirstShard(OperationContext* opCtx) {
 }
 
 void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
-                                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv,
-                                              std::shared_ptr<executor::TaskExecutor> executor) {
+                                              mongo::ServerGlobalParams::FCVSnapshot::FCV fcv) {
     if (_doc.getIsConfigShard()) {
         return;
     }
@@ -512,17 +534,18 @@ void AddShardCoordinator::_setFCVOnReplicaSet(OperationContext* opCtx,
     setFcvCmd.setFromConfigServer(true);
     generic_argument_util::setMajorityWriteConcern(setFcvCmd);
 
-    uassertStatusOK(
-        topology_change_helpers::runCommandForAddShard(
-            opCtx, _getTargeter(opCtx), DatabaseName::kAdmin, setFcvCmd.toBSON(), executor)
-            .commandStatus);
+    uassertStatusOK(topology_change_helpers::runCommandForAddShard(opCtx,
+                                                                   _getTargeter(opCtx),
+                                                                   DatabaseName::kAdmin,
+                                                                   setFcvCmd.toBSON(),
+                                                                   _executorWithoutGossip)
+                        .commandStatus);
 }
 
-void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx,
-                                           std::shared_ptr<executor::TaskExecutor> executor) {
+void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx) {
     auto level = _doc.getOriginalUserWriteBlockingLevel();
     if (!level.has_value()) {
-        level = _getUserWritesBlockFromReplicaSet(opCtx, executor);
+        level = _getUserWritesBlockFromReplicaSet(opCtx);
         _doc.setOriginalUserWriteBlockingLevel(static_cast<int32_t>(*level));
         _updateStateDocument(opCtx, StateDoc(_doc));
     }
@@ -532,11 +555,10 @@ void AddShardCoordinator::_blockUserWrites(OperationContext* opCtx,
         topology_change_helpers::UserWriteBlockingLevel::All,
         true, /* block writes */
         _osiGenerator(),
-        executor);
+        _executorWithoutGossip);
 }
 
-void AddShardCoordinator::_restoreUserWrites(OperationContext* opCtx,
-                                             std::shared_ptr<executor::TaskExecutor> executor) {
+void AddShardCoordinator::_restoreUserWrites(OperationContext* opCtx) {
     uint8_t level = static_cast<uint8_t>(*_doc.getOriginalUserWriteBlockingLevel());
     if (level & topology_change_helpers::UserWriteBlockingLevel::Writes) {
         level |= topology_change_helpers::UserWriteBlockingLevel::DDLOperations;
@@ -546,12 +568,11 @@ void AddShardCoordinator::_restoreUserWrites(OperationContext* opCtx,
                                                        level,
                                                        true, /* block writes */
                                                        _osiGenerator(),
-                                                       executor);
+                                                       _executorWithoutGossip);
 }
 
 topology_change_helpers::UserWriteBlockingLevel
-AddShardCoordinator::_getUserWritesBlockFromReplicaSet(
-    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+AddShardCoordinator::_getUserWritesBlockFromReplicaSet(OperationContext* opCtx) {
     auto& targeter = _getTargeter(opCtx);
     auto fetcherStatus =
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
@@ -578,7 +599,7 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(
             return true;
         },
         [&](const Status& status) { fetcherStatus = status; },
-        executor);
+        _executorWithoutGossip);
     uassertStatusOK(fetcher->schedule());
     uassertStatusOK(fetcher->join(opCtx));
     uassertStatusOK(fetcherStatus);
@@ -586,15 +607,16 @@ AddShardCoordinator::_getUserWritesBlockFromReplicaSet(
     return topology_change_helpers::UserWriteBlockingLevel(level);
 }
 
-void AddShardCoordinator::_dropSessionsCollection(
-    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
-
+void AddShardCoordinator::_dropSessionsCollection(OperationContext* opCtx) {
     ListCollections listCollectionsCmd;
     listCollectionsCmd.setDbName(DatabaseName::kConfig);
     listCollectionsCmd.setFilter(BSON("name" << NamespaceString::kLogicalSessionsNamespace.coll()));
 
-    auto res = topology_change_helpers::runCommandForAddShard(
-        opCtx, _getTargeter(opCtx), DatabaseName::kConfig, listCollectionsCmd.toBSON(), executor);
+    auto res = topology_change_helpers::runCommandForAddShard(opCtx,
+                                                              _getTargeter(opCtx),
+                                                              DatabaseName::kConfig,
+                                                              listCollectionsCmd.toBSON(),
+                                                              _executorWithoutGossip);
     uassertStatusOK(res.commandStatus);
 
     auto parsedResponse =
@@ -621,7 +643,7 @@ void AddShardCoordinator::_dropSessionsCollection(
                         _getTargeter(opCtx),
                         NamespaceString::kLogicalSessionsNamespace.dbName(),
                         builder.done(),
-                        executor)
+                        _executorWithoutGossip)
                         .commandStatus);
 }
 
