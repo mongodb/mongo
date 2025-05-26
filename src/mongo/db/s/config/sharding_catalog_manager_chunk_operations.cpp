@@ -1846,10 +1846,11 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     ChunkVersion newCollectionPlacementVersion(
         {collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()},
         {collPlacementVersion.majorVersion() + 1, 0});
-    std::set<ShardId> changedShardIds;
+    std::set<ShardId> shardsOwningChunks;
     for (const auto& chunk : allChunksVector) {
         auto upgradeChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
             chunk, collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()));
+        shardsOwningChunks.emplace(upgradeChunk.getShard());
         bool historyIsAt40 = chunk[ChunkType::historyIsAt40()].booleanSafe();
         if (historyIsAt40) {
             uassert(
@@ -1865,7 +1866,6 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
 
         upgradeChunk.setVersion(newCollectionPlacementVersion);
         newCollectionPlacementVersion.incMinor();
-        changedShardIds.emplace(upgradeChunk.getShard());
 
         // Construct the fresh history.
         upgradeChunk.setOnCurrentShardSince(validAfter);
@@ -1893,7 +1893,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     uassertStatusOK(waitForWriteConcern(
         opCtx, clientOpTime, defaultMajorityWriteConcernDoNotUse(), &unusedWCResult));
 
-    for (const auto& shardId : changedShardIds) {
+    for (const auto& shardId : shardsOwningChunks) {
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
         uassertStatusOK(
             Shard::CommandResponse::getEffectiveStatus(shard->runCommandWithFixedRetryAttempts(
