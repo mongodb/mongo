@@ -2091,67 +2091,6 @@ TEST_F(ShardRoleTest, ReadSourceDoesNotChangeOnSecondary) {
         shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
 }
 
-TEST_F(ShardRoleTest, ReadSourceChecksForNestedAcquisitionsCorrectOrdering) {
-    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
-
-    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
-
-    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
-        operationContext(),
-        CollectionAcquisitionRequest(NamespaceString::kRsOplogNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kRead));
-
-    ASSERT_TRUE(replicatedAcquisition.exists());
-
-    ASSERT_EQUALS(
-        RecoveryUnit::ReadSource::kLastApplied,
-        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
-
-    // Unreplicated collections can use kLastApplied just fine, so acquiring an unreplicated
-    // collection after a replicated one is ok.
-    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
-        operationContext(),
-        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kRead));
-}
-
-DEATH_TEST_REGEX_F(ShardRoleTest,
-                   ReadSourceChecksForNestedAcquisitionsIncorrectOrdering,
-                   "Tripwire assertion.*10141601") {
-    createTestCollection(operationContext(), NamespaceString::kSystemReplSetNamespace);
-
-    ASSERT_OK(repl::ReplicationCoordinator::get(getServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
-
-    const auto unreplicatedAcquisition = acquireCollectionMaybeLockFree(
-        operationContext(),
-        CollectionAcquisitionRequest(NamespaceString::kSystemReplSetNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kRead));
-
-    ASSERT_TRUE(unreplicatedAcquisition.exists());
-
-    ASSERT_EQUALS(
-        RecoveryUnit::ReadSource::kNoTimestamp,
-        shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
-
-    // With the testing proctor enabled, an acquisition which would need the read source to
-    // change should throw.
-    const auto replicatedAcquisition = acquireCollectionMaybeLockFree(
-        operationContext(),
-        CollectionAcquisitionRequest(NamespaceString::kRsOplogNamespace,
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::kLocal,
-                                     AcquisitionPrerequisites::kRead));
-}
-
-
 TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
     const auto nss = nssShardedCollection1;
 

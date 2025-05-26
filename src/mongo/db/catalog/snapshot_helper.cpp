@@ -111,22 +111,18 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
     return true;
 }
 
-// The dryRun parameter controls both whether to actually change the read source if a change would
-// be needed and the return value of the function. When false, the read source may actually be
-// modified and the return value is the result of `shouldReadAtLastApplied`. When true, the read
-// source will not be changed and the return value is whether in non-dry run mode the read source
-// would have actually changed. See the declarations of wouldChangeReadSourceToLastApplied and
-// changeReadSourceIfNeeded for more information.
-bool changeReadSource(OperationContext* opCtx,
-                      boost::optional<const NamespaceString&> nss,
-                      bool dryRun) {
+}  // namespace
+
+namespace SnapshotHelper {
+
+bool changeReadSourceIfNeeded(OperationContext* opCtx,
+                              boost::optional<const NamespaceString&> nss) {
 
     StringData reason;
     bool readAtLastApplied = shouldReadAtLastApplied(opCtx, nss, &reason);
-    bool wouldChangeToLastApplied = false;
 
     if (!canReadAtLastApplied(opCtx)) {
-        return dryRun ? wouldChangeToLastApplied : readAtLastApplied;
+        return readAtLastApplied;
     }
 
     auto ru = shard_role_details::getRecoveryUnit(opCtx);
@@ -146,19 +142,14 @@ bool changeReadSource(OperationContext* opCtx,
     // is already set)
     if (originalReadSource != RecoveryUnit::ReadSource::kNoTimestamp &&
         originalReadSource != RecoveryUnit::ReadSource::kLastApplied) {
-        return dryRun ? wouldChangeToLastApplied : readAtLastApplied;
+        return readAtLastApplied;
     }
 
     // Helper to set read source to the recovery unit and remember our current setting
     auto currentReadSource = originalReadSource;
     auto setReadSource = [&](RecoveryUnit::ReadSource readSource) {
-        if (dryRun) {
-            wouldChangeToLastApplied = readSource == RecoveryUnit::ReadSource::kLastApplied &&
-                originalReadSource != RecoveryUnit::ReadSource::kLastApplied;
-        } else {
-            ru->setTimestampReadSource(readSource);
-            currentReadSource = readSource;
-        }
+        ru->setTimestampReadSource(readSource);
+        currentReadSource = readSource;
     };
 
     // Set read source based on current setting and readAtLastApplied decision.
@@ -204,48 +195,32 @@ bool changeReadSource(OperationContext* opCtx,
     }
 
     // All done, log if we made a change to the read source
-    if (!dryRun) {
-        if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
-            currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-            LOGV2_DEBUG(4452901,
-                        2,
-                        "Changed ReadSource to kLastApplied",
-                        "namespace"_attr = nss,
-                        "ts"_attr = ru->getPointInTimeReadTimestamp());
-        } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
-                   currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
-            LOGV2_DEBUG(6730500,
-                        2,
-                        "ReadSource kLastApplied updated timestamp",
-                        "namespace"_attr = nss,
-                        "ts"_attr = ru->getPointInTimeReadTimestamp());
-        } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
-                   currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
-            LOGV2_DEBUG(4452902,
-                        2,
-                        "Changed ReadSource to kNoTimestamp",
-                        "namespace"_attr = nss,
-                        "reason"_attr = reason);
-        }
+    if (originalReadSource == RecoveryUnit::ReadSource::kNoTimestamp &&
+        currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+        LOGV2_DEBUG(4452901,
+                    2,
+                    "Changed ReadSource to kLastApplied",
+                    "namespace"_attr = nss,
+                    "ts"_attr = ru->getPointInTimeReadTimestamp());
+    } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
+               currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
+        LOGV2_DEBUG(6730500,
+                    2,
+                    "ReadSource kLastApplied updated timestamp",
+                    "namespace"_attr = nss,
+                    "ts"_attr = ru->getPointInTimeReadTimestamp());
+    } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
+               currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
+        LOGV2_DEBUG(4452902,
+                    2,
+                    "Changed ReadSource to kNoTimestamp",
+                    "namespace"_attr = nss,
+                    "reason"_attr = reason);
     }
 
     // Return if we need to read at last applied to the caller in case further checks need to be
     // performed.
-    return dryRun ? wouldChangeToLastApplied : readAtLastApplied;
-}
-
-}  // namespace
-
-namespace SnapshotHelper {
-
-bool wouldChangeReadSourceToLastApplied(OperationContext* opCtx,
-                                        boost::optional<const NamespaceString&> nss) {
-    return changeReadSource(opCtx, nss, true /* dryRun */);
-}
-
-bool changeReadSourceIfNeeded(OperationContext* opCtx,
-                              boost::optional<const NamespaceString&> nss) {
-    return changeReadSource(opCtx, nss, false /* dryRun */);
+    return readAtLastApplied;
 }
 }  // namespace SnapshotHelper
 }  // namespace mongo
