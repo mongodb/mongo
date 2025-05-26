@@ -853,9 +853,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * Sanity check that the oldest ID hasn't moved on before we have cleared our entry.
      */
     WT_ASSERT(session,
-      WT_TXNID_LE(
-        __wt_atomic_loadv64(&txn_global->oldest_id), __wt_atomic_loadv64(&txn_shared->id)) &&
-        WT_TXNID_LE(__wt_atomic_loadv64(&txn_global->oldest_id),
+      (__wt_atomic_loadv64(&txn_global->oldest_id) <= __wt_atomic_loadv64(&txn_shared->id)) &&
+        (__wt_atomic_loadv64(&txn_global->oldest_id) <=
           __wt_atomic_loadv64(&txn_shared->pinned_id)));
 
     /*

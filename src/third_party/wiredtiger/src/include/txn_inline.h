@@ -295,7 +295,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
     txn_id = txn->id;
     WT_ASSERT_ALWAYS(session, txn_id != WT_TXN_ABORTED,
       "Assert failure: session: %s: txn->id == WT_TXN_ABORTED", session->name);
-    while (WT_TXNID_LT(btree_txn_id_prev, txn_id)) {
+    while (btree_txn_id_prev < txn_id) {
         if (__wt_atomic_cas64(&op->btree->max_upd_txn, btree_txn_id_prev, txn_id))
             break;
         btree_txn_id_prev = op->btree->max_upd_txn;
@@ -784,7 +784,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
          * active checkpoint, keep changes until checkpoint is finished.
          */
         checkpoint_pinned = __wt_atomic_loadv64(&txn_global->checkpoint_txn_shared.pinned_id);
-        if (checkpoint_pinned == WT_TXN_NONE || WT_TXNID_LT(oldest_id, checkpoint_pinned))
+        if (checkpoint_pinned == WT_TXN_NONE || oldest_id < checkpoint_pinned)
             return (oldest_id);
         return (checkpoint_pinned);
     } else {
@@ -793,7 +793,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
          * changes until the recovery is finished.
          */
         recovery_ckpt_snap_min = conn->recovery_ckpt_snap_min;
-        if (recovery_ckpt_snap_min == WT_TXN_NONE || WT_TXNID_LT(oldest_id, recovery_ckpt_snap_min))
+        if (recovery_ckpt_snap_min == WT_TXN_NONE || oldest_id < recovery_ckpt_snap_min)
             return (oldest_id);
         return (recovery_ckpt_snap_min);
     }
@@ -893,7 +893,7 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
             txn->snapshot_data.snapshot, txn->snapshot_data.snapshot_count));
     oldest_id = __wt_txn_oldest_id(session);
 
-    return (WT_TXNID_LT(id, oldest_id));
+    return (id < oldest_id);
 }
 
 /*
@@ -1085,9 +1085,9 @@ __wt_txn_visible_id_snapshot(
      *	ids < snap_min are visible,
      *	everything else is visible unless it is found in the snapshot.
      */
-    if (WT_TXNID_LE(snap_max, id))
+    if (snap_max <= id)
         return (false);
-    if (snapshot_count == 0 || WT_TXNID_LT(id, snap_min))
+    if (snapshot_count == 0 || id < snap_min)
         return (true);
 
     WT_BINARY_SEARCH(id, snapshot, snapshot_count, found);
@@ -1174,7 +1174,7 @@ __wt_txn_snap_min_visible(
     WT_ASSERT(session, F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* Transaction snapshot minimum check. */
-    if (!WT_TXNID_LT(id, session->txn->snapshot_data.snap_min))
+    if (id >= session->txn->snapshot_data.snap_min)
         return (false);
 
     /* Transactions read their writes, regardless of timestamps. */

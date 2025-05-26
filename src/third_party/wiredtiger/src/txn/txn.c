@@ -77,7 +77,7 @@ __txn_remove_from_global_table(WT_SESSION_IMPL *session)
     txn_global = &S2C(session)->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
-    WT_ASSERT(session, !WT_TXNID_LT(txn->id, __wt_atomic_loadv64(&txn_global->last_running)));
+    WT_ASSERT(session, txn->id >= __wt_atomic_loadv64(&txn_global->last_running));
     WT_ASSERT(
       session, txn->id != WT_TXN_NONE && __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE);
 #else
@@ -104,7 +104,7 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 
     txn->snapshot_data.snapshot_count = n;
     txn->snapshot_data.snap_max = snap_max;
-    txn->snapshot_data.snap_min = (n > 0 && WT_TXNID_LE(txn->snapshot_data.snapshot[0], snap_max)) ?
+    txn->snapshot_data.snap_min = (n > 0 && txn->snapshot_data.snapshot[0] <= snap_max) ?
       txn->snapshot_data.snapshot[0] :
       snap_max;
     F_SET(txn, WT_TXN_HAS_SNAPSHOT);
@@ -174,7 +174,7 @@ __wt_txn_active(WT_SESSION_IMPL *session, uint64_t txnid)
     __wt_readlock(session, &txn_global->rwlock);
     oldest_id = __wt_atomic_loadv64(&txn_global->oldest_id);
 
-    if (WT_TXNID_LT(txnid, oldest_id)) {
+    if (txnid < oldest_id) {
         active = false;
         goto done;
     }
@@ -277,7 +277,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
          *    not be visible to the current snapshot.
          */
         while (s != txn_shared && (id = __wt_atomic_loadv64(&s->id)) != WT_TXN_NONE &&
-          WT_TXNID_LE(prev_oldest_id, id) && WT_TXNID_LT(id, current_id)) {
+          (prev_oldest_id <= id) && (id < current_id)) {
             /*
              * If the transaction is still allocating its ID, then we spin here until it gets its
              * valid ID.
@@ -293,7 +293,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
                 WT_ACQUIRE_BARRIER();
                 if (id == __wt_atomic_loadv64(&s->id)) {
                     txn->snapshot_data.snapshot[n++] = id;
-                    if (WT_TXNID_LT(id, pinned_id))
+                    if (id < pinned_id)
                         pinned_id = id;
                     break;
                 }
@@ -306,7 +306,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
     /*
      * If we got a new snapshot, update the published pinned ID for this session.
      */
-    WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, pinned_id));
+    WT_ASSERT(session, prev_oldest_id <= pinned_id);
     WT_ASSERT(session, prev_oldest_id == __wt_atomic_loadv64(&txn_global->oldest_id));
 done:
     if (update_shared_state)
@@ -425,8 +425,8 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
         /* Update the last running transaction ID. */
-        while ((id = __wt_atomic_loadv64(&s->id)) != WT_TXN_NONE &&
-          WT_TXNID_LE(prev_oldest_id, id) && WT_TXNID_LT(id, last_running)) {
+        while ((id = __wt_atomic_loadv64(&s->id)) != WT_TXN_NONE && prev_oldest_id <= id &&
+          id < last_running) {
             /*
              * If the transaction is still allocating its ID, then we spin here until it gets its
              * valid ID.
@@ -449,8 +449,7 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
         }
 
         /* Update the metadata pinned ID. */
-        if ((id = __wt_atomic_loadv64(&s->metadata_pinned)) != WT_TXN_NONE &&
-          WT_TXNID_LT(id, metadata_pinned))
+        if ((id = __wt_atomic_loadv64(&s->metadata_pinned)) != WT_TXN_NONE && id < metadata_pinned)
             metadata_pinned = id;
 
         /*
@@ -461,19 +460,18 @@ __txn_oldest_scan(WT_SESSION_IMPL *session, uint64_t *oldest_idp, uint64_t *last
          * table.  See the comment in __wt_txn_cursor_op for more
          * details.
          */
-        if ((id = __wt_atomic_loadv64(&s->pinned_id)) != WT_TXN_NONE &&
-          WT_TXNID_LT(id, oldest_id)) {
+        if ((id = __wt_atomic_loadv64(&s->pinned_id)) != WT_TXN_NONE && id < oldest_id) {
             oldest_id = id;
             oldest_session = &WT_CONN_SESSIONS_GET(conn)[i];
         }
     }
     WT_STAT_CONN_INCRV(session, txn_sessions_walked, i);
 
-    if (WT_TXNID_LT(last_running, oldest_id))
+    if (last_running < oldest_id)
         oldest_id = last_running;
 
     /* The metadata pinned ID can't move past the oldest ID. */
-    if (WT_TXNID_LT(oldest_id, metadata_pinned))
+    if (oldest_id < metadata_pinned)
         metadata_pinned = oldest_id;
 
     *last_runningp = last_running;
@@ -522,7 +520,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
      * behind, avoid scanning.
      */
     if ((prev_oldest_id == current_id && prev_metadata_pinned == current_id) ||
-      (!strict && WT_TXNID_LT(current_id, prev_oldest_id + non_strict_min_threshold)))
+      (!strict && current_id < prev_oldest_id + non_strict_min_threshold))
         return (0);
 
     /* First do a read-only scan. */
@@ -537,9 +535,9 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
      * If the state hasn't changed (or hasn't moved far enough for non-forced updates), give up.
      */
     if ((oldest_id == prev_oldest_id ||
-          (!strict && WT_TXNID_LT(oldest_id, prev_oldest_id + non_strict_min_threshold))) &&
+          (!strict && (oldest_id < prev_oldest_id + non_strict_min_threshold))) &&
       ((last_running == prev_last_running) ||
-        (!strict && WT_TXNID_LT(last_running, prev_last_running + non_strict_min_threshold))) &&
+        (!strict && last_running < prev_last_running + non_strict_min_threshold)) &&
       metadata_pinned == prev_metadata_pinned)
         return (0);
 
@@ -552,9 +550,9 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
     /*
      * If the oldest ID has been updated while we waited, don't bother scanning.
      */
-    if (WT_TXNID_LE(oldest_id, __wt_atomic_loadv64(&txn_global->oldest_id)) &&
-      WT_TXNID_LE(last_running, __wt_atomic_loadv64(&txn_global->last_running)) &&
-      WT_TXNID_LE(metadata_pinned, __wt_atomic_loadv64(&txn_global->metadata_pinned)))
+    if (oldest_id <= __wt_atomic_loadv64(&txn_global->oldest_id) &&
+      last_running <= __wt_atomic_loadv64(&txn_global->last_running) &&
+      metadata_pinned <= __wt_atomic_loadv64(&txn_global->metadata_pinned))
         goto done;
 
     /*
@@ -565,11 +563,11 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
     __txn_oldest_scan(session, &oldest_id, &last_running, &metadata_pinned, &oldest_session);
 
     /* Update the public IDs. */
-    if (WT_TXNID_LT(__wt_atomic_loadv64(&txn_global->metadata_pinned), metadata_pinned))
+    if (__wt_atomic_loadv64(&txn_global->metadata_pinned) < metadata_pinned)
         __wt_atomic_storev64(&txn_global->metadata_pinned, metadata_pinned);
-    if (WT_TXNID_LT(__wt_atomic_loadv64(&txn_global->oldest_id), oldest_id))
+    if (__wt_atomic_loadv64(&txn_global->oldest_id) < oldest_id)
         __wt_atomic_storev64(&txn_global->oldest_id, oldest_id);
-    if (WT_TXNID_LT(__wt_atomic_loadv64(&txn_global->last_running), last_running)) {
+    if (__wt_atomic_loadv64(&txn_global->last_running) < last_running) {
         __wt_atomic_storev64(&txn_global->last_running, last_running);
 
         /*
@@ -577,7 +575,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
          * being made.
          */
         current_id = __wt_atomic_loadv64(&txn_global->current);
-        WT_ASSERT(session, WT_TXNID_LE(oldest_id, current_id));
+        WT_ASSERT(session, oldest_id <= current_id);
         if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
           current_id - oldest_id > (10 * WT_THOUSAND) && oldest_session != NULL) {
             __wt_verbose(session, WT_VERB_TRANSACTION,

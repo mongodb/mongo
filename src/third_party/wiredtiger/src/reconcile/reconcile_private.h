@@ -31,10 +31,10 @@
  *     Due to a difference in transaction id based visibility and timestamp visibility the timestamp
  *     comparison is inclusive whereas the transaction id comparison isn't.
  */
-#define WTI_REC_TW_START_VISIBLE_ALL(r, tw)                    \
-    (WT_TXNID_LT((tw)->start_txn, (r)->rec_start_oldest_id) && \
-      ((tw)->durable_start_ts == WT_TS_NONE ||                 \
-        ((r)->rec_start_pinned_ts != WT_TS_NONE &&             \
+#define WTI_REC_TW_START_VISIBLE_ALL(r, tw)          \
+    (((tw)->start_txn < (r)->rec_start_oldest_id) && \
+      ((tw)->durable_start_ts == WT_TS_NONE ||       \
+        ((r)->rec_start_pinned_ts != WT_TS_NONE &&   \
           (tw)->durable_start_ts <= (r)->rec_start_pinned_ts)))
 
 /*

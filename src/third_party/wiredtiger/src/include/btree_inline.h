@@ -660,7 +660,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
     }
 
     /* Check if this is the largest transaction ID to update the page. */
-    if (WT_TXNID_LT(__wt_atomic_load64(&page->modify->update_txn), session->txn->id))
+    if (__wt_atomic_load64(&page->modify->update_txn) < session->txn->id)
         __wt_atomic_store64(&page->modify->update_txn, session->txn->id);
 }
 

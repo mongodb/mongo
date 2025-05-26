@@ -2193,8 +2193,7 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 
     /* Assign pinned to the lesser of id or snap_min */
     if (__wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE &&
-      WT_TXNID_LT(
-        __wt_atomic_loadv64(&txn_shared->id), __wt_atomic_loadv64(&txn_shared->pinned_id)))
+      __wt_atomic_loadv64(&txn_shared->id) < __wt_atomic_loadv64(&txn_shared->pinned_id))
         pinned = __wt_atomic_loadv64(&txn_shared->id);
     else
         pinned = __wt_atomic_loadv64(&txn_shared->pinned_id);

@@ -62,7 +62,6 @@ typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;
  * WT_TXN_ABORTED is the largest possible ID (never visible to a running transaction), WT_TXN_NONE
  * is smaller than any possible ID (visible to all running transactions).
  */
-#define WT_TXNID_LE(t1, t2) ((t1) <= (t2))
 
 #define WT_TXNID_LT(t1, t2) ((t1) < (t2))
 
