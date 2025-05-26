@@ -1193,6 +1193,11 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         bool logIndexSpec = (secondaryIndexCheckParameters &&
                              (secondaryIndexCheckParameters.get().getValidateMode() ==
                               mongo::DbCheckValidationModeEnum::extraIndexKeysCheck));
+        // If logIndexSpec is true, then we checked indexDescriptor for null in the switch above and
+        // returned Status::OK() if it was null. Therefore, we can safely use
+        // indexDescriptor->infoObj() to construct logEntry below.
+        // To appease Coverity, we add the following invariant.
+        invariant(!logIndexSpec || indexDescriptor);
         auto logEntry = dbCheckBatchHealthLogEntry(
             secondaryIndexCheckParameters,
             entry.getBatchId(),
@@ -1212,7 +1217,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             logIndexSpec ? boost::make_optional(indexDescriptor->infoObj()) : boost::none);
 
         // TODO(SERVER-78399): Remove 'batchesProcessed' logic and expect that
-        // 'getLogBatchToHealthLog' from the enry always exists.
+        // 'getLogBatchToHealthLog' from the entry always exists.
         batchesProcessed++;
         bool shouldLog = (batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0);
         if (entry.getLogBatchToHealthLog()) {
