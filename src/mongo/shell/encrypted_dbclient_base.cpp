@@ -657,6 +657,13 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
         builder.append("encryptionInformation"_sd, ei.toBSON());
     }
 
+    for (const auto& [fieldName, _] : extra) {
+        uassert(ErrorCodes::BadValue,
+                fmt::format("Invalid field '{}' for CompactStructuredEncryptionData command",
+                            fieldName),
+                fieldName == "compactionTokens" || fieldName == "encryptionInformation" ||
+                    fieldName == "anchorPaddingFactor");
+    }
     builder.appendElements(extra);
 
     BSONObj reply;
@@ -676,6 +683,13 @@ void EncryptedDBClientBase::cleanup(JSContext* cx, JS::CallArgs args) {
     if (extra["cleanupTokens"_sd].eoo()) {
         builder.append("cleanupTokens",
                        efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+    }
+
+    for (const auto& [fieldName, _] : extra) {
+        uassert(ErrorCodes::BadValue,
+                fmt::format("Invalid field '{}' for CleanupStructuredEncryptionData command",
+                            fieldName),
+                fieldName == "cleanupTokens");
     }
 
     builder.appendElements(extra);
