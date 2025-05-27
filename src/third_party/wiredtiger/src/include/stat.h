@@ -545,9 +545,9 @@ struct __wt_connection_stats {
     int64_t cache_eviction_target_page_lt64;
     int64_t cache_eviction_target_page_lt128;
     int64_t cache_eviction_target_page_reduced;
-    int64_t eviction_target_strategy_both_clean_and_dirty;
     int64_t eviction_target_strategy_clean;
     int64_t eviction_target_strategy_dirty;
+    int64_t eviction_target_strategy_updates;
     int64_t eviction_walks_abandoned;
     int64_t eviction_walks_stopped;
     int64_t eviction_walks_gave_up_no_targets;

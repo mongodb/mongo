@@ -736,7 +736,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
         LF_SET(WT_EVICT_CACHE_DIRTY);
 
     /*
-     * Scrub dirty pages and keep them in cache if we are less than half way to the clean, dirty and
+     * Scrub dirty pages and keep them in cache if we are less than half way to the clean, dirty or
      * updates triggers.
      */
     if (bytes_inuse < (uint64_t)((target + trigger) * bytes_max) / 200) {
@@ -2071,16 +2071,17 @@ __evict_get_min_pages(WT_SESSION_IMPL *session, uint32_t target_pages)
 
     /*
      * Examine at least a reasonable number of pages before deciding whether to give up. When we are
-     * only looking for dirty pages, search the tree for longer.
+     * not looking for clean pages, search the tree for longer.
      */
     min_pages = 10 * (uint64_t)target_pages;
-    if (!F_ISSET(evict, WT_EVICT_CACHE_DIRTY | WT_EVICT_CACHE_UPDATES))
+    if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN))
         WT_STAT_CONN_INCR(session, eviction_target_strategy_clean);
-    else if (!F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
+    else
         min_pages *= 10;
+    if (F_ISSET(evict, WT_EVICT_CACHE_UPDATES))
+        WT_STAT_CONN_INCR(session, eviction_target_strategy_updates);
+    if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
         WT_STAT_CONN_INCR(session, eviction_target_strategy_dirty);
-    } else
-        WT_STAT_CONN_INCR(session, eviction_target_strategy_both_clean_and_dirty);
 
     return (min_pages);
 }

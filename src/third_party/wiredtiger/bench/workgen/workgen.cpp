@@ -3067,7 +3067,7 @@ Stats::report(std::ostream &os) const
     os << truncate.ops << " truncates, ";
     os << remove.ops << " removes, ";
     os << rts.ops << " RTSes, ";
-    os << checkpoint.ops << " checkpoints";
+    os << checkpoint.ops << " checkpoints, ";
     os << verify.ops << " verifies";
 }
 

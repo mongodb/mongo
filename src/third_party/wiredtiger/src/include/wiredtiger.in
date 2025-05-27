@@ -6055,12 +6055,12 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * pressure
  */
 #define	WT_STAT_CONN_CACHE_EVICTION_TARGET_PAGE_REDUCED	1127
-/*! cache: eviction walk target strategy both clean and dirty pages */
-#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_BOTH_CLEAN_AND_DIRTY	1128
-/*! cache: eviction walk target strategy only clean pages */
-#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_CLEAN	1129
-/*! cache: eviction walk target strategy only dirty pages */
-#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_DIRTY	1130
+/*! cache: eviction walk target strategy clean pages */
+#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_CLEAN	1128
+/*! cache: eviction walk target strategy dirty pages */
+#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_DIRTY	1129
+/*! cache: eviction walk target strategy pages with updates */
+#define	WT_STAT_CONN_EVICTION_TARGET_STRATEGY_UPDATES	1130
 /*! cache: eviction walks abandoned */
 #define	WT_STAT_CONN_EVICTION_WALKS_ABANDONED		1131
 /*! cache: eviction walks gave up because they restarted their walk twice */
