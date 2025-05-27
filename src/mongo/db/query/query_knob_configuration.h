@@ -61,6 +61,9 @@ public:
      */
     bool isForceClassicEngineEnabled() const;
     size_t getPlanEvaluationMaxResultsForOp() const;
+    size_t getPlannerMaxIndexedSolutions() const;
+    double getPlanEvaluationCollFraction() const;
+    double getPlanTotalEvaluationCollFraction() const;
     size_t getMaxScansToExplodeForOp() const;
 
     /**
@@ -78,6 +81,9 @@ private:
     SamplingCEMethodEnum _samplingCEMethod;
     SbeHashAggIncreasedSpillingModeEnum _sbeHashAggIncreasedSpillingMode;
     size_t _planEvaluationMaxResults;
+    size_t _plannerMaxIndexedSolutions;
+    double _planEvaluationCollFraction;
+    double _planTotalEvaluationCollFraction;
     size_t _maxScansToExplodeValue;
     bool _sbeDisableGroupPushdownValue;
     bool _sbeDisableLookupPushdownValue;

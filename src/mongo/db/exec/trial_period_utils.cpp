@@ -40,6 +40,16 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::trial_period {
+
+double getCollFractionPerCandidatePlan(const CanonicalQuery& query, size_t numSolutions) {
+    const double collFraction =
+        query.getExpCtx()->getQueryKnobConfiguration().getPlanEvaluationCollFraction();
+    const double totalCollFraction =
+        query.getExpCtx()->getQueryKnobConfiguration().getPlanTotalEvaluationCollFraction();
+
+    return std::min(collFraction, totalCollFraction / numSolutions);
+}
+
 size_t getTrialPeriodMaxWorks(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               int maxWorksParam,

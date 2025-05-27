@@ -148,6 +148,18 @@ server_parameters:
             lte: 1.0
         redact: false
 
+    internalQueryPlanTotalEvaluationCollFraction:
+        description: >-
+            Similar to 'internalQueryPlanEvaluationCollFraction', but defines a ceiling for
+            the number of times we work() all candidate plans in total. Applies only to the classic execution engine.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryPlanTotalEvaluationCollFraction"
+        cpp_vartype: AtomicDouble
+        default: 2.0
+        validator:
+            gte: 0.0
+        redact: false
+
     internalQueryPlanEvaluationCollFractionSbe:
         description: >-
             For large collections, the ceiling for the number of individual storage cursor

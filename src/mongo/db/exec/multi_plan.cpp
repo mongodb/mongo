@@ -263,11 +263,10 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     classicNumPlansHistogram.increment(_candidates.size());
     classicCount.increment();
 
-    const size_t numWorks =
-        trial_period::getTrialPeriodMaxWorks(opCtx(),
-                                             collectionPtr(),
-                                             internalQueryPlanEvaluationWorks.load(),
-                                             internalQueryPlanEvaluationCollFraction.load());
+    const double collFraction =
+        trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
+    const size_t numWorks = trial_period::getTrialPeriodMaxWorks(
+        opCtx(), collectionPtr(), internalQueryPlanEvaluationWorks.load(), collFraction);
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
 
     try {

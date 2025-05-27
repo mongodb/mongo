@@ -65,6 +65,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
             ->_data.get();
 
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
+    _plannerMaxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.loadRelaxed();
+    _planEvaluationCollFraction = internalQueryPlanEvaluationCollFraction.load();
+    _planTotalEvaluationCollFraction = internalQueryPlanTotalEvaluationCollFraction.load();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
     _internalQuerySpillingMinAvailableDiskSpaceBytes =
         static_cast<int64_t>(internalQuerySpillingMinAvailableDiskSpaceBytes.loadRelaxed());
@@ -110,6 +113,18 @@ bool QueryKnobConfiguration::isForceClassicEngineEnabled() const {
 
 size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() const {
     return _planEvaluationMaxResults;
+}
+
+size_t QueryKnobConfiguration::getPlannerMaxIndexedSolutions() const {
+    return _plannerMaxIndexedSolutions;
+}
+
+double QueryKnobConfiguration::getPlanEvaluationCollFraction() const {
+    return _planEvaluationCollFraction;
+}
+
+double QueryKnobConfiguration::getPlanTotalEvaluationCollFraction() const {
+    return _planTotalEvaluationCollFraction;
 }
 
 size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() const {

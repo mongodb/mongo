@@ -58,5 +58,10 @@ size_t getTrialPeriodMaxWorks(OperationContext* opCtx,
  * trial period. As soon as any plan hits this number of documents, the trial period ends.
  */
 size_t getTrialPeriodNumToReturn(const CanonicalQuery& query);
+
+/**
+ * Returns the fraction of the collection that we are allowed to scan for each candidate plan.
+ */
+double getCollFractionPerCandidatePlan(const CanonicalQuery& query, size_t numSolutions);
 }  // namespace trial_period
 }  // namespace mongo
