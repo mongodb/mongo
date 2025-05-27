@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/catalog_repair.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog_raii.h"
@@ -138,14 +139,22 @@ public:
 
     StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {
         Lock::GlobalLock globalLock{opCtx, MODE_IX};
-        return _storageEngine->reconcileCatalogAndIdents(
-            opCtx, Timestamp::min(), StorageEngine::LastShutdownState::kClean);
+        return catalog_repair::reconcileCatalogAndIdents(
+            opCtx,
+            _storageEngine,
+            Timestamp::min(),
+            StorageEngine::LastShutdownState::kClean,
+            reinterpret_cast<StorageEngineImpl*>(_storageEngine)->_options.forRepair);
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcileAfterUncleanShutdown(
         OperationContext* opCtx) {
-        return _storageEngine->reconcileCatalogAndIdents(
-            opCtx, Timestamp::min(), StorageEngine::LastShutdownState::kUnclean);
+        return catalog_repair::reconcileCatalogAndIdents(
+            opCtx,
+            _storageEngine,
+            Timestamp::min(),
+            StorageEngine::LastShutdownState::kUnclean,
+            reinterpret_cast<StorageEngineImpl*>(_storageEngine)->_options.forRepair);
     }
 
     std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {

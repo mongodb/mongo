@@ -3251,6 +3251,7 @@ mongo_cc_library(
         "server_feature_flags",
         "vector_clock",
         "//src/mongo/db/catalog:catalog_helpers",
+        "//src/mongo/db/catalog:catalog_repair",
         "//src/mongo/db/catalog:collection_catalog",
         "//src/mongo/db/catalog:database_holder",
         "//src/mongo/db/catalog:document_validation",

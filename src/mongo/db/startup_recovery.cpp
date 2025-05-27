@@ -52,6 +52,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/catalog_repair.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -582,8 +583,11 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
                                        startupTimeElapsedBuilder);
         reconcileResult =
             fassert(40593,
-                    storageEngine->reconcileCatalogAndIdents(
-                        opCtx, storageEngine->getStableTimestamp(), lastShutdownState));
+                    catalog_repair::reconcileCatalogAndIdents(opCtx,
+                                                              storageEngine,
+                                                              storageEngine->getStableTimestamp(),
+                                                              lastShutdownState,
+                                                              storageGlobalParams.repair));
     }
 
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");

@@ -136,10 +136,6 @@ public:
     void setOldestActiveTransactionTimestampCallback(
         OldestActiveTransactionTimestampCallback callback) final {}
 
-    StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) final {
-        return ReconcileResult{};
-    }
     Timestamp getAllDurableTimestamp() const final {
         return {};
     }
@@ -201,6 +197,9 @@ public:
     }
     const MDBCatalog* getMDBCatalog() const final {
         return nullptr;
+    }
+    std::set<std::string> getDropPendingIdents() final {
+        return {};
     }
 
     StatusWith<Timestamp> pinOldestTimestamp(RecoveryUnit&,

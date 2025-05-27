@@ -194,6 +194,10 @@ public:
         std::shared_ptr<Ident> ident,
         DropIdentCallback&& onDrop) override;
 
+    std::set<std::string> getDropPendingIdents() override {
+        return _dropPendingIdentReaper.getAllIdentNames();
+    };
+
     std::shared_ptr<Ident> markIdentInUse(StringData ident) override;
 
     void startTimestampMonitor(
@@ -205,9 +209,6 @@ public:
 
     bool hasDataBeenCheckpointed(
         StorageEngine::CheckpointIteration checkpointIteration) const override;
-
-    StatusWith<ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) override;
 
     std::string getFilesystemPathForDb(const DatabaseName& dbName) const override;
 
@@ -319,17 +320,6 @@ private:
     void _onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
                                                      const Timestamp& timestamp);
 
-    /**
-     * Returns whether the given ident is an internal ident and if it should be dropped or used to
-     * resume an index build.
-     */
-    bool _handleInternalIdent(OperationContext* opCtx,
-                              const std::string& ident,
-                              LastShutdownState lastShutdownState,
-                              ReconcileResult* reconcileResult,
-                              std::set<std::string>* internalIdentsToKeep,
-                              std::set<std::string>* allInternalIdents);
-
     class RemoveDBChange;
 
     // Main KVEngine instance used for all user tables.
@@ -359,5 +349,7 @@ private:
 
     // Stores a copy of the TimestampMonitor's listeners when temporarily stopping the monitor.
     std::vector<TimestampMonitor::TimestampListener*> _listeners;
+
+    friend class StorageEngineTest;
 };
 }  // namespace mongo

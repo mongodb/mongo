@@ -415,6 +415,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "catalog_repair",
+    srcs = [
+        "catalog_repair.cpp",
+    ],
+    hdrs = [
+        "catalog_repair.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:storage_engine_impl",
+    ],
+)
+
+mongo_cc_library(
     name = "catalog_helpers",
     srcs = [
         "backwards_compatible_collection_options_util.cpp",
@@ -516,6 +530,7 @@ mongo_cc_library(
         "catalog_control.h",
     ],
     deps = [
+        ":catalog_repair",
         ":catalog_stats",
         ":collection_catalog",
         ":collection_record_store_options",

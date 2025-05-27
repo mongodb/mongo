@@ -211,30 +211,6 @@ void putMetaData(OperationContext* opCtx,
     mdbCatalog->putUpdatedEntry(opCtx, catalogId, rawMDBCatalogEntry);
 }
 
-StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
-                                         const std::string& ident,
-                                         const CollectionOptions& optionsWithUUID,
-                                         MDBCatalog* mdbCatalog) {
-    // The collection will be named local.orphan.xxxxx.
-    std::string identNs = ident;
-    std::replace(identNs.begin(), identNs.end(), '-', '_');
-    const auto nss = NamespaceStringUtil::deserialize(
-        DatabaseName::kLocal, NamespaceString::kOrphanCollectionPrefix + identNs);
-    auto ns = NamespaceStringUtil::serializeForCatalog(nss);
-
-
-    BSONCollectionCatalogEntry::MetaData md =
-        internal::createMetaDataForNewCollection(nss, optionsWithUUID);
-    auto catalogEntryObj =
-        internal::buildRawMDBCatalogEntry(ident, BSONObj() /* idxIdent */, md, ns);
-
-    auto res = mdbCatalog->addOrphanedEntry(opCtx, ident, nss, catalogEntryObj);
-    if (!res.isOK()) {
-        return res.getStatus();
-    }
-    return {ns};
-}
-
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,

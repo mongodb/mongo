@@ -30,6 +30,7 @@
 #include "mongo/db/storage/mdb_catalog.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -120,6 +121,13 @@ MDBCatalog::EntryIdentifier MDBCatalog::getEntry(const RecordId& catalogId) cons
 BSONObj MDBCatalog::getRawCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const {
     auto cursor = _rs->getCursor(opCtx);
     return _findRawEntry(*cursor, catalogId).getOwned();
+}
+
+RecordStore::Options MDBCatalog::getParsedRecordStoreOptions(OperationContext* opCtx,
+                                                             const RecordId& catalogId,
+                                                             const NamespaceString& nss) const {
+    auto bsonEntry = getRawCatalogEntry(opCtx, catalogId);
+    return _parseRecordStoreOptions(nss, bsonEntry);
 }
 
 void MDBCatalog::putUpdatedEntry(OperationContext* opCtx,
@@ -343,6 +351,113 @@ NamespaceString MDBCatalog::getNSSFromCatalog(OperationContext* opCtx,
     }
 
     tassert(9117800, str::stream() << "Namespace not found for " << catalogId, false);
+}
+
+BSONObj MDBCatalog::_buildOrphanedCatalogEntryObjAndNs(
+    const std::string& ident, bool isClustered, NamespaceString* nss, std::string* ns, UUID uuid) {
+    // The collection will be named local.orphan.xxxxx.
+    std::string identNs = ident;
+    std::replace(identNs.begin(), identNs.end(), '-', '_');
+
+    *nss = NamespaceStringUtil::deserialize(DatabaseName::kLocal,
+                                            NamespaceString::kOrphanCollectionPrefix + identNs);
+    *ns = NamespaceStringUtil::serializeForCatalog(*nss);
+    BSONObjBuilder catalogEntryBuilder;
+    catalogEntryBuilder.append("ident", ident);
+    catalogEntryBuilder.append("idxIdent", BSONObj());
+    BSONObjBuilder mdBuilder = catalogEntryBuilder.subobjStart("md");
+    mdBuilder.append("ns", *ns);
+    BSONObjBuilder optBuilder = mdBuilder.subobjStart("options");
+    optBuilder.appendElements(uuid.toBSON());
+    if (isClustered) {
+        BSONObjBuilder indexSpecBuilder = optBuilder.subobjStart("clusteredIndex");
+        indexSpecBuilder.append("v", 2);
+        indexSpecBuilder.append("key", BSON("_id" << 1));
+        indexSpecBuilder.append("name", IndexConstants::kIdIndexName);
+        indexSpecBuilder.append("unique", true);
+        indexSpecBuilder.doneFast();
+    }
+    optBuilder.doneFast();
+    mdBuilder.append("indexes", BSONArray());
+    mdBuilder.doneFast();
+    catalogEntryBuilder.append("ns", *ns);
+
+    return catalogEntryBuilder.obj();
+}
+
+StatusWith<std::string> MDBCatalog::newOrphanedIdent(OperationContext* opCtx,
+                                                     const std::string& ident,
+                                                     bool isClustered) {
+    NamespaceString nss;
+    std::string ns;
+    auto catalogEntry = _buildOrphanedCatalogEntryObjAndNs(ident, isClustered, &nss, &ns);
+    auto res = addOrphanedEntry(opCtx, ident, nss, catalogEntry);
+    if (!res.isOK()) {
+        return res.getStatus();
+    }
+    return {std::move(ns)};
+}
+
+RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString& nss,
+                                                          const BSONObj& obj) {
+    RecordStore::Options recordStoreOptions;
+
+    recordStoreOptions.isOplog = nss.isOplog();
+
+    BSONElement mdElement = obj["md"];
+    if (mdElement.isABSONObj()) {
+        BSONElement optionsElement = mdElement.Obj()["options"];
+        if (optionsElement.isABSONObj()) {
+            BSONObj optionsObj = optionsElement.Obj();
+
+            BSONElement clusteredElement = optionsObj["clusteredIndex"];
+            bool isClustered = clusteredElement.isABSONObj() || clusteredElement.booleanSafe();
+            recordStoreOptions.keyFormat = isClustered ? KeyFormat::String : KeyFormat::Long;
+            recordStoreOptions.allowOverwrite = !isClustered;
+
+            if (recordStoreOptions.isOplog) {
+                BSONElement cappedSizeElement = optionsObj["size"];
+                long long cappedSize = 0;
+                if (cappedSizeElement.isNumber()) {
+                    constexpr const long long kGB = 1024 * 1024 * 1024;
+                    const long long kPB = 1024 * 1024 * kGB;
+                    cappedSize = cappedSizeElement.safeNumberLong();
+                    uassert(10455500,
+                            "Invalid capped size in collection options",
+                            cappedSize >= 0 && cappedSize < kPB);
+                }
+                recordStoreOptions.oplogMaxSize = cappedSize;
+            }
+
+            BSONElement timeseriesElement = optionsObj["timeseries"];
+            if (!timeseriesElement.eoo()) {
+                uassert(10455501,
+                        "Timeseries options must be a document",
+                        timeseriesElement.type() == mongo::Object);
+                recordStoreOptions.customBlockCompressor = "zstd"_sd.toString();
+                recordStoreOptions.forceUpdateWithFullDocument = true;
+            }
+
+            recordStoreOptions.isCapped = optionsObj["capped"].trueValue();
+
+            BSONElement storageEngineElement = optionsObj["storageEngine"];
+            if (!storageEngineElement.eoo()) {
+                uassert(10455502,
+                        "StorageEngine must be a document",
+                        storageEngineElement.type() == mongo::Object);
+                for (auto&& elem : storageEngineElement.Obj()) {
+                    uassert(10455503,
+                            str::stream() << "StorageEngine." << elem.fieldName()
+                                          << " must be an embedded document",
+                            elem.type() == mongo::Object);
+                }
+                recordStoreOptions.storageEngineCollectionOptions =
+                    storageEngineElement.Obj().getOwned();
+            }
+        }
+    }
+
+    return recordStoreOptions;
 }
 
 StatusWith<MDBCatalog::EntryIdentifier> MDBCatalog::_addEntry(OperationContext* opCtx,

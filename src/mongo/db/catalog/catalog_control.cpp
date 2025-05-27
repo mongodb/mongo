@@ -35,6 +35,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/catalog_repair.h"
 #include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -244,8 +245,11 @@ void openCatalog(OperationContext* opCtx,
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
     auto reconcileResult =
         fassert(40688,
-                storageEngine->reconcileCatalogAndIdents(
-                    opCtx, stableTimestamp, StorageEngine::LastShutdownState::kClean));
+                catalog_repair::reconcileCatalogAndIdents(opCtx,
+                                                          storageEngine,
+                                                          stableTimestamp,
+                                                          StorageEngine::LastShutdownState::kClean,
+                                                          false /* forRepair */));
 
     // Once all unfinished index builds have been dropped and the catalog has been reloaded, resume
     // or restart any unfinished index builds. This will not resume/restart any index builds to

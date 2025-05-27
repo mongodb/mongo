@@ -95,11 +95,6 @@ void putMetaData(OperationContext* opCtx,
                  BSONCollectionCatalogEntry::MetaData& md,
                  MDBCatalog* mdbCatalog);
 
-StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
-                                         const std::string& ident,
-                                         const CollectionOptions& optionsWithUUID,
-                                         MDBCatalog* mdbCatalog);
-
 /**
  * On success, returns the RecordId which identifies the new record store in the durable catalog in
  * addition to ownership of the new RecordStore.

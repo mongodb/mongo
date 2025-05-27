@@ -61,6 +61,11 @@ class StorageEngineMetadata;
 
 struct StorageGlobalParams;
 
+// StorageEngine constants
+const std::string kCatalogInfo = DatabaseName::kMdbCatalog.db(omitTenant).toString();
+const NamespaceString kCatalogInfoNamespace = NamespaceString(DatabaseName::kMdbCatalog);
+const auto kResumableIndexIdentStem = "resumable-index-build-"_sd;
+
 /**
  * The StorageEngine class is the top level interface for creating a new storage engine. All
  * StorageEngine(s) must be registered by calling registerFactory in order to possibly be
@@ -766,19 +771,6 @@ public:
     };
 
     /**
-     * Drop abandoned idents using two-phase drop at the stable timestamp. Idents may be needed for
-     * reads between the oldest and stable timestamps. If successful, returns a ReconcileResult with
-     * indexes that need to be rebuilt or builds that need to be restarted.
-     *
-     * Abandoned internal idents require special handling based on the context known only to the
-     * caller. For example, on starting from a previous unclean shutdown, we would always drop all
-     * unknown internal idents. If we started from a clean shutdown, the internal idents may contain
-     * information for resuming index builds.
-     */
-    virtual StatusWith<ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) = 0;
-
-    /**
      * Returns the all_durable timestamp. All transactions with timestamps earlier than the
      * all_durable timestamp are committed.
      *
@@ -828,6 +820,7 @@ public:
     virtual const KVEngine* getEngine() const = 0;
     virtual MDBCatalog* getMDBCatalog() = 0;
     virtual const MDBCatalog* getMDBCatalog() const = 0;
+    virtual std::set<std::string> getDropPendingIdents() = 0;
 
     /**
      * A service that would like to pin the oldest timestamp registers its request here. If the

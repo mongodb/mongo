@@ -101,6 +101,10 @@ public:
 
     BSONObj getRawCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const;
 
+    RecordStore::Options getParsedRecordStoreOptions(OperationContext* opCtx,
+                                                     const RecordId& catalogId,
+                                                     const NamespaceString& nss) const;
+
     void putUpdatedEntry(OperationContext* opCtx,
                          const RecordId& catalogId,
                          const BSONObj& catalogEntry);
@@ -178,6 +182,10 @@ public:
         return _directoryForIndexes;
     }
 
+    StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
+                                             const std::string& ident,
+                                             bool isClustered);
+
 private:
     class AddIdentChange;
 
@@ -194,6 +202,16 @@ private:
 
     std::vector<std::string> _getIndexIdents(const BSONObj& rawCatalogEntry);
 
+    // TODO SERVER-105451 refactor to avoid the need for direct bson parsing
+    static RecordStore::Options _parseRecordStoreOptions(const NamespaceString& nss,
+                                                         const BSONObj& obj);
+
+    static BSONObj _buildOrphanedCatalogEntryObjAndNs(const std::string& ident,
+                                                      bool isClustered,
+                                                      NamespaceString* nss,
+                                                      std::string* ns,
+                                                      UUID uuid = UUID::gen());
+
     RecordStore* _rs;  // not owned
     const bool _directoryPerDb;
     const bool _directoryForIndexes;
@@ -202,5 +220,7 @@ private:
     mutable stdx::mutex _catalogIdToEntryMapLock;
 
     KVEngine* const _engine;
+
+    friend class MDBCatalogTest;
 };
 }  // namespace mongo
