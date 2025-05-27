@@ -1303,9 +1303,6 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/unittest",
     ],
-    tags = [
-        "compile_requires_large_memory_gcc",
-    ],
     deps = [
         "audit",
         "commands",
@@ -3487,7 +3484,6 @@ mongo_cc_library(
         "session_manager_mongod.h",
         "//src/mongo/s:read_write_concern_defaults_cache_lookup_mongos.h",
     ],
-    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         # NOTE: Do not add new libdeps (public or private) here unless required by the linker to
         # satisfy symbol dependencies from the files listed above in `sources`. If you need to add a
@@ -3632,7 +3628,6 @@ mongo_cc_binary(
         "//conditions:default": [],
     }),
     tags = [
-        "compile_requires_large_memory_gcc",
         "devcore",
         "dist_test",
     ],
