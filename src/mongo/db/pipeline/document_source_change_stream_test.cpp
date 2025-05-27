@@ -1473,6 +1473,66 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
     checkTransformation(newShardDetected, expectedNewShardDetected, kShowExpandedEventsSpec);
 }
 
+TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
+    auto uuid = UUID::gen();
+
+    for (auto eventType : {DSChangeStream::kShardCollectionOpType,
+                           DSChangeStream::kMigrateLastChunkFromShardOpType,
+                           DSChangeStream::kRefineCollectionShardKeyOpType,
+                           DSChangeStream::kReshardCollectionOpType,
+                           DSChangeStream::kNewShardDetectedOpType,
+                           DSChangeStream::kReshardBeginOpType,
+                           DSChangeStream::kReshardBlockingWritesOpType,
+                           DSChangeStream::kReshardDoneCatchUpOpType}) {
+
+        const bool hasReshardingUuid = eventType == DSChangeStream::kReshardBeginOpType ||
+            eventType == DSChangeStream::kReshardBlockingWritesOpType ||
+            eventType == DSChangeStream::kReshardDoneCatchUpOpType;
+
+        BSONObjBuilder bob;
+        bob.appendBool(eventType, 1);
+        if (hasReshardingUuid) {
+            bob.append(DSChangeStream::kReshardingUuidField, uuid.toBSON());
+        }
+
+        auto entry = makeOplogEntry(OpTypeEnum::kNoop,
+                                    nss,
+                                    BSONObj(),
+                                    uuid,
+                                    false,  // fromMigrate
+                                    bob.obj());
+
+        Value opDesc = V{D{}};
+        if (hasReshardingUuid) {
+            opDesc = V{D{{DSChangeStream::kReshardingUuidField, D{{"uuid"_sd, uuid}}}}};
+        }
+
+        Document expectedDoc{
+            {DSChangeStream::kReshardingUuidField,
+             hasReshardingUuid ? V{D{{"uuid"_sd, uuid}}} : V{}},
+            {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, uuid, opDesc, eventType)},
+            {DSChangeStream::kOperationTypeField, eventType},
+            {DSChangeStream::kClusterTimeField, kDefaultTs},
+            {DSChangeStream::kCollectionUuidField, uuid},
+            {DSChangeStream::kWallTimeField, Date_t()},
+            {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+            {DSChangeStream::kOperationDescriptionField, opDesc},
+        };
+
+        if (eventType == DSChangeStream::kNewShardDetectedOpType) {
+            // Need to set this because the event is only emitted on the router.
+            getExpCtx()->setNeedsMerge(true);
+        }
+
+        // Using 'show...Events' here in order to see all relevant events.
+        checkTransformation(
+            entry,
+            expectedDoc,
+            BSON("$changeStream" << BSON("showSystemEvents" << true << "showExpandedEvents" << true
+                                                            << "showMigrationEvents" << true)));
+    }
+}
+
 TEST_F(ChangeStreamStageTest, TransformReshardBegin) {
     auto uuid = UUID::gen();
     auto reshardingUuid = UUID::gen();

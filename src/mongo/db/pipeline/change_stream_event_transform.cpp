@@ -49,6 +49,7 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
+#include <array>
 #include <cstddef>
 #include <initializer_list>
 #include <utility>
@@ -66,6 +67,17 @@ constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 constexpr auto checkValueTypeOrMissing = &DocumentSourceChangeStream::checkValueTypeOrMissing;
 constexpr auto resolveResumeToken = &change_stream::resolveResumeTokenFromSpec;
 
+constexpr std::array kBuiltInNoopEvents = {
+    DocumentSourceChangeStream::kShardCollectionOpType,
+    DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType,
+    DocumentSourceChangeStream::kRefineCollectionShardKeyOpType,
+    DocumentSourceChangeStream::kReshardCollectionOpType,
+    DocumentSourceChangeStream::kNewShardDetectedOpType,
+    DocumentSourceChangeStream::kReshardBeginOpType,
+    DocumentSourceChangeStream::kReshardBlockingWritesOpType,
+    DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
+    DocumentSourceChangeStream::kEndOfTransactionOpType};
+
 const StringDataSet kOpsWithoutUUID = {
     DocumentSourceChangeStream::kInvalidateOpType,
     DocumentSourceChangeStream::kDropDatabaseOpType,
@@ -74,6 +86,12 @@ const StringDataSet kOpsWithoutUUID = {
 
 const StringDataSet kOpsWithoutNs = {
     DocumentSourceChangeStream::kEndOfTransactionOpType,
+};
+
+const StringDataSet kOpsWithReshardingUUIDs = {
+    DocumentSourceChangeStream::kReshardBeginOpType,
+    DocumentSourceChangeStream::kReshardBlockingWritesOpType,
+    DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
 };
 
 const StringDataSet kPreImageOps = {DocumentSourceChangeStream::kUpdateOpType,
@@ -233,6 +251,10 @@ ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
                     !supportedEvent.empty() && result.insert(supportedEvent).second);
         }
     }
+
+
+    // Add built-in sharding events to list of noop events we need to handle.
+    result.insert(kBuiltInNoopEvents.begin(), kBuiltInNoopEvents.end());
 
     return result;
 }
@@ -444,83 +466,25 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
         case repl::OpTypeEnum::kNoop: {
             const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
 
-            // Check whether this is a shardCollection oplog entry.
-            if (!o2Field["shardCollection"].missing()) {
-                operationType = DocumentSourceChangeStream::kShardCollectionOpType;
-                operationDescription = Value(copyDocExceptFields(o2Field, {"shardCollection"_sd}));
-                break;
-            }
-
-            // Check if this is a migration of the last chunk off a shard.
-            if (!o2Field["migrateLastChunkFromShard"].missing()) {
-                operationType = DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType;
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"migrateLastChunkFromShard"_sd}));
-                break;
-            }
-
-            // Check whether this is a refineCollectionShardKey oplog entry.
-            if (!o2Field["refineCollectionShardKey"].missing()) {
-                operationType = DocumentSourceChangeStream::kRefineCollectionShardKeyOpType;
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"refineCollectionShardKey"_sd}));
-                break;
-            }
-
-            // Check whether this is a reshardCollection oplog entry.
-            if (!o2Field["reshardCollection"].missing()) {
-                operationType = DocumentSourceChangeStream::kReshardCollectionOpType;
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"reshardCollection"_sd}));
-                break;
-            }
-
-            if (!o2Field["migrateChunkToNewShard"].missing()) {
-                operationType = DocumentSourceChangeStream::kNewShardDetectedOpType;
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"migrateChunkToNewShard"_sd}));
-                break;
-            }
-
-            if (!o2Field["reshardBegin"].missing()) {
-                operationType = DocumentSourceChangeStream::kReshardBeginOpType;
-                doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
-                             o2Field["reshardingUUID"]);
-                operationDescription = Value(copyDocExceptFields(o2Field, {"reshardBegin"_sd}));
-                break;
-            }
-
-            if (!o2Field["reshardBlockingWrites"].missing()) {
-                operationType = DocumentSourceChangeStream::kReshardBlockingWritesOpType;
-                doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
-                             o2Field["reshardingUUID"]);
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"reshardBlockingWrites"_sd}));
-                break;
-            }
-
-            if (!o2Field["reshardDoneCatchUp"].missing()) {
-                operationType = DocumentSourceChangeStream::kReshardDoneCatchUpOpType;
-                doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
-                             o2Field["reshardingUUID"]);
-                operationDescription =
-                    Value(copyDocExceptFields(o2Field, {"reshardDoneCatchUp"_sd}));
-                break;
-            }
-
-            if (!o2Field["endOfTransaction"].missing()) {
-                operationType = DocumentSourceChangeStream::kEndOfTransactionOpType;
-                operationDescription = Value{copyDocExceptFields(o2Field, {"endOfTransaction"_sd})};
-                addTransactionIdFieldsIfPresent(o2Field, doc);
-                break;
-            }
-
             // Check for dynamic events that were specified via the 'supportedEvents' change stream
             // parameter.
+            // This also checks for some hard-code sharding-related events.
             if (auto result = handleSupportedEvent(o2Field)) {
                 // Apply returned event name and operationDescription.
                 operationType = result->first;
                 operationDescription = result->second;
+
+                // Check if the 'reshardingUUID' field needs to be added to the event.
+                if (kOpsWithReshardingUUIDs.contains(operationType)) {
+                    doc.addField(DocumentSourceChangeStream::kReshardingUuidField,
+                                 o2Field[DocumentSourceChangeStream::kReshardingUuidField]);
+                }
+
+                // Check if the 'txnNumber' and 'lsid' fields need to be added to the event. This is
+                // currently only true for 'endOfTransaction' events.
+                if (operationType == DocumentSourceChangeStream::kEndOfTransactionOpType) {
+                    addTransactionIdFieldsIfPresent(o2Field, doc);
+                }
                 break;
             }
 
