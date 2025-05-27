@@ -153,7 +153,14 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
     }
 
     // The 'primary' database must be version checked for sharding.
-    DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+    {
+        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+        if (scopedSs.isInTransitionalPhase(opCtx)) {
+            scopedSs.checkDbVersionOrThrow(opCtx, _dbName);
+        } else {
+            DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+        }
+    }
 }
 
 bool AutoGetDb::canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID) {
@@ -222,7 +229,14 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     _db = databaseHolder->openDb(opCtx, _dbName, nullptr);
 
-    DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+    {
+        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+        if (scopedSs.isInTransitionalPhase(opCtx)) {
+            scopedSs.checkDbVersionOrThrow(opCtx, _dbName);
+        } else {
+            DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+        }
+    }
 
     return _db;
 }
@@ -232,7 +246,15 @@ Database* AutoGetDb::refreshDbReferenceIfNull(OperationContext* opCtx) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
         _db = databaseHolder->getDb(opCtx, _dbName);
 
-        DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+        {
+            const auto scopedSs =
+                ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+            if (scopedSs.isInTransitionalPhase(opCtx)) {
+                scopedSs.checkDbVersionOrThrow(opCtx, _dbName);
+            } else {
+                DatabaseShardingState::acquire(opCtx, _dbName)->checkDbVersionOrThrow(opCtx);
+            }
+        }
     }
     return _db;
 }

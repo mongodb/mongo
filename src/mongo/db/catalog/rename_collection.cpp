@@ -73,6 +73,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -553,7 +554,14 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
-    DatabaseShardingState::acquire(opCtx, source.dbName())->checkDbVersionOrThrow(opCtx);
+    {
+        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+        if (scopedSs.isInTransitionalPhase(opCtx)) {
+            scopedSs.checkDbVersionOrThrow(opCtx, source.dbName());
+        } else {
+            DatabaseShardingState::acquire(opCtx, source.dbName())->checkDbVersionOrThrow(opCtx);
+        }
+    }
 
     DisableDocumentValidation validationDisabler(opCtx);
 

@@ -31,7 +31,9 @@
 
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -150,5 +152,94 @@ std::string ShardingState::RecoveredClusterRole::toString() const {
     return str::stream() << clusterId << " : " << role << " : " << configShardConnectionString
                          << " : " << shardId;
 }
+
+ShardingState::ScopedTransitionalShardingState::ScopedTransitionalShardingState(
+    ScopedTransitionalShardingState&& other)
+    : _lock(std::move(other._lock)), _shardingState(other._shardingState) {
+    other._shardingState = nullptr;
+}
+
+auto ShardingState::ScopedTransitionalShardingState::getCriticalSectionSignal(
+    ShardingMigrationCriticalSection::Operation op) const {
+    return _shardingState->_transitionalPhaseCritSec.getSignal(op);
+}
+
+auto ShardingState::ScopedTransitionalShardingState::getCriticalSectionReason() const {
+    return _shardingState->_transitionalPhaseCritSec.getReason();
+}
+
+// The transitional phase contains the state transitions too.
+// This means the transitional state begins when we start to enter to phase (first crit sec acquire)
+// and ends when we finish to leave the phase (last crit sec release)
+bool ShardingState::ScopedTransitionalShardingState::isInTransitionalPhase(
+    OperationContext* opCtx) const {
+    const auto critSecSignal =
+        getCriticalSectionSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                     ? ShardingMigrationCriticalSection::kWrite
+                                     : ShardingMigrationCriticalSection::kRead);
+    return critSecSignal || _shardingState->_transitionalPhaseVersion.is_initialized();
+}
+
+ShardingState::ScopedTransitionalShardingState
+ShardingState::ScopedTransitionalShardingState::acquireShared(OperationContext* opCtx) {
+    auto shardingState = ShardingState::get(opCtx);
+    return ScopedTransitionalShardingState(std::shared_lock(shardingState->_transitionalPhaseMutex),
+                                           shardingState);
+}
+
+ShardingState::ScopedTransitionalShardingState
+ShardingState::ScopedTransitionalShardingState::acquireExclusive(OperationContext* opCtx) {
+    auto shardingState = ShardingState::get(opCtx);
+    return ScopedTransitionalShardingState(std::unique_lock(shardingState->_transitionalPhaseMutex),
+                                           shardingState);
+}
+
+void ShardingState::ScopedTransitionalShardingState::checkDbVersionOrThrow(
+    OperationContext* opCtx, const DatabaseName& dbName) const {
+    // If there is a version attached to the OperationContext, use it as the received version.
+    // If there is no database version information on the 'opCtx'. This means that the operation
+    // represented by 'opCtx' is unversioned, and the database version is always OK for unversioned
+    // operations.
+    if (OperationShardingState::isComingFromRouter(opCtx)) {
+        const auto version = OperationShardingState::get(opCtx).getDbVersion(dbName);
+        if (version) {
+            checkDbVersionOrThrow(opCtx, dbName, *version);
+        }
+    };
+}
+
+void ShardingState::ScopedTransitionalShardingState::checkDbVersionOrThrow(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const DatabaseVersion& receivedVersion) const {
+    {
+        const auto critSecSignal =
+            getCriticalSectionSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                         ? ShardingMigrationCriticalSection::kWrite
+                                         : ShardingMigrationCriticalSection::kRead);
+        const auto optCritSecReason = getCriticalSectionReason();
+
+        uassert(StaleDbRoutingVersion(dbName, receivedVersion, boost::none, critSecSignal),
+                fmt::format("The global sharding state critical section is acquired while checking "
+                            "for the database {} with reason: {}",
+                            dbName.toStringForErrorMsg(),
+                            getCriticalSectionReason()->toString()),
+                !critSecSignal);
+    }
+
+    tassert(10483400,
+            "checkDbVersionOrThrow should be called only if we are in transitional state",
+            _shardingState->_transitionalPhaseVersion.is_initialized());
+
+    uassert(StaleDbRoutingVersion(
+                dbName, receivedVersion, *(_shardingState->_transitionalPhaseVersion)),
+            fmt::format("Database version mismatch: transitional version expected for {}",
+                        dbName.toStringForErrorMsg()),
+            receivedVersion == *(_shardingState->_transitionalPhaseVersion));
+}
+
+ShardingState::ScopedTransitionalShardingState::ScopedTransitionalShardingState(
+    LockType lock, ShardingState* shardingState)
+    : _shardingState(shardingState) {}
 
 }  // namespace mongo

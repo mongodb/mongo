@@ -677,7 +677,13 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
         // Check that the sharding database version matches our read.
         if (dbName) {
             // Check that the sharding database version matches our read.
-            DatabaseShardingState::acquire(opCtx, *dbName)->checkDbVersionOrThrow(opCtx);
+            const auto scopedSs =
+                ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+            if (scopedSs.isInTransitionalPhase(opCtx)) {
+                scopedSs.checkDbVersionOrThrow(opCtx, *dbName);
+            } else {
+                DatabaseShardingState::acquire(opCtx, *dbName)->checkDbVersionOrThrow(opCtx);
+            }
         }
 
         // We must open a storage snapshot consistent with the fetched in-memory Catalog instance.
@@ -869,7 +875,14 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         (!shard_role_details::getRecoveryUnit(opCtx)->isActive() || _isLockFreeReadSubOperation));
 
     // Pre-snapshot shard version checks.
-    DatabaseShardingState::acquire(opCtx, nsOrUUID.dbName())->checkDbVersionOrThrow(opCtx);
+    {
+        const auto scopedSs = ShardingState::ScopedTransitionalShardingState::acquireShared(opCtx);
+        if (scopedSs.isInTransitionalPhase(opCtx)) {
+            scopedSs.checkDbVersionOrThrow(opCtx, nsOrUUID.dbName());
+        } else {
+            DatabaseShardingState::acquire(opCtx, nsOrUUID.dbName())->checkDbVersionOrThrow(opCtx);
+        }
+    }
     if (nsOrUUID.isNamespaceString()) {
         CollectionShardingState::acquire(opCtx, nsOrUUID.nss())->checkShardVersionOrThrow(opCtx);
     }

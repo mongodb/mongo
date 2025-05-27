@@ -33,9 +33,11 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/s/database_version.h"
 #include "mongo/stdx/mutex.h"
 
 #include <string>
@@ -57,12 +59,80 @@ namespace mongo {
  * ShardingInitializationMongoD, which should be its only caller).
  */
 class ShardingState {
+    friend class ScopedTransitionalShardingState;
+
     ShardingState(const ShardingState&) = delete;
     ShardingState& operator=(const ShardingState&) = delete;
 
 public:
     ShardingState(bool inMaintenanceMode);
     ~ShardingState();
+
+    /**
+     * Obtains the transitional sharding state along with a lock in either shared or exclusive mode,
+     * which will be held until the object goes out of scope.
+     */
+    class ScopedTransitionalShardingState {
+        using LockType = std::variant<std::shared_lock<std::shared_mutex>,   // NOLINT
+                                      std::unique_lock<std::shared_mutex>>;  // NOLINT
+
+        ScopedTransitionalShardingState(const ScopedTransitionalShardingState&) = delete;
+        ScopedTransitionalShardingState& operator=(const ScopedTransitionalShardingState&) = delete;
+
+    public:
+        ScopedTransitionalShardingState(ScopedTransitionalShardingState&& other);
+
+        ~ScopedTransitionalShardingState() = default;
+
+        /**
+         * Acquires the ScopedTransitionalShardingState in shared mode
+         */
+        static ScopedTransitionalShardingState acquireShared(OperationContext* opCtx);
+
+        /**
+         * Acquires the ScopedTransitionalShardingState in exclusive mode
+         */
+        static ScopedTransitionalShardingState acquireExclusive(OperationContext* opCtx);
+
+        /**
+         * Checks the version of database `dbName` against the transitional version.
+         * If not in transitional state the function has no effect.
+         * Otherwise if the mismatch between database's version and the transitional version
+         * generates an exception
+         *
+         * Should be called if we are in transitional state, otherwise call DSS'
+         * checkDbVersionOrThrow
+         */
+        void checkDbVersionOrThrow(OperationContext* opCtx, const DatabaseName& dbName) const;
+
+        /**
+         * Checks the received database version (associated with `dbName`) against the transitional
+         * version.
+         * If not in transitional state the function has no effect. Otherwise if the
+         * mismatch between database's version and the transitional version generates an exception
+         *
+         * Should be called if we are in transitional state, otherwise call DSS'
+         * checkDbVersionOrThrow
+         */
+        void checkDbVersionOrThrow(OperationContext* opCtx,
+                                   const DatabaseName& dbName,
+                                   const DatabaseVersion& receivedVersion) const;
+
+        /**
+         * Checks if we are in a transitional state or not
+         */
+        [[nodiscard]] bool isInTransitionalPhase(OperationContext* opCtx) const;
+
+    private:
+        auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const;
+
+        auto getCriticalSectionReason() const;
+
+        ScopedTransitionalShardingState(LockType lock, ShardingState* shardingState);
+
+        LockType _lock;
+        ShardingState* _shardingState;
+    };
 
     static void create(ServiceContext* serviceContext);
 
@@ -158,6 +228,10 @@ private:
     SharedPromise<RecoveredClusterRole> _awaitClusterRoleRecoveryPromise;
     Promise<RecoveredClusterRole> _promise;
     Future<RecoveredClusterRole> _future;
+
+    std::shared_mutex _transitionalPhaseMutex;  // NOLINT
+    boost::optional<DatabaseVersion> _transitionalPhaseVersion;
+    ShardingMigrationCriticalSection _transitionalPhaseCritSec;
 
     // Log severity suppressor for direct connection checks
     logv2::SeveritySuppressor _directConnectionLogSuppressor{
