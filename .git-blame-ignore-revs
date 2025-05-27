@@ -75,3 +75,6 @@ c25ff7cb2f755b8b11b2b7b85189599b162a4059
 
 # SERVER-94150: v5 clang-format
 ff6b2194e3617a338d83597d96710b1b92a18940
+
+# SERVER-105050: IncludeBlocks: Regroup for clang-format
+5abd171fa9d539578d5f1d3d4417a4ca4606c078
