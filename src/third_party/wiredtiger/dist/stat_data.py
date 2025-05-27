@@ -268,6 +268,8 @@ conn_stats = [
     # Cache statistics
     ##########################################
     CacheStat('cache_bytes_hs', 'bytes belonging to the history store table in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_hs_dirty', 'dirty bytes belonging to the history store table in the cache', 'no_clear,no_scale,size'),
+    CacheStat('cache_bytes_hs_updates', 'update bytes belonging to the history store table in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_image', 'bytes belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_internal', 'tracked bytes belonging to internal pages in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale,size'),

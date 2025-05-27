@@ -45,8 +45,9 @@ struct __wt_cache {
      * History store cache usage. TODO: The values for these variables are cached and potentially
      * outdated.
      */
-    wt_shared uint64_t bytes_hs; /* History store bytes inmem */
-    uint64_t bytes_hs_dirty;     /* History store bytes inmem dirty */
+    wt_shared uint64_t bytes_hs;         /* History store bytes inmem */
+    wt_shared uint64_t bytes_hs_dirty;   /* History store bytes inmem dirty */
+    wt_shared uint64_t bytes_hs_updates; /* History store bytes inmem updates */
 
     wt_shared uint64_t pages_dirty_intl;
     wt_shared uint64_t pages_dirty_leaf;

@@ -111,6 +111,10 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
       __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_dirty_total)));
     WT_STATP_CONN_SET(session, stats, cache_bytes_hs,
       __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_hs)));
+    WT_STATP_CONN_SET(session, stats, cache_bytes_hs_dirty,
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_hs_dirty)));
+    WT_STATP_CONN_SET(session, stats, cache_bytes_hs_updates,
+      __wt_cache_bytes_plus_overhead(cache, __wt_atomic_load64(&cache->bytes_hs_updates)));
     WT_STATP_CONN_SET(session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
     WT_STATP_CONN_SET(session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
     WT_STATP_CONN_SET(session, stats, cache_bytes_internal, intl);

@@ -254,3 +254,75 @@ err:
 
     return (ret);
 }
+
+/*
+ * __wt_hs_btree_truncate --
+ *     Wipe all history store updates for the btree.
+ */
+int
+__wt_hs_btree_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
+{
+    WT_CURSOR *hs_cursor_start, *hs_cursor_stop;
+    WT_DECL_ITEM(hs_key);
+    WT_DECL_RET;
+    WT_SESSION *truncate_session;
+    wt_timestamp_t hs_start_ts;
+    uint64_t hs_counter;
+    uint32_t hs_btree_id;
+
+    hs_cursor_start = hs_cursor_stop = NULL;
+    hs_btree_id = 0;
+    truncate_session = (WT_SESSION *)session;
+
+    WT_RET(__wt_scr_alloc(session, 0, &hs_key));
+
+    /* Open a history store start cursor. */
+    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_start));
+    F_SET(hs_cursor_start, WT_CURSTD_HS_READ_COMMITTED);
+
+    hs_cursor_start->set_key(hs_cursor_start, 1, btree_id);
+    WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, hs_cursor_start), true);
+    if (ret == WT_NOTFOUND) {
+        ret = 0;
+        goto done;
+    }
+
+    /* Open a history store stop cursor. */
+    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_stop));
+    F_SET(hs_cursor_stop, WT_CURSTD_HS_READ_COMMITTED | WT_CURSTD_HS_READ_ACROSS_BTREE);
+
+    hs_cursor_stop->set_key(hs_cursor_stop, 1, btree_id + 1);
+    WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, hs_cursor_stop), true);
+
+#ifdef HAVE_DIAGNOSTIC
+    /* If we get not found, we are at the largest btree id in the history store. */
+    if (ret == 0) {
+        hs_cursor_stop->get_key(hs_cursor_stop, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter);
+        WT_ASSERT(session, hs_btree_id > btree_id);
+    }
+#endif
+
+    do {
+        WT_ASSERT(session, ret == WT_NOTFOUND || hs_btree_id > btree_id);
+
+        WT_ERR_NOTFOUND_OK(hs_cursor_stop->prev(hs_cursor_stop), true);
+        /* We can find the start point then we must be able to find the stop point. */
+        if (ret == WT_NOTFOUND)
+            WT_ERR_PANIC(
+              session, ret, "cannot locate the stop point to truncate the history store.");
+        hs_cursor_stop->get_key(hs_cursor_stop, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter);
+    } while (hs_btree_id != btree_id);
+
+    WT_ERR(
+      truncate_session->truncate(truncate_session, NULL, hs_cursor_start, hs_cursor_stop, NULL));
+
+done:
+err:
+    __wt_scr_free(session, &hs_key);
+    if (hs_cursor_start != NULL)
+        WT_TRET(hs_cursor_start->close(hs_cursor_start));
+    if (hs_cursor_stop != NULL)
+        WT_TRET(hs_cursor_stop->close(hs_cursor_stop));
+
+    return (ret);
+}

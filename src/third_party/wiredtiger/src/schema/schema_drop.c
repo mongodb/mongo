@@ -22,7 +22,9 @@ __drop_file(
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     const char *filename;
-    bool remove_files;
+    char *metadata_cfg = NULL;
+    bool id_found, remove_files;
+    uint32_t id = 0;
 
     WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
     remove_files = cval.val != 0;
@@ -41,16 +43,34 @@ __drop_file(
         WT_RET_SUB(session, ret, WT_CONFLICT_DHANDLE, WT_CONFLICT_DHANDLE_MSG);
     WT_RET(ret);
 
+    /* Get file id that will be used to truncate history store for the file. */
+    id_found = __wt_metadata_search(session, uri, &metadata_cfg) == 0 &&
+      __wt_config_getones(session, metadata_cfg, "id", &cval) == 0;
+    if (id_found)
+        id = (uint32_t)cval.val;
+
     /* Remove the metadata entry (ignore missing items). */
     WT_TRET(__wt_metadata_remove(session, uri));
-    if (!remove_files)
-        return (ret);
+    if (remove_files)
+        /*
+         * Schedule the remove of the underlying physical file when the drop completes.
+         */
+        WT_TRET(__wt_meta_track_drop(session, filename));
 
     /*
-     * Schedule the remove of the underlying physical file when the drop completes.
+     * Truncate history store for the dropped file if we can find its id from the metadata, this is
+     * a best-effort operation, as we don't fail drop if truncate returns an error. There is no
+     * history store to truncate for in-memory database, and we should not call truncate if
+     * connection is not ready for history store operations.
      */
-    WT_TRET(__wt_meta_track_drop(session, filename));
-
+    WT_ERR(ret);
+    if (id_found && !F_ISSET_ATOMIC_32(S2C(session), WT_CONN_IN_MEMORY) &&
+      F_ISSET_ATOMIC_32(S2C(session), WT_CONN_READY))
+        if (__wt_hs_btree_truncate(session, id) != 0)
+            __wt_verbose_warning(
+              session, WT_VERB_HS, "Failed to truncate history store for the file: %s", uri);
+err:
+    __wt_free(session, metadata_cfg);
     return (ret);
 }
 
