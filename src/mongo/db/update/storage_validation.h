@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+
+#include <cstdint>
 
 namespace mongo {
 

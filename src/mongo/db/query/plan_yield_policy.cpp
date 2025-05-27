@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <utility>
+#include "mongo/db/query/plan_yield_policy.h"
 
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
@@ -42,6 +39,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

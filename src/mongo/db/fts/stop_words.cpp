@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
+#include "mongo/db/fts/stop_words.h"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/util/string_map.h"
+
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/db/fts/stop_words.h"
-#include "mongo/util/string_map.h"
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 

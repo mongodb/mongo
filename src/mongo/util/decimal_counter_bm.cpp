@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/util/decimal_counter.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/itoa.h"
+
 #include <cstdint>
 #include <limits>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/decimal_counter.h"
-#include "mongo/util/itoa.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

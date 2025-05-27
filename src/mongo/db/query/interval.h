@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 

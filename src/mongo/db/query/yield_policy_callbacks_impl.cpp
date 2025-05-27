@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <utility>
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

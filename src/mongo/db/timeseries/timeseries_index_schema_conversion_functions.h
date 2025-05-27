@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <list>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+
+#include <list>
+
+#include <boost/optional/optional.hpp>
 
 /**
  * Namespace for helper functions converting index spec schema between time-series collection and

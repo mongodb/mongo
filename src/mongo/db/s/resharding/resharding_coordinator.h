@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -40,6 +38,8 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/stdx/mutex.h"
+
+#include <vector>
 
 namespace mongo {
 

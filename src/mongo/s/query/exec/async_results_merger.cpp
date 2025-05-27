@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <cstdint>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/exec/async_results_merger.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -51,10 +46,16 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
-#include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -43,6 +43,7 @@
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/platform/compiler.h"
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/repl/oplog_writer_impl.h"
+
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_writer.h"
-#include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"

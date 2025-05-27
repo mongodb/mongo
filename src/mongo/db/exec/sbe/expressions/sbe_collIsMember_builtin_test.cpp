@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <memory>
-#include <tuple>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
@@ -43,6 +37,13 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <memory>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional.hpp>
 
 namespace mongo::sbe {
 

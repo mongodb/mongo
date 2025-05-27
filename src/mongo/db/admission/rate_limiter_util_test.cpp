@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/admission/rate_limiter.h"
-
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/join_thread.h"

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -44,6 +40,10 @@
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

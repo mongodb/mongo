@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
+
+#include <type_traits>
 
 namespace mongo::stage_builder {
 

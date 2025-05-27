@@ -29,12 +29,12 @@
 
 #include "mongo/db/update/field_checker.h"
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace {
 

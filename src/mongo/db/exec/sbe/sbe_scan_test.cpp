@@ -31,10 +31,6 @@
  * This file contains minimal tests for sbe::ScanStage and sbe::ParallelScanStage.
  */
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
@@ -49,6 +45,10 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

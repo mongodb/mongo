@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/s/shard_server_test_fixture.h"
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -37,7 +35,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -47,6 +44,10 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/config_server_catalog_cache_loader_impl.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

@@ -29,13 +29,13 @@
 
 
 #include "mongo/db/storage/storage_engine_lock_file.h"
-
-#include <boost/filesystem.hpp>
-#include <io.h>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#include <io.h>
+
+#include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

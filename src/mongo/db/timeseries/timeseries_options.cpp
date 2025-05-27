@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/timeseries/timeseries_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -41,9 +35,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <cstdint>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

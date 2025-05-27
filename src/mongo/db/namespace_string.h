@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <array>
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -48,6 +38,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

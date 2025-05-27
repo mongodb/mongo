@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <array>
-
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/user_writes_block_reason_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <array>
 
 namespace mongo {
 

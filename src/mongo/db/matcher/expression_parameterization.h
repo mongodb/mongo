@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -45,6 +38,14 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

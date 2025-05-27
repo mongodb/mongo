@@ -30,11 +30,12 @@
 
 #include "mongo/db/storage/storage_file_util.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <cerrno>
 #include <string>
 #include <system_error>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifdef __linux__

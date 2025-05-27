@@ -27,22 +27,24 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
+#include "mongo/platform/waitable_atomic.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <iostream>
+#include <memory>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <functional>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -57,6 +50,14 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace cluster_aggregation_planner {

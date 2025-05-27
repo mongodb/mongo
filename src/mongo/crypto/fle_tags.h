@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/db/namespace_string.h"
+
+#include <cstdint>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class FLETagQueryInterface;

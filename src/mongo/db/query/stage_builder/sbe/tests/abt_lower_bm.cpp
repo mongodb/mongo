@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::stage_builder::abt_lower {
 namespace {

@@ -27,24 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/math/statistics/bivariate_statistics.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cmath>
-#include <cstdint>
-#include <cstdlib>
-#include <functional>
-#include <memory>
-#include <numeric>
-#include <set>
-#include <string>
-#include <vector>
+#include "mongo/db/s/analyze_shard_key_cmd_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -90,7 +73,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/analyze_shard_key_cmd_util.h"
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 #include "mongo/db/s/analyze_shard_key_util.h"
 #include "mongo/db/s/config/initial_split_policy.h"
@@ -125,6 +107,26 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <numeric>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/math/statistics/bivariate_statistics.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

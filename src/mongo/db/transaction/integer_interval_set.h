@@ -53,10 +53,11 @@
 
 #pragma once
 
-#include <boost/intrusive/set.hpp>
+#include "mongo/util/assert_util.h"
+
 #include <type_traits>
 
-#include "mongo/util/assert_util.h"
+#include <boost/intrusive/set.hpp>
 
 namespace mongo {
 template <typename Int>

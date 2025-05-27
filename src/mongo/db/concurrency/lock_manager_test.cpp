@@ -27,15 +27,9 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/concurrency/lock_manager.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/concurrency/locker.h"
@@ -46,6 +40,13 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

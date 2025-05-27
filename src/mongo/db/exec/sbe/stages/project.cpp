@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <set>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
+#include "mongo/db/exec/sbe/stages/project.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -39,9 +35,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/str.h"
+
+#include <set>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 namespace sbe {

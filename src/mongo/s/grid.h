@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -44,6 +39,11 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+
+#include <functional>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

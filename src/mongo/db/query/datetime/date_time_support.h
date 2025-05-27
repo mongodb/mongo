@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <cstdlib>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,6 +38,17 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 struct _timelib_error_container;
 struct _timelib_time;

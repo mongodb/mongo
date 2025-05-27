@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <asio.hpp>
-#include <utility>
-
 #include "mongo/config.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/baton.h"
+
+#include <utility>
+
+#include <asio.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl.hpp"

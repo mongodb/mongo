@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/utility/formatting_ostream_fwd.hpp>
-#include <cstdint>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <cstdint>
+
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
 
 namespace mongo::logv2 {
 

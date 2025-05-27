@@ -34,15 +34,6 @@
 
 #include "mongo/db/query/query_planner_test_lib.h"
 
-#include <cstddef>
-#include <memory>
-#include <set>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -77,6 +68,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

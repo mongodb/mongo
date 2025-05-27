@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/delayable_timeout_callback.h"
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"

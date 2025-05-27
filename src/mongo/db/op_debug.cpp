@@ -29,8 +29,6 @@
 
 #include "mongo/db/op_debug.h"
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,6 +45,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/ticketholder_queue_stats.h"
 #include "mongo/util/duration.h"
+
+#include <string>
 
 namespace mongo {
 namespace {

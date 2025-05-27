@@ -28,10 +28,6 @@
  */
 #pragma once
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -41,6 +37,10 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

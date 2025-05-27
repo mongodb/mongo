@@ -28,21 +28,22 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/clustered_collection_util.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

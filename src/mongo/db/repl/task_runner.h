@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <list>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
+
+#include <list>
+#include <string>
 
 namespace mongo {
 

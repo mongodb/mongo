@@ -29,16 +29,16 @@
 
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
 
-#include <climits>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
+
+#include <climits>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

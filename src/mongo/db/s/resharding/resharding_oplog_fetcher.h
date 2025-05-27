@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/cancelable_operation_context.h"
@@ -54,6 +49,12 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 

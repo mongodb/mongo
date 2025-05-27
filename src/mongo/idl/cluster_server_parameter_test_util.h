@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/change_stream_options_manager.h"
@@ -54,6 +50,11 @@
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace cluster_server_parameter_test_util {

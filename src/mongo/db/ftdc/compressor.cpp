@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <limits>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/ftdc/compressor.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/status.h"
-#include "mongo/db/ftdc/compressor.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/ftdc/varint.h"
 #include "mongo/util/assert_util.h"
+
+#include <limits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

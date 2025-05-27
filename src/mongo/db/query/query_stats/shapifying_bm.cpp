@@ -28,10 +28,6 @@
  */
 
 
-#include <benchmark/benchmark.h>
-#include <climits>
-#include <memory>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -41,6 +37,11 @@
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/duration.h"
+
+#include <climits>
+#include <memory>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

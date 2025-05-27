@@ -28,15 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <cstddef>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/ftdc/file_manager.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -46,7 +38,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
-#include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/ftdc/file_reader.h"
 #include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/ftdc_test.h"
@@ -54,6 +45,16 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

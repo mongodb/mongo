@@ -29,12 +29,6 @@
 
 #include "mongo/s/query/exec/cluster_client_cursor_impl.h"
 
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -50,6 +44,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/string_map.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

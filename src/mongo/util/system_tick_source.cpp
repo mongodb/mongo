@@ -29,10 +29,10 @@
 
 #include "mongo/util/system_tick_source.h"
 
+#include "mongo/util/tick_source.h"
+
 #include <chrono>  // NOLINT
 #include <memory>
-
-#include "mongo/util/tick_source.h"
 
 namespace mongo {
 

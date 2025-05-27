@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/scripting/bson_template_evaluator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 

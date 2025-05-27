@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/collation/collator_factory_icu.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -40,10 +37,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace {
 

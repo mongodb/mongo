@@ -29,14 +29,14 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
-#include <fmt/format.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

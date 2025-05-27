@@ -31,6 +31,7 @@
 #include "mongo/db/geo/geoparser.h"
 
 #include <cstddef>
+
 #include <s1angle.h>
 #include <s1interval.h>
 #include <s2.h>
@@ -41,15 +42,10 @@
 #include <s2loop.h>
 #include <s2polygon.h>
 #include <s2polyline.h>
+
 #include <util/math/vector3-inl.h>
 #include <util/math/vector3.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cmath>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -60,6 +56,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+
+#include <cmath>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGeo
 

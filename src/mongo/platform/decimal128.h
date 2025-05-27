@@ -29,6 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/data_type.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+
 #include <array>
 #include <climits>
 #include <cstddef>
@@ -37,13 +44,6 @@
 #include <string>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/base/data_type.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

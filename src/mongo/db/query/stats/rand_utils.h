@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/value_utils.h"
+
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -38,9 +41,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::stats {
 // A simple histogram describing the distribution of values of each data type.

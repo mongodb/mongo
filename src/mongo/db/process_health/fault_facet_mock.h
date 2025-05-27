@@ -28,14 +28,13 @@
  */
 #pragma once
 
-#include <functional>
-
 #include "mongo/db/process_health/fault_facet.h"
-
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/timer.h"
+
+#include <functional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

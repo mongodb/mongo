@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <mutex>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/collection.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -44,7 +38,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
@@ -81,6 +74,14 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

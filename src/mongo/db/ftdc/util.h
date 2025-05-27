@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -44,6 +39,12 @@
 #include "mongo/db/ftdc/decompressor.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

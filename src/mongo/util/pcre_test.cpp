@@ -29,15 +29,16 @@
 
 #include "mongo/util/pcre.h"
 
-#include <array>
-#include <fmt/format.h>
-#include <initializer_list>
-#include <ostream>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+
+#include <array>
+#include <initializer_list>
+#include <ostream>
+
+#include <fmt/format.h>
 
 namespace mongo::pcre {
 namespace {

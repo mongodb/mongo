@@ -29,19 +29,20 @@
 
 #include "file_helpers.h"
 
-#include <boost/algorithm/string.hpp>
-#include <fstream>
-#include <ostream>
-#include <regex>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/str.h"
+
+#include <fstream>
+#include <ostream>
+#include <regex>
+#include <string>
+#include <vector>
+
+#include <boost/algorithm/string.hpp>
 
 namespace mongo::query_tester {
 namespace {

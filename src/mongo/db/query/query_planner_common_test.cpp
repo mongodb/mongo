@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_planner_common.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
 

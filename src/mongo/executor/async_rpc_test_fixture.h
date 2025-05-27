@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -46,6 +44,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+
+#include <memory>
 
 namespace mongo::async_rpc {
 using executor::NetworkInterface;

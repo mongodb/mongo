@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <stdexcept>
-#include <string>
-#include <vector>
+#include "mongo/util/fail_point.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -50,10 +43,18 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

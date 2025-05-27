@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/stdx/mutex.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

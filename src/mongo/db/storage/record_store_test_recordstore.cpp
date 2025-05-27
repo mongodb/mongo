@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace {

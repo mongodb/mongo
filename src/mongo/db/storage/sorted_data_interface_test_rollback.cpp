@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

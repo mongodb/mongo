@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/field_path.h"
+
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/pipeline/field_path.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

@@ -29,20 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <boost/move/utility_core.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <compare>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
@@ -72,6 +58,21 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <compare>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

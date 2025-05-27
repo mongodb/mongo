@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/memory_tracking/op_memory_use.h"
+
 #include "mongo/base/initializer.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"

@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -52,6 +46,12 @@
 #include "mongo/db/session/kill_sessions_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

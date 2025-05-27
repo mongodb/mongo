@@ -28,9 +28,11 @@
  */
 
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/util/assert_util.h"
+
 #include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

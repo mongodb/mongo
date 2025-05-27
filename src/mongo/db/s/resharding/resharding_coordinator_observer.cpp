@@ -28,21 +28,22 @@
  */
 
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <mutex>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <mutex>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

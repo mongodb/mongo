@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/tokenizer.h"
+
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 

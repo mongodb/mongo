@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <string>
+#include "mongo/util/decimal_counter.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/decimal_counter.h"
+
+#include <cstdint>
+#include <string>
 
 namespace {
 using namespace mongo;

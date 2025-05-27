@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -49,6 +44,12 @@
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
 
 namespace mongo {
 class MultiPlanStage;

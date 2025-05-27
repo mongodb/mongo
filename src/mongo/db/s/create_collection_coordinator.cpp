@@ -28,23 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <list>
-#include <mutex>
-#include <set>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
+#include "mongo/db/s/create_collection_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -78,7 +62,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/remove_chunks_gen.h"
@@ -140,6 +123,24 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <list>
+#include <mutex>
+#include <set>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);

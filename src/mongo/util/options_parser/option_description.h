@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace optionenvironment {

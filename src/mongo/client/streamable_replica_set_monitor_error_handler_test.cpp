@@ -28,19 +28,19 @@
  */
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
-#include <boost/none.hpp>
-#include <functional>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

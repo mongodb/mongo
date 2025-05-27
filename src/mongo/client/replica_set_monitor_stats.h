@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <utility>
-
 #include "mongo/base/counter.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 

@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <boost/random/normal_distribution.hpp>
+#include "mongo/db/pipeline/window_function/window_function_percentile_bm_fixture.h"
+
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/pipeline/window_function/window_function_percentile.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
+
 #include <cmath>
 #include <cstddef>
 #include <memory>
 #include <random>
 
 #include <benchmark/benchmark.h>
+#include <boost/random/normal_distribution.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/window_function/window_function.h"
-#include "mongo/db/pipeline/window_function/window_function_percentile.h"
-#include "mongo/db/pipeline/window_function/window_function_percentile_bm_fixture.h"
-#include "mongo/util/intrusive_counter.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 using std::vector;

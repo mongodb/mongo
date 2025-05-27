@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/status_with.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/status_with.h"
 
 namespace mongo {
 

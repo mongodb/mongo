@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include <random>
-
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/unittest/unittest.h"
+
+#include <random>
 
 namespace mongo::key_string_test {
 class KeyStringBuilderTest : public unittest::Test {

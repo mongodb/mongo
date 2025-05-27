@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/filesystem/operations.hpp>
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/periodic_runner.h"
+
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/service_context.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/periodic_runner.h"
+#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 

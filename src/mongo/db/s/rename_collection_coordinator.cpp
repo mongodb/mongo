@@ -28,17 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/rename_collection_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
@@ -67,7 +57,6 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -109,6 +98,18 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

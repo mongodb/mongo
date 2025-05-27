@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/transport/session.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 /**

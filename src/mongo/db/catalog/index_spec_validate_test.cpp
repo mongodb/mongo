@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <limits>
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -45,6 +41,10 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <limits>
+#include <memory>
 
 namespace mongo {
 namespace {

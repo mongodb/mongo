@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/profile_filter.h"
+
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/util/processinfo.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

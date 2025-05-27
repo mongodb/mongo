@@ -28,11 +28,6 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -45,6 +40,11 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

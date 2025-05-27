@@ -32,17 +32,18 @@
 #include <s2.h>
 #include <s2cellid.h>
 #include <s2regioncoverer.h>
+
 #include <util/math/vector3.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <ostream>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <memory>
+#include <ostream>
 
 namespace mongo {
 

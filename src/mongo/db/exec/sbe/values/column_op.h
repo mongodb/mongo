@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/values/value.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-
-#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::value {
 /**

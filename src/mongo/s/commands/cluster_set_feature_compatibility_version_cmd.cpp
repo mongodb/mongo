@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/read_preference.h"
@@ -52,6 +48,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
 
 namespace mongo {
 

@@ -29,13 +29,14 @@
 
 #include "mongo/util/fixed_string.h"
 
-#include <fmt/format.h>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <utility>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

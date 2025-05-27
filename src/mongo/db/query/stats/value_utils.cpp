@@ -29,11 +29,6 @@
 
 #include "mongo/db/query/stats/value_utils.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -41,6 +36,12 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+
+#include <fmt/format.h>
 
 namespace mongo::stats {
 

@@ -28,16 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <mutex>
-#include <tuple>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/sharding_initialization_mongod.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -85,7 +76,6 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -123,6 +113,17 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <mutex>
+#include <tuple>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

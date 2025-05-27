@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/service_liaison_mock.h"
+
+#include "mongo/util/periodic_runner_factory.h"
+
 #include <memory>
 #include <mutex>
 
 #include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/service_liaison_mock.h"
-#include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 

@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <utility>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/exec/store_possible_cursor.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -57,9 +51,16 @@
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
-#include "mongo/s/query/exec/store_possible_cursor.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/decorable.h"
+
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

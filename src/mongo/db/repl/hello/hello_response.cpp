@@ -28,13 +28,7 @@
  */
 
 
-#include <ctime>
-#include <memory>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/hello/hello_response.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,9 +36,16 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/repl/hello/hello_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <ctime>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

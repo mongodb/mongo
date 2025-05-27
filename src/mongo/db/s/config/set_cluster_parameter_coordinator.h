@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -44,6 +41,10 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <functional>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <functional>
 
 namespace mongo::variableValidation {
 

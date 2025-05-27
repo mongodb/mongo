@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/util/shared_buffer.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
 

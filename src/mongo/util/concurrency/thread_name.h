@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/util/static_immortal.h"
+
 #include <memory>
 #include <string>
 #include <utility>
-
-#include "mongo/base/string_data.h"
-#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 

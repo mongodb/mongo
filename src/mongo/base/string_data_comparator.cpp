@@ -29,9 +29,9 @@
 
 #include "mongo/base/string_data_comparator.h"
 
-#include <cstdlib>
-
 #include "mongo/util/murmur3.h"
+
+#include <cstdlib>
 
 namespace mongo {
 

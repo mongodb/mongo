@@ -28,13 +28,14 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <vector>
-
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/sorter/sorter.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

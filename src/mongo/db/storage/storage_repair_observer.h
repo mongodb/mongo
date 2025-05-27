@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/service_context.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/service_context.h"
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,6 +41,10 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::evaluate_matcher_test {
 

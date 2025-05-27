@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -37,6 +34,9 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::sbe {
 using SBELocalBindTest = GoldenEExpressionTestFixture;

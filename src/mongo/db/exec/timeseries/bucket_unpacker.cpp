@@ -29,20 +29,6 @@
 
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <s2cellid.h>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -53,6 +39,21 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <s2cellid.h>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries {
 

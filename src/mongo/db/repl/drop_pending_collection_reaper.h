@@ -30,15 +30,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <map>
-#include <memory>
-
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/mutex.h"
+
+#include <map>
+#include <memory>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

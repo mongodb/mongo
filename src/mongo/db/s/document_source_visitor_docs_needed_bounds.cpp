@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
+
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 
 namespace mongo {

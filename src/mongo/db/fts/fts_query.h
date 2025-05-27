@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/fts/fts_util.h"
+
+#include <string>
 
 namespace mongo {
 namespace fts {

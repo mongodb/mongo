@@ -31,12 +31,12 @@
 #include <clocale>  // For setlocale()
 #endif
 
-#include <array>
-#include <climits>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
+
+#include <array>
+#include <climits>
 
 namespace mongo {
 namespace {

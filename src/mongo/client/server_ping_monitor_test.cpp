@@ -28,14 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <list>
-#include <memory>
-#include <ratio>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/client/server_ping_monitor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -45,7 +38,6 @@
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/client/server_ping_monitor.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -62,6 +54,15 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <list>
+#include <memory>
+#include <ratio>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

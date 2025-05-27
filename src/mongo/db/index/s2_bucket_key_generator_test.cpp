@@ -28,20 +28,6 @@
  */
 
 
-#include <algorithm>
-#include <ostream>
-#include <s2cell.h>
-#include <s2latlng.h>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <s2cellid.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -60,6 +46,21 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2latlng.h>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

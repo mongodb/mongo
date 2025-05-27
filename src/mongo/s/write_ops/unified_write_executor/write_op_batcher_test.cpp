@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
 #include "mongo/unittest/unittest.h"
 

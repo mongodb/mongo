@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/validate/validate_results.h"
+
+#include <cstdint>
+#include <string>
 
 namespace mongo {
 

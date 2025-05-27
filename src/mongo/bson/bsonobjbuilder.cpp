@@ -29,10 +29,10 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 
-#include <string>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/logv2/log.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

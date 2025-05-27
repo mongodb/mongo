@@ -29,7 +29,8 @@
 
 
 #include "mongo/util/str.h"  // IWYU pragma: keep
-#include <string>            // IWYU pragma: keep
+
+#include <string>  // IWYU pragma: keep
 
 namespace mongo {
 

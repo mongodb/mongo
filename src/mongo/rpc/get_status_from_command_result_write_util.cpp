@@ -29,8 +29,6 @@
 
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -40,6 +38,8 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 

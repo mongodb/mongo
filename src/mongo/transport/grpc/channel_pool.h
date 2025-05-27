@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/base/counter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
@@ -45,6 +42,9 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

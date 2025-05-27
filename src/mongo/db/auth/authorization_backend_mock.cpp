@@ -29,9 +29,6 @@
 
 #include "mongo/db/auth/authorization_backend_mock.h"
 
-#include <string>
-#include <utility>
-
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/update/update_driver.h"
+
+#include <string>
+#include <utility>
 
 
 namespace mongo::auth {

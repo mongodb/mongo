@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <deque>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,10 +43,19 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/unittest/unittest.h"
+
+#include <deque>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

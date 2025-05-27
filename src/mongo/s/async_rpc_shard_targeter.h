@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <memory>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -55,6 +48,14 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 
 namespace mongo {

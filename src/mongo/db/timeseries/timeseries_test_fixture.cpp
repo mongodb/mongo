@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <numeric>
-#include <utility>
-#include <vector>
+#include "mongo/db/timeseries/timeseries_test_fixture.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -52,13 +49,17 @@
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <numeric>
+#include <utility>
+#include <vector>
 
 namespace mongo::timeseries {
 void TimeseriesTestFixture::setUpCollectionsHelper(

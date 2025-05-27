@@ -29,10 +29,6 @@
 #pragma once
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstdint>
-#include <memory>
-#include <mutex>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -42,6 +38,10 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <memory>
+#include <mutex>
 
 namespace mongo {
 

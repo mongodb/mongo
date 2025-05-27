@@ -29,15 +29,16 @@
 
 #include "mongo/db/query/stage_builder/sbe/analysis.h"
 
-#include <absl/container/inlined_vector.h>
-#include <algorithm>
-#include <sstream>
-#include <tuple>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <sstream>
+#include <tuple>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::stage_builder {
 FieldEffect FieldEffects::getComposedEffect(FieldEffect child, FieldEffect parent) {

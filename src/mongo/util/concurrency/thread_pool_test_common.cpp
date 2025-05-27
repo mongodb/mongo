@@ -31,11 +31,6 @@
 #include <absl/container/node_hash_map.h>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <memory>
-#include <mutex>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
@@ -49,6 +44,11 @@
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

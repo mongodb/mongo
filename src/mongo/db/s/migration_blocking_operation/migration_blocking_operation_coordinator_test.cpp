@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
-#include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/stdx/thread.h"

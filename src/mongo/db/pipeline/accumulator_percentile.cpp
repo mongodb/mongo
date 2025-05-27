@@ -29,9 +29,6 @@
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -46,6 +43,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <type_traits>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

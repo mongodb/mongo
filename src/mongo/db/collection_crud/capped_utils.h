@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class Database;

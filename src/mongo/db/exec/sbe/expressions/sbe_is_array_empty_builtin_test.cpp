@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <initializer_list>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -38,6 +34,10 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/unittest/unittest.h"
+
+#include <initializer_list>
+#include <memory>
+#include <utility>
 
 namespace mongo::sbe {
 

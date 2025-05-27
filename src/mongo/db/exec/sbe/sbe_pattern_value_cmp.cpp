@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 
 #include "mongo/bson/bsonelement.h"
@@ -37,6 +35,8 @@
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include <cstdint>
 
 namespace mongo::sbe {
 namespace {

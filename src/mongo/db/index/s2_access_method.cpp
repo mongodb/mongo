@@ -30,14 +30,6 @@
 
 #include "mongo/db/index/s2_access_method.h"
 
-#include <boost/move/utility_core.hpp>
-#include <cmath>
-#include <s2cellid.h>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +43,15 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cmath>
+#include <string>
+#include <utility>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

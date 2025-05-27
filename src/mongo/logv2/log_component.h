@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+
+#include <iosfwd>
+#include <string>
 
 namespace mongo::logv2 {
 

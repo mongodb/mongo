@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/validate/index_consistency.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/validate/collection_validation.h"
-#include "mongo/db/validate/index_consistency.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/unittest/unittest.h"

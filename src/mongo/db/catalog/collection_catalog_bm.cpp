@@ -27,19 +27,10 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/catalog/collection_catalog.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -51,6 +42,16 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

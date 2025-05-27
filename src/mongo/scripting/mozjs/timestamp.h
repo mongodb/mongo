@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

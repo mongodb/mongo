@@ -29,13 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -51,6 +44,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

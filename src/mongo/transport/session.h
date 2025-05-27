@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -50,6 +44,13 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_types.h"
 #endif

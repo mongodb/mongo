@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +42,11 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

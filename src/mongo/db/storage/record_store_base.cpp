@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/record_store_base.h"
+
 #include "mongo/db/operation_context.h"
 
 namespace mongo {

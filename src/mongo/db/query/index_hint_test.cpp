@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/index_hint.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/index_hint.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

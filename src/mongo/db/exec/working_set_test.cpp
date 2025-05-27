@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/working_set.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/unittest.h"

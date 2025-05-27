@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace express {

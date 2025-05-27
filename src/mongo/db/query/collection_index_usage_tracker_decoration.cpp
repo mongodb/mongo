@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
+
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/server_status_metric.h"

@@ -31,6 +31,21 @@
 #include "mongo/util/options_parser/options_parser.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <iterator>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+
+#include <fcntl.h>
+
 #include <boost/any.hpp>
 #include <boost/any/bad_any_cast.hpp>
 #include <boost/core/typeinfo.hpp>
@@ -50,21 +65,8 @@
 #include <boost/program_options/variables_map.hpp>
 #include <boost/type_index.hpp>
 #include <boost/type_index/type_index_facade.hpp>
-#include <cerrno>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <exception>
-#include <fcntl.h>
 #include <fmt/format.h>
-#include <fstream>  // IWYU pragma: keep
-#include <iterator>
-#include <map>
-#include <memory>
-#include <stdexcept>
 #include <sys/stat.h>
-#include <type_traits>
-#include <utility>
 #include <yaml-cpp/exceptions.h>
 #include <yaml-cpp/node/detail/iterator.h>
 #include <yaml-cpp/node/detail/iterator_fwd.h>

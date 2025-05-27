@@ -28,22 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <iterator>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/replication_recovery.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -73,7 +58,6 @@
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/server_options.h"
@@ -103,6 +87,23 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

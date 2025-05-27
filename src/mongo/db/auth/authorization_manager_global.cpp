@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +46,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

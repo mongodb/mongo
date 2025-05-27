@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-
-#include <grpcpp/channel.h>
-#include <grpcpp/client_context.h>
-#include <grpcpp/create_channel.h>
-#include <grpcpp/security/credentials.h>
-#include <grpcpp/support/sync_stream.h>
-
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/rpc/message.h"
@@ -66,6 +56,16 @@
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
+#include <memory>
+#include <string>
+
+#include <grpcpp/channel.h>
+#include <grpcpp/client_context.h>
+#include <grpcpp/create_channel.h>
+#include <grpcpp/security/credentials.h>
+#include <grpcpp/support/sync_stream.h>
 
 namespace mongo::transport::grpc {
 

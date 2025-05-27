@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/field_path.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

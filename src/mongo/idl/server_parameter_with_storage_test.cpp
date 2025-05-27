@@ -29,16 +29,6 @@
 
 #include "mongo/db/server_parameter_with_storage.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <string>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -49,6 +39,16 @@
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 AtomicWord<int> test::gStdIntPreallocated;

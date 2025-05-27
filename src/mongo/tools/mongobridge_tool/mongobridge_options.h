@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+
 #include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <vector>
-
-#include "mongo/base/status.h"
 
 namespace mongo {
 

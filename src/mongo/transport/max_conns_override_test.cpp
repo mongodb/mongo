@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
@@ -40,6 +35,11 @@
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
+
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace mongo {
 namespace {

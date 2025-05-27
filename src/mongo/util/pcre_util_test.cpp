@@ -29,16 +29,17 @@
 
 #include "mongo/util/pcre_util.h"
 
-#include <climits>
-#include <cstdint>
-#include <fmt/format.h>
-#include <ostream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
+
+#include <climits>
+#include <cstdint>
+#include <ostream>
+
+#include <fmt/format.h>
 
 namespace mongo::pcre_util {
 namespace {

@@ -29,22 +29,22 @@
 
 #include "mongo/db/exec/document_value/document.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/functional/hash.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 using boost::intrusive_ptr;

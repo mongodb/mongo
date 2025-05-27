@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/utility.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

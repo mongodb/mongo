@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_distinct.h"
@@ -44,6 +42,8 @@
 #include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/shard_targeting_helpers.h"
+
+#include <vector>
 
 namespace mongo {
 

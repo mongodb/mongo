@@ -29,12 +29,6 @@
 
 #include "mongo/s/write_ops/batched_command_response.h"
 
-#include <fmt/ostream.h>
-#include <iosfwd>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,6 +39,12 @@
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
+
+#include <iosfwd>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/ostream.h>
 
 namespace mongo {
 namespace {

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/matcher/matcher.h"
+
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"

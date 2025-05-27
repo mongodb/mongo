@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <vector>
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
@@ -58,7 +54,6 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -85,6 +80,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

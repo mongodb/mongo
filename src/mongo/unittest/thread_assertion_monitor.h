@@ -30,17 +30,17 @@
 #pragma once
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <exception>
-#include <functional>
-#include <mutex>
-#include <utility>
-
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <exception>
+#include <functional>
+#include <mutex>
+#include <utility>
 
 namespace mongo::unittest {
 

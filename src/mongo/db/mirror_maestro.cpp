@@ -28,16 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cmath>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
-#include <vector>
+#include "mongo/db/mirror_maestro.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,7 +41,6 @@
 #include "mongo/db/client_out_of_line_executor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mirror_maestro_gen.h"
 #include "mongo/db/mirroring_sampler.h"
 #include "mongo/db/namespace_string.h"
@@ -81,6 +71,18 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <cmath>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

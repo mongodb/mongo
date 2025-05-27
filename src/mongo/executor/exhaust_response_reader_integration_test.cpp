@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/exhaust_response_reader_tl.h"
-
-#include <memory>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/async_client.h"
@@ -46,6 +42,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/executor_integration_test_connection_stats.h"
+#include "mongo/executor/exhaust_response_reader_tl.h"
 #include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/generic_argument_gen.h"
@@ -60,6 +57,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/async_client_factory.h"

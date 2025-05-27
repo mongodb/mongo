@@ -27,26 +27,27 @@
  *    it in the license file.
  */
 
+#include "mongo/util/icu.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
+
+#include <absl/base/attributes.h>
+#include <boost/move/utility_core.hpp>
 #include <unicode/uchar.h>
 #include <unicode/umachine.h>
 #include <unicode/usprep.h>
 #include <unicode/ustring.h>
 #include <unicode/utf8.h>
 #include <unicode/utypes.h>
-#include <vector>
-
-#include <absl/base/attributes.h>
-#include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

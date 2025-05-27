@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <ostream>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -41,6 +36,11 @@
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <utility>
 
 namespace mongo::sbe {
 

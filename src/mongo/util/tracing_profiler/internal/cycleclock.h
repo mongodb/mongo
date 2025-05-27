@@ -30,6 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
+
 #include <absl/base/internal/cycleclock.h>
 
 namespace mongo::tracing_profiler::internal {

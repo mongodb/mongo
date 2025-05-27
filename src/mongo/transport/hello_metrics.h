@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
+
+#include <cstddef>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace transport {

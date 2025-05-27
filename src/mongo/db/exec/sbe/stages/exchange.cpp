@@ -29,12 +29,7 @@
 
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <absl/container/inlined_vector.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <functional>
-#include <mutex>
-#include <string>
+#include "mongo/db/exec/sbe/stages/exchange.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -43,9 +38,16 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future_impl.h"
+
+#include <functional>
+#include <mutex>
+#include <string>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo::sbe {
 std::unique_ptr<ThreadPool> s_globalThreadPool;

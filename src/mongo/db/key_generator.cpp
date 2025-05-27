@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
+#include "mongo/db/key_generator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
@@ -42,6 +40,9 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

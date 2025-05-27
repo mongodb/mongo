@@ -28,14 +28,14 @@
  */
 
 
-#include <functional>
-
 #include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
+
+#include <functional>
 
 namespace mongo {
 namespace transport {

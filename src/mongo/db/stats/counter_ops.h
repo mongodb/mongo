@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+
 #include <cstdint>
 
 namespace mongo {

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/fts/unicode/byte_vector.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <numeric>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/fts/unicode/byte_vector.h"
-#include "mongo/unittest/unittest.h"
 
 #ifdef MONGO_HAVE_FAST_BYTE_VECTOR
 namespace mongo {

@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <list>
 #include <type_traits>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

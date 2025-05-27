@@ -29,11 +29,11 @@
 
 #include "mongo/db/coll_mod_reply_validation.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::coll_mod_reply_validation {
 void validateReply(const CollModReply& reply) {

@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/multi_plan.h"
@@ -47,6 +44,9 @@
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/duration.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 /**

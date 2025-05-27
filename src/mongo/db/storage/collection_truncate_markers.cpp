@@ -29,13 +29,6 @@
 
 #include "mongo/db/storage/collection_truncate_markers.h"
 
-#include <algorithm>
-#include <cmath>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -45,6 +38,13 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -29,25 +29,6 @@
 
 #include "mongo/logv2/plain_formatter.h"
 
-#include <algorithm>
-#include <any>
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-#include <cstddef>
-#include <deque>
-#include <fmt/args.h>
-#include <fmt/format.h>
-#include <functional>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
-#include <boost/cstdint.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/utility/formatting_ostream_fwd.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,6 +41,25 @@
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <any>
+#include <cstddef>
+#include <deque>
+#include <functional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <fmt/args.h>
+#include <fmt/format.h>
 
 namespace mongo::logv2 {
 namespace {

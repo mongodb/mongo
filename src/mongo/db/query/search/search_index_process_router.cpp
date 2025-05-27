@@ -35,6 +35,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

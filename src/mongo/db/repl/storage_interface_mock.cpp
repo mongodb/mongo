@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/repl/storage_interface_mock.h"
+
+#include "mongo/logv2/log.h"
+
 #include <iterator>
 #include <mutex>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

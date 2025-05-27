@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo::sbe::value {
 /**

@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo {
 namespace repl {

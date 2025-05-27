@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <memory>
-#include <thread>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/util/future.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,9 +39,21 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/executor_test_util.h"
-#include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_test_utils.h"
+
+#include <cstddef>
+#include <memory>
+#include <thread>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

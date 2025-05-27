@@ -32,11 +32,6 @@
 #include <absl/container/node_hash_set.h>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -49,6 +44,11 @@
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

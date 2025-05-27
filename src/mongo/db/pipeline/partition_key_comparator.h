@@ -28,9 +28,6 @@
  */
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -41,6 +38,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

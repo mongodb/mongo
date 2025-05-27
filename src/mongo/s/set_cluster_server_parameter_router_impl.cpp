@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
 #include "mongo/s/set_cluster_server_parameter_router_impl.h"
 
 #include "mongo/db/query/query_settings/query_settings_service_dependencies.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

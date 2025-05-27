@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,6 +47,10 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <boost/none.hpp>
 

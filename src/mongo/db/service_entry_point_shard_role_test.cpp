@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/service_entry_point_shard_role.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/ingress_admission_context.h"
@@ -36,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_test_fixture.h"

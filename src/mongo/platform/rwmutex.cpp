@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <forward_list>
-#include <functional>
-#include <memory>
-
 #include "mongo/platform/rwmutex.h"
 
 #include "mongo/platform/compiler.h"
@@ -43,6 +35,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/static_immortal.h"
+
+#include <algorithm>
+#include <array>
+#include <forward_list>
+#include <functional>
+#include <memory>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

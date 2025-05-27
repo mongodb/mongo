@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstring>
-#include <memory>
-#include <string>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/net/http_client.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
@@ -47,7 +42,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/http_client.h"
+
+#include <algorithm>
+#include <cstring>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

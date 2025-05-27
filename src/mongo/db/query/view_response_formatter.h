@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class BSONObjBuilder;

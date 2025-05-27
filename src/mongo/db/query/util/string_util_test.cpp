@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/db/query/util/string_util.h"
+
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 namespace mongo::query_string_util {
 

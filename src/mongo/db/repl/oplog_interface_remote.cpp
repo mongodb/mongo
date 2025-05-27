@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <utility>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/oplog_interface_remote.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -44,9 +40,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {

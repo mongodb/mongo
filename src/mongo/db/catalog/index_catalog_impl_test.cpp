@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
+
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands/list_indexes_allowed_fields.h"
 #include "mongo/db/service_context.h"

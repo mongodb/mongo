@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/shard_id.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

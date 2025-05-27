@@ -28,12 +28,12 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <fstream>  // IWYU pragma: keep
 #include <system_error>
 
 #include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep

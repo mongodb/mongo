@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/util/histogram.h"
+
+#include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

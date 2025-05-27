@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <boost/cstdint.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <ostream>
-#include <string>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +41,18 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

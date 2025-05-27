@@ -28,20 +28,20 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
 #include <algorithm>
-#include <boost/filesystem/operations.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-#include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <cstdint>
-#include <fmt/format.h>
 #include <mutex>
 #include <type_traits>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/filesystem/operations.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/error_codes.h"

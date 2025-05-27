@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/cidr.h"
+
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

@@ -28,12 +28,13 @@
  */
 
 
-#include <algorithm>
-#include <fmt/format.h>
-
-
 #include "mongo/db/exec/batched_delete_stage_buffer.h"
+
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

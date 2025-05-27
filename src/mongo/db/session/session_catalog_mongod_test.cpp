@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/session/session_catalog_mongod.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
@@ -39,7 +39,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_mock.h"
@@ -48,6 +47,8 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

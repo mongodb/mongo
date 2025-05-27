@@ -32,10 +32,6 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -58,6 +54,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace auth {

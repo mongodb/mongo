@@ -29,19 +29,20 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
+#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/util/field_set.h"
+#include "mongo/util/string_map.h"
+
 #include <algorithm>
-#include <boost/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
-#include "mongo/util/field_set.h"
-#include "mongo/util/string_map.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 struct QuerySolutionNode;

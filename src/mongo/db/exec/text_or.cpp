@@ -29,14 +29,6 @@
 
 #include "mongo/db/exec/text_or.h"
 
-#include <iterator>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
@@ -50,6 +42,14 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
+
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

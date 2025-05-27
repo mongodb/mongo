@@ -33,12 +33,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstdint>
-#include <ostream>
-#include <string>
-#include <system_error>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -112,6 +106,12 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <ostream>
+#include <string>
+#include <system_error>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

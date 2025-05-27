@@ -28,14 +28,7 @@
  */
 
 
-#include <cstdint>
-#include <mutex>
-#include <string>
-#include <utility>
-#include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/change_stream_options_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +36,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_options_parameter_gen.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
@@ -55,6 +47,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

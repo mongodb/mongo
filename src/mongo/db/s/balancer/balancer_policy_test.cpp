@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstdint>
-#include <iosfwd>
-#include <iterator>
-#include <memory>
-#include <type_traits>
-
-#include <absl/container/node_hash_set.h>
+#include "mongo/db/s/balancer/balancer_policy.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -43,10 +36,18 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <iosfwd>
+#include <iterator>
+#include <memory>
+#include <type_traits>
+
+#include <absl/container/node_hash_set.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,12 +29,12 @@
 
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 Document GroupFromFirstDocumentTransformation::applyTransformation(const Document& input) const {

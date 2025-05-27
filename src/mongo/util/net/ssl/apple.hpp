@@ -31,10 +31,11 @@
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 
-#include <CoreFoundation/CoreFoundation.h>
-#include <Security/Security.h>
 #include <memory>
 #include <string>
+
+#include <CoreFoundation/CoreFoundation.h>
+#include <Security/Security.h>
 
 namespace asio {
 namespace ssl {

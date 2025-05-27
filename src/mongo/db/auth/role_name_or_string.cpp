@@ -29,7 +29,6 @@
 
 #include "mongo/db/auth/role_name_or_string.h"
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"

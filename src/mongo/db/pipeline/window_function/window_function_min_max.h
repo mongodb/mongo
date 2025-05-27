@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -45,6 +39,11 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

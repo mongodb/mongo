@@ -28,11 +28,12 @@
  */
 
 
-#include <utility>
+#include "mongo/db/catalog/index_catalog.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

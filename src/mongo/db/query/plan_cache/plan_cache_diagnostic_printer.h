@@ -30,9 +30,9 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
+
+#include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
 

@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <climits>
-#include <limits>
-#include <memory>
-#include <ostream>
+#include "mongo/db/commands/parse_log_component_settings.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -39,10 +36,14 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands/parse_log_component_settings.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <climits>
+#include <limits>
+#include <memory>
+#include <ostream>
 
 namespace {
 

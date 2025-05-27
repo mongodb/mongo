@@ -29,8 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 
-#include <fmt/ranges.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/util/string_util.h"
+
+#include <fmt/ranges.h>
 
 namespace mongo::hybrid_scoring_util {
 

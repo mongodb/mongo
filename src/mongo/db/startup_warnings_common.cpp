@@ -28,17 +28,18 @@
  */
 
 
-#include <fstream>  // IWYU pragma: keep
-#include <string>
-#include <vector>
+#include "mongo/db/startup_warnings_common.h"
 
 #include "mongo/client/internal_auth.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
-#include "mongo/db/startup_warnings_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <fstream>  // IWYU pragma: keep
+#include <string>
+#include <vector>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

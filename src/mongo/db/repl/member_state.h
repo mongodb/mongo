@@ -31,14 +31,14 @@
 
 #pragma once
 
-#include <ostream>
-#include <string>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
+#include <string>
+#include <type_traits>
 
 namespace mongo {
 namespace repl {

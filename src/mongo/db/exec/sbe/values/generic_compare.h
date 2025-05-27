@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/cstdint.hpp>
-#include <boost/optional/optional.hpp>
-#include <cmath>
-
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
@@ -41,6 +37,11 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <cmath>
+
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <iostream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
@@ -42,6 +38,10 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/quick_exit.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

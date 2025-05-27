@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/uuid.h"
+
+#include <vector>
 
 namespace mongo {
 

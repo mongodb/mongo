@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <grpcpp/support/sync_stream.h>
-
 #include "mongo/transport/grpc/server_stream.h"
+
+#include <grpcpp/support/sync_stream.h>
 
 namespace mongo::transport::grpc {
 

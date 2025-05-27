@@ -30,12 +30,13 @@
 
 #pragma once
 
-#include "asio/detail/config.hpp"
+#include "mongo/util/net/ssl/context_base.hpp"
+
+#include <string>
 
 #include "asio/buffer.hpp"
+#include "asio/detail/config.hpp"
 #include "asio/io_context.hpp"
-#include "mongo/util/net/ssl/context_base.hpp"
-#include <string>
 
 // This must be after all other includes
 #include "asio/detail/push_options.hpp"

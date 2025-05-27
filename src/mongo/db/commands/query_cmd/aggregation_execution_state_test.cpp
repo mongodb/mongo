@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -43,6 +42,8 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

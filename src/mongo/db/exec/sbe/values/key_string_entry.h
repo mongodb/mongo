@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <span>
-
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+
+#include <span>
 
 namespace mongo::sbe::value {
 class KeyStringEntry {

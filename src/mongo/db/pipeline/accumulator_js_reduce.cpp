@@ -27,19 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/accumulator_js_reduce.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/pipeline/map_reduce_options_gen.h"
@@ -47,6 +41,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -30,12 +30,13 @@
 
 #include "mongo/util/perfctr_collect.h"
 
-#include <boost/filesystem.hpp>
-#include <map>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/unittest.h"
+
+#include <map>
+
+#include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

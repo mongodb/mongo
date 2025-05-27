@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
+#include "mongo/db/exec/idhack.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/find_command.h"
@@ -45,6 +41,10 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

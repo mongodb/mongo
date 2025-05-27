@@ -28,8 +28,6 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -37,6 +35,8 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace {
 

@@ -30,11 +30,6 @@
 
 #include "mongo/db/catalog/catalog_stats.h"
 
-#include <memory>
-
-#include <absl/container/flat_hash_set.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -30,9 +30,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <initializer_list>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -46,6 +43,9 @@
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
+
+#include <initializer_list>
+#include <vector>
 
 namespace mongo {
 namespace {

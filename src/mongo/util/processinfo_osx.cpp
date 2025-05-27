@@ -28,22 +28,19 @@
  */
 
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
 
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-
 #include <mach/mach_init.h>
 #include <mach/mach_traps.h>
 #include <mach/task.h>
 #include <mach/task_info.h>
-
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

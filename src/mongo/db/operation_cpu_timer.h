@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
+#include "mongo/util/inline_memory.h"
+
 #include <cstddef>
 #include <list>
 #include <memory>
-
-#include "mongo/util/duration.h"
-#include "mongo/util/inline_memory.h"
 
 namespace mongo {
 

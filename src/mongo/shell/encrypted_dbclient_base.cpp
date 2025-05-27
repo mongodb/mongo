@@ -27,29 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <cstring>
-#include <fmt/format.h>
-#include <iterator>
-#include <js/Class.h>
-#include <js/Object.h>
-#include <js/ValueArray.h>
-#include <jsapi.h>
-#include <limits>
-#include <list>
-#include <new>
-#include <stack>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <js/CallArgs.h>
-#include <js/RootingAPI.h>
-#include <js/TracingAPI.h>
-#include <js/TypeDecls.h>
-#include <js/Value.h>
+#include "mongo/shell/encrypted_dbclient_base.h"
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
@@ -95,7 +73,6 @@
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wraptype.h"
-#include "mongo/shell/encrypted_dbclient_base.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/assert_util.h"
@@ -103,6 +80,31 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <new>
+#include <stack>
+
+#include <jsapi.h>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+#include <js/ValueArray.h>
 
 namespace mongo {
 

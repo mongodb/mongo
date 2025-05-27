@@ -27,18 +27,11 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/crypto/aead_encryption.h"
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/sha512_block.h"
@@ -46,6 +39,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/secure_compare_memory.h"
 #include "mongo/util/str.h"
+
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace crypto {

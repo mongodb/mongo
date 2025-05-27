@@ -28,15 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <thread>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include "mongo/executor/inline_executor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -45,7 +37,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/executor/inline_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/thread.h"
@@ -64,6 +55,17 @@
 #include "mongo/util/future_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <thread>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo::executor {
 namespace {

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <cstdint>
+#include "mongo/util/timer.h"
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
-#include "mongo/util/timer.h"
+
+#include <cstdint>
 
 namespace mongo {
 

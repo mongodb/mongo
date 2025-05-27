@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/user_name.h"
@@ -40,6 +38,8 @@
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

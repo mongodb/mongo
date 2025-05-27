@@ -30,9 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <limits>
-#include <memory>
-
 #include "mongo/db/client.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -44,6 +41,9 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+
+#include <limits>
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/transport/session_manager.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -35,10 +35,11 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

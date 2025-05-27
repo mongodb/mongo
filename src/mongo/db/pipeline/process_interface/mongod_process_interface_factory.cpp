@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/shim.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +39,10 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

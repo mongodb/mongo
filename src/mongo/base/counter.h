@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/platform/atomic_word.h"
+
+#include <cstdint>
 
 namespace mongo {
 /**

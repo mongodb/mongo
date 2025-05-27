@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -50,6 +40,16 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/string_listset.h"
+
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 enum class MakeObjFieldBehavior { drop, keep };

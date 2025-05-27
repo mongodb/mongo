@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/collection_scan.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -42,7 +36,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
-#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
@@ -61,6 +54,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

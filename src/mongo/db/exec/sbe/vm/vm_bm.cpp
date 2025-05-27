@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/sbe/vm/vm.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -44,12 +38,19 @@
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 namespace {

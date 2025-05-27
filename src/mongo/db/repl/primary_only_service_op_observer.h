@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
@@ -41,6 +39,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
 
 namespace mongo {
 namespace repl {

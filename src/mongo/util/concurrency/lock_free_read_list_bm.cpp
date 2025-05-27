@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
+#include "mongo/util/concurrency/lock_free_read_list.h"
+
+#include "mongo/platform/atomic.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/system_tick_source.h"
+#include "mongo/util/time_support.h"
+
 #include <functional>
 #include <list>
 #include <memory>
 
 #include <benchmark/benchmark.h>
-
-#include "mongo/platform/atomic.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/lock_free_read_list.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/system_tick_source.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

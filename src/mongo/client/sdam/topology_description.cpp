@@ -34,12 +34,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/type_traits/decay.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <climits>
-#include <iterator>
-#include <memory>
-#include <ostream>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
@@ -49,6 +43,12 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#include <algorithm>
+#include <climits>
+#include <iterator>
+#include <memory>
+#include <ostream>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

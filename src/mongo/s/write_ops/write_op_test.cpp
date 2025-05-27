@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/none.hpp>
-#include <string>
-#include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/write_ops/write_op.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -59,8 +53,15 @@
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/s/write_ops/write_op.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <string>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

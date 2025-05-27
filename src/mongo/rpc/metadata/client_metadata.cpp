@@ -28,13 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <mutex>
-#include <string>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/rpc/metadata/client_metadata.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -48,7 +42,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/assert_util.h"
@@ -58,6 +51,14 @@
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/version.h"
+
+#include <cstdint>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

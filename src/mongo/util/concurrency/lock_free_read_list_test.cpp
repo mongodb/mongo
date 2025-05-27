@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/util/concurrency/lock_free_read_list.h"
 
 #include "mongo/platform/waitable_atomic.h"
@@ -39,6 +35,10 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <set>
+#include <vector>
 
 namespace mongo {
 namespace {

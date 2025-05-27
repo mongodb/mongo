@@ -28,16 +28,17 @@
  */
 
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/operation_killer.h"
 
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_key_manager.h"
-#include "mongo/db/operation_killer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

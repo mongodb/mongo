@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_stats/distinct_key.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/distinct_command_gen.h"
-#include "mongo/db/query/query_stats/distinct_key.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
 #include <memory>
 
 namespace mongo::query_stats {

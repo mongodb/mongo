@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <string>
-#include <vector>
+#include "mongo/util/thread_safety_context.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/thread_safety_context.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

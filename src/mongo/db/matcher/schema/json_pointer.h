@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 /**

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

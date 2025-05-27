@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/string_map.h"
+
+#include <variant>
 
 namespace mongo {
 

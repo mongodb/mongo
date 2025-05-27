@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,6 +41,14 @@
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/util/net/cidr.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

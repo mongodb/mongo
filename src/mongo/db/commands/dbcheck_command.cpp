@@ -28,20 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <chrono>
-#include <compare>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <ratio>
-#include <string>
-#include <utility>
-#include <vector>
+#include "mongo/db/commands/dbcheck_command.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -62,7 +49,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/dbcheck_command.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -98,6 +84,22 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <chrono>
+#include <compare>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 MONGO_FAIL_POINT_DEFINE(hangBeforeExtraIndexKeysCheck);

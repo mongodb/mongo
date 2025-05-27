@@ -28,12 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <memory>
-#include <mutex>
-#include <ostream>
-#include <ratio>
-#include <string>
+#include "mongo/db/repl/check_quorum_for_config_change.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/optime.h"
@@ -64,6 +58,14 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <ratio>
+#include <string>
+
+#include <absl/container/node_hash_map.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

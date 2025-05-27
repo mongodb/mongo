@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/operation_context.h"
@@ -41,6 +36,11 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/stage_builder.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 

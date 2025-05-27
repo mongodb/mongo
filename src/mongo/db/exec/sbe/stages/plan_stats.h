@@ -29,7 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/plan_stats_visitor.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/query/tree_walker.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -37,12 +42,6 @@
 #include <memory>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/plan_stats_visitor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/stage_types.h"
-#include "mongo/db/query/tree_walker.h"
 
 namespace mongo::sbe {
 struct CommonStats {

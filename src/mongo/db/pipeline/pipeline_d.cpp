@@ -29,23 +29,6 @@
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
-#include <algorithm>
-#include <bitset>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <iterator>
-#include <list>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/exact_cast.h"
 #include "mongo/base/status.h"
@@ -137,6 +120,24 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <bitset>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <iterator>
+#include <list>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

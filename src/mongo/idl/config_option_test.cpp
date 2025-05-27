@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <vector>
+#include "mongo/idl/config_option_test.h"
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -41,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/config_option_no_init_test_gen.h"
-#include "mongo/idl/config_option_test.h"
 #include "mongo/idl/config_option_test_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -53,6 +47,14 @@
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace test {

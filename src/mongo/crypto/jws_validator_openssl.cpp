@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <openssl/bn.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/opensslv.h>
-#include <openssl/ossl_typ.h>
-#include <openssl/rsa.h>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,6 +38,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <openssl/bn.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/opensslv.h>
+#include <openssl/ossl_typ.h>
+#include <openssl/rsa.h>
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || \
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)

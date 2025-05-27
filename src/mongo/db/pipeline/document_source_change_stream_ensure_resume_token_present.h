@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -42,6 +40,8 @@
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 /**

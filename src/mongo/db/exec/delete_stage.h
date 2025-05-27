@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -46,6 +42,10 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
 
 namespace mongo {
 

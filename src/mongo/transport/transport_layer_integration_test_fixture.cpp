@@ -28,6 +28,7 @@
  */
 
 #include "mongo/transport/transport_layer_integration_test_fixture.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/message.h"

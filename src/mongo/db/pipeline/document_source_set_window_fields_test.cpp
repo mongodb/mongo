@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <vector>
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -37,13 +37,14 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

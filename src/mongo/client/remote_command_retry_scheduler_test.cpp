@@ -29,19 +29,13 @@
 
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <functional>
-#include <list>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
+#include "mongo/client/remote_command_retry_scheduler.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/baton.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
@@ -52,6 +46,13 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

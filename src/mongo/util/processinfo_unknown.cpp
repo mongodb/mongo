@@ -28,9 +28,9 @@
  */
 
 
-#include <iostream>
-
 #include "mongo/util/processinfo.h"
+
+#include <iostream>
 
 namespace mongo {
 

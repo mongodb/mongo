@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <boost/log/sinks/basic_sink_backend.hpp>
+#include "mongo/logv2/ramlog.h"
+
 #include <string>
 
-#include "mongo/logv2/ramlog.h"
+#include <boost/log/sinks/basic_sink_backend.hpp>
 
 namespace mongo::logv2 {
 

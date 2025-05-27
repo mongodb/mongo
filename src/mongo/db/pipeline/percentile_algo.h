@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/sorter/sorter.h"
+
 #include <cmath>
 #include <memory>
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/sorter/sorter.h"
+#include <boost/optional/optional.hpp>
 namespace mongo {
 
 /**

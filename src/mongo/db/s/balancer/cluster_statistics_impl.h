@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

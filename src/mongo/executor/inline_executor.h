@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
 #include "mongo/db/baton.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
@@ -40,6 +37,9 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo::executor {
 

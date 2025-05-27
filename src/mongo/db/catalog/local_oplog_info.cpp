@@ -33,9 +33,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <mutex>
-#include <utility>
-
 #include "mongo/db/admission/flow_control.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/oplog.h"
@@ -49,6 +46,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
+
+#include <mutex>
+#include <utility>
 
 
 namespace mongo {

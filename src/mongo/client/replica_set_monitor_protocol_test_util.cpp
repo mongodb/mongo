@@ -26,16 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/client/replica_set_monitor_protocol_test_util.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+
 #include <map>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
-#include "mongo/bson/bsonelement.h"
-#include "mongo/client/replica_set_monitor_protocol_test_util.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 void ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol protocol) {

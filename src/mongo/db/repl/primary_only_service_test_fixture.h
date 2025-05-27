@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

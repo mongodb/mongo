@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <variant>
+#include "mongo/db/exec/express/express_plan.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,7 +40,6 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/express/express_plan.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
@@ -53,6 +51,9 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <variant>
 
 namespace mongo::express {
 namespace {

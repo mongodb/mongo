@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_arity.h"
 #include "mongo/db/matcher/expression_visitor.h"
+
+#include <array>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

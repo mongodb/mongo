@@ -29,8 +29,6 @@
 
 #include "mongo/db/commands/rename_collection_common.h"
 
-#include <variant>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+
+#include <variant>
 
 namespace mongo {
 namespace rename_collection {

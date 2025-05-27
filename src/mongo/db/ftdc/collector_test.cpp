@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ftdc/collector.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

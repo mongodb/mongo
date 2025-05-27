@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

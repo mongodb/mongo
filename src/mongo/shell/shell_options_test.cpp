@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/shell/shell_options.h"
+
+#include "mongo/unittest/unittest.h"
+
 #include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/shell/shell_options.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

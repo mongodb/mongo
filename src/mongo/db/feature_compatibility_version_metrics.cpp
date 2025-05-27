@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

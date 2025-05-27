@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
@@ -49,6 +45,11 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**

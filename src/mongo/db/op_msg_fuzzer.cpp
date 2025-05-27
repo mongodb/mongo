@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/log/core/core.hpp>
-
 #include "mongo/db/op_msg_fuzzer_fixture.h"
+
+#include <boost/log/core/core.hpp>
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     static auto fixture = []() {

@@ -29,8 +29,6 @@
 
 #include "mongo/util/concurrency/ticketholder_queue_stats.h"
 
-#include <utility>
-
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/duration.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

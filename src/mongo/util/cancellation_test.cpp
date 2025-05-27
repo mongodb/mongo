@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/util/cancellation.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/cancellation.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <thread>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -43,6 +36,13 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 namespace mongo {
 

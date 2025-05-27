@@ -29,8 +29,6 @@
 
 #include "mongo/db/pipeline/split_pipeline.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace sharded_agg_helpers {

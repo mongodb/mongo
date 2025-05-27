@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
@@ -42,6 +40,8 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/fail_point.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-#include <vm/PosixNSPR.h>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -49,6 +45,11 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
+
+#include <functional>
+#include <string>
+
+#include <vm/PosixNSPR.h>
 
 namespace mongo {
 namespace mozjs {

@@ -29,13 +29,6 @@
 
 #include "mongo/db/repl/rollback_test_fixture.h"
 
-#include <cstdint>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -69,6 +62,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

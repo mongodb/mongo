@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/pipeline/granularity_rounder.h"
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

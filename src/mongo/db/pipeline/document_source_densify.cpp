@@ -29,26 +29,13 @@
 
 #include "mongo/db/pipeline/document_source_densify.h"
 
-#include "mongo/db/pipeline/expression.h"
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <iterator>
-#include <memory>
-#include <tuple>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/document_source_fill.h"
 #include "mongo/db/pipeline/document_source_fill_gen.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -56,6 +43,20 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 using boost::intrusive_ptr;
 using boost::optional;

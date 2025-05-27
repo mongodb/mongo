@@ -28,6 +28,12 @@
  */
 
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/immutable/unordered_map.h"
+#include "mongo/util/immutable/unordered_set.h"
+#include "mongo/util/string_map.h"
+
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -37,12 +43,6 @@
 #include <immer/map_transient.hpp>
 #include <immer/set.hpp>
 #include <immer/set_transient.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/immutable/unordered_map.h"
-#include "mongo/util/immutable/unordered_set.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

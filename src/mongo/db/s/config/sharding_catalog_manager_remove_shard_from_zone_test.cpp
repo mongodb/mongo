@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -43,6 +40,9 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -50,6 +42,14 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class ExternalRecordStore : public RecordStore {

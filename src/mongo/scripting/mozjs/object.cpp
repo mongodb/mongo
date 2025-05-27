@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
-#include <js/CallArgs.h>
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
-
-#include <js/PropertySpec.h>
+#include "mongo/scripting/mozjs/object.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/scripting/mozjs/object.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
+
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

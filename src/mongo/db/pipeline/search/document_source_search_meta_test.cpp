@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/intrusive_ptr.hpp>
-#include <vector>
+#include "mongo/db/pipeline/search/document_source_search_meta.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -39,10 +38,13 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
-#include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <vector>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +42,10 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/merge_chunk_request_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

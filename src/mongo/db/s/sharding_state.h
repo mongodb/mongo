@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/cluster_role.h"
@@ -40,6 +37,10 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/mutex.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

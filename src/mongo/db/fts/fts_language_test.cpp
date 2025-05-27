@@ -29,11 +29,11 @@
 
 #include "mongo/db/fts/fts_language.h"
 
-#include <ostream>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <ostream>
 
 namespace mongo {
 

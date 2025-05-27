@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -56,6 +49,14 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

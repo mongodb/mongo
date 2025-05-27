@@ -29,15 +29,15 @@
 
 #include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 
-#include <cstddef>
-#include <string>
-
-#include <benchmark/benchmark.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <string>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

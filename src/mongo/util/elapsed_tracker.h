@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
 
 namespace mongo {
 

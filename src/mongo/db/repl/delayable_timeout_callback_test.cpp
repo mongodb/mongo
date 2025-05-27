@@ -29,18 +29,18 @@
 
 #include "mongo/db/repl/delayable_timeout_callback.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
 #include <memory>
 #include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/executor/network_interface_mock.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {

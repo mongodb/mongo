@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <functional>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/db_raii.h"
@@ -47,6 +41,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <functional>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 /**

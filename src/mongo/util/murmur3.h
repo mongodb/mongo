@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
+
+#include <MurmurHash3.h>
 
 namespace mongo {
 

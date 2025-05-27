@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/util/tracking/allocator.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::tracking {
 

@@ -29,14 +29,14 @@
 
 #include "mongo/db/exec/text_match.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/storage/snapshot.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

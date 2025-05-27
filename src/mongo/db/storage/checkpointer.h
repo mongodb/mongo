@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

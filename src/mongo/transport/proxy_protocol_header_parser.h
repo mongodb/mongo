@@ -30,10 +30,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstddef>
 #include <fmt/format.h>
 
 #ifndef _WIN32

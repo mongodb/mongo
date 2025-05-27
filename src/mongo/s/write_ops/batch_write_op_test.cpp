@@ -28,15 +28,11 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -74,6 +70,11 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

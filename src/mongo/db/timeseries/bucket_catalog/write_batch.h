@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -48,6 +42,13 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 

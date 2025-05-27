@@ -30,11 +30,6 @@
 
 #include "mongo/db/process_health/progress_monitor.h"
 
-#include <algorithm>
-#include <mutex>
-#include <ratio>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/process_health/fault_manager.h"
@@ -46,6 +41,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <mutex>
+#include <ratio>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 

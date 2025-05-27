@@ -29,12 +29,6 @@
 
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -56,6 +50,11 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace aggregation_request_helper {

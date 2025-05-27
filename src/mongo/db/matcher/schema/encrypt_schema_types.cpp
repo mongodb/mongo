@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/str.h"

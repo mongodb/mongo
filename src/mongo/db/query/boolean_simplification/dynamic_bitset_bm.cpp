@@ -29,8 +29,9 @@
 
 #include "mongo/util/dynamic_bitset.h"
 
-#include <benchmark/benchmark.h>
 #include <bitset>
+
+#include <benchmark/benchmark.h>
 #include <boost/dynamic_bitset.hpp>
 
 namespace mongo::boolean_simplification {

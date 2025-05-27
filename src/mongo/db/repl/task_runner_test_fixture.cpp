@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
-#include <string>
+#include "mongo/db/repl/task_runner_test_fixture.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/task_runner.h"
-#include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace repl {

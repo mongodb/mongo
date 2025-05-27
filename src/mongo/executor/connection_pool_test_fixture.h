@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <deque>
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/transport/transport_layer.h"
@@ -45,6 +38,14 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace executor {

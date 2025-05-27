@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/router_transactions_stats_gen.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

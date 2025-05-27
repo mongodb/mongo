@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
-
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/util.h"

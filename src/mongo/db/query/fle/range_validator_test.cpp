@@ -26,18 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <cstdint>
-#include <initializer_list>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "encrypted_predicate_test_fixtures.h"
 #include "range_validator.h"
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,6 +44,19 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "encrypted_predicate_test_fixtures.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::fle {
 class RangeValidatorTest : public ServiceContextTest {

@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <compare>
-#include <string>
-#include <type_traits>
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+
+#include <compare>
+#include <string>
+#include <type_traits>
+#include <variant>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 using IndexKeyPattern = BSONObj;

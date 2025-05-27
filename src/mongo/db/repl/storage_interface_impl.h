@@ -30,13 +30,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -55,6 +48,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

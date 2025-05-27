@@ -29,15 +29,15 @@
 
 #include "mongo/stdx/unordered_map.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
-#include <fmt/format.h>
 #include <stdexcept>
 #include <string>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
+#include <fmt/format.h>
 
 namespace {
 

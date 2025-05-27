@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <compare>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +40,14 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
+
+#include <array>
+#include <compare>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 

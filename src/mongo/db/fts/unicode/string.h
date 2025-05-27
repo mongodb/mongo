@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/fts/unicode/codepoints.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace unicode {

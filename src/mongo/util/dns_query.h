@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
 #include <array>
-#include <boost/noncopyable.hpp>
 #include <compare>
 #include <cstdint>
 #include <exception>
@@ -42,8 +44,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
+#include <boost/noncopyable.hpp>
 
 namespace mongo {
 namespace dns {

@@ -29,12 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -48,6 +42,12 @@
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

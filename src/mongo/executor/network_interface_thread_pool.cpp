@@ -29,15 +29,16 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <utility>
+#include "mongo/executor/network_interface_thread_pool.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 

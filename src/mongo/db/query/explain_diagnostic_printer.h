@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/db/curop_diagnostic_printer.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/logv2/redaction.h"
+
+#include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
 

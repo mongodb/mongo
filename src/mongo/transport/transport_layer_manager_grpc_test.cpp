@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/filesystem.hpp>
-
 #include "mongo/db/dbmessage.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session.h"
@@ -54,6 +50,10 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
+
+#include <memory>
+
+#include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

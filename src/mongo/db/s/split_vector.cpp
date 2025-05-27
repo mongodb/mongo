@@ -29,13 +29,6 @@
 
 #include "mongo/db/s/split_vector.h"
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <memory>
-#include <set>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -58,6 +51,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,20 +29,6 @@
 
 #include "mongo/transport/grpc/client.h"
 
-#include <grpcpp/channel.h>
-#include <grpcpp/client_context.h>
-#include <grpcpp/create_channel.h>
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/security/credentials.h>
-#include <grpcpp/security/tls_certificate_provider.h>
-#include <grpcpp/security/tls_certificate_verifier.h>
-#include <grpcpp/security/tls_credentials_options.h>
-#include <grpcpp/support/async_stream.h>
-#include <src/core/lib/security/security_connector/ssl_utils.h>
-
-#include <src/core/tsi/ssl_transport_security.h>
-#include <src/core/tsi/transport_security_interface.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -62,6 +48,19 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <grpcpp/channel.h>
+#include <grpcpp/client_context.h>
+#include <grpcpp/create_channel.h>
+#include <grpcpp/grpcpp.h>
+#include <grpcpp/security/credentials.h>
+#include <grpcpp/security/tls_certificate_provider.h>
+#include <grpcpp/security/tls_certificate_verifier.h>
+#include <grpcpp/security/tls_credentials_options.h>
+#include <grpcpp/support/async_stream.h>
+#include <src/core/lib/security/security_connector/ssl_utils.h>
+#include <src/core/tsi/ssl_transport_security.h>
+#include <src/core/tsi/transport_security_interface.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

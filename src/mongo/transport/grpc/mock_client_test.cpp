@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
+#include "mongo/transport/grpc/mock_client.h"
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
-#include "mongo/transport/grpc/mock_client.h"
 #include "mongo/transport/grpc/mock_wire_version_provider.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
@@ -42,6 +40,9 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo::transport::grpc {
 

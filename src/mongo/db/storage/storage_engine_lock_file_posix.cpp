@@ -28,16 +28,18 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 #include <cerrno>
 #include <exception>
 #include <memory>
 #include <string>
 #include <system_error>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
 #ifndef _WIN32
 #include <fcntl.h>
+
 #include <sys/file.h>
 #include <sys/stat.h>
 #endif

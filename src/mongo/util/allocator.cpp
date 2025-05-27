@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <cstdlib>
-
 #include "mongo/util/signal_handlers_synchronous.h"
+
+#include <cstdlib>
 
 namespace mongo {
 

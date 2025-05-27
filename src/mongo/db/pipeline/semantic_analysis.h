@@ -29,18 +29,19 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/string_map.h"
+
 #include <functional>
 #include <set>
 #include <string>
 #include <utility>
 
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/util/string_map.h"
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::semantic_analysis {
 

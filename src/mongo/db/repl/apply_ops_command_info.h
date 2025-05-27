@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+
+#include <vector>
 
 namespace mongo {
 class BSONObjBuilder;

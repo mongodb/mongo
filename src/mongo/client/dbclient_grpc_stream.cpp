@@ -28,6 +28,7 @@
  */
 
 #include "mongo/client/dbclient_grpc_stream.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"

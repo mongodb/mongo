@@ -28,19 +28,19 @@
  */
 
 
-#include <queue>
-#include <vector>
-
+#include "mongo/db/query/plan_ranker.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <queue>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +46,8 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

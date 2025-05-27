@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/util/duration.h"
+
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace optionenvironment {

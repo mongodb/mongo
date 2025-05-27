@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <bitset>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <memory>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_project.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
@@ -53,10 +45,19 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <bitset>
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

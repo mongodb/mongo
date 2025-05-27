@@ -29,11 +29,6 @@
 
 #include <boost/none.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <mutex>
-#include <thread>
-#include <utility>
-
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -44,6 +39,11 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/interruptible.h"
+
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <utility>
 
 namespace mongo {
 namespace mozjs {

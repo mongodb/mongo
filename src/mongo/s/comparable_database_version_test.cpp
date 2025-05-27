@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/database_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

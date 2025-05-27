@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/s/query/exec/router_stage_pipeline.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,9 +39,15 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
-#include "mongo/s/query/exec/router_stage_pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

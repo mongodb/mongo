@@ -30,11 +30,6 @@
 
 #include "mongo/logv2/redaction.h"
 
-#include <initializer_list>
-#include <iostream>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -45,6 +40,11 @@
 #include "mongo/logv2/log_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <initializer_list>
+#include <iostream>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/platform/compiler.h"
+
 #include <cstdint>
-#include <fmt/format.h>
 #include <ostream>
 #include <string>
 #include <version>
 
-#include "mongo/platform/compiler.h"
+#include <fmt/format.h>
 
 #if __cpp_lib_source_location >= 201907L
 #include <source_location>

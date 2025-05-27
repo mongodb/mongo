@@ -29,18 +29,6 @@
 
 #include "mongo/db/s/drop_collection_coordinator.h"
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -65,6 +53,18 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

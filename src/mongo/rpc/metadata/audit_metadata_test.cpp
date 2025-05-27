@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/rpc/metadata/audit_metadata.h"
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer_mock.h"

@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
+#include "mongo/rpc/get_status_from_command_result.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

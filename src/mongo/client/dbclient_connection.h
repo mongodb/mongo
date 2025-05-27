@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <map>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,6 +51,15 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

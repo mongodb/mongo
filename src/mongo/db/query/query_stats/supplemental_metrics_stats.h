@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include <memory>
-
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/op_debug.h"
 #include "mongo/db/query/util/named_enum.h"
+
+#include <memory>
 
 namespace mongo::query_stats {
 

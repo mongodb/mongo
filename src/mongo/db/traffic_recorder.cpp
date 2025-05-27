@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <deque>
-#include <fstream>  // IWYU pragma: keep
-#include <limits>
-#include <mutex>
-#include <string>
-#include <tuple>
-#include <utility>
-
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/traffic_recorder.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
@@ -57,7 +46,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/traffic_recorder.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -65,6 +53,19 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <fstream>  // IWYU pragma: keep
+#include <limits>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

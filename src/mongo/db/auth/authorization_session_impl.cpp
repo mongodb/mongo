@@ -28,19 +28,7 @@
  */
 
 
-#include "mongo/db/auth/authorization_manager.h"
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/auth/authorization_session_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -58,7 +46,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/auth_name.h"
-#include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern_search_list.h"
@@ -82,6 +70,19 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

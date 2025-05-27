@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/variables.h"
+
 #include <memory>
 #include <set>
 #include <string>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/variables.h"
 
 namespace mongo {
 namespace change_stream_rewrite {

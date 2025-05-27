@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
@@ -58,6 +48,16 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace {
 using namespace mongo;

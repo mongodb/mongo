@@ -32,19 +32,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <deque>
-#include <functional>
-#include <iosfwd>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -86,6 +73,19 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <iosfwd>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

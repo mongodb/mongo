@@ -28,16 +28,6 @@
  */
 #pragma once
 
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -52,6 +42,16 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 

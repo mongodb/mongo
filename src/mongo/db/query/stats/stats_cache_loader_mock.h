@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::stats {
 

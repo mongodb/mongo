@@ -29,13 +29,6 @@
 
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <utility>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/database.h"
@@ -78,6 +71,13 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

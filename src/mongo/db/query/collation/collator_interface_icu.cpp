@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/collation/collator_interface_icu.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <unicode/coll.h>
-#include <unicode/sortkey.h>
 #include <utility>
 
+#include <unicode/coll.h>
+#include <unicode/sortkey.h>
 #include <unicode/stringpiece.h>
 #include <unicode/ucol.h>
 #include <unicode/unistr.h>
 #include <unicode/utypes.h>
-
-#include "mongo/db/query/collation/collator_interface_icu.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

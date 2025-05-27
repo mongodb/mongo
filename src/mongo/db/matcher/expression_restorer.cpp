@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/matcher/expression_restorer.h"
+
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"

@@ -29,16 +29,6 @@
 
 #include "mongo/db/query/client_cursor/clientcursor.h"
 
-#include <boost/cstdint.hpp>
-#include <fmt/format.h>
-#include <iosfwd>
-#include <mutex>
-#include <ratio>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/client.h"
@@ -56,6 +46,16 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
+
+#include <iosfwd>
+#include <mutex>
+#include <ratio>
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

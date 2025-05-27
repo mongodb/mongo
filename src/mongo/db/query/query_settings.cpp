@@ -29,18 +29,18 @@
 
 #include "mongo/db/query/query_settings.h"
 
-#include <boost/move/utility_core.hpp>
-#include <tuple>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
+
+#include <tuple>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

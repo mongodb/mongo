@@ -29,11 +29,12 @@
 
 #include "mongo/unittest/matcher.h"
 
-#include <fmt/format.h>
+#include "mongo/util/pcre.h"
+
 #include <memory>
 #include <utility>
 
-#include "mongo/util/pcre.h"
+#include <fmt/format.h>
 
 namespace mongo::unittest::match {
 

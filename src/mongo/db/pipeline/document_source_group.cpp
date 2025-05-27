@@ -29,14 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_group.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <utility>
-
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -53,6 +45,15 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

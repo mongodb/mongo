@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/immutable/details/memory_policy.h"
+
 #include <immer/vector.hpp>
 #include <immer/vector_transient.hpp>
-
-#include "mongo/util/immutable/details/memory_policy.h"
 
 namespace mongo::immutable {
 

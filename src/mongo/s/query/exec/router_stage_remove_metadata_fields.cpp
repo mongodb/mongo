@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <absl/container/flat_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/exec/router_stage_remove_metadata_fields.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/s/query/exec/router_stage_remove_metadata_fields.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -47,10 +42,16 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

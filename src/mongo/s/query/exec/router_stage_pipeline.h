@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +41,11 @@
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

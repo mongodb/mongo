@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include "mongo/util/errno_util.h"
+
 #include <system_error>
 
-#include "mongo/util/errno_util.h"
+#include <fmt/format.h>
 
 namespace mongo {
 inline std::string getLastSystemErrorMessageFormatted(StringData op, const std::string& path) {

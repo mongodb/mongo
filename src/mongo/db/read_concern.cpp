@@ -29,10 +29,10 @@
 
 #include "mongo/db/read_concern.h"
 
-#include <string>
-
 #include "mongo/base/shim.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+
+#include <string>
 
 namespace mongo {
 

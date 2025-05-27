@@ -30,18 +30,20 @@
 #include "mongo/crypto/fle_numeric.h"
 
 #include <algorithm>
+
 #include <boost/container/small_vector.hpp>
 #include <boost/multiprecision/cpp_int/import_export.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/platform/bits.h"
+#include "mongo/platform/overflow_arithmetic.h"
+
 #include <cmath>
 #include <iterator>
 #include <limits>
 
-#include "mongo/platform/bits.h"
-#include "mongo/platform/overflow_arithmetic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -47,6 +41,12 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,23 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-#include <map>
-#include <memory>
-#include <random>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
@@ -69,6 +52,23 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <map>
+#include <memory>
+#include <random>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

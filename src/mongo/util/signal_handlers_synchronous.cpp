@@ -29,14 +29,10 @@
 
 #include "mongo/util/signal_handlers_synchronous.h"
 
-#include "signal_handlers_synchronous.h"
-#include <boost/exception/diagnostic_information.hpp>
-#include <boost/exception/exception.hpp>
 #include <cerrno>
 #include <csignal>
 #include <cstring>
 #include <exception>
-#include <fmt/format.h>
 #include <iostream>
 #include <mutex>
 #include <new>
@@ -44,6 +40,12 @@
 #include <streambuf>
 #include <string>
 #include <typeinfo>
+
+#include "signal_handlers_synchronous.h"
+
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 
 #ifdef __linux__

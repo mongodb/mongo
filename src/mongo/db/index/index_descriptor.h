@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <boost/type_traits/decay.hpp>
-#include <cstdint>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -53,6 +42,18 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
+
+#include <cstdint>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/type_traits/decay.hpp>
 
 namespace mongo {
 

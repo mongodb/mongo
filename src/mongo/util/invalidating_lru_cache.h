@@ -29,9 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/trusted_hasher.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/lru_cache.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
 #include <algorithm>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -42,15 +50,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/static_assert.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/trusted_hasher.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/lru_cache.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

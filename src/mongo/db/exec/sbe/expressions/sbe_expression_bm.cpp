@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <benchmark/benchmark.h>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -65,6 +55,16 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

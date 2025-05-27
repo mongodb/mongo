@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

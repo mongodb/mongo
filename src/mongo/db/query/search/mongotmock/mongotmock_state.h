@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <deque>
-#include <map>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+
+#include <deque>
+#include <map>
 
 namespace mongo {
 namespace mongotmock {

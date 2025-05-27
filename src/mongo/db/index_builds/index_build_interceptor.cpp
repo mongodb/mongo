@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <cstdint>
-#include <limits>
-#include <vector>
-
-#include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index_builds/index_build_interceptor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -57,7 +47,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/duplicate_key_tracker.h"
-#include "mongo/db/index_builds/index_build_interceptor.h"
 #include "mongo/db/index_builds/index_build_interceptor_gen.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -75,6 +64,18 @@
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

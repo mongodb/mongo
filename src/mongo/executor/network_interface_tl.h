@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -66,6 +57,16 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <array>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace executor {

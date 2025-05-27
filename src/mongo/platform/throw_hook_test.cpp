@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/throw_hook.h"
+
+#include "mongo/unittest/unittest.h"
+
 #include <exception>
 #include <string>
-
-#include "mongo/platform/throw_hook.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

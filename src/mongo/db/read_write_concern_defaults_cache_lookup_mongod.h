@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

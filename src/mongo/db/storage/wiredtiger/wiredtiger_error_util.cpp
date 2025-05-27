@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 

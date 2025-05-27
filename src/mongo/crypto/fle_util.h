@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/crypto/mongocrypt_definitions.h"
+
+#include <memory>
 
 // Shared utility used by various pieces of the FLE code.
 namespace mongo {

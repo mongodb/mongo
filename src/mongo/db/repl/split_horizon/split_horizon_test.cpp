@@ -27,8 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/repl/split_horizon/split_horizon.h"
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
-#include <boost/none.hpp>
 #include <cstddef>
 #include <iterator>
 #include <ostream>
@@ -36,14 +43,8 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/repl/split_horizon/split_horizon.h"
-#include "mongo/unittest/unittest.h"
 
 using namespace std::literals::string_literals;
 

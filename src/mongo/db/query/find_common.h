@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/plan_executor.h"
-#include <cstddef>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
 
 namespace mongo {
 

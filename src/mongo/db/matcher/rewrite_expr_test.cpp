@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/rewrite_expr.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/rewrite_expr.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 

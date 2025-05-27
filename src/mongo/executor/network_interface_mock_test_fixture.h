@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,6 +39,8 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
 
 namespace mongo {
 namespace executor {

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/expression.h"
@@ -46,6 +42,11 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/sort_pattern.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -43,18 +43,14 @@
 #include <limits>
 #include <memory>
 #include <queue>
-#include <snappy.h>
 #include <string>
 #include <system_error>
 #include <utility>
 #include <vector>
 
-// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include <snappy.h>
 
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -79,6 +75,11 @@
 #include "mongo/util/file.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 /**
  * Template definitions for Sorter implementations.

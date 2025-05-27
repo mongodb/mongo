@@ -29,25 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
-#include <absl/hash/hash.h>
-#include <absl/meta/type_traits.h>
-#include <absl/strings/string_view.h>
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/collection.h"
@@ -73,6 +54,26 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <absl/hash/hash.h>
+#include <absl/meta/type_traits.h>
+#include <absl/strings/string_view.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 

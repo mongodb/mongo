@@ -29,9 +29,9 @@
 
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 
+#include "mongo/base/shim.h"
+
 #include <memory>
 #include <string>
-
-#include "mongo/base/shim.h"
 
 namespace mongo {}  // namespace mongo

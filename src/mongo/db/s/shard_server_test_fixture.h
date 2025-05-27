@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_mock.h"
@@ -42,6 +39,9 @@
 #include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/config_server_catalog_cache_loader_mock.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

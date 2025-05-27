@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstring>
-#include <type_traits>
-#include <utility>
-#include <wiredtiger.h>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
@@ -44,6 +38,13 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <cstdint>
+#include <cstring>
+#include <type_traits>
+#include <utility>
+
+#include <wiredtiger.h>
 
 
 namespace mongo {

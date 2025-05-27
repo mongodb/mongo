@@ -29,14 +29,14 @@
 
 #include "mongo/db/s/database_sharding_state.h"
 
-#include <memory>
-#include <mutex>
-
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
 
 namespace mongo {
 namespace {

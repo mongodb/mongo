@@ -27,27 +27,29 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <benchmark/benchmark.h>
-#include <cmath>
-#include <cstdint>
-#include <fmt/format.h>
-#include <random>
-#include <string>
-#include <vector>
+#include "mongo/bson/column/bsoncolumn.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/util/time_support.h"
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <random>
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

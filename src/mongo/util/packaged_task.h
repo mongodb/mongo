@@ -28,14 +28,14 @@
  */
 #pragma once
 
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
 namespace packaged_task_detail {

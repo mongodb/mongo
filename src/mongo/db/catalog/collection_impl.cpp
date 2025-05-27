@@ -29,6 +29,8 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 
+#include <mutex>
+
 #include <absl/container/flat_hash_map.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
@@ -40,7 +42,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
-#include <mutex>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 

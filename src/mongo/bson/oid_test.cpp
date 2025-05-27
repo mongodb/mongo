@@ -29,12 +29,13 @@
 
 #include "mongo/bson/oid.h"
 
-#include <absl/hash/hash.h>
-#include <cstring>
-
 #include "mongo/base/parse_number.h"
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstring>
+
+#include <absl/hash/hash.h>
 
 
 namespace mongo {

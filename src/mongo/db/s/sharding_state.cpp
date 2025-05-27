@@ -29,17 +29,17 @@
 
 #include "mongo/db/s/sharding_state.h"
 
-#include <boost/none.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

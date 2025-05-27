@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <chrono>
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <string>
-#include <thread>
-#include <utility>
-#include <vector>
+#include "mongo/db/concurrency/deferred_writer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -48,7 +39,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/deferred_writer.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -60,6 +50,17 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
+
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace deferred_writer_tests {

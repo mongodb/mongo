@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/unittest/stringify.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+
 #include <string>
 #include <typeinfo>
 
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/stringify.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
+#include <fmt/format.h>
 
 namespace mongo::unittest::stringify {
 

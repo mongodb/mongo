@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-
 #include "mongo/db/direct_shard_client_tracker.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+
+#include <algorithm>
 
 namespace mongo {
 

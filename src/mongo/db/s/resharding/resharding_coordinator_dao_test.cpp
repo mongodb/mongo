@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/resharding/resharding_coordinator_dao.h"
+
 #include "mongo/db/s/resharding/resharding_coordinator_service_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/unittest/death_test.h"

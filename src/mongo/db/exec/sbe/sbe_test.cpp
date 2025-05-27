@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <cstring>
-#include <limits>
-
-#include <absl/container/inlined_vector.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -54,6 +44,16 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/represent_as.h"
+
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

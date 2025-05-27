@@ -28,16 +28,16 @@
  */
 
 
-#include <algorithm>
-
+#include "mongo/db/repl/replica_set_aware_service.h"
 
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

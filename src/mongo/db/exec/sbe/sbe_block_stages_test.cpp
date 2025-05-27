@@ -31,12 +31,6 @@
  * This file contains tests for sbe::TsBlockToCellBlockStage and sbe::BlockToRowStage.
  */
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -49,6 +43,12 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace mongo::sbe {
 class BlockStagesTest : public PlanStageTestFixture {

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/debug_util.h"
+
+#include <string>
 
 /**
  * This header is separated from assert_util.h so that the low-level

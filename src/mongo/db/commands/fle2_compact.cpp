@@ -28,23 +28,15 @@
  */
 
 
+#include <cstdint>
+
 #include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
-#include <cstdint>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <array>
-#include <functional>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <utility>
-
 #include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -78,6 +70,15 @@
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

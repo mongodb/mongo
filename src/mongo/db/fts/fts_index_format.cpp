@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <array>
-#include <boost/container/vector.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/fts/fts_index_format.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -44,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
@@ -53,6 +43,17 @@
 #include "mongo/util/md5.h"
 #include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/container/vector.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

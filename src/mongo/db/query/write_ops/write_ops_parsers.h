@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <variant>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -51,6 +42,15 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace write_ops {

@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
+
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/assert_util.h"
+
 #include <cstdlib>
 #include <utility>
 #include <variant>
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

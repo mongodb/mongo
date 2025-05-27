@@ -28,14 +28,14 @@
  */
 #pragma once
 
-#include <future>
-
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future_util.h"
+
+#include <future>
 
 namespace mongo {
 

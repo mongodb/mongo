@@ -29,12 +29,11 @@
 
 #include "mongo/db/catalog/health_log_interface.h"
 
-#include <utility>
-
-
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 

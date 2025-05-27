@@ -29,8 +29,6 @@
 
 #include "mongo/util/net/hostandport.h"
 
-#include <boost/functional/hash.hpp>
-
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo {
 

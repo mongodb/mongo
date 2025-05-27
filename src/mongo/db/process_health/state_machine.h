@@ -28,14 +28,6 @@
  */
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <mutex>
-#include <stdexcept>
-#include <utility>
-#include <vector>
-
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -43,6 +35,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 namespace mongo {

@@ -29,8 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +40,8 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

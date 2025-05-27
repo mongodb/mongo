@@ -29,15 +29,16 @@
 
 #include "mongo/executor/split_timer.h"
 
-#include <array>
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <array>
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

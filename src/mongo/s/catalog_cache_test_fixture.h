@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -51,6 +44,13 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

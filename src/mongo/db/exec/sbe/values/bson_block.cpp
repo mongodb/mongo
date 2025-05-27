@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/values/bson_block.h"
+
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 

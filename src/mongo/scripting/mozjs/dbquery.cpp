@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <js/RootingAPI.h>
-#include <js/ValueArray.h>
-#include <jsapi.h>
-#include <jsfriendapi.h>
-
-#include <js/CallArgs.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/dbquery.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/scripting/mozjs/dbquery.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/util/assert_util.h"
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+
+#include <js/CallArgs.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/ValueArray.h>
 
 namespace mongo {
 namespace mozjs {

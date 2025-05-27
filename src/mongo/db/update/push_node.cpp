@@ -27,7 +27,19 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
+#include "mongo/db/update/push_node.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/mutable_bson/algorithm.h"
+#include "mongo/db/exec/mutable_bson/document.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+
 #include <cstdlib>
 #include <iterator>
 #include <limits>
@@ -37,21 +49,10 @@
 #include <type_traits>
 #include <utility>
 
+#include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/mutable_bson/algorithm.h"
-#include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/db/update/push_node.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 

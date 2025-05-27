@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <chrono>
-#include <filesystem>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <vector>
-
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/platform/random.h"
@@ -43,6 +36,13 @@
 #include "mongo/util/shell_exec.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/version.h"
+
+#include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <vector>
 
 #include "command_helpers.h"
 #include "mock_version_info.h"

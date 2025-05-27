@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

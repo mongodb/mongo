@@ -27,23 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/stage_builder/sbe/builder.h"
-
-#include <iostream>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/vectorizer.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+
+#include <iostream>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

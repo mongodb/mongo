@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <string>
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
@@ -44,6 +37,14 @@
 #include "mongo/util/tracking/unordered_map.h"
 #include "mongo/util/tracking/vector.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <string>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 

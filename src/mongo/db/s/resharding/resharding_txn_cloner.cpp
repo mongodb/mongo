@@ -28,19 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
-#include <mutex>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
+#include "mongo/db/s/resharding/resharding_txn_cloner.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -65,7 +53,6 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/service_context.h"
@@ -87,6 +74,21 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

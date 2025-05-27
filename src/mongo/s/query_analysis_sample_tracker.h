@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -48,6 +39,16 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace analyze_shard_key {

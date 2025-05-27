@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
 #include <array>
 #include <stdexcept>
 #include <type_traits>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo::algebra {
 namespace detail {

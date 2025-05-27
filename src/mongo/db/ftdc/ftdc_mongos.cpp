@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
-#include <string>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/ftdc/ftdc_mongos.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,7 +37,6 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/ftdc/collector.h"
-#include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/operation_context.h"
@@ -53,6 +47,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

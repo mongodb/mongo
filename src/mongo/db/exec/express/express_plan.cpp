@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/express/express_plan.h"
+
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/stacktrace.h"
 

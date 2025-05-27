@@ -32,15 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <system_error>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -100,6 +91,15 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

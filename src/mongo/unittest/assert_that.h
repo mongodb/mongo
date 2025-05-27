@@ -32,11 +32,11 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include <tuple>
-
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/matcher.h"
 #include "mongo/unittest/matcher_core.h"
+
+#include <tuple>
 
 /**
  * unittest-style ASSERT that an `expr` successfully matches a `matcher`.

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_util.h"
+
+#include <memory>
 
 namespace mongo {
 namespace fts {

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/base/error_extra_info.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +37,11 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

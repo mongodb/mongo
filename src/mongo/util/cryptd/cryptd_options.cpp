@@ -28,8 +28,6 @@
  */
 #include "mongo/util/cryptd/cryptd_options.h"
 
-#include <iostream>
-
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
@@ -38,6 +36,8 @@
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/version.h"
+
+#include <iostream>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -30,8 +30,6 @@
 #pragma once
 
 
-#include <fmt/format.h>
-
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -41,6 +39,8 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 

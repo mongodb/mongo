@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/expression/evaluate_sharding.h"
+
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/fts/fts_spec.h"

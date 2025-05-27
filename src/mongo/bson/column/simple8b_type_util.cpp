@@ -29,19 +29,19 @@
 
 #include "mongo/bson/column/simple8b_type_util.h"
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonelement.h"
+
 #include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <cmath>
 #include <cstring>
 
 #include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/bson/bsonelement.h"
 
 namespace mongo {
 namespace {

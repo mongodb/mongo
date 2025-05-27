@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/fle/implicit_validator.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -50,13 +44,20 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/fle/implicit_validator.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

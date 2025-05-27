@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +42,13 @@
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

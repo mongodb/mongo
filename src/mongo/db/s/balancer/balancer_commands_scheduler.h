@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -44,6 +42,8 @@
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/future.h"
+
+#include <cstdint>
 
 namespace mongo {
 

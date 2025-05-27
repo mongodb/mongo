@@ -34,9 +34,9 @@
  */
 
 
-#include <cstdint>
-
 #include "mongo/bson/bsonelement.h"
+
+#include <cstdint>
 
 namespace mongo {
 

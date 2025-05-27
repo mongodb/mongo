@@ -29,9 +29,6 @@
 
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 
-#include <memory>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -43,6 +40,9 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::stats {
 

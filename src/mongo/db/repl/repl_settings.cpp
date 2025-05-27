@@ -28,13 +28,13 @@
  */
 
 
-#include <cstddef>
-#include <utility>
-
+#include "mongo/db/repl/repl_settings.h"
 
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/boolean_simplification/bitset_test_util.h"
 #include "mongo/db/query/boolean_simplification/bitset_tree.h"
+
+#include "mongo/db/query/boolean_simplification/bitset_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::boolean_simplification {

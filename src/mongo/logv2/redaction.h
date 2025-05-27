@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
+
+#include <string>
 
 /**
  * The 'redact' methods defined below should be used to redact possibly sensitive

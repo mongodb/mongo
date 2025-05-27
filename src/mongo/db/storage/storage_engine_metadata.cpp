@@ -28,18 +28,20 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <cerrno>
 #include <exception>
 #include <fstream>  // IWYU pragma: keep
 #include <system_error>
 #include <vector>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #ifdef __linux__  // Only needed by flushDirectory for Linux
-#include <boost/filesystem/path.hpp>
 #include <fcntl.h>
+
+#include <boost/filesystem/path.hpp>
 #endif
 
 #include "mongo/base/data_range.h"

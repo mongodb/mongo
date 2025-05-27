@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/document.h"
+
 #include <string>
 #include <vector>
-
-#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
 namespace expression_evaluation_test {

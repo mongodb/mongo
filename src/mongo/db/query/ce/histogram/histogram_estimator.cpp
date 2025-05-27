@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/histogram/histogram_estimator.h"
+
 #include "mongo/db/exec/sbe/values/bson.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE

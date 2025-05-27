@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/default_baton.h"
+
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

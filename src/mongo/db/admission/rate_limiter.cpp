@@ -29,9 +29,9 @@
 
 #include "mongo/db/admission/rate_limiter.h"
 
-#include <folly/TokenBucket.h>
-
 #include "mongo/logv2/log.h"
+
+#include <folly/TokenBucket.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/auth/address_restriction.h"
+
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

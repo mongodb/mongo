@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/histogram/histogram_test_utils.h"
+
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/ce/histogram/histogram_estimation_impl.h"
 #include "mongo/db/query/stats/max_diff.h"

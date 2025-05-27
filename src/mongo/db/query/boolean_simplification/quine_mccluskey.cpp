@@ -33,13 +33,13 @@
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/stdx/unordered_set.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <memory>
-
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo::boolean_simplification {
 namespace {

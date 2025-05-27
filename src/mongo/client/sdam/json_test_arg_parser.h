@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/format.hpp>
+#include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
+
 #include <cstdlib>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
@@ -38,7 +36,10 @@
 #include <string>
 #include <vector>
 
-#include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
+#include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/format.hpp>
 
 
 namespace mongo::sdam {

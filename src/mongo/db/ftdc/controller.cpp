@@ -31,10 +31,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <mutex>
-#include <tuple>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/collector.h"
@@ -50,6 +46,10 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

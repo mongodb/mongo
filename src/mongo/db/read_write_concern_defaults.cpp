@@ -28,19 +28,11 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <initializer_list>
-#include <list>
-#include <memory>
-#include <string>
+#include "mongo/db/read_write_concern_defaults.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -52,6 +44,16 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

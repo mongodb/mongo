@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/fle_crud.h"
@@ -45,6 +41,11 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::fle {
 /**

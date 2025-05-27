@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/dynamic_bitset.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 using Bitset = DynamicBitset<uint8_t, 1>;

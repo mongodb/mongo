@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -43,6 +39,11 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

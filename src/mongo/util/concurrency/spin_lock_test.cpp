@@ -28,16 +28,17 @@
  */
 
 
-#include <string>
-#include <vector>
+#include "mongo/util/concurrency/spin_lock.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
+
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

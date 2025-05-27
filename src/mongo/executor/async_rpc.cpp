@@ -29,13 +29,6 @@
 
 #include "mongo/executor/async_rpc.h"
 
-#include <boost/smart_ptr.hpp>
-#include <string>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
@@ -48,6 +41,13 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <string>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 // TODO(SERVER-98556): kTest debug statements for the purpose of helping with diagnosing BFs.
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

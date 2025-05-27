@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/util/future.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

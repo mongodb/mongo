@@ -28,10 +28,10 @@
  */
 
 
-#include <boost/algorithm/string/join.hpp>
 #include <ostream>
 #include <utility>
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
@@ -41,6 +41,7 @@
 
 #ifndef _WIN32
 #include <cstdlib>
+
 #include <sys/wait.h>
 #endif
 

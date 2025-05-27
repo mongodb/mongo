@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
+#include "mongo/db/matcher/expression_text_noop.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/matcher/expression_text_noop.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 
 namespace mongo {

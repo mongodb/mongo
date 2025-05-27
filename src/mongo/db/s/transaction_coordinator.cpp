@@ -28,18 +28,7 @@
  */
 
 
-#include <absl/container/flat_hash_set.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <iterator>
-#include <mutex>
-#include <tuple>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/transaction_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -53,7 +42,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
-#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
@@ -73,6 +61,19 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/tick_source.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

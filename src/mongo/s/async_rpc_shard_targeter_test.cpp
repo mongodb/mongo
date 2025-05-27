@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <memory>
-#include <set>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/s/async_rpc_shard_targeter.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -52,7 +46,6 @@
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -61,6 +54,14 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace async_rpc {

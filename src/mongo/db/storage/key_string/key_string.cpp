@@ -29,16 +29,6 @@
 
 #include "mongo/db/storage/key_string/key_string.h"
 
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <cfloat>
-#include <cmath>
-#include <cstdlib>
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
-#include <type_traits>
-
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
@@ -54,6 +44,17 @@
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <algorithm>
+#include <cfloat>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+#include <memory>
+#include <type_traits>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

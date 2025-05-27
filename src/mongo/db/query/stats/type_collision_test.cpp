@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -43,6 +40,9 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo::stats {
 TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {

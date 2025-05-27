@@ -29,12 +29,6 @@
 
 #include "mongo/db/process_health/test_health_observer.h"
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -47,6 +41,12 @@
 #include "mongo/db/process_health/health_observer_registration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 

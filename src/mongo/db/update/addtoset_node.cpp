@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <set>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/update/addtoset_node.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/update/addtoset_node.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <set>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

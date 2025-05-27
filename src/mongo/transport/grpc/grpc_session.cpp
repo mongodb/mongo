@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <charconv>
+#include "mongo/transport/grpc/grpc_session.h"
 
 #include "mongo/config.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/util/base64.h"
+
+#include <charconv>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

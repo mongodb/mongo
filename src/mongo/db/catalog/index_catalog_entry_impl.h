@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -49,6 +43,13 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

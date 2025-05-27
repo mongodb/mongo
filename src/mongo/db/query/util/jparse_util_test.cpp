@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/db/query/util/jparse_util.h"
 
 #include "mongo/bson/bson_validate.h"
-#include "mongo/db/query/util/jparse_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 namespace mongo {
 void parseFuzzerJsonAndAssertEq(const char* jsonStr, BSONObj expected) {

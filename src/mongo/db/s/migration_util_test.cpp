@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <initializer_list>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/s/migration_util.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -42,11 +39,15 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <initializer_list>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

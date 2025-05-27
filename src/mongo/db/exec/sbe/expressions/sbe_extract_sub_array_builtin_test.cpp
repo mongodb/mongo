@@ -27,9 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
 #include <cstdint>
-#include <fmt/format.h>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -38,14 +45,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/unittest/unittest.h"
+#include <fmt/format.h>
 
 namespace mongo::sbe {
 

@@ -29,16 +29,17 @@
 
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

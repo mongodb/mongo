@@ -30,16 +30,6 @@
 
 #include "mongo/db/query/expression_geo_index_mapping.h"
 
-#include <algorithm>
-#include <memory>
-#include <s2cellid.h>
-#include <s2region.h>
-#include <s2regioncoverer.h>
-#include <set>
-#include <string>
-#include <utility>
-
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/r2_region_coverer.h"
@@ -51,6 +41,16 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <s2cellid.h>
+#include <s2region.h>
+#include <s2regioncoverer.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

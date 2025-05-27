@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/s/sharding_initialization_mongod.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,7 +48,6 @@
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/s/shard_server_op_observer.h"
-#include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -65,6 +62,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

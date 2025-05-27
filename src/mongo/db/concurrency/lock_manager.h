@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <map>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
@@ -39,6 +36,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <map>
+#include <vector>
 
 namespace mongo {
 

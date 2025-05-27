@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

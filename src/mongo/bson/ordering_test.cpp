@@ -29,15 +29,16 @@
 
 #include "mongo/bson/ordering.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

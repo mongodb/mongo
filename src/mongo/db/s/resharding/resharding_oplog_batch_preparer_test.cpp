@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <ostream>
-#include <utility>
-#include <variant>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -47,12 +39,21 @@
 #include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <ostream>
+#include <utility>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

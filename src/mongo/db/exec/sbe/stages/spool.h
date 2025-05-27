@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -52,6 +43,15 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo::sbe {
 /**

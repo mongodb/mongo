@@ -32,11 +32,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/ordering.h"
@@ -45,6 +40,11 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

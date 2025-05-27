@@ -27,19 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <vector>
-
+#include "mongo/db/exec/subplan.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/exec/subplan.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -53,6 +47,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

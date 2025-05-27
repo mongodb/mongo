@@ -28,6 +28,19 @@
  */
 
 
+#include "mongo/db/s/auto_split_vector.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
+
 #include <initializer_list>
 #include <memory>
 #include <string>
@@ -35,18 +48,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/auto_split_vector.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

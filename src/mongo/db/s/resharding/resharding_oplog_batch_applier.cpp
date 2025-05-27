@@ -28,14 +28,7 @@
  */
 
 
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
@@ -43,7 +36,6 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
-#include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
@@ -57,6 +49,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

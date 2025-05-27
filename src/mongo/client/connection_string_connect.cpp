@@ -28,17 +28,6 @@
  */
 
 
-#include <memory>
-#include <mutex>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -53,6 +42,17 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/client/dbclient_grpc_stream.h"

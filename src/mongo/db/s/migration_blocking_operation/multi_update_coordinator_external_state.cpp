@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_external_state.h"
+
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"

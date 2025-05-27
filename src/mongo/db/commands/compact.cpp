@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <absl/container/btree_set.h>
-#include <cstdint>
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -56,6 +51,12 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <iosfwd>
+#include <string>
+
+#include <absl/container/btree_set.h>
 
 namespace mongo {
 

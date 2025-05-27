@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -50,6 +46,11 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -28,17 +28,18 @@
  */
 
 
-#include <mutex>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/initial_sync/base_cloner.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/repl/initial_sync/base_cloner.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

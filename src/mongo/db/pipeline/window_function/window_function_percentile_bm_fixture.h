@@ -28,10 +28,11 @@
  */
 #pragma once
 #include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
-#include <benchmark/benchmark.h>
+#include "mongo/db/query/query_fcv_environment_for_test.h"
+
 #include <vector>
 
-#include "mongo/db/query/query_fcv_environment_for_test.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

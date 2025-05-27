@@ -29,19 +29,6 @@
 
 #pragma once
 
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <iterator>
-#include <span>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +41,20 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/platform/int128.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <span>
+#include <variant>
+#include <vector>
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 namespace mongo {
 

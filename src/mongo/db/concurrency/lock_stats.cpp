@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/concurrency/lock_stats.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/stats/counter_ops.h"
+
+#include <memory>
 
 namespace mongo {
 

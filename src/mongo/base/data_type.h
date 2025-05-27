@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <cstring>
-#include <iosfwd>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
+
+#include <cstring>
+#include <iosfwd>
+#include <type_traits>
 
 namespace mongo {
 

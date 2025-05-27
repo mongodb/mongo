@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/plan_explainer_factory.h"
+
+#include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
+
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/query/plan_explainer_factory.h"
-#include "mongo/db/query/plan_explainer_impl.h"
-#include "mongo/db/query/plan_explainer_sbe.h"
 
 namespace mongo::plan_explainer_factory {
 

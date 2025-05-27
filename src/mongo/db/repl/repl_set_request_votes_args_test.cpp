@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
+#include "mongo/db/repl/repl_set_request_votes_args.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <ostream>
 
 namespace mongo {
 namespace repl {

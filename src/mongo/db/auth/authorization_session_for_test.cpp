@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/authorization_session_for_test.h"
+
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/util/read_through_cache.h"
+
 #include <set>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authorization_session_for_test.h"
-#include "mongo/db/auth/builtin_roles.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/util/read_through_cache.h"
 
 namespace mongo {
 void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege,

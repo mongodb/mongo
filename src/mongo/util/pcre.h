@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -37,8 +39,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/string_data.h"
 
 namespace mongo::pcre {
 

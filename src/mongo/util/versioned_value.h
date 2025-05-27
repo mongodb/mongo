@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-#include <shared_mutex>
-
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"
+
+#include <memory>
+#include <shared_mutex>
 
 namespace mongo {
 namespace versioned_value_detail {

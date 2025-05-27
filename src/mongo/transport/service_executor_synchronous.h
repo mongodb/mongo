@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <deque>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +38,11 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <string>
 
 namespace mongo::transport {
 /** Transitional for differential benchmarking of ServiceExecutorSynchronous refactor */

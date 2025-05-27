@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

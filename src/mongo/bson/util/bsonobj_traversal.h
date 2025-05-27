@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+
+#include <boost/container/small_vector.hpp>
 
 namespace mongo {
 /**

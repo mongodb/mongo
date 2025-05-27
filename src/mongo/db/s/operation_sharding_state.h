@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -42,6 +38,10 @@
 #include "mongo/util/future.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/string_map.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

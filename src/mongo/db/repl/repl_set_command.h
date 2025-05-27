@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+
+#include <string>
 
 namespace mongo {
 

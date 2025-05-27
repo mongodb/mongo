@@ -30,10 +30,10 @@
 
 #include "mongo/util/net/private/ssl_expiration.h"
 
-#include <string>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

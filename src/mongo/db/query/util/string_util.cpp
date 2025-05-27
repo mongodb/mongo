@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/util/string_util.h"
+
 #include <algorithm>
 #include <vector>
-
-#include "mongo/db/query/util/string_util.h"
 
 namespace mongo {
 

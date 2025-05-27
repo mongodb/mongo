@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -60,6 +49,18 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

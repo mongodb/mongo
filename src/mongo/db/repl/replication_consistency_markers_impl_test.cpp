@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
@@ -41,7 +37,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -53,6 +48,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

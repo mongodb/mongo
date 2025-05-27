@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+
+#include <memory>
 
 namespace mongo {
 

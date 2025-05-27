@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/storage/disk_space_monitor.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

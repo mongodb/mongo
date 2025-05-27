@@ -35,16 +35,6 @@
  * rather parameters should be defined in .idl files.
  */
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
@@ -63,6 +53,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

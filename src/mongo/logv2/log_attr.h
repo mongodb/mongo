@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
 #include <tuple>
 #include <type_traits>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace logv2 {

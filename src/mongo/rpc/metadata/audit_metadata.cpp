@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <cmath>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/rpc/metadata/audit_metadata.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,11 +39,18 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/audit_client_attrs.h"
-#include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <cmath>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace rpc {

@@ -27,20 +27,22 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <string>
+#include "mongo/db/s/start_chunk_clone_request.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

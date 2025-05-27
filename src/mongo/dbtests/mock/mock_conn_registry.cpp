@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <mutex>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/dbtests/mock/mock_conn_registry.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
-#include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/assert_util.h"
+
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

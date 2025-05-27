@@ -29,10 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_documents.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -44,6 +40,9 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

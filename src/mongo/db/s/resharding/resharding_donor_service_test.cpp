@@ -28,14 +28,7 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <initializer_list>
-#include <ostream>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/resharding/resharding_donor_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,7 +52,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_test_util.h"
 #include "mongo/db/s/resharding/resharding_util.h"
@@ -77,6 +69,15 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <initializer_list>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

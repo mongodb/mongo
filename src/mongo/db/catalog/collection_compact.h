@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/compact_options.h"
+
+#include <cstdint>
 
 namespace mongo {
 

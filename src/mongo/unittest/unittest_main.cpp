@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iostream>
-#include <string>
-#include <vector>
-
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -50,6 +44,11 @@
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <algorithm>
+#include <iostream>
+#include <string>
+#include <vector>
 
 using ::mongo::Status;
 

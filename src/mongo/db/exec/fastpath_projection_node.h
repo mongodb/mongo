@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/projection_node.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo::projection_executor {
 

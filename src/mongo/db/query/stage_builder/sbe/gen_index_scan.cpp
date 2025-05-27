@@ -28,18 +28,7 @@
  */
 
 
-#include <absl/container/inlined_vector.h>
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <bitset>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstddef>
-#include <deque>
-#include <iterator>
-#include <map>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -62,7 +51,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
-#include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/logv2/log.h"
@@ -70,6 +58,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <bitset>
+#include <cstddef>
+#include <deque>
+#include <iterator>
+#include <map>
+
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

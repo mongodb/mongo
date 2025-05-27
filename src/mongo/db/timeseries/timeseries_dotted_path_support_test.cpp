@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <ostream>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,8 +35,12 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/db/timeseries/timeseries_dotted_path_support.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+#include <ostream>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

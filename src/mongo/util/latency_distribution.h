@@ -28,13 +28,13 @@
  */
 #pragma once
 
+#include "mongo/util/duration.h"
+
 #include <cstdint>
 #include <iterator>
 #include <map>
 #include <ratio>
 #include <utility>
-
-#include "mongo/util/duration.h"
 
 namespace mongo {
 /**

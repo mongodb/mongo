@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/util/dynamic_bitset.h"
+
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/util/dynamic_bitset.h"
 
 namespace mongo::boolean_simplification {
 

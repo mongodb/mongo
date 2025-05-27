@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/catalog/collection.h"
+
 #include "mongo/db/transaction_resources.h"
 
 #include <boost/move/utility_core.hpp>

@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstddef>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include <cstddef>
+#include <utility>
 
 namespace mongo {
 namespace sbe {

@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

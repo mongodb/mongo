@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <list>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/keypattern.h"
@@ -54,6 +45,16 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

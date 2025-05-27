@@ -28,20 +28,21 @@
  */
 
 
+#include "mongo/db/repl/insert_group.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/write_ops/write_ops.h"
-#include "mongo/db/repl/insert_group.h"
-#include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <list>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/session/sessions_collection_rs.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -51,12 +45,19 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/session/sessions_collection_rs.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <list>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

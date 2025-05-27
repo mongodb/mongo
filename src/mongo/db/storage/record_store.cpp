@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/record_store.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/damage_vector.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

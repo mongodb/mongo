@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <utility>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/update/pullall_node.h"
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/error_codes.h"
@@ -40,9 +36,14 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/update/pullall_node.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

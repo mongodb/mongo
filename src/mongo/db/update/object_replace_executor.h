@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/update/update_executor.h"
+
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/update/update_executor.h"
 
 namespace mongo {
 

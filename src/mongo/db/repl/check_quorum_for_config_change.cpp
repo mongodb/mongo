@@ -28,10 +28,7 @@
  */
 
 
-#include <cstddef>
-#include <memory>
-#include <string>
-
+#include "mongo/db/repl/check_quorum_for_config_change.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -40,7 +37,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/optime.h"
@@ -52,6 +48,10 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

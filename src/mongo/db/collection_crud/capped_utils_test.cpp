@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/collection_crud/capped_utils.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -43,7 +38,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/member_state.h"
@@ -61,6 +55,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace {
 

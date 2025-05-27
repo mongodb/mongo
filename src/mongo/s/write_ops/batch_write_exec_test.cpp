@@ -31,17 +31,11 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/util/fail_point.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <system_error>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -90,6 +84,13 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <vector>
 
 namespace mongo {
 namespace {

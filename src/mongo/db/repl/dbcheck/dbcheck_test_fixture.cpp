@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bson_validate_gen.h"
-#include "mongo/util/fail_point.h"
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/dbcheck/dbcheck_test_fixture.h"
 
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/health_log.h"
@@ -45,10 +44,12 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
-#include "mongo/db/repl/dbcheck/dbcheck_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/util/fail_point.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

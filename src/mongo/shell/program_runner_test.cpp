@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/json.h"
-
-#include "mongo/db/wire_version.h"
 #include "mongo/shell/program_runner.h"
 
+#include "mongo/bson/json.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::shell_utils {

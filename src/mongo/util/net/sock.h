@@ -34,6 +34,7 @@
 #ifndef _WIN32
 
 #include <cerrno>
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -44,18 +45,18 @@
 
 #endif  // not _WIN32
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/config.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

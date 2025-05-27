@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <variant>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/plan_executor_factory.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
-#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

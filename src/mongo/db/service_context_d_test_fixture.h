@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -43,6 +39,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

@@ -29,13 +29,13 @@
 #pragma once
 
 #include "mongo/bson/bsonelement.h"
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/timeseries/bucket_spec.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace timeseries {

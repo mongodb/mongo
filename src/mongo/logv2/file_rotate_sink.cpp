@@ -29,26 +29,26 @@
 
 #include "mongo/logv2/file_rotate_sink.h"
 
+#include <algorithm>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <utility>
+
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <algorithm>
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/log/core/record_view.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
-#include <exception>
 #include <fmt/format.h>
-#include <fstream>  // IWYU pragma: keep
-#include <iostream>
-#include <utility>
-
-#include <boost/log/core/record_view.hpp>
 // IWYU pragma: no_include "boost/system/detail/errc.hpp"
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 

@@ -29,12 +29,12 @@
 
 #include "mongo/db/operation_id.h"
 
-#include <vector>
-
 #include "mongo/db/client.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

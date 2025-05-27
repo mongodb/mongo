@@ -29,9 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_index_stats.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <iterator>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/cluster_role.h"
@@ -42,6 +39,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"
+
+#include <iterator>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include "mongo/db/pipeline/document_source.h"
+
 #include <type_traits>
 #include <unordered_map>
 
-#include "mongo/db/pipeline/document_source.h"
+#include <fmt/format.h>
 
 namespace mongo {
 

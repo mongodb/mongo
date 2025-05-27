@@ -30,12 +30,12 @@
 #ifndef UTIL_VERSION_HEADER
 #define UTIL_VERSION_HEADER
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+
 #include <iosfwd>
 #include <string>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 

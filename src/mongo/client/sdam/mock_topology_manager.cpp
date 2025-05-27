@@ -30,11 +30,11 @@
 
 #include "mongo/client/sdam/mock_topology_manager.h"
 
-#include <memory>
-#include <mutex>
-
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

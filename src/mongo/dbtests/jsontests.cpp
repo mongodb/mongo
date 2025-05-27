@@ -31,15 +31,10 @@
  * Tests for json.{h,cpp} code and BSONObj::jsonString()
  */
 
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/tuple/tuple.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <fmt/format.h>
-#include <fmt/printf.h>  // IWYU pragma: keep
 #include <initializer_list>
 #include <limits>
 #include <memory>
@@ -51,12 +46,15 @@
 #include <boost/core/swap.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
 // IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
 #include <boost/operators.hpp>
 // IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
 // IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
-#include <boost/property_tree/ptree_fwd.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
@@ -78,6 +76,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/property_tree/ptree_fwd.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

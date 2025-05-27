@@ -29,7 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/base/counter.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/synchronized_value.h"
+
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -39,14 +47,7 @@
 #include <utility>
 #include <variant>
 
-#include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/cluster_role.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/synchronized_value.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 class Service;

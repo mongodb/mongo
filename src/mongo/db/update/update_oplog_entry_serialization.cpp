@@ -29,18 +29,18 @@
 
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::update_oplog_entry {
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {

@@ -28,13 +28,6 @@
  */
 
 
-#include <algorithm>
-#include <cstddef>
-#include <random>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -44,6 +37,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <random>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

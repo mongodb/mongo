@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/oplog_entry.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -32,19 +32,6 @@
 
 #include <absl/container/node_hash_map.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <cstddef>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -71,6 +58,19 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 namespace mongo {

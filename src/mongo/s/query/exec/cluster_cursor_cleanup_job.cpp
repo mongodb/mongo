@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <mutex>
-
+#include "mongo/s/query/exec/cluster_cursor_cleanup_job.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/exec/cluster_cursor_cleanup_job.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

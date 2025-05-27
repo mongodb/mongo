@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <set>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/variables.h"
+
+#include <set>
 
 namespace mongo::match_expression {
 

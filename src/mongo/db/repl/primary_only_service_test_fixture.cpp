@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 
-
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"

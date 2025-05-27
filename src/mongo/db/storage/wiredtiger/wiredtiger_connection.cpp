@@ -27,19 +27,10 @@
  *    it in the license file.
  */
 
-#include <cerrno>
-#include <cstdlib>
-
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <iterator>
-#include <wiredtiger.h>
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -48,6 +39,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cerrno>
+#include <cstdlib>
+#include <functional>
+#include <iterator>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

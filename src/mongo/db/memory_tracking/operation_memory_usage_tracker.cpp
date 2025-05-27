@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+
 #include "mongo/db/memory_tracking/op_memory_use.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/logv2/log.h"

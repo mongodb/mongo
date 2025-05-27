@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstring>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/op_msg_fuzzer_fixture.h"
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -49,7 +44,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/op_msg_fuzzer_fixture.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -74,6 +68,13 @@
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/version/releases.h"
+
+#include <cstring>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

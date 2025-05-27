@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/stage_builder/sbe/builder.h"
-
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"

@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/query_settings/query_settings_service.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/curop.h"
@@ -47,6 +45,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

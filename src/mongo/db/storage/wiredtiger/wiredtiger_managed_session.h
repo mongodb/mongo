@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+
+#include <memory>
 
 namespace mongo {
 

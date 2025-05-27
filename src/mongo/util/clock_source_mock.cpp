@@ -27,17 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/util/clock_source_mock.h"
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
+
 #include <mutex>
 #include <new>
 #include <queue>
 #include <utility>
 #include <vector>
-
-
-#include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 namespace {

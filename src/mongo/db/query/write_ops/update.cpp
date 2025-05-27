@@ -28,10 +28,7 @@
  */
 
 
-#include <memory>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/write_ops/update.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -46,12 +43,16 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/write_ops/parsed_update.h"
-#include "mongo/db/query/write_ops/update.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

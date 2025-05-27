@@ -29,14 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <array>
 #include <cstddef>
-#include <fmt/format.h>
 #include <sstream>
 #include <string>
 #include <utility>
 
-#include "mongo/base/string_data.h"
+#include <fmt/format.h>
 
 namespace mongo {
 namespace base64_detail {

@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
+#include <string>
 
 namespace mongo {
 

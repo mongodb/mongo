@@ -26,11 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "cryptd_options.h"
-
-#include <boost/filesystem.hpp>
-#include <iostream>
-
 #include "mongo/base/status.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
@@ -38,6 +33,12 @@
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
+
+#include <iostream>
+
+#include "cryptd_options.h"
+
+#include <boost/filesystem.hpp>
 
 namespace mongo {
 namespace {

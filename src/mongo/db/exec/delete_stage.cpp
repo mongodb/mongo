@@ -28,17 +28,12 @@
  */
 
 
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/delete_stage.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/namespace_string.h"
@@ -56,6 +51,12 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

@@ -46,9 +46,6 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -66,6 +63,9 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using namespace mongo;
 

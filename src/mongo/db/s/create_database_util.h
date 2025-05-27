@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_database_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

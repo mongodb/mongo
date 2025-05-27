@@ -31,22 +31,23 @@
  * This file contains tests for mongo/db/geo/geoparser.cpp.
  */
 
-#include <cstddef>
-#include <memory>
-#include <s2polygon.h>
-#include <string>
-#include <vector>
-
-#include <s2cellid.h>
+#include "mongo/db/geo/geoparser.h"
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <s2cellid.h>
+#include <s2polygon.h>
 
 // Wrap a BSON object to a BSON element.
 #define BSON_ELT(bson) BSON("" << (bson)).firstElement()

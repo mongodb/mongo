@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_admission_context.h"
@@ -65,6 +56,16 @@
 #include "mongo/util/string_listset.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

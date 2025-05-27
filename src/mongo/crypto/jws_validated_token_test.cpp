@@ -29,9 +29,6 @@
 
 #include "mongo/crypto/jws_validated_token.h"
 
-#include <openssl/opensslv.h>
-#include <string>
-
 #include "mongo/bson/json.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/jwk_manager_test_framework.h"
@@ -39,6 +36,10 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
+
+#include <string>
+
+#include <openssl/opensslv.h>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 

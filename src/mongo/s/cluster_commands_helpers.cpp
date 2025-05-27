@@ -29,17 +29,6 @@
 
 #include "mongo/s/cluster_commands_helpers.h"
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-#include <iterator>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/client/connection_string.h"
@@ -83,6 +72,17 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

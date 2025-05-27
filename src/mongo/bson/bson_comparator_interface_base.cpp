@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/functional/hash.hpp>
-#include <cmath>
-#include <limits>
+#include "mongo/bson/bson_comparator_interface_base.h"
 
 #include "mongo/base/string_data_comparator.h"
-#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -40,6 +37,11 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/time_support.h"
+
+#include <cmath>
+#include <limits>
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo {
 

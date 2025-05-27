@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/db/stats/counters.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 /**
  * Contains common functionality shared between the bulkWrite command in mongos and mongod.

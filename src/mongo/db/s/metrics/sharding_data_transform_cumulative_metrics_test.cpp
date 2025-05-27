@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"

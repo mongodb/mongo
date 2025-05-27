@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+
+#include <functional>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

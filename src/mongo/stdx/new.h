@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/config.h"
+#include "mongo/platform/compiler.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <new>
-
-#include "mongo/config.h"
-#include "mongo/platform/compiler.h"
 
 namespace mongo {
 namespace stdx {

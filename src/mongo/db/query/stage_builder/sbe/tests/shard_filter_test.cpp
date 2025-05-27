@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -55,6 +50,12 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

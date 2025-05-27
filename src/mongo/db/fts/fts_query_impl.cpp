@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <iosfwd>
-#include <memory>
-#include <utility>
+#include "mongo/db/fts/fts_query_impl.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/fts/fts_language.h"
-#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_query_parser.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/util/assert_util.h"
+
+#include <iosfwd>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

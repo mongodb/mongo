@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/ordering.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_string/key_string.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

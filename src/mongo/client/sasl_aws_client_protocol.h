@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace awsIam {

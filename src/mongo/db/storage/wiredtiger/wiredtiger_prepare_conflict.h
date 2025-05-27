@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <wiredtiger.h>
-
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

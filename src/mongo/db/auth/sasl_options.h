@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/platform/atomic_word.h"
+
 #include <atomic>
 #include <string>
 #include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

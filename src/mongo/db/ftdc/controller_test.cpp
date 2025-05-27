@@ -29,14 +29,6 @@
 
 #include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cmath>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +44,14 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
+
+#include <cmath>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

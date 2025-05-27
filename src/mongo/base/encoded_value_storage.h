@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <cstring>
-
 #include "mongo/base/data_view.h"
+
+#include <cstring>
 
 namespace mongo {
 

@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
+#include "mongo/stdx/mutex.h"
+
 #include <memory>
 #include <utility>
 
-#include "mongo/stdx/mutex.h"
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 /**

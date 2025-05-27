@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_options.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

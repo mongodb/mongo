@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
 #include <cstdint>
 #include <vector>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::boolean_simplification {
 /**

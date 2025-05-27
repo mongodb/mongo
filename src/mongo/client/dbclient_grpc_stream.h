@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"
@@ -41,6 +37,10 @@
 #include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

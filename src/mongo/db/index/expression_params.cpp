@@ -29,10 +29,6 @@
 
 #include "mongo/db/index/expression_params.h"
 
-#include <memory>
-#include <utility>
-
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -43,6 +39,9 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

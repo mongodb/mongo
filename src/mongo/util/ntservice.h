@@ -38,11 +38,11 @@
 
 #ifdef _WIN32
 
-#include <string>
-#include <vector>
-
 #include "mongo/platform/compiler.h"
 #include "mongo/util/exit_code.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 

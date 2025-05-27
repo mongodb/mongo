@@ -29,14 +29,13 @@
 
 #include "mongo/db/exec/and_sorted.h"
 
+#include "mongo/db/exec/and_common.h"
+#include "mongo/util/assert_util.h"
+
 #include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
-
-
-#include "mongo/db/exec/and_common.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

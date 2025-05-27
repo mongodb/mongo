@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <vector>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
@@ -43,6 +40,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <vector>
 
 namespace mongo {
 

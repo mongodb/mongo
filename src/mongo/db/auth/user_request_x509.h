@@ -30,12 +30,12 @@
 #pragma once
 
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/util/net/ssl_peer_info.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

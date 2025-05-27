@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+
 #include <wiredtiger.h>
 
 namespace mongo {

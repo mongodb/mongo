@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/s/catalog_cache.h"
@@ -34,7 +36,6 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_request.h"
-#include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

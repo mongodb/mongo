@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <variant>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
@@ -49,6 +43,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 using executor::RemoteCommandResponse;

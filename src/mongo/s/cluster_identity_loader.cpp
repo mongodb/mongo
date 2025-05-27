@@ -31,9 +31,6 @@
 
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +39,9 @@
 #include "mongo/s/catalog/type_config_version_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

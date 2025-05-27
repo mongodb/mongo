@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 /**
  * Use to compare two instances of type Value under the default ValueComparator in unit tests.

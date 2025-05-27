@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/ftdc/collector.h"
+
 #include <cstddef>
 #include <cstdint>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/ftdc/collector.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

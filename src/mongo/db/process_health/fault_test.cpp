@@ -29,8 +29,6 @@
 
 #include "mongo/db/process_health/fault.h"
 
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/process_health/health_check_status.h"
@@ -38,6 +36,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <utility>
 
 namespace mongo {
 namespace process_health {

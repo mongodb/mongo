@@ -33,9 +33,9 @@
 #define __STDC_WANT_LIB_EXT1__ 1
 #endif
 
-#include <cstring>
-
 #include "mongo/util/assert_util.h"
+
+#include <cstring>
 
 namespace mongo {
 

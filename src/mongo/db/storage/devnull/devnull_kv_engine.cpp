@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <memory>
-#include <set>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,7 +35,6 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/damage_vector.h"
-#include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -55,6 +48,14 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

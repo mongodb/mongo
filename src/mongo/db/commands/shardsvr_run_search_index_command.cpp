@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -51,6 +47,11 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

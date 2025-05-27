@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+
+#include <memory>
 
 typedef struct _bson_value_t bson_value_t;
 

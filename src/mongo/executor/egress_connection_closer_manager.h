@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/db/service_context.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/stdx/mutex.h"
@@ -40,6 +36,10 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace executor {

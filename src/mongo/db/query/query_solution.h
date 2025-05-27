@@ -29,22 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <cstdint>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <iosfwd>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -78,6 +71,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/id_generator.h"
 #include "mongo/util/str.h"
+
+#include <iosfwd>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

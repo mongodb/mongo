@@ -28,11 +28,7 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <cstdint>
-#include <initializer_list>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/dbclient_cursor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/dbclient_connection.h"
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -54,6 +49,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstdint>
+#include <initializer_list>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

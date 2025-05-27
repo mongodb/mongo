@@ -30,10 +30,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <climits>
-#include <cmath>
-#include <limits>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -64,6 +60,10 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/summation.h"
 #include "mongo/util/time_support.h"
+
+#include <climits>
+#include <cmath>
+#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

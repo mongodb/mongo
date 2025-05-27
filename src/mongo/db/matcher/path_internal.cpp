@@ -29,10 +29,10 @@
 
 #include "mongo/db/matcher/path_internal.h"
 
-#include <algorithm>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/ctype.h"
+
+#include <algorithm>
 
 namespace mongo {
 

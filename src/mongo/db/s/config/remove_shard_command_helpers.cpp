@@ -28,9 +28,6 @@
  */
 #include "mongo/db/s/config/remove_shard_command_helpers.h"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
@@ -42,7 +37,6 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
-#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/version_context.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -56,6 +50,13 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

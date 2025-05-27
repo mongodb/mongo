@@ -28,13 +28,6 @@
  */
 
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
@@ -53,6 +46,13 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

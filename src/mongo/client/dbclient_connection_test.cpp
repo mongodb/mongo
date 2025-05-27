@@ -28,6 +28,7 @@
  */
 
 #include "mongo/client/dbclient_connection.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

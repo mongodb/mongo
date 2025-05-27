@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/service_entry_point_shard_role.h"
+
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_bm_fixture.h"
-#include "mongo/db/service_entry_point_shard_role.h"
 
 namespace mongo {
 

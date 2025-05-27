@@ -27,23 +27,24 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/sbe/stages/bson_scan.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

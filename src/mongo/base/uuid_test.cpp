@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/util/uuid.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -44,7 +40,12 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace {

@@ -29,11 +29,6 @@
 
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/type_traits.h"
-#include <array>
-#include <cmath>
-#include <limits>
-#include <ostream>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -43,6 +38,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <cmath>
+#include <limits>
+#include <ostream>
 
 namespace mongo {
 namespace {

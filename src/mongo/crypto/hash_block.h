@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <array>
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
@@ -45,6 +39,13 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/secure_compare_memory.h"
+
+#include <array>
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include <absl/hash/hash.h>
 
 #if defined(MONGO_CONFIG_SSL) && (MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL)
 #include <openssl/hmac.h>

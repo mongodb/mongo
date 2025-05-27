@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/executor/task_executor_cursor.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 /**

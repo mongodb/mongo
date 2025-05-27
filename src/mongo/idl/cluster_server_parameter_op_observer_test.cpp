@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <ctime>
-#include <initializer_list>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/idl/cluster_server_parameter_op_observer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -57,12 +46,24 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
-#include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <ctime>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

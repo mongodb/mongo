@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/ce_histogram.h"
@@ -37,6 +34,9 @@
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo::stats {
 namespace {

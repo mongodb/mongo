@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_set.h>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <iterator>
-#include <list>
-#include <type_traits>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -50,11 +40,22 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/s/query/exec/cluster_client_cursor_mock.h"
-#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+
+#include <iterator>
+#include <list>
+#include <type_traits>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

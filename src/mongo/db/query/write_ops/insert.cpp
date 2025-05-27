@@ -29,13 +29,6 @@
 
 #include "mongo/db/query/write_ops/insert.h"
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
@@ -55,6 +48,14 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/s/sharding_index_catalog_cache.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"

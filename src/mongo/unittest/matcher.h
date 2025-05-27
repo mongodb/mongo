@@ -32,18 +32,6 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include <algorithm>
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -54,6 +42,19 @@
 #include "mongo/unittest/matcher_core.h"
 #include "mongo/unittest/stringify.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 /**
  * Defines a basic set of matchers to be used with the ASSERT_THAT macro (see

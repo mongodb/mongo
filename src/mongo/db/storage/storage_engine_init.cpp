@@ -29,16 +29,6 @@
 
 #include "mongo/db/storage/storage_engine_init.h"
 
-#include <exception>
-#include <map>
-#include <string>
-#include <utility>
-
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
@@ -62,6 +52,16 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <exception>
+#include <map>
+#include <string>
+#include <utility>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

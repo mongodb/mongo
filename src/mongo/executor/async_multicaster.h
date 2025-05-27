@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace mongo {
 namespace executor {

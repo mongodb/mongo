@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/count.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <memory>
 #include <vector>
-
-#include "mongo/db/exec/count.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

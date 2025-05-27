@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/notification.h"
+
 #include <list>
 #include <map>
 #include <memory>
 #include <utility>
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/notification.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

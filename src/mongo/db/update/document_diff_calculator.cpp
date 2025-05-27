@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
+#include "mongo/db/update/document_diff_calculator.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
@@ -47,9 +37,21 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::doc_diff {
 namespace {

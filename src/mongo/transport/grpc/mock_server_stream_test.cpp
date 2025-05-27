@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <grpcpp/support/status.h>
+#include "mongo/transport/grpc/mock_server_stream.h"
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
@@ -41,7 +35,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_server_context.h"
-#include "mongo/transport/grpc/mock_server_stream.h"
 #include "mongo/transport/grpc/mock_stub.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/unittest/death_test.h"
@@ -54,6 +47,14 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <grpcpp/support/status.h>
 
 namespace mongo::transport::grpc {
 

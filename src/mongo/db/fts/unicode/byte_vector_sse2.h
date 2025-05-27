@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <cstdint>
-#include <emmintrin.h>
-
 #include "mongo/platform/bits.h"
+
+#include <cstdint>
+
+#include <emmintrin.h>
 
 namespace mongo {
 namespace unicode {

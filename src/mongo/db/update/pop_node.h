@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -48,6 +43,11 @@
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_node_visitor.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

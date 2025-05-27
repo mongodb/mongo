@@ -31,17 +31,15 @@
 #include "mongo/db/query/planner_analysis.h"
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <cstring>
+
+#include <s2cellid.h>
+
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstring>
-#include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <set>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -72,6 +70,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <set>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

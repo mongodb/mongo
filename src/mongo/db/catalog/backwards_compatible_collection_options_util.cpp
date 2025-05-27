@@ -30,6 +30,7 @@
 // TODO SERVER-92265 evaluate getting rid of this util
 
 #include "mongo/db/catalog/backwards_compatible_collection_options_util.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"

@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -43,6 +40,10 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

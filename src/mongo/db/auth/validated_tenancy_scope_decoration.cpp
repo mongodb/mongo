@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/decorable.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/operation_context.h"
-#include "mongo/util/decorable.h"
 
 namespace mongo::auth {
 namespace {

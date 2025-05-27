@@ -29,7 +29,6 @@
 
 #include "mongo/db/catalog/virtual_collection_impl.h"
 
-
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog_impl.h"

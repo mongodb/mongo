@@ -29,18 +29,6 @@
 
 #include "mongo/db/s/range_deleter_service.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <iterator>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -81,6 +69,18 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <iterator>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 

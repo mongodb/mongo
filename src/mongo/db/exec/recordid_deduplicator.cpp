@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/recordid_deduplicator.h"
+
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"

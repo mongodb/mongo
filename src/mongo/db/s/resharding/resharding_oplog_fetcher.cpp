@@ -29,20 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <mutex>
-#include <tuple>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -102,6 +88,20 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <mutex>
+#include <tuple>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/exec/sbe/values/block_interface.h"
+
+#include <memory>
 
 namespace mongo::sbe::value {
 /**

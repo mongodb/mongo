@@ -28,15 +28,7 @@
  */
 
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
@@ -53,7 +45,6 @@
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
@@ -78,6 +69,16 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

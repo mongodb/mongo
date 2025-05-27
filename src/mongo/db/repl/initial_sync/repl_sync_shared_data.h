@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <mutex>
-
 #include "mongo/base/status.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace repl {

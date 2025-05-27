@@ -29,11 +29,11 @@
 
 #include "mongo/util/options_parser/value.h"
 
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+
+#include <utility>
 
 namespace mongo {
 namespace optionenvironment {

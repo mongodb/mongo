@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/egress_networking_parameters_gen.h"
 #include "mongo/logv2/log.h"
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
+
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/node_hash_map.h>
 #include <boost/container/flat_set.hpp>
@@ -43,12 +44,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstdint>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -130,6 +125,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

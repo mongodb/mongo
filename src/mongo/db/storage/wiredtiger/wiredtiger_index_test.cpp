@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/json.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

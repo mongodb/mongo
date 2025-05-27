@@ -41,6 +41,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/s/catalog_cache.h"
+
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

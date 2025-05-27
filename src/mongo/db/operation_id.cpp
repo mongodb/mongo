@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <limits>
-#include <list>
+#include "mongo/db/operation_id.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <limits>
+#include <list>
 
 namespace mongo {
 

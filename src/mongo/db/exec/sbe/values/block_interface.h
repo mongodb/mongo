@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-
 #include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe::value {
 /**

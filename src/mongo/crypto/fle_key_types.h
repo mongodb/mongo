@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-#include <fmt/format.h>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <list>
-#include <utility>
-
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <cstddef>
+#include <list>
+#include <utility>
 
 namespace mongo::stage_builder {
 

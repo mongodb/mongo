@@ -29,23 +29,6 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
-#include <algorithm>
-#include <climits>
-#include <limits>
-#include <list>
-#include <string>
-#include <tuple>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
@@ -76,6 +59,23 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/tracking/unordered_map.h"
+
+#include <algorithm>
+#include <climits>
+#include <limits>
+#include <list>
+#include <string>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

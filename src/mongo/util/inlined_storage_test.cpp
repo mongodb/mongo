@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/util/inlined_storage.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 TEST(InlinedStorageTests, StoreAndAccessData) {

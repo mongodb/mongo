@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <utility>
-
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace analyze_shard_key {

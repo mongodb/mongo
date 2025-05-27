@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
@@ -36,12 +42,6 @@
 #include <limits>
 #include <memory>
 #include <utility>
-
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type.h"
-#include "mongo/base/status.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

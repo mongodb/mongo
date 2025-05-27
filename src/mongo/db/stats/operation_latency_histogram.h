@@ -28,12 +28,12 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/platform/atomic.h"
+
+#include <array>
+#include <cstdint>
 
 namespace mongo {
 namespace operation_latency_histogram_details {

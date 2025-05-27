@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/unittest/task_executor_proxy.h"
+
+#include <utility>
 
 namespace mongo {
 namespace unittest {

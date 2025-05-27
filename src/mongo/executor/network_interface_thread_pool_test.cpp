@@ -28,15 +28,16 @@
  */
 
 
-#include <memory>
+#include "mongo/executor/network_interface_thread_pool.h"
 
 #include "mongo/base/init.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

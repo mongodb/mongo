@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <functional>
-#include <iosfwd>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
@@ -44,6 +39,12 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
+
+#include <functional>
+#include <iosfwd>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {

@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/util/string_map.h"
+
 #include <functional>
 #include <memory>
 #include <set>
@@ -36,10 +40,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 

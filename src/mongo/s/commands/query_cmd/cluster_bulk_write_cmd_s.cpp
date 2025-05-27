@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
-
-#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 
 namespace mongo {
 namespace {

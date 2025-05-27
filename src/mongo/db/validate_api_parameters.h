@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "api_parameters.h"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+
+#include "api_parameters.h"
 
 namespace mongo {
 

@@ -26,12 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <algorithm>
+#include "mongo/util/tracing_profiler/profiler.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/tracing_profiler/profiler.h"
+
+#include <algorithm>
 
 namespace mongo::tracing_profiler {
 namespace {

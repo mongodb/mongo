@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/stages/sort.h"
-
-#include <memory>
-#include <vector>
-
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/values/row.h"
@@ -39,6 +34,9 @@
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo::sbe {
 

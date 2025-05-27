@@ -30,11 +30,6 @@
 
 #include "mongo/db/keys_collection_util.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -53,6 +48,10 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace keys_collection_util {

@@ -28,16 +28,18 @@
  */
 
 
-#include <cstdarg>
-#include <cstdlib>
-#include <shellapi.h>
-#include <string>
-#include <vector>
+#include "mongo/util/ntservice.h"
 
 #include "mongo/db/client.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/ntservice.h"
 #include "mongo/util/text.h"
+
+#include <cstdarg>
+#include <cstdlib>
+#include <string>
+#include <vector>
+
+#include <shellapi.h>
 
 using namespace mongo;
 

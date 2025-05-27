@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/transport/grpc/channel_pool.h"
 
 #include "mongo/platform/atomic_word.h"
@@ -40,6 +38,8 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo::transport::grpc {
 namespace {

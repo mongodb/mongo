@@ -29,9 +29,6 @@
 
 #include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
 namespace mongo {

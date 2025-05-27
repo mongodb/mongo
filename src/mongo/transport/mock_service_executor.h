@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/transport/service_executor.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <functional>
 
 namespace mongo::transport {
 

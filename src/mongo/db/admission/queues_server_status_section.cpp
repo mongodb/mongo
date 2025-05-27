@@ -30,9 +30,8 @@
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/admission/ticketholder_manager.h"
-#include "mongo/db/server_feature_flags_gen.h"
-
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 namespace mongo {
 namespace admission {

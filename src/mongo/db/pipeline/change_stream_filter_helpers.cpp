@@ -29,14 +29,6 @@
 
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 
-#include <boost/optional/optional.hpp>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -54,6 +46,14 @@
 #include "mongo/db/query/bson/bson_helper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace change_stream_filter {

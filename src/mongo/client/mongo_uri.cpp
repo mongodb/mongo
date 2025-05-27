@@ -35,25 +35,6 @@
 #include <boost/range/algorithm/count.hpp>
 // IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
 // IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
-#include <algorithm>
-#include <array>
-#include <boost/algorithm/string/finder.hpp>
-#include <boost/core/addressof.hpp>
-#include <boost/function/function_base.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/range/const_iterator.hpp>
-#include <boost/range/iterator_range_core.hpp>
-#include <boost/type_index/type_index_facade.hpp>
-#include <cstddef>
-#include <exception>
-#include <memory>
-#include <type_traits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -72,6 +53,25 @@
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <exception>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/algorithm/string/finder.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/range/const_iterator.hpp>
+#include <boost/range/iterator_range_core.hpp>
+#include <boost/type_index/type_index_facade.hpp>
 
 using namespace std::literals::string_literals;
 

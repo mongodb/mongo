@@ -29,6 +29,7 @@
 
 
 #include "mongo/crypto/fle_numeric.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

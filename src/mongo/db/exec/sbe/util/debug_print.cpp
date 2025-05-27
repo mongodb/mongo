@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
+#include "mongo/db/exec/sbe/util/debug_print.h"
 
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/util/debug_print.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 namespace sbe {

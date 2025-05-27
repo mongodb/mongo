@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
+#include "mongo/base/status.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/variables.h"
+
 #include <cstddef>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/variables.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

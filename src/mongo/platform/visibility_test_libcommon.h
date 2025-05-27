@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <string_view>
-
 #include "mongo/platform/visibility.h"
+
+#include <string_view>
 
 #ifdef MONGO_API_visibility_test_libcommon
 #define MONGO_VISIBILITY_TEST_LIBCOMMON_API MONGO_API_EXPORT

@@ -31,6 +31,7 @@
 #include "mongo/db/geo/geometry_container.h"
 
 #include <cstddef>
+
 #include <s1angle.h>
 #include <s2.h>
 #include <s2cap.h>
@@ -42,12 +43,10 @@
 #include <s2polyline.h>
 #include <s2region.h>
 #include <s2regionunion.h>
+
 #include <util/math/vector3-inl.h>
 #include <util/math/vector3.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <set>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
@@ -60,6 +59,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+
+#include <set>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

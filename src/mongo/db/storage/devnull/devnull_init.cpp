@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +39,9 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_options.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/logv2/bson_formatter.h"
+#include "mongo/logv2/plain_formatter.h"
+#include "mongo/util/assert_util.h"
+
 #include <boost/log/attributes/attribute_value_set.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/sinks.hpp>
-
-#include "mongo/logv2/bson_formatter.h"
-#include "mongo/logv2/plain_formatter.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::logv2 {
 class UserAssertSink

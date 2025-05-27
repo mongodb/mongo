@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo::str_trim_utils {
 

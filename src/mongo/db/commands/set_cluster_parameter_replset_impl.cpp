@@ -29,12 +29,6 @@
 
 #include "mongo/db/commands/set_cluster_parameter_replset_impl.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cluster_role.h"
@@ -49,6 +43,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

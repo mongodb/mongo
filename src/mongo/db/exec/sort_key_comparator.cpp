@@ -29,12 +29,12 @@
 
 #include "mongo/db/exec/sort_key_comparator.h"
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
-
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 
 namespace mongo {
 

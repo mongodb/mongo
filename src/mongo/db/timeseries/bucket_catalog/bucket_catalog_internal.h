@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +44,15 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 struct Stripe;

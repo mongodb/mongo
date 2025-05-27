@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
 #include "mongo/s/transaction_router.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kExecutor
 namespace mongo::async_rpc {

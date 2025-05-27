@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <memory>
-
+#include "mongo/db/repl/repl_set_tag.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <memory>
 
 namespace mongo {
 namespace repl {

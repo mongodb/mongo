@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/write_ops/write_ops_gen.h"
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstdint>
-#include <functional>
-#include <set>
-#include <tuple>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/query_analysis_writer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -49,10 +38,10 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/analyze_shard_key_util.h"
-#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -79,6 +68,18 @@
 #include "mongo/util/scoped_unlock.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <functional>
+#include <set>
+#include <tuple>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,20 +29,19 @@
 
 #include "mongo/logv2/text_formatter.h"
 
-#include <boost/exception/exception.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-#include <fmt/format.h>
-
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/utility/formatting_ostream_fwd.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/exception/exception.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <fmt/format.h>
 
 namespace mongo::logv2 {
 

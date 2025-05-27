@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/config.h"  // IWYU pragma: keep
+
 #include <cstddef>
 #include <cstring>
-
-#include "mongo/config.h"  // IWYU pragma: keep
 
 namespace mongo {
 

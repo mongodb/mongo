@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/transaction/retryable_writes_stats.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transactions_stats_gen.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

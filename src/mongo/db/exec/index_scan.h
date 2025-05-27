@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -50,6 +45,12 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

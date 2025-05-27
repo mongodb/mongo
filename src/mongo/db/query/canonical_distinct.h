@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <string>
-#include <utility>
-
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

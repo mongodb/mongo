@@ -42,13 +42,6 @@
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 #include <boost/type_index/type_index_facade.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstdlib>
-#include <iostream>
-#include <map>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -68,6 +61,13 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
+
+#include <cstdlib>
+#include <iostream>
+#include <map>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

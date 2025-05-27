@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
@@ -49,6 +43,13 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

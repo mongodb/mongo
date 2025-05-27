@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/repl_set_command.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"

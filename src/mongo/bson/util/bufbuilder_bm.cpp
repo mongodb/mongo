@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/util/builder.h"
+
 #include <benchmark/benchmark.h>
 
 namespace mongo {

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -56,6 +52,10 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

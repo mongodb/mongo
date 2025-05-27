@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-#include <utility>
-
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
+
+#include <string>
+#include <utility>
 
 
 namespace mongo::abt {

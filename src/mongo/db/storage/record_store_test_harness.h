@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/test_harness_helper.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 

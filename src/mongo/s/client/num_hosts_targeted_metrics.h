@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/platform/atomic.h"
+
 #include <memory>
 #include <vector>
-
-#include "mongo/platform/atomic.h"
 
 
 namespace mongo {

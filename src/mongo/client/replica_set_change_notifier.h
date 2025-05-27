@@ -29,7 +29,14 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/connection_string.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+
 #include <cstdint>
 #include <memory>
 #include <set>
@@ -38,13 +45,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/client/connection_string.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/functional.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/net/hostandport.h"
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

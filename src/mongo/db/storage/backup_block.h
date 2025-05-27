@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <string>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <string>
+
+#include <boost/filesystem.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

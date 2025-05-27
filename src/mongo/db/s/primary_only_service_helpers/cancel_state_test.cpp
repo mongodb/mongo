@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/primary_only_service_helpers/cancel_state.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

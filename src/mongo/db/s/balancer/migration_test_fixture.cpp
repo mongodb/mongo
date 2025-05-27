@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/balancer/migration_test_fixture.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
-#include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -43,6 +39,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

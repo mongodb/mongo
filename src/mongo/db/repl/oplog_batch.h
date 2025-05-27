@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/repl/oplog_entry.h"
+
+#include <vector>
 
 namespace mongo {
 namespace repl {

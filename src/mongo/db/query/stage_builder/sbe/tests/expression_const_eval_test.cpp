@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
@@ -39,12 +37,15 @@
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower_defs.h"
-#include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo::stage_builder {
 namespace {

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <iostream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -41,6 +37,10 @@
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
 
 namespace mongo {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {

@@ -30,20 +30,6 @@
 
 #include "mongo/db/transaction/transaction_api.h"
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <memory>
-#include <mutex>
-#include <tuple>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -82,6 +68,20 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

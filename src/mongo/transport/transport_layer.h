@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <functional>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +47,13 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"

@@ -27,15 +27,6 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <iterator>
-#include <limits>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -59,6 +50,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace expression_evaluation_test {

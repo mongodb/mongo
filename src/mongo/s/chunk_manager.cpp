@@ -36,12 +36,6 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <compare>
-#include <cstdint>
-#include <iterator>
-#include <tuple>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,6 +49,12 @@
 #include "mongo/s/shard_targeting_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <compare>
+#include <cstdint>
+#include <iterator>
+#include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -99,8 +99,10 @@
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
-#include <sys/ioctl.h>
+
 #include <termios.h>
+
+#include <sys/ioctl.h>
 
 #endif /* _WIN32 */
 
@@ -113,12 +115,13 @@
 #include <cstdint>
 #include <cstdio>
 #include <cwctype>
-#include <fcntl.h>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <system_error>
 #include <vector>
+
+#include <fcntl.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
 #include "mongo/base/data_view.h"

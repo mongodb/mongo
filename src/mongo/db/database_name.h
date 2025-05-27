@@ -28,20 +28,6 @@
  */
 
 #pragma once
-#include <algorithm>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <cstring>
-#include <fmt/format.h>
-#include <iosfwd>
-#include <mutex>
-#include <string>
-#include <utility>
-
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -52,6 +38,21 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <iosfwd>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

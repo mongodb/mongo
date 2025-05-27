@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +39,9 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace {

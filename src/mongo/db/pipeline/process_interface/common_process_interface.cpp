@@ -28,14 +28,7 @@
  */
 
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <mutex>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,7 +45,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -70,6 +62,15 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

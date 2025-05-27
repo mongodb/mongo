@@ -29,19 +29,19 @@
 
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/container/vector.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/iterator/transform_iterator.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+
 #include <set>
 #include <string>
 #include <vector>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/container/vector.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

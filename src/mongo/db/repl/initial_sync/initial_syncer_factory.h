@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_sync/initial_syncer_interface.h"
@@ -42,6 +37,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/string_map.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace repl {

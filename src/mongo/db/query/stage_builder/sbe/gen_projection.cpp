@@ -27,6 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/stage_builder/sbe/gen_projection.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/query/stage_builder/sbe/gen_expression.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+
 #include <cstddef>
 #include <memory>
 #include <stack>
@@ -40,16 +51,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/gen_expression.h"
-#include "mongo/db/query/stage_builder/sbe/gen_projection.h"
-#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::stage_builder {
 ProjectActionType ProjectAction::type() const {

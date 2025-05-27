@@ -28,11 +28,12 @@
  */
 
 
-#include <utility>
+#include "mongo/db/query/query_settings_decoration.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

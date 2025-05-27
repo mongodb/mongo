@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,6 +41,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

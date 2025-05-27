@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/hash/hash.h>
-#include <absl/strings/string_view.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-#include <cmath>
+#include "mongo/db/exec/sbe/values/value.h"
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/string_data_comparator.h"
@@ -46,7 +39,6 @@
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/util.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/index/btree_key_generator.h"
@@ -55,6 +47,16 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/duration.h"
+
+#include <cmath>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

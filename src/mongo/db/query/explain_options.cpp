@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/explain_options.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

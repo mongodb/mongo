@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/query/query_planner.h"
+
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

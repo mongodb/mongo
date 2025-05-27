@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <functional>
-#include <map>
-#include <memory>
-#include <string>
-
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/client/shard.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
 
 namespace mongo {
 

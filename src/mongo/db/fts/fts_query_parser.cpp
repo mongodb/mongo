@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/fts/fts_query_parser.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

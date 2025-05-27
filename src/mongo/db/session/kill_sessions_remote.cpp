@@ -28,14 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <memory>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/session/kill_sessions_remote.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,7 +37,6 @@
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/kill_sessions_gen.h"
-#include "mongo/db/session/kill_sessions_remote.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard.h"
@@ -54,6 +46,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <algorithm>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

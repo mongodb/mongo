@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
@@ -38,6 +34,9 @@
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/bson/bsonobj.h"

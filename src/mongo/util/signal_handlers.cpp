@@ -32,13 +32,6 @@
 
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
-#include <cerrno>
-#include <csignal>
-#include <cstring>
-#include <ctime>
-#include <memory>
-#include <random>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -60,6 +53,13 @@
 #include "mongo/util/signal_win32.h"  // IWYU pragma: keep
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/thread_util.h"
+
+#include <cerrno>
+#include <csignal>
+#include <cstring>
+#include <ctime>
+#include <memory>
+#include <random>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

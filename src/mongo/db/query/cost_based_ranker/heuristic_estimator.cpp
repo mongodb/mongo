@@ -29,11 +29,11 @@
 
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 
-#include <span>
-
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/cost_based_ranker/ce_utils.h"
+
+#include <span>
 
 namespace mongo::cost_based_ranker {
 

@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <limits>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/persistent_task_store.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/unittest/unittest.h"
+
+#include <limits>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

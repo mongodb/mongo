@@ -28,17 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <cmath>
-#include <iterator>
-#include <s2cellid.h>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_geo_near.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -53,7 +43,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -65,6 +54,19 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/logv2/log.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

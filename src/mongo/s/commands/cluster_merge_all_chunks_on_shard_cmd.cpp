@@ -28,12 +28,6 @@
  */
 
 
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/action_type.h"
@@ -52,6 +46,12 @@
 #include "mongo/s/request_types/merge_chunk_request_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

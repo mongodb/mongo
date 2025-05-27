@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <wiredtiger.h>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
@@ -58,6 +52,14 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstring>
+#include <memory>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

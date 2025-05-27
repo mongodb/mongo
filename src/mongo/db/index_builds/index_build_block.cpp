@@ -28,10 +28,7 @@
  */
 
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index_builds/index_build_block.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds/index_build_block.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -60,6 +56,11 @@
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

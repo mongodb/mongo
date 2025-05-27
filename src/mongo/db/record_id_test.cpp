@@ -31,7 +31,6 @@
 
 #include "mongo/db/record_id.h"
 
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/record_id_helpers.h"

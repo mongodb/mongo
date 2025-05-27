@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -46,6 +42,10 @@
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
 
 namespace mongo {
 

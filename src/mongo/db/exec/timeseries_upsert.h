@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
@@ -41,6 +39,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/shard_role.h"
+
+#include <memory>
 
 namespace mongo {
 

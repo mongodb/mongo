@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <jscustomallocator.h>
-
-#include <jscustomallocator_oom.h>
-#include <jstypes.h>
-#include <mozilla/Assertions.h>
-#include <mozjemalloc_types.h>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/mozjs/implscope.h"
+
+#include <jscustomallocator.h>
+#include <jscustomallocator_oom.h>
+#include <jstypes.h>
+#include <mozjemalloc_types.h>
+
+#include <mozilla/Assertions.h>
 
 #ifdef __linux__
 #include <malloc.h>

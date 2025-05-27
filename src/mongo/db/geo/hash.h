@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/key_string/key_string.h"
+
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

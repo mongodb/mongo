@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/query_settings/query_settings_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +41,6 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
@@ -54,6 +50,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_settings {
 static bool operator==(const QueryShapeConfiguration& lhs, const QueryShapeConfiguration& rhs) {

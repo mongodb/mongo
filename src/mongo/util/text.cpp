@@ -30,11 +30,12 @@
 
 #include "mongo/util/text.h"
 
-#include <boost/integer_traits.hpp>
 #include <cerrno>
 #include <iostream>
 #include <memory>
 #include <sstream>  // IWYU pragma: keep
+
+#include <boost/integer_traits.hpp>
 
 #ifdef _WIN32
 #include <io.h>

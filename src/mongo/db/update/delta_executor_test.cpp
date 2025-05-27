@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/update/delta_executor.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
@@ -37,10 +35,13 @@
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

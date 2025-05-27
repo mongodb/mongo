@@ -28,16 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/plan_executor_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
@@ -52,7 +43,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
@@ -69,6 +59,17 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

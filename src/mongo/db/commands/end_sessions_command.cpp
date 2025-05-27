@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sessions_commands_gen.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/rpc/op_msg.h"
+
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo {
 namespace {

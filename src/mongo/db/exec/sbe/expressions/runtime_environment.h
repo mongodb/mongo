@@ -32,12 +32,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/slots_provider.h"
@@ -46,6 +40,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 /**

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/expression_where_noop.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <memory>
 #include <string>
 #include <utility>
-
-#include "mongo/db/matcher/expression_where_noop.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

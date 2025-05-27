@@ -29,30 +29,30 @@
 
 #include "mongo/db/query/query_stats/agg_key.h"
 
-#include "mongo/db/query/explain_options.h"
-#include <absl/container/node_hash_set.h>
-#include <boost/cstdint.hpp>
-#include <functional>
-#include <initializer_list>
-#include <memory>
-#include <numeric>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/util/assert_util.h"
+
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <numeric>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_stats {
 

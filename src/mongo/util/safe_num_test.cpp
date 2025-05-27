@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <limits>
+#include "mongo/util/safe_num.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/safe_num.h"
+
+#include <limits>
 
 namespace {
 

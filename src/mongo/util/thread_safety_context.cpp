@@ -29,7 +29,6 @@
 
 #include "mongo/util/thread_safety_context.h"
 
-
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 

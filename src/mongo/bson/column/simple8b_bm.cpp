@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/bson/column/simple8b.h"
+
+#include "mongo/bson/column/simple8b_builder.h"
+#include "mongo/bson/column/simple8b_type_util.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/shared_buffer.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <random>
 
+#include <benchmark/benchmark.h>
 #include <boost/cstdint.hpp>
-
-#include "mongo/bson/column/simple8b.h"
-#include "mongo/bson/column/simple8b_builder.h"
-#include "mongo/bson/column/simple8b_type_util.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 

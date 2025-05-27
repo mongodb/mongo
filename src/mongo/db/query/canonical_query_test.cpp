@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/canonical_query.h"
 
-#include <fmt/format.h>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_hasher.h"
@@ -43,6 +41,8 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+
 #include <forward_list>
 
 namespace mongo::bsoncolumn {

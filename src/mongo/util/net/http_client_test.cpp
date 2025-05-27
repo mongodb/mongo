@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/http_client.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

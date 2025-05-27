@@ -29,15 +29,15 @@
 
 #include "mongo/db/query/lru_key_value.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+
 #include <memory>
 #include <ostream>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 

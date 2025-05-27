@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/db/query/query_settings/query_settings_hash.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_settings/query_settings_hash.h"
 #include "mongo/unittest/unittest.h"
+
+#include <fmt/format.h>
 
 namespace mongo::query_settings {
 

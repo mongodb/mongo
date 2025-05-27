@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/db/query/shard_filterer_factory_mock.h"
+
+#include <utility>
 
 namespace mongo {
 

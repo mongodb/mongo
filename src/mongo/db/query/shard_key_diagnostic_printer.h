@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <fmt/format.h>
 
 namespace mongo::diagnostic_printers {
 

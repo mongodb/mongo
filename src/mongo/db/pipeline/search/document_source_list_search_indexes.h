@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <queue>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/search/search_query_view_spec_gen.h"
+
+#include <queue>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class DocumentSourceListSearchIndexesSpec;

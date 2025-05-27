@@ -29,9 +29,8 @@
 
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
 
-#include "mongo/db/s/transaction_coordinator.h"
-
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {

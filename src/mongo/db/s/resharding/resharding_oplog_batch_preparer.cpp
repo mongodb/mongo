@@ -29,14 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
-#include <cstddef>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator.h"
@@ -53,6 +45,14 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

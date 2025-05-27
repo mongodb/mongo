@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <array>
-#include <fmt/format.h>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_key_types.h"
+
+#include <array>
+#include <vector>
+
+#include <fmt/format.h>
 
 /*
  * The many token types are derived from the index key

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/catalog/collection_record_store_options.h"
+
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/record_store.h"

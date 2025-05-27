@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -47,6 +40,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

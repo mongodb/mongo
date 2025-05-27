@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <fmt/format.h>
+#include "mongo/bson/bsontypes.h"
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/string_map.h"
+
 #include <ostream>
 #include <utility>
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/util/string_map.h"
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

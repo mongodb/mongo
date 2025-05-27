@@ -29,11 +29,11 @@
 
 #include "mongo/util/versioned_value.h"
 
-#include <memory>
-
 #include "mongo/platform/atomic.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

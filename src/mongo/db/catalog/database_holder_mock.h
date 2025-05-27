@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/database_holder.h"
+
 #include <boost/none.hpp>
 
 namespace mongo {

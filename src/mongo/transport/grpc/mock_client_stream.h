@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include "mongo/transport/grpc/client_stream.h"
-
 #include "mongo/transport/grpc/bidirectional_pipe.h"
+#include "mongo/transport/grpc/client_stream.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_util.h"
 #include "mongo/util/future.h"

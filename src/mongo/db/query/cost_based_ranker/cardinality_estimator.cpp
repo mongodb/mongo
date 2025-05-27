@@ -34,6 +34,7 @@
 #include "mongo/db/query/cost_based_ranker/heuristic_estimator.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/stage_types.h"
+
 #include <absl/container/flat_hash_map.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryCE

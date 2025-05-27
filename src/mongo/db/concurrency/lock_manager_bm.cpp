@@ -27,19 +27,21 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <utility>
-#include <vector>
+#include "mongo/db/concurrency/lock_manager.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

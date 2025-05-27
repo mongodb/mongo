@@ -31,10 +31,10 @@
 
 #if defined(_WIN32)
 
-#include <iosfwd>
-
 #include "mongo/platform/windows_basic.h"  // for CONTEXT
 #include "mongo/util/stacktrace.h"
+
+#include <iosfwd>
 
 namespace mongo {
 

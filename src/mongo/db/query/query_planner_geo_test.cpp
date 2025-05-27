@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +38,10 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace {
 

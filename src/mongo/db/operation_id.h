@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <cstdint>
 
 namespace mongo {
 class ServiceContext;

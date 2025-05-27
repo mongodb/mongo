@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +41,11 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

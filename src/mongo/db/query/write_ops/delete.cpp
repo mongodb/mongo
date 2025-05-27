@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/write_ops/delete.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/write_ops/delete.h"
 #include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

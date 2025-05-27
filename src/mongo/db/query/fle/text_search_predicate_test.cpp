@@ -27,7 +27,24 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/fle/text_search_predicate.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tokens.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
 #include <functional>
 #include <initializer_list>
 #include <map>
@@ -37,22 +54,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/crypto/fle_crypto.h"
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
-#include "mongo/db/query/fle/text_search_predicate.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::fle {
 namespace {

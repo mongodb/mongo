@@ -29,13 +29,6 @@
 
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <ostream>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -82,6 +75,13 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
+
+#include <ostream>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

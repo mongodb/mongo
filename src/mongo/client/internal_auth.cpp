@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/client/internal_auth.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -39,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/internal_auth.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_command_constants.h"
@@ -50,6 +45,12 @@
 #include "mongo/util/password_digest.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace auth {

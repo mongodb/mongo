@@ -28,6 +28,7 @@
  */
 
 #include "mongo/client/replica_set_monitor_stats.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

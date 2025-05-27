@@ -28,16 +28,17 @@
  */
 
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/speculative_majority_read_info.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <algorithm>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

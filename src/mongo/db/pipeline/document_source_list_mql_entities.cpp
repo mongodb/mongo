@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/document_source_list_mql_entities.h"
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_list_mql_entities_gen.h"
 

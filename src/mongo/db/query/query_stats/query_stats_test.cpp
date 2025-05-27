@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_stats/query_stats.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/collection_type.h"
 #include "mongo/db/namespace_string.h"
@@ -36,7 +38,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_stats/find_key.h"
-#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"

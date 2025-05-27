@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <functional>
-#include <string_view>  // NOLINT
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
@@ -41,6 +36,12 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <functional>
+#include <string_view>  // NOLINT
+#include <variant>
+
+#include <boost/container/small_vector.hpp>
 
 namespace mongo::logv2 {
 

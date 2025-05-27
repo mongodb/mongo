@@ -27,21 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstdint>
-#include <deque>
-#include <iterator>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -98,6 +83,21 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

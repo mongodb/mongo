@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_resources.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace {

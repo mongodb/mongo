@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/bufreader.h"
+
+#include <vector>
 
 namespace mongo::sbe::value {
 

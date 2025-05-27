@@ -28,9 +28,7 @@
  */
 
 
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/session/kill_sessions_common.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,7 +36,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -46,6 +43,10 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <mutex>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

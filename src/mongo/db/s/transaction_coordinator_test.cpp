@@ -29,20 +29,7 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <absl/container/flat_hash_set.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <ratio>
-#include <string>
-#include <system_error>
-#include <utility>
-#include <vector>
+#include "mongo/db/s/transaction_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -65,7 +52,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
-#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
@@ -99,6 +85,22 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <ratio>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

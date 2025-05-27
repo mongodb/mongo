@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+
 #include <cstddef>
 #include <string>
-
-#include "mongo/base/status_with.h"
 
 namespace mongo::memory_util {
 

@@ -29,9 +29,6 @@
 
 #include "mongo/db/matcher/expression_geo_serializer.h"
 
-#include <vector>
-
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -41,6 +38,8 @@
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

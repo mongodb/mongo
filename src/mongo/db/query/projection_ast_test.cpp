@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
+#include "mongo/db/query/projection_ast.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -45,7 +36,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
@@ -55,6 +45,17 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace {
 

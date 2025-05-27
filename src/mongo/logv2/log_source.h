@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/log/attributes/constant.hpp>
-#include <boost/log/attributes/function.hpp>
-#include <boost/log/attributes/mutable_constant.hpp>
-#include <boost/log/keywords/channel.hpp>
-#include <boost/log/keywords/severity.hpp>
-#include <boost/log/sources/basic_logger.hpp>
-#include <boost/log/sources/threading_models.hpp>
-
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
@@ -46,6 +38,14 @@
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/log/attributes/constant.hpp>
+#include <boost/log/attributes/function.hpp>
+#include <boost/log/attributes/mutable_constant.hpp>
+#include <boost/log/keywords/channel.hpp>
+#include <boost/log/keywords/severity.hpp>
+#include <boost/log/sources/basic_logger.hpp>
+#include <boost/log/sources/threading_models.hpp>
 
 namespace mongo::logv2 {
 

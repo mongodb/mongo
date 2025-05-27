@@ -29,14 +29,14 @@
 
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
+#include "mongo/bson/util/builder.h"
+
 #include <iosfwd>
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/util/builder.h"
 
 namespace mongo::sbe {
 RuntimeEnvironment::RuntimeEnvironment(const RuntimeEnvironment& other)

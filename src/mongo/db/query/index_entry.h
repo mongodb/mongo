@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <iosfwd>
-#include <set>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -49,6 +40,16 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 class CollatorInterface;

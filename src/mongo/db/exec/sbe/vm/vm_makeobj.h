@@ -44,8 +44,6 @@
 #warning "vm_makeobj.h is only allowed to be included in whitelisted cpp files. See above comment"
 #endif
 
-#include <limits>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -54,6 +52,8 @@
 #include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/platform/compiler.h"
+
+#include <limits>
 
 namespace mongo::sbe::vm {
 namespace {  // NOLINT(google-build-namespaces) See WHITELIST comment above.

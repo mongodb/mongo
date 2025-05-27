@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,6 +44,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/update_zone_key_range_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

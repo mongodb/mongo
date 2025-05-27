@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/itoa.h"
+
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <type_traits>
-
-#include "mongo/base/string_data.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/itoa.h"
 
 namespace mongo {
 /**

@@ -29,7 +29,6 @@
 
 
 #include "mongo/config.h"
-
 #include "mongo/util/fail_point.h"
 
 #ifdef MONGO_CONFIG_SSL

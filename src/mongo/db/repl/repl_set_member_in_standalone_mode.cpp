@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
+
 #include "mongo/db/service_context.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

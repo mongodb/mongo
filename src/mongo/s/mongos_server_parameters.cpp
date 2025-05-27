@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -40,6 +36,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

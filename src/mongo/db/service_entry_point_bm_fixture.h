@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <benchmark/benchmark.h>
-#include <memory>
-
 #include "mongo/base/init.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
@@ -45,6 +42,10 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/benchmark_util.h"
 #include "mongo/util/processinfo.h"
+
+#include <memory>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 class ServiceEntryPointBenchmarkFixture : public unittest::BenchmarkWithProfiler {

@@ -29,23 +29,24 @@
 
 
 #include <algorithm>
-#include <boost/log/attributes/attribute_value.hpp>
-#include <boost/log/attributes/attribute_value_impl.hpp>
-#include <boost/log/attributes/attribute_value_set.hpp>
-#include <boost/log/core/record.hpp>
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <fmt/args.h>
-#include <fmt/format.h>
 #include <functional>
 #include <new>
 #include <string>
 #include <system_error>
 #include <utility>
 #include <variant>
+
+#include <boost/log/attributes/attribute_value.hpp>
+#include <boost/log/attributes/attribute_value_impl.hpp>
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/record.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include <fmt/args.h>
+#include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 
 #ifdef _WIN32

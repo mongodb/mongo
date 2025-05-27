@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 constexpr StringData InternalSchemaMatchArrayIndexMatchExpression::kName;

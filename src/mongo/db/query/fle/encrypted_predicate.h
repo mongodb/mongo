@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <typeindex>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
@@ -53,6 +46,14 @@
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <functional>
+#include <memory>
+#include <typeindex>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 /**
  * This file contains an abstract class that describes rewrites on agg Expressions and

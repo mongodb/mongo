@@ -29,12 +29,12 @@
 
 #include "mongo/db/query/query_test_service_context.h"
 
-#include <memory>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/s/sharding_state.h"
+
+#include <memory>
 
 namespace mongo {
 

@@ -29,12 +29,6 @@
 
 #include "mongo/db/admission/throughput_probing.h"
 
-#include <algorithm>
-#include <cmath>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/dump_lock_manager.h"
@@ -42,6 +36,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <algorithm>
+#include <cmath>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

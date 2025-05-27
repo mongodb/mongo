@@ -29,18 +29,18 @@
 
 #include "mongo/db/exec/and_hash.h"
 
-#include <memory>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/and_common.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 namespace {
 

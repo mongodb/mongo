@@ -29,18 +29,18 @@
 
 #include "mongo/db/aggregated_index_usage_tracker.h"
 
-#include "mongo/db/index_names.h"
-#include <utility>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

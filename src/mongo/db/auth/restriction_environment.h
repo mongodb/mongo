@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/net/sockaddr.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/s/grid.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace unified_write_executor {

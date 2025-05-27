@@ -30,8 +30,6 @@
 
 #include "mongo/s/grid.h"
 
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +38,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

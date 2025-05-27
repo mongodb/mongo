@@ -29,13 +29,13 @@
 
 #include "mongo/db/op_observer/batched_write_context.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 const OperationContext::Decoration<BatchedWriteContext> BatchedWriteContext::get =

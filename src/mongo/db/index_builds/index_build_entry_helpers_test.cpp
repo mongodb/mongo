@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
+#include "mongo/db/index_builds/index_build_entry_helpers.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -47,12 +39,21 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/db/index_builds/index_build_entry_gen.h"
-#include "mongo/db/index_builds/index_build_entry_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

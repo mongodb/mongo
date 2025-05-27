@@ -30,12 +30,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
@@ -59,6 +53,13 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

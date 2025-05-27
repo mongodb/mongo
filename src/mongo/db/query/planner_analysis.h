@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <map>
-#include <memory>
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
@@ -42,6 +37,12 @@
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+
+#include <map>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

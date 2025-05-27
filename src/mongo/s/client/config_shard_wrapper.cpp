@@ -28,14 +28,14 @@
  */
 #include "mongo/s/client/config_shard_wrapper.h"
 
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

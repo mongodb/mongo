@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-#include <ostream>
-#include <thread>
-#include <tuple>
-#include <type_traits>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/producer_consumer_queue.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
@@ -47,8 +39,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/time_support.h"
+
+#include <array>
+#include <ostream>
+#include <thread>
+#include <tuple>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

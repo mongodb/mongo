@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/container/static_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -59,6 +49,17 @@
 #include "mongo/util/tracking/inlined_vector.h"
 #include "mongo/util/tracking/unordered_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <variant>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/container/static_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <mutex>
-
 #include "mongo/db/repl/intent_registry.h"
+
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

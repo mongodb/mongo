@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +40,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

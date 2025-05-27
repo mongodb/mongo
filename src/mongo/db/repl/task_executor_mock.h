@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/baton.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
 
 namespace mongo {
 namespace repl {

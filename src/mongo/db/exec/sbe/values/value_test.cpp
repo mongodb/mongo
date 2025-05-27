@@ -27,21 +27,22 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <initializer_list>
-#include <tuple>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/exec/sbe/values/value.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+#include <initializer_list>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo::sbe {
 

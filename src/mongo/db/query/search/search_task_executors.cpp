@@ -30,15 +30,15 @@
 
 #include "search_task_executors.h"
 
-#include <memory>
-#include <utility>
-
 #include "mongo/executor/connection_pool_controllers.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
 
 #include "mongot_options.h"
 #include "search_index_options.h"

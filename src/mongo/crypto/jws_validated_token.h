@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/jwk_manager.h"
 #include "mongo/crypto/jwt_types_gen.h"
+
+#include <string>
 
 namespace mongo::crypto {
 

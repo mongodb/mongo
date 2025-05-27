@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <numeric>
-
 #include "mongo/db/pipeline/field_path.h"
+
+#include <numeric>
 
 namespace mongo::monotonic {
 

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <cstdio>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
@@ -44,6 +40,11 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/message.h"
+
+#include <cstdint>
+#include <cstdio>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

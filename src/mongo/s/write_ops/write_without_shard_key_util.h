@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,6 +39,10 @@
 #include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class WriteConcernErrorDetail;

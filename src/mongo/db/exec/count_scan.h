@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -50,6 +46,10 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

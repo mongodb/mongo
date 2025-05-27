@@ -27,21 +27,22 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_set.h>
-#include <algorithm>
-#include <cstdint>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/views/view_graph.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/views/view.h"
-#include "mongo/db/views/view_graph.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
 
 namespace mongo {
 

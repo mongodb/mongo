@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 // Helper that's used to make tests easier to write (and read). Not all tests have been changed

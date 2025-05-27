@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace clustered_util {

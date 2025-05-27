@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_stats/key.h"
+
+#include <memory>
 
 
 namespace mongo::query_stats {

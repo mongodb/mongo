@@ -29,11 +29,6 @@
 
 #include "mongo/db/s/sharding_write_router.h"
 
-#include <boost/none.hpp>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/catalog_cache.h"
@@ -41,6 +36,10 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

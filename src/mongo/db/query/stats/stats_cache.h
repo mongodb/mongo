@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <memory>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
@@ -41,6 +36,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/read_through_cache.h"
+
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo::stats {
 using StatsCacheType = ReadThroughCache<StatsPathString, StatsCacheVal>;

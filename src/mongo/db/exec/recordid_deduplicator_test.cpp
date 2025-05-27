@@ -32,6 +32,7 @@
 //
 
 #include "mongo/db/exec/recordid_deduplicator.h"
+
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 

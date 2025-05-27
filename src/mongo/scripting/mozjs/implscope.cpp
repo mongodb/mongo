@@ -28,6 +28,11 @@
  */
 
 
+#include <jsapi.h>
+#include <jscustomallocator.h>
+#include <jsfriendapi.h>
+#include <jspubtd.h>
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
@@ -55,17 +60,8 @@
 #include <js/TypeDecls.h>
 #include <js/Value.h>
 #include <js/friend/ErrorMessages.h>
-#include <jsapi.h>
-#include <jscustomallocator.h>
-#include <jsfriendapi.h>
-#include <jspubtd.h>
 #include <mozilla/Utf8.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <mutex>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -85,6 +81,11 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

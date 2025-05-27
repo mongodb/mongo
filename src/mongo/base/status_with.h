@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <iosfwd>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
@@ -43,6 +36,14 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/stringify.h"
 #include "mongo/util/assert_util_core.h"
+
+#include <iosfwd>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

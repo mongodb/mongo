@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/version_context.h"
-
 #include "mongo/db/operation_context.h"
+#include "mongo/db/version_context.h"
 
 namespace mongo {
 

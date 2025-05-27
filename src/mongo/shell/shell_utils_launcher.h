@@ -29,18 +29,19 @@
 
 #pragma once
 
-#include <boost/filesystem.hpp>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+
 #include <map>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
+#include <boost/filesystem.hpp>
 
 namespace mongo {
 

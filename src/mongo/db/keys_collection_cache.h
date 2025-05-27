@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

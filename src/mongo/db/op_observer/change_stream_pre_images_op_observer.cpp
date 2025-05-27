@@ -29,11 +29,11 @@
 
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 
-#include <fmt/format.h>
-
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/transaction_resources.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 

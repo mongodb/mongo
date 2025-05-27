@@ -28,9 +28,6 @@
  */
 
 
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -50,6 +47,9 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
+
+#include <iosfwd>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

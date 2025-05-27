@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/base/parse_number.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"  // for str::stream()!
+
 #include <algorithm>
 #include <cmath>
-#include <fmt/format.h>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -37,11 +43,7 @@
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/parse_number.h"
-#include "mongo/base/status.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"  // for str::stream()!
+#include <fmt/format.h>
 
 #define ASSERT_PARSES_WITH_PARSER(type, input_string, parser, expected_value) \
     do {                                                                      \

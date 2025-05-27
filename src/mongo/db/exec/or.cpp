@@ -29,15 +29,15 @@
 
 #include "mongo/db/exec/or.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/filter.h"
+
 #include <iterator>
 #include <memory>
 #include <utility>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/filter.h"
 
 namespace mongo {
 

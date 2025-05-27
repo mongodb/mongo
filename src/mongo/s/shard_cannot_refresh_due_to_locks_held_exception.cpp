@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

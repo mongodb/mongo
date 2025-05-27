@@ -28,13 +28,7 @@
  */
 
 
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <memory>
-#include <ratio>
-#include <string>
-#include <utility>
+#include "mongo/util/executor_stats.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -44,8 +38,16 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/executor_stats.h"
 #include "mongo/util/functional.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <ratio>
+#include <string>
+#include <utility>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

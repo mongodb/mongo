@@ -29,19 +29,6 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-#include <boost/container/flat_set.hpp>
-#include <boost/optional/optional.hpp>
-#include <compare>
-#include <cstdint>
-#include <cstring>
-#include <functional>
-#include <iosfwd>
-#include <span>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -63,6 +50,20 @@
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <compare>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <iosfwd>
+#include <span>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <absl/hash/hash.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace key_string {

@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ratio>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/replica_set_aware_service.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
@@ -39,7 +36,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/database_sharding_state_factory_mock.h"
@@ -50,6 +46,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <ratio>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

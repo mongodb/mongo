@@ -29,6 +29,7 @@
 
 
 #include "mongo/s/stale_shard_version_helpers.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/database_name.h"
 #include "mongo/logv2/log.h"

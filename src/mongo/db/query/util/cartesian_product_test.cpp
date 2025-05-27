@@ -30,6 +30,7 @@
 #include "cartesian_product.h"
 
 #include "mongo/unittest/unittest.h"
+
 #include <algorithm>
 
 

@@ -28,12 +28,13 @@
  */
 
 
-#include <benchmark/benchmark.h>
+#include "mongo/platform/endian.h"
+
 #include <cstdint>
 #include <numeric>
 #include <vector>
 
-#include "mongo/platform/endian.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

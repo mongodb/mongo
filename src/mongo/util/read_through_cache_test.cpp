@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <string>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-
+#include "mongo/util/read_through_cache.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
@@ -49,8 +40,17 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/out_of_line_executor.h"
-#include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
+
+#include <cstddef>
+#include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

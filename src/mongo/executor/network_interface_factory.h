@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/executor/async_client_factory.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/transport/transport_layer.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace executor {

@@ -28,18 +28,7 @@
  */
 
 
-#include "mongo/util/serialization_context.h"
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/rpc/op_msg_test.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -72,11 +61,23 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/serialization_context.h"
+
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

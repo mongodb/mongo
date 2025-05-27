@@ -28,12 +28,7 @@
  */
 
 
-#include <boost/container/flat_set.hpp>
-#include <mutex>
-
-#include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index_builds/skipped_record_tracker.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -48,7 +43,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/preallocated_container_pool.h"
-#include "mongo/db/index_builds/skipped_record_tracker.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
@@ -63,6 +57,13 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <mutex>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

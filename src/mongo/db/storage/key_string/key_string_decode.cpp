@@ -27,15 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdlib>
-#include <exception>
-#include <iostream>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -55,6 +46,15 @@
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
+
+#include <cstdlib>
+#include <exception>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

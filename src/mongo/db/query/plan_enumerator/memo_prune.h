@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
+#include "mongo/db/query/projection.h"
+
 #include <memory>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
-#include "mongo/db/query/projection.h"
 
 namespace mongo {
 namespace plan_enumerator {

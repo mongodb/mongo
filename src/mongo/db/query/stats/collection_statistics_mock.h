@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo::stats {
 

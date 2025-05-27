@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+
 #include <cmath>
 #include <tuple>
 #include <utility>
-
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

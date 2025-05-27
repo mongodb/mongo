@@ -30,8 +30,6 @@
 
 #include "mongo/s/client_transport_observer_mongos.h"
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/request_execution_context.h"
@@ -41,6 +39,8 @@
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/transaction_router.h"
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

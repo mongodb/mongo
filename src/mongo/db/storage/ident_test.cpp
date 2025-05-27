@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/storage/ident.h"
+
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

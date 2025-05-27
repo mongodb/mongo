@@ -29,12 +29,6 @@
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
-#include <typeinfo>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -66,6 +60,12 @@
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/str.h"
+
+#include <typeinfo>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

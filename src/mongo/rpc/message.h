@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <utility>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/encoded_value_storage.h"
@@ -42,6 +37,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

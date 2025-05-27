@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
@@ -46,6 +42,10 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace asio {
 class io_context;

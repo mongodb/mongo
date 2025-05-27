@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +45,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

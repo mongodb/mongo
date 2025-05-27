@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 

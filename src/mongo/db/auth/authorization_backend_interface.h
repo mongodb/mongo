@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/tenant_id.h"

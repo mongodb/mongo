@@ -30,10 +30,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
@@ -48,6 +44,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {

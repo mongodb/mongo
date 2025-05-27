@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
+
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

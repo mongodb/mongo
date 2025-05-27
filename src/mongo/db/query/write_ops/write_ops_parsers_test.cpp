@@ -28,10 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <initializer_list>
-#include <memory>
-#include <string>
-#include <vector>
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -45,13 +42,17 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
-#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

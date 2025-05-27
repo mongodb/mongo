@@ -31,6 +31,10 @@
 
 #ifdef MONGO_CONFIG_OTEL
 
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/chrono.h"
+#include "mongo/tracing/trace_settings_gen.h"
+
 #include <opentelemetry/exporters/otlp/otlp_file_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_file_exporter_options.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
@@ -40,10 +44,6 @@
 #include <opentelemetry/sdk/trace/tracer_provider.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
 #include <opentelemetry/trace/provider.h>
-
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/tracing/trace_settings_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

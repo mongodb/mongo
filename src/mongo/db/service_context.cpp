@@ -33,10 +33,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <exception>
-#include <list>
-#include <memory>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
@@ -57,6 +53,10 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
+
+#include <exception>
+#include <list>
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstdint>
+#include "mongo/transport/transport_layer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/util/future_util.h"
+
+#include <cstdint>
 
 namespace mongo {
 namespace transport {

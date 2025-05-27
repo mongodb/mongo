@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <string>
-
-#include "mongo/base/string_data.h"
 
 namespace mongo {
 

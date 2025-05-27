@@ -28,17 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <deque>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/balancer/auto_merger_policy.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -50,7 +40,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -66,6 +55,18 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <deque>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

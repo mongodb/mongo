@@ -29,11 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 
-#include <cerrno>
-
-#include <boost/move/utility_core.hpp>
-#include <wiredtiger.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -49,6 +44,12 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <cerrno>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

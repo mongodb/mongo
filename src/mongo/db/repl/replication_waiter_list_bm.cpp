@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+
+#include <benchmark/benchmark.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

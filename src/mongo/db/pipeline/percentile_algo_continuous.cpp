@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/percentile_algo_continuous.h"
+
 #include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <cmath>
 #include <limits>
 #include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/pipeline/percentile_algo_continuous.h"
 
 namespace mongo {
 

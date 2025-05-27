@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <cmath>
-
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+
+#include <cmath>
 
 namespace mongo {
 

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <initializer_list>
+#include "mongo/db/matcher/path.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/path.h"
 #include "mongo/unittest/unittest.h"
+
+#include <initializer_list>
 
 namespace mongo {
 

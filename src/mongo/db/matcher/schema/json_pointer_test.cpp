@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/schema/json_pointer.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/schema/json_pointer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

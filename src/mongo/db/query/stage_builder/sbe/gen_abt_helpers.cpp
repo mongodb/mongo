@@ -29,8 +29,13 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
-#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
@@ -38,12 +43,7 @@
 #include <numeric>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/query/algebra/polyvalue.h"
-#include "mongo/db/query/bson_typemask.h"
-#include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
-#include "mongo/util/assert_util.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 SbExpr makeBooleanOpTree(abt::Operations logicOp,

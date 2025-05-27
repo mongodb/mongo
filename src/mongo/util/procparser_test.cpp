@@ -30,9 +30,10 @@
 
 #include <array>
 #include <cerrno>
-#include <fcntl.h>
 #include <map>
 #include <system_error>
+
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <boost/filesystem/operations.hpp>

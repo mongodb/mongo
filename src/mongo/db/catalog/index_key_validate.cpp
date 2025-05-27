@@ -27,19 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
-#include <limits>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/catalog/index_key_validate.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -53,7 +41,6 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
-#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -77,6 +64,20 @@
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <string>
-#include <type_traits>
-
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+#include <type_traits>
 
 namespace mongo {
 

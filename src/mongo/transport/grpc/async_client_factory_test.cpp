@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_client_factory.h"
+
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/logv2/log.h"

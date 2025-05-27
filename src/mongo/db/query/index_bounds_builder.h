@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +40,8 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
+
+#include <string>
 
 namespace mongo {
 

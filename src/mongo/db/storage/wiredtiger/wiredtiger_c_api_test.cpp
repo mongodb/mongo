@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <ostream>
-#include <string>
-#include <wiredtiger.h>
-
-#include <boost/filesystem/directory.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <ostream>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

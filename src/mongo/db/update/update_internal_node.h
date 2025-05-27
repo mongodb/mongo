@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_node.h"
+
+#include <map>
+#include <string>
 
 namespace mongo {
 

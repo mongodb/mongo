@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <functional>
-#include <utility>
-#include <variant>
-
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -43,6 +37,13 @@
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
+
+#include <functional>
+#include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 /**

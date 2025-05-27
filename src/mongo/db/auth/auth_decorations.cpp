@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_client_handle.h"
@@ -49,6 +42,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/sequence_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cmath>
-#include <memory>
-#include <utility>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -41,6 +37,10 @@
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+
+#include <cmath>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

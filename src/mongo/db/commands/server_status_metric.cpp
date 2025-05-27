@@ -29,15 +29,6 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
-#include <cstddef>
-#include <deque>
-#include <fmt/format.h>
-#include <memory>
-#include <new>
-#include <vector>
-
-#include <absl/container/node_hash_set.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -47,6 +38,15 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
+
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <new>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

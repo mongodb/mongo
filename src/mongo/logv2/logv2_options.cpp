@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -41,6 +39,8 @@
 #include "mongo/logv2/log_util.h"
 #include "mongo/logv2/logv2_options_gen.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

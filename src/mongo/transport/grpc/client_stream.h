@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <grpcpp/grpcpp.h>
-
 #include "mongo/transport/grpc/reactor.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <boost/optional.hpp>
+#include <grpcpp/grpcpp.h>
 
 namespace mongo::transport::grpc {
 

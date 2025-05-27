@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +36,10 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

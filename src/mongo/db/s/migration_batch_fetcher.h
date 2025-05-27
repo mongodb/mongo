@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +51,9 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
 
 #pragma once
 

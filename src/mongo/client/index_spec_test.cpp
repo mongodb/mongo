@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/index_spec.h"
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

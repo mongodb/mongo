@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <variant>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/yieldable.h"
+
+#include <memory>
+#include <variant>
 
 namespace mongo {
 

@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/commands/query_cmd/plan_cache_commands.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/commands/query_cmd/plan_cache_commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

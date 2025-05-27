@@ -28,18 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <cstddef>
-#include <fstream>  // IWYU pragma: keep
-#include <initializer_list>
-#include <iostream>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/client/mongo_uri.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -49,10 +38,22 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/client/mongo_uri.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+#include <initializer_list>
+#include <iostream>
+#include <memory>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

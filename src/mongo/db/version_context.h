@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <variant>
-
 #include "mongo/db/server_options.h"
 #include "mongo/db/version_context_metadata_gen.h"
+
+#include <variant>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

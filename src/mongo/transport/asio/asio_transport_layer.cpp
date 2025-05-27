@@ -30,21 +30,16 @@
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
-#include <fmt/format.h>
 #include <fstream>
+
+#include <fmt/format.h>
 
 #ifdef __linux__
 #include <netinet/tcp.h>
 #endif
 
-#include <asio.hpp>
-#include <asio/system_timer.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem/operations.hpp>
-
-#include "mongo/config.h"
-
 #include "mongo/base/system_error.h"
+#include "mongo/config.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -68,6 +63,12 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/strong_weak_finish_line.h"
+
+#include <asio.hpp>
+
+#include <asio/system_timer.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl.hpp"

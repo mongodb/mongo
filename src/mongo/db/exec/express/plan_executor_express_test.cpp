@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/json.h"
 #include "mongo/db/exec/express/plan_executor_express.h"
+
+#include "mongo/bson/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 

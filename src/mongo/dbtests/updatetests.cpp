@@ -31,14 +31,6 @@
  * unit tests relating to update requests
  */
 
-#include <algorithm>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,6 +52,14 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace UpdateTests {

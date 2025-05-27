@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
@@ -46,6 +43,9 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace metadata_consistency_util {

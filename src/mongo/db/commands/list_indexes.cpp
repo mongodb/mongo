@@ -28,20 +28,7 @@
  */
 
 
-#include <cstdint>
-#include <fmt/format.h>
-#include <limits>
-#include <list>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/catalog/list_indexes.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -55,7 +42,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_indexes_allowed_fields.h"
 #include "mongo/db/commands/shuffle_list_command_results.h"
@@ -91,6 +77,21 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <limits>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

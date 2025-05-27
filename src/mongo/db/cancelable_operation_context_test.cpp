@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <mutex>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/cancelable_operation_context.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

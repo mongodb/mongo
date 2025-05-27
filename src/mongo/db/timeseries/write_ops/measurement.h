@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/string_map.h"
+
+#include <vector>
 
 
 namespace mongo::timeseries::write_ops_utils::details {

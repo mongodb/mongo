@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
+
 #include <cstring>
 #include <memory>
 #include <numeric>
@@ -37,9 +40,6 @@
 #include <grpcpp/impl/service_type.h>
 #include <grpcpp/support/byte_buffer.h>
 #include <grpcpp/support/status.h>
-
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/shared_buffer.h"
 
 namespace grpc {
 

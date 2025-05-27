@@ -27,23 +27,24 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/window_function/partition_iterator.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
+
 #include <variant>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
-#include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
-#include "mongo/util/str.h"
 
 using boost::optional;
 

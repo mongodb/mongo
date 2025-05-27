@@ -26,8 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <tuple>
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/search_index_commands_gen.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/version_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+
+#include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

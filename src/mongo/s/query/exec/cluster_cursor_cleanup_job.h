@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/background.h"
+
 #include <atomic>
 #include <string>
-
-#include "mongo/util/background.h"
 
 namespace mongo {
 

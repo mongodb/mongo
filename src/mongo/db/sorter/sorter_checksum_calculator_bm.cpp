@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
+
 #include "mongo/platform/random.h"
 
 #include <benchmark/benchmark.h>

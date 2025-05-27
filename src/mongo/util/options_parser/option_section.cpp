@@ -29,13 +29,13 @@
 
 #include "mongo/util/options_parser/option_section.h"
 
-#include <algorithm>
-#include <iostream>
-#include <sstream>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <algorithm>
+#include <iostream>
+#include <sstream>
 
 namespace mongo {
 namespace optionenvironment {

@@ -27,22 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-#include <js/Array.h>
-#include <js/ComparisonOperators.h>
-#include <js/Conversions.h>
-#include <js/Date.h>
-#include <js/Object.h>
-#include <js/RegExp.h>
-#include <jsapi.h>
-#include <jsfriendapi.h>
-#include <jspubtd.h>
-#include <new>
-
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/valuewriter.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -64,13 +49,30 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/timestamp.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <new>
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+#include <jspubtd.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/Array.h>
+#include <js/ComparisonOperators.h>
+#include <js/Conversions.h>
+#include <js/Date.h>
+#include <js/Object.h>
+#include <js/RegExp.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

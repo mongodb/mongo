@@ -28,11 +28,11 @@
  */
 #include "mongo/util/pcre_util.h"
 
-#include <fmt/format.h>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
+
+#include <fmt/format.h>
 
 namespace mongo::pcre_util {
 

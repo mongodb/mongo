@@ -28,17 +28,19 @@
  */
 
 
-#include <bitset>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <iostream>
-#include <psapi.h>
-#include <winsock2.h>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/text.h"
+
+#include <bitset>
+#include <iostream>
+
+#include <psapi.h>
+#include <winsock2.h>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

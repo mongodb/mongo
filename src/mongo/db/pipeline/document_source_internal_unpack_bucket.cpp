@@ -29,23 +29,18 @@
 
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
+#include <cstddef>
+#include <cstdint>
+
+#include <s2cellid.h>
+
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <iterator>
-#include <list>
-#include <ostream>
-#include <string>
-#include <tuple>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -91,6 +86,13 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <ostream>
+#include <string>
+#include <tuple>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

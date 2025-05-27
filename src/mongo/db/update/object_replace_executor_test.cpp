@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/update/object_replace_executor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -39,10 +39,11 @@
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
-#include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
@@ -50,6 +42,14 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
+
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace {
 

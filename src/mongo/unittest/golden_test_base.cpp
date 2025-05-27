@@ -27,6 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/unittest/golden_test_base.h"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
+
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+
 #include <boost/core/addressof.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -40,23 +53,12 @@
 #include <boost/program_options/value_semantic.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/type_index/type_index_facade.hpp>
-#include <cstddef>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <fstream>  // IWYU pragma: keep
 #include <yaml-cpp/node/impl.h>
 #include <yaml-cpp/node/node.h>
 #include <yaml-cpp/node/parse.h>
 #include <yaml-cpp/yaml.h>  // IWYU pragma: keep
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

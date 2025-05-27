@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <cstddef>
-#include <deque>
-#include <memory>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/spill_table.h"
+
+#include <cstddef>
+#include <deque>
+#include <memory>
 
 namespace mongo {
 

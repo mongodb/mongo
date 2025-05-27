@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <limits>
-#include <string>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -40,6 +36,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <limits>
+#include <string>
 
 namespace mongo {
 

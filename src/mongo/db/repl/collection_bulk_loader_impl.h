@@ -30,10 +30,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index_builds/multi_index_block.h"
@@ -43,6 +39,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace repl {

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

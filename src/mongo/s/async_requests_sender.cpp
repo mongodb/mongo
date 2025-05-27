@@ -28,14 +28,7 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <tuple>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/async_requests_sender.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/curop.h"
@@ -44,7 +37,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/transaction_participant_failed_unyield_exception.h"
@@ -53,6 +45,15 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <tuple>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

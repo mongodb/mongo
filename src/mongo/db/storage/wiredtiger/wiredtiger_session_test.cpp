@@ -29,12 +29,13 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 
-#include <memory>
-#include <wiredtiger.h>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <queue>
-
 #include "mongo/db/exec/sbe/stages/stages.h"
+
+#include <queue>
 
 namespace mongo::sbe {
 /**

@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/executor/connection_pool_stats.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/duration.h"
+
 #include <algorithm>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <iosfwd>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/executor/connection_pool_stats.h"
-#include "mongo/util/duration.h"
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 namespace mongo {
 namespace executor {

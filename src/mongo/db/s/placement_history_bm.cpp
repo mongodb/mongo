@@ -28,12 +28,6 @@
  */
 
 
-#include <benchmark/benchmark.h>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -68,6 +62,13 @@
 #include "mongo/s/database_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

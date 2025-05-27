@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
+
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 

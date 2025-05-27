@@ -29,11 +29,10 @@
 
 #include "mongo/s/initialize_tenant_to_shard_cache.h"
 
-#include <utility>
-
-
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

@@ -28,16 +28,17 @@
  */
 
 #ifdef _WIN32
-#include "named_pipe.h"
-
-#include <fmt/format.h>
-#include <string>
-#include <system_error>
-
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/named_pipe/io_error_message.h"
 #include "mongo/util/errno_util.h"
+
+#include <string>
+#include <system_error>
+
+#include "named_pipe.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 

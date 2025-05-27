@@ -27,23 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/hash/hash.h>
-#include <boost/cstdint.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <type_traits>
-#include <typeinfo>
-
-#include <absl/strings/string_view.h>
+#include "mongo/db/exec/document_value/value.h"
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
@@ -55,12 +39,29 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_internal.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
+
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <type_traits>
+#include <typeinfo>
+
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
+#include <boost/cstdint.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

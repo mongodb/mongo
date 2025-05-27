@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <map>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +42,13 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <vector>
 
 
 namespace mongo {

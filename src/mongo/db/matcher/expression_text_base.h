@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

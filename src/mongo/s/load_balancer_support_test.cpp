@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
-#include <string>
+#include "mongo/s/load_balancer_support.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -37,10 +35,13 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/load_balancer_support.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-
 #include "mongo/bson/oid.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo::timeseries::bucket_catalog {
 

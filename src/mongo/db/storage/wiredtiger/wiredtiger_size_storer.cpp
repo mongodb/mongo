@@ -29,10 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <wiredtiger.h>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +43,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+
+#include <wiredtiger.h>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

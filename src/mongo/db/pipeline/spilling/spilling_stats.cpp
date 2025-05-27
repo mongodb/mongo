@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <limits>
-
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
+
+#include <limits>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats

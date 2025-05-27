@@ -27,12 +27,14 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
+#include "mongo/platform/atomic_proxy.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/atomic_proxy.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

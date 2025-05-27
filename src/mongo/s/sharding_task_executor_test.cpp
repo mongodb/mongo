@@ -28,12 +28,7 @@
  */
 
 
-#include <fmt/format.h>
-#include <list>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/sharding_task_executor.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -50,9 +45,15 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
-#include "mongo/s/sharding_task_executor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
+
+#include <list>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

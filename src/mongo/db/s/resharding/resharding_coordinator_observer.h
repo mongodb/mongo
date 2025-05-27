@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -41,6 +37,11 @@
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/string_map.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

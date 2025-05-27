@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/query/stats/ce_histogram.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
+
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -36,10 +40,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/db/query/stats/ce_histogram.h"
-#include "mongo/db/query/stats/scalar_histogram.h"
-#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::stats {
 

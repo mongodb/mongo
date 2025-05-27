@@ -29,15 +29,15 @@
 
 #include "kms.h"
 
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 
 namespace mongo {

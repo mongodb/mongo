@@ -44,11 +44,11 @@
 #include <pthread_np.h>
 #endif
 
-#include <limits>
-#include <sstream>  // IWYU pragma: keep
-
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"  // IWYU pragma: keep
+
+#include <limits>
+#include <sstream>  // IWYU pragma: keep
 
 namespace mongo {
 

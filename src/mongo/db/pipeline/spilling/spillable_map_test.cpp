@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_set.h>
-
 #include "mongo/db/pipeline/spilling/spillable_map.h"
+
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <absl/container/flat_hash_set.h>
 
 namespace mongo {
 namespace {

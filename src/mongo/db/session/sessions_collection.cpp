@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/session/sessions_collection.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -46,13 +38,22 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_server_parameters_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result_write_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

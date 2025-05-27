@@ -32,8 +32,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/dbclient_mockcursor.h"
 #include "mongo/db/basic_types.h"
@@ -48,6 +46,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
 
 using mongo::BSONObj;
 

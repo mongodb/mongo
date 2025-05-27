@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/s/catalog/type_collection.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

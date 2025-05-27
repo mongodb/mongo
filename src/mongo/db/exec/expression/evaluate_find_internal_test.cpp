@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <set>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -48,6 +41,13 @@
 #include "mongo/db/pipeline/expression_find_internal.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/string_map.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::expression_evaluate_internal_tests {
 

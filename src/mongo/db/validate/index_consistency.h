@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -51,6 +43,14 @@
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/db/validate/validate_state.h"
 #include "mongo/util/progress_meter.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

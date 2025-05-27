@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/transport/grpc/client_context.h"
-
 #include "mongo/transport/grpc/mock_client_stream.h"
 
 namespace mongo::transport::grpc {

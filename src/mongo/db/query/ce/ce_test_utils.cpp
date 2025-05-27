@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/ce_test_utils.h"
+
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/query/stats/value_utils.h"

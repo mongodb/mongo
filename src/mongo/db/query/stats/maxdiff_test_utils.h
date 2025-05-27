@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/stats/value_utils.h"
+
 #include <cstddef>
 #include <string>
 #include <vector>
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::stats {
 

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/core.h>
-
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/service_context.h"
@@ -41,6 +36,11 @@
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/unittest/unittest.h"
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/core.h>
 
 namespace mongo {
 namespace {

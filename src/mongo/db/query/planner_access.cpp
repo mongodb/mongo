@@ -30,18 +30,14 @@
 
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <s2cellid.h>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <memory>
-#include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <set>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -85,6 +81,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

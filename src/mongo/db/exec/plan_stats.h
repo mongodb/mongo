@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstdlib>
-#include <string>
-#include <vector>
-
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
@@ -45,6 +40,11 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

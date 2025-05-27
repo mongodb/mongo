@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
 
 namespace mongo {
 namespace executor {

@@ -29,12 +29,14 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <wiredtiger.h>
-
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+
+#include <cstdint>
+
+#include <wiredtiger.h>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**

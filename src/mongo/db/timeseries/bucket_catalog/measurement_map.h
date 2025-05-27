@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/tracking/string_map.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo::timeseries::bucket_catalog {
 

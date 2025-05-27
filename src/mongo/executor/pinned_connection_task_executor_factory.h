@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
+
+#include <memory>
 
 namespace mongo {
 namespace executor {

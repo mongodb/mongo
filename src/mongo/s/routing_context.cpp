@@ -30,9 +30,6 @@
 
 #include "mongo/s/routing_context.h"
 
-#include <exception>
-#include <optional>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/logv2/log.h"
@@ -41,6 +38,9 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <exception>
+#include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

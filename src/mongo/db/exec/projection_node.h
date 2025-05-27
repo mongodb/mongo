@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <list>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -54,6 +42,19 @@
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 /**

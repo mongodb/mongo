@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
@@ -45,6 +40,11 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace migrationutil {

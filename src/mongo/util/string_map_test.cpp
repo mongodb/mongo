@@ -28,14 +28,15 @@
  */
 
 
+#include "mongo/util/string_map.h"
+
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstdio>
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

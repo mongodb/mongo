@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <span>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/validate/validate_results.h"
+
+#include <span>
 
 namespace mongo {
 

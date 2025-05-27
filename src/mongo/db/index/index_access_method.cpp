@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/container/container_fwd.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
+#include "mongo/db/index/index_access_method.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -52,7 +44,6 @@
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/hash_access_method.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/index/s2_access_method.h"
@@ -78,6 +69,17 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/stacktrace.h"
+
+#include <algorithm>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/container/container_fwd.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

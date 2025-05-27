@@ -28,12 +28,6 @@
  */
 
 
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <fmt/format.h>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/rpc/op_msg.h"
@@ -44,6 +38,13 @@
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/transport/message_compressor_zstd.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <string>
+#include <utility>
+
+#include <benchmark/benchmark.h>
+#include <fmt/format.h>
 
 namespace mongo {
 

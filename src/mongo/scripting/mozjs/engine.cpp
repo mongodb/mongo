@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <js-config.h>
-#include <js/Initialization.h>
-#include <utility>
-#include <vector>
+#include "mongo/scripting/mozjs/engine.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,11 +35,23 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/engine_gen.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/proxyscope.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+#include <js-config.h>
+
+#include <absl/meta/type_traits.h>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <js/Initialization.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

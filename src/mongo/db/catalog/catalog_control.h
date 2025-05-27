@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <map>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
 
 namespace mongo {
 namespace catalog {

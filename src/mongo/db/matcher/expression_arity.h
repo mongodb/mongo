@@ -29,12 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/matcher/expression.h"
+
 #include <algorithm>
 #include <array>
-#include <boost/optional.hpp>
 #include <memory>
 
-#include "mongo/db/matcher/expression.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 

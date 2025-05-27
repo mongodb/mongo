@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace auth {

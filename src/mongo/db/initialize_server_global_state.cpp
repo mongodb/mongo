@@ -28,15 +28,16 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <fmt/format.h>
 #include <iostream>
 #include <string>
 #include <system_error>
+
+#include <boost/filesystem/operations.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
@@ -71,6 +72,7 @@
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
+
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>

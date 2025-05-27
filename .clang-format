@@ -75,21 +75,25 @@ ForEachMacros:
   - BOOST_FOREACH
 StatementAttributeLikeMacros:
   - Q_EMIT
-IncludeBlocks:   Preserve
+IncludeBlocks:   Regroup
 IncludeCategories:
+  - Regex:           '"mongo/.*"'
+    Priority:        10
+    SortPriority:    0
+    CaseSensitive:   true
+  - Regex:           '[<"][a-z_]*[">]' # c++ stdlib headers (no folder or extension)
+    Priority:        20
+    SortPriority:    0
+    CaseSensitive:   false
+  - Regex:           '[<"][^/]*[">]' # top-level headers with no folder
+    Priority:        30
+    SortPriority:    0
+    CaseSensitive:   false
   - Regex:           '.*'
-    Priority:        1
+    Priority:        40
     SortPriority:    0
     CaseSensitive:   false
-  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
-    Priority:        3
-    SortPriority:    0
-    CaseSensitive:   false
-  - Regex:           '.*'
-    Priority:        1
-    SortPriority:    0
-    CaseSensitive:   false
-IncludeIsMainRegex: '(Test)?$'
+IncludeIsMainRegex: '(_(test|bm))?$'
 IncludeIsMainSourceRegex: ''
 IndentCaseLabels: true
 IndentCaseBlocks: false

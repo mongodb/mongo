@@ -29,15 +29,6 @@
 
 #include "range_predicate.h"
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <functional>
-#include <iterator>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -48,6 +39,15 @@
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::fle {
 

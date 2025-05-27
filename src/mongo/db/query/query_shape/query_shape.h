@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
 

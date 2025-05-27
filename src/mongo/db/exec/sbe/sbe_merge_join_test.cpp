@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,6 +40,10 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 /**

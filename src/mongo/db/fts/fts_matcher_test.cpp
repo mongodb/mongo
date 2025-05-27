@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
+#include "mongo/db/fts/fts_matcher.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace fts {

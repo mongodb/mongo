@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/net/ssl_util.h"
+
 #include "mongo/util/str.h"
 
 namespace mongo {

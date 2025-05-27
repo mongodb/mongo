@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <ostream>
-
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -39,6 +36,9 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <ostream>
 
 namespace mongo {
 namespace unittest {

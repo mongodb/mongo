@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <utility>
-
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

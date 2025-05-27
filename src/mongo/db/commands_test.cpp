@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <functional>
-#include <initializer_list>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands.h"
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonmisc.h"
@@ -53,7 +46,6 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example.h"
 #include "mongo/db/commands_test_example_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -73,6 +65,15 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,13 +29,13 @@
 
 #include "mongo/db/exec/working_set.h"
 
-#include <cstdint>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

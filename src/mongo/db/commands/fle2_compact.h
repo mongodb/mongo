@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <numeric>
-#include <queue>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -46,6 +41,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <cstddef>
+#include <numeric>
+#include <queue>
+#include <vector>
 
 namespace mongo {
 

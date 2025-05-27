@@ -29,15 +29,16 @@
 
 #include "mongo/base/data_builder.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <cstdint>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <sys/types.h>
-#include <type_traits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,6 +46,15 @@
 #include "mongo/db/matcher/path.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/idl_parser.h"
+
+#include <cstddef>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <sys/types.h>
 
 namespace mongo {
 

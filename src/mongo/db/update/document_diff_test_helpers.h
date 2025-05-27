@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/update/update_executor.h"
 #include "mongo/platform/random.h"
+
+#include <string>
 
 namespace mongo::doc_diff {
 

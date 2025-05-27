@@ -29,10 +29,9 @@
 
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/none.hpp>
+#include "mongo/db/exec/index_scan.h"
 
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -40,6 +39,8 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

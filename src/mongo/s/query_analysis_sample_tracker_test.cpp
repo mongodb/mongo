@@ -29,12 +29,6 @@
 
 #include "mongo/s/query_analysis_sample_tracker.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/namespace_string.h"
@@ -46,6 +40,12 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

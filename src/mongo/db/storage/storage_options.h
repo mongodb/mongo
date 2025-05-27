@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <string>
 
 /*
  * This file defines the storage for options that come from the command line related to data file

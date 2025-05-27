@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/stats/single_transaction_stats.h"
 
+#include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/stats/single_transaction_stats.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <atomic>
-#include <benchmark/benchmark.h>
-#include <cstdint>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/base/status.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
+
+#include <atomic>
+#include <cstdint>
+
+#include <benchmark/benchmark.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

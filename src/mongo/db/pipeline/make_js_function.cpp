@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/make_js_function.h"
+
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/util/assert_util.h"
 

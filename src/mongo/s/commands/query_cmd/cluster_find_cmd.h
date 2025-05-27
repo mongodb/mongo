@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -61,6 +59,8 @@
 #include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/query/planner/cluster_find.h"
 #include "mongo/s/router_role.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 /**

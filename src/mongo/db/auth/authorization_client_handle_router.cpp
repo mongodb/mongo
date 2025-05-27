@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/auth/authorization_client_handle_router.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"

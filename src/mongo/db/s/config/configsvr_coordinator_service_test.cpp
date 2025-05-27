@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/s/config/configsvr_coordinator_service.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,13 +36,16 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/config/configsvr_coordinator.h"
-#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator_document_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 
 namespace mongo {

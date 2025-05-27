@@ -33,11 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -58,6 +53,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
@@ -69,8 +65,10 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
-
-#include "mongo/logv2/log.h"
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

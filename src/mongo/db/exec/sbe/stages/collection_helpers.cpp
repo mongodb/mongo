@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <boost/cstdint.hpp>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

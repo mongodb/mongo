@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <cassert>
-#include <cstdint>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -57,6 +51,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <cassert>
+#include <cstdint>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

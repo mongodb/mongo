@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <atomic>
-#include <cstddef>
-#include <functional>
-#include <string>
+#include "mongo/util/out_of_line_executor.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
-#include "mongo/util/out_of_line_executor.h"
+
+#include <atomic>
+#include <cstddef>
+#include <functional>
+#include <string>
 
 namespace mongo {
 namespace {

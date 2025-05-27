@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/client/global_conn_pool.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/global_conn_pool_gen.h"
+
+#include <string>
 
 namespace mongo {
 namespace {

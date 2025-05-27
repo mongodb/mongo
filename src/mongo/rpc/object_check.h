@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstddef>
-#include <string>
-
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,6 +40,10 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <string>
 
 // We do not use the rpc namespace here so we can specialize Validator.
 namespace mongo {

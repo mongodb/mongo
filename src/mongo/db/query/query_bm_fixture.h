@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <benchmark/benchmark.h>
-#include <string>
-#include <vector>
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/benchmark_util.h"
+
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

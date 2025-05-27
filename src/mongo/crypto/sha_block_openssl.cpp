@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <initializer_list>
-#include <memory>
-
 #include "mongo/base/data_range.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
@@ -38,12 +34,17 @@
 #include "mongo/crypto/sha512_block.h"
 #include "mongo/util/assert_util.h"
 
+#include <algorithm>
+#include <initializer_list>
+#include <memory>
+
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
 #endif
 
 #include <cstdint>
 #include <cstring>
+
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/opensslv.h>

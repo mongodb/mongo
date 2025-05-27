@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/iterator/iterator_traits.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <deque>
-#include <memory>
-#include <set>
-
-#include <absl/strings/str_split.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -56,7 +45,6 @@
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
@@ -67,6 +55,19 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <set>
+
+#include <absl/strings/str_split.h>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/iterator/iterator_traits.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

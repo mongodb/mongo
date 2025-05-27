@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -55,6 +49,13 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

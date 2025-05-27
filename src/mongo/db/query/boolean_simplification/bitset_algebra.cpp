@@ -30,13 +30,13 @@
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/stream_utils.h"
+
 #include <algorithm>
 #include <ostream>
 #include <utility>
 #include <version>
-
-#include "mongo/util/assert_util.h"
-#include "mongo/util/stream_utils.h"
 
 #ifdef __has_include
 #if __has_include(<memory_resource>)

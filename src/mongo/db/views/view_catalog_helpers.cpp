@@ -36,12 +36,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <iterator>
-#include <list>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/basic_types_gen.h"
@@ -68,6 +62,12 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace view_catalog_helpers {

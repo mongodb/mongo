@@ -28,14 +28,10 @@
  */
 
 #include "mongo/util/duration.h"
+
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <set>
-#include <system_error>
-#include <utility>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -50,6 +46,11 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <set>
+#include <system_error>
+#include <utility>
 
 namespace mongo {
 namespace {

@@ -28,7 +28,7 @@
  */
 
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/throttle_cursor.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -55,6 +54,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/db/s/balancer/cluster_statistics.h"
+
+#include <utility>
 
 namespace mongo {
 

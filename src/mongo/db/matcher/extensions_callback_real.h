@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_where_base.h"
@@ -39,6 +36,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

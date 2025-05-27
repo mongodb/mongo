@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
+#include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
@@ -41,9 +41,10 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/util/assert_util.h"
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
@@ -49,6 +45,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

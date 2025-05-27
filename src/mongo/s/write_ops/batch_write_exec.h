@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <map>
-#include <set>
-#include <string>
-
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
@@ -44,6 +39,12 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <map>
+#include <set>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

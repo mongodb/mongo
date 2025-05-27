@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
@@ -47,6 +41,12 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

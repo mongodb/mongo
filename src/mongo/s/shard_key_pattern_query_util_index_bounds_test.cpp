@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -59,6 +51,14 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

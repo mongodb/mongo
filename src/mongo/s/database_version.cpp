@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/database_version.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 

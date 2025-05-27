@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/shared_array.hpp>
-#include <boost/smart_ptr/shared_array.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +43,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/shared_array.hpp>
+#include <boost/smart_ptr/shared_array.hpp>
 
 namespace mongo {
 

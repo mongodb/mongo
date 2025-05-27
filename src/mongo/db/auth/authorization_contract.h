@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <array>
-#include <bitset>
-#include <initializer_list>
-
 #include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/stdx/mutex.h"
+
+#include <array>
+#include <bitset>
+#include <initializer_list>
 
 namespace mongo {
 

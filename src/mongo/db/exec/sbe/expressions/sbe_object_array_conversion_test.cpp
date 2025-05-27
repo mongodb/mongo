@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <initializer_list>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -47,6 +41,12 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo::sbe {
 

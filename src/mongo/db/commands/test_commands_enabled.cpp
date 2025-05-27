@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/test_commands_enabled.h"
+
 #include "mongo/db/commands/test_commands_enabled_gen.h"
 #include "mongo/logv2/log_severity.h"
 

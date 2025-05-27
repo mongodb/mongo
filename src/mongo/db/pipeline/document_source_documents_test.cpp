@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 #include "document_source_documents.h"
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -38,6 +35,10 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

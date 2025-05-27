@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/pipeline/document_source.h"
+
+#include <memory>
 
 namespace mongo::exec::agg {
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(

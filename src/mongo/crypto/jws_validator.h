@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+
+#include <memory>
 
 namespace mongo::crypto {
 

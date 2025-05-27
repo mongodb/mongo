@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -49,6 +42,13 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <functional>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_set_metadata.h"
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/document_source_set_metadata.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

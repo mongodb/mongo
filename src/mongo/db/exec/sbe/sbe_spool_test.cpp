@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -50,6 +42,15 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo::sbe {
 

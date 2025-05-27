@@ -29,8 +29,6 @@
 
 #include "mongo/db/server_options_base.h"
 
-#include <ostream>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -44,6 +42,8 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
 
 namespace moe = mongo::optionenvironment;
 

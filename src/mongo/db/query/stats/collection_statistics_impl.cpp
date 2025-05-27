@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
 
 namespace mongo::stats {
 

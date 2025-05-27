@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/query_cmd/run_aggregate.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/db/commands/db_command_test_fixture.h"
-#include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"

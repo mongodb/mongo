@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/requires_index_stage.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"

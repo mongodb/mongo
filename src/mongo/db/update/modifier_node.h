@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
@@ -47,6 +39,15 @@
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

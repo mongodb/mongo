@@ -28,18 +28,13 @@
  */
 
 
-#include <boost/optional.hpp>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
@@ -56,6 +51,11 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

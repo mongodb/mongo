@@ -29,15 +29,6 @@
 
 #include "mongo/db/query/projection.h"
 
-#include <cstddef>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/exact_cast.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
@@ -47,6 +38,15 @@
 #include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace projection_ast {

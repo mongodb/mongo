@@ -30,9 +30,10 @@
 
 #include "MongoMacroDefinitionLeaksCheck.h"
 
+#include <stack>
+
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
-#include <stack>
 
 namespace mongo::tidy {
 

@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

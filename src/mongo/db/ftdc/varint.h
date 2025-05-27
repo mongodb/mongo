@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-
 #include "mongo/base/data_type.h"
 #include "mongo/base/status.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo {
 /**

@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <fcntl.h>
-#include <memory>
-#include <sys/stat.h>
-#include <vector>
-
-#include <boost/filesystem.hpp>
-
 #include "mongo/client/async_client.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
@@ -62,6 +55,14 @@
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
+
+#include <memory>
+#include <vector>
+
+#include <fcntl.h>
+
+#include <boost/filesystem.hpp>
+#include <sys/stat.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

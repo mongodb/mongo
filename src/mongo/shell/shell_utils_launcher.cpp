@@ -34,7 +34,6 @@
 #include <csignal>
 #include <cstdint>
 #include <cstring>
-#include <fmt/format.h>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <iterator>
@@ -45,6 +44,8 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/filesystem/directory.hpp>

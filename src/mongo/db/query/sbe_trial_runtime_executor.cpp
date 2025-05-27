@@ -29,12 +29,6 @@
 
 #include "mongo/db/query/sbe_trial_runtime_executor.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <deque>
-#include <tuple>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +36,12 @@
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
+
+#include <deque>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

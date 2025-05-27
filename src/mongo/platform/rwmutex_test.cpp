@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include <shared_mutex>
-#include <vector>
-
 #include "mongo/platform/rwmutex.h"
+
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -40,6 +38,9 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
+
+#include <shared_mutex>
+#include <vector>
 
 namespace mongo {
 namespace {

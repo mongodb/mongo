@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/search/search_task_executors.h"
-
 #include "mongo/db/commands.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/executor/connection_pool_stats.h"
 
 namespace mongo {

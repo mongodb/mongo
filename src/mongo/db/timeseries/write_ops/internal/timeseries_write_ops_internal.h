@@ -28,11 +28,11 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::write_ops::internal {
 

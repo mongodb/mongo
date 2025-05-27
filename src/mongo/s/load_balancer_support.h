@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::load_balancer_support {
 

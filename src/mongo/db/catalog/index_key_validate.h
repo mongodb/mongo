@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <functional>
-#include <limits>
-#include <set>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -46,6 +40,13 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/ttl/ttl_collection_cache.h"
 #include "mongo/util/duration.h"
+
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <set>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 class BSONObj;

@@ -29,19 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_set.h>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <functional>
-#include <immer/detail/util.hpp>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -66,6 +53,20 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <immer/detail/util.hpp>
 
 namespace mongo {
 

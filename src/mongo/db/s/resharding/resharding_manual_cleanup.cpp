@@ -30,19 +30,6 @@
 
 #include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 
-#include <algorithm>
-#include <fmt/format.h>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -76,6 +63,19 @@
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

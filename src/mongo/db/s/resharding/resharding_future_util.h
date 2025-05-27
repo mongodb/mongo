@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
@@ -43,6 +39,9 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace resharding {

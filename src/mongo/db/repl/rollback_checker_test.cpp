@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <mutex>
+#include "mongo/db/repl/rollback_checker.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -37,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/rollback_checker.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_fixture.h"
@@ -45,6 +42,11 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

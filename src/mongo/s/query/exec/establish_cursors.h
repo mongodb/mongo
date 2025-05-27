@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
@@ -44,6 +39,12 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

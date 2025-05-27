@@ -30,7 +30,6 @@
 
 #include "mongo/watchdog/watchdog.h"
 
-#include <boost/align.hpp>  // IWYU pragma: keep
 #include <cerrno>
 #include <cstring>
 #include <mutex>
@@ -38,6 +37,7 @@
 #include <system_error>
 #include <utility>
 
+#include <boost/align.hpp>  // IWYU pragma: keep
 #include <boost/align/align_up.hpp>
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include <boost/filesystem/operations.hpp>
@@ -46,6 +46,7 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
+
 #include <sys/stat.h>
 #endif
 

@@ -32,16 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cstdint>
-#include <deque>
-#include <exception>
-#include <list>
-#include <mutex>
-#include <sstream>
-#include <thread>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -55,6 +45,16 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <exception>
+#include <list>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

@@ -28,12 +28,13 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <ostream>
-#include <utility>
-
 #include "mongo/db/repl/abstract_async_component.h"
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
+#include <utility>
 
 namespace mongo {
 namespace repl {

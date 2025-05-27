@@ -28,15 +28,16 @@
  */
 
 
+#include "mongo/db/exec/sort_key_generator.h"
+
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/working_set.h"
+
 #include <memory>
 #include <utility>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/exec/working_set.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

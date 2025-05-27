@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/column/bsoncolumn.h"
+
+#include "mongo/bson/bsonelement.h"
 
 #include <absl/numeric/int128.h>
 #include <boost/cstdint.hpp>
@@ -36,13 +37,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <forward_list>
-#include <limits>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -62,6 +56,13 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/context.h"
+
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <forward_list>
+#include <limits>
+#include <string>
 
 namespace mongo::bsoncolumn {
 namespace {

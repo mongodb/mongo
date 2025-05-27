@@ -30,19 +30,17 @@
 
 #pragma once
 
-#include "asio/detail/config.hpp"
-
-#include "asio/detail/throw_error.hpp"
-#include "asio/error.hpp"
-
-#include <arpa/inet.h>
-
 #include "mongo/logv2/log.h"
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 #include "mongo/util/str.h"
+
+#include "asio/detail/config.hpp"
+#include "asio/detail/throw_error.hpp"
+#include "asio/error.hpp"
+#include <arpa/inet.h>
 
 // This must be after all other includes
 #include "asio/detail/push_options.hpp"

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics_field_name_provider.h"
 #include "mongo/s/resharding/common_types_gen.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

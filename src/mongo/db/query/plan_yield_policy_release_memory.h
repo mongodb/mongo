@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/yieldable.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

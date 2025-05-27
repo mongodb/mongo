@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
+#include "mongo/db/fts/fts_unicode_tokenizer.h"
 
 #include "mongo/db/fts/fts_language.h"
-#include "mongo/db/fts/fts_unicode_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace fts {

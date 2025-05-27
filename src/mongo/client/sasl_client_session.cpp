@@ -29,13 +29,13 @@
 
 #include "mongo/client/sasl_client_session.h"
 
-#include <cstddef>
-#include <limits>
-#include <type_traits>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <limits>
+#include <type_traits>
 
 namespace mongo {
 SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create;

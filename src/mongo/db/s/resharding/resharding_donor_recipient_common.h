@@ -28,9 +28,6 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -41,6 +38,10 @@
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace resharding {

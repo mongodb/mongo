@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <iterator>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/stats/top.h"
 
 #include "mongo/base/string_data.h"
@@ -41,6 +34,13 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {

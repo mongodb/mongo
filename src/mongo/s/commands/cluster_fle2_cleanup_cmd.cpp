@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -59,6 +54,11 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

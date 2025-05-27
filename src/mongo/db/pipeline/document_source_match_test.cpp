@@ -28,14 +28,7 @@
  */
 
 
-#include <cstddef>
-#include <fmt/format.h>
-#include <iterator>
-#include <list>
-#include <string>
-#include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_match.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -47,7 +40,6 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -56,6 +48,15 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <string>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

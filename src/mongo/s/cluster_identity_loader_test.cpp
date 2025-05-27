@@ -31,10 +31,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <system_error>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +52,10 @@
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <system_error>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

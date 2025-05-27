@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 
 namespace mongo {

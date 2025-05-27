@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/s/router_role.h"
+
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -35,7 +37,6 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/router_role.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"

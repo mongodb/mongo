@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/bson/oid.h"
 #include "mongo/util/duration.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 struct HostAndPort;

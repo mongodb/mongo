@@ -29,19 +29,12 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <functional>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <variant>
-#include <vector>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -64,6 +57,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace mongo {
 class QuerySolution;

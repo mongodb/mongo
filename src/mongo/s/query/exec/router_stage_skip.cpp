@@ -28,12 +28,13 @@
  */
 
 
+#include "mongo/s/query/exec/router_stage_skip.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/s/query/exec/router_stage_skip.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

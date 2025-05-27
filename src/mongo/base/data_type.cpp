@@ -29,10 +29,10 @@
 
 #include "mongo/base/data_type.h"
 
-#include <fmt/format.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 

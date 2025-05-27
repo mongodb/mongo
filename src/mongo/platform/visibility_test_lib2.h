@@ -28,10 +28,10 @@
  */
 
 
-#include <string>
-
 #include "mongo/platform/visibility.h"
 #include "mongo/platform/visibility_test_lib1.h"
+
+#include <string>
 
 #ifdef MONGO_API_visibility_test_lib2
 #define MONGO_API_VISIBILITY_TEST_LIB2 MONGO_API_EXPORT

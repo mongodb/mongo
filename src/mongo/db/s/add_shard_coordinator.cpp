@@ -29,8 +29,6 @@
 
 #include "mongo/db/s/add_shard_coordinator.h"
 
-#include <fmt/format.h>
-
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/list_collections_gen.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
@@ -48,6 +46,8 @@
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/repl/data_replicator_external_state_mock.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+
 #include <memory>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/db/repl/data_replicator_external_state_mock.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 
 namespace mongo {
 namespace repl {

@@ -37,6 +37,7 @@
 #include <bcrypt.h>
 #else
 #include <cerrno>
+
 #include <fcntl.h>
 #endif
 

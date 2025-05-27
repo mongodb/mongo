@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <tuple>
-
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
@@ -44,6 +40,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <memory>
+#include <tuple>
 
 namespace mongo::sbe {
 

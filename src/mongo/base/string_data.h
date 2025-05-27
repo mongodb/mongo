@@ -29,10 +29,14 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/debug_util.h"
+
 #include <algorithm>
 #include <cstring>
-#include <fmt/format.h>
 #include <functional>
 #include <iosfwd>
 #include <limits>
@@ -41,11 +45,8 @@
 #include <string_view>  // NOLINT
 #include <type_traits>
 
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/debug_util.h"
+#include <absl/hash/hash.h>
+#include <fmt/format.h>
 
 namespace mongo {
 

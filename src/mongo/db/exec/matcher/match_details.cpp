@@ -29,9 +29,9 @@
 
 #include "mongo/db/exec/matcher/match_details.h"
 
-#include <sstream>
-
 #include "mongo/util/assert_util.h"
+
+#include <sstream>
 
 namespace mongo {
 

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <wiredtiger.h>
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <wiredtiger.h>
 
 namespace mongo {
 namespace {

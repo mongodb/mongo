@@ -32,7 +32,6 @@
  */
 
 #include "mongo/db/query/plan_ranker.h"
-
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::plan_ranker {

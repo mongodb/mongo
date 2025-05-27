@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/namespace_string.h"
 
 #include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

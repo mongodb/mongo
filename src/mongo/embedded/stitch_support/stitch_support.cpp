@@ -27,20 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstdlib>
-#include <exception>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <new>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "api_common.h"
 #include "stitch_support/stitch_support.h"
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/initializer.h"
@@ -75,6 +62,21 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <exception>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "api_common.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #if defined(_WIN32)
 #define MONGO_API_CALL __cdecl

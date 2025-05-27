@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <memory>
-
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -42,6 +38,11 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

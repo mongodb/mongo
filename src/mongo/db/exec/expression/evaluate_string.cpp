@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/algorithm/string/case_conv.hpp>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/exec/str_trim_utils.h"
 #include "mongo/db/exec/substr_utils.h"
+
+#include <boost/algorithm/string/case_conv.hpp>
 
 namespace mongo {
 

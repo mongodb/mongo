@@ -29,17 +29,6 @@
 
 #include "mongo/bson/bson_validate.h"
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
@@ -60,6 +49,17 @@
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/str_escape.h"
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <tuple>
-#include <vector>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/ftdc/file_writer.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
@@ -41,11 +36,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <tuple>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

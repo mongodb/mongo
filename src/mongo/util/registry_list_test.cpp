@@ -29,14 +29,14 @@
 
 #include "mongo/util/registry_list.h"
 
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

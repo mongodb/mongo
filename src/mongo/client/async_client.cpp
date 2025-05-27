@@ -28,15 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <memory>
-#include <ratio>
-#include <type_traits>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/client/async_client.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -46,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/client/async_client.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
@@ -78,6 +69,16 @@
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#include <memory>
+#include <ratio>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork

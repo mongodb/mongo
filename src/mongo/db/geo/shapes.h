@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/geo/big_polygon.h"
+
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <string>
+#include <vector>
+
 #include <s2.h>
 #include <s2cap.h>
 #include <s2cell.h>
@@ -39,15 +48,8 @@
 #include <s2latlng.h>
 #include <s2polygon.h>
 #include <s2polyline.h>
-#include <string>
-#include <util/math/vector3-inl.h>
-#include <vector>
 
-#include "mongo/base/clonable_ptr.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/geo/big_polygon.h"
+#include <util/math/vector3-inl.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846

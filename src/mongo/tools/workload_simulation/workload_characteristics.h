@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <random>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
+
+#include <random>
 
 namespace mongo::workload_simulation {
 

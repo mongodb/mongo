@@ -29,9 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_list_cluster_catalog.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -46,6 +43,10 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

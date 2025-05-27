@@ -30,10 +30,6 @@
 #pragma once
 
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
@@ -41,6 +37,11 @@
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
 namespace mongo {

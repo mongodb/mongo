@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/remove_shard_exception.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 
 namespace mongo {

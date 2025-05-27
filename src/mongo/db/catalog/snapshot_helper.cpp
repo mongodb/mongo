@@ -28,11 +28,9 @@
  */
 
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/snapshot_helper.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/catalog/snapshot_helper.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -42,6 +40,9 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

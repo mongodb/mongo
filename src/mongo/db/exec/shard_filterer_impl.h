@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 

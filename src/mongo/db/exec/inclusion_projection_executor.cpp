@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-#include <tuple>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/exec/inclusion_projection_executor.h"
+
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <tuple>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 using ComputedFieldsPolicy = ProjectionPolicies::ComputedFieldsPolicy;

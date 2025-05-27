@@ -28,15 +28,16 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <set>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
+
+#include <set>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

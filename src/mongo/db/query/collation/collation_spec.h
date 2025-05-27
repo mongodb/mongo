@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/basic_types_gen.h"
+
+#include <string>
 
 namespace mongo::CollationSpec {
 

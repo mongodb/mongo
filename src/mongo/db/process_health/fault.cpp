@@ -29,14 +29,13 @@
 
 #include "mongo/db/process_health/fault.h"
 
-#include <algorithm>
-#include <mutex>
-#include <utility>
-
-
 #include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 namespace process_health {

@@ -29,20 +29,6 @@
 
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 
-#include <absl/numeric/int128.h>
-#include <algorithm>
-#include <array>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <cstring>
-#include <iterator>
-#include <memory>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/bsoncolumn.h"
@@ -53,6 +39,20 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/allocator.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <memory>
+#include <tuple>
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 using namespace bsoncolumn;

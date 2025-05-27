@@ -29,13 +29,13 @@
 
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {

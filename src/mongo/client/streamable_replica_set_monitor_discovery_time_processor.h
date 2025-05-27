@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
@@ -38,6 +36,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/timer.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 class StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor final

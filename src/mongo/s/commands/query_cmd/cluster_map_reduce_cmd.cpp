@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
@@ -39,6 +36,9 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/commands/query_cmd/cluster_map_reduce_agg.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

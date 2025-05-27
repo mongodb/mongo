@@ -29,21 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/static_assert.hpp>
-#include <cfloat>
-#include <cinttypes>
-#include <climits>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <sstream>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
@@ -62,6 +47,22 @@
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str_basic.h"
 #include "mongo/util/tracking/allocator.h"
+
+#include <cfloat>
+#include <cinttypes>
+#include <climits>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <sstream>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/static_assert.hpp>
 
 namespace mongo {
 

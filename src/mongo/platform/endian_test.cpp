@@ -29,11 +29,11 @@
 
 #include "mongo/platform/endian.h"
 
-#include <cstring>
-
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
+
+#include <cstring>
 
 namespace mongo::endian {
 namespace {

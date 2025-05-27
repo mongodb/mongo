@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/session/logical_session_cache.h"
+
+#include <memory>
 
 namespace mongo {
 

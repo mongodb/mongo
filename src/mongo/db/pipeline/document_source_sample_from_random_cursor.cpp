@@ -33,14 +33,6 @@
 #include <boost/math/policies/policy.hpp>
 // IWYU pragma: no_include "boost/math/special_functions/detail/erf_inv.hpp"
 // IWYU pragma: no_include "boost/math/special_functions/detail/lanczos_sse2.hpp"
-#include <algorithm>
-#include <boost/math/tools/precision.hpp>
-#include <cstddef>
-#include <stdexcept>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -53,6 +45,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <stdexcept>
+#include <utility>
+
+#include <boost/math/tools/precision.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

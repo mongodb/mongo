@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -50,6 +48,8 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/util/serialization_context.h"
+
+#include <utility>
 
 namespace mongo {
 

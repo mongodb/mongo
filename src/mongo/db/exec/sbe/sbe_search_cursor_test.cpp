@@ -31,10 +31,6 @@
  * This file contains tests for sbe::SearchCursorStage.
  */
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
@@ -54,6 +50,10 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

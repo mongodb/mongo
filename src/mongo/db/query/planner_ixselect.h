@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +38,10 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <arpa/inet.h>
-#include <cstddef>
-#include <curl/curl.h>
-#include <curl/easy.h>
-#include <memory>
-#include <string>
-
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
@@ -63,6 +56,14 @@
 #include "mongo/util/strong_weak_finish_line.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+
+#include <arpa/inet.h>
+#include <curl/curl.h>
+#include <curl/easy.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

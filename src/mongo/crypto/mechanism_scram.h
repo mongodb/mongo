@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
@@ -51,6 +41,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/secure_compare_memory.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace scram {

@@ -28,17 +28,17 @@
  */
 
 
-#include <utility>
-#include <vector>
-
+#include "mongo/crypto/symmetric_crypto.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

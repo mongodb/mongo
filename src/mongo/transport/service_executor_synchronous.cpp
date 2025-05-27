@@ -30,11 +30,6 @@
 #include "mongo/transport/service_executor_synchronous.h"
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <deque>
-#include <mutex>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -44,6 +39,11 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/out_of_line_executor.h"
+
+#include <deque>
+#include <mutex>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

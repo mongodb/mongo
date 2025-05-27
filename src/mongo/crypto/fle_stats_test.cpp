@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/crypto/fle_stats.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/crypto/fle_stats.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
@@ -41,6 +40,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/testing_options_gen.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

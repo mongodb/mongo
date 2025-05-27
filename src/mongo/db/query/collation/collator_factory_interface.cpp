@@ -29,12 +29,11 @@
 
 #include "mongo/db/query/collation/collator_factory_interface.h"
 
-#include <utility>
-
-
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 

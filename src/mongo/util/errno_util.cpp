@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/util/errno_util.h"
+
 #include <system_error>
 
-#include "mongo/util/errno_util.h"
+#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <errhandlingapi.h>

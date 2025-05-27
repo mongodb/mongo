@@ -28,15 +28,11 @@
  */
 
 
-#include <algorithm>
-#include <thread>
-#include <utility>
-
+#include "mongo/transport/service_executor.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session_manager.h"
@@ -46,6 +42,10 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <algorithm>
+#include <thread>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

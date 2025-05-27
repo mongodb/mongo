@@ -28,17 +28,6 @@
  */
 
 
-#include "mongo/util/net/ssl_manager.h"
-
-#include <asio.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <fstream>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <vector>
-#include <winhttp.h>
-
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -56,6 +45,7 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl.hpp"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -64,6 +54,17 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/uuid.h"
+
+#include <fstream>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <asio.hpp>
+#include <winhttp.h>
+
+#include <boost/algorithm/string/replace.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

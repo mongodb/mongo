@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/repl/oplog_buffer_proxy.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <mutex>
 #include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/repl/oplog_buffer_proxy.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -86,6 +75,18 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

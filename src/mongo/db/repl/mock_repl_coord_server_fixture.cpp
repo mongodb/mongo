@@ -29,8 +29,6 @@
 
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 
-#include <memory>
-
 #include "mongo/client/connection_string.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -58,6 +56,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
 
 namespace mongo {
 

@@ -31,12 +31,7 @@
  * Unit tests of the UserDocumentParser type.
  */
 
-#include <boost/none.hpp>
-#include <memory>
-#include <set>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/auth/user_document_parser.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -50,13 +45,19 @@
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
+
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)

@@ -28,9 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <set>
+#include "mongo/db/s/config_server_op_observer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
@@ -41,7 +39,6 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -55,6 +52,11 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

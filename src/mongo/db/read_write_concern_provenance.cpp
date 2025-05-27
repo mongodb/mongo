@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/read_write_concern_provenance.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/read_write_concern_provenance.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

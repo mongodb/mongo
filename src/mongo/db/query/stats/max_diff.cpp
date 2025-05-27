@@ -29,9 +29,13 @@
 
 #include "mongo/db/query/stats/max_diff.h"
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>
 #include <cmath>
-#include <fmt/format.h>
 #include <limits>
 #include <map>
 #include <queue>
@@ -40,11 +44,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/value_utils.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+#include <fmt/format.h>
 
 namespace mongo::stats {
 namespace {

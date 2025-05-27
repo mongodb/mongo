@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_facet.h"
@@ -40,6 +38,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo {
 namespace process_health {

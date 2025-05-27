@@ -32,18 +32,12 @@
     LOGV2_DEBUG_OPTIONS(                               \
         ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstring>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <iosfwd>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -99,6 +93,13 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <iosfwd>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

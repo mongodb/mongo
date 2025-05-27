@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/rpc/message.h"
 #include "mongo/util/assert_util.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace rpc {

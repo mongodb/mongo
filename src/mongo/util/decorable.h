@@ -60,10 +60,11 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/static_immortal.h"
+
 #include <algorithm>
-#include <boost/optional.hpp>
 #include <cstdint>
-#include <fmt/format.h>
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -73,8 +74,8 @@
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/static_immortal.h"
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

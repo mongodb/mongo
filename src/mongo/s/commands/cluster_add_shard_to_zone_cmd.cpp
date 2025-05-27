@@ -28,9 +28,6 @@
  */
 
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +50,9 @@
 #include "mongo/s/request_types/add_shard_to_zone_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

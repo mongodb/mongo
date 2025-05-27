@@ -28,12 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <memory>
-#include <ostream>
-#include <string>
+#include "mongo/db/index/2d_key_generator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,13 +39,20 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/2d_common.h"
-#include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <algorithm>
+#include <memory>
+#include <ostream>
+#include <string>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

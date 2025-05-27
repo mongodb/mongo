@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/transport/transport_layer.h"
+
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

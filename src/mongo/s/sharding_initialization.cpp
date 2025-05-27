@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/s/sharding_initialization.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -82,7 +76,6 @@
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/routing_table_cache_gossip_metadata_hook.h"
-#include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/util/assert_util.h"
@@ -92,6 +85,14 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

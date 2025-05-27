@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
+
+#include <memory>
 
 namespace mongo {
 

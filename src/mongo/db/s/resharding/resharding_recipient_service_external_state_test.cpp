@@ -28,17 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <list>
-#include <memory>
-#include <string>
-#include <system_error>
-#include <utility>
-#include <vector>
+#include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -59,7 +49,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -77,6 +66,19 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <list>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

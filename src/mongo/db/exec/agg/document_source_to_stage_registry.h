@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/pipeline/document_source.h"
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace exec {

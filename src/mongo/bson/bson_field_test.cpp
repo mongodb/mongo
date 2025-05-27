@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"

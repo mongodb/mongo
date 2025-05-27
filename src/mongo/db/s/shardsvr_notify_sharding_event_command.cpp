@@ -26,9 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -46,6 +43,9 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

@@ -29,17 +29,18 @@
 
 #include "mongo/db/query/stats/rand_utils_new.h"
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
-#include <fmt/format.h>
 #include <limits>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/util/assert_util.h"
+#include <fmt/format.h>
 
 namespace mongo::stats {
 namespace value = sbe::value;

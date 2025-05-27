@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <limits>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -43,6 +38,11 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <limits>
+
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

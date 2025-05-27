@@ -31,10 +31,9 @@
 
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace audit {

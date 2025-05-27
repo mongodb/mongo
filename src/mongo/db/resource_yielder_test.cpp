@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/resource_yielder.h"
+
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

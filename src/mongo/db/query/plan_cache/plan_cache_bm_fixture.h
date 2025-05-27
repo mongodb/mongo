@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <benchmark/benchmark.h>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
+
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 

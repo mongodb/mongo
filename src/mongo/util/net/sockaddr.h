@@ -34,7 +34,8 @@
 
 #ifndef _WIN32
 
-#include <cerrno>        // IWYU pragma: export
+#include <cerrno>  // IWYU pragma: export
+
 #include <sys/socket.h>  // IWYU pragma: export
 #include <sys/types.h>   // IWYU pragma: export
 #include <sys/un.h>      // IWYU pragma: export

@@ -26,15 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/query_cmd/map_reduce_agg.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,7 +34,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/query_cmd/map_reduce_agg.h"
 #include "mongo/db/commands/query_cmd/map_reduce_gen.h"
 #include "mongo/db/commands/query_cmd/map_reduce_global_variable_scope.h"
 #include "mongo/db/commands/query_cmd/map_reduce_out_options.h"
@@ -74,6 +65,16 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

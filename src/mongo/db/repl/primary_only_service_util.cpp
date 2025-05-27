@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <mutex>
-#include <string>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/primary_only_service_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/primary_only_service_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+#include <string>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

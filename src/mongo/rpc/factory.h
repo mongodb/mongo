@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/client.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
+
+#include <memory>
 
 /**
  * Utilities to construct the correct concrete rpc class based on what the remote server

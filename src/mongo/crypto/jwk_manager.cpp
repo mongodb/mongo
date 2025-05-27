@@ -29,13 +29,6 @@
 
 #include "mongo/crypto/jwk_manager.h"
 
-#include <algorithm>
-#include <iterator>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/crypto/jws_validator.h"
 #include "mongo/crypto/jwt_types_gen.h"
@@ -44,6 +37,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

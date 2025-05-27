@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/executor/thread_pool_task_executor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -40,7 +36,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_common.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
@@ -48,6 +43,12 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/scopeguard.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace executor {

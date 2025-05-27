@@ -29,14 +29,14 @@
 
 #include "mongo/db/timeseries/catalog_helper.h"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

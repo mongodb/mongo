@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <string>
-#include <vector>
-
-#include <boost/algorithm/string/trim.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -44,6 +38,12 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include <boost/algorithm/string/trim.hpp>
 
 namespace mongo {
 

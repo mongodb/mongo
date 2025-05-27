@@ -27,15 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <ctime>
-#include <fmt/format.h>
-#include <fstream>  // IWYU pragma: keep
-#include <memory>
-#include <span>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -44,6 +35,16 @@
 #include "mongo/stdx/thread.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <ctime>
+#include <fstream>  // IWYU pragma: keep
+#include <memory>
+#include <span>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <fmt/format.h>
 
 
 namespace mongo {

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,6 +42,10 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <utility>
+#include <vector>
 
 namespace mongo::timeseries {
 class TimeseriesTestFixture : public CatalogTestFixture {

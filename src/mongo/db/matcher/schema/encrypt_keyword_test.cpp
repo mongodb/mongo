@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -48,6 +45,9 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace {

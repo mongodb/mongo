@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
+
+#include <cstddef>
 
 namespace mongo {
 class SnappyMessageCompressor final : public MessageCompressorBase {

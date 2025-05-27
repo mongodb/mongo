@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+
+#include <memory>
 
 namespace mongo {
 

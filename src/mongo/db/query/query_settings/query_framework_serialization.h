@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs_gen.h"
+
+#include <string>
 
 namespace mongo::query_settings::query_framework {
 

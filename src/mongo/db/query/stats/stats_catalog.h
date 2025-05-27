@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/namespace_string.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo::stats {
 /**

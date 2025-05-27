@@ -33,8 +33,6 @@
  * Parse a memory region into usable pieces.
  */
 
-#include <utility>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_terminated.h"
@@ -42,6 +40,8 @@
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
+
+#include <utility>
 
 namespace mongo {
 

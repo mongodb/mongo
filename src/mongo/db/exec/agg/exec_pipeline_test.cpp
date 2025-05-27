@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/agg/exec_pipeline.h"
+
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 namespace eof_node {

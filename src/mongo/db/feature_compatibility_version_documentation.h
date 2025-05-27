@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+
+#include <fmt/format.h>
 
 namespace mongo::feature_compatibility_version_documentation {
 constexpr inline auto kReleaseNotesRoot = "https://docs.mongodb.com/master/release-notes"_sd;

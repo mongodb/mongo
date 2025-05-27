@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <set>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/fts/fts_spec.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <fmt/format.h>
 
 namespace mongo {
 

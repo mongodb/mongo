@@ -29,9 +29,9 @@
 
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 
-#include <utility>
-
 #include "mongo/db/commands/server_status_metric.h"
+
+#include <utility>
 
 namespace mongo {
 

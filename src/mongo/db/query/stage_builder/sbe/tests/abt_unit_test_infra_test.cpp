@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <string>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
@@ -41,6 +35,12 @@
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 
 namespace mongo::stage_builder::abt_lower {

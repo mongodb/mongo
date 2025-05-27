@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 

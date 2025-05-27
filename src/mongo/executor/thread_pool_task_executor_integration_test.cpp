@@ -28,13 +28,6 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -78,6 +71,13 @@
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

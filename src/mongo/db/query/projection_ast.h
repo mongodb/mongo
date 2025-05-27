@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -50,6 +38,18 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/projection_ast_visitor.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace projection_ast {

@@ -33,11 +33,6 @@
 
 #include "mongo/db/exec/queued_data_stage.h"
 
-#include <cstddef>
-#include <memory>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"
@@ -47,6 +42,11 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using namespace mongo;
 

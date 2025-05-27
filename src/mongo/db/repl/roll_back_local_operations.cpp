@@ -28,20 +28,21 @@
  */
 
 
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/roll_back_local_operations.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationRollback
 

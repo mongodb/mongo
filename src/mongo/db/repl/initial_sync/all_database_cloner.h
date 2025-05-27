@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -47,6 +42,11 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace repl {

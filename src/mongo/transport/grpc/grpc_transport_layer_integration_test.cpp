@@ -28,10 +28,6 @@
  */
 
 
-#include <string>
-#include <system_error>
-#include <vector>
-
 #include "mongo/client/connection_string.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -40,6 +36,10 @@
 #include "mongo/transport/transport_layer_integration_test_fixture.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/unittest/log_test.h"
+
+#include <string>
+#include <system_error>
+#include <vector>
 
 namespace mongo::transport {
 namespace {

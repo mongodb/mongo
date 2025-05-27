@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <set>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -44,6 +40,10 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
+
+#include <set>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

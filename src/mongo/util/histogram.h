@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
@@ -40,10 +44,6 @@
 #include <vector>
 
 #include <fmt/format.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

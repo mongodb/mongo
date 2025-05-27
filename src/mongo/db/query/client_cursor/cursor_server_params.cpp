@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
+
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/platform/atomic_word.h"
 

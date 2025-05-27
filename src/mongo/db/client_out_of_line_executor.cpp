@@ -30,10 +30,6 @@
 
 #include "mongo/db/client_out_of_line_executor.h"
 
-#include <boost/optional/optional.hpp>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/baton.h"
@@ -46,6 +42,11 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
+
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

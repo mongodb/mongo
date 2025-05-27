@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstdint>
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
+
+#include <cstdint>
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 

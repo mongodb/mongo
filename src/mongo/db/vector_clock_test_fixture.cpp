@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/vector_clock_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
@@ -42,9 +42,10 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/db/vector_clock_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <memory>
 
 namespace mongo {
 

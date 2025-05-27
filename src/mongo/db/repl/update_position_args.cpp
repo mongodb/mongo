@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/update_position_args.h"
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

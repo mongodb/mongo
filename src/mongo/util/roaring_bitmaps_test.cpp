@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/roaring_bitmaps.h"
+
+#include "mongo/unittest/unittest.h"
 
 #include <absl/container/flat_hash_set.h>
 

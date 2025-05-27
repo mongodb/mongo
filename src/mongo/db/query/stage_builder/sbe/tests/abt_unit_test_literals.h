@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/core/demangle.hpp>
+#include "mongo/db/exec/sbe/util/print_options.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+
 #include <sstream>
 #include <string>
 #include <typeinfo>
 
-#include "mongo/db/exec/sbe/util/print_options.h"
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include <boost/core/demangle.hpp>
 
 namespace mongo::stage_builder::abt_lower::unit_test_abt_literals {
 using namespace sbe::value;

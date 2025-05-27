@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
+
+#include <memory>
 
 namespace mongo {
 

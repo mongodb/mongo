@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/db/storage/recovery_unit.h"
+
 #include <memory>
 #include <vector>
-
-#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 

@@ -30,15 +30,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
@@ -63,6 +54,16 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

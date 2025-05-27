@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +39,9 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace sharding_util {

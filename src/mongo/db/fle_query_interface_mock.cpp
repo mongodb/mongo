@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <limits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/fle_query_interface_mock.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -41,10 +36,16 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
-#include "mongo/db/fle_query_interface_mock.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <limits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

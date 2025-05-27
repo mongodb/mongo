@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/exec/eof.h"
+
+#include <memory>
 
 namespace mongo {
 

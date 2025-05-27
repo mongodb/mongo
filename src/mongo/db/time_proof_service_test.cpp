@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/time_proof_service.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

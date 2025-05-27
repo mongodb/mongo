@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
-
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/boost_assert_shim.h"
+
+#include <functional>
+#include <memory>
 
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
 

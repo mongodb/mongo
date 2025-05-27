@@ -39,11 +39,13 @@
 #include <resolv.h>
 // clang-format on
 
-#include <cstdio>
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
 
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -53,9 +55,6 @@
 #include <vector>
 
 #include <boost/noncopyable.hpp>
-
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace dns {

@@ -27,6 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/mirroring_sampler.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+
 #include <cmath>
 #include <numeric>
 #include <string>
@@ -34,13 +42,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/mirroring_sampler.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

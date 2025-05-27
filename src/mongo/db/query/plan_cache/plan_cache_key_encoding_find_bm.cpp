@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <memory>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 #include "mongo/db/query/query_test_service_context.h"
+
+#include <memory>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::optimizer {
 namespace {

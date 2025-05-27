@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
 #include "mongo/db/auth/ldap_operation_stats.h"
@@ -39,6 +37,8 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
+
+#include <memory>
 
 namespace mongo {
 enum UserAcquisitionOpType { kCache, kBind, kSearch, kSuccessfulReferral, kFailedReferral };

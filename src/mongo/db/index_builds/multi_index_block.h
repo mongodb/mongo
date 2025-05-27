@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <iosfwd>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -59,6 +49,17 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <iosfwd>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

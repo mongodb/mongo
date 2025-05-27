@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

@@ -28,25 +28,26 @@
  */
 
 
-#include <asio.hpp>
-#include <boost/filesystem.hpp>
-#include <fstream>
-
-#include "mongo/config.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/config.h"
+#include "mongo/logv2/log.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sock_test_utils.h"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/stream.hpp"
-#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
-
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <fstream>
+
+#include <asio.hpp>
+
+#include <boost/filesystem.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/dh_openssl.h"

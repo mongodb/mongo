@@ -31,10 +31,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <stack>
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -47,6 +43,10 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/assert_util.h"
+
+#include <stack>
+#include <string>
+#include <vector>
 
 namespace mongo::projection_ast {
 namespace {

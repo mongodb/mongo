@@ -29,15 +29,15 @@
 
 #include "mongo/db/matcher/expression_array.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/query/util/make_data_structure.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

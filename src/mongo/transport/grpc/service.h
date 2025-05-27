@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <list>
-
-#include <grpcpp/impl/service_type.h>
-#include <grpcpp/support/status.h>
-
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/client_cache.h"
@@ -41,6 +36,11 @@
 #include "mongo/transport/grpc/serialization.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
 #include "mongo/transport/transport_layer.h"
+
+#include <list>
+
+#include <grpcpp/impl/service_type.h>
+#include <grpcpp/support/status.h>
 
 namespace mongo::transport::grpc {
 

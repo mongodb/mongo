@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/rpc/metadata/client_metadata.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -40,10 +37,14 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -30,20 +30,22 @@
 #pragma once
 
 #ifdef __linux__
+#include <unistd.h>
+
 #include <linux/perf_event.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
-#include <unistd.h>
 #endif  // __linux__
-
-#include <barrier>  // NOLINT
-#include <benchmark/benchmark.h>
-#include <memory>
-#include <utility>
 
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/mutex.h"
+
+#include <barrier>  // NOLINT
+#include <memory>
+#include <utility>
+
+#include <benchmark/benchmark.h>
 
 // Utilities for helping with writing Google-style benchmarks.
 

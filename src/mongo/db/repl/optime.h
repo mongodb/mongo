@@ -29,19 +29,19 @@
 
 #pragma once
 
-#include <compare>
-#include <cstddef>
-#include <iosfwd>
-#include <string>
-#include <tuple>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/time_support.h"
+
+#include <compare>
+#include <cstddef>
+#include <iosfwd>
+#include <string>
+#include <tuple>
+#include <utility>
 
 namespace mongo::repl {
 

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/expression/evaluate.h"
-
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_common.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max_scaler_util.h"
 

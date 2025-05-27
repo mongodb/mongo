@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_def.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
+
+#include <vector>
 
 namespace mongo::stage_builder {
 

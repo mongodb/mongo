@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <boost/any.hpp>
-#include <boost/optional/optional.hpp>
-#include <iosfwd>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/platform/compiler.h"
+
+#include <iosfwd>
+
+#include <boost/any.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace timeseries {

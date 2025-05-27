@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <ratio>
+#include "mongo/db/auth/ldap_operation_stats.h"
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
+
+#include <cstdint>
+#include <ratio>
 
 namespace mongo {
 namespace {

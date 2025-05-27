@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -39,6 +36,9 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <utility>
 
 namespace mongo {
 

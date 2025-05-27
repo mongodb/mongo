@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/util/future.h"
+
+#include <cstdint>
 
 namespace mongo {
 

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_client_factory.h"
@@ -41,6 +39,8 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+
+#include <memory>
 
 namespace mongo::executor {
 

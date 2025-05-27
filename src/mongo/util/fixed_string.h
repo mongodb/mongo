@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <algorithm>
 #include <array>
 #include <concepts>
@@ -37,8 +39,6 @@
 #include <ostream>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/base/string_data.h"
 
 namespace mongo {
 

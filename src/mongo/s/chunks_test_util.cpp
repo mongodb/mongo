@@ -31,11 +31,6 @@
 #include "mongo/s/chunks_test_util.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <cstdlib>
-#include <iterator>
-#include <utility>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
@@ -43,6 +38,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <iterator>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

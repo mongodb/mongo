@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/auth/authorization_contract.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/access_checks_gen.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/unittest/unittest.h"
+
 #include <initializer_list>
 #include <memory>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/access_checks_gen.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_contract.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

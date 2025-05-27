@@ -27,21 +27,15 @@
  *    it in the license file.
  */
 
+#include <jsapi.h>
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <js/CallArgs.h>
 #include <js/PropertySpec.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
-#include <jsapi.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <climits>
-#include <cmath>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/countdownlatch.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -49,6 +43,13 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <climits>
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 namespace mozjs {

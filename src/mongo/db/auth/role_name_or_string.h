@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/database_name.h"
+
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 namespace mongo {
 

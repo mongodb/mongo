@@ -28,15 +28,11 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
+#include "mongo/db/s/config/configsvr_coordinator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
-#include "mongo/db/s/config/configsvr_coordinator.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +41,11 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

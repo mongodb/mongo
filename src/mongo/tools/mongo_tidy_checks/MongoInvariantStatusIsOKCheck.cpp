@@ -28,9 +28,10 @@
  */
 
 #include "MongoInvariantStatusIsOKCheck.h"
-#include "MongoTidyUtils.h"
 
 #include <iostream>
+
+#include "MongoTidyUtils.h"
 
 namespace mongo::tidy {
 

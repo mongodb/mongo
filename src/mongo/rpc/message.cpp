@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <ostream>
-#include <vector>
+#include "mongo/rpc/message.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+
+#include <ostream>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

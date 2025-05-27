@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <string>
-#include <utility>
-
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -39,6 +35,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
+
+#include <cstdint>
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

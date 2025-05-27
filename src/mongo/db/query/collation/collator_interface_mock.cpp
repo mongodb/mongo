@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/collation/collator_interface_mock.h"
+
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/db/basic_types_gen.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

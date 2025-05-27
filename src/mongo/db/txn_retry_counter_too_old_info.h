@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 

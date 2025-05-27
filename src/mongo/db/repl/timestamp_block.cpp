@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/timestamp_block.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <s2cellid.h>
-#include <s2region.h>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/geo/hash.h"
@@ -40,6 +36,11 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"  // For OrderedIntervalList
+
+#include <vector>
+
+#include <s2cellid.h>
+#include <s2region.h>
 
 class S2CellId;
 class S2Region;

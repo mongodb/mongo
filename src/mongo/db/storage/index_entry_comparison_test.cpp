@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/storage/index_entry_comparison.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
+
+#include <memory>
 
 namespace mongo {
 

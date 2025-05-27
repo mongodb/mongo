@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <queue>
-
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
@@ -43,6 +41,8 @@
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/stacktrace.h"
+
+#include <queue>
 
 namespace mongo {
 

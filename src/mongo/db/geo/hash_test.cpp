@@ -31,6 +31,16 @@
  * This file contains tests for mongo/db/geo/hash.cpp.
  */
 
+#include "mongo/db/geo/hash.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>  // For max()
 #include <cmath>
 #include <cstddef>
@@ -38,15 +48,6 @@
 #include <string>
 
 #include <s2cellid.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/geo/hash.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace {
 

@@ -29,9 +29,9 @@
 
 #include "mongo/db/query/stats/stats_cache_loader_mock.h"
 
-#include <utility>
-
 #include "mongo/base/error_codes.h"
+
+#include <utility>
 
 namespace mongo::stats {
 

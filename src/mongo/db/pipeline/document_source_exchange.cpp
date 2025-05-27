@@ -32,13 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <compare>
-#include <iterator>
-#include <mutex>
-#include <set>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -51,6 +44,13 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <compare>
+#include <iterator>
+#include <mutex>
+#include <set>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

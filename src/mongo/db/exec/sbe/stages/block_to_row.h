@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstddef>
-#include <vector>
-
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+
+#include <cstddef>
+#include <vector>
 
 namespace mongo::sbe {
 /**

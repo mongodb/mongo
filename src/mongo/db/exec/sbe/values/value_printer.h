@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <ostream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <ostream>
 
 namespace mongo::sbe::value {
 

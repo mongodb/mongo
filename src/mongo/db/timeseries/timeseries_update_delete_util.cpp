@@ -29,16 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-#include <string>
-#include <type_traits>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsontypes.h"
@@ -56,6 +46,16 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo::timeseries {
 namespace {

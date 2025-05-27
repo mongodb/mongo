@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/plan_explainer_pipeline.h"
+
+#include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/plan_explainer_pipeline.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 const PlanExplainer::ExplainVersion& PlanExplainerPipeline::getVersion() const {

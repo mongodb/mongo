@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <iterator>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/exec/add_fields_projection_executor.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <iterator>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 namespace {

@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 

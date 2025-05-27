@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstring>
-#include <iosfwd>
-#include <string>
-#include <sys/types.h>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
@@ -44,6 +38,13 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstring>
+#include <iosfwd>
+#include <string>
+
+#include <sys/types.h>
 
 namespace mongo {
 class SecureRandom;

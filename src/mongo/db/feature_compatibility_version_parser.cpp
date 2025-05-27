@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include "mongo/db/feature_compatibility_version_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 namespace mongo {
 

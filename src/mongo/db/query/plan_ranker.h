@@ -31,13 +31,6 @@
 
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <algorithm>
-#include <cstddef>
-#include <deque>
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -46,6 +39,13 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

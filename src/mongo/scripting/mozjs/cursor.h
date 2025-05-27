@@ -29,17 +29,17 @@
 
 #pragma once
 
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/base.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+
 #include <memory>
 #include <utility>
 
 #include <js/Class.h>
 #include <js/PropertySpec.h>
 #include <js/TypeDecls.h>
-
-#include "mongo/client/dbclient_cursor.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/scripting/mozjs/base.h"
-#include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {
 namespace mozjs {

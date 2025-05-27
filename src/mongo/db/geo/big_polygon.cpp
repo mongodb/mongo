@@ -29,21 +29,22 @@
 
 #include "mongo/db/geo/big_polygon.h"
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+
 #include <memory>
+#include <vector>
+
 #include <s2.h>
 #include <s2cap.h>
 #include <s2cell.h>
+#include <s2latlngrect.h>
 #include <s2loop.h>
 #include <s2polygon.h>
 #include <s2polyline.h>
 #include <s2region.h>
+
 #include <util/math/vector3-inl.h>
-#include <vector>
-
-#include <s2latlngrect.h>
-
-#include "mongo/util/assert_util.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 namespace mongo {
 

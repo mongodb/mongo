@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <type_traits>
-
-#include "mongo/base/static_assert.h"
-#include "mongo/config.h"  // IWYU pragma: keep
 
 namespace mongo {
 

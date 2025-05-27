@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/canonical_distinct.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,12 +39,18 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

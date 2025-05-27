@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/overloaded_visitor.h"
+
+#include <variant>
 
 namespace mongo::docs_needed_bounds {
 static constexpr auto kNeedAllName = "NeedAll"_sd;

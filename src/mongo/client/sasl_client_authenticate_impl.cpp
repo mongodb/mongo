@@ -35,15 +35,6 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <functional>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -71,6 +62,15 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
+
+#include <functional>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

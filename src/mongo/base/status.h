@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ref_counter.hpp>
-#include <iosfwd>
-#include <memory>
-#include <new>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/static_assert.h"
@@ -49,6 +38,18 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/static_immortal.h"
+
+#include <iosfwd>
+#include <memory>
+#include <new>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 namespace mongo {
 

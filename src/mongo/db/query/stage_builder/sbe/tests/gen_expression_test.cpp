@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,10 +37,12 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
-#include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo::stage_builder {
 

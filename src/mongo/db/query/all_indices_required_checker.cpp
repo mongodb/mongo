@@ -29,10 +29,6 @@
 
 #include "mongo/db/query/all_indices_required_checker.h"
 
-#include <utility>
-
-#include <absl/container/flat_hash_map.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 

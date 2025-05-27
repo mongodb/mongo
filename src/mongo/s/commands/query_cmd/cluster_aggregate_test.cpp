@@ -28,13 +28,7 @@
  */
 
 
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/planner/cluster_aggregate.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -58,10 +52,17 @@
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
-#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

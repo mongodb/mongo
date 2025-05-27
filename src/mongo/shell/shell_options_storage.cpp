@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <cstring>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
+
+#include <cstring>
+#include <string>
 
 mongo::ShellGlobalParams mongo::shellGlobalParams;
 

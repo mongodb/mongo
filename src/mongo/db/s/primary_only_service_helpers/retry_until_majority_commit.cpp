@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/s/primary_only_service_helpers/retry_until_majority_commit.h"
+
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 

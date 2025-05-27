@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/key_string/key_string_test_util.h"
+
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"

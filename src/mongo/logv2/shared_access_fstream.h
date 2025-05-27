@@ -31,9 +31,9 @@
 
 #if defined(_WIN32) && defined(_MSC_VER)
 
-#include <fstream>  // IWYU pragma: keep
-
 #include "mongo/base/string_data.h"
+
+#include <fstream>  // IWYU pragma: keep
 
 namespace mongo {
 // Helper class to open a FILE* with shared access. Used by the stream classes below.

@@ -29,8 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -38,9 +40,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
-#include "mongo/platform/atomic_word.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class Status;

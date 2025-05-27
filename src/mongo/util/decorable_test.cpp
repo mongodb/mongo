@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
+#include "mongo/util/decorable.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

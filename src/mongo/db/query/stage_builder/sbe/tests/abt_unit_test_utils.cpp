@@ -29,15 +29,15 @@
 
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
+
 #include <cstddef>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <utility>
 
+#include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 
 namespace mongo::stage_builder::abt_lower {
 

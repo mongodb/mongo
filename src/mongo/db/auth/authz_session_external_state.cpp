@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/db/auth/authz_session_external_state.h"
 
 #include "mongo/base/shim.h"
 #include "mongo/db/auth/authorization_manager.h"
+
+#include <string>
 
 namespace mongo {
 

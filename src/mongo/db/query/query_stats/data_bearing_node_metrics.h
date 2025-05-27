@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/db/query/client_cursor/cursor_response_gen.h"
+
+#include <cstdint>
 
 namespace mongo::query_stats {
 

@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/pipeline/spilling/spilling_test_fixture.h"
-#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/spilling/spilling_test_process_interface.h"
 
 namespace mongo {
 

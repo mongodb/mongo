@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
@@ -50,6 +41,15 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

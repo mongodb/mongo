@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/exec/return_key.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"

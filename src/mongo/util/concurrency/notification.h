@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -38,6 +36,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

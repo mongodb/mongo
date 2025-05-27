@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/stdx/condition_variable.h"
-#include <queue>
-#include <thread>
-
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <queue>
+#include <thread>
 
 namespace mongo::workload_simulation {
 

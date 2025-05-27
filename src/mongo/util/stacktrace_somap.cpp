@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fmt/format.h>
-#include <string>
-#include <utility>
+#include "mongo/util/stacktrace_somap.h"
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/util/stacktrace_somap.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <string>
+#include <utility>
+
+#include <fmt/format.h>
 
 #if defined(__linux__)
 #include <elf.h>

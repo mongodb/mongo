@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/fts/fts_language.h"
+#include "mongo/db/fts/fts_spec.h"
+
 #include <iosfwd>
 #include <map>
 #include <stack>
 #include <string>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/fts/fts_language.h"
-#include "mongo/db/fts/fts_spec.h"
 
 namespace mongo {
 

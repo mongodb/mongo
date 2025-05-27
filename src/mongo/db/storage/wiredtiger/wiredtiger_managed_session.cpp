@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/util/assert_util.h"
 

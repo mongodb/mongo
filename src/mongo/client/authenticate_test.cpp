@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-#include <queue>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/authenticate.h"
 
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
@@ -42,6 +38,11 @@
 #include "mongo/util/md5.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
+
+#include <queue>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace {
 

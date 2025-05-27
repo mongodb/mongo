@@ -31,11 +31,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/net/hostandport.h"
+
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <system_error>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
@@ -57,6 +56,8 @@
 #include "mongo/s/transaction_router.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <system_error>
 
 namespace mongo {
 

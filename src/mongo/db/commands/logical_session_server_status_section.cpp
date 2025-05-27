@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +35,9 @@
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_stats_gen.h"
 #include "mongo/db/session/session_catalog.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 namespace {

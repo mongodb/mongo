@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_set.h>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -51,6 +45,13 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

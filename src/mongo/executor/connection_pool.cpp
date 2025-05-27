@@ -30,21 +30,6 @@
 
 #include "mongo/executor/connection_pool.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <algorithm>
-#include <boost/smart_ptr.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <fmt/format.h>
-#include <iterator>
-#include <list>
-#include <memory>
-#include <queue>
-#include <system_error>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
@@ -59,6 +44,21 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <queue>
+#include <system_error>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 

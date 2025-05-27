@@ -32,9 +32,9 @@
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <algorithm>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

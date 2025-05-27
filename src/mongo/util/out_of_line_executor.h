@@ -29,13 +29,12 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
-
 #include "mongo/base/status.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

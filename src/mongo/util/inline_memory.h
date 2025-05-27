@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/platform/compiler.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -39,8 +41,6 @@
 #include <ratio>
 #include <utility>
 #include <vector>
-
-#include "mongo/platform/compiler.h"
 
 /*
  * This Resource system is like `std::pmr::memory_resource`, but not polymorphic.

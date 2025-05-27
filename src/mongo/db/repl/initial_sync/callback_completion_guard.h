@@ -30,12 +30,13 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/with_lock.h"
-#include <boost/optional.hpp>
-#include <functional>
-
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+
+#include <functional>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {

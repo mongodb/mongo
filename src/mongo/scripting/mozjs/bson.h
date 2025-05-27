@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <js/Class.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
-#include <tuple>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
+
+#include <tuple>
+
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

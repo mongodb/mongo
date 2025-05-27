@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/util/partitioned.h"
@@ -62,6 +53,16 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

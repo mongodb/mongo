@@ -29,17 +29,6 @@
 
 #include "mongo/util/dynamic_catch.h"
 
-#include <boost/exception/diagnostic_information.hpp>
-#include <boost/exception/exception.hpp>
-#include <exception>
-#include <fmt/format.h>
-#include <fmt/ranges.h>  // IWYU pragma: keep
-#include <functional>
-#include <ostream>
-#include <stdexcept>
-#include <string>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/redaction.h"
@@ -48,6 +37,17 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <exception>
+#include <functional>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>  // IWYU pragma: keep
 
 namespace mongo {
 namespace {

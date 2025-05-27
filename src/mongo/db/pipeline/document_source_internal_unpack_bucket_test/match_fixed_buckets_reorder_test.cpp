@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -37,6 +34,9 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace {

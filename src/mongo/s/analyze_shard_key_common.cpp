@@ -29,10 +29,10 @@
 
 #include "mongo/s/analyze_shard_key_common.h"
 
-#include <boost/none.hpp>
-
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
+
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace analyze_shard_key {

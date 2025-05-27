@@ -29,6 +29,10 @@
 
 #include "mongo/db/repl/split_horizon/split_horizon.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
+#include "mongo/util/decorable.h"
+
 #include <algorithm>
 #include <iterator>
 #include <mutex>
@@ -37,10 +41,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/client.h"
-#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

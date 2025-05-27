@@ -28,11 +28,12 @@
  */
 
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/query/stats/value_utils.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/test_utils.h"
-#include "mongo/db/query/stats/value_utils.h"
+
+#include <benchmark/benchmark.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

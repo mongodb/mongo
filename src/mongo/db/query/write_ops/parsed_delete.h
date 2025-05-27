@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/matcher/expression.h"
@@ -43,6 +38,12 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -27,23 +27,25 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <system_error>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/util/shell_exec.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/shell_exec.h"
+
+#include <algorithm>
+#include <system_error>
+
+#include <boost/move/utility_core.hpp>
 
 #ifdef _WIN32
 #include <processthreadsapi.h>
 #include <synchapi.h>
 #else
 #include <cstdio>
+
 #include <poll.h>
 #endif
 

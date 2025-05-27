@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/error_extra_info.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/query/record_id_range.h"
 
+#include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 

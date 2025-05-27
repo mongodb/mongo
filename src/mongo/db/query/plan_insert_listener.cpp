@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
+#include "mongo/db/query/plan_insert_listener.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -36,7 +35,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -45,6 +43,8 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

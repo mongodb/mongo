@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo::plan_cache_commands {
 

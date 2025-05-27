@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <sstream>
 #include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 /**

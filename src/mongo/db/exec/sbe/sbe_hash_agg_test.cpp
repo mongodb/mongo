@@ -31,22 +31,6 @@
  * This file contains tests for sbe::HashAggStage.
  */
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <set>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -72,6 +56,22 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <set>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

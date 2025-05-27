@@ -28,8 +28,12 @@
  */
 #pragma once
 
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/optional_util.h"
+
 #include <array>
-#include <boost/optional.hpp>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -39,10 +43,7 @@
 #include <type_traits>
 #include <vector>
 
-#include "mongo/client/sdam/sdam_datatypes.h"
-#include "mongo/client/sdam/server_description.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/optional_util.h"
+#include <boost/optional.hpp>
 
 /**
  * The following facilitates writing tests in the Server Discovery And Monitoring (sdam) namespace.

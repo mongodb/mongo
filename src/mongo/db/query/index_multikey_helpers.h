@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
+
+#include <vector>
 
 namespace mongo {
 

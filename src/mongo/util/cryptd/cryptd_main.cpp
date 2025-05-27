@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -64,6 +62,8 @@
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
+
+#include <boost/filesystem.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

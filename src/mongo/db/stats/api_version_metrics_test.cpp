@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
+#include "mongo/db/stats/api_version_metrics.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <set>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 

@@ -30,12 +30,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/stdx/mutex.h"
+
+#include <memory>
 
 namespace mongo {
 

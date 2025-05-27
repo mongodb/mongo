@@ -28,11 +28,6 @@
  */
 
 
-#include "signal_handlers.h"
-#include <csignal>
-#include <cstdlib>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -44,6 +39,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/signal_handlers.h"
+
+#include <csignal>
+#include <cstdlib>
+#include <string>
+
+#include "signal_handlers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

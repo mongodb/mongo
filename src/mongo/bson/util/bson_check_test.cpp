@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iterator>
-#include <vector>
+#include "mongo/bson/util/bson_check.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bson_check.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <iterator>
+#include <vector>
 
 namespace mongo {
 namespace {

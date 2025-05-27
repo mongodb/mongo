@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/intent_registry.h"
+
 #include <boost/optional.hpp>
 
 namespace mongo::rss::consensus {

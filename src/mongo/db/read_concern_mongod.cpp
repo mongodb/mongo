@@ -28,17 +28,6 @@
  */
 
 
-#include <iterator>
-#include <map>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <tuple>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
@@ -85,6 +74,17 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <iterator>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

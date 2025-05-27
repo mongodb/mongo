@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/session_catalog_migration.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 namespace mongo {

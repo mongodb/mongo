@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <memory>
-#include <s2cellid.h>
-#include <utility>
-#include <variant>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/query_shape/query_shape.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,7 +40,6 @@
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/query_shape_test_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
@@ -55,6 +47,16 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <variant>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 namespace mongo::query_shape {
 
 namespace {

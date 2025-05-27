@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/db/pipeline/transformer_interface.h"
+
+#include <type_traits>
 
 namespace mongo {
 

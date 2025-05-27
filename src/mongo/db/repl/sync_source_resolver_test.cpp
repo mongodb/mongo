@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <fmt/format.h>
-#include <functional>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/sync_source_resolver.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -48,7 +42,6 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
@@ -61,6 +54,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <fmt/format.h>
 
 namespace mongo::repl {
 namespace {

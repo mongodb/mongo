@@ -29,18 +29,6 @@
 
 #include "mongo/db/query/bind_input_params.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/js_function.h"
@@ -69,6 +57,18 @@
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::input_params {
 namespace {

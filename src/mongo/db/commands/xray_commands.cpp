@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_type.h"
@@ -46,6 +42,11 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #if __has_feature(xray_instrument)
 

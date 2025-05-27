@@ -28,17 +28,12 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <set>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/remote_command_targeter_rs.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/operation_context.h"
@@ -49,6 +44,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

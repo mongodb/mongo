@@ -29,16 +29,16 @@
 
 #include "mongo/db/fts/fts_element_iterator.h"
 
-#include <map>
-#include <ostream>
-#include <stack>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/util/str.h"
+
+#include <map>
+#include <ostream>
+#include <stack>
+#include <utility>
 
 namespace mongo {
 

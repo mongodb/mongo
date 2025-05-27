@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -50,6 +46,11 @@
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace transport {

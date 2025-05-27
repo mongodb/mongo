@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <set>
-#include <string>
-
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
+
+#include <set>
+#include <string>
 
 namespace mongo {
 /**

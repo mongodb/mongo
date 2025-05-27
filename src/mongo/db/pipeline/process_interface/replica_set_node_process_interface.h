@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <list>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +47,14 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+
+#include <list>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

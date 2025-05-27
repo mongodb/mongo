@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/projection_ast_visitor.h"
+
 #include <list>
 #include <stack>
 #include <string>
-
-#include "mongo/db/query/projection_ast.h"
-#include "mongo/db/query/projection_ast_visitor.h"
 
 namespace mongo {
 namespace projection_ast {

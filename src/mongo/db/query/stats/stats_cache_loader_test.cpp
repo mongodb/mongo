@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/query/stats/stats_cache_loader.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
@@ -46,7 +40,6 @@
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
-#include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_cache_loader_test_fixture.h"
 #include "mongo/db/query/stats/value_utils.h"
@@ -54,6 +47,14 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo::stats {
 namespace {

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <limits>
-#include <sstream>
+#include "mongo/util/safe_num.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/safe_num.h"
+
+#include <limits>
+#include <sstream>
 
 namespace mongo {
 

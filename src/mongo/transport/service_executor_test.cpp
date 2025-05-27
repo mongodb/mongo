@@ -28,8 +28,6 @@
  */
 
 
-#include <asio.hpp>  // IWYU pragma: keep
-#include <boost/smart_ptr.hpp>
 #include <chrono>
 #include <compare>
 #include <cstddef>
@@ -38,14 +36,14 @@
 #include <thread>
 #include <utility>
 
+#include <asio.hpp>  // IWYU pragma: keep
+
+#include <boost/smart_ptr.hpp>
+
 // IWYU pragma: no_include "asio/impl/dispatch.hpp"
 // IWYU pragma: no_include "asio/impl/io_context.hpp"
 // IWYU pragma: no_include "asio/impl/post.hpp"
 // IWYU pragma: no_include "asio/impl/system_executor.hpp"
-#include <asio/io_context.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -73,6 +71,10 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
+
+#include <asio/io_context.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

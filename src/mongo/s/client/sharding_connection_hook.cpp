@@ -28,8 +28,7 @@
  */
 
 
-#include <string>
-#include <utility>
+#include "mongo/s/client/sharding_connection_hook.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,9 +43,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

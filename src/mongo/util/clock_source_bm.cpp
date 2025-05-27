@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <memory>
-
 #include "mongo/util/clock_source.h"
+
 #include "mongo/util/duration.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
+
+#include <memory>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

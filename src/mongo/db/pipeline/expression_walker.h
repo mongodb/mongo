@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/stdx/type_traits.h"
+
 #include <memory>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/stdx/type_traits.h"
 
 namespace mongo::expression_walker {
 

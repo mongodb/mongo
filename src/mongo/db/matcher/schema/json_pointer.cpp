@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/schema/json_pointer.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <cstddef>
 #include <utility>
-
-#include "mongo/db/matcher/schema/json_pointer.h"
-#include "mongo/util/assert_util.h"
 
 namespace {
 

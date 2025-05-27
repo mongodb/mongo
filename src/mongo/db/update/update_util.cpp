@@ -29,14 +29,6 @@
 
 #include "mongo/db/update/update_util.h"
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <map>
-#include <memory>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -55,6 +47,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace update {

@@ -28,10 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-
+#include "mongo/s/sharding_test_fixture_common.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -48,10 +45,14 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resource_yielders.h"
-#include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/crypto/fle_field_schema_gen.h"
-
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 

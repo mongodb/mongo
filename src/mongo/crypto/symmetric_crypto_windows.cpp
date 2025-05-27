@@ -28,11 +28,6 @@
  */
 
 
-#include <bcrypt.h>
-#include <limits>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/crypto/block_packer.h"
 #include "mongo/crypto/symmetric_crypto.h"
@@ -41,6 +36,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#include <limits>
+#include <memory>
+#include <vector>
+
+#include <bcrypt.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <deque>
-#include <memory>
-#include <tuple>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -47,6 +41,12 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <tuple>
+#include <vector>
 
 namespace mongo {
 

@@ -29,12 +29,14 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <jsapi.h>
-#include <string>
-
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
+
+#include <string>
+
+#include <jsapi.h>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace mozjs {

@@ -32,8 +32,11 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/optional.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_depth.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/container_size_helper.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
@@ -41,10 +44,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bson_depth.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/container_size_helper.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

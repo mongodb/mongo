@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <mutex>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

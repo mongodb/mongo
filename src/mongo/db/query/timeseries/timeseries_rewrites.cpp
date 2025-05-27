@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/timeseries/timeseries_rewrites.h"
+
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"

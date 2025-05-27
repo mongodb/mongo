@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <js/Object.h>
-#include <js/RootingAPI.h>
-#include <string>
-
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/numberdecimal.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -41,13 +35,20 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/numberdecimal.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <string>
+
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

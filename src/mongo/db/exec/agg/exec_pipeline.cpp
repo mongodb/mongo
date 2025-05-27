@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/agg/exec_pipeline.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo::exec::agg {

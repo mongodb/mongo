@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/optional.hpp>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +38,11 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/lazily_initialized.h"
+
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 class InListElemLessThan {

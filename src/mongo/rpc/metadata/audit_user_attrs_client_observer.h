@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <vector>
-
-#include <boost/optional.hpp>
-
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo::audit {
 class AuditUserAttrsClientObserver final : public ServiceContext::ClientObserver {

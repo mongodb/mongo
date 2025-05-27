@@ -29,14 +29,6 @@
 
 #include "mongo/db/s/shard_server_op_observer.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/timestamp.h"
@@ -76,6 +68,14 @@
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

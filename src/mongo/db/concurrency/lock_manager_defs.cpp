@@ -29,11 +29,11 @@
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

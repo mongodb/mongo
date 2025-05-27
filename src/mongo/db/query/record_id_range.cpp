@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-
 #include "mongo/db/query/record_id_range.h"
+
 #include <compare>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 void RecordIdRange::maybeNarrowMin(const BSONObj& newMin, bool inclusive) {

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <atomic>
-#include <list>
-
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <atomic>
+#include <list>
 
 namespace mongo {
 

@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/directory.hpp>
-#include <climits>
-
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/platform/random.h"
+
+#include <climits>
+
+#include <boost/filesystem/directory.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

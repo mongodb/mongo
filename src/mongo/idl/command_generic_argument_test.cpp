@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/command_generic_argument.h"
+
+#include "mongo/unittest/unittest.h"
+
 #include <array>
 #include <memory>
 
 #include <fmt/format.h>
-
-#include "mongo/idl/command_generic_argument.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace test {

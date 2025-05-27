@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+
+#include <functional>
+#include <vector>
 
 namespace mongo {
 namespace document_path_support {

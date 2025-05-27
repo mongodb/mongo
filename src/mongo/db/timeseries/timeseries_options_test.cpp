@@ -27,6 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/timeseries_options.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
 #include <string>
 #include <tuple>
 #include <vector>
@@ -34,11 +40,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/time_parsers.hpp>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
 
 
 namespace mongo {

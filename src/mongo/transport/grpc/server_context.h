@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <map>
+#include <string>
 
 namespace mongo::transport::grpc {
 

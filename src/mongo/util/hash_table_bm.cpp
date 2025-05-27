@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/node_hash_map.h>
-#include <absl/strings/string_view.h>
+#include "mongo/base/string_data.h"
+
 #include <algorithm>
-#include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstdio>
 #include <map>
@@ -43,7 +41,10 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/string_data.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/strings/string_view.h>
+#include <benchmark/benchmark.h>
 
 
 namespace mongo {

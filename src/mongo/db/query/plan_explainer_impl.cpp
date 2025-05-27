@@ -29,16 +29,7 @@
 
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <set>
-#include <utility>
+#include "mongo/db/query/plan_explainer_impl.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -57,7 +48,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/cost_based_ranker/estimates_storage.h"
-#include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -67,6 +57,18 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <utility>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

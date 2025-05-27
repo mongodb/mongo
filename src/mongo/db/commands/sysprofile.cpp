@@ -29,11 +29,13 @@
 
 #ifdef __linux__
 #include <csignal>
-#include <fcntl.h>
 #include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#include <fcntl.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>

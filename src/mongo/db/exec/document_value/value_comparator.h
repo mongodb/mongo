@@ -29,17 +29,17 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+
 #include <cstddef>
 #include <map>
 #include <set>
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

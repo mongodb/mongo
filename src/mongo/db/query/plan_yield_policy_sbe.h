@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <memory>
-#include <variant>
-#include <vector>
-
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <variant>
+#include <vector>
 
 namespace mongo {
 

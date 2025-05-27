@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -38,6 +37,8 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 

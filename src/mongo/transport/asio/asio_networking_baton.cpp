@@ -30,8 +30,6 @@
 
 #include "mongo/transport/asio/asio_networking_baton.h"
 
-#include <sys/eventfd.h>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,6 +40,8 @@
 #include "mongo/util/errno_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <sys/eventfd.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

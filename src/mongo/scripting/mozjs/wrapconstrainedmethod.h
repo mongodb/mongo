@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <jsapi.h>
-
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <jsapi.h>
 
 namespace mongo {
 namespace mozjs {

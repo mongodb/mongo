@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/matcher/doc_validation_error.h"
-
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"

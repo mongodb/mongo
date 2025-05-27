@@ -29,16 +29,6 @@
 
 #include "mongo/transport/asio/asio_transport_layer.h"
 
-#include <exception>
-#include <fstream>
-#include <queue>
-#include <system_error>
-#include <utility>
-#include <vector>
-
-#include <asio.hpp>
-#include <fmt/format.h>
-
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/config.h"
 #include "mongo/db/cluster_role.h"
@@ -68,6 +58,17 @@
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <exception>
+#include <fstream>
+#include <queue>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include <asio.hpp>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

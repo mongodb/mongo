@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <bitset>
-#include <cstddef>
-#include <string>
+#include "mongo/db/auth/action_set.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type_gen.h"
+
+#include <bitset>
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 

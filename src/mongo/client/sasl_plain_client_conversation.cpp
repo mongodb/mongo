@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/sasl_plain_client_conversation.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/client/sasl_plain_client_conversation.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

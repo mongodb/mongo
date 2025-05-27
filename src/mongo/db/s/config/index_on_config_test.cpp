@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <vector>
+#include "mongo/db/s/config/index_on_config.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -39,9 +37,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

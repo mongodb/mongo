@@ -28,15 +28,16 @@
  */
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/variables.h"
+
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

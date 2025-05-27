@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace mongo {
 /**

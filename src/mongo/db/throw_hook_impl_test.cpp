@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <exception>
-#include <sstream>
-#include <string>
-
 #include "mongo/db/throw_hook_options_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/throw_hook.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <exception>
+#include <sstream>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

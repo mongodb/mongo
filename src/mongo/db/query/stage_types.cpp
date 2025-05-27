@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/stage_types.h"
+
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {

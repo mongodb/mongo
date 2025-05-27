@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/idl/cluster_server_parameter_common.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -41,10 +38,14 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

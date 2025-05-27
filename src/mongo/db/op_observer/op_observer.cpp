@@ -29,10 +29,9 @@
 
 #include "mongo/db/op_observer/op_observer.h"
 
-#include <utility>
-
-
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 namespace {

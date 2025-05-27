@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <set>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/batched_delete_stage_buffer.h"
 #include "mongo/db/exec/batched_delete_stage_gen.h"
@@ -46,6 +42,10 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
 
 namespace mongo {
 

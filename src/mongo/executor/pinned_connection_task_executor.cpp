@@ -30,16 +30,6 @@
 #include "pinned_connection_task_executor.h"
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <functional>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/async_client.h"
@@ -49,6 +39,17 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scoped_unlock.h"  // IWYU pragma: keep
+
+#include <functional>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo::executor {
 /**

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

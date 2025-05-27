@@ -30,14 +30,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -53,6 +45,15 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/trusted_hasher.h"
+
+#include <cstddef>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {
 

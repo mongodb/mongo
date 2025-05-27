@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <numeric>
-#include <set>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -46,7 +39,6 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/transaction_coordinator_futures_util.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
@@ -60,6 +52,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
+
+#include <numeric>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace txn {

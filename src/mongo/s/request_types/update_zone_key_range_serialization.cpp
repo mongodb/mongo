@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/s/request_types/update_zone_key_range_serialization.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/request_types/update_zone_key_range_serialization.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

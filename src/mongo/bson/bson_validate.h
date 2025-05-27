@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
+
+#include <cstdint>
 
 namespace mongo {
 

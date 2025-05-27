@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/connection_string.h"
@@ -40,6 +37,9 @@
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 /**

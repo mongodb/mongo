@@ -34,11 +34,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -107,6 +102,11 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/serialization_context.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

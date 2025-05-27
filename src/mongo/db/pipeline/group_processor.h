@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/group_processor_base.h"
+#include "mongo/db/sorter/sorter.h"
+
 #include <memory>
 #include <utility>
 
 #include <boost/optional.hpp>
-
-#include "mongo/db/pipeline/group_processor_base.h"
-#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
 

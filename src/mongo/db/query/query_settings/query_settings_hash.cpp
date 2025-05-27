@@ -29,10 +29,10 @@
 
 #include "mongo/db/query/query_settings/query_settings_hash.h"
 
+#include "mongo/db/basic_types.h"
+
 #include <absl/container/inlined_vector.h>
 #include <boost/container_hash/hash.hpp>
-
-#include "mongo/db/basic_types.h"
 
 
 namespace absl {

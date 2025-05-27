@@ -30,12 +30,11 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace exec {

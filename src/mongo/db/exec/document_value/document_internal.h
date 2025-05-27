@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <type_traits>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <type_traits>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 

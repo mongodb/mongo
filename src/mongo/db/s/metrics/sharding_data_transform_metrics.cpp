@@ -29,12 +29,12 @@
 
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

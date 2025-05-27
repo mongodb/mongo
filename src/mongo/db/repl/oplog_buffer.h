@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include "mongo/util/assert_util.h"
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

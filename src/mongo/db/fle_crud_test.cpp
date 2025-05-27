@@ -28,19 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/fle_crud.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -65,7 +53,6 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/fle_crud.h"
 #include "mongo/db/fle_query_interface_mock.h"
 #include "mongo/db/fts/unicode/string.h"
 #include "mongo/db/namespace_string.h"
@@ -93,6 +80,20 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

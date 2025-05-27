@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <vector>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
@@ -43,6 +40,9 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <vector>
 
 namespace mongo {
 

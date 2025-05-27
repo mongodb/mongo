@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/s/routing_table_cache_gossip_metadata_hook.h"
+
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/s/gossiped_routing_cache_gen.h"
-#include "mongo/s/routing_table_cache_gossip_metadata_hook.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 
 namespace mongo {

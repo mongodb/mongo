@@ -28,11 +28,11 @@
  */
 #pragma once
 
-#include <functional>
-
 #include "mongo/db/process_health/fault_facet_mock.h"
 #include "mongo/db/process_health/health_observer_base.h"
 #include "mongo/logv2/log.h"
+
+#include <functional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

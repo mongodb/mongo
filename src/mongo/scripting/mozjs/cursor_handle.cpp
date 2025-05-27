@@ -28,20 +28,20 @@
  */
 
 
-#include <js/CallArgs.h>
-#include <js/Object.h>
-#include <js/RootingAPI.h>
-
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/cursor_handle.h"
 
 #include "mongo/client/dbclient_base.h"
 #include "mongo/logv2/log.h"
-#include "mongo/scripting/mozjs/cursor_handle.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/scripting_util_gen.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

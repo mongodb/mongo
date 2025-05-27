@@ -29,6 +29,12 @@
 
 #include "mongo/db/query/stats/ce_histogram.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <cstddef>
 #include <functional>
 #include <tuple>
@@ -38,12 +44,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/stats/value_utils.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo::stats {
 namespace {

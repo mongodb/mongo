@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <vector>
-
 #include "kms.h"
 
 #include "mongo/base/data_range.h"
@@ -42,6 +38,10 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <array>
+#include <vector>
 
 namespace mongo {
 namespace {

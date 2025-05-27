@@ -31,14 +31,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstdint>
-#include <initializer_list>
-#include <limits>
-#include <ostream>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -76,6 +68,14 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <initializer_list>
+#include <limits>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {

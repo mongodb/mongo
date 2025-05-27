@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+
+#include <vector>
 
 namespace mongo {
 class BSONObjBuilder;

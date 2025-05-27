@@ -26,21 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <js/CallArgs.h>
-#include <js/Object.h>
-#include <js/PropertyDescriptor.h>
-#include <js/RootingAPI.h>
-#include <jsapi.h>
-#include <jscustomallocator.h>
-
-#include <js/Class.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/bson.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -49,7 +35,6 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/resume_token.h"
-#include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/idwrapper.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
@@ -59,6 +44,23 @@
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+
+#include <jsapi.h>
+#include <jscustomallocator.h>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

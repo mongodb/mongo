@@ -28,14 +28,6 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -65,6 +57,14 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

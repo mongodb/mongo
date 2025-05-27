@@ -29,10 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +44,10 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using boost::intrusive_ptr;
 

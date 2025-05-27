@@ -29,8 +29,6 @@
 
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

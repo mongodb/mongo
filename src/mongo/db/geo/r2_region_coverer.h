@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/core/noncopyable.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/smart_ptr/scoped_ptr.hpp>
+#include "mongo/db/geo/hash.h"
+
 #include <memory>
 #include <queue>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/db/geo/hash.h"
+#include <boost/core/noncopyable.hpp>
+#include <boost/noncopyable.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/smart_ptr/scoped_ptr.hpp>
 
 
 namespace mongo {

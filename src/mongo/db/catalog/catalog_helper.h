@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <vector>
 
 namespace mongo::catalog_helper {
 

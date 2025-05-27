@@ -28,20 +28,21 @@
  */
 
 
+#include "mongo/db/wire_version.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
+
 #include <limits>
 #include <new>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/wire_version.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -30,15 +30,15 @@
 
 #include "mongo/db/query/plan_enumerator/memo_prune.h"
 
-#include <algorithm>
-#include <set>
-
-#include <absl/hash/hash.h>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/index_names.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/map_utils.h"
+
+#include <algorithm>
+#include <set>
+
+#include <absl/hash/hash.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

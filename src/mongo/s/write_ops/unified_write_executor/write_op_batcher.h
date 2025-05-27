@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace unified_write_executor {

@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

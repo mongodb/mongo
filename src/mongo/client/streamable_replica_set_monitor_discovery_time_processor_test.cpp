@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
@@ -40,11 +37,15 @@
 #include "mongo/client/sdam/server_selector.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_state_machine.h"
-#include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::sdam {
 

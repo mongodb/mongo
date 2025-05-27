@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/version/releases.h"
+
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

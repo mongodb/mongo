@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <vector>
+#include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
+
+#include <memory>
+#include <set>
+#include <vector>
 
 namespace mongo {
 namespace {

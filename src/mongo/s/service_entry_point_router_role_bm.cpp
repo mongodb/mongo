@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_entry_point_bm_fixture.h"
 #include "mongo/s/service_entry_point_router_role.h"
+
+#include "mongo/db/service_entry_point_bm_fixture.h"
 
 namespace mongo {
 

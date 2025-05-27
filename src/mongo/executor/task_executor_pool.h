@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace executor {

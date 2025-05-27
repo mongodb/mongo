@@ -36,8 +36,6 @@
  */
 
 #include <algorithm>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -45,6 +43,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifndef _WIN32
 #include <strings.h>

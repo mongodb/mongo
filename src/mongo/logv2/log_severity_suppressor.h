@@ -36,16 +36,17 @@
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index_container.hpp>
 // IWYU pragma: no_include "boost/multi_index/detail/adl_swap.hpp"
-#include <boost/multi_index/indexed_by.hpp>
-#include <functional>
-#include <mutex>
-
 #include "mongo/logv2/log_severity.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <mutex>
+
+#include <boost/multi_index/indexed_by.hpp>
 
 namespace mongo::logv2 {
 

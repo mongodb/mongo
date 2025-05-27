@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/tenant_id.h"
+
 #include <iosfwd>
 #include <string>
 
 #include <boost/optional.hpp>
-
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/tenant_id.h"
+#include <fmt/format.h>
 
 namespace mongo {
 

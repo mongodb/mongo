@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/util/tick_source.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/util/tick_source.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

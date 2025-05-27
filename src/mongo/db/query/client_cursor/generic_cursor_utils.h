@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/platform/random.h"
+
+#include <functional>
 
 namespace mongo::generic_cursor {
 

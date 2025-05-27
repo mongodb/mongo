@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include "document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
+
+#include "document_source_list_search_indexes.h"
 
 namespace mongo {
 

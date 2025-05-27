@@ -29,14 +29,15 @@
 
 #pragma once
 
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/query/util/jparse_util.h"
+#include "mongo/shell/shell_utils.h"
+
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 #include "file_helpers.h"
-#include "mongo/client/dbclient_connection.h"
-#include "mongo/db/query/util/jparse_util.h"
-#include "mongo/shell/shell_utils.h"
 
 namespace mongo::query_tester {
 using shell_utils::NormalizationOpts;

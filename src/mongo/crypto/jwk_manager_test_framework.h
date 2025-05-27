@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/jwk_manager.h"
 #include "mongo/crypto/jwks_fetcher_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <memory>
 
 namespace mongo::crypto::test {
 

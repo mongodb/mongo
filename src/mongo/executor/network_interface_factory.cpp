@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
-#include <fmt/format.h>
+#include "mongo/executor/network_interface_factory.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/config.h"     // IWYU pragma: keep
@@ -38,10 +35,14 @@
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/pooled_async_client_factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+
+#include <memory>
+#include <utility>
+
+#include <fmt/format.h>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/async_client_factory.h"

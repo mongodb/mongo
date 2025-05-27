@@ -29,14 +29,16 @@
 
 #pragma once
 
-#include <cstdint>
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
-#include <jsapi.h>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
+
+#include <cstdint>
+#include <string>
+
+#include <jsapi.h>
+
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

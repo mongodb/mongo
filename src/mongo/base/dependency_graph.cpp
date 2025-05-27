@@ -29,10 +29,13 @@
 
 #include "mongo/base/dependency_graph.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
+
 #include <algorithm>
 #include <compare>
-#include <fmt/format.h>
-#include <fmt/ranges.h>  // IWYU pragma: keep
 #include <iterator>
 #include <random>
 #include <utility>
@@ -40,11 +43,8 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/string_map.h"
+#include <fmt/format.h>
+#include <fmt/ranges.h>  // IWYU pragma: keep
 
 namespace mongo {
 

@@ -29,15 +29,14 @@
 
 #include "mongo/db/concurrency/resource_catalog.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

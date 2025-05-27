@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <bitset>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/exec/exclusion_projection_executor.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,7 +38,6 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -54,6 +49,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <bitset>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 namespace {

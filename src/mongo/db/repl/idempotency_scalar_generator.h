@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/platform/random.h"
+
+#include <string>
 
 namespace mongo {
 

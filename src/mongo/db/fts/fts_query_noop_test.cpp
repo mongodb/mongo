@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_query_noop.h"
+
+#include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

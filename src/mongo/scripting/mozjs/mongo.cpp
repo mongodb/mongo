@@ -29,22 +29,6 @@
 
 #include "mongo/scripting/mozjs/mongo.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <initializer_list>
-#include <js/Object.h>
-#include <js/PropertyDescriptor.h>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/RootingAPI.h>
-#include <js/TracingAPI.h>
-#include <js/TypeDecls.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -90,6 +74,22 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

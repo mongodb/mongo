@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -27,17 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/grpc/core_test.grpc.pb.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/future.h"
+
 #include <memory>
 #include <string>
 
 #include <grpcpp/grpcpp.h>
-
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/future.h"
-
-#include "mongo/transport/grpc/core_test.grpc.pb.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

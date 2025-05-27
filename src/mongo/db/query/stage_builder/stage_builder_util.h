@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
@@ -43,6 +40,9 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::stage_builder {
 /**

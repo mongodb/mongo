@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <string>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/update/document_diff_calculator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
@@ -41,9 +38,13 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

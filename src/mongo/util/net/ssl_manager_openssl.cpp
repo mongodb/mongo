@@ -28,19 +28,6 @@
  */
 
 
-#include "mongo/util/future.h"
-#include "mongo/util/net/ssl_manager.h"
-
-#include <boost/algorithm/string.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <stack>
-#include <string>
-#include <vector>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/base/secure_allocator.h"
@@ -56,12 +43,14 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/dh_openssl.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -73,7 +62,17 @@
 #include "mongo/util/strong_weak_finish_line.h"
 #include "mongo/util/text.h"
 
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <stack>
+#include <string>
+#include <vector>
+
 #include <arpa/inet.h>
+#include <boost/algorithm/string.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <netinet/in.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>

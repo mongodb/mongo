@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
-
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace unittest {

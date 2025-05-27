@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/database_name.h"
+
+#include <string>
 
 namespace mongo {
 

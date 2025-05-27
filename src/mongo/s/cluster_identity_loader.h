@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -44,6 +41,9 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 

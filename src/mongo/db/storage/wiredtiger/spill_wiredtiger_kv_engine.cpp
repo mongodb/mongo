@@ -34,11 +34,6 @@
 
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <valgrind/valgrind.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
@@ -46,6 +41,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
+
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <valgrind/valgrind.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

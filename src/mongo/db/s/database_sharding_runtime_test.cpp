@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/database_sharding_runtime.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +38,6 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/database_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state_factory_shard.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -58,6 +51,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

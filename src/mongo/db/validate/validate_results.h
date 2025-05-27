@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <map>
-#include <string>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -44,6 +36,14 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace CollectionValidation {

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
@@ -52,6 +48,10 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
 
 namespace mongo {
 

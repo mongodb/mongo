@@ -29,12 +29,11 @@
 
 #include "mongo/db/traffic_recorder_validators.h"
 
-#include <boost/filesystem/operations.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

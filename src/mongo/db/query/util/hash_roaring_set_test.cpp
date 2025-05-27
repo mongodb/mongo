@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/util/hash_roaring_set.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

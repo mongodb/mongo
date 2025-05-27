@@ -29,11 +29,11 @@
 
 #include "mongo/transport/asio/asio_utils.h"
 
-#include <asio.hpp>
-
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <asio.hpp>
 
 namespace mongo::transport {
 namespace {

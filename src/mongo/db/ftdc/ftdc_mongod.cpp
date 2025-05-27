@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/path.hpp>
-#include <fmt/format.h>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/ftdc/ftdc_mongod.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +40,6 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod_gen.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
@@ -56,6 +51,12 @@
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <memory>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

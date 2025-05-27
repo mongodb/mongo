@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/auth/authorization_router_impl.h"
+
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_request_x509.h"

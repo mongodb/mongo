@@ -28,14 +28,6 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-#include <iosfwd>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +37,14 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
+
+#include <iosfwd>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

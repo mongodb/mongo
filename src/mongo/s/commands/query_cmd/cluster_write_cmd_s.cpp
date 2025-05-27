@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -38,6 +34,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/s/commands/query_cmd/cluster_write_cmd.h"
+
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo {
 namespace {

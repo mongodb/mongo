@@ -29,17 +29,17 @@
 
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
 
-#include <cstdint>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo::stage_builder {
 using namespace std::string_literals;

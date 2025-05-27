@@ -27,24 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/number.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <climits>
-#include <cstdint>
-#include <initializer_list>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <stack>
-#include <string>
-#include <tuple>
-#include <vector>
+#include "mongo/crypto/fle_crypto.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -61,13 +44,13 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/encryption_fields_validation.h"
-#include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/fle_testing_util.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -79,6 +62,25 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <climits>
+#include <cstdint>
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <stack>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/number.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

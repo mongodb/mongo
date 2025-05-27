@@ -29,10 +29,6 @@
 
 #include "mongo/db/update/v2_log_builder.h"
 
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -43,6 +39,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/safe_num.h"
+
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo::v2_log_builder {
 namespace {

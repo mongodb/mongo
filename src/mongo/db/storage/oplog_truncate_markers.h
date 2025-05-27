@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <deque>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+
+#include <deque>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

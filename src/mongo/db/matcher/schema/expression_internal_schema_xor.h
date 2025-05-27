@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

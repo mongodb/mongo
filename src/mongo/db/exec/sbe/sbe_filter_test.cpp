@@ -31,12 +31,6 @@
  * This file contains tests for sbe::FilterStage.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <memory>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -49,6 +43,13 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe {
 

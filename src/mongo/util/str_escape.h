@@ -29,11 +29,12 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <cstddef>
-#include <fmt/format.h>
 #include <string>
 
-#include "mongo/base/string_data.h"
+#include <fmt/format.h>
 
 namespace mongo::str {
 

@@ -28,19 +28,20 @@
  */
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
-#include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
-#include <boost/cstdint.hpp>
-#include <cstdint>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_coll_stats_gen.h"
+#include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
 #include "mongo/db/pipeline/storage_stats_spec_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstdint>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

@@ -28,12 +28,13 @@
  */
 #pragma once
 
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+
+#include <memory>
+
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

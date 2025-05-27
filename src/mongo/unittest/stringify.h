@@ -29,11 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/optional_util.h"
+
 #include <algorithm>
 #include <array>
-#include <boost/optional.hpp>
 #include <cstddef>
-#include <fmt/format.h>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -44,10 +47,8 @@
 #include <typeinfo>
 #include <utility>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/optional_util.h"
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 /**
  * Mechanisms and extensibility hooks used by this library to format arbitrary

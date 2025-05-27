@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
+
+#include <cstddef>
+
+#include <boost/optional/optional.hpp>
 
 /**
  * This provides helpers for creating oplog entries.

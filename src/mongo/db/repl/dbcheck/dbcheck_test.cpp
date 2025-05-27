@@ -28,12 +28,12 @@
  */
 
 #include "mongo/bson/bson_validate_gen.h"
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/repl/dbcheck/dbcheck_test_fixture.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <cmath>
-
-#include <absl/container/flat_hash_map.h>
+#include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cmath>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace {

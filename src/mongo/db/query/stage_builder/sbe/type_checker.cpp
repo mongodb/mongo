@@ -32,13 +32,13 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <vector>
-
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/util/assert_util.h"
+
+#include <vector>
 
 namespace mongo::stage_builder {
 using namespace std::string_literals;

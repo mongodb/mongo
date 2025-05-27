@@ -29,13 +29,13 @@
 
 #include "mongo/db/repl/split_prepare_session_manager.h"
 
+#include "mongo/util/assert_util.h"
+
 #include <mutex>
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace repl {

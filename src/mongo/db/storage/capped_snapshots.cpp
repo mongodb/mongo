@@ -29,17 +29,17 @@
 
 #include "mongo/db/storage/capped_snapshots.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

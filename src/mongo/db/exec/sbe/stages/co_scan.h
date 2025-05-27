@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo::sbe {
 /**

@@ -29,10 +29,10 @@
 
 #include "mongo/logv2/log_domain.h"
 
+#include "mongo/logv2/log_domain_internal.h"
+
 #include <memory>
 #include <utility>
-
-#include "mongo/logv2/log_domain_internal.h"
 
 namespace mongo::logv2 {
 

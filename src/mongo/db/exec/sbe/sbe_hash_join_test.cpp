@@ -31,17 +31,6 @@
  * This file contains tests for sbe::HashJoinStage.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
@@ -56,6 +45,17 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

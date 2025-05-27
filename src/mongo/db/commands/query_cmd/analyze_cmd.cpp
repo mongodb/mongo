@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/query_cmd/analyze_cmd.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -48,7 +40,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/analyze_cmd.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
@@ -69,6 +60,16 @@
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

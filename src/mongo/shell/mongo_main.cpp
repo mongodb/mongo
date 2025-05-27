@@ -29,9 +29,6 @@
 
 #include <algorithm>
 #include <array>
-#include <boost/core/null_deleter.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/log/attributes/value_extraction.hpp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -47,8 +44,11 @@
 #include <utility>
 #include <vector>
 
+#include <boost/core/null_deleter.hpp>
 #include <boost/exception/exception.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core/core.hpp>
 #include <boost/log/core/record_view.hpp>
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
@@ -60,8 +60,6 @@
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-#include <boost/thread/exceptions.hpp>
-
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -127,6 +125,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
+
+#include <boost/thread/exceptions.hpp>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/grpc_transport_layer.h"

@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <limits>
-#include <list>
-#include <memory>
-#include <type_traits>
-
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scoped_unlock.h"
+
+#include <limits>
+#include <list>
+#include <memory>
+#include <type_traits>
 
 namespace mongo {
 

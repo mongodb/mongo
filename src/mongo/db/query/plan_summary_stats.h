@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <set>
-#include <string>
-
 #include "mongo/db/pipeline/spilling/spilling_stats.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/duration.h"
+
+#include <set>
+#include <string>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 

@@ -28,13 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cmath>
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
-#include <random>
-#include <vector>
+#include "mongo/db/storage/key_string/key_string.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -47,7 +41,6 @@
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/key_string/key_string_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
@@ -57,6 +50,15 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <random>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

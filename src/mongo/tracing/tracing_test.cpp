@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/tracing/tracing.h"
+
 #include "mongo/config.h"
+#include "mongo/tracing/mock_exporter.h"
+#include "mongo/tracing/traceable.h"
+#include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
 #include <opentelemetry/trace/provider.h>
-
-#include "mongo/tracing/mock_exporter.h"
-#include "mongo/tracing/traceable.h"
-#include "mongo/tracing/tracing.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace tracing {

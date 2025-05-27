@@ -27,22 +27,23 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <numeric>
-#include <vector>
+#include "mongo/db/stats/operation_latency_histogram.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <numeric>
+#include <vector>
 
 namespace mongo {
 

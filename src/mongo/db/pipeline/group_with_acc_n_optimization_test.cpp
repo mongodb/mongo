@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

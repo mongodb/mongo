@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/overflow_arithmetic.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstdint>
 #include <limits>
 #include <memory>
-
-#include "mongo/base/string_data.h"
-#include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

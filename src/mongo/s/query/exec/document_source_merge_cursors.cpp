@@ -29,12 +29,6 @@
 
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <utility>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -44,6 +38,13 @@
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

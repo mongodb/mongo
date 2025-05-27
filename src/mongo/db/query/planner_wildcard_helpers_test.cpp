@@ -34,8 +34,6 @@
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -48,6 +46,8 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/wildcard_test_utils.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::wildcard_planning {
 

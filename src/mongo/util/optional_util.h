@@ -28,15 +28,16 @@
  */
 #pragma once
 
-#include <boost/none_t.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/stdx/type_traits.h"
+
 #include <optional>
 #include <ostream>
 #include <string>
 #include <type_traits>
 
-#include "mongo/stdx/type_traits.h"
+#include <boost/none_t.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

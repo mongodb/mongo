@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -41,6 +37,11 @@
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
+
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo::stage_builder {
 

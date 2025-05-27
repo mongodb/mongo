@@ -28,16 +28,7 @@
  */
 
 
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <sstream>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/commands/query_cmd/index_filter_commands.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -53,7 +44,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/commands/query_cmd/index_filter_commands.h"
 #include "mongo/db/commands/query_cmd/plan_cache_commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -70,6 +60,17 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -31,10 +31,6 @@
 
 #include "mongo/db/views/resolved_view.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -53,6 +49,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

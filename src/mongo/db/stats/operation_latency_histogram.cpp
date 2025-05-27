@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
+#include "mongo/db/stats/operation_latency_histogram.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/platform/bits.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo {
 namespace {

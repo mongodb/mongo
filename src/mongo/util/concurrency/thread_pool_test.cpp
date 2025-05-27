@@ -32,10 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-#include <ostream>
-#include <utility>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -52,6 +48,10 @@
 #include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <mutex>
+#include <ostream>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

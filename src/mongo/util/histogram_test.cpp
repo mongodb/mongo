@@ -29,16 +29,16 @@
 
 #include "mongo/util/histogram.h"
 
-#include <boost/optional.hpp>
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+
 #include <ostream>
 #include <tuple>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/duration.h"
 
 namespace mongo {
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/assert_util_parameters.h"
+
 #include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/assert_util_parameters_gen.h"

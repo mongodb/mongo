@@ -28,11 +28,11 @@
  */
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
+
+#include <string>
 
 namespace mongo {
 

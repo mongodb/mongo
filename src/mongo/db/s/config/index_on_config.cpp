@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/config/index_on_config.h"
 
-
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/util/assert_util.h"
 

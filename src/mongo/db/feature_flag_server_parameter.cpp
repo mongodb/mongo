@@ -28,13 +28,14 @@
  */
 
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/feature_flag_server_parameter.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/feature_flag_server_parameter.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

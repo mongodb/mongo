@@ -30,11 +30,6 @@
 
 #include "mongo/db/collection_crud/capped_visibility.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
@@ -43,6 +38,11 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

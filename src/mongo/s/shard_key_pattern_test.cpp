@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/s/shard_key_pattern.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -46,11 +43,15 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

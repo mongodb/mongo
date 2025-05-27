@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+
+#include <vector>
 
 namespace mongo {
 

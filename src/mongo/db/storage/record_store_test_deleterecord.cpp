@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
@@ -41,6 +35,12 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 
 namespace mongo {

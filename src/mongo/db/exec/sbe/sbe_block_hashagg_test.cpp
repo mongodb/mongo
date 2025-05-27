@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <functional>
-#include <map>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
@@ -41,6 +34,13 @@
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include <algorithm>
+#include <functional>
+#include <map>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

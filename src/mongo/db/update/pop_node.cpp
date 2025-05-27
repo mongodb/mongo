@@ -28,15 +28,16 @@
  */
 
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/update/pop_node.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/update/pop_node.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

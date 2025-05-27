@@ -30,12 +30,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <memory>
-#include <ratio>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +51,12 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

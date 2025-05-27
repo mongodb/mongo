@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/curop_failpoint_helpers.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -38,12 +35,16 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {

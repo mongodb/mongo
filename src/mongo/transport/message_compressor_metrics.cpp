@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_registry.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

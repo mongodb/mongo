@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/multi_plan_bucket.h"
+
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
 

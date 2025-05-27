@@ -26,12 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <string>
-#include <vector>
+#include "mongo/util/field_set.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/field_set.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo::stage_builder {
 namespace {

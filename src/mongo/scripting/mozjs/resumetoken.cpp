@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <js/CallArgs.h>
-#include <js/TypeDecls.h>
-#include <string>
-
-#include <js/PropertySpec.h>
-
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+
+#include <string>
+
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

@@ -28,11 +28,11 @@
  */
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
+
+#include <vector>
 
 namespace mongo {
 

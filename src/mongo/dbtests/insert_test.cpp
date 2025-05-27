@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
+#include "mongo/db/query/write_ops/insert.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,9 +38,10 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
 
 namespace mongo {
 namespace {

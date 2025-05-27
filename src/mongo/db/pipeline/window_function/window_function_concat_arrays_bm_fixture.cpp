@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays_bm_fixture.h"
+
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 

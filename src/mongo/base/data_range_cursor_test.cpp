@@ -29,16 +29,16 @@
 
 #include "mongo/base/data_range_cursor.h"
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstdint>
 #include <string>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

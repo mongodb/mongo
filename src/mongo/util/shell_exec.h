@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-
 #include "mongo/base/status_with.h"
 #include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 

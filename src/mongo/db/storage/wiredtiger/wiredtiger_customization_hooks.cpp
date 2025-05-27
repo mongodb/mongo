@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
+#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace {

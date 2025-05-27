@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
 
 namespace mongo {
 

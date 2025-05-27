@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstddef>
-#include <vector>
-
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <vector>
 
 namespace mongo {
 namespace mutablebson {

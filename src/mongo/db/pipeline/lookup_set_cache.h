@@ -38,22 +38,23 @@
 // IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
 // IWYU pragma: no_include "boost/multi_index/detail/hash_index_iterator.hpp"
 // IWYU pragma: no_include "boost/multi_index/detail/index_node_base.hpp"
-#include <boost/multi_index/indexed_by.hpp>
-#include <boost/multi_index_container_fwd.hpp>
-#include <boost/operators.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <cstddef>
-#include <functional>
-#include <iterator>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <utility>
+#include <vector>
+
+#include <boost/multi_index/indexed_by.hpp>
+#include <boost/multi_index_container_fwd.hpp>
+#include <boost/operators.hpp>
+#include <boost/tuple/tuple.hpp>
 
 namespace mongo {
 

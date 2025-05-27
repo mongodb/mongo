@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 #include "mongo/db/fts/fts_util.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

@@ -29,19 +29,6 @@
 
 #include "mongo/logv2/bson_formatter.h"
 
-#include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/utility/formatting_ostream.hpp>
-#include <fmt/format.h>
-#include <functional>
-#include <string>
-#include <variant>
-
-#include <boost/cstdint.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/log/core/record_view.hpp>
-#include <boost/log/utility/formatting_ostream_fwd.hpp>
-#include <boost/log/utility/value_ref.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +44,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <string>
+#include <variant>
+
+#include <boost/cstdint.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/log/attributes/value_extraction.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/log/utility/value_ref.hpp>
+#include <fmt/format.h>
 
 namespace mongo::logv2 {
 

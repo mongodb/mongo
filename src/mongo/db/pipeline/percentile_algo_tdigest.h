@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/percentile_algo.h"
+
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -37,8 +39,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/pipeline/percentile_algo.h"
 
 namespace mongo {
 

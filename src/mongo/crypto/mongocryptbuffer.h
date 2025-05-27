@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/data_range.h"
 #include "mongo/crypto/mongocrypt_definitions.h"
+
+#include <memory>
 
 typedef struct __mongocrypt_buffer_t _mongocrypt_buffer_t;
 

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <cstring>
+#include "mongo/db/exec/sbe/values/bson.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -37,10 +36,12 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstring>
 
 namespace mongo {
 namespace sbe {

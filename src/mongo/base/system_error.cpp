@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/base/system_error.h"
+
+#include <string>
 
 namespace mongo {
 

@@ -27,19 +27,21 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
+#include "mongo/rpc/rewrite_state_change_errors.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::rpc {
 namespace {

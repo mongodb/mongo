@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -42,6 +39,9 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

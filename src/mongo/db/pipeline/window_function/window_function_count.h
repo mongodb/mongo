@@ -28,13 +28,14 @@
  */
 
 #pragma once
-#include "window_function_expression.h"
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/sort_pattern.h"
+
+#include "window_function_expression.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::window_function {
 

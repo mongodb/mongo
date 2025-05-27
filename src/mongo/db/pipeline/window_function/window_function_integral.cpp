@@ -29,14 +29,14 @@
 
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
 
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/exec/expression/evaluate.h"
+
 #include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/exec/expression/evaluate.h"
 
 namespace mongo {
 

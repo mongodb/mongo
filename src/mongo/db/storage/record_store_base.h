@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -42,6 +38,10 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

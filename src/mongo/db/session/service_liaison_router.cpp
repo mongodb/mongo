@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/session/service_liaison_router.h"
+
 #include "mongo/db/service_context.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"

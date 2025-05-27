@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/session/logical_session_id.h"
+
+#include <vector>
 
 namespace mongo {
 namespace analyze_shard_key {

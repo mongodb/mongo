@@ -28,12 +28,12 @@
  */
 
 #include "mongo/db/s/remove_shard_commit_coordinator.h"
+
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/s/remove_shard_exception.h"
 #include "mongo/db/s/sharding_logging.h"
-#include "mongo/s/grid.h"
-
 #include "mongo/db/s/topology_change_helpers.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

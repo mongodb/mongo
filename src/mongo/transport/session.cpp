@@ -28,6 +28,7 @@
  */
 
 #include "mongo/transport/session.h"
+
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session_manager.h"

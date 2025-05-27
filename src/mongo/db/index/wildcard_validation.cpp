@@ -30,11 +30,12 @@
 #include "mongo/db/index/wildcard_validation.h"
 
 #include <algorithm>
-#include <boost/container/small_vector.hpp>
 #include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
+
+#include <boost/container/small_vector.hpp>
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 

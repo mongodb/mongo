@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <fstream>
-#include <map>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/processinfo.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -39,7 +35,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/processinfo.h"
+
+#include <cstdint>
+#include <fstream>
+#include <map>
+
+#include <boost/optional/optional.hpp>
 
 using mongo::unittest::TempDir;
 

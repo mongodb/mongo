@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <vector>
+#include "mongo/db/matcher/in_list_data.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <vector>
 
 namespace mongo {
 namespace {

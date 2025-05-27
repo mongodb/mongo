@@ -30,15 +30,6 @@
 
 #include "mongo/db/matcher/expression_geo.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cmath>
-#include <limits>
-#include <memory>
-#include <s2cellid.h>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -48,6 +39,17 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
+
+#include <cmath>
+#include <limits>
+#include <memory>
+#include <utility>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

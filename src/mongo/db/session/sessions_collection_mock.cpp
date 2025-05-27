@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/session/sessions_collection_mock.h"
+
 #include <functional>
 #include <mutex>
 
 #include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/db/session/sessions_collection_mock.h"
 
 namespace mongo {
 

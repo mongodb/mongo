@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-
-#include <absl/container/node_hash_set.h>
-
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sessions_commands_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -43,6 +37,12 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <set>
+#include <string>
+
+#include <absl/container/node_hash_set.h>
 
 namespace mongo {
 namespace {

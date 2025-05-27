@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
 #include "mongo/util/interruptible.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
 

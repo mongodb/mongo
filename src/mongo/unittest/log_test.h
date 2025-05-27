@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::unittest {
 

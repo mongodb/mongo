@@ -29,13 +29,13 @@
 
 #include "mongo/s/catalog/type_chunk_range.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

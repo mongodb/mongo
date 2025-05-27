@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,6 +42,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo::auth {

@@ -30,11 +30,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <ostream>
-#include <set>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
@@ -45,6 +40,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <ostream>
+#include <set>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -29,15 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
-#include <cstring>
-#include <string>
-#include <utility>
-#include <wiredtiger.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -73,6 +64,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/str.h"
+
+#include <cstring>
+#include <string>
+#include <utility>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

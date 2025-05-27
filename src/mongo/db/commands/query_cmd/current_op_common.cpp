@@ -33,9 +33,6 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstddef>
-#include <utility>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/query_cmd/current_op_common.h"
@@ -46,6 +43,9 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <utility>
 
 namespace mongo {
 namespace {

@@ -28,9 +28,7 @@
  */
 
 
-#include <limits>
-#include <memory>
-#include <ratio>
+#include "mongo/db/vector_clock.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -42,7 +40,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/vector_clock_test_fixture.h"
@@ -50,6 +47,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <limits>
+#include <memory>
+#include <ratio>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

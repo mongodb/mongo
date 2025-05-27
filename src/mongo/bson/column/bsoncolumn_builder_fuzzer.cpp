@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/column/simple8b_type_util.h"
-#include "mongo/bson/util/builder.h"
-#include <cstring>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/column/simple8b_helpers.h"
+#include "mongo/bson/column/simple8b_type_util.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/base64.h"
+
+#include <cstring>
 
 using namespace mongo;
 

@@ -27,21 +27,22 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/query_analysis_op_observer.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/query_analysis_coordinator.h"
-#include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/util/future.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

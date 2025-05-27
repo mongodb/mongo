@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/db/baton.h"
 #include "mongo/executor/async_client_factory.h"
@@ -38,6 +36,8 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+
+#include <memory>
 
 namespace mongo::executor {
 

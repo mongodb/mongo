@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <absl/container/flat_hash_map.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -52,6 +46,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace {

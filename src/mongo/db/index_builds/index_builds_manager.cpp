@@ -28,12 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <mutex>
-#include <string>
-#include <type_traits>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index_builds/index_builds_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_validate.h"
@@ -45,7 +40,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +55,13 @@
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <mutex>
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

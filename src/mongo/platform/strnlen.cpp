@@ -28,6 +28,7 @@
  */
 
 #include "mongo/platform/strnlen.h"
+
 #include "mongo/config.h"  // IWYU pragma: keep
 
 #ifndef MONGO_CONFIG_HAVE_STRNLEN

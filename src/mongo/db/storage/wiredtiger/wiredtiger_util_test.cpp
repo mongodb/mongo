@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <wiredtiger.h>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -42,7 +36,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/death_test.h"
@@ -51,6 +44,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/system_clock_source.h"
+
+#include <memory>
+#include <sstream>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

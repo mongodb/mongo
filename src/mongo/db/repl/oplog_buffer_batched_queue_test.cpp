@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/oplog_buffer_batched_queue.h"
+
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

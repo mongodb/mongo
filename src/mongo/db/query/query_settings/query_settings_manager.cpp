@@ -29,14 +29,15 @@
 
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
+
+#include <algorithm>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {
 

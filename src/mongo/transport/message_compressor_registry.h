@@ -29,19 +29,19 @@
 
 #pragma once
 
-#include <array>
-#include <limits>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/util/string_map.h"
+
+#include <array>
+#include <limits>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <iostream>
-#include <memory>
-#include <tuple>
-
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/ftdc/ftdc_test.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
@@ -43,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/ftdc/ftdc_test.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
@@ -51,6 +42,16 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <tuple>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
 
 namespace mongo {
 

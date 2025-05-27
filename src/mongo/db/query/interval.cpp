@@ -29,12 +29,11 @@
 
 #include "mongo/db/query/interval.h"
 
-#include <utility>
-
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+
+#include <utility>
 
 namespace mongo {
 

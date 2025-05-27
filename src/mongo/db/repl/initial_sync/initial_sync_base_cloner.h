@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -41,6 +39,8 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <string>
 
 namespace mongo {
 namespace repl {

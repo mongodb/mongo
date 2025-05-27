@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/ticketholder_manager.h"
@@ -44,6 +40,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace admission {

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -51,6 +47,11 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace bulk_write_exec {

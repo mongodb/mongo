@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+
 #include <memory>
 #include <string>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo::doc_validation_error {
 /**

@@ -39,14 +39,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstddef>
-#include <functional>
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -134,6 +126,14 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <functional>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

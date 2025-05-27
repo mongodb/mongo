@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -38,6 +36,8 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <variant>
 
 namespace mongo {
 /**

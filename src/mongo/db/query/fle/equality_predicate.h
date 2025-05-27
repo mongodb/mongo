@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -41,6 +36,12 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::fle {
 /**

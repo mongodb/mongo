@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 /**

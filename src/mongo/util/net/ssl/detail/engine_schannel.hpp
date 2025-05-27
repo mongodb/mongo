@@ -30,12 +30,12 @@
 
 #pragma once
 
-#include "asio/detail/config.hpp"
-
-#include "asio/buffer.hpp"
-#include "asio/detail/static_mutex.hpp"
 #include "mongo/util/net/ssl/detail/schannel.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"
+
+#include "asio/buffer.hpp"
+#include "asio/detail/config.hpp"
+#include "asio/detail/static_mutex.hpp"
 
 // This must be after all other includes
 #include "asio/detail/push_options.hpp"

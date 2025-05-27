@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -41,6 +36,11 @@
 #include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {

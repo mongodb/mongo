@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/string_map.h"
+
 #include <string>
 
 namespace mongo::cluster::cmd::translations {

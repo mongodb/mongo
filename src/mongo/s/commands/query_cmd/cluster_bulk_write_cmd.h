@@ -29,21 +29,6 @@
 
 #pragma once
 
-#include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/s/write_ops/batched_command_request.h"
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -70,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
@@ -85,8 +71,22 @@
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/s/query/exec/router_stage_queued_data.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

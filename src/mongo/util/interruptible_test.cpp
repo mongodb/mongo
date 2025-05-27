@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/util/interruptible.h"
+
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

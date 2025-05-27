@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <tomcrypt.h>
+#include "mongo/util/md5.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/md5.h"
+
+#include <tomcrypt.h>
 
 namespace mongo {
 

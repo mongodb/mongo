@@ -28,11 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <chrono>
-#include <exception>
-#include <future>
-#include <mutex>
-#include <system_error>
+#include "mongo/db/s/persistent_task_queue.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog_raii.h"
@@ -40,13 +36,18 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/persistent_task_queue.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
+
+#include <chrono>
+#include <exception>
+#include <future>
+#include <mutex>
+#include <system_error>
 
 namespace mongo {
 namespace {

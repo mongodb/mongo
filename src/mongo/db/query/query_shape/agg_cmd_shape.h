@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo::query_shape {
 

@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <functional>
-#include <limits>
-#include <queue>
-
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <functional>
+#include <limits>
+#include <queue>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

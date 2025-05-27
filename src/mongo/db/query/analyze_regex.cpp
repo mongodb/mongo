@@ -29,11 +29,11 @@
 
 #include "mongo/db/query/analyze_regex.h"
 
-#include <cstring>
-
 #include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
+
+#include <cstring>
 
 namespace mongo::analyze_regex {
 

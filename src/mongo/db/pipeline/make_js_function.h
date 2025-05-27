@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/scripting/engine.h"
+
+#include <string>
 
 namespace mongo {
 

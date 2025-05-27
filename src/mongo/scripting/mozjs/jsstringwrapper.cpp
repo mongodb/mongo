@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <cstring>
-#include <fmt/format.h>
-#include <js/CharacterEncoding.h>
-#include <js/String.h>
-
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/jsstringwrapper.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/exception.h"
-#include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstring>
+
+#include <fmt/format.h>
+#include <js/CharacterEncoding.h>
+#include <js/String.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

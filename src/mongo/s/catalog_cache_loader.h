@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -50,6 +44,13 @@
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

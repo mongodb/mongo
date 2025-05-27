@@ -33,9 +33,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <mutex>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,6 +56,9 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

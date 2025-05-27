@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/exec/sbe/vm/vm_types.h"
+
+#include <string>
 
 namespace mongo {
 namespace sbe {

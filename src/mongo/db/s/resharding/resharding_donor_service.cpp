@@ -30,18 +30,6 @@
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <mutex>
-#include <string>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -107,6 +95,18 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <mutex>
+#include <string>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 

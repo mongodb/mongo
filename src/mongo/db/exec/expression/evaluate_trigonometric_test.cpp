@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace expression_evaluation_test {

@@ -30,17 +30,6 @@
 
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstring>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/shared_array.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
@@ -49,6 +38,17 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
+
+#include <cstring>
+#include <iterator>
+#include <memory>
+#include <numeric>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/shared_array.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

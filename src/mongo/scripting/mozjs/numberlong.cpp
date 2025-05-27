@@ -27,20 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-#include <js/ComparisonOperators.h>
-#include <js/Object.h>
-#include <js/PropertyDescriptor.h>
-#include <js/RootingAPI.h>
-#include <jsapi.h>
-#include <string>
-
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/numberlong.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -50,7 +37,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/numberlong.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
@@ -59,6 +45,22 @@
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <string>
+
+#include <jsapi.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/ComparisonOperators.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

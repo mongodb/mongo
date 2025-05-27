@@ -27,18 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <utility>
-
-#include <boost/optional.hpp>
+#include "mongo/db/storage/oplog_truncation.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -57,12 +46,24 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/oplog_truncation.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <utility>
+
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace repl {

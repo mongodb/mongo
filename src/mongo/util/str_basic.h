@@ -34,10 +34,10 @@
  * bson/util/builder.h
  */
 
-#include <cstring>
-
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstring>
 
 namespace mongo::str {
 /**

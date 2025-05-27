@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where_base.h"
+
+#include <memory>
 
 namespace mongo {
 

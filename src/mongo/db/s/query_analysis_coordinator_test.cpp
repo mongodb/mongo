@@ -29,15 +29,6 @@
 
 #include "mongo/db/s/query_analysis_coordinator.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,6 +46,15 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version.h"
+
+#include <memory>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

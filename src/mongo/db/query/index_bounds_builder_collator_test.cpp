@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,6 +42,8 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

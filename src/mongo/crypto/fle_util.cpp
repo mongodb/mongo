@@ -32,9 +32,10 @@
 #include "mongo/db/service_context.h"
 
 extern "C" {
-#include <bson/bson.h>
 #include <mongocrypt-private.h>
 #include <mongocrypt.h>
+
+#include <bson/bson.h>
 }
 namespace mongo {
 

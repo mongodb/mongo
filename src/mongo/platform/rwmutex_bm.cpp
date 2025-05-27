@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/rwmutex.h"
+
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/waitable_atomic.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/processinfo.h"
+
 #include <array>
 #include <shared_mutex>
 #include <vector>
 
 #include <benchmark/benchmark.h>
-
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager.h"
-#include "mongo/db/service_context.h"
-#include "mongo/platform/rwmutex.h"
-#include "mongo/platform/waitable_atomic.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/util/processinfo.h"
 
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer) || \
     __has_feature(memory_sanitizer) || __has_feature(undefined_behavior_sanitizer)

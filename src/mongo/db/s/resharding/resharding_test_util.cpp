@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/resharding/resharding_test_util.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

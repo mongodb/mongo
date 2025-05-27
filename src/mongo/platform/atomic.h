@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <atomic>
-#include <cstring>
-#include <type_traits>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
+
+#include <atomic>
+#include <cstring>
+#include <type_traits>
 
 namespace mongo {
 

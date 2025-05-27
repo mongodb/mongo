@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <map>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <map>
 
 namespace mongo {
 

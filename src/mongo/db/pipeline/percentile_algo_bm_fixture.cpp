@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/percentile_algo_bm_fixture.h"
+
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/percentile_algo_accurate.h"
+#include "mongo/db/pipeline/percentile_algo_tdigest.h"
+
 #include <algorithm>
-#include <boost/random/normal_distribution.hpp>
 #include <cmath>
 #include <cstddef>
 #include <memory>
 #include <random>
 
 #include <benchmark/benchmark.h>
-
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/percentile_algo_accurate.h"
-#include "mongo/db/pipeline/percentile_algo_bm_fixture.h"
-#include "mongo/db/pipeline/percentile_algo_tdigest.h"
+#include <boost/random/normal_distribution.hpp>
 
 namespace mongo {
 using std::vector;

@@ -29,16 +29,17 @@
 
 #include "mongo/db/server_parameter.h"
 
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <utility>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

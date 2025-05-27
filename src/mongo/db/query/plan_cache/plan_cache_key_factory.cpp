@@ -29,15 +29,6 @@
 
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 
-#include <cstddef>
-#include <map>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -49,6 +40,15 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_version.h"
+
+#include <cstddef>
+#include <map>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace plan_cache_detail {

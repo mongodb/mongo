@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -44,6 +41,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/shardsvr_join_ddl_coordinators_request_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <type_traits>
 
 namespace mongo {
 namespace {

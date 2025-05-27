@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include <limits>
+#include "mongo/db/exec/matcher/matcher.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
@@ -39,6 +38,8 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/assert.h"
+
+#include <limits>
 
 namespace mongo::evaluate_matcher_test {
 

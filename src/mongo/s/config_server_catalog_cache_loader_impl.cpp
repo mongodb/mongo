@@ -29,14 +29,6 @@
 
 #include "mongo/s/config_server_catalog_cache_loader_impl.h"
 
-#include <boost/smart_ptr.hpp>
-#include <mutex>
-#include <string>
-#include <tuple>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/feature_flag.h"
@@ -56,6 +48,14 @@
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_impl.h"
+
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/memory_tracking/op_memory_use.h"
+
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"

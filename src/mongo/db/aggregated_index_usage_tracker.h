@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/index_names.h"
+#include "mongo/platform/atomic_word.h"
+
 #include <functional>
 #include <map>
 #include <string>
-
-#include "mongo/db/index_names.h"
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 class IndexDescriptor;

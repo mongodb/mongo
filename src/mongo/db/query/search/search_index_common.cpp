@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/search/search_index_common.h"
+
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_index_options.h"

@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/auth/user_management_commands_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,7 +37,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/command_generic_argument.h"
@@ -50,6 +44,13 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace auth {

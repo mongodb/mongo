@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/operation_cpu_timer.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

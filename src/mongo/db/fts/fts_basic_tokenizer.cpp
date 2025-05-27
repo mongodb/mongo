@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/fts/fts_basic_tokenizer.h"
+
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/util/str.h"
+
+#include <memory>
 
 namespace mongo {
 namespace fts {

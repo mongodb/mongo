@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <cstddef>
-#include <cstdint>
-#include <set>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/plan_explainer_sbe.h"
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
@@ -50,7 +43,6 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
-#include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast_util.h"
@@ -61,6 +53,15 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <set>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

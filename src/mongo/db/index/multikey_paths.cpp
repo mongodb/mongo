@@ -29,10 +29,10 @@
 
 #include "mongo/db/index/multikey_paths.h"
 
+#include "mongo/util/str.h"
+
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
-
-#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/engine.h"
+
 #include <cstddef>
 #include <memory>
 #include <string>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/scripting/engine.h"
 
 namespace mongo {
 /**

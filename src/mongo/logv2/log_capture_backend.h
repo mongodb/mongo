@@ -29,15 +29,16 @@
 
 #pragma once
 
+#include "mongo/platform/atomic_word.h"
+
+#include <string>
+#include <vector>
+
 #include <boost/log/attributes/attribute_value_set.hpp>
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/sinks.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
 #include <boost/make_shared.hpp>
-#include <string>
-#include <vector>
-
-#include "mongo/platform/atomic_word.h"
 
 namespace mongo::logv2 {
 

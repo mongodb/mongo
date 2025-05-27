@@ -28,9 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/none.hpp>
-#include <exception>
+#include "mongo/db/repl/isself.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -43,7 +41,6 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/repl/isself.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -54,6 +51,11 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <exception>
+
+#include <boost/none.hpp>
 
 #if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #define FASTPATH_UNIX 1

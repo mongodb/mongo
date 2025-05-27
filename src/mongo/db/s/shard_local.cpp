@@ -28,15 +28,16 @@
  */
 
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/shard_local.h"
 
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/shard_local.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

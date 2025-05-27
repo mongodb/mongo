@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <limits>
-#include <numeric>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
@@ -41,6 +36,11 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <limits>
+#include <numeric>
+#include <vector>
 
 namespace mongo {
 namespace {

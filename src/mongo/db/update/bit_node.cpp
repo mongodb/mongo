@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/update/bit_node.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/db/update/bit_node.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

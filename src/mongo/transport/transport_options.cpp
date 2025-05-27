@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <variant>
-#include <vector>
+#include "mongo/transport/transport_options.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -41,10 +39,13 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
-#include "mongo/transport/transport_options.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/overloaded_visitor.h"
+
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace mongo::transport {
 namespace {

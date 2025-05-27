@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/matcher/schema/expression_internal_schema_num_properties.h"
+
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {

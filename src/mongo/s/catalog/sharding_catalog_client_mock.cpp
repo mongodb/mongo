@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version_gen.h"
@@ -41,6 +38,9 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

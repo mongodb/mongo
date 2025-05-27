@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/baton.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
@@ -38,6 +36,8 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/waitable.h"
+
+#include <memory>
 
 namespace mongo {
 

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/util/debugger.h"
+
+#include "mongo/config.h"  // IWYU pragma: keep
+
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <mutex>
-
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/util/debugger.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

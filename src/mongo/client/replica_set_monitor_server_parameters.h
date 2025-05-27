@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 namespace mongo {
 

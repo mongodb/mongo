@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/remote_command_request.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace mozjs {

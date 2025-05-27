@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/database_name.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <memory>
 
 
 namespace mongo {

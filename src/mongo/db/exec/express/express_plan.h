@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -69,6 +63,13 @@
 #include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_util.h"
+
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 
 namespace mongo {

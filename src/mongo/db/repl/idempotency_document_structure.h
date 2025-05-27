@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <set>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/idempotency_scalar_generator.h"
+
+#include <cstddef>
+#include <set>
+#include <vector>
 
 namespace mongo {
 

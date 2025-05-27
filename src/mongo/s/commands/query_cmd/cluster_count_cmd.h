@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -60,6 +58,8 @@
 #include "mongo/s/router_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
+
+#include <vector>
 
 namespace mongo {
 

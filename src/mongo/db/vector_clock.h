@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
@@ -49,6 +39,15 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

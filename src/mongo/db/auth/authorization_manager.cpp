@@ -29,13 +29,13 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/shim.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+
+#include <string>
 
 namespace mongo {
 

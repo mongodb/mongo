@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
+
 #include <array>
 #include <cstddef>
 #include <mutex>
 #include <string>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::logv2 {
 

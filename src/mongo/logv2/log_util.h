@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+
+#include <functional>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::logv2 {
 

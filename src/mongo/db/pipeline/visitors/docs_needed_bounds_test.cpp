@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
 #include <variant>
 
 namespace mongo {

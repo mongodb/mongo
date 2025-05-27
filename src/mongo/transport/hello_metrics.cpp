@@ -28,14 +28,14 @@
  */
 #include "mongo/transport/hello_metrics.h"
 
-#include <utility>
-
 #include "mongo/logv2/log.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

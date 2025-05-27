@@ -27,18 +27,6 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <benchmark/benchmark.h>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <initializer_list>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -69,6 +57,18 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
+
+#include <array>
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

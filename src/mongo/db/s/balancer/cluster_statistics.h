@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_id.h"
+
 #include <cstdint>
 #include <set>
 #include <string>
 #include <vector>
-
-#include "mongo/base/status_with.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_id.h"
 
 namespace mongo {
 

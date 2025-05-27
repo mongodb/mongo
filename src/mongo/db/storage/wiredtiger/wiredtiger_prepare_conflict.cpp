@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <wiredtiger.h>
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <wiredtiger.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
+#include "mongo/executor/task_executor_test_fixture.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -37,10 +35,13 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace executor {

@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/name_expression.h"
-
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/name_expression.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 NameExpression::NameExpression(const BSONElement& nameElem) : _name(nameElem) {

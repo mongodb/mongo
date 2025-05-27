@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-
-#include <absl/hash/hash.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_view.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -47,6 +39,14 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**

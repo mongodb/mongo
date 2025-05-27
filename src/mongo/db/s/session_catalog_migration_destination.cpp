@@ -28,17 +28,7 @@
  */
 
 
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <utility>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/session_catalog_migration_destination.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -60,7 +50,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration.h"
-#include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/s/session_catalog_migration_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -82,6 +71,18 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

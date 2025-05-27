@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/trial_period_utils.h"
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knob_configuration.h"
+
 #include <algorithm>
 
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_knob_configuration.h"
 
 namespace mongo::trial_period {
 size_t getTrialPeriodMaxWorks(OperationContext* opCtx,

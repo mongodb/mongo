@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -51,6 +49,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <vector>
 
 namespace mongo {
 namespace repl {

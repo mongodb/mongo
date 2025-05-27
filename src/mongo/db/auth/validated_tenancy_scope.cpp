@@ -29,12 +29,13 @@
 
 #include "mongo/db/auth/validated_tenancy_scope.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/validated_tenancy_scope_gen.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

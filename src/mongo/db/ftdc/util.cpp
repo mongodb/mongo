@@ -28,15 +28,7 @@
  */
 
 
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <string>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/ftdc/util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -46,12 +38,21 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
-#include "mongo/db/ftdc/util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <string>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

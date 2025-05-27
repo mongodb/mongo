@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/stage_builder/sbe/abt/containers.h"
-#include "mongo/db/query/stage_builder/sbe/abt/reference_tracker.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <vector>
 
 
 namespace mongo::abt {

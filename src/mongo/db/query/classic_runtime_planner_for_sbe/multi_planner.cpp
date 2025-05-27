@@ -28,13 +28,12 @@
  */
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
-
-#include <absl/functional/bind_front.h>
-
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/logv2/log.h"
+
+#include <absl/functional/bind_front.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

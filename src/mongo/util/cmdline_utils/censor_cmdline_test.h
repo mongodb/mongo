@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace test {

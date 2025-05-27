@@ -29,18 +29,18 @@
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
-#include <boost/smart_ptr.hpp>
-#include <memory>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future_impl.h"
+
+#include <memory>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace {

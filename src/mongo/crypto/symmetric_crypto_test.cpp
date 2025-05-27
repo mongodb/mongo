@@ -28,6 +28,19 @@
  */
 
 
+#include "mongo/crypto/symmetric_crypto.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/block_packer.h"
+#include "mongo/crypto/symmetric_key.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -43,18 +56,6 @@
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/secure_allocator.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/crypto/block_packer.h"
-#include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/crypto/symmetric_key.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace crypto {

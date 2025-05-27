@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

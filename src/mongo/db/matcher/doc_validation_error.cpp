@@ -27,19 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <set>
-#include <stack>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <absl/container/flat_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <s2cellid.h>
+#include "mongo/db/matcher/doc_validation_error.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -51,7 +39,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -91,6 +78,21 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <set>
+#include <stack>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::doc_validation_error {
 namespace {

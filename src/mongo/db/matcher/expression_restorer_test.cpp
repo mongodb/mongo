@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/expression_restorer.h"
+
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_restorer.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/boolean_simplification/bitset_test_util.h"
 #include "mongo/unittest/death_test.h"

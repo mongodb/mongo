@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <type_traits>
-#include <utility>
-#include <variant>
-
 #include "mongo/db/exec/express/plan_executor_express.h"
 
 #include "mongo/base/error_codes.h"
@@ -71,6 +64,14 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

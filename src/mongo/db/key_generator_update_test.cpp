@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
@@ -52,6 +46,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace mongo {
 namespace {

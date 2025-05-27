@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/field_ref.h"
+
+#include <vector>
 
 namespace mongo {
 /**

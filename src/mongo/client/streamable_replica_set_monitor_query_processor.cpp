@@ -28,14 +28,14 @@
  */
 #include "mongo/client/streamable_replica_set_monitor_query_processor.h"
 
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/logv2/log.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

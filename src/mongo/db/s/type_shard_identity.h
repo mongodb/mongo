@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/s/type_shard_identity_gen.h"
+
+#include <string>
 
 namespace mongo {
 

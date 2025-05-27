@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/executor/task_executor.h"
+
+#include <memory>
 
 namespace mongo {
 

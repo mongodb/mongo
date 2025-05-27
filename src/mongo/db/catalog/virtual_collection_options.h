@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 /**

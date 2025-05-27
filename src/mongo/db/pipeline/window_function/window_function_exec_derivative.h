@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <utility>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
@@ -45,6 +40,12 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

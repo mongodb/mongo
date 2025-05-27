@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
+#include "mongo/transport/grpc/service.h"
+
 #include <memory>
 
 #include <grpc/grpc_security.h>
 #include <grpcpp/security/server_credentials.h>
-
-#include "mongo/stdx/mutex.h"
-#include "mongo/transport/grpc/service.h"
 
 namespace mongo::transport::grpc {
 

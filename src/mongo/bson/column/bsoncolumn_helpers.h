@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
-#include <concepts>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,6 +38,10 @@
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/bson/column/simple8b_type_util.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
+
+#include <concepts>
+
+#include <boost/container/small_vector.hpp>
 
 namespace mongo {
 namespace bsoncolumn {

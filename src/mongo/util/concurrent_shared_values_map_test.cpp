@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <absl/container/flat_hash_map.h>
+#include "mongo/util/concurrent_shared_values_map.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrent_shared_values_map.h"
+
+#include <string>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace {

@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <bitset>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <bitset>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace projection_ast {

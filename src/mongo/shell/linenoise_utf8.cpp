@@ -30,10 +30,10 @@
 #include "mongo/shell/linenoise_utf8.h"
 
 #ifdef _WIN32
-#include <io.h>
-
 #include "mongo/platform/windows_basic.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <io.h>
 #else
 #include "mongo/config.h"  // IWYU pragma: keep
 

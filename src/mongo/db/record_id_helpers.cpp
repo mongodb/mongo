@@ -30,12 +30,6 @@
 
 #include "mongo/db/record_id_helpers.h"
 
-#include <cstdint>
-#include <limits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_validate.h"
@@ -49,6 +43,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <limits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

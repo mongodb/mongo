@@ -29,14 +29,6 @@
 
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
-#include <algorithm>
-#include <ctime>
-#include <memory>
-#include <sstream>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +43,14 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <ctime>
+#include <memory>
+#include <sstream>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 using namespace mongo::repl;
 

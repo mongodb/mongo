@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
-#include <fcntl.h>
 #include <iostream>
 #include <string>
 #include <system_error>
+
+#include <fcntl.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef _WIN32
 #include <io.h>

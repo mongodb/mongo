@@ -27,22 +27,21 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <vector>
+#include "mongo/db/s/topology_time_ticker.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/unittest/unittest.h"
-
-
-#include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

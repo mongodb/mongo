@@ -32,11 +32,22 @@
  */
 
 
+#include "mongo/unittest/unittest.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/stringify.h"
+#include "mongo/util/assert_util.h"
+
 #include <array>
-#include <boost/optional.hpp>
 #include <cstddef>
 #include <exception>
-#include <fmt/format.h>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -48,19 +59,9 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/stringify.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

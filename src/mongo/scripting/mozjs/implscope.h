@@ -29,27 +29,6 @@
 
 #pragma once
 
-#include <atomic>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <functional>
-#include <js/CompileOptions.h>
-#include <js/Context.h>
-#include <js/GCAPI.h>
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
-#include <js/Value.h>
-#include <jsapi.h>
-#include <jsfriendapi.h>
-#include <memory>
-#include <mongo/scripting/mozjs/freeOpToJSContext.h>
-#include <string>
-#include <thread>
-#include <type_traits>
-#include <utility>
-#include <vector>
-#include <vm/PosixNSPR.h>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -102,6 +81,29 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/string_map.h"
+
+#include <atomic>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
+#include <thread>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+
+#include <boost/optional/optional.hpp>
+#include <js/CompileOptions.h>
+#include <js/Context.h>
+#include <js/GCAPI.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+#include <mongo/scripting/mozjs/freeOpToJSContext.h>
+#include <vm/PosixNSPR.h>
 
 namespace mongo {
 namespace mozjs {

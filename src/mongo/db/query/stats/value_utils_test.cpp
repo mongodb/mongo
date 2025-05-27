@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/stats/value_utils.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -35,10 +37,8 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_bounds_builder_test_fixture.h"
-#include "mongo/db/query/stats/test_utils.h"
-
 #include "mongo/db/query/interval.h"
-#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/query/stats/test_utils.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

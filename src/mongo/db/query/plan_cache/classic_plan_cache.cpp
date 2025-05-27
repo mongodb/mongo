@@ -29,9 +29,6 @@
 
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 
-#include <boost/optional/optional.hpp>
-
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -43,6 +40,8 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 Counter64& planCacheTotalSizeEstimateBytes =

@@ -31,8 +31,6 @@
 #if defined(_WIN32)
 
 
-#include <boost/range/size.hpp>
-
 #include "mongo/util/ntservice.h"
 
 #include "mongo/logv2/log.h"
@@ -47,6 +45,8 @@
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/winutil.h"
+
+#include <boost/range/size.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

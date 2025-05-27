@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -43,6 +39,11 @@
 #include "mongo/db/s/split_chunk_request_type.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

@@ -28,17 +28,11 @@
  */
 
 
-#include <cstdlib>
-#include <new>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/shutdown.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/shutdown.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
@@ -48,6 +42,13 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdlib>
+#include <new>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

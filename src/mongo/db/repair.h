@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <functional>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/tenant_id.h"
+
+#include <functional>
+#include <string>
 
 namespace mongo {
 class StorageEngine;

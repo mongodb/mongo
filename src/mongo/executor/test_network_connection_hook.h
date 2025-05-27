@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/executor/network_connection_hook.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace executor {

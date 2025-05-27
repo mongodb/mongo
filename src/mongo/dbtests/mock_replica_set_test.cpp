@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <set>
-#include <string>
-#include <vector>
+#include "mongo/dbtests/mock/mock_replica_set.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -50,9 +46,15 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <set>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 using mongo::BSONArrayBuilder;
 using mongo::BSONElement;

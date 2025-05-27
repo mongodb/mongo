@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -36,7 +38,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

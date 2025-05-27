@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/duration.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 

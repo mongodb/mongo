@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <utility>
 
 namespace mongo::sbe {
 

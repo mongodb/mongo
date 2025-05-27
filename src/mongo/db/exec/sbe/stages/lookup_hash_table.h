@@ -29,6 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/spilling.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -38,14 +46,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/util/spilling.h"
-#include "mongo/db/exec/sbe/values/row.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo::sbe {
 using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT

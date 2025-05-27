@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -49,10 +46,14 @@
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::stage_builder {
 

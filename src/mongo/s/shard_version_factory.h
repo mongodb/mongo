@@ -28,14 +28,14 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

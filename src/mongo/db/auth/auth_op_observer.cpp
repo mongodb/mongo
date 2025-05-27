@@ -27,17 +27,13 @@
  *    it in the license file.
  */
 
-#include <set>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/auth/auth_op_observer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer/op_observer_util.h"
@@ -46,6 +42,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <set>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

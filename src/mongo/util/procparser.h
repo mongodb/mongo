@@ -29,19 +29,20 @@
 
 #pragma once
 
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/file_status.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+
 #include <cstdint>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "mongo/base/error_extra_info.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_applier.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 

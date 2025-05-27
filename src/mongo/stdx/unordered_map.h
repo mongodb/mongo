@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/stdx/trusted_hasher.h"
+
 #include <cstddef>
 
-#include "mongo/stdx/trusted_hasher.h"
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace stdx {

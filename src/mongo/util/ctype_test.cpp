@@ -29,8 +29,9 @@
 
 
 #include <cstddef>
-#include <fmt/format.h>
 #include <string>
+
+#include <fmt/format.h>
 // IWYU pragma: no_include <ctype.h>
 
 #include "mongo/base/static_assert.h"

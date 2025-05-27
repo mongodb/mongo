@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +40,8 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/service_context.h"
+
+#include <string>
 
 namespace mongo {
 

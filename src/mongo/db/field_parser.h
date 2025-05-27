@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
@@ -47,6 +39,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 namespace mongo {
 

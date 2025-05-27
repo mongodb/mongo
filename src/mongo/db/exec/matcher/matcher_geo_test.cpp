@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -36,6 +34,8 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::evaluate_matcher_geo_test {
 

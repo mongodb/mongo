@@ -28,8 +28,6 @@
  */
 
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

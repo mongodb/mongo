@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <string>
-#include <tuple>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/primary_only_service_util.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +37,6 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
-#include "mongo/db/repl/primary_only_service_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -54,6 +46,15 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
+
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 using namespace mongo;
 using namespace mongo::repl;

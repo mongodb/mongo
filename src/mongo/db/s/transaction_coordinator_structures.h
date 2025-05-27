@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/shard_id.h"
+
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace txn {

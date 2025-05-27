@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstdlib>
-#include <exception>
-#include <fmt/format.h>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <typeinfo>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/static_assert.h"
@@ -54,6 +42,19 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <exception>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <typeinfo>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

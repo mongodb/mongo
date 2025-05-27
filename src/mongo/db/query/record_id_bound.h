@@ -29,15 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <compare>
-#include <fmt/format.h>
-#include <ostream>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+
+#include <compare>
+#include <ostream>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

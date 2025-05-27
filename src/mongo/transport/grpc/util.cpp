@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-
 #include "mongo/transport/grpc/util.h"
 
 #include "mongo/client/mongo_uri.h"
@@ -36,6 +34,8 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <fmt/format.h>
 
 namespace mongo::transport::grpc::util {
 namespace constants {

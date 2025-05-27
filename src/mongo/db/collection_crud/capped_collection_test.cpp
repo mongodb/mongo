@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -65,6 +59,12 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

@@ -29,12 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <list>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
@@ -56,6 +50,13 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <list>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 

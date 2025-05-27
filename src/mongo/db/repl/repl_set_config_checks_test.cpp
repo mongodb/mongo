@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
-#include <string>
+#include "mongo/db/repl/repl_set_config_checks.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -40,7 +38,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -50,6 +47,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <string>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace repl {

@@ -29,9 +29,7 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstdint>
-#include <exception>
-#include <string>
+#include "mongo/db/commands/fsync.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -46,7 +44,6 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/fsync_gen.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -65,6 +62,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <exception>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

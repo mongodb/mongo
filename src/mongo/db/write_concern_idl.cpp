@@ -29,14 +29,14 @@
 
 #include "mongo/db/write_concern_idl.h"
 
-#include <fmt/format.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <fmt/format.h>
 
 namespace mongo {
 // Helpers for IDL parsing

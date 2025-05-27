@@ -29,11 +29,6 @@
 
 #include "mongo/db/global_settings.h"
 
-#include <mutex>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +43,11 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

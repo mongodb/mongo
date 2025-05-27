@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <mutex>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -37,6 +34,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/notification.h"
+
+#include <mutex>
+#include <string>
 
 namespace mongo {
 namespace {

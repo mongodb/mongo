@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
@@ -40,7 +39,6 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
-#include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -50,6 +48,9 @@
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

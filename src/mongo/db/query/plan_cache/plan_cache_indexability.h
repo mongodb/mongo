@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/string_map.h"
+
 #include <functional>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 class BSONObj;

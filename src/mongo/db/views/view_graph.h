@@ -28,19 +28,20 @@
  */
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 class ViewDefinition;

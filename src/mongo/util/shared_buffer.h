@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
-#include <boost/intrusive_ptr.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -40,11 +43,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "mongo/base/data_view.h"
-#include "mongo/base/static_assert.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
+#include <boost/intrusive_ptr.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace allocator_aware {

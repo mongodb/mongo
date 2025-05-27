@@ -26,16 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

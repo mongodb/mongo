@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
@@ -34,7 +36,6 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/unordered_set.h"

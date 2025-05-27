@@ -29,15 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <vector>
-
-#include <wiredtiger.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
@@ -50,6 +41,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include <wiredtiger.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 

@@ -31,10 +31,6 @@
 #include "mongo/db/operation_cpu_timer.h"
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-#include <ratio>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
@@ -50,6 +46,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+#include <ratio>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

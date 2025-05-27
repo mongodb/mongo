@@ -33,13 +33,13 @@
  * This file contains tests for mongo/db/query/query_planner.cpp
  */
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/query_solution.h"
+
+#include <string>
 
 namespace mongo {
 

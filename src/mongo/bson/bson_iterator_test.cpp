@@ -28,14 +28,6 @@
  */
 
 
-#include <cstdio>
-#include <cstring>
-#include <ctime>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,6 +35,14 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

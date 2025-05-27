@@ -30,22 +30,23 @@
 #include "mongo/shell/program_runner.h"
 
 #include <algorithm>
-#include <boost/filesystem/operations.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
 #include <cerrno>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-#include <fcntl.h>
 #include <iostream>
 #include <iterator>
 #include <memory>
 #include <utility>
 
+#include <fcntl.h>
+
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
+#include <boost/filesystem/operations.hpp>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/stream_buffer.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/core/typeinfo.hpp>
 #include <boost/filesystem/path.hpp>

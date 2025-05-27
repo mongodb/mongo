@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/s/commands/query_cmd/cluster_explain.h"
+
 #include "mongo/bson/json.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

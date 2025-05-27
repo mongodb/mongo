@@ -34,9 +34,6 @@
 #include <vector>
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
@@ -51,6 +48,9 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 namespace {

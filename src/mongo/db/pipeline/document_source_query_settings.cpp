@@ -29,8 +29,6 @@
 
 #include "document_source_query_settings.h"
 
-#include <algorithm>
-
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
@@ -40,6 +38,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
+
+#include <algorithm>
 
 namespace mongo {
 

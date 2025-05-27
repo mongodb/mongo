@@ -28,17 +28,17 @@
  */
 
 
-#include <memory>
-#include <utility>
-#include <vector>
-
+#include "mongo/db/exec/shard_filter.h"
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

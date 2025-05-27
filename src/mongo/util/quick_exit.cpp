@@ -29,10 +29,10 @@
 
 // NOTE: This file *must not* depend on any mongo symbols.
 
-#include <mutex>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/exit_code.h"
+
+#include <mutex>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

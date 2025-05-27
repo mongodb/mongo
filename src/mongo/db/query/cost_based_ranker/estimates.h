@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/functional/hash.hpp>
-#include <limits>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fixed_string.h"
+
+#include <limits>
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo::cost_based_ranker {
 

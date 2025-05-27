@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+
+#include <memory>
 
 namespace mongo {
 

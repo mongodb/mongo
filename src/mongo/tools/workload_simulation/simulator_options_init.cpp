@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include <iostream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/logv2/log_debug.h"
 #include "mongo/tools/workload_simulation/simulator_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
@@ -42,7 +39,9 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
 
-#include "mongo/logv2/log_debug.h"
+#include <iostream>
+#include <string>
+#include <vector>
 
 namespace mongo::workload_simulation {
 MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(SimulatorOptions)(InitializerContext* context) {

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/catalog/collection_mock.h"
@@ -55,6 +53,8 @@
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/platform/compiler.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

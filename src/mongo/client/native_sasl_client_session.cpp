@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <tuple>
+#include "mongo/client/native_sasl_client_session.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -38,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
@@ -51,6 +49,10 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/str.h"
+
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/client/sasl_aws_client_conversation.h"

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -43,6 +38,11 @@
 #include "mongo/s/commands/query_cmd/cluster_find_cmd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

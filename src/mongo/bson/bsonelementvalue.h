@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <cstring>  // strlen
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +39,9 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstring>  // strlen
 
 namespace mongo {
 class BSONObj;

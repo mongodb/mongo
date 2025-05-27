@@ -29,24 +29,13 @@
 
 
 #include "mongo/bson/bsonobj.h"
+
 #include <absl/container/flat_hash_map.h>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <compare>
-#include <functional>
-#include <initializer_list>
-#include <map>
-#include <memory>
-#include <ratio>
-#include <set>
-#include <system_error>
-#include <tuple>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -90,6 +79,18 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <algorithm>
+#include <compare>
+#include <functional>
+#include <initializer_list>
+#include <map>
+#include <memory>
+#include <ratio>
+#include <set>
+#include <system_error>
+#include <tuple>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

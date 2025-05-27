@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/db/service_context.h"
 #include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/platform/atomic_word.h"
@@ -39,6 +36,10 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

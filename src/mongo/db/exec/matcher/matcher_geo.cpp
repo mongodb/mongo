@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include <s2cellid.h>
-#include <s2cellunion.h>
-#include <s2regioncoverer.h>
-
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+
+#include <s2cellid.h>
+#include <s2cellunion.h>
+#include <s2regioncoverer.h>
 
 namespace mongo {
 

@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 

@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,6 +47,10 @@
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+#include <tuple>
+#include <vector>
 
 namespace mongo {
 

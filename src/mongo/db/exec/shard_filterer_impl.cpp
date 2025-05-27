@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
-
+#include "mongo/db/exec/shard_filterer_impl.h"
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

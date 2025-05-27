@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 

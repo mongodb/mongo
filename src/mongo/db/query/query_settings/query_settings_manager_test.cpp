@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <vector>
-
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -43,7 +38,6 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
-#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -52,6 +46,13 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
+
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_settings {
 namespace {

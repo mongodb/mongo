@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstddef>
-#include <variant>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/commands/query_cmd/bulk_write_gen.h"
+
+#include <cstddef>
+#include <variant>
 
 namespace mongo {
 

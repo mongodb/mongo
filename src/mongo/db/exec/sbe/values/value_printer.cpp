@@ -26,14 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <algorithm>
-#include <cstdint>
-#include <limits>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <fmt/format.h>
+#include "mongo/db/exec/sbe/values/value_printer.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
@@ -44,7 +37,6 @@
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -56,6 +48,15 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo::sbe::value {
 

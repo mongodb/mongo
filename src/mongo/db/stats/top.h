@@ -33,10 +33,6 @@
  * DB usage monitor.
  */
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <cstdint>
-#include <span>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
@@ -46,6 +42,11 @@
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
+
+#include <cstdint>
+#include <span>
+
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 namespace mongo {
 

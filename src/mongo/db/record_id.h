@@ -29,23 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <boost/functional/hash.hpp>
-#include <boost/optional.hpp>
-#include <climits>
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <fmt/format.h>
-#include <limits>
-#include <new>
-#include <ostream>
-#include <span>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -59,6 +42,24 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <array>
+#include <climits>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <ostream>
+#include <span>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <boost/functional/hash.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/member_config.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/repl/member_config.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/index_builds/commit_quorum_options.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/index_builds/commit_quorum_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

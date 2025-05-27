@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <queue>
-#include <variant>
-
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -42,6 +37,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <queue>
+#include <variant>
 
 namespace mongo {
 

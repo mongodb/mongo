@@ -28,15 +28,7 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/s/shard_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -57,11 +49,20 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

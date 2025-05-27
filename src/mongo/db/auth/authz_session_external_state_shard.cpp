@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-
 #include "mongo/db/auth/authz_session_external_state_shard.h"
 
 #include "mongo/base/shim.h"
@@ -42,6 +38,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

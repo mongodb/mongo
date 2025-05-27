@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/change_stream_pre_images_truncate_manager.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -38,7 +36,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/change_stream_pre_images_truncate_manager.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
@@ -52,6 +49,10 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -32,27 +32,28 @@
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
 #include <atomic>
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
 #include <cerrno>
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
-#include <fmt/format.h>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include <syscall.h>
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 

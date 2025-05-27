@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include <memory>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/oid.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
@@ -39,6 +34,11 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 

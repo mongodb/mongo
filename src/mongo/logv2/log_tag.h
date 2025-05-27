@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+
 #include <cstdint>
 #include <string>
-
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo::logv2 {
 

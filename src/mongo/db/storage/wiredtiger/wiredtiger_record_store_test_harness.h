@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <wiredtiger.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -40,6 +36,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <memory>
+#include <string>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

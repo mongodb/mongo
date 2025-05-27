@@ -29,16 +29,6 @@
 
 #include "mongo/client/dbclient_cursor.h"
 
-#include <boost/cstdint.hpp>
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <ostream>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -66,6 +56,16 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <ostream>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

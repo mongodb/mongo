@@ -25,6 +25,7 @@
 
 #include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
+
 #include <asio/buffer.hpp>
 
 // This must be after all other includes

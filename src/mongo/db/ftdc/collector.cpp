@@ -29,13 +29,6 @@
 
 #include "mongo/db/ftdc/collector.h"
 
-#include <algorithm>
-#include <array>
-#include <memory>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +52,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <array>
+#include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

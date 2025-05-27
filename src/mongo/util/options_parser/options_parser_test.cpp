@@ -27,14 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <exception>
-#include <fstream>  // IWYU pragma: keep
-#include <map>
-#include <memory>
-#include <utility>
-
-#include <boost/filesystem/path.hpp>
+#include "mongo/util/options_parser/options_parser.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -49,8 +42,16 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <cstddef>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <map>
+#include <memory>
+#include <utility>
+
+#include <boost/filesystem/path.hpp>
 
 namespace {
 

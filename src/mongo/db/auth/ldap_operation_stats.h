@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <iostream>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -42,6 +38,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/tick_source.h"
+
+#include <cstdint>
+#include <iostream>
+#include <memory>
 
 namespace mongo {
 /**

@@ -33,11 +33,6 @@
 
 #include "mongo/db/exec/sort.h"
 
-#include <memory>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -59,6 +54,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using namespace mongo;
 

@@ -28,16 +28,17 @@
  */
 
 
-#include <memory>
-#include <mutex>
-#include <utility>
+#include "mongo/executor/async_multicaster.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

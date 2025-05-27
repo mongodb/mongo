@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
@@ -43,8 +41,11 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
-#include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

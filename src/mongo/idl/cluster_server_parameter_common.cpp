@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <iterator>
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/idl/cluster_server_parameter_common.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -52,8 +43,18 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/logv2/log.h"
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

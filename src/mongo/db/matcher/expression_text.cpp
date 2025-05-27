@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
+#include "mongo/db/matcher/expression_text.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,11 +46,15 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

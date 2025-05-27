@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsontypes.h"
+
+#include <string>
 
 namespace mongo {
 

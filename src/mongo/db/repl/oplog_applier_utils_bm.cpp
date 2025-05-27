@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <chrono>
-#include <string>
-#include <vector>
+#include "mongo/db/repl/oplog_applier_utils.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/stats/rand_utils.h"
-#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
+
+#include <chrono>
+#include <string>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

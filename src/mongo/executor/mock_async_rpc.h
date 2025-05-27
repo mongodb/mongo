@@ -33,18 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <deque>
-#include <functional>
-#include <iosfwd>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -74,6 +62,18 @@
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <deque>
+#include <functional>
+#include <iosfwd>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace mongo::async_rpc {
 

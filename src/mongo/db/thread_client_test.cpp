@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
@@ -37,6 +35,8 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_name.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

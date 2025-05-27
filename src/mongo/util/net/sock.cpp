@@ -31,16 +31,19 @@
 #include "mongo/util/net/sock.h"
 
 #include <algorithm>
+
 #include <fmt/format.h>
 
 #if !defined(_WIN32)
-#include <arpa/inet.h>
 #include <cerrno>
+
 #include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
+
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>

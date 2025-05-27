@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
@@ -45,6 +37,15 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
+
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

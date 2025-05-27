@@ -28,14 +28,15 @@
  */
 
 
-#include <boost/none.hpp>
+#include "mongo/s/query/exec/cluster_client_cursor_mock.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/s/query/exec/cluster_client_cursor_mock.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

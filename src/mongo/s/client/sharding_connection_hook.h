@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+
+#include <memory>
 
 namespace mongo {
 

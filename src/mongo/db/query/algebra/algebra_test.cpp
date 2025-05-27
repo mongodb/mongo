@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/algebra/operator.h"
+#include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/overloaded_visitor.h"
+
 #include <algorithm>
 #include <iterator>
 #include <numeric>
 #include <set>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/query/algebra/operator.h"
-#include "mongo/db/query/algebra/polyvalue.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::algebra {
 

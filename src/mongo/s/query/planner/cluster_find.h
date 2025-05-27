@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/getmore_command_gen.h"
+
+#include <cstddef>
+#include <vector>
 
 namespace mongo {
 

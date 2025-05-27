@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <functional>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/db_raii.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -44,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -73,6 +68,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

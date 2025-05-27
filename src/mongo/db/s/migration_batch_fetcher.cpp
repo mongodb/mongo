@@ -29,13 +29,6 @@
 
 #include "mongo/db/s/migration_batch_fetcher.h"
 
-#include <functional>
-#include <mutex>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
@@ -53,6 +46,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/timer.h"
+
+#include <functional>
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

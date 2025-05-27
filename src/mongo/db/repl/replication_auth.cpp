@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/replication_auth.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/db/auth/authorization_manager.h"

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/hashagg_base.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <absl/hash/hash.h>
 
 namespace mongo {
 namespace sbe {

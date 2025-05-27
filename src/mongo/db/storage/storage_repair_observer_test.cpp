@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/storage/storage_repair_observer.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

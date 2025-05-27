@@ -29,25 +29,6 @@
 
 #pragma once
 
-#include <array>
-#include <bitset>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstring>
-#include <fmt/format.h>
-#include <functional>
-#include <iosfwd>
-#include <iterator>
-#include <limits>
-#include <list>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_type.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -69,6 +50,26 @@
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/string_map.h"
+
+#include <array>
+#include <bitset>
+#include <cstddef>
+#include <cstring>
+#include <functional>
+#include <iosfwd>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

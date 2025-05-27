@@ -28,6 +28,7 @@
  */
 
 #include "mongo/rpc/legacy_request.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"

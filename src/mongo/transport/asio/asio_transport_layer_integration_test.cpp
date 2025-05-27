@@ -28,11 +28,6 @@
  */
 
 
-#include <array>
-#include <string>
-#include <system_error>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/service_context.h"
@@ -46,6 +41,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+
+#include <array>
+#include <string>
+#include <system_error>
+#include <vector>
 
 #include <asio.hpp>
 

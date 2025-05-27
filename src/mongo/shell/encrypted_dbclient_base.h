@@ -27,22 +27,6 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <js/CallArgs.h>
-#include <js/RootingAPI.h>
-#include <js/TracingAPI.h>
-#include <js/TypeDecls.h>
-#include <js/Value.h>
-#include <memory>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
@@ -91,6 +75,23 @@
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
 
 namespace mongo {
 

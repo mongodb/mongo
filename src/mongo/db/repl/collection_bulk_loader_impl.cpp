@@ -29,9 +29,6 @@
 
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 
-#include <cstddef>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -52,6 +49,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <cstddef>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

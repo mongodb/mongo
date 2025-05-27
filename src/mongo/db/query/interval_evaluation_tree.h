@@ -29,19 +29,20 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <map>
-#include <stack>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
+
+#include <map>
+#include <stack>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::interval_evaluation_tree {
 class ConstNode;

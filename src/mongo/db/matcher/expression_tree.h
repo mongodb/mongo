@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,6 +39,13 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 /**
  * this contains all Expressions that define the structure of the tree

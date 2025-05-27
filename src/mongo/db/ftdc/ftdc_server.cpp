@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <fstream>  // IWYU pragma: keep
-#include <memory>
-#include <utility>
-
-#include <boost/filesystem/path.hpp>
+#include "mongo/db/ftdc/ftdc_server.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +38,6 @@
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/controller.h"
-#include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/ftdc/ftdc_server_gen.h"
 #include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/db/mirror_maestro.h"
@@ -58,6 +52,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <fstream>  // IWYU pragma: keep
+#include <memory>
+#include <utility>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

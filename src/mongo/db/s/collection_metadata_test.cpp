@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/collection_metadata.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -40,7 +36,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/database_version.h"
@@ -48,6 +43,12 @@
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

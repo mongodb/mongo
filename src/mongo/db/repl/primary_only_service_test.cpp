@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <ostream>
-#include <tuple>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/primary_only_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -46,7 +37,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -69,6 +59,17 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <tuple>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 using namespace mongo;
 using namespace mongo::repl;

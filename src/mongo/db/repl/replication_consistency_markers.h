@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

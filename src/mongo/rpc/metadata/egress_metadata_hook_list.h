@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/rpc/metadata/metadata_hook.h"
+
 #include <memory>
 #include <vector>
-
-#include "mongo/rpc/metadata/metadata_hook.h"
 
 namespace mongo {
 

@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+
+#include <functional>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**

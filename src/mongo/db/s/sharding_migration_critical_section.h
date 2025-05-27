@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

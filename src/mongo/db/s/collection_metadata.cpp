@@ -28,26 +28,27 @@
  */
 
 
-#include <boost/none.hpp>
-#include <fmt/format.h>
-#include <map>
-#include <set>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/collection_metadata.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <map>
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

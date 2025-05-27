@@ -28,8 +28,7 @@
  */
 
 
-#include <string>
-
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -37,10 +36,11 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

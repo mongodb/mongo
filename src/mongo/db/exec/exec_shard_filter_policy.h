@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <variant>
-
 #include "mongo/db/exec/shard_filterer.h"
+
+#include <variant>
 
 namespace mongo {
 

@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <ostream>
-#include <string>
-#include <util/math/mathutil.h>
+#include "mongo/db/index/s2_key_generator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,7 +39,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/index/s2_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -54,6 +47,15 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <ostream>
+#include <string>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <util/math/mathutil.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

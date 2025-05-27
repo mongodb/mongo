@@ -29,12 +29,13 @@
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <cstring>
-#include <fmt/format.h>
 #include <string>
 #include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #ifndef _WIN32
 #include <sys/un.h>

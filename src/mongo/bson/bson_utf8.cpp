@@ -29,14 +29,14 @@
 
 #include "mongo/bson/bson_utf8.h"
 
-#include <algorithm>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/str_escape.h"
+
+#include <algorithm>
 
 namespace mongo {
 bool isValidUTF8(const BSONObj& obj) {

@@ -28,18 +28,18 @@
  */
 
 
-#include <ostream>
-#include <type_traits>
-
+#include "mongo/util/assert_util.h"
 
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
+#include <type_traits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo {

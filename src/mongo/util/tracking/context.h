@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <functional>
-
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tracking/allocator.h"
+
+#include <functional>
 
 namespace mongo::tracking {
 

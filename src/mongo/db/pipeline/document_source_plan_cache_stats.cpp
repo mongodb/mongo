@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <iterator>
-#include <list>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/str.h"
+
+#include <iterator>
+#include <list>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

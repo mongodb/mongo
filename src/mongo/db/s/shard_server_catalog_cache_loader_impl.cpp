@@ -29,16 +29,6 @@
 
 #include "mongo/db/s/shard_server_catalog_cache_loader_impl.h"
 
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <iterator>
-#include <mutex>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_field.h"
@@ -93,6 +83,16 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
+
+#include <iterator>
+#include <mutex>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,11 +29,6 @@
 
 #include "mongo/client/sdam/json_test_arg_parser.h"
 
-#include <memory>
-
-#include <boost/algorithm/string/join.hpp>
-#include <boost/iterator/iterator_traits.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
 #include "mongo/logv2/log.h"
@@ -42,6 +37,11 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/value.h"
+
+#include <memory>
+
+#include <boost/algorithm/string/join.hpp>
+#include <boost/iterator/iterator_traits.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

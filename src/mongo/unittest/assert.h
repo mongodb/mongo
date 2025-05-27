@@ -36,16 +36,6 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include <cmath>
-#include <fmt/format.h>
-#include <functional>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -61,6 +51,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
+
+#include <cmath>
+#include <functional>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 /**
  * Fail unconditionally, reporting the given message.

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/mixed_schema_buckets_state.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

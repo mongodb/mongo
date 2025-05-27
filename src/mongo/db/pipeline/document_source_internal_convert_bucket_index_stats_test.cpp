@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

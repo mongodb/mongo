@@ -28,15 +28,7 @@
  */
 
 
-#include <bitset>
-#include <boost/cstdint.hpp>
-#include <fmt/format.h>
-#include <memory>
-#include <set>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/rpc/op_msg.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_validated.h"
@@ -51,12 +43,21 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
-#include "mongo/rpc/op_msg.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+
+#include <bitset>
+#include <memory>
+#include <set>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 #include <wiredtiger.h>

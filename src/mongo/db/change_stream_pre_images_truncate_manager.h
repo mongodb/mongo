@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <memory>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
@@ -45,6 +40,12 @@
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**

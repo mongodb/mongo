@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <deque>
-#include <string>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/storage_engine.h"
+
+#include <deque>
+#include <string>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

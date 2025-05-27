@@ -31,12 +31,12 @@
 
 #include "mongo/client/sasl_sspi_options.h"
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo {
 

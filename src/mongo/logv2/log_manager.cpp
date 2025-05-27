@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
+#include "mongo/logv2/log_manager.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -37,8 +37,9 @@
 #include "mongo/logv2/log_domain.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_domain_internal.h"
-#include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_util.h"
+
+#include <functional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

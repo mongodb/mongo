@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_score.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_score.h"
 #include "mongo/db/pipeline/document_source_score_gen.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
@@ -48,6 +47,8 @@
 #include "mongo/db/version_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

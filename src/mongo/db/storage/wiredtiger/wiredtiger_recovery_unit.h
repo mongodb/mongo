@@ -29,17 +29,6 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <memory>
-#include <stack>
-#include <vector>
-#include <wiredtiger.h>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -55,6 +44,19 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <memory>
+#include <stack>
+#include <vector>
+
+#include <wiredtiger.h>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

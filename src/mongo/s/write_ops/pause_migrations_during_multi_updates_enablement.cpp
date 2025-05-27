@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <random>
+#include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 
 #include "mongo/db/server_parameter.h"
 #include "mongo/s/migration_blocking_operation/migration_blocking_operation_cluster_parameters_gen.h"
-#include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/util/fail_point.h"
+
+#include <random>
 
 namespace mongo {
 

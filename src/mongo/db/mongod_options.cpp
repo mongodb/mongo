@@ -30,20 +30,6 @@
 
 #include "mongo/db/mongod_options.h"
 
-#include <algorithm>
-#include <boost/filesystem.hpp>  // IWYU pragma: keep
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <initializer_list>
-#include <iostream>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -83,6 +69,21 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#include <algorithm>
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem.hpp>  // IWYU pragma: keep
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

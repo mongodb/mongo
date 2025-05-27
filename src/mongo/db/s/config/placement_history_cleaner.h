@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <cstddef>
+#include <string>
 
 namespace mongo {
 

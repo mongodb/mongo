@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <mutex>
-#include <utility>
-#include <vector>
-
+#include "mongo/db/baton.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/baton.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

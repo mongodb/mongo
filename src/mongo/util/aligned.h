@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/stdx/new.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <new>
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "mongo/stdx/new.h"
 
 namespace mongo {
 

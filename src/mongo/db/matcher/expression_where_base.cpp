@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/matcher/expression_where_base.h"
 
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/matcher/expression_where_base.h"
+
+#include <utility>
 
 namespace mongo {
 

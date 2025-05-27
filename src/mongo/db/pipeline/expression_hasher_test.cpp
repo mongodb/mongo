@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/expression_hasher.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/expression_hasher.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/unittest/unittest.h"
+
 #include <string>
 
 namespace mongo {

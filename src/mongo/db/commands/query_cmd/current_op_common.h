@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -41,6 +39,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/service_context.h"
+
+#include <vector>
 
 namespace mongo {
 

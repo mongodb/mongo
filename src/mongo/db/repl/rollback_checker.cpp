@@ -28,14 +28,15 @@
  */
 
 
-#include <memory>
-#include <mutex>
+#include "mongo/db/repl/rollback_checker.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/repl/rollback_checker.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

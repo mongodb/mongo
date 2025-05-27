@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <mutex>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -49,6 +43,13 @@
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace analyze_shard_key {

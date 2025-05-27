@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/client/remote_command_targeter_mock.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
+
 #include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/future_impl.h"
 
 namespace mongo {
 

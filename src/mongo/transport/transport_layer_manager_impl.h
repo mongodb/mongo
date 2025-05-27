@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -41,6 +37,11 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"

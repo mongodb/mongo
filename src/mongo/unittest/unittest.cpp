@@ -29,12 +29,9 @@
 
 
 #include <algorithm>
-#include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
-#include <fmt/format.h>
-#include <fmt/printf.h>  // IWYU pragma: keep
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -46,14 +43,11 @@
 
 #include <boost/exception/exception.hpp>
 #include <boost/log/core/core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 // IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
-#include <boost/log/sinks/unlocked_frontend.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/thread/exceptions.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -78,6 +72,12 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version/releases.h"
+
+#include <boost/log/sinks/unlocked_frontend.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

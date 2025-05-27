@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+
+#include <memory>
 
 namespace mongo {
 namespace executor {

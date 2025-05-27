@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <iterator>
-#include <memory>
+#include "mongo/util/dns_query.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/dns_query.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

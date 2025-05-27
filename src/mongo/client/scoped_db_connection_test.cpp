@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +43,11 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {

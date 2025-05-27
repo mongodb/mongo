@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/util/allocator_thread.h"
-
 #include "mongo/config.h"
+#include "mongo/util/allocator_thread.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE

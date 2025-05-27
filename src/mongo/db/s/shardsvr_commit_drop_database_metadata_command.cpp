@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog_raii.h"
@@ -45,6 +43,8 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

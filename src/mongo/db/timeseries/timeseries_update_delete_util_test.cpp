@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

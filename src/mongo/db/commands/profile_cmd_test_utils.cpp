@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/profile_cmd_test_utils.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/profile_filter_impl.h"

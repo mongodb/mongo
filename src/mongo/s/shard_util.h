@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -46,6 +39,14 @@
 #include "mongo/s/catalog/type_chunk_range.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_key_pattern.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

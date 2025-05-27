@@ -29,17 +29,16 @@
 
 #include "mongo/db/catalog/catalog_helper.h"
 
-#include <algorithm>
-#include <memory>
-#include <set>
-#include <string>
-
-
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/database_name.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo::catalog_helper {
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);

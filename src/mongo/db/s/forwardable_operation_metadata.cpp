@@ -29,14 +29,6 @@
 
 #include "mongo/db/s/forwardable_operation_metadata.h"
 
-#include <boost/optional.hpp>
-#include <mutex>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -52,6 +44,14 @@
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/util/assert_util.h"
+
+#include <mutex>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

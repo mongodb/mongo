@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
-#include <cstddef>
-#include <map>
-#include <set>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstddef>
+#include <map>
+#include <set>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

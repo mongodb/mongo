@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/rename_collection_gen.h"
+
+#include <string>
 
 namespace mongo {
 

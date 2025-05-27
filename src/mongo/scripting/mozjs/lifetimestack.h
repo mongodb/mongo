@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
 #include <cstddef>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

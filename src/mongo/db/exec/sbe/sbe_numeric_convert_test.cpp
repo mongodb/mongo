@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -40,6 +35,12 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <limits>
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo::sbe {
 namespace test_detail {

@@ -28,9 +28,11 @@
  */
 
 #include "mongo/bson/column/bsoncolumn_fuzzer_util.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/simple8b_helpers.h"
 #include "mongo/bson/column/simple8b_type_util.h"
+
 #include <absl/numeric/int128.h>
 
 namespace mongo::bsoncolumn {

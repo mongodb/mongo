@@ -29,13 +29,6 @@
 
 #include "mongo/db/catalog/unique_collection_name.h"
 
-#include <algorithm>
-#include <memory>
-#include <mutex>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -48,6 +41,13 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

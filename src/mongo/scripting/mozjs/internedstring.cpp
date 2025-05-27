@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <js/String.h>
+#include "mongo/scripting/mozjs/internedstring.h"
+
+#include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/util/assert_util.h"
 
 #include <js/Id.h>
 #include <js/RootingAPI.h>
+#include <js/String.h>
 #include <js/TypeDecls.h>
-
-#include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

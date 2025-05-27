@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <list>
-#include <map>
-#include <memory>
-#include <vector>
-
-#include <poll.h>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/mutex.h"
@@ -46,6 +38,15 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+
+#include <list>
+#include <map>
+#include <memory>
+#include <vector>
+
+#include <poll.h>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace transport {

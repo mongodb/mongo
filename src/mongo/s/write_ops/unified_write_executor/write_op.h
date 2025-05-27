@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/s/write_ops/batched_command_request.h"
+
 #include <variant>
 
-#include "mongo/s/write_ops/batched_command_request.h"
+#include <boost/optional.hpp>
 
 
 namespace mongo {

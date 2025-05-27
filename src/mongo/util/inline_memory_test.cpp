@@ -29,14 +29,15 @@
 
 #include "mongo/util/inline_memory.h"
 
-#include <fmt/format.h>
-#include <list>
-#include <utility>
-
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <list>
+#include <utility>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

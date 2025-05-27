@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <utility>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -40,6 +37,10 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/spill_table.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

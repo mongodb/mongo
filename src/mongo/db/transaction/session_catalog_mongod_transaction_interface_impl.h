@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod_transaction_interface.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+
+#include <vector>
 
 namespace mongo {
 

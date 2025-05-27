@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+
 #include <map>
 #include <vector>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

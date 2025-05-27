@@ -27,6 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/debugger.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/string_map.h"
+
 #include <iostream>
 #include <memory>
 #include <set>
@@ -36,15 +45,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/util/debugger.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/string_map.h"
 
 #if defined(__clang__)
 #define clang_optnone __attribute__((optnone))

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/remote_command_targeter_standalone.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/remote_command_targeter_standalone.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

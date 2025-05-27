@@ -28,14 +28,7 @@
  */
 
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/watchdog/watchdog_mongod.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -55,9 +48,17 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/watchdog/watchdog.h"
-#include "mongo/watchdog/watchdog_mongod.h"
 #include "mongo/watchdog/watchdog_mongod_gen.h"
 #include "mongo/watchdog/watchdog_register.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

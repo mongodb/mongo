@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/util/assert_util.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/time_support.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/processinfo.h"
-#include "mongo/util/time_support.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

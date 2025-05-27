@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/timeseries/timeseries_extended_range.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 

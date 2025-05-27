@@ -28,10 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <string>
-#include <utility>
-#include <vector>
+#include "mongo/db/commands/query_cmd/write_commands_common.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -41,11 +38,15 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/commands/query_cmd/write_commands_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace auth {

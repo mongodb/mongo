@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::boolean_simplification {

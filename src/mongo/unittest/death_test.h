@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/unittest/framework.h"
+
 #include <functional>
 #include <memory>
 #include <string>
-
-#include "mongo/unittest/framework.h"
 
 /**
  * Constructs a single death test named `TEST_NAME` within the test suite `SUITE_NAME`.

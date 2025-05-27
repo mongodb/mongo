@@ -27,6 +27,16 @@
  *    it in the license file.
  */
 
+#include "aead_encryption.h"
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/hex.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -36,18 +46,9 @@
 #include <string>
 #include <vector>
 
-#include "aead_encryption.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/secure_allocator.h"
-#include "mongo/base/string_data.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace {

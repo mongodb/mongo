@@ -32,12 +32,12 @@
 
 #include <cstdint>
 #include <cstring>
-#include <fmt/format.h>
 #include <stdexcept>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #ifndef _WIN32
 #include <netinet/in.h>

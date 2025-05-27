@@ -29,11 +29,6 @@
 
 #include "mongo/db/exec/sbe/util/spilling.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +43,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/str.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

@@ -29,6 +29,7 @@
 
 
 #include "mongo/util/periodic_runner.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

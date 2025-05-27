@@ -32,19 +32,20 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/stringify.h"
+#include "mongo/util/optional_util.h"
+
 #include <algorithm>
-#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <typeinfo>
 #include <utility>
 
-#include "mongo/base/string_data.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/stringify.h"
-#include "mongo/util/optional_util.h"
+#include <fmt/format.h>
 
 /**
  * This file defines infrastructure used in the ASSERT_THAT system.

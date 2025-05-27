@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+
 #include <cstring>
 #include <iostream>
 #include <ostream>
 #include <regex>
 #include <string>
 #include <utility>
-
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 

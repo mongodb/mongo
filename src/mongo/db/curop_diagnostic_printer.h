@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+
+#include <fmt/format.h>
 
 /*
  * This file contains functions which will compute a diagnostic string for use during a tassert or

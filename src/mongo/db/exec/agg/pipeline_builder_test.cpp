@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/agg/pipeline_builder.h"
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"

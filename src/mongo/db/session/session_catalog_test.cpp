@@ -32,12 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <future>
-#include <memory>
-#include <string>
-#include <system_error>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog_test.h"
@@ -49,6 +43,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <future>
+#include <memory>
+#include <string>
+#include <system_error>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

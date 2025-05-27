@@ -29,13 +29,11 @@
 
 #include "mongo/db/query/interval_evaluation_tree.h"
 
+#include <cstddef>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstddef>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <ostream>
-#include <type_traits>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -45,6 +43,9 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <ostream>
+#include <type_traits>
 
 namespace mongo::interval_evaluation_tree {
 namespace {

@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include "expression_context.h"
-#include "mongo/bson/json.h"
-
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
+
+#include "mongo/bson/json.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include "expression_context.h"
 
 namespace mongo {
 namespace {

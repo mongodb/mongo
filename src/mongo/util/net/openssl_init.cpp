@@ -37,10 +37,11 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #include <stack>
 #include <vector>
+
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
 #if OPENSSL_VERSION_NUMBER > 0x30000000L
 #include <openssl/provider.h>

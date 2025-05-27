@@ -29,12 +29,6 @@
 
 #include "mongo/db/update/modifier_table.h"
 
-#include <algorithm>
-#include <array>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
 #include "mongo/db/update/bit_node.h"
@@ -49,6 +43,12 @@
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
 #include "mongo/db/update/update_node.h"
+
+#include <algorithm>
+#include <array>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo::modifiertable {
 namespace {

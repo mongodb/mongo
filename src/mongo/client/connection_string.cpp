@@ -29,15 +29,15 @@
 
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <set>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <set>
+#include <utility>
 
 namespace mongo {
 

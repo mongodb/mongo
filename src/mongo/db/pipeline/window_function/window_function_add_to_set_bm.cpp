@@ -27,12 +27,14 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <boost/random/normal_distribution.hpp>
-#include <random>
+#include "mongo/db/pipeline/window_function/window_function_add_to_set.h"
 
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/window_function/window_function_add_to_set.h"
+
+#include <random>
+
+#include <benchmark/benchmark.h>
+#include <boost/random/normal_distribution.hpp>
 
 namespace mongo {
 namespace {

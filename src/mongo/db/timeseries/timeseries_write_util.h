@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -53,6 +46,14 @@
 #include "mongo/db/version_context.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries {
 

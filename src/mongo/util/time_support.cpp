@@ -28,15 +28,12 @@
  */
 
 #include <algorithm>
+
 #include <boost/move/utility_core.hpp>
 #include <fmt/compile.h>
 #include <fmt/format.h>
 #include <sys/types.h>
 // IWYU pragma: no_include "bits/types/struct_tm.h"
-#include <cstdio>
-#include <cstring>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/parse_number.h"
@@ -49,11 +46,15 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
-#if defined(_WIN32)
-#include <mmsystem.h>
+#include <cstdio>
+#include <cstring>
+#include <string>
 
+#if defined(_WIN32)
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
+
+#include <mmsystem.h>
 #elif defined(__linux__)
 #include <ctime>
 #elif defined(__APPLE__)

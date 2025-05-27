@@ -29,14 +29,6 @@
 
 #include "mongo/db/concurrency/deferred_writer.h"
 
-#include <boost/move/utility_core.hpp>
-#include <compare>
-#include <functional>
-#include <mutex>
-#include <utility>
-
-#include <boost/none.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/client.h"
@@ -53,6 +45,14 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <compare>
+#include <functional>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

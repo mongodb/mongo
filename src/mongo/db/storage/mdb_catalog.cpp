@@ -29,8 +29,6 @@
 
 #include "mongo/db/storage/mdb_catalog.h"
 
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

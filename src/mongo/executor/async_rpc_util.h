@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
+
+#include <memory>
 
 namespace mongo::async_rpc {
 

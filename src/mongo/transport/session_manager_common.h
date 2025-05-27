@@ -29,15 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
+#include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/session_manager.h"
+#include "mongo/util/net/cidr.h"
 
 #include <string>
 #include <variant>
 #include <vector>
-
-#include "mongo/db/client.h"
-#include "mongo/transport/client_transport_observer.h"
-#include "mongo/util/net/cidr.h"
 
 namespace mongo {
 class ServiceContext;

@@ -28,7 +28,6 @@
  */
 
 #include "mongo/client/read_preference.h"
-
 #include "mongo/db/operation_context.h"
 #include "mongo/util/decorable.h"
 

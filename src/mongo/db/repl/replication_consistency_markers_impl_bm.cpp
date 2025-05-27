@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
@@ -42,7 +42,6 @@
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -60,6 +59,8 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/logv2/log_domain_global.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

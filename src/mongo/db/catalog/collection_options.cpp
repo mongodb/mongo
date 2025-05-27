@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <limits>
-#include <memory>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
+#include "mongo/db/catalog/collection_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -45,7 +35,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_validation.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -57,6 +46,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
+
+#include <limits>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

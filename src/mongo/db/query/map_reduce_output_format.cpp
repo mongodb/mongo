@@ -29,11 +29,11 @@
 
 #include "mongo/db/query/map_reduce_output_format.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::map_reduce_output_format {
 

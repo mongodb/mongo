@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-#include <boost/move/utility_core.hpp>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/view_response_formatter.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -41,8 +35,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/view_response_formatter.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

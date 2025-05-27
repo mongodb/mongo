@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace repl {

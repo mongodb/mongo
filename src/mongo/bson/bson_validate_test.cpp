@@ -28,13 +28,7 @@
  */
 
 
-#include <cstdio>
-#include <cstring>
-#include <ctime>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
+#include "mongo/bson/bson_validate.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -42,7 +36,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -63,6 +56,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

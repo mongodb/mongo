@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <cstdint>
 
 namespace mongo {
 

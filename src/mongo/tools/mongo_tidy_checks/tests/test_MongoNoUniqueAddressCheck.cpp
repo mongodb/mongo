@@ -1,10 +1,11 @@
-#include <boost/unordered_map.hpp>
+#include "mongo/platform/compiler.h"
+
 #include <condition_variable>
 #include <future>
 #include <mutex>
 #include <unordered_map>
 
-#include "mongo/platform/compiler.h"
+#include <boost/unordered_map.hpp>
 
 namespace mongo {
 void mongoNoUniqueAddressTest() {

@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/logv2/log_format.h"
+
 #include <memory>
 #include <string>
-
-#include "mongo/logv2/log_format.h"
 
 namespace mongo::logv2 {
 

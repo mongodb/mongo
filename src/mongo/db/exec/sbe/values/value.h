@@ -37,21 +37,6 @@
 // IWYU pragma: no_include "boost/predef/hardware/simd/x86/versions.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
 // IWYU pragma: no_include "emmintrin.h"
-#include <algorithm>
-#include <array>
-#include <bitset>
-#include <climits>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
@@ -78,6 +63,21 @@
 #include "mongo/util/represent_as.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <array>
+#include <bitset>
+#include <climits>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 /**

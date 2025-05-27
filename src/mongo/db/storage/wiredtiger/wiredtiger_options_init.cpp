@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <iostream>
-#include <vector>
-
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -37,6 +34,9 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+
+#include <iostream>
+#include <vector>
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

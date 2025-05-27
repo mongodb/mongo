@@ -28,11 +28,11 @@
  */
 #include "mongo/db/commands/server_status.h"
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 namespace mongo {
 

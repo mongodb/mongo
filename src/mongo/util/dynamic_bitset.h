@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <bit>
-#include <type_traits>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/inlined_storage.h"
+
+#include <bit>
+#include <type_traits>
 
 namespace mongo {
 namespace bitset_utils {

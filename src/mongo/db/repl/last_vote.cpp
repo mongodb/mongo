@@ -29,13 +29,13 @@
 
 #include "mongo/db/repl/last_vote.h"
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {

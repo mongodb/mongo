@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/update/update_node.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/update/update_array_node.h"
 #include "mongo/db/update/update_object_node.h"

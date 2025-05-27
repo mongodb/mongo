@@ -29,10 +29,11 @@
 
 #include "mongo/idl/generic_argument.h"
 
-#include <fmt/format.h>
+#include "mongo/base/error_codes.h"
+
 #include <limits>
 
-#include "mongo/base/error_codes.h"
+#include <fmt/format.h>
 
 namespace mongo {
 

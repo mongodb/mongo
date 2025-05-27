@@ -28,11 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-#include <future>
-#include <system_error>
-#include <vector>
+#include "mongo/db/s/migration_batch_fetcher.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -46,7 +42,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/migration_batch_fetcher.h"
 #include "mongo/db/s/migration_batch_mock_inserter.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -66,6 +61,13 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/uuid.h"
+
+#include <future>
+#include <system_error>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

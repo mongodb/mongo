@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <absl/container/inlined_vector.h>
-#include <scoped_allocator>
-
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
+
+#include <scoped_allocator>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::tracking {
 

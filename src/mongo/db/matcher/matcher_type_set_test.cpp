@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <limits>
-#include <string>
+#include "mongo/db/matcher/matcher_type_set.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -37,9 +35,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cmath>
+#include <limits>
+#include <string>
 
 namespace mongo {
 namespace {

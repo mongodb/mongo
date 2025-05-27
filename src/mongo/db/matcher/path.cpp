@@ -29,13 +29,12 @@
 
 #include "mongo/db/matcher/path.h"
 
-#include <boost/move/utility_core.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/path_internal.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

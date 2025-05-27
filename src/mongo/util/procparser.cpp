@@ -32,17 +32,18 @@
 
 #include <algorithm>
 #include <array>
-#include <boost/algorithm/string/finder.hpp>
 #include <cerrno>
 #include <cstddef>
-#include <fcntl.h>
 #include <istream>
 #include <map>
 #include <set>
 #include <string>
 #include <system_error>
 
+#include <fcntl.h>
+
 #include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/finder.hpp>
 // IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/core/addressof.hpp>

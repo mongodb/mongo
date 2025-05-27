@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/query/stage_types.h"
-#include <algorithm>
-
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/stage_types.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

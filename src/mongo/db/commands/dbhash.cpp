@@ -28,15 +28,6 @@
  */
 
 
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -79,6 +70,15 @@
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

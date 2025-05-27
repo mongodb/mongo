@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <cstdint>
-#include <random>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,6 +41,12 @@
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <random>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

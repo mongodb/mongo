@@ -28,18 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/authentication_commands.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -60,7 +49,6 @@
 #include "mongo/db/auth/x509_protocol_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/commands/authentication_commands_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
@@ -78,6 +66,19 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <iosfwd>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -52,9 +47,15 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <iosfwd>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

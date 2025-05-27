@@ -29,13 +29,13 @@
 
 #include "mongo/base/clonable_ptr.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
 
 
 namespace {

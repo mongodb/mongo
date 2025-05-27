@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
-#include <grpcpp/grpcpp.h>
-
 #include "mongo/transport/grpc/bidirectional_pipe.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_util.h"
 #include "mongo/transport/grpc/server_stream.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <map>
+#include <string>
+
+#include <grpcpp/grpcpp.h>
 
 namespace mongo::transport::grpc {
 

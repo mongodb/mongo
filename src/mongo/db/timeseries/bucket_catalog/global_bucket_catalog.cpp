@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-
 #include "mongo/db/timeseries/bucket_catalog/global_bucket_catalog.h"
+
+#include <cstddef>
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {

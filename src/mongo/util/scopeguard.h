@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/platform/compiler.h"
+
 #include <type_traits>
 #include <utility>
-
-#include "mongo/platform/compiler.h"
 
 namespace mongo {
 

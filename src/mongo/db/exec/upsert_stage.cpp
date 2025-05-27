@@ -29,11 +29,6 @@
 
 #include "mongo/db/exec/upsert_stage.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
@@ -72,6 +67,12 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

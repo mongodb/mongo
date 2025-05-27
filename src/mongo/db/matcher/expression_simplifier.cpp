@@ -28,12 +28,12 @@
  */
 
 #include "mongo/db/matcher/expression_simplifier.h"
+
 #include "mongo/db/matcher/expression_restorer.h"
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
 #include "mongo/db/query/tree_walker.h"
-
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

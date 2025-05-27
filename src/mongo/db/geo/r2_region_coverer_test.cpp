@@ -31,14 +31,6 @@
 #include <cmath>
 #include <cstddef>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <chrono>
-#include <iterator>
-#include <limits>
-#include <map>
-#include <memory>
-#include <random>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -54,6 +46,14 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <chrono>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <memory>
+#include <random>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/util/alarm.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -37,10 +35,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/alarm.h"
 #include "mongo/util/alarm_runner_background_thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

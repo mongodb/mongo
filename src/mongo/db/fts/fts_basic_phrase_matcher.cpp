@@ -29,9 +29,9 @@
 
 #include "mongo/db/fts/fts_basic_phrase_matcher.h"
 
-#include <cstring>
-
 #include "mongo/platform/strcasestr.h"
+
+#include <cstring>
 
 namespace mongo {
 namespace fts {

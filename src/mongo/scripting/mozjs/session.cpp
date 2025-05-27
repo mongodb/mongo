@@ -28,15 +28,7 @@
  */
 
 
-#include <cstdint>
-#include <js/CallArgs.h>
-#include <js/Object.h>
-#include <js/RootingAPI.h>
-#include <string>
-#include <utility>
-
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/session.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -46,12 +38,21 @@
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/scripting_util_gen.h"
-#include "mongo/scripting/mozjs/session.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <string>
+#include <utility>
+
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

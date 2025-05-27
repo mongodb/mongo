@@ -29,11 +29,11 @@
 
 #include "mongo/crypto/libbsonvalue.h"
 
-#include <bson/bson.h>
-#include <fmt/format.h>
-
 #include "mongo/crypto/mongocryptbuffer.h"
 #include "mongo/rpc/object_check.h"
+
+#include <bson/bson.h>
+#include <fmt/format.h>
 
 extern "C" {
 #include <mongocrypt-buffer-private.h>

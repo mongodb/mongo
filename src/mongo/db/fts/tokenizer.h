@@ -30,10 +30,10 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
+
+#include <string>
 
 namespace mongo {
 

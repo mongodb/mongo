@@ -29,12 +29,12 @@
 
 #pragma once
 
+#include "mongo/util/immutable/details/map.h"
+#include "mongo/util/immutable/details/memory_policy.h"
+
 #include <algorithm>
 
 #include <immer/flex_vector.hpp>
-
-#include "mongo/util/immutable/details/map.h"
-#include "mongo/util/immutable/details/memory_policy.h"
 
 
 namespace mongo::immutable {

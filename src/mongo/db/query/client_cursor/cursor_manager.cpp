@@ -33,14 +33,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/optional.hpp>
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <string>
-#include <type_traits>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_checks.h"
@@ -68,6 +60,14 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

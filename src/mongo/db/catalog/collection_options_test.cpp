@@ -27,19 +27,13 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/collection_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +41,13 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
+
+#include <limits>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 using unittest::assertGet;

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/duration.h"
+
+#include <cstdint>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 static constexpr auto kDefaultMaxTimeMSClusterParameterName = "defaultMaxTimeMS"_sd;

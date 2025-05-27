@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/s/catalog/type_collection.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

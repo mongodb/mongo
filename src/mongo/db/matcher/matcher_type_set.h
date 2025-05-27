@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <functional>
-#include <set>
-#include <string>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -46,6 +38,15 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <functional>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

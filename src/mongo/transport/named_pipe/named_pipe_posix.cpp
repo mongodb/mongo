@@ -29,14 +29,6 @@
 
 #ifndef _WIN32
 
-#include <cerrno>
-#include <chrono>
-#include <cstdio>
-#include <fmt/format.h>
-#include <fstream>  // IWYU pragma: keep
-#include <string>
-#include <sys/stat.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -45,6 +37,15 @@
 #include "mongo/transport/named_pipe/io_error_message.h"
 #include "mongo/transport/named_pipe/named_pipe.h"
 #include "mongo/util/assert_util.h"
+
+#include <cerrno>
+#include <chrono>
+#include <cstdio>
+#include <fstream>  // IWYU pragma: keep
+#include <string>
+
+#include <fmt/format.h>
+#include <sys/stat.h>
 
 namespace mongo {
 

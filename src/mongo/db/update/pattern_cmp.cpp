@@ -29,8 +29,6 @@
 
 #include "mongo/db/update/pattern_cmp.h"
 
-#include <cstddef>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
 
 namespace mongo {
 namespace pattern_cmp {

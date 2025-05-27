@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <utility>
-
 #include "mongo/db/catalog/document_validation.h"
+
+#include <utility>
 
 namespace mongo {
 const OperationContext::Decoration<DocumentValidationSettings> DocumentValidationSettings::get =

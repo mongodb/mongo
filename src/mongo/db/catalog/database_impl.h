@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +44,11 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

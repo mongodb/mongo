@@ -29,6 +29,11 @@
 
 #include "mongo/util/str_escape.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -36,11 +41,6 @@
 #include <utility>
 
 #include <fmt/format.h>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
 
 namespace mongo::str {
 namespace {

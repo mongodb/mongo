@@ -28,23 +28,7 @@
  */
 
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <js/Array.h>
-#include <js/CallArgs.h>
-#include <js/Object.h>
-#include <js/RootingAPI.h>
-#include <js/ValueArray.h>
-#include <jsapi.h>
-#include <jsfriendapi.h>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
-
-#include <js/PropertyAndElement.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/jsthread.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -59,12 +43,30 @@
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
-#include "mongo/scripting/mozjs/jsthread.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <jsapi.h>
+#include <jsfriendapi.h>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/Array.h>
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertyAndElement.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/ValueArray.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

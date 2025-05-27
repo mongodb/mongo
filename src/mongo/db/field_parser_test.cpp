@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/db/field_parser.h"
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/time_support.h"
+
 #include <climits>
 #include <cstring>
 #include <limits>
 #include <map>
 #include <string>
 #include <vector>
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
 
 namespace {
 

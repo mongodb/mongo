@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/routing_context.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace unified_write_executor {

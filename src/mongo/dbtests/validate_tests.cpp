@@ -32,18 +32,6 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
-#include <algorithm>
-#include <boost/move/algo/move.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -99,6 +87,19 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/algo/move.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace ValidateTests {

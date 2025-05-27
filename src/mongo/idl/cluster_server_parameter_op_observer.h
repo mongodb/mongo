@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/database_name.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <vector>
 
 namespace mongo {
 

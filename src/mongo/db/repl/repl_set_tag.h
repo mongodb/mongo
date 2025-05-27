@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/error_extra_info.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 
 namespace mongo {
 class BSONObjBuilder;

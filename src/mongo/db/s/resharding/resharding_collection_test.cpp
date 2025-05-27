@@ -28,12 +28,6 @@
  */
 
 
-#include <memory>
-#include <utility>
-#include <vector>
-
-#include <fmt/format.h>
-
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -61,6 +55,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -28,22 +28,15 @@
  */
 
 #include <array>
+#include <cstdint>
+#include <cstring>
+
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
-#include <cstring>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <deque>
-#include <initializer_list>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -99,6 +92,14 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <deque>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <vector>
 
 namespace mongo {
 namespace {

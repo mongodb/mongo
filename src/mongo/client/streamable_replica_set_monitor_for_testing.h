@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/mock_topology_manager.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/executor/task_executor.h"
+
+#include <memory>
 
 namespace mongo {
 

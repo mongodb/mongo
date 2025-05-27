@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <cstring>
-#include <map>
+#include "mongo/db/exec/sbe/stages/makeobj.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -41,10 +36,17 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <cstdint>
+#include <cstring>
+#include <map>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 template <typename O>

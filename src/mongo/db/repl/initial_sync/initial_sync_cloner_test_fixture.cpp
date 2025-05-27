@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <mutex>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/initial_sync/repl_sync_shared_data.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {

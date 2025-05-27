@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <initializer_list>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha256_block.h"
@@ -42,6 +36,12 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <initializer_list>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -29,11 +29,11 @@
 
 #include "mongo/db/shard_id.h"
 
-#include <compare>
-
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <compare>
 
 namespace mongo {
 namespace {

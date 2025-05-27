@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/client.h"
@@ -51,6 +44,13 @@
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

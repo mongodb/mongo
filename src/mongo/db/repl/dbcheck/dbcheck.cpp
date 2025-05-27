@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <utility>
-#include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/dbcheck/dbcheck.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -56,7 +50,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/repl/dbcheck/dbcheck.h"
 #include "mongo/db/repl/dbcheck/dbcheck_gen.h"
 #include "mongo/db/repl/dbcheck/dbcheck_idl.h"
 #include "mongo/db/repl/oplog.h"
@@ -71,6 +64,14 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 namespace mongo {

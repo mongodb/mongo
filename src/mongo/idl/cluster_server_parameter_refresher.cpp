@@ -28,19 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <iterator>
-#include <map>
-#include <mutex>
-#include <set>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include "mongo/idl/cluster_server_parameter_refresher.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -66,7 +54,6 @@
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
-#include "mongo/idl/cluster_server_parameter_refresher.h"
 #include "mongo/idl/cluster_server_parameter_refresher_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -80,6 +67,21 @@
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/version/releases.h"
+
+#include <iterator>
+#include <map>
+#include <mutex>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

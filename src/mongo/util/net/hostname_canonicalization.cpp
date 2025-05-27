@@ -31,8 +31,9 @@
 #include "mongo/util/net/hostname_canonicalization.h"
 
 #if !defined(_WIN32)
-#include <arpa/inet.h>
 #include <netdb.h>
+
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>

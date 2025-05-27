@@ -31,10 +31,12 @@
 
 #include <array>
 #include <cstddef>
+
+#include <jsapi.h>
+
 #include <js/Id.h>
 #include <js/RootingAPI.h>
 #include <js/TypeDecls.h>
-#include <jsapi.h>
 
 namespace mongo {
 namespace mozjs {

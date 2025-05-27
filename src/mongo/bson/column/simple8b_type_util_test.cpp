@@ -29,6 +29,9 @@
 
 #include "mongo/bson/column/simple8b_type_util.h"
 
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
 #include <cstring>
 #include <limits>
@@ -36,9 +39,6 @@
 
 #include <absl/numeric/int128.h>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
 

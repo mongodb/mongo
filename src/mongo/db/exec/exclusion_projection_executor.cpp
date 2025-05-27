@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
+#include "mongo/db/exec/exclusion_projection_executor.h"
+
+#include "mongo/db/query/query_knobs_gen.h"
+
 #include <algorithm>
 #include <list>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/exec/exclusion_projection_executor.h"
-#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::projection_executor {
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <vector>
 
 namespace mongo {
 class ReshardingCoordinator;

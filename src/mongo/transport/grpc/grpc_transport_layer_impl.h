@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
@@ -40,6 +37,10 @@
 #include "mongo/transport/grpc_connection_stats_gen.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
 

@@ -28,8 +28,9 @@
  */
 
 
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/cidr.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

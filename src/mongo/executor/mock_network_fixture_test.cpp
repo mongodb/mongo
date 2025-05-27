@@ -28,12 +28,13 @@
  */
 
 
+#include "mongo/executor/mock_network_fixture.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/executor/mock_network_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_interface_mock_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"

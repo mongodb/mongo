@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/util/net/http_client.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo {
 

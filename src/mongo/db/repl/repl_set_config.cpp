@@ -28,21 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_set.h>
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <fmt/ranges.h>  // IWYU pragma: keep
-#include <iterator>
-#include <map>
-#include <utility>
-#include <variant>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/repl_set_config.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -50,7 +36,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/member_config_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
@@ -63,6 +48,22 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <map>
+#include <utility>
+#include <variant>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

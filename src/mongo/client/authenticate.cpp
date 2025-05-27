@@ -28,13 +28,7 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/client/authenticate.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -46,7 +40,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/client/authenticate.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep
@@ -61,6 +54,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

@@ -29,10 +29,6 @@
 
 #include "mongo/client/sasl_client_authenticate.h"
 
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -40,6 +36,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

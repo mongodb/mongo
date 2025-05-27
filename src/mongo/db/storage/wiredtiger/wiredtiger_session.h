@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <list>
-#include <string>
-#include <wiredtiger.h>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/scopeguard.h"
@@ -41,6 +36,12 @@
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <list>
+#include <string>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

@@ -28,10 +28,10 @@
  */
 #pragma once
 
+#include "mongo/platform/visibility.h"
+
 #include <string>
 #include <string_view>
-
-#include "mongo/platform/visibility.h"
 
 #ifdef MONGO_API_visibility_test_lib1
 #define MONGO_VISIBILITY_TEST_LIB1_API MONGO_API_EXPORT

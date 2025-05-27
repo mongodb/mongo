@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/query_cmd/aggregation_execution_state.h"
+
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/change_stream_serverless_helpers.h"

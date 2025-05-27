@@ -30,11 +30,12 @@
 #include "mongo/transport/asio/asio_tcp_fast_open.h"
 
 #include <array>
-#include <fmt/format.h>
 #include <fstream>
 #include <map>
 #include <string>
 #include <utility>
+
+#include <fmt/format.h>
 
 #ifdef __linux__
 #include <netinet/tcp.h>

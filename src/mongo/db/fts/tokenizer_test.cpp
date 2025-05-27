@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/db/fts/tokenizer.h"
 
 #include "mongo/db/fts/fts_util.h"
-#include "mongo/db/fts/tokenizer.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 namespace mongo {
 namespace fts {

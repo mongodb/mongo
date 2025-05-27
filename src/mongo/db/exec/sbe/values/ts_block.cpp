@@ -29,11 +29,6 @@
 
 #include "mongo/db/exec/sbe/values/ts_block.h"
 
-#include <cstddef>
-#include <memory>
-#include <tuple>
-#include <utility>
-
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -48,6 +43,11 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/itoa.h"
+
+#include <cstddef>
+#include <memory>
+#include <tuple>
+#include <utility>
 
 namespace mongo::sbe::value {
 

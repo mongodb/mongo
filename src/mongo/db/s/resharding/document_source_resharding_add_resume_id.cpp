@@ -28,7 +28,7 @@
  */
 
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -36,11 +36,12 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

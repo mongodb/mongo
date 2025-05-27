@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <set>
-#include <string>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/matcher/doc_validation_error.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
@@ -43,7 +38,6 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/doc_validation_error.h"
 #include "mongo/db/matcher/doc_validation_error_test.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression.h"
@@ -56,6 +50,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::doc_validation_error {
 namespace {

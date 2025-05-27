@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
+
+#include <string>
 
 namespace mongo {
 

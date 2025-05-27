@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <string>
-
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/str.h"
+
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 namespace repl {

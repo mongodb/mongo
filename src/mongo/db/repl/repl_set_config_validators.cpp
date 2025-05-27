@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/repl_set_config_validators.h"
+
 #include "mongo/db/repl/repl_set_config_gen.h"
 
 namespace mongo {

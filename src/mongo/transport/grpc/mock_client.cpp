@@ -28,6 +28,7 @@
  */
 
 #include "mongo/transport/grpc/mock_client.h"
+
 #include "mongo/transport/grpc/util.h"
 
 namespace mongo::transport::grpc {

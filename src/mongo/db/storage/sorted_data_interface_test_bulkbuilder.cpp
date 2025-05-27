@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_format.h"
@@ -36,6 +34,8 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

@@ -28,6 +28,8 @@
  */
 
 
+#include "mongo/db/index_builds/index_builds_coordinator.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
@@ -38,7 +40,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"

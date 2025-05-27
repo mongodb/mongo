@@ -30,13 +30,12 @@
 #include "mongo/base/initializer.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
+#include "mongo/logv2/log_debug.h"
 #include "mongo/tools/workload_simulation/simulation.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
-
-#include "mongo/logv2/log_debug.h"
 
 namespace mongo::workload_simulation {
 namespace {

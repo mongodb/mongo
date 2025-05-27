@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"

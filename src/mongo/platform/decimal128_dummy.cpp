@@ -29,7 +29,6 @@
 
 
 #include "mongo/platform/decimal128.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

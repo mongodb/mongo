@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,6 +45,12 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

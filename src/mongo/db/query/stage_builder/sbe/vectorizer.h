@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <list>
-
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <list>
 
 namespace mongo::stage_builder {
 

@@ -43,20 +43,6 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/optional.hpp>
-#include <cmath>
-#include <fmt/format.h>
-#include <functional>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log_debug.h"
@@ -66,6 +52,21 @@
 #include "mongo/util/optional_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <cmath>
+#include <functional>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 /**
  * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.

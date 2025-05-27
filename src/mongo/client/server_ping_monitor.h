@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
@@ -41,6 +39,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
 
 namespace mongo {
 

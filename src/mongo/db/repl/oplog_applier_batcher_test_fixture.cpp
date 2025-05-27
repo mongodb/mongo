@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <mutex>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,13 +39,19 @@
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog_applier_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace repl {

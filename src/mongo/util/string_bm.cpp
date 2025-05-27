@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
+
 #include <algorithm>
-#include <benchmark/benchmark.h>
 #include <cctype>  // NOLINT
 #include <cstddef>
 #include <cstdint>
 #include <string>
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/ctype.h"
-#include "mongo/util/str.h"
+#include <benchmark/benchmark.h>
 
 // Verify the performance of our string processing algorithms.
 // This can include StringData, util/str utilities, etc.

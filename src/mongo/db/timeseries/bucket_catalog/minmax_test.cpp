@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <iterator>
-#include <numeric>
-#include <string>
-#include <tuple>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,6 +34,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/unittest/unittest.h"
+
+#include <iterator>
+#include <numeric>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {

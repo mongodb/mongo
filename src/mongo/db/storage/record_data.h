@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <type_traits>
 
 namespace mongo {
 

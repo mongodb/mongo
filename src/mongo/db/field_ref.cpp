@@ -33,13 +33,13 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <type_traits>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+
+#include <algorithm>
+#include <type_traits>
 
 namespace mongo {
 

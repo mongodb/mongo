@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iterator>
-
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 
 #include "mongo/db/exec/sbe/size_estimator.h"
+
+#include <algorithm>
+#include <iterator>
 
 namespace mongo::sbe {
 

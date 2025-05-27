@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstring>
-#include <type_traits>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/time_support.h"
+
+#include <cstring>
+#include <type_traits>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

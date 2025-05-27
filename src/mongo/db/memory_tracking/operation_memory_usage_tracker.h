@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 #pragma once
-#include <cstdint>
-
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+
+#include <cstdint>
 
 namespace mongo {
 

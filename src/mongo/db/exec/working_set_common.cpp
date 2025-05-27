@@ -28,16 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/iterator/transform_iterator.hpp>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/working_set_common.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -50,7 +41,6 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -73,6 +63,17 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

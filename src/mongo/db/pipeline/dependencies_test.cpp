@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <bitset>
-#include <compare>
-#include <set>
-#include <string>
+#include "mongo/db/pipeline/dependencies.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <bitset>
+#include <compare>
+#include <set>
+#include <string>
 
 namespace mongo {
 namespace {

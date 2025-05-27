@@ -29,13 +29,6 @@
 
 #include "mongo/dbtests/framework.h"
 
-#include <cstdlib>
-#include <ctime>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
@@ -65,6 +58,13 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
+
+#include <cstdlib>
+#include <ctime>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

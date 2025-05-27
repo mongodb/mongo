@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iterator>
-#include <ostream>
-
-#include <absl/container/flat_hash_map.h>
+#include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -39,9 +35,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/repl/repl_set_write_concern_mode_definitions.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <ostream>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 namespace repl {

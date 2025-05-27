@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
-#include <cstdint>
-#include <memory>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/query/query_stats/aggregated_metric.h"
 #include "mongo/db/query/query_stats/key.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo::query_stats {
 

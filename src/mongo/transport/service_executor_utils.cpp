@@ -31,14 +31,16 @@
 
 #include <cstddef>
 #include <exception>
-#include <fmt/format.h>
 #include <memory>
 #include <string>
 #include <system_error>
 #include <utility>
 
+#include <fmt/format.h>
+
 #if !defined(_WIN32)
 #include <pthread.h>
+
 #include <sys/resource.h>
 #endif
 

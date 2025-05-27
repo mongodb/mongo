@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/util/allocator_thread.h"
-
 #include "mongo/config.h"
+#include "mongo/util/allocator_thread.h"
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #error This file should not be built

@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <set>
+#include <string>
 
 namespace mongo {
 

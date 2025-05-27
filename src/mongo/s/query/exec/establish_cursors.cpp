@@ -29,17 +29,6 @@
 
 #include "mongo/s/query/exec/establish_cursors.h"
 
-#include <set>
-#include <string>
-#include <tuple>
-#include <utility>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -72,6 +61,17 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
+
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

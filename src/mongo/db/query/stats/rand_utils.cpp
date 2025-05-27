@@ -29,7 +29,10 @@
 
 #include "mongo/db/query/stats/rand_utils.h"
 
-#include <absl/container/flat_hash_map.h>
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -39,11 +42,8 @@
 #include <tuple>
 #include <vector>
 
+#include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::stats {
 namespace value = sbe::value;

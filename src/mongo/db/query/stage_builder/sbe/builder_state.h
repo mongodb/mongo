@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
+
+#include <memory>
+
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <boost/optional/optional.hpp>
-#include <memory>
-
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/plan_yield_policy_sbe.h"
 
 namespace mongo {
 class InMatchExpression;

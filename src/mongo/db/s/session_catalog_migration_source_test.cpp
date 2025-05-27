@@ -27,20 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-#include <iterator>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/session_catalog_migration_source.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -59,7 +46,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/session_catalog_migration.h"
-#include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -73,6 +59,21 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <iterator>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 namespace mongo {

@@ -29,8 +29,9 @@
 
 #include "MongoCollectionShardingRuntimeCheck.h"
 
-#include <clang-tidy/utils/OptionsUtils.h>
 #include <filesystem>
+
+#include <clang-tidy/utils/OptionsUtils.h>
 
 namespace mongo::tidy {
 

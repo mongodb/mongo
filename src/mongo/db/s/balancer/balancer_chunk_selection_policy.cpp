@@ -27,25 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <climits>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <iterator>
-#include <map>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -62,7 +44,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_util.h"
@@ -94,6 +75,26 @@
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <map>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

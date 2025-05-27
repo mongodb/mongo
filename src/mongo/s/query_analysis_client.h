@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace analyze_shard_key {

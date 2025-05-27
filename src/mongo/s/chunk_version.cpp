@@ -29,7 +29,6 @@
 
 #include "mongo/s/chunk_version.h"
 
-
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/chunk_version_gen.h"
 #include "mongo/util/str.h"

@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <fmt/format.h>
-#include <string>
-#include <wiredtiger.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -50,7 +42,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
@@ -60,6 +51,17 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <algorithm>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

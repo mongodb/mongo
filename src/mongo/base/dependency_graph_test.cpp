@@ -33,12 +33,12 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <fmt/ranges.h>  // IWYU pragma: keep
 #include <random>
 #include <string>
 #include <vector>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>  // IWYU pragma: keep
 // IWYU pragma: no_include "format.h"
 
 #include "mongo/base/dependency_graph.h"

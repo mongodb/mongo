@@ -28,13 +28,6 @@
  */
 
 
-#include <boost/version.hpp>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <typeinfo>
-
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -48,6 +41,14 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <iostream>
+#include <memory>
+#include <string>
+#include <typeinfo>
+
+#include <boost/version.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

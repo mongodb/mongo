@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

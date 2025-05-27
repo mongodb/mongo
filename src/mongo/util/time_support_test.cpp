@@ -28,14 +28,7 @@
  */
 
 
-#include <cstdlib>
-#include <ctime>
-#include <fmt/format.h>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <system_error>
-#include <vector>
+#include "mongo/util/time_support.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -45,7 +38,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
+
+#include <cstdlib>
+#include <ctime>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <system_error>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

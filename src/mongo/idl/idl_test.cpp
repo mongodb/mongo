@@ -27,27 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <boost/optional.hpp>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <initializer_list>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/idl/idl_test.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -79,7 +59,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/idl_test.h"
 #include "mongo/idl/idl_test_types.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/unittest_gen.h"
@@ -94,6 +73,28 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 using namespace mongo::idl::test;
 using namespace mongo::idl::import;

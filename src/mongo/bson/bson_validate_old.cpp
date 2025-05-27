@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <cstring>
-#include <limits>
-#include <vector>
-
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/platform/decimal128.h"
+
+#include <cstring>
+#include <limits>
+#include <vector>
 
 namespace mongo {
 

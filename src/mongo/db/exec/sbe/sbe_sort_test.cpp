@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -45,6 +39,12 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 

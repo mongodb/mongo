@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/status.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

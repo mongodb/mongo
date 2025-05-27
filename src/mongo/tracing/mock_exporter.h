@@ -30,11 +30,10 @@
 #pragma once
 
 #include "mongo/config.h"
+#include "mongo/stdx/unordered_map.h"
 
 #include <opentelemetry/sdk/trace/exporter.h>
 #include <opentelemetry/sdk/trace/recordable.h>
-
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 namespace tracing {

@@ -28,10 +28,8 @@
  */
 
 
-#include <memory>
-#include <utility>
-
 #include "mongo/db/logical_session_cache_factory_mongod.h"
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/sessions_collection_config_server.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
@@ -45,6 +43,9 @@
 #include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

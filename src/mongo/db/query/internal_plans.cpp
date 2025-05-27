@@ -30,14 +30,6 @@
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <utility>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -58,6 +50,14 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

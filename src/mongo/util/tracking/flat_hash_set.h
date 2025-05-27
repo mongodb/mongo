@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_set.h>
-#include <absl/container/internal/hash_function_defaults.h>
+#include "mongo/util/tracking/allocator.h"
+#include "mongo/util/tracking/context.h"
+
 #include <functional>
 #include <scoped_allocator>
 
-#include "mongo/util/tracking/allocator.h"
-#include "mongo/util/tracking/context.h"
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/internal/hash_function_defaults.h>
 
 namespace mongo::tracking {
 

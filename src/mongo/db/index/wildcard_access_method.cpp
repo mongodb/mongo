@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index/wildcard_access_method.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/storage/key_format.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

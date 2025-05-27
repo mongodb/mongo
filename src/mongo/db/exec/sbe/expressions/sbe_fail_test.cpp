@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
@@ -38,6 +36,8 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo::sbe {
 

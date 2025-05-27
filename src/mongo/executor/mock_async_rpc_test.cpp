@@ -28,10 +28,6 @@
  */
 #include "mongo/executor/mock_async_rpc.h"
 
-#include <absl/container/flat_hash_set.h>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
@@ -47,6 +43,9 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::async_rpc {
 namespace {

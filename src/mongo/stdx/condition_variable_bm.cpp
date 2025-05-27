@@ -29,10 +29,10 @@
 
 #include <benchmark/benchmark.h>
 // IWYU pragma: no_include "cxxabi.h"
+#include "mongo/stdx/condition_variable.h"
+
 #include <condition_variable>
 #include <mutex>
-
-#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 

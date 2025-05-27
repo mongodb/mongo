@@ -29,11 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 
-#include <algorithm>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -64,6 +59,12 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

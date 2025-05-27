@@ -31,13 +31,13 @@
 #error Do not include the DNS Query platform implementation headers.  Please use "mongo/util/dns_query.h" instead.
 #endif
 
-#include <windns.h>
-
-#include <cstdio>
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
 
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -46,10 +46,9 @@
 #include <string>
 #include <vector>
 
-#include <boost/noncopyable.hpp>
+#include <windns.h>
 
-#include "mongo/util/duration.h"
-#include "mongo/util/errno_util.h"
+#include <boost/noncopyable.hpp>
 
 using std::begin;
 using std::end;

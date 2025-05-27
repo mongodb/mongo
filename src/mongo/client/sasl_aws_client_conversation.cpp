@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdlib>
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/client/sasl_aws_client_conversation.h"
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
@@ -39,12 +35,17 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/client/sasl_aws_client_conversation.h"
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_aws_client_protocol.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/str.h"
+
+#include <cstdlib>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace awsIam {

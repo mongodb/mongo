@@ -36,10 +36,10 @@
 #include <roaring.hh>
 #undef IS_BIG_ENDIAN
 
+#include "mongo/util/assert_util.h"
+
 #include <absl/container/btree_map.h>
 #include <absl/container/flat_hash_set.h>
-
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 /**

@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/profile_settings.h"
+
+#include "mongo/db/service_context.h"
+
 #include <memory>
 #include <shared_mutex>
-
-#include "mongo/db/profile_settings.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace {

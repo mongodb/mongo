@@ -29,12 +29,13 @@
 
 #include "mongo/util/inline_memory.h"
 
-#include <absl/container/inlined_vector.h>
-#include <benchmark/benchmark.h>
-#include <boost/container/small_vector.hpp>
 #include <list>
 #include <vector>
 #include <version>
+
+#include <absl/container/inlined_vector.h>
+#include <benchmark/benchmark.h>
+#include <boost/container/small_vector.hpp>
 
 #if __cpp_lib_memory_resource >= 201603L
 #include <memory_resource>

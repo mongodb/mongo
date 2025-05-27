@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <utility>
+#include "mongo/db/exec/sbe/stages/unwind.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -36,10 +35,13 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe {
 UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,

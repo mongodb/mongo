@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/util/summation.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/summation.h"
 
 namespace mongo {
 

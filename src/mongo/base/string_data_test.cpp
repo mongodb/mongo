@@ -27,6 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+
+#include "mongo/base/string_data_comparator.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
+
 #include <algorithm>
 #include <functional>
 #include <initializer_list>
@@ -36,12 +43,6 @@
 #include <vector>
 
 #include <fmt/format.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

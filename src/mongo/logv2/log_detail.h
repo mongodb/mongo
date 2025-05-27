@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <functional>
-#include <string>
-#include <tuple>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
@@ -47,6 +39,15 @@
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/errno_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <tuple>
+
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::logv2 {
 

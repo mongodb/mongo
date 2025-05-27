@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <shared_mutex>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +38,13 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+
+#include <memory>
+#include <shared_mutex>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

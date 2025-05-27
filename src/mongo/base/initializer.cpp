@@ -27,21 +27,23 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/base/initializer.h"
+
+#include "mongo/base/dependency_graph.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/exit_code.h"
+#include "mongo/util/quick_exit.h"
+
 #include <iostream>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/base/dependency_graph.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/quick_exit.h"
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

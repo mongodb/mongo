@@ -29,9 +29,6 @@
 
 #include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <limits>
-#include <memory>
-
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/time_support.h"
+
+#include <limits>
+#include <memory>
 
 namespace {
 

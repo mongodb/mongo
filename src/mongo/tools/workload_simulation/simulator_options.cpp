@@ -29,18 +29,6 @@
 
 #include "mongo/tools/workload_simulation/simulator_options.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <iostream>
-#include <map>
-#include <utility>
-
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/exception.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -56,6 +44,18 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
+
+#include <iostream>
+#include <map>
+#include <utility>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

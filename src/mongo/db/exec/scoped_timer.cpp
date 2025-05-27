@@ -29,13 +29,13 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 #include <algorithm>
 #include <array>
 #include <memory>
 #include <string>
 #include <type_traits>
-
-#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bson_depth.h"
+
 #include <cstddef>
 #include <functional>
 #include <string>
 
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
-
-#include "mongo/bson/bson_depth.h"
 
 namespace mongo {
 

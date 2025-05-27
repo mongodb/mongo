@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/tracing/trace_initialization.h"
+
 #include "mongo/config.h"
+#include "mongo/tracing/trace_settings_gen.h"
+#include "mongo/unittest/unittest.h"
 
 #include <opentelemetry/trace/noop.h>
 #include <opentelemetry/trace/provider.h>
-
-#include "mongo/tracing/trace_initialization.h"
-#include "mongo/tracing/trace_settings_gen.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

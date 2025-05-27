@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <bitset>
-#include <cstddef>
-#include <iosfwd>
-#include <memory>
-#include <utility>
-
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -44,6 +37,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/time_support.h"
+
+#include <bitset>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 /**

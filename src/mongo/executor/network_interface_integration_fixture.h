@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <mutex>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -54,6 +49,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <mutex>
 
 namespace mongo {
 

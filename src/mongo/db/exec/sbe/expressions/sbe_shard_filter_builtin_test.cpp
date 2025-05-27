@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
@@ -38,6 +35,9 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo::sbe {
 

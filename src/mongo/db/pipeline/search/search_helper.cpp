@@ -29,14 +29,6 @@
 
 #include "mongo/db/pipeline/search/search_helper.h"
 
-#include <boost/optional/optional.hpp>
-#include <list>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -55,6 +47,14 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
+
+#include <list>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

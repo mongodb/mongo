@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/sharding_ready.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"

@@ -30,8 +30,6 @@
 
 #include "mongo/db/storage/disk_space_monitor.h"
 
-#include <utility>
-
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/storage/disk_space_util.h"
@@ -41,6 +39,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

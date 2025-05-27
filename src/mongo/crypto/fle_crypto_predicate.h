@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_tokens.h"
 #include "mongo/db/exec/document_value/value.h"
+
+#include <functional>
+#include <vector>
 
 namespace mongo {
 

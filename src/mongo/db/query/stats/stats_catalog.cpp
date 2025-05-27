@@ -29,15 +29,16 @@
 
 #include "mongo/db/query/stats/stats_catalog.h"
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/stats/ce_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -27,25 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/algorithm/string/join.hpp>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/range/adaptor/argument_fwd.hpp>
-#include <boost/range/adaptor/transformed.hpp>
-#include <boost/range/begin.hpp>
-#include <boost/range/end.hpp>
-#include <fmt/format.h>
-#include <queue>
-#include <s2cellid.h>
-#include <tuple>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/query/query_solution.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -68,7 +50,27 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_solution.h"
+
+#include <algorithm>
+#include <queue>
+#include <tuple>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/algorithm/string/join.hpp>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/range/adaptor/argument_fwd.hpp>
+#include <boost/range/adaptor/transformed.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

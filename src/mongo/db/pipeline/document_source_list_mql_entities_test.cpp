@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_list_mql_entities.h"
+
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_list_mql_entities.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

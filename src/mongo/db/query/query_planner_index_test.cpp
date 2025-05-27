@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +41,10 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace {

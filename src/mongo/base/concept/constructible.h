@@ -28,9 +28,9 @@
  */
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/stdx/type_traits.h"
+
+#include <type_traits>
 
 namespace mongo {
 namespace concept {

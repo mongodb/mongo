@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <type_traits>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 constexpr StringData InternalSchemaAllowedPropertiesMatchExpression::kName;

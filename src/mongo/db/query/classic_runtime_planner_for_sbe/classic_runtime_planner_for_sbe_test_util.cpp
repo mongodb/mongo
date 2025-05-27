@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
+
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 
 namespace mongo::sbe {

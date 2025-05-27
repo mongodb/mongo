@@ -33,8 +33,6 @@
 #include <sys/poll.h>
 #endif
 
-#include <asio.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/system_error.h"
@@ -48,6 +46,8 @@
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+
+#include <asio.hpp>
 
 namespace mongo::transport {
 

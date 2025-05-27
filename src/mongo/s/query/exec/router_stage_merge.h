@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/query/query_stats/data_bearing_node_metrics.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
@@ -38,6 +36,8 @@
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
 
 namespace mongo {
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
+
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"

@@ -31,13 +31,7 @@
  * Runs db unit tests.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -68,7 +62,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/service_entry_point.h"
@@ -85,6 +78,14 @@
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace dbtests {

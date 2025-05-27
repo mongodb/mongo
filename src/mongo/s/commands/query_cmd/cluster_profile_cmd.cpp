@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

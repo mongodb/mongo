@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/index_builds/index_builds_coordinator_mock.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/index_builds/repl_index_build_state.h"
 

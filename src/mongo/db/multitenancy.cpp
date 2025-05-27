@@ -29,13 +29,12 @@
 
 #include "mongo/db/multitenancy.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/tenant_id.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

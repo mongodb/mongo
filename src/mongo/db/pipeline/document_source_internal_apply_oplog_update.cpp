@@ -28,15 +28,12 @@
  */
 
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <utility>
+#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/field_ref_set.h"
-#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
 #include "mongo/db/pipeline/document_source_internal_apply_oplog_update_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -46,6 +43,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

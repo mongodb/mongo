@@ -28,9 +28,9 @@
  */
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/bsonobj.h"
+
+#include <string>
 
 namespace mongo {
 

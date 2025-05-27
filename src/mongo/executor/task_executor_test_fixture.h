@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace executor {

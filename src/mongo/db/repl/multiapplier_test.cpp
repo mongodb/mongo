@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/multiapplier.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -40,7 +36,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -53,6 +48,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace {
 

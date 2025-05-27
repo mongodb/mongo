@@ -29,14 +29,6 @@
 
 #include "mongo/db/query/query_stats/query_stats.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/hash/hash.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <climits>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -58,6 +50,15 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <climits>
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 

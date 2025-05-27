@@ -29,12 +29,12 @@
 
 #include "mongo/util/buildinfo.h"
 
-#include <climits>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/version.h"
+
+#include <climits>
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>

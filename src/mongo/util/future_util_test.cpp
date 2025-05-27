@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/cancellation.h"
-#include <algorithm>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
-#include <functional>
-#include <random>
-#include <ratio>
-#include <tuple>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/util/future_util.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -46,7 +37,17 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/future_util.h"
+#include "mongo/util/cancellation.h"
+
+#include <algorithm>
+#include <functional>
+#include <random>
+#include <ratio>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

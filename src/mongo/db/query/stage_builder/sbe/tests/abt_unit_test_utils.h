@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
 #include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo::stage_builder::abt_lower {

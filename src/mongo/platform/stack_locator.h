@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/platform/compiler.h"
+
 #include <cstddef>
 
-#include "mongo/platform/compiler.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef __has_builtin
 #if __has_builtin(__builtin_frame_address)

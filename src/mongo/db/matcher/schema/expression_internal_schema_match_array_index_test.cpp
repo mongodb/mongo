@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

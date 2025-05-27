@@ -29,16 +29,16 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <utility>
-
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <functional>
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

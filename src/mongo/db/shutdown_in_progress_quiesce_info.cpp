@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
+
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

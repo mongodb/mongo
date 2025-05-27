@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
-#include <boost/optional.hpp>
-
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -51,6 +47,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
 

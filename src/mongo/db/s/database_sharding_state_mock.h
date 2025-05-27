@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
@@ -38,6 +36,8 @@
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/stale_exception.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

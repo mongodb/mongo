@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/timer.h"
+
+#include <string>
 
 namespace mongo {
 

@@ -28,9 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstddef>
-#include <mutex>
-#include <string>
+#include "mongo/util/periodic_runner_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +42,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/periodic_runner_impl.h"
+
+#include <cstddef>
+#include <mutex>
+#include <string>
 
 namespace mongo {
 

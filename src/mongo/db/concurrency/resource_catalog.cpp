@@ -29,21 +29,21 @@
 
 #include "mongo/db/concurrency/resource_catalog.h"
 
-#include <absl/container/flat_hash_set.h>
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
-#include <boost/type_traits/decay.hpp>
-#include <mutex>
-#include <new>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/static_immortal.h"
+
+#include <mutex>
+#include <new>
+#include <utility>
+
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
 
 namespace mongo {
 

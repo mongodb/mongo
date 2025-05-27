@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/block_compressor.h"
+
+#include <vector>
 
 namespace mongo {
 

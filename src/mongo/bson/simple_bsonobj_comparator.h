@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <cstddef>
-#include <map>
-#include <set>
-
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <cstddef>
+#include <map>
+#include <set>
 
 namespace mongo {
 

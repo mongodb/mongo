@@ -29,19 +29,20 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <utility>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/dynamic_bitset.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::doc_diff {
 

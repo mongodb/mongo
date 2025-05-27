@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
+
+#include "mongo/db/query/stage_builder/sbe/abt/explain.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"

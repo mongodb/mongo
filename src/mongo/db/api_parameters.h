@@ -29,19 +29,19 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/decorable.h"
+
+#include <cstddef>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

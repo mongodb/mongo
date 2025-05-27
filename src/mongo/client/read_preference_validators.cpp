@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/duration.h"
+
+#include <fmt/format.h>
 
 
 namespace mongo {

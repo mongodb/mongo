@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <limits>
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/matcher/expression_expr.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -41,7 +37,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -53,6 +48,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <limits>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

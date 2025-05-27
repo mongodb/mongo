@@ -28,8 +28,24 @@
  */
 
 
+#include "mongo/db/repl/wait_for_majority_service.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/read_concern.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future_util.h"
+#include "mongo/util/static_immortal.h"
+
 #include <algorithm>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
 #include <mutex>
 #include <string>
@@ -39,22 +55,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/db/client.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/future_util.h"
-#include "mongo/util/static_immortal.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

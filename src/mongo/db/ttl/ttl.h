@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/record_id_bound.h"
@@ -43,6 +40,9 @@
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
 
 namespace mongo {
 

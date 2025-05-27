@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/db/dbmessage.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/dbmessage.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 using std::string;

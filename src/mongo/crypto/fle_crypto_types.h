@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <fmt/format.h>
-#include <vector>
-
 #include "mongo/base/secure_allocator.h"
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_key_types.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/fle_tokens.h"
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <cstdint>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

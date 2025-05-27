@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 constexpr StringData InternalSchemaUniqueItemsMatchExpression::kName;

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -56,6 +51,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
 
 namespace {
 

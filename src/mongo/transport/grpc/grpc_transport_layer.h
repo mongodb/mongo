@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo::transport::grpc {
 

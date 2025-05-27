@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <forward_list>
-#include <type_traits>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -51,6 +46,12 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
+
+#include <forward_list>
+#include <type_traits>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 

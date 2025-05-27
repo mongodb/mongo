@@ -27,16 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <iterator>
-#include <mutex>
-#include <numeric>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/oplog_buffer_collection.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -57,9 +48,19 @@
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
-#include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <numeric>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/read_concern_idl.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 

@@ -27,24 +27,25 @@
  *    it in the license file.
  */
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
+#include "mongo/util/represent_as.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cmath>
 #include <cstdint>
-#include <fmt/format.h>
 #include <limits>
 #include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/represent_as.h"
+#include <fmt/format.h>
 
 namespace mongo {
 

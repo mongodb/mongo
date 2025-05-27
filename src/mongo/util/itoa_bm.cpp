@@ -28,12 +28,13 @@
  */
 
 
-#include <benchmark/benchmark.h>
+#include "mongo/util/itoa.h"
+
 #include <cstdint>
+
+#include <benchmark/benchmark.h>
 #include <fmt/compile.h>
 #include <fmt/format.h>
-
-#include "mongo/util/itoa.h"
 
 namespace mongo {
 namespace {

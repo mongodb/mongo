@@ -28,10 +28,6 @@
  */
 
 
-#include <functional>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -42,6 +38,10 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <functional>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

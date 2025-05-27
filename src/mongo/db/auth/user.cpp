@@ -29,14 +29,6 @@
 
 #include "mongo/db/auth/user.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <cstddef>
-#include <memory>
-#include <vector>
-
-
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -51,6 +43,14 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo {
 

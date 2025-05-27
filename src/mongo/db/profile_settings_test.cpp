@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/profile_settings.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

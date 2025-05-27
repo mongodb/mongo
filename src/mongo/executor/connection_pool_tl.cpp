@@ -28,18 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_set.h>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <functional>
-#include <mutex>
-#include <tuple>
-#include <type_traits>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/executor/connection_pool_tl.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -60,7 +49,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/egress_networking_parameters_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -78,6 +66,19 @@
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 

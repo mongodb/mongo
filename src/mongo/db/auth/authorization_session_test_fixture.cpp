@@ -29,9 +29,6 @@
 
 #include "mongo/db/auth/authorization_session_test_fixture.h"
 
-#include <boost/none.hpp>
-#include <vector>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -52,6 +49,10 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <vector>
+
+#include <boost/none.hpp>
 
 namespace mongo {
 

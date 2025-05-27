@@ -29,10 +29,6 @@
 
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <system_error>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -53,6 +49,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <system_error>
+#include <utility>
 
 namespace mongo {
 namespace {

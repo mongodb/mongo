@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
@@ -50,6 +46,10 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

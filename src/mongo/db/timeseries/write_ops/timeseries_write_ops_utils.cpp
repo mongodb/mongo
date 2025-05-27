@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
+
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"

@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/field_set.h"
 #include "mongo/util/string_listset.h"
+
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 struct MakeObjSpec {

@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/query/exec/router_stage_skip.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -40,9 +36,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query/exec/router_stage_mock.h"
-#include "mongo/s/query/exec/router_stage_skip.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

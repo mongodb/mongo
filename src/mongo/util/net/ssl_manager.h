@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/config.h"
+#include "mongo/db/tenant_id.h"
+
 #include <memory>
 #include <string>
 
-#include "mongo/config.h"
-#include "mongo/db/tenant_id.h"
+#include <boost/optional.hpp>
 
 #ifdef MONGO_CONFIG_SSL
 

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/dbtests/storage_debug_util.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,9 +47,11 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/validate/validate_results.h"
-#include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

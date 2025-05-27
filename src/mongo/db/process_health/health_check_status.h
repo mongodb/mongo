@@ -28,12 +28,12 @@
  */
 #pragma once
 
-#include <memory>
-#include <ostream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_manager_config.h"
+
+#include <memory>
+#include <ostream>
 
 namespace mongo {
 namespace process_health {

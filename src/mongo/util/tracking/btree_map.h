@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <absl/container/btree_map.h>
-#include <scoped_allocator>
-
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
+
+#include <scoped_allocator>
+
+#include <absl/container/btree_map.h>
 
 namespace mongo::tracking {
 

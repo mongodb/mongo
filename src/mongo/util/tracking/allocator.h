@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/new.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
 namespace mongo::tracking {
 

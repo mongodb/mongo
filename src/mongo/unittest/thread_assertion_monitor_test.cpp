@@ -30,12 +30,12 @@
 
 #include "mongo/unittest/thread_assertion_monitor.h"
 
-#include <memory>
-#include <ostream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/framework.h"
+
+#include <memory>
+#include <ostream>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -48,6 +43,11 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {

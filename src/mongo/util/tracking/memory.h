@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <boost/smart_ptr/allocate_unique.hpp>
-#include <memory>
-
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/allocate_unique.hpp>
 
 namespace mongo::tracking {
 

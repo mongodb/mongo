@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/namespace_metadata_change_notifications.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/db/s/namespace_metadata_change_notifications.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

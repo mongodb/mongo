@@ -32,20 +32,6 @@
  */
 
 
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <map>
-#include <set>
-#include <string>
-#include <sys/types.h>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
@@ -77,6 +63,21 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <exception>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <sys/types.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

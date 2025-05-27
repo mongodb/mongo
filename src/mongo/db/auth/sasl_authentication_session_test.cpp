@@ -27,15 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <functional>
-#include <initializer_list>
-#include <memory>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -69,6 +60,15 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/password_digest.h"
+
+#include <cstddef>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

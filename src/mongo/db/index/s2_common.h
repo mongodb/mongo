@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string/key_string.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 class S2CellId;
 class S2RegionCoverer;

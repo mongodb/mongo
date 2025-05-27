@@ -31,15 +31,16 @@
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <memory>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
 #include "mongo/util/decorable.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

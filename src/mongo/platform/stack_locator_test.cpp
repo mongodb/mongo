@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include <memory>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <memory>
 
 #ifndef _WIN32
 #include <pthread.h>

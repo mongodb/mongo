@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+
 #include <string>
 
 #include "boost/none_t.hpp"
-
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/db/query/datetime/date_time_support.h"
 
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) try {

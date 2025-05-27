@@ -31,9 +31,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-#include <system_error>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -54,6 +51,9 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+#include <system_error>
 
 namespace mongo {
 

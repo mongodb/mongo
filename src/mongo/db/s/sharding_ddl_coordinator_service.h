@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -53,6 +48,11 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

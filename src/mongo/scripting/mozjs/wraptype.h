@@ -29,18 +29,19 @@
 
 #pragma once
 
-#include <cstddef>
-#include <js/PropertyAndElement.h>
-#include <js/ValueArray.h>
-#include <js/Wrapper.h>
-
-#include <jsapi.h>
-#include <type_traits>
-
 #include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <type_traits>
+
+#include <jsapi.h>
+
+#include <js/PropertyAndElement.h>
+#include <js/ValueArray.h>
+#include <js/Wrapper.h>
 
 // The purpose of this class is to take in specially crafted types and generate
 // a wrapper which installs the type, along with any useful life cycle methods

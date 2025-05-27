@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <atomic>
-#include <condition_variable>
-#include <list>
-
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/parking_lot.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <list>
 
 namespace mongo {
 

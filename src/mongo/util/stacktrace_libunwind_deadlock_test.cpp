@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include <cstdlib>
-#include <functional>
-#include <link.h>
-
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
+
+#include <cstdlib>
+#include <functional>
+
+#include <link.h>
 
 namespace mongo {
 namespace {

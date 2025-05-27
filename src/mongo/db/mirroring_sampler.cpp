@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/mirroring_sampler.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <chrono>
 #include <cmath>
 #include <utility>
-
-
-#include "mongo/db/mirroring_sampler.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

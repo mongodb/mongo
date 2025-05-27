@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/rpc/factory.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
@@ -40,6 +39,8 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
 
 namespace mongo {
 namespace rpc {

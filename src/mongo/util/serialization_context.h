@@ -28,10 +28,10 @@
  */
 
 #pragma once
-#include <boost/optional.hpp>
-
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

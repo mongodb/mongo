@@ -29,20 +29,20 @@
 
 #include "uncommitted_catalog_updates.h"
 
-#include <absl/container/node_hash_map.h>
-#include <algorithm>
-#include <boost/container/vector.hpp>
-#include <boost/none.hpp>
-#include <utility>
-
-#include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/decorable.h"
+
+#include <algorithm>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/util/tracking/allocator.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 
 /**

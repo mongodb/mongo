@@ -28,12 +28,10 @@
  */
 
 #include <algorithm>
-#include <boost/smart_ptr.hpp>
 #include <climits>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <fmt/printf.h>  // IWYU pragma: keep
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -45,8 +43,10 @@
 #include <absl/container/inlined_vector.h>
 #include <absl/container/node_hash_map.h>
 #include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
+#include <fmt/printf.h>  // IWYU pragma: keep
 // IWYU pragma: no_include "format.h"
 
 #include "mongo/base/error_codes.h"

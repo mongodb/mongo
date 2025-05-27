@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_noop.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_visitor.h"
+
+#include <memory>
 
 namespace mongo {
 

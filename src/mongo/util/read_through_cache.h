@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
@@ -56,6 +46,17 @@
 #include "mongo/util/invalidating_lru_cache.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <iterator>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
+
 #include <cstdlib>
 #include <iterator>
 #include <list>
 #include <type_traits>
 #include <utility>
 
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/util/assert_util.h"
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

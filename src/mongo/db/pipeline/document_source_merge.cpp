@@ -27,20 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <iosfwd>
-#include <map>
-#include <tuple>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/document_source_merge.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
@@ -48,7 +35,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
 #include "mongo/db/pipeline/variable_validation.h"
@@ -63,6 +49,21 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
+#include <map>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

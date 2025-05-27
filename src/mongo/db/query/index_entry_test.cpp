@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-
-#include <boost/container/vector.hpp>
+#include "mongo/db/query/index_entry.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/index_entry.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 

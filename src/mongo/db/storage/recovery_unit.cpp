@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <exception>
-#include <fmt/format.h>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/storage/recovery_unit.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/scopeguard.h"
+
+#include <exception>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

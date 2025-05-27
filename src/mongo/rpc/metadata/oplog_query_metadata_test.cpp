@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace rpc {

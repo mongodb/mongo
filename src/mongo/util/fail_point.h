@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -49,6 +43,12 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/string_map.h"
+
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
 

@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include <utility>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
@@ -50,6 +40,16 @@
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 #include "mongo/util/summation.h"
+
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

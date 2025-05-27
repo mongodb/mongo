@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <list>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
 #include "mongo/stdx/mutex.h"
@@ -41,6 +39,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <list>
 
 namespace mongo {
 namespace transport {

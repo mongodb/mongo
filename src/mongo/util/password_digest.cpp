@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/password_digest.h"
+
 #include "mongo/util/md5.h"
 
 namespace mongo {

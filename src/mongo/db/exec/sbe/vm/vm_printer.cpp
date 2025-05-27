@@ -26,15 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <algorithm>
-#include <iomanip>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
@@ -44,8 +36,17 @@
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
-#include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+
+#include <algorithm>
+#include <iomanip>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe::vm {
 

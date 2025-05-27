@@ -27,24 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstdint>
-#include <list>
-#include <memory>
-#include <string>
-#include <typeinfo>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/query_cmd/map_reduce_agg.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/commands/query_cmd/map_reduce_agg.h"
 #include "mongo/db/commands/query_cmd/map_reduce_gen.h"
 #include "mongo/db/commands/query_cmd/map_reduce_javascript_code.h"
 #include "mongo/db/commands/query_cmd/map_reduce_out_options.h"
@@ -65,6 +53,19 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <typeinfo>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

@@ -31,12 +31,7 @@
 #define NVALGRIND
 #endif
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <cstdlib>
-#include <fmt/format.h>
-#include <limits>
-#include <valgrind/valgrind.h>
+#include "mongo/util/tcmalloc_set_parameter.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/initializer.h"
@@ -53,7 +48,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
-#include "mongo/util/tcmalloc_set_parameter.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <limits>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <valgrind/valgrind.h>
 
 #ifdef MONGO_CONFIG_TCMALLOC_GOOGLE
 #include <tcmalloc/malloc_extension.h>

@@ -29,9 +29,6 @@
 
 #include <benchmark/benchmark.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <map>
-#include <memory>
-
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
@@ -45,6 +42,9 @@
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <map>
+#include <memory>
 
 namespace mongo {
 namespace {

@@ -37,12 +37,6 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/column/simple8b_builder.h"
 #include "mongo/bson/column/simple8b_type_util.h"
@@ -52,6 +46,12 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <utility>
+#include <vector>
 
 using namespace mongo;
 

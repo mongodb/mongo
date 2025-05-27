@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+
 #include <boost/intrusive_ptr.hpp>
 
 namespace mongo {

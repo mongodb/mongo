@@ -29,14 +29,15 @@
 
 
 // IWYU pragma: no_include <bits/types/clockid_t.h>
+#include <memory>
+#include <string>
+#include <thread>
+#include <utility>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <memory>
-#include <string>
 #include <sys/types.h>
-#include <thread>
-#include <utility>
 
 #if defined(__linux__)
 #include <ctime>

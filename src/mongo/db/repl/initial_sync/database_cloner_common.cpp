@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/initial_sync/database_cloner_common.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

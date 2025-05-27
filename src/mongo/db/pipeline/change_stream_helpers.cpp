@@ -29,12 +29,11 @@
 
 #include "mongo/db/pipeline/change_stream_helpers.h"
 
-#include <boost/optional/optional.hpp>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace change_stream {

@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <stack>
+#include "mongo/bson/json.h"
 
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/overloaded_visitor.h"
+
+#include <stack>
 
 namespace mongo {
 

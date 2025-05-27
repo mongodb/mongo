@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <mutex>
-
+#include "mongo/db/vector_clock.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -50,7 +47,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_gen.h"
 #include "mongo/util/assert_util.h"
@@ -60,6 +56,11 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version/releases.h"
+
+#include <mutex>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

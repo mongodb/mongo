@@ -29,17 +29,6 @@
 
 #include <absl/container/flat_hash_map.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <algorithm>
-#include <cstddef>
-#include <iterator>
-#include <list>
-#include <memory>
-#include <type_traits>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -58,6 +47,17 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <type_traits>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

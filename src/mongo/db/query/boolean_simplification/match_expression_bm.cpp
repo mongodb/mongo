@@ -29,6 +29,7 @@
 
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+
 #include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {

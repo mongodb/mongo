@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <compare>
-#include <cstddef>
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <utility>
-#include <variant>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -50,6 +38,19 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
+
+#include <compare>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

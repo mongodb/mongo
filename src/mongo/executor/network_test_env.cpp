@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/executor/network_test_env.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -38,7 +36,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/executor/network_test_env.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 

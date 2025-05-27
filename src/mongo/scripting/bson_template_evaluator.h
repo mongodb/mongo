@@ -44,16 +44,16 @@
  */
 #pragma once
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/random.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
-
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/random.h"
 
 namespace mongo {
 

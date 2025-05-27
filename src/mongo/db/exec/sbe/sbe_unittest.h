@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <sstream>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -40,6 +35,11 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/unittest.h"
+
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 

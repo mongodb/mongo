@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
@@ -48,6 +46,8 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 class CmdMakeSnapshot final : public BasicCommand {

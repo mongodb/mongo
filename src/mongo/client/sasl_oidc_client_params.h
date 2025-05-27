@@ -33,8 +33,6 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/string_data.h"
-
 namespace mongo {
 using oidcIdPAuthCallbackT = void(StringData, StringData, StringData);
 

@@ -29,9 +29,6 @@
 
 #include "mongo/db/matcher/expression_hasher.h"
 
-#include <absl/hash/hash.h>
-#include <boost/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
@@ -70,6 +67,9 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
+
+#include <absl/hash/hash.h>
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {

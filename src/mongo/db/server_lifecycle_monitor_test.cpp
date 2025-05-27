@@ -29,9 +29,9 @@
 
 #include "mongo/db/server_lifecycle_monitor.h"
 
-#include <vector>
-
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

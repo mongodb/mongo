@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
@@ -44,6 +41,9 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/record_store.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 

@@ -31,29 +31,15 @@
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <cstdint>
+
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstdint>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cstddef>
-#include <fstream>  // IWYU pragma: keep
-#include <future>
-#include <initializer_list>
-#include <iterator>
-#include <list>
-#include <memory>
-#include <set>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -178,6 +164,21 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+#include <future>
+#include <initializer_list>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

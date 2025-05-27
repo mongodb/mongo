@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+
 #include <cstddef>
-#include <fmt/format.h>
 #include <string>
 #include <type_traits>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
+#include <fmt/format.h>
 
 namespace mongo {
 

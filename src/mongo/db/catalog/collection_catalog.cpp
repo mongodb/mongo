@@ -41,15 +41,6 @@
 #include <immer/map.hpp>
 #include <immer/map_transient.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cstddef>
-#include <exception>
-#include <list>
-#include <mutex>
-#include <shared_mutex>
-
-#include "collection_catalog.h"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -84,6 +75,15 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <exception>
+#include <list>
+#include <mutex>
+#include <shared_mutex>
+
+#include "collection_catalog.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

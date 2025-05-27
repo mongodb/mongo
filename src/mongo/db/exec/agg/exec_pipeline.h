@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/exec/agg/stage.h"
+
 #include <vector>
 
-#include "mongo/db/exec/agg/stage.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::exec::agg {
 class Pipeline {

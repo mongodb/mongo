@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/query/collation/collation_index_key.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -37,12 +37,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace {
 

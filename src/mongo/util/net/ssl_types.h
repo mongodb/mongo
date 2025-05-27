@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <string>
 
 namespace mongo {
 

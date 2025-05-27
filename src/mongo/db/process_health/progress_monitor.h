@@ -28,13 +28,13 @@
  */
 #pragma once
 
-#include <functional>
-#include <string>
-#include <thread>
-
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+
+#include <functional>
+#include <string>
+#include <thread>
 
 namespace mongo {
 namespace process_health {

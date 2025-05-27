@@ -26,12 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/client/sdam/topology_listener_mock.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::sdam {
 

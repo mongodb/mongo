@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/date_time/posix_time/ptime.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -42,6 +36,13 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/stdx/mutex.h"
+
+#include <cstdint>
+
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

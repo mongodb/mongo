@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/str.h"
+
+#include <iostream>
 
 namespace mongo {
 namespace repl {

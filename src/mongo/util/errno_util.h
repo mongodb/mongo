@@ -29,13 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+
 #include <cerrno>
 #include <cstdlib>
 #include <string>
 #include <system_error>
 #include <utility>
-
-#include "mongo/base/string_data.h"
 
 namespace mongo {
 

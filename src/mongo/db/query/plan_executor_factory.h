@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -53,6 +48,12 @@
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::plan_executor_factory {
 

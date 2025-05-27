@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace {

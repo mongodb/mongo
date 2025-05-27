@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
+
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/stats/counters.h"

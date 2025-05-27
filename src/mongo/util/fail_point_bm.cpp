@@ -28,12 +28,14 @@
  */
 
 
-#include <benchmark/benchmark.h>
-#include <string>
+#include "mongo/util/fail_point.h"
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/fail_point.h"
+
+#include <string>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

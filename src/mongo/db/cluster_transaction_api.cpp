@@ -29,12 +29,6 @@
 
 #include "mongo/db/cluster_transaction_api.h"
 
-#include <fmt/format.h>
-#include <string>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -43,6 +37,12 @@
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
+
+#include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <fmt/format.h>
 
 namespace mongo::txn_api::details {
 

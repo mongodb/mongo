@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <list>
-#include <memory>
-
-#include <grpc/support/time.h>
-#include <grpcpp/alarm.h>
-#include <grpcpp/completion_queue.h>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic.h"
@@ -46,6 +39,13 @@
 #include "mongo/util/executor_stats.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <list>
+#include <memory>
+
+#include <grpc/support/time.h>
+#include <grpcpp/alarm.h>
+#include <grpcpp/completion_queue.h>
 
 namespace mongo::transport::grpc {
 

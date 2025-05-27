@@ -31,15 +31,7 @@
  * This file contains tests for mongo/db/commands/query_cmd/index_filter_commands.h
  */
 
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <variant>
-#include <vector>
+#include "mongo/db/commands/query_cmd/index_filter_commands.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -47,7 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/commands/query_cmd/index_filter_commands.h"
 #include "mongo/db/exec/plan_cache_callbacks_impl.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -67,6 +58,17 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
+
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

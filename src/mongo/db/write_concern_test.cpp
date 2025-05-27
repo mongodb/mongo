@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/write_concern.h"
+
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/storage_engine_mock.h"
-#include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/unittest/unittest.h"

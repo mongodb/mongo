@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/query/plan_insert_listener.h"
-#include <boost/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <deque>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -53,6 +46,7 @@
 #include "mongo/db/query/oplog_wait_config.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
@@ -66,6 +60,13 @@
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <deque>
+#include <memory>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

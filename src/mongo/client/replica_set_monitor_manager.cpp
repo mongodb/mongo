@@ -28,15 +28,7 @@
  */
 
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/client/replica_set_monitor_manager.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -44,7 +36,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
@@ -62,6 +53,16 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <mutex>
+#include <set>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

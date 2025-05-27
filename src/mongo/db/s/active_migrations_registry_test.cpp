@@ -28,11 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-#include <future>
-#include <system_error>
+#include "mongo/db/s/active_migrations_registry.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
@@ -40,10 +36,16 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
-#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
+
+#include <future>
+#include <system_error>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

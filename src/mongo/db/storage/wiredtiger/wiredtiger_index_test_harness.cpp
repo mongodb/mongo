@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <string>
-#include <wiredtiger.h>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -56,6 +51,13 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

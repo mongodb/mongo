@@ -28,14 +28,7 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstdint>
-#include <mutex>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/transaction_coordinator_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -46,7 +39,6 @@
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/write_concern.h"
@@ -58,6 +50,15 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future_impl.h"
+
+#include <cstdint>
+#include <mutex>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 

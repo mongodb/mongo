@@ -27,24 +27,25 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/functional/hash.hpp>
-#include <ctime>
-#include <limits>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/bson/oid.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/oid.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <ctime>
+#include <limits>
+#include <memory>
+
+#include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <initializer_list>
-#include <list>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -58,6 +53,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
+
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace {

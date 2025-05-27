@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/expression_js_emit.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
-#include "mongo/db/pipeline/expression_js_emit.h"
+
+#include <cstddef>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

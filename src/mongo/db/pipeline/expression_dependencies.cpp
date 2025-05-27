@@ -29,14 +29,6 @@
 
 #include "mongo/db/pipeline/expression_dependencies.h"
 
-#include <map>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
@@ -46,6 +38,14 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
+
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::expression {
 

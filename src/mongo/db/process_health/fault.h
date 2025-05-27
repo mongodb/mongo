@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <deque>
-#include <memory>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_facet.h"
@@ -45,6 +40,12 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/uuid.h"
+
+#include <deque>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace process_health {

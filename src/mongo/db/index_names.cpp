@@ -29,14 +29,14 @@
 
 #include "mongo/db/index_names.h"
 
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/string_map.h"
+
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

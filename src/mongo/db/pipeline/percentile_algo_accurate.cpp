@@ -29,15 +29,16 @@
 
 #include "mongo/db/pipeline/percentile_algo_accurate.h"
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cmath>
-
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/platform/atomic_word.h"
+
+#include <algorithm>
+#include <cmath>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 using std::vector;

@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/shard_id.h"
@@ -39,6 +36,9 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 namespace resharding {

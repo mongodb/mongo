@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <limits>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
+#include "mongo/db/repl/repl_set_config.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -42,7 +37,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
-#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
@@ -51,6 +45,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/scopeguard.h"
+
+#include <cstdint>
+#include <limits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace repl {

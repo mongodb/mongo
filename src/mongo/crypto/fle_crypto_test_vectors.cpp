@@ -27,6 +27,15 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/unittest.h"
+
 #include <cstdint>
 #include <functional>
 #include <iostream>
@@ -39,15 +48,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/crypto/fle_crypto.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

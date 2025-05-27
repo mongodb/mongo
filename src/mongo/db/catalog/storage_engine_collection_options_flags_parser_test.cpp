@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/unittest.h"
 

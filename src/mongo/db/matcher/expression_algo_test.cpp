@@ -27,7 +27,26 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/expression_algo.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/parsed_match_expression_for_test.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/intrusive_counter.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <initializer_list>
@@ -38,24 +57,6 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/parsed_match_expression_for_test.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 

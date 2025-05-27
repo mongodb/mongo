@@ -29,9 +29,9 @@
 
 #include "mongo/base/string_data.h"
 
-#include <boost/container_hash/hash.hpp>
-
 #include <ostream>
+
+#include <boost/container_hash/hash.hpp>
 
 namespace mongo {
 std::ostream& operator<<(std::ostream& stream, StringData value) {

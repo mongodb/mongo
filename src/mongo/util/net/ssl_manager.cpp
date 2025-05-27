@@ -30,10 +30,6 @@
 
 #include "mongo/util/net/ssl_manager.h"
 
-#include <boost/algorithm/string.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/data_view.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -55,6 +51,11 @@
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/text.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/algorithm/string.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/util/alarm.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
+
 #include <type_traits>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/util/alarm.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

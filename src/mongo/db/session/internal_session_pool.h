@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <list>
-#include <ratio>
-#include <stack>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -49,6 +42,14 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <list>
+#include <ratio>
+#include <stack>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

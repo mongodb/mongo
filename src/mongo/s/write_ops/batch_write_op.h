@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <map>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -52,6 +45,14 @@
 #include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

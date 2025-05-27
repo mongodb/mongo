@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <vector>
+#include "mongo/db/update/document_diff_test_helpers.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -37,12 +37,13 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/update/document_diff_applier.h"
-#include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <vector>
 
 namespace mongo::doc_diff {
 

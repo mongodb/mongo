@@ -29,8 +29,16 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+
 #include <cstddef>
 #include <deque>
 #include <iterator>
@@ -42,15 +50,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/interruptible.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

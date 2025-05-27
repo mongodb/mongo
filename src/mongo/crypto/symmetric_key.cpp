@@ -30,11 +30,11 @@
 
 #include "mongo/crypto/symmetric_key.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

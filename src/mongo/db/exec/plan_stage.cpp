@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/exec/plan_stage.h"
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 

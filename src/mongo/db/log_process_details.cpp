@@ -28,15 +28,12 @@
  */
 
 
-#include <fmt/format.h>
-#include <ostream>
-#include <string>
+#include "mongo/db/log_process_details.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/log_process_details.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -47,6 +44,11 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
+
+#include <ostream>
+#include <string>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

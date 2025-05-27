@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/db/feature_flag.h"
@@ -52,8 +47,14 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

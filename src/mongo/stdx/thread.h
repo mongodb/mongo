@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/stdx/exception.h"
+#include "mongo/util/thread_safety_context.h"
+
 #include <algorithm>
 #include <chrono>
 #include <csignal>
@@ -39,9 +42,6 @@
 #include <exception>
 #include <thread>
 #include <type_traits>
-
-#include "mongo/stdx/exception.h"
-#include "mongo/util/thread_safety_context.h"
 
 #if defined(__linux__) || defined(__FreeBSD__)
 #define MONGO_HAS_SIGALTSTACK 1

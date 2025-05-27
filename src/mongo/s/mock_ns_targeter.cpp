@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/s/mock_ns_targeter.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -39,9 +37,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/mock_ns_targeter.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

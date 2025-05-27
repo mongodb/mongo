@@ -28,18 +28,19 @@
  */
 
 #pragma once
-#include <cstddef>
-#include <fmt/format.h>
-#include <functional>
-#include <list>
-#include <memory>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <functional>
+#include <list>
+#include <memory>
+#include <utility>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

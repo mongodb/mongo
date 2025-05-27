@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <memory>
-
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role.h"
+
+#include <memory>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

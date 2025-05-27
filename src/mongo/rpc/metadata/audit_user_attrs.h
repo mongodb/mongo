@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <vector>
-
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/audit_attrs_gen.h"
+
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo::rpc {
 

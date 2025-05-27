@@ -29,8 +29,6 @@
 
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
 
-#include <algorithm>
-
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/profile_settings.h"
@@ -52,6 +50,8 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
+
+#include <algorithm>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

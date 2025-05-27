@@ -29,8 +29,6 @@
 
 #include "mongo/db/storage/oplog_truncate_markers.h"
 
-#include <memory>
-
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/oplog_truncate_marker_parameters_gen.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

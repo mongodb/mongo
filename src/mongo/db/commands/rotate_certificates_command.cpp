@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_type.h"
@@ -46,6 +42,11 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
+
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

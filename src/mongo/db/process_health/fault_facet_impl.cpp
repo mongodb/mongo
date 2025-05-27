@@ -29,11 +29,11 @@
 
 #include "mongo/db/process_health/fault_facet_impl.h"
 
-#include <algorithm>
-#include <mutex>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+
+#include <algorithm>
+#include <mutex>
 
 namespace mongo {
 namespace process_health {

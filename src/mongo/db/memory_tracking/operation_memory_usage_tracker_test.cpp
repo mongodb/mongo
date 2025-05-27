@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
 #include "mongo/db/memory_tracking/op_memory_use.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/idl/server_parameter_test_util.h"

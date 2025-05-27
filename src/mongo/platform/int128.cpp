@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <absl/strings/str_cat.h>
-
 #include "mongo/platform/int128.h"
+
+#include <absl/strings/str_cat.h>
 
 namespace absl {
 

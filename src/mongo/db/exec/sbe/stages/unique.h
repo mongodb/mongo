@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <queue>
-#include <vector>
-
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
 #include "mongo/stdx/unordered_set.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <vector>
 
 namespace mongo::sbe {
 /**

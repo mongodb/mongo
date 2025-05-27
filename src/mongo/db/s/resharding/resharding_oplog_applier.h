@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <list>
-#include <memory>
-#include <vector>
-
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
@@ -57,6 +51,13 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

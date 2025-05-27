@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
+
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {

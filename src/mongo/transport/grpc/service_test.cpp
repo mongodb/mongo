@@ -27,6 +27,23 @@
  *    it in the license file.
  */
 
+#include "mongo/transport/grpc/service.h"
+
+#include "mongo/db/wire_version.h"
+#include "mongo/logv2/constants.h"
+#include "mongo/logv2/log.h"
+#include "mongo/rpc/message.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/grpc/grpc_server_context.h"
+#include "mongo/transport/grpc/metadata.h"
+#include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/grpc/util.h"
+#include "mongo/transport/grpc/wire_version_provider.h"
+#include "mongo/unittest/log_test.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <memory>
@@ -38,22 +55,6 @@
 #include <grpcpp/support/byte_buffer.h>
 #include <grpcpp/support/status_code_enum.h>
 #include <grpcpp/support/sync_stream.h>
-
-#include "mongo/db/wire_version.h"
-#include "mongo/logv2/constants.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/message.h"
-#include "mongo/stdx/thread.h"
-#include "mongo/transport/grpc/grpc_server_context.h"
-#include "mongo/transport/grpc/metadata.h"
-#include "mongo/transport/grpc/service.h"
-#include "mongo/transport/grpc/test_fixtures.h"
-#include "mongo/transport/grpc/util.h"
-#include "mongo/transport/grpc/wire_version_provider.h"
-#include "mongo/unittest/log_test.h"
-#include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/notification.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

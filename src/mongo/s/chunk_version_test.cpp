@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <limits>
-
 #include "mongo/s/chunk_version.h"
+
 #include "mongo/unittest/unittest.h"
+
+#include <limits>
 
 namespace mongo {
 namespace {

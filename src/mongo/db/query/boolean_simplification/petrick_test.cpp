@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <vector>
+#include "mongo/db/query/boolean_simplification/petrick.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/query/boolean_simplification/petrick.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo::boolean_simplification {
 /**

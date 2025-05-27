@@ -26,17 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <boost/smart_ptr.hpp>
-#include <string>
-#include <type_traits>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/executor/task_executor.h"
+
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
+
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace executor {

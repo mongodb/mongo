@@ -27,6 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/rpc/metadata.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
+
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
@@ -35,17 +47,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
 
 namespace {
 using namespace mongo;

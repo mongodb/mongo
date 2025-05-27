@@ -28,9 +28,6 @@
  */
 #include "mongo/util/cryptd/cryptd_watchdog.h"
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -39,6 +36,9 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/time_support.h"
 #include "mongo/watchdog/watchdog.h"
+
+#include <cstdint>
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

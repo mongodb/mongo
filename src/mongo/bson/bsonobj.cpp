@@ -27,20 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <functional>
-#include <limits>
-#include <list>
-#include <memory>
-#include <ostream>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_set.h>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
+#include "mongo/bson/bsonobj.h"
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
@@ -48,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
@@ -64,6 +50,21 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <algorithm>
+#include <functional>
+#include <limits>
+#include <list>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

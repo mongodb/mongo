@@ -29,11 +29,6 @@
 
 #include "mongo/crypto/fle_fields_util.h"
 
-#include <cstdint>
-#include <limits>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -42,6 +37,11 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <limits>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {

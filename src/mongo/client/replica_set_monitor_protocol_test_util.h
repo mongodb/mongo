@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,6 +37,8 @@
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 

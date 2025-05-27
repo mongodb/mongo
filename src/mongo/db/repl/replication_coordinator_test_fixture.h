@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -57,6 +53,10 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 

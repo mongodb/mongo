@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -52,6 +48,11 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

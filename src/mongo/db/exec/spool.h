@@ -30,10 +30,6 @@
 
 #pragma once
 
-#include <deque>
-#include <memory>
-#include <vector>
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
@@ -43,6 +39,10 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
+
+#include <deque>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

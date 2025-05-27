@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <deque>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/action_type.h"
@@ -60,6 +51,16 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/producer_consumer_queue.h"
+
+#include <deque>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

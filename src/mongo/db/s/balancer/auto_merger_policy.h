@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <functional>
-#include <map>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -46,6 +40,13 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

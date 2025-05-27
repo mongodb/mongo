@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <limits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
+#include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,11 +36,18 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-#include <boost/optional.hpp>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/exec/projection_node.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/projection_node.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {
 using ArrayRecursionPolicy = ProjectionPolicies::ArrayRecursionPolicy;

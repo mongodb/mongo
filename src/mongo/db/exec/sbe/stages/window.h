@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <bit>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
+
+#include <bit>
 
 namespace mongo::sbe {
 

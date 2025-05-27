@@ -30,19 +30,6 @@
 
 #include "mongo/db/query/fle/server_rewrite.h"
 
-#include <boost/smart_ptr.hpp>
-#include <functional>
-#include <list>
-#include <memory>
-#include <string>
-#include <typeindex>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status_with.h"
@@ -69,6 +56,19 @@
 #include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <typeindex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

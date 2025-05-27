@@ -29,12 +29,6 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
-#include <cstdint>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <wiredtiger.h>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -42,6 +36,13 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+
+#include <wiredtiger.h>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

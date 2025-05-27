@@ -30,9 +30,6 @@
 #ifdef _WIN32
 
 
-#include <sasl/sasl.h>
-#include <sasl/saslplug.h>
-
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/client/sasl_sspi_options.h"
@@ -40,6 +37,9 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#include <sasl/sasl.h>
+#include <sasl/saslplug.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

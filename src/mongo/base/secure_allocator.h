@@ -29,6 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/server_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdlib>
@@ -39,15 +48,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/static_assert.h"
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/server_options.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

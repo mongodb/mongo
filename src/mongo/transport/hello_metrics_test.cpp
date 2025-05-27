@@ -29,8 +29,6 @@
 
 #include "mongo/transport/hello_metrics.h"
 
-#include <fmt/format.h>
-
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -41,6 +39,8 @@
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <fmt/format.h>
 
 namespace mongo::transport {
 namespace {

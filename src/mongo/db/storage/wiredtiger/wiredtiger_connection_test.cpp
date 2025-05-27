@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-#include <sstream>
-#include <string>
-
-#include <wiredtiger.h>
+#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
@@ -42,6 +38,11 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
+
+#include <sstream>
+#include <string>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

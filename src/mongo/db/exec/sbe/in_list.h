@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/in_list_data.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 namespace mongo::sbe {
 /**

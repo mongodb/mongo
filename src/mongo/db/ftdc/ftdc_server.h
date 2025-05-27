@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/filesystem/path.hpp>
-#include <cstdint>
-#include <functional>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +40,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
+#include <boost/filesystem/path.hpp>
 
 namespace mongo {
 

@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
+
+#include <cstddef>
 
 namespace mongo::transport::grpc {
 

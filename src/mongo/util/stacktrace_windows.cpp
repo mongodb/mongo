@@ -36,18 +36,6 @@
 #include <DbgHelp.h>
 #pragma warning(pop)
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/optional.hpp>
-#include <cstdio>
-#include <cstdlib>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +44,19 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/text.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

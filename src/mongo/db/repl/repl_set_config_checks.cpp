@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
 #include <cstddef>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <iterator>
-#include <set>
-#include <vector>
 
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -57,6 +53,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+#include <set>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

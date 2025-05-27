@@ -29,9 +29,9 @@
 
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 
-#include <utility>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
+
+#include <utility>
 
 namespace mongo {
 

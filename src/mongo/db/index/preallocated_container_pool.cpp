@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/index/preallocated_container_pool.h"
+
 #include "mongo/util/decorable.h"
 
 namespace mongo {

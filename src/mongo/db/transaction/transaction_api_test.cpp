@@ -28,18 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <absl/container/node_hash_map.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <future>
-#include <mutex>
-#include <queue>
-#include <system_error>
+#include "mongo/db/transaction/transaction_api.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -61,7 +50,6 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/internal_transaction_metrics.h"
-#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -84,6 +72,20 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/scopeguard.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <future>
+#include <mutex>
+#include <queue>
+#include <system_error>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 

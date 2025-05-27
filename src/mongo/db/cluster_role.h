@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/logv2/log_service.h"
+
 #include <array>
 #include <cstdint>
 #include <initializer_list>
 #include <ostream>
 #include <sstream>
 #include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/logv2/log_service.h"
 
 namespace mongo {
 

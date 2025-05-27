@@ -28,14 +28,11 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
-#include <utility>
-#include <vector>
+#include "mongo/db/repl/task_runner.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/task_runner.h"
 #include "mongo/db/repl/task_runner_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -43,6 +40,10 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace mongo::repl {
 namespace {

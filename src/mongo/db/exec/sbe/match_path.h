@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <ostream>
-
 #include "mongo/db/field_ref.h"
+
+#include <ostream>
 
 namespace mongo::sbe {
 

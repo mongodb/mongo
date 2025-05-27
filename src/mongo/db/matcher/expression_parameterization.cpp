@@ -29,12 +29,12 @@
 
 #include "mongo/db/matcher/expression_parameterization.h"
 
-#include <cmath>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+
+#include <cmath>
 
 namespace mongo {
 void MatchExpressionParameterizationVisitor::visitBitTestExpression(BitTestMatchExpression* expr) {

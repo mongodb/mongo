@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jwt_types_gen.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
+
+#include <string>
 
 namespace mongo {
 class ClockSource;

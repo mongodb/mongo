@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-
-#include <grpcpp/grpcpp.h>
-
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/server_context.h"
 #include "mongo/transport/grpc/util.h"
+
+#include <string>
+
+#include <grpcpp/grpcpp.h>
 
 namespace mongo::transport::grpc {
 

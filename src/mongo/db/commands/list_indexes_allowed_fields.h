@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <map>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/list_indexes_gen.h"
+
+#include <map>
 
 namespace mongo {
 // The allowed fields have to be in sync with those defined in 'src/mongo/db/list_indexes.idl'.

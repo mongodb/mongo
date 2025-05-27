@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/query/tailable_mode.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/tailable_mode.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

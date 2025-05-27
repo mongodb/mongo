@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include <utility>
-
+#include "mongo/db/pipeline/spilling/spillable_deque.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
-#include "mongo/db/pipeline/spilling/spillable_deque.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
@@ -43,6 +41,8 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 

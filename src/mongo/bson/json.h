@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -39,6 +36,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/util/time_support.h"
+
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 

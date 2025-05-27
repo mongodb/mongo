@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <climits>
-#include <cstddef>
-#include <cstdint>
+#include "mongo/db/repl/idempotency_scalar_generator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/repl/idempotency_scalar_generator.h"
 #include "mongo/util/assert_util.h"
+
+#include <climits>
+#include <cstddef>
+#include <cstdint>
 
 namespace mongo {
 

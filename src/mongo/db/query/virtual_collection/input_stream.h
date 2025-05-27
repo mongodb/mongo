@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <fmt/format.h>
-#include <utility>
-
 #include "mongo/logv2/log.h"
 #include "mongo/transport/named_pipe/io_error_message.h"
+
+#include <utility>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <memory>
+#include "mongo/util/duration.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/duration.h"
+
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

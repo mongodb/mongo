@@ -26,9 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/query/boolean_simplification/petrick.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::boolean_simplification {
 /**

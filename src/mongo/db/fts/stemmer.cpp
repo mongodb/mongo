@@ -29,12 +29,12 @@
 
 #include "mongo/db/fts/stemmer.h"
 
+#include "mongo/util/assert_util.h"
+
 #include <cstdlib>
-#include <libstemmer.h>
 #include <string>
 
-
-#include "mongo/util/assert_util.h"
+#include <libstemmer.h>
 
 namespace mongo::fts {
 

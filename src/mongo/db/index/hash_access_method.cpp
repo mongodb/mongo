@@ -29,15 +29,15 @@
 
 #include "mongo/db/index/hash_access_method.h"
 
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

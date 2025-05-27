@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/unittest/golden_test.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/golden_test_base.h"
+#include "mongo/unittest/test_info.h"
+#include "mongo/util/assert_util.h"
+
 #include <exception>
 #include <ostream>
 #include <string>
 
 #include <boost/filesystem.hpp>
 #include <fmt/format.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/unittest/test_info.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::unittest {
 namespace {

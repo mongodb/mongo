@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/db/exec/sbe/sbe_pattern_value_cmp.h"
 
 #include "mongo/base/string_data.h"
@@ -42,6 +37,11 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace mongo::sbe::value {
 namespace {

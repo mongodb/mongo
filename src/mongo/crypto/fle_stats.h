@@ -30,8 +30,6 @@
 
 #pragma once
 
-#include <mutex>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_stats_gen.h"
@@ -41,6 +39,8 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
+
+#include <mutex>
 
 
 namespace mongo {

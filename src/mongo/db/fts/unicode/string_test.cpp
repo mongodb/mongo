@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/db/fts/unicode/string.h"
+
 #include "mongo/shell/linenoise_utf8.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <memory>
 
 #ifdef MSC_VER
 // Microsoft VS 2013 does not handle UTF-8 strings in char literal strings, error C4566

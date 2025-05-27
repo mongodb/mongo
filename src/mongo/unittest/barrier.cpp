@@ -31,6 +31,7 @@
 
 
 #include "mongo/unittest/barrier.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

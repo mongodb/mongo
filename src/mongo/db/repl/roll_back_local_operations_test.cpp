@@ -28,13 +28,7 @@
  */
 
 
-#include <fmt/format.h>
-#include <iterator>
-#include <list>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/repl/roll_back_local_operations.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -50,7 +44,6 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
-#include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -60,6 +53,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
+
+#include <iterator>
+#include <list>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

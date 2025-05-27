@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
+
+#include <memory>
 
 namespace mongo {
 

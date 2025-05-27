@@ -31,13 +31,6 @@
  * This file contains tests for mongo/db/query/get_executor.h
  */
 
-#include <absl/container/node_hash_map.h>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -58,6 +51,13 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

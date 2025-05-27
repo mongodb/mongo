@@ -28,12 +28,6 @@
  */
 
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <utility>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -58,6 +52,11 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

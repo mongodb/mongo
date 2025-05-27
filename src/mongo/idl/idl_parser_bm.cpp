@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <cstdint>
-#include <vector>
+#include "mongo/idl/idl_parser.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
@@ -42,11 +38,17 @@
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/idl_parser_bm_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

@@ -28,11 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <string>
-
-#include <boost/optional/optional.hpp>
-#include <boost/optional/optional_io.hpp>
+#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,7 +38,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -57,6 +52,12 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

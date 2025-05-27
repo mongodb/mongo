@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/container_hash/hash.hpp>
 #include <filesystem>
 #include <limits>
 #include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
+
+#include <boost/container_hash/hash.hpp>
 
 #ifdef _WIN32
 #include <io.h>

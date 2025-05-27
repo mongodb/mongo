@@ -28,14 +28,14 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/waitable_atomic.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 
 #include <cstdint>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

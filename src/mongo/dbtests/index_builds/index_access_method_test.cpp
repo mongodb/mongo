@@ -28,12 +28,7 @@
  */
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
-#include <cstdint>
-#include <initializer_list>
-#include <memory>
-#include <utility>
+#include "mongo/db/index/index_access_method.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -50,7 +45,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +55,14 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <utility>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 

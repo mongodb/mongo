@@ -29,10 +29,11 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+
 #include <iosfwd>
 
-#include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+#include <boost/optional.hpp>
 
 namespace mongo::boolean_simplification {
 /**

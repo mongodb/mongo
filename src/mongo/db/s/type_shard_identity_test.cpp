@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/type_shard_identity.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -34,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

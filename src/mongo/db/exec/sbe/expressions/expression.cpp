@@ -27,18 +27,10 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <functional>
-#include <sstream>
-#include <vector>
-
-#include <absl/container/inlined_vector.h>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/sbe/expressions/expression.h"
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -52,6 +44,15 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <sstream>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

@@ -29,16 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <list>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <stack>
-#include <string>
-#include <vector>
-
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/mongo_uri.h"
@@ -51,6 +41,17 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <stack>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

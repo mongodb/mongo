@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+
 #include <string>
 #include <vector>
-
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 

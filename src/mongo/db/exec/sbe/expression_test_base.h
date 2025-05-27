@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
@@ -44,6 +42,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/unittest/golden_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 

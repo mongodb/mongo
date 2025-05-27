@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdint>
-#include <cstring>  // strlen
-#include <fmt/format.h>
-#include <limits>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
@@ -59,6 +47,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstring>  // strlen
+#include <limits>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 class BSONObj;

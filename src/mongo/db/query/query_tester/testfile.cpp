@@ -29,15 +29,16 @@
 
 #include "testfile.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/query/util/jparse_util.h"
+#include "mongo/util/shell_exec.h"
+
 #include <algorithm>
 #include <ostream>
 #include <regex>
 #include <vector>
 
 #include "command_helpers.h"
-#include "mongo/base/error_codes.h"
-#include "mongo/db/query/util/jparse_util.h"
-#include "mongo/util/shell_exec.h"
 
 namespace mongo::query_tester {
 namespace {

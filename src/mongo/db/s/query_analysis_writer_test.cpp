@@ -33,15 +33,6 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <cstdint>
-#include <future>
-#include <new>
-#include <set>
-#include <system_error>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -71,6 +62,15 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <future>
+#include <new>
+#include <set>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

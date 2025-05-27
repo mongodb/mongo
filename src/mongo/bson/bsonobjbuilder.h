@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <list>
-#include <map>
-#include <set>
-#include <sys/types.h>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -62,6 +50,19 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/tracking/allocator.h"
+
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <list>
+#include <map>
+#include <set>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <sys/types.h>
 
 namespace mongo {
 

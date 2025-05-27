@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
-#include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

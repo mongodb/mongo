@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
+#include <memory>
 
 namespace mongo {
 

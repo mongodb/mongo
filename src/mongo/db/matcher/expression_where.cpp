@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/expression_where.h"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/matcher/expression.h"
+
 #include <memory>
 #include <string>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_where.h"
 
 
 namespace mongo {

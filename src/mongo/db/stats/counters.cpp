@@ -29,16 +29,16 @@
 
 #include "mongo/db/stats/counters.h"
 
-#include <fmt/format.h>
-#include <tuple>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/static_immortal.h"
+
+#include <tuple>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

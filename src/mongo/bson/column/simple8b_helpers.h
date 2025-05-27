@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <array>
-#include <cstdint>
-#include <limits>
-
 #include "mongo/platform/bits.h"
 #include "mongo/platform/int128.h"
 #include "mongo/util/assert_util.h"
+
+#include <array>
+#include <cstdint>
+#include <limits>
 
 namespace mongo::simple8b_internal {
 /*

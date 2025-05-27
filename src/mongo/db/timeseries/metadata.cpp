@@ -29,9 +29,9 @@
 
 #include "mongo/db/timeseries/metadata.h"
 
-#include <boost/container/small_vector.hpp>
-
 #include "mongo/util/tracking/allocator.h"
+
+#include <boost/container/small_vector.hpp>
 
 namespace mongo::timeseries::metadata {
 namespace {

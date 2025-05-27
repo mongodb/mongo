@@ -30,11 +30,11 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
+
+#include <vector>
 
 namespace mongo {
 

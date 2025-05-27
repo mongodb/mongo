@@ -29,9 +29,7 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <functional>
-#include <mutex>
-#include <utility>
+#include "mongo/db/repl/noop_writer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -45,7 +43,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -59,6 +56,10 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <mutex>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

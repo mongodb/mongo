@@ -29,8 +29,6 @@
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 
-#include <boost/iterator/transform_iterator.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -46,6 +44,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/tracking/context.h"
+
+#include <boost/iterator/transform_iterator.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

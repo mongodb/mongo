@@ -28,9 +28,7 @@
  */
 
 
-#include <map>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/get_cluster_parameter_invocation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -38,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -47,6 +44,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <map>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

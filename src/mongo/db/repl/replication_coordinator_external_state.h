@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <cstddef>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
+
+#include <cstddef>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

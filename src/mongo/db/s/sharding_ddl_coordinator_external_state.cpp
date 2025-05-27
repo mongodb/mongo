@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/sharding_ddl_coordinator_external_state.h"
+
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/sharding_ddl_util.h"

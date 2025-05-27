@@ -29,12 +29,12 @@
 
 #include "mongo/db/pipeline/name_expression.h"
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 void NameExpression::compile(ExpressionContext* expCtx) {

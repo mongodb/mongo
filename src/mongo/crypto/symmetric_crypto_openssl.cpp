@@ -28,20 +28,6 @@
  */
 
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/opensslv.h>
-#include <openssl/ossl_typ.h>
-#include <openssl/rand.h>
-#include <set>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -52,6 +38,20 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/opensslv.h>
+#include <openssl/ossl_typ.h>
+#include <openssl/rand.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

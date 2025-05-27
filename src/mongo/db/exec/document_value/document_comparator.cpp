@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/document_value/document_comparator.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

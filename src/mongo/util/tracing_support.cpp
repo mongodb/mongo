@@ -28,12 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <deque>
-#include <new>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/tracing_support.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -45,7 +40,13 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/system_tick_source.h"
-#include "mongo/util/tracing_support.h"
+
+#include <deque>
+#include <new>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

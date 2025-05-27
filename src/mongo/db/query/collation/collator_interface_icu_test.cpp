@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <unicode/coll.h>
-#include <utility>
-
-#include <unicode/locid.h>
-#include <unicode/utypes.h>
-
 #include "mongo/db/query/collation/collator_interface_icu.h"
+
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <utility>
+
+#include <unicode/coll.h>
+#include <unicode/locid.h>
+#include <unicode/utypes.h>
 
 namespace {
 

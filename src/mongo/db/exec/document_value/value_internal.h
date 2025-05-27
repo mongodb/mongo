@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstdlib>
-#include <new>
-
-#include <boost/intrusive_ptr.hpp>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -46,6 +40,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <new>
+
+#include <boost/intrusive_ptr.hpp>
 
 
 namespace mongo {

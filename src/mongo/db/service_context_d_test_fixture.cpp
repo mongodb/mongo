@@ -29,8 +29,6 @@
 
 #include "mongo/db/service_context_d_test_fixture.h"
 
-#include <type_traits>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -56,6 +54,8 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
+
+#include <type_traits>
 
 namespace mongo {
 

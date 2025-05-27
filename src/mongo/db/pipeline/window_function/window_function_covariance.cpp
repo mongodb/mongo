@@ -29,15 +29,14 @@
 
 #include "mongo/db/pipeline/window_function/window_function_covariance.h"
 
-#include <limits>
-#include <vector>
-
-
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+
+#include <limits>
+#include <vector>
 
 namespace mongo {
 

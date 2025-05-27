@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <s2cellunion.h>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/near.h"
@@ -49,6 +46,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_executor.h"
+
+#include <memory>
+
+#include <s2cellunion.h>
 
 
 namespace mongo {

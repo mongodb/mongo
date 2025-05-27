@@ -29,6 +29,7 @@
 
 
 #include "mongo/transport/transport_layer_manager_impl.h"
+
 #include "mongo/stdx/mutex.h"
 
 #ifdef __linux__

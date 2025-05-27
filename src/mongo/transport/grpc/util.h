@@ -29,14 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/net/hostandport.h"
+
 #include <type_traits>
 
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/support/status_code_enum.h>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/util/net/hostandport.h"
 
 namespace mongo::transport::grpc::util {
 namespace constants {

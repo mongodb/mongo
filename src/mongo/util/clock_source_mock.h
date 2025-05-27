@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/exec/distinct_scan.h"
 
 #include "mongo/client/index_spec.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/query_shard_server_test_fixture.h"
 #include "mongo/db/namespace_string.h"
@@ -39,6 +38,8 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

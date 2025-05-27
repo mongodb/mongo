@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <string>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <string>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace ExpressionTests {

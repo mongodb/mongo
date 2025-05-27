@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <list>
-#include <memory>
-#include <queue>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -42,6 +37,11 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <list>
+#include <memory>
+#include <queue>
+#include <vector>
 
 namespace mongo {
 

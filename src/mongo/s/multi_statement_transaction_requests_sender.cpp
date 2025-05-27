@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+
+#include <utility>
 
 namespace mongo {
 

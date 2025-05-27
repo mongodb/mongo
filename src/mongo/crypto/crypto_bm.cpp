@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <cstdint>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -40,6 +34,13 @@
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/util/assert_util.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

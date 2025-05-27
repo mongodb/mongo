@@ -28,13 +28,12 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <mutex>
+#include "mongo/db/repl/wait_for_majority_service.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -44,6 +43,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
+
+#include <mutex>
 
 namespace mongo {
 namespace {

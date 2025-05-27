@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <vector>
+#include "mongo/db/pipeline/lookup_set_cache.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -37,9 +36,11 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/pipeline/lookup_set_cache.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+
+#include <algorithm>
+#include <vector>
 
 namespace mongo {
 

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/fts/fts_language.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/fts/tokenizer.h"
 #include "mongo/db/fts/unicode/codepoints.h"
 #include "mongo/db/fts/unicode/string.h"
+
+#include <cstddef>
 
 namespace mongo {
 namespace fts {

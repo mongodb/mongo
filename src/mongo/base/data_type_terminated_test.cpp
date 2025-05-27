@@ -29,14 +29,14 @@
 
 #include "mongo/base/data_type_terminated.h"
 
-#include <string>
-#include <utility>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

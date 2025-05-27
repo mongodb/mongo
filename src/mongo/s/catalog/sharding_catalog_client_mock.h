@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -63,6 +57,12 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

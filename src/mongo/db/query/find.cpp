@@ -28,11 +28,7 @@
  */
 
 
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/query/find.h"
 
 #include "mongo/db/curop.h"
 #include "mongo/db/query/canonical_query.h"
@@ -40,11 +36,16 @@
 #include "mongo/db/query/client_cursor/collect_query_stats_mongod.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/find.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/fail_point.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

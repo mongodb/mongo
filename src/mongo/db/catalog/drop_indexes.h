@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-#include <string>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/uuid.h"
+
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class BSONObj;

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/query_shape/serialization_options.h"
+
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

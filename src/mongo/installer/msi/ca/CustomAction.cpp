@@ -43,11 +43,11 @@
 #include <msiquery.h>
 // clang-format on
 
+#include "mongo/util/scopeguard.h"
+
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "mongo/util/scopeguard.h"
 
 // UpdateMongoYAML CustomAction Constants
 constexpr wchar_t kBIN[] = L"BIN";

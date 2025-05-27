@@ -37,8 +37,6 @@
 #include <DbgHelp.h>
 #pragma warning(pop)
 
-#include <ostream>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -46,6 +44,8 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace_windows.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <ostream>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

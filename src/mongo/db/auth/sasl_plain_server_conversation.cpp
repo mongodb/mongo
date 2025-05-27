@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <stdexcept>
-#include <string>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/db/auth/sasl_plain_server_conversation.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -43,7 +37,6 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
-#include "mongo/db/auth/sasl_plain_server_conversation.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
@@ -53,6 +46,14 @@
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <cstddef>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

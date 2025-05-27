@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <iostream>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/idl/server_parameter_specialized_test.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -49,12 +43,19 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/server_parameter_specialized_test.h"
 #include "mongo/idl/server_parameter_specialized_test_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <iostream>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace test {

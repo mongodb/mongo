@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <array>
-#include <cstring>
-#include <string>
-#include <tuple>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/sbe/values/row.h"
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -49,7 +43,6 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
@@ -62,6 +55,14 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
+
+#include <array>
+#include <cstring>
+#include <string>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe::value {
 

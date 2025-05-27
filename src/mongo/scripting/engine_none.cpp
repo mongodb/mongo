@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/scripting/engine.h"
+
+#include <string>
 
 namespace mongo {
 void ScriptEngine::setup(ExecutionEnvironment environment) {

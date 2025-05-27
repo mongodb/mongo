@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
 #include <climits>
 #include <compare>
 #include <initializer_list>
 #include <ostream>
 #include <type_traits>
-
-#include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 /**

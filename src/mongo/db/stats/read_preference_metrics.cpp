@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/stats/read_preference_metrics.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"

@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +36,9 @@
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 namespace rpc {

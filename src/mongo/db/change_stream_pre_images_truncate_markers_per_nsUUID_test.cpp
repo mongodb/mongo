@@ -26,19 +26,20 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include <fmt/format.h>
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/processinfo.h"
+
+#include <cstdint>
 
 namespace mongo {
 

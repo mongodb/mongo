@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <s2cellid.h>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/geo/shapes.h"
+
+#include <string>
+
+#include <s2cellid.h>
 
 namespace mongo {
 

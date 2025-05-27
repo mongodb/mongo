@@ -28,9 +28,10 @@
  */
 
 
+#include "mongo/db/op_msg_fuzzer_fixture.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/op_msg_fuzzer_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"

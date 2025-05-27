@@ -31,12 +31,12 @@
 #include "mongo/db/storage/storage_repair_observer.h"
 
 #include <algorithm>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/path.hpp>
 #include <ostream>
 #include <utility>
 
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/db/operation_context.h"

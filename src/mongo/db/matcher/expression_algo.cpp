@@ -29,20 +29,6 @@
 
 #include "mongo/db/matcher/expression_algo.h"
 
-#include <algorithm>
-#include <cmath>
-#include <compare>
-#include <cstddef>
-#include <iterator>
-#include <set>
-#include <type_traits>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <s2cellid.h>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -68,6 +54,21 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <cmath>
+#include <compare>
+#include <cstddef>
+#include <iterator>
+#include <set>
+#include <type_traits>
+
+#include <s2cellid.h>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

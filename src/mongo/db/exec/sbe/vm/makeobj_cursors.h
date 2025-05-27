@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/hash/hash.h>
-#include <boost/optional/optional.hpp>
-#include <cstdint>
-#include <cstdlib>
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/string_data.h"
@@ -52,6 +40,19 @@
 #include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/hash/hash.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe::vm {
 

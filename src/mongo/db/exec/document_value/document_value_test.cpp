@@ -27,16 +27,6 @@
  *    it in the license file.
  */
 
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <limits>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
@@ -65,6 +55,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/time_support.h"
+
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <variant>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

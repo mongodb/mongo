@@ -29,15 +29,14 @@
 
 #pragma once
 
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
+
 #include <functional>
 #include <iosfwd>
 #include <memory>
 #include <type_traits>
 #include <utility>
-
-
-#include "mongo/stdx/type_traits.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 template <typename Function>

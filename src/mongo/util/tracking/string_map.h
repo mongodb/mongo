@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <scoped_allocator>
-
 #include "mongo/util/string_map.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/context.h"
 #include "mongo/util/tracking/string.h"
+
+#include <scoped_allocator>
 
 namespace mongo::tracking {
 

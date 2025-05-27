@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <utility>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/matcher/extensions_callback_noop.h"
 
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_where_noop.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
+
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

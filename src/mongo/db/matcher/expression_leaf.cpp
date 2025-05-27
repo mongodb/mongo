@@ -31,10 +31,6 @@
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <cmath>
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
@@ -51,6 +47,10 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
 
 namespace mongo {
 

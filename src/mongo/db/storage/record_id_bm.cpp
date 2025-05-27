@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/db/record_id.h"
+
+#include "mongo/bson/oid.h"
+#include "mongo/db/record_id_helpers.h"
+
 #include <algorithm>
-#include <benchmark/benchmark.h>
 #include <cstdint>
 #include <cstring>
 #include <random>
 #include <string>
 #include <vector>
 
-#include "mongo/bson/oid.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/record_id_helpers.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

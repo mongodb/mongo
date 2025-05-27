@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <utility>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/time_support.h"
+
+#include <utility>
 
 namespace mongo {
 

@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/options_parser/option_section.h"
+
+#include <string>
+#include <vector>
 
 namespace mongo::workload_simulation {
 

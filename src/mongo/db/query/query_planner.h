@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <functional>
-#include <map>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/catalog/collection.h"
@@ -48,6 +42,12 @@
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+
+#include <cstddef>
+#include <functional>
+#include <map>
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

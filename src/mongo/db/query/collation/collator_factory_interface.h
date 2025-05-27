@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/query/collation/collator_interface.h"
+
+#include <memory>
 
 namespace mongo {
 

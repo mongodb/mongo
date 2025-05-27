@@ -29,13 +29,13 @@
 
 #include "mongo/util/static_immortal.h"
 
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/unittest.h"
+
 #include <map>
 #include <string>
 #include <type_traits>
 #include <utility>
-
-#include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

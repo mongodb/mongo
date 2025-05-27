@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/db/matcher/match_expression_util.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/matcher/match_expression_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo::match_expression_util {
 namespace {

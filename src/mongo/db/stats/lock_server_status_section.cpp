@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <mutex>
-#include <valarray>
-
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,6 +38,10 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <mutex>
+#include <valarray>
 
 namespace mongo {
 namespace {

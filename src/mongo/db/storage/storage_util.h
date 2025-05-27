@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+
+#include <vector>
 
 namespace mongo {
 namespace storage_helpers {

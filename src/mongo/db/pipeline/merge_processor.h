@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_merge_modes_gen.h"
@@ -44,6 +40,10 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 

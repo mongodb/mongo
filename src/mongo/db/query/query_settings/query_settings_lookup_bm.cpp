@@ -28,8 +28,6 @@
  */
 
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
@@ -39,6 +37,8 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::query_settings {
 namespace {

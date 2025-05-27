@@ -15,11 +15,11 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include <asio/detail/config.hpp>
-
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/detail/stream_core.hpp"
+
+#include <asio/detail/config.hpp>
 #include <asio/write.hpp>
 
 // This must be after all other includes

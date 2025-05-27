@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/util/tracing_profiler/profiler.h"
+
+#include <benchmark/benchmark.h>
 
 namespace mongo::tracing_profiler {
 using namespace mongo::tracing_profiler::internal;

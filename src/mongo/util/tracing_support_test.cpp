@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/tracing_support.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -42,7 +39,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
-#include "mongo/util/tracing_support.h"
+
+#include <cstdint>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

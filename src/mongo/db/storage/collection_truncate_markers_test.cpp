@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/collection_truncate_markers.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
@@ -40,13 +36,18 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

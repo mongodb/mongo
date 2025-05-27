@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -49,6 +44,11 @@
 #include "mongo/platform/visibility.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 
 namespace mongo {
 namespace mutablebson {

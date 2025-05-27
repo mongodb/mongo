@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/query_cmd/acquire_locks.h"
+
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/util/scopeguard.h"

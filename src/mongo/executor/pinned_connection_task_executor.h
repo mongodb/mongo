@@ -28,13 +28,6 @@
  */
 #pragma once
 
-#include <deque>
-#include <memory>
-#include <mutex>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/baton.h"
@@ -53,6 +46,13 @@
 #include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::executor {
 

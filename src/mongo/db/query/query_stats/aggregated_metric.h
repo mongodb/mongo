@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstdint>
-#include <limits>
-#include <type_traits>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/summation.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <type_traits>
 
 namespace mongo::query_stats {
 namespace agg_metric_detail {

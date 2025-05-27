@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <map>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tracking/allocator.h"
 #include "mongo/util/tracking/map.h"
 #include "mongo/util/tracking/memory.h"
 #include "mongo/util/tracking/string.h"
+
+#include <map>
+#include <vector>
 
 namespace mongo::tracking {
 

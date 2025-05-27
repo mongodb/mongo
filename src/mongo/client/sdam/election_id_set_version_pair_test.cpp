@@ -29,16 +29,16 @@
 
 #include "mongo/client/sdam/election_id_set_version_pair.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
 namespace {

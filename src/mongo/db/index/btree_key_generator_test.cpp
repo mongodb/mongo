@@ -28,23 +28,25 @@
  */
 
 
-#include <algorithm>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <iostream>
-#include <memory>
-#include <string>
+#include "mongo/db/index/btree_key_generator.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <string>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

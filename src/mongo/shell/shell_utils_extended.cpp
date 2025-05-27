@@ -27,6 +27,14 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>  // IWYU pragma: keep
+#include <string>
+#include <system_error>
+#include <vector>
+
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/file_status.hpp>
@@ -35,14 +43,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
 #include <fmt/format.h>
-#include <fstream>  // IWYU pragma: keep
-#include <string>
-#include <system_error>
-#include <vector>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32

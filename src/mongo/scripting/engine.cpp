@@ -28,19 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <chrono>
-#include <cstring>
-#include <deque>
-#include <mutex>
-
-#include <boost/optional/optional.hpp>
-#include <boost/type_traits/decay.hpp>
+#include "mongo/scripting/engine.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -57,7 +45,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
@@ -67,6 +54,20 @@
 #include "mongo/util/file.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <algorithm>
+#include <chrono>
+#include <cstring>
+#include <deque>
+#include <mutex>
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

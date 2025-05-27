@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <atomic>  // NOLINT
-#include <boost/intrusive_ptr.hpp>
-#include <cstdlib>
-
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
+
+#include <atomic>  // NOLINT
+#include <cstdlib>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 

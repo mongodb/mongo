@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -46,6 +42,10 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/session/logical_session_id.h"
+
+#include <cstdint>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include <boost/smart_ptr/shared_ptr.hpp>
-
 #include "mongo/scripting/mozjs/implscope.h"
+
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/shared_ptr.hpp>
 
 namespace mongo {
 namespace mozjs {

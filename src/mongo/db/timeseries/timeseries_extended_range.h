@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/util/time_support.h"
+
+#include <vector>
 
 namespace mongo::timeseries {
 

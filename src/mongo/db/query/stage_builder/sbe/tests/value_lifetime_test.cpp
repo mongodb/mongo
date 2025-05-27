@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -38,8 +36,11 @@
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
-#include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo::stage_builder {
 namespace {

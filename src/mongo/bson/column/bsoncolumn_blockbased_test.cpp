@@ -30,7 +30,6 @@
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
-
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/container/vector.hpp>
+#include "mongo/db/query/algebra/polyvalue.h"
+
 #include <cstddef>
 #include <span>
 #include <utility>
 #include <vector>
 
-#include "mongo/db/query/algebra/polyvalue.h"
+#include <boost/container/vector.hpp>
 
 namespace mongo::algebra {
 

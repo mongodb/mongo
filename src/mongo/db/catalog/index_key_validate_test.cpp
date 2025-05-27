@@ -27,19 +27,21 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <climits>
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
+#include "mongo/db/catalog/index_key_validate.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <climits>
+#include <limits>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/dynamic_bitset.hpp>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <set>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
@@ -48,6 +39,16 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/shared_buffer_fragment.h"
+
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

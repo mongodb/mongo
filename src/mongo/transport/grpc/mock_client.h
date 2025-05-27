@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/service_context.h"
 #include "mongo/transport/grpc/channel_pool.h"
 #include "mongo/transport/grpc/client.h"
@@ -39,6 +37,8 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_types.h"
+
+#include <memory>
 
 namespace mongo::transport::grpc {
 

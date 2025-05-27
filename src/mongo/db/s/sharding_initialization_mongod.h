@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_change_notifier.h"
@@ -44,6 +38,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/stdx/mutex.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

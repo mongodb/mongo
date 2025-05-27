@@ -29,14 +29,14 @@
 
 #include "mongo/db/index/s2_key_generator.h"
 
-#include <s2cellid.h>
-#include <s2regioncoverer.h>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
+
+#include <s2cellid.h>
+#include <s2regioncoverer.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

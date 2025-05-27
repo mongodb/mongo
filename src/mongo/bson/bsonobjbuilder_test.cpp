@@ -40,8 +40,6 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
@@ -57,6 +55,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

@@ -28,11 +28,12 @@
  */
 
 
-#include <benchmark/benchmark.h>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <iostream>
+
+#include <benchmark/benchmark.h>
 
 // IWYU pragma: no_include "libunwind-x86_64.h"
 

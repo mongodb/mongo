@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/util/periodic_runner.h"
+
+#include <memory>
 
 namespace mongo {
 

@@ -29,6 +29,7 @@
 
 
 #include "mongo/db/concurrency/exception_util.h"
+
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context_test_fixture.h"

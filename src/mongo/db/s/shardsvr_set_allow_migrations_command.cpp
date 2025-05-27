@@ -28,10 +28,6 @@
  */
 
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
@@ -51,6 +47,10 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
+
+#include <memory>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

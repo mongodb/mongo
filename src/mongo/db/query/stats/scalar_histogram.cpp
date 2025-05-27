@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/stats/scalar_histogram.h"
 
-#include <utility>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -38,6 +36,8 @@
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <utility>
 
 namespace mongo::stats {
 namespace {

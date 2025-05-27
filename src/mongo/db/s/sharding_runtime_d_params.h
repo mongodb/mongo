@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <fmt/core.h>
-
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/processinfo.h"
+
+#include <fmt/core.h>
 
 namespace mongo {
 

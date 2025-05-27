@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
+#include "mongo/db/keys_collection_cache.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/keys_collection_client.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/str.h"
+
 #include <iterator>
 #include <mutex>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/db/keys_collection_cache.h"
-#include "mongo/db/keys_collection_client.h"
-#include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

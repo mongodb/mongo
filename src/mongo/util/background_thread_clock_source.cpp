@@ -29,15 +29,16 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <memory>
-#include <utility>
+#include "mongo/util/background_thread_clock_source.h"
 
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/background_thread_clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

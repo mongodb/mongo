@@ -27,23 +27,24 @@
  *    it in the license file.
  */
 
-#include <ostream>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/exec/js_function.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
-#include "mongo/db/exec/js_function.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
+
+#include <ostream>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

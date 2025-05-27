@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+
 #include <iterator>
 #include <list>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include "mongo/db/pipeline/search/document_source_search.h"
 
 namespace mongo {
 

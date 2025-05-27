@@ -29,18 +29,18 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
-#include <boost/serialization/strong_typedef.hpp>
-
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/serialization/strong_typedef.hpp>
 
 namespace mongo {
 

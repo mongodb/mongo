@@ -28,13 +28,6 @@
  */
 
 
-#include <cstdint>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <sys/types.h>
-#include <vector>
-
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -48,7 +41,15 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/str.h"
 
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <vector>
+
 #include <tomcrypt.h>
+
+#include <sys/types.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

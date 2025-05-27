@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stop_words.h"
+
+#include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -41,15 +41,6 @@
 #endif
 #endif
 
-#include <cstddef>
-#include <cstdint>
-#include <fmt/compile.h>
-#include <fmt/format.h>
-#include <system_error>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/config.h"     // IWYU pragma: keep
 #include "mongo/logv2/log.h"
@@ -57,6 +48,15 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <system_error>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/compile.h>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

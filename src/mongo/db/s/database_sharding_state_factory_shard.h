@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/database_name.h"
 #include "mongo/db/s/database_sharding_state.h"
+
+#include <memory>
 
 namespace mongo {
 

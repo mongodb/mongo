@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/timeseries/bucket_compression.h"
 
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

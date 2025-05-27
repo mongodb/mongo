@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <boost/container/flat_set.hpp>
-
-#include <boost/container/vector.hpp>
+#include "mongo/db/query/index_entry.h"
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/query/index_entry.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 
 namespace mongo {
 

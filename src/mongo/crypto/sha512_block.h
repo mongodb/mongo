@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/util/make_array_type.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 
 namespace mongo {
 

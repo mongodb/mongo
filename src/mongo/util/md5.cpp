@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/util/md5.h"
+
 #include <cstring>
 #include <sstream>
-
-#include "mongo/util/md5.h"
 
 namespace mongo {
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/spilling/spillable_map.h"
+
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"

@@ -30,16 +30,16 @@
 
 #pragma once
 
+#include "mongo/util/net/ssl/apple.hpp"
+#include "mongo/util/net/ssl/context_apple.hpp"
+#include "mongo/util/net/ssl/stream_base.hpp"
+
 #include <deque>
 
 #include <asio/buffer.hpp>
 #include <asio/detail/config.hpp>
 #include <asio/error_code.hpp>
 #include <boost/optional.hpp>
-
-#include "mongo/util/net/ssl/apple.hpp"
-#include "mongo/util/net/ssl/context_apple.hpp"
-#include "mongo/util/net/ssl/stream_base.hpp"
 
 // This must be after all other includes
 #include "asio/detail/push_options.hpp"

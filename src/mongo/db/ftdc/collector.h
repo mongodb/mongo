@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <functional>
-#include <map>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +40,15 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

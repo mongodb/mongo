@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sort.h"
+
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/util/assert_util.h"
+
 #include <utility>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/storage/snapshot.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

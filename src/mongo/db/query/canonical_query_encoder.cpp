@@ -30,22 +30,6 @@
 
 #include "mongo/db/query/canonical_query_encoder.h"
 
-#include <algorithm>
-#include <boost/iterator/transform_iterator.hpp>
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <vector>
-
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <s2cellid.h>
-
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -91,6 +75,23 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/decorable.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

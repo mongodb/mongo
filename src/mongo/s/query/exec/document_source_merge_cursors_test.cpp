@@ -28,20 +28,7 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <cstddef>
-#include <fmt/format.h>
-#include <memory>
-#include <string>
-#include <system_error>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
@@ -82,13 +69,28 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
-#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

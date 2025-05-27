@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "bson_block.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
+#include "bson_block.h"
 
 
 namespace mongo::sbe {

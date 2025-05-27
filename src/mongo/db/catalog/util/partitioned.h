@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/aligned.h"
+#include "mongo/util/assert_util.h"
+
 #include <algorithm>
-#include <boost/align/aligned_allocator.hpp>
 #include <cstdlib>
 #include <iterator>
 #include <memory>
@@ -39,9 +42,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/aligned.h"
-#include "mongo/util/assert_util.h"
+#include <boost/align/aligned_allocator.hpp>
 
 namespace mongo {
 

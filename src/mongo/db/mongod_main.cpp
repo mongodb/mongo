@@ -29,26 +29,6 @@
 
 #include "mongo/db/mongod_main.h"
 
-#include <algorithm>
-#include <boost/filesystem/operations.hpp>
-#include <csignal>
-#include <cstdint>
-#include <cstdlib>
-#include <ctime>
-#include <exception>
-#include <fstream>  // IWYU pragma: keep
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/filesystem/path.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -294,6 +274,26 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 #include "mongo/watchdog/watchdog_mongod.h"
+
+#include <algorithm>
+#include <csignal>
+#include <cstdint>
+#include <cstdlib>
+#include <ctime>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifdef MONGO_CONFIG_GRPC
 #include "mongo/transport/grpc/grpc_feature_flag_gen.h"

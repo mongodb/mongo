@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <iterator>
-#include <variant>
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
-#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
+
+#include <iterator>
+#include <variant>
 
 namespace {
 

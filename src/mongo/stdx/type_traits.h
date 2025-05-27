@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <type_traits>
-
 #include "mongo/config.h"
+
+#include <type_traits>
 
 namespace mongo {
 namespace stdx {

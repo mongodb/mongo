@@ -28,16 +28,6 @@
  */
 
 
-#include <algorithm>
-#include <iosfwd>
-#include <memory>
-#include <set>
-#include <string>
-#include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
@@ -49,6 +39,16 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <iosfwd>
+#include <memory>
+#include <set>
+#include <string>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

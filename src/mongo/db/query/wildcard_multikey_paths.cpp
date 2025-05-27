@@ -35,9 +35,6 @@
 #include <absl/container/node_hash_set.h>
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -65,6 +62,9 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 /**
  * A wildcard index contains an unbounded set of multikey paths, therefore, it was decided to store

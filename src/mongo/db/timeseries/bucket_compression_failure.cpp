@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/bucket_compression_failure.h"
+
 #include "mongo/base/init.h"
 #include "mongo/util/uuid.h"
 

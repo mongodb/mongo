@@ -38,10 +38,6 @@
 #endif
 #endif
 
-#include <climits>
-#include <fmt/format.h>
-#include <sstream>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +47,11 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/debug_util.h"
+
+#include <climits>
+#include <sstream>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

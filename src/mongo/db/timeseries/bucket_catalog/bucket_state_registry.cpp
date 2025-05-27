@@ -29,21 +29,21 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <algorithm>
-#include <boost/optional.hpp>
-#include <cstdint>
-#include <fmt/format.h>
-#include <utility>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::timeseries::bucket_catalog {
 

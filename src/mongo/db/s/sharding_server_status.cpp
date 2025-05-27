@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -60,6 +58,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 namespace {

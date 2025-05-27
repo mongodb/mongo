@@ -29,12 +29,11 @@
 
 #include "mongo/s/shard_version_factory.h"
 
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

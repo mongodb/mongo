@@ -29,13 +29,6 @@
 
 #include "mongo/s/collection_uuid_mismatch.h"
 
-#include <memory>
-#include <mutex>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -58,6 +51,13 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 Status populateCollectionUUIDMismatch(OperationContext* opCtx,

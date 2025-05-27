@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
+#include "mongo/db/update/update_leaf_node.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/update/update_leaf_node.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

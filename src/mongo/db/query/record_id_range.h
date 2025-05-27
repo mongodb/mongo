@@ -30,10 +30,10 @@
 #pragma once
 
 
-#include <boost/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/record_id_bound.h"
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

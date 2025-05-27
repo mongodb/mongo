@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+
+#include <vector>
 
 namespace mongo {
 

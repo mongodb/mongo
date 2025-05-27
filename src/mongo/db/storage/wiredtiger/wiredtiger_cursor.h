@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <wiredtiger.h>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_managed_session.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session.h"
+
+#include <cstdint>
+#include <string>
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

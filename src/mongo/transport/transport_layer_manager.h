@@ -29,12 +29,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
+
+#include <memory>
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"

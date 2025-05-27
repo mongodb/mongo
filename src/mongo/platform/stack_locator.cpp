@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/stack_locator.h"
+
+#include "mongo/util/assert_util.h"
+
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
 #include <boost/optional/optional.hpp>
-
-#include "mongo/platform/stack_locator.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

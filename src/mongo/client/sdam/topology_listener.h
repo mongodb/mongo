@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include <deque>
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
@@ -40,6 +34,12 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <deque>
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::sdam {
 

@@ -27,15 +27,17 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstring>
-#include <fmt/format.h>
+#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/storage_engine_collection_options_flags_parser.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
+
+#include <algorithm>
+#include <cstring>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

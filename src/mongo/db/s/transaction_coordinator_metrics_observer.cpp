@@ -31,9 +31,9 @@
 
 #include "mongo/db/s/server_transaction_coordinators_metrics.h"
 #include "mongo/db/s/transaction_coordinator.h"
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/s/transaction_coordinator_structures.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

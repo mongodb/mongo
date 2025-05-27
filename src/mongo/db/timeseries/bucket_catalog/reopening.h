@@ -29,14 +29,13 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
-#include <boost/none.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/util/future.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
 

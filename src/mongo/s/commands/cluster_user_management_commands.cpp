@@ -28,14 +28,6 @@
  */
 
 
-#include <fmt/format.h>
-#include <iosfwd>
-#include <memory>
-#include <set>
-#include <string>
-#include <type_traits>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -64,6 +56,15 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
+
+#include <iosfwd>
+#include <memory>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

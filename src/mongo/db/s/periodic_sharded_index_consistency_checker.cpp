@@ -28,13 +28,7 @@
  */
 
 
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include <boost/none.hpp>
+#include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -52,7 +46,6 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -68,6 +61,14 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

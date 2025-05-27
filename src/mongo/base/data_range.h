@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <cstring>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,6 +37,12 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <cstring>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 namespace mongo {
 class ConstDataRange {

@@ -35,11 +35,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <exception>
-#include <mutex>
-#include <string>
-#include <utility>
-
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -69,6 +64,11 @@
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <exception>
+#include <mutex>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

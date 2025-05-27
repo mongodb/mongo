@@ -28,8 +28,7 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <utility>
-#include <vector>
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -46,12 +45,14 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

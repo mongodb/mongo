@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
@@ -38,6 +34,10 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/unittest/unittest.h"
+
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

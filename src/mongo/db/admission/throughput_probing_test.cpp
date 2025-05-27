@@ -29,13 +29,6 @@
 
 #include "mongo/db/admission/throughput_probing.h"
 
-#include <cmath>
-#include <functional>
-#include <memory>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -47,6 +40,13 @@
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::admission::throughput_probing {
 namespace {

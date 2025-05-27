@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/common_process_interface.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 #include "mongo/executor/task_executor.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

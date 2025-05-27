@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
+#include "mongo/db/geo/hash.h"
+
 #include <cstdint>
 #include <random>
 #include <utility>
 #include <vector>
 
-#include "mongo/db/geo/hash.h"
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

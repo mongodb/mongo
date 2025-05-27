@@ -31,13 +31,14 @@
 
 #ifdef __linux__
 
+#include "mongo/base/parse_number.h"
+
+#include <unistd.h>
+
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <unistd.h>
-
-#include "mongo/base/parse_number.h"
 
 namespace mongo {
 namespace {

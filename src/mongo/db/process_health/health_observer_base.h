@@ -28,11 +28,6 @@
  */
 #pragma once
 
-#include <memory>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/db/process_health/deadline_future.h"
 #include "mongo/db/process_health/fault_manager_config.h"
@@ -50,6 +45,11 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace process_health {

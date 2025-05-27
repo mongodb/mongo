@@ -28,12 +28,12 @@
  */
 
 
-#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo::query_stats {
 TEST(SupplementalMetricsStats, ClassicMetrics) {

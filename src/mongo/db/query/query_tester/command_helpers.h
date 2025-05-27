@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/client/dbclient_connection.h"
+
+#include <string>
 
 namespace mongo::query_tester {
 // Returns the array element containing result documents.

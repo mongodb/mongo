@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <utility>
-
+#include "mongo/db/not_primary_error_tracker.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 

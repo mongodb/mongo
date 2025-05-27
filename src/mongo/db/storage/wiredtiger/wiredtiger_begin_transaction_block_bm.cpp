@@ -27,18 +27,12 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <memory>
-#include <ostream>
-#include <string>
-
-#include <wiredtiger.h>
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -46,6 +40,14 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {

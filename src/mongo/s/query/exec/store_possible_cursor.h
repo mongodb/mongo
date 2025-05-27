@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
@@ -44,6 +40,11 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/owned_remote_cursor.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

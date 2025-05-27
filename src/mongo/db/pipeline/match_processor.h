@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/util/intrusive_counter.h"
+
+#include <memory>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 

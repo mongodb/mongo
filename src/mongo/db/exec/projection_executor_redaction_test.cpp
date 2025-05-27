@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#include <functional>
-#include <memory>
-#include <string>
-
-#include "document_value/document_value_test_util.h"
-#include <boost/none.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -50,6 +43,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+
+#include "document_value/document_value_test_util.h"
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace {

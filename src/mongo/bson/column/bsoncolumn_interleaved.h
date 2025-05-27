@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <algorithm>
-#include <span>
-
 #include "mongo/bson/column/bsoncolumn_helpers.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/overloaded_visitor.h"
+
+#include <algorithm>
+#include <span>
 
 namespace mongo::bsoncolumn {
 

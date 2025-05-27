@@ -28,16 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <set>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -62,6 +52,17 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
+
 #include "mongo/logv2/log.h"
 
 namespace mongo {

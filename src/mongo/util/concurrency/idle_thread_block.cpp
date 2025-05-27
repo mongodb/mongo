@@ -29,6 +29,7 @@
 
 
 #include "mongo/util/concurrency/idle_thread_block.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

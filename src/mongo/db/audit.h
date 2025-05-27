@@ -34,14 +34,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <set>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -62,6 +54,15 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/functional.h"
+
+#include <functional>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

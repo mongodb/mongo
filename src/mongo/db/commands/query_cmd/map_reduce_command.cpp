@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+
+#include <cstddef>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 
 namespace mongo {

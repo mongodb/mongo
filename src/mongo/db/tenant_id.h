@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <new>
-#include <ostream>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,6 +38,13 @@
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <new>
+#include <ostream>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

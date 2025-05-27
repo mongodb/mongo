@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/vm/vm.h"
-
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo {
 namespace sbe {

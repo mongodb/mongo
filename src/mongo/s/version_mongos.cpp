@@ -30,11 +30,11 @@
 
 #include "mongo/s/version_mongos.h"
 
-#include <iostream>
-#include <string>
-
 #include "mongo/db/log_process_details.h"
 #include "mongo/util/version.h"
+
+#include <iostream>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

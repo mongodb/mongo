@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-#include <boost/smart_ptr.hpp>
+#include "mongo/util/cancellation.h"
+
+#include "mongo/util/future.h"
+
 #include <forward_list>
 #include <utility>
 
+#include <benchmark/benchmark.h>
 #include <boost/move/utility_core.hpp>
-
-#include "mongo/util/cancellation.h"
-#include "mongo/util/future.h"
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 

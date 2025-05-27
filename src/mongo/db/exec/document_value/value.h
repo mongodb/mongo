@@ -29,14 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <cstring>
-#include <initializer_list>
-#include <iosfwd>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
@@ -57,6 +49,14 @@
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstring>
+#include <initializer_list>
+#include <iosfwd>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 class BSONElement;

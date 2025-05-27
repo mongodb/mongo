@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <map>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/repl/initial_sync/database_cloner.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -42,7 +39,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
-#include "mongo/db/repl/initial_sync/database_cloner.h"
 #include "mongo/db/repl/initial_sync/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/tenant_id.h"
@@ -55,6 +51,11 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
+
+#include <map>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 namespace mongo {
 namespace repl {

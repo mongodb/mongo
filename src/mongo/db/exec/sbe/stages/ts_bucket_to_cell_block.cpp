@@ -29,9 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 
-#include <cstddef>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
@@ -44,6 +41,9 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstddef>
+#include <string>
 
 namespace mongo::sbe {
 TsBucketToCellBlockStage::TsBucketToCellBlockStage(

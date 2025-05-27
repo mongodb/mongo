@@ -28,12 +28,12 @@
  */
 #pragma once
 
+#include "mongo/db/process_health/health_observer.h"
+#include "mongo/db/service_context.h"
+
 #include <functional>
 #include <memory>
 #include <vector>
-
-#include "mongo/db/process_health/health_observer.h"
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace process_health {

@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <mutex>
-#include <utility>
-
-
 #include "mongo/db/operation_time_tracker.h"
+
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <mutex>
+#include <utility>
 
 namespace mongo {
 namespace {

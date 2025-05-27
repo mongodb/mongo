@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -40,6 +38,8 @@
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <vector>
 
 
 namespace mongo {

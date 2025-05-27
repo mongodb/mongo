@@ -28,11 +28,6 @@
  */
 
 
-#include <benchmark/benchmark.h>
-#include <cstddef>
-#include <fmt/format.h>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_validate.h"
@@ -43,6 +38,12 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <cstddef>
+#include <string>
+
+#include <benchmark/benchmark.h>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

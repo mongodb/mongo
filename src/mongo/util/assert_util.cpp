@@ -29,11 +29,6 @@
 
 #include "mongo/util/assert_util.h"
 
-#include <boost/exception/diagnostic_information.hpp>
-#include <boost/exception/exception.hpp>
-#include <exception>
-#include <ostream>
-
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/debugger.h"
@@ -42,6 +37,12 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
+
+#include <exception>
+#include <ostream>
+
+#include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAssert
 

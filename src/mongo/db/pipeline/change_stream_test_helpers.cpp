@@ -29,12 +29,6 @@
 
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 
-#include <set>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -42,6 +36,12 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::change_stream_test_helper {
 

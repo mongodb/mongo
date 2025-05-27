@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/executor/remote_command_request.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -42,13 +36,20 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
+
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace executor {

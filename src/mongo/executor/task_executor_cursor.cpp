@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -40,13 +36,18 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/pinned_connection_task_executor_factory.h"
-#include "mongo/executor/task_executor_cursor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

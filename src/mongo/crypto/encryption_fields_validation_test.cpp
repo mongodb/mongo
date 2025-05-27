@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/crypto/encryption_fields_validation.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/encryption_fields_validation.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 namespace mongo {
 namespace {

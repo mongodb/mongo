@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression.h"
+
+#include <string>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 class BSONObjBuilder;

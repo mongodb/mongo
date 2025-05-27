@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include "mongo/util/synchronized_value.h"
+
 #include <functional>
 
-#include "mongo/util/synchronized_value.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 

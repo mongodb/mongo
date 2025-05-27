@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/document_source_hybrid_scoring_input_util.h"
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

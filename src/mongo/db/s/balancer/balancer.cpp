@@ -38,20 +38,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cmath>
-#include <iterator>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <ratio>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -111,6 +97,20 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <ratio>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
 #include "mongo/db/client.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
+
+#include <functional>
+#include <memory>
 
 namespace mongo {
 

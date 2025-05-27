@@ -29,9 +29,6 @@
 
 #include <cmath>
 // IWYU pragma: no_include "ext/type_traits.h"
-#include <limits>
-#include <string>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -41,6 +38,9 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+
+#include <limits>
+#include <string>
 
 using namespace mongo;
 

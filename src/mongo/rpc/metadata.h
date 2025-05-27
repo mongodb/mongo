@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <tuple>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -41,6 +38,9 @@
 #include "mongo/db/database_name.h"
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/rpc/op_msg.h"
+
+#include <functional>
+#include <tuple>
 
 namespace mongo {
 class BSONObj;

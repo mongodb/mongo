@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/db/repl/insert_group.h"
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/unittest/unittest.h"
+
 #include <memory>
 #include <vector>
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/insert_group.h"
-#include "mongo/db/repl/oplog_entry_test_helpers.h"
-#include "mongo/unittest/unittest.h"
+#include <fmt/format.h>
 
 namespace mongo {
 namespace repl {

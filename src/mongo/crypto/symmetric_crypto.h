@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/base/data_range.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/crypto/symmetric_key.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
-
-#include "mongo/base/data_range.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/crypto/symmetric_key.h"
 
 namespace mongo {
 namespace crypto {

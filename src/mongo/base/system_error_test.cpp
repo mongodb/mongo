@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <system_error>
+#include "mongo/base/system_error.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/base/system_error.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <system_error>
 
 namespace mongo {
 namespace {

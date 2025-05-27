@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-#include <iterator>
-#include <memory>
-#include <set>
-#include <string>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -65,6 +59,11 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <iterator>
+#include <memory>
+#include <set>
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

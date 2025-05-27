@@ -29,18 +29,6 @@
 
 #pragma once
 
-#include <absl/container/btree_set.h>
-#include <absl/container/inlined_vector.h>
-#include <boost/intrusive_ptr.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <queue>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -64,6 +52,19 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <utility>
+#include <vector>
+
+#include <absl/container/btree_set.h>
+#include <absl/container/inlined_vector.h>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

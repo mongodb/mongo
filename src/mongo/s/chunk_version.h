@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
-#include <iosfwd>
-#include <limits>
-#include <string>
-
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,6 +39,11 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
+
+#include <cstdint>
+#include <iosfwd>
+#include <limits>
+#include <string>
 
 namespace mongo {
 

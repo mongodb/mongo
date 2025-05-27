@@ -28,12 +28,12 @@
  */
 
 
-#include <utility>
-
-
 #include "mongo/db/repl/member_data.h"
+
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

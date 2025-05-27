@@ -28,13 +28,7 @@
  */
 
 
-#include <iostream>
-#include <map>
-#include <set>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/shell/shell_options.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -55,7 +49,6 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_options_client_gen.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -67,6 +60,14 @@
 #include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+
+#include <iostream>
+#include <map>
+#include <set>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

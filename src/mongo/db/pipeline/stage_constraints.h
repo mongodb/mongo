@@ -29,11 +29,12 @@
 
 #pragma once
 
-#include <boost/intrusive_ptr.hpp>
-#include <numeric>
-
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <numeric>
+
+#include <boost/intrusive_ptr.hpp>
 
 namespace mongo {
 /**

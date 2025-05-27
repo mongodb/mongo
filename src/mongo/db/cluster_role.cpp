@@ -29,10 +29,10 @@
 
 #include "mongo/db/cluster_role.h"
 
-#include <iostream>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
+
+#include <iostream>
 
 namespace mongo {
 

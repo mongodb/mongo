@@ -28,17 +28,7 @@
  */
 
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <functional>
-#include <mutex>
-#include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -59,7 +49,6 @@
 #include "mongo/db/index_builds/active_index_builds.h"
 #include "mongo/db/index_builds/index_build_entry_gen.h"
 #include "mongo/db/index_builds/index_build_entry_helpers.h"
-#include "mongo/db/index_builds/index_builds_coordinator_mongod.h"
 #include "mongo/db/index_builds/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
@@ -89,6 +78,18 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

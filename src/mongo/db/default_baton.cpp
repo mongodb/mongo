@@ -28,21 +28,22 @@
  */
 
 
-#include <algorithm>
-#include <memory>
-#include <mutex>
-#include <utility>
+#include "mongo/db/default_baton.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/default_baton.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

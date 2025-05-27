@@ -30,9 +30,9 @@
 
 #include "mongo/db/exec/near.h"
 
-#include <memory>
-
 #include "mongo/util/assert_util.h"
+
+#include <memory>
 
 namespace mongo {
 

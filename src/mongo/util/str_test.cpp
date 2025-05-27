@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <bitset>
-#include <fmt/format.h>
-#include <limits>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/str.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
 #include "mongo/util/str_escape.h"
+
+#include <algorithm>
+#include <bitset>
+#include <limits>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo::str {
 namespace {

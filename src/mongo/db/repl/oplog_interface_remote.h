@@ -29,14 +29,14 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace mongo {
 

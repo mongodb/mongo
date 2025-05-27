@@ -30,8 +30,6 @@
 
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/base/status_with.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -40,6 +38,8 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
+
+#include <absl/container/node_hash_map.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

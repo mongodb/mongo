@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/duration.h"
+
+#include <string>
 
 namespace mongo {
 

@@ -27,23 +27,25 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <cstdint>
-#include <limits>
-#include <string>
+#include "mongo/db/exec/sbe/stages/sort.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <cstdint>
+#include <limits>
+#include <string>
+
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 namespace mongo::sbe {
 SortStage::SortStage(std::unique_ptr<PlanStage> input,

@@ -30,29 +30,17 @@
 
 #include "log_domain_global.h"
 
-#include <boost/core/null_deleter.hpp>
-#include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <iosfwd>
 #include <utility>
 #include <vector>
 
+#include <boost/core/null_deleter.hpp>
 #include <boost/exception/exception.hpp>
 #include <boost/log/core/core.hpp>
+#include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
 // IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
-#include <boost/log/keywords/facility.hpp>
-#include <boost/log/keywords/use_impl.hpp>
-#include <boost/log/sinks/attribute_mapping.hpp>
-#include <boost/log/sinks/syslog_backend.hpp>
-#include <boost/log/sinks/syslog_constants.hpp>
-#include <boost/log/sinks/text_ostream_backend.hpp>
-#include <boost/log/sinks/unlocked_frontend.hpp>
-#include <boost/parameter/keyword.hpp>
-#include <boost/smart_ptr/make_shared_object.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/thread/exceptions.hpp>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
@@ -72,6 +60,18 @@
 #include "mongo/logv2/tagged_severity_filter.h"
 #include "mongo/logv2/uassert_sink.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/log/keywords/facility.hpp>
+#include <boost/log/keywords/use_impl.hpp>
+#include <boost/log/sinks/attribute_mapping.hpp>
+#include <boost/log/sinks/syslog_backend.hpp>
+#include <boost/log/sinks/syslog_constants.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/log/sinks/unlocked_frontend.hpp>
+#include <boost/parameter/keyword.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

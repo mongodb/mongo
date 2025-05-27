@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
+#include "mongo/platform/compiler.h"
+#include "mongo/util/dynamic_catch.h"
+
 #include <functional>
 #include <iosfwd>
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/platform/compiler.h"
-#include "mongo/util/dynamic_catch.h"
+#include <boost/optional.hpp>
 
 namespace mongo {
 /**

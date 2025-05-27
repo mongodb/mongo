@@ -28,12 +28,7 @@
  */
 
 
-#include <boost/smart_ptr.hpp>
-#include <climits>
-#include <cstddef>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/executor/task_executor_cursor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -43,13 +38,19 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/executor/task_executor_cursor.h"
 #include "mongo/executor/task_executor_cursor_test_fixture.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <climits>
+#include <cstddef>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 namespace executor {

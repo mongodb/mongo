@@ -30,11 +30,12 @@
 
 #pragma once
 
-#include <libstemmer.h>
-#include <memory>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
+
+#include <memory>
+
+#include <libstemmer.h>
 
 
 namespace mongo::fts {

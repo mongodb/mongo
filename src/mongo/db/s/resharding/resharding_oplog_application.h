@@ -29,12 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <functional>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -50,6 +44,13 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/chunk_manager.h"
+
+#include <cstddef>
+#include <functional>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class Collection;

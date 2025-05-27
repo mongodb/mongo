@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
@@ -40,6 +37,9 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/storage/record_store.h"
+
+#include <memory>
+#include <vector>
 
 namespace mongo {
 

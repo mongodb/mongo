@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <utility>
+#include "mongo/db/write_block_bypass.h"
 
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
-#include "mongo/db/write_block_bypass.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <utility>
 
 namespace mongo {
 

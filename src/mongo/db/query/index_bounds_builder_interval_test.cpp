@@ -28,8 +28,6 @@
  */
 
 
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/unittest/unittest.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

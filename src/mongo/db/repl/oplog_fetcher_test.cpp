@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/repl/oplog_fetcher.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -51,7 +45,6 @@
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -82,6 +75,14 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace {
 

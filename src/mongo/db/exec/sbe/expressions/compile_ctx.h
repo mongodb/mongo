@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 

@@ -27,19 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/smart_ptr.hpp>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <random>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
@@ -79,6 +66,19 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <random>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kProcessHealth
 

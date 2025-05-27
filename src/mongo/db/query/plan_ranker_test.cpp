@@ -31,9 +31,6 @@
  * This file contains tests for mongo/db/query/plan_ranker.h
  */
 
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -45,6 +42,9 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <utility>
+#include <vector>
 
 using namespace mongo;
 

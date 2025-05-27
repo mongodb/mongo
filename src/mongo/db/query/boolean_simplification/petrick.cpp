@@ -32,10 +32,10 @@
 #include <algorithm>
 #include <cstddef>
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/util/dynamic_bitset.h"
+
 #include <memory>
 #include <utility>
-
-#include "mongo/util/dynamic_bitset.h"
 
 namespace mongo::boolean_simplification {
 namespace {

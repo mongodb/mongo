@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional.hpp>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/update/pull_node.h"
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/bson/bsonmisc.h"
@@ -44,8 +42,10 @@
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/update/pull_node.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

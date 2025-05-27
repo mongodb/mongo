@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -43,6 +41,8 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/routing_context.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 namespace sharding {

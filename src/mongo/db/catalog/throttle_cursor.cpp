@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/catalog/throttle_cursor.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
@@ -44,6 +40,11 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+
+#include <algorithm>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

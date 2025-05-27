@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -44,6 +39,11 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/string_map.h"
+
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 namespace mongo {
 

@@ -28,14 +28,6 @@
  */
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault.h"
 #include "mongo/db/process_health/fault_facet.h"
@@ -57,6 +49,15 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace process_health {

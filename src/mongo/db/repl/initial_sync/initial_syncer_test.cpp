@@ -28,17 +28,7 @@
  */
 
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <iosfwd>
-#include <list>
-#include <map>
-#include <memory>
-#include <ostream>
-#include <ratio>
-#include <utility>
+#include "mongo/db/repl/initial_sync/initial_syncer.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -58,7 +48,6 @@
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
 #include "mongo/db/repl/initial_sync/collection_cloner.h"
-#include "mongo/db/repl/initial_sync/initial_syncer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -114,6 +103,19 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
+
+#include <functional>
+#include <iosfwd>
+#include <list>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <ratio>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -31,14 +31,9 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include <boost/functional/hash.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <mutex>
-#include <string>
+#include "mongo/db/client.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
@@ -48,6 +43,13 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <string>
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo {
 namespace {

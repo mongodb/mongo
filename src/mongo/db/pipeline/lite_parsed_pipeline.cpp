@@ -27,17 +27,13 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_options.h"
@@ -45,6 +41,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

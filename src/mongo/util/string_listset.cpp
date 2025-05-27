@@ -29,11 +29,12 @@
 
 #include "mongo/util/string_listset.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <sstream>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <sstream>
+
+#include <absl/container/flat_hash_map.h>
 
 namespace mongo {
 // This method returns an array to be stored in  '_fastHt'. This method also has the side-effect

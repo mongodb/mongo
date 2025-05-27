@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <vector>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -46,6 +44,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+
+#include <vector>
 
 namespace mongo {
 namespace {

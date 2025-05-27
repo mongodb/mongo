@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <variant>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -46,6 +41,11 @@
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <variant>
 
 namespace mongo {
 

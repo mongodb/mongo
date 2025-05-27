@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <boost/optional/optional.hpp>
-#include <memory>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -57,6 +52,12 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

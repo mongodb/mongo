@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
+#include "mongo/util/packaged_task.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -41,7 +37,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/packaged_task.h"
+
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

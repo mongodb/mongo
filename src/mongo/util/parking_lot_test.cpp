@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
+#include "mongo/util/parking_lot.h"
 
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/parking_lot.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 namespace {

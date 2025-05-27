@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <typeinfo>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/s/client/config_shard_wrapper.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -44,10 +40,15 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/s/client/config_shard_wrapper.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+
+#include <typeinfo>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

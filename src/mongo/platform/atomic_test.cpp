@@ -27,18 +27,18 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <fmt/format.h>
-#include <iostream>
-#include <memory>
-
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <iostream>
+#include <memory>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

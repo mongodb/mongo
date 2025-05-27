@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
@@ -42,6 +40,8 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+
+#include <memory>
 
 namespace mongo::transport::grpc {
 

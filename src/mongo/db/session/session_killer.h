@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <random>
-#include <vector>
-
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/operation_context.h"
@@ -53,6 +44,16 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <random>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

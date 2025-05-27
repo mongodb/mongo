@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
+#include "mongo/db/s/create_database_util.h"
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/s/create_database_util.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/pcre_util.h"
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

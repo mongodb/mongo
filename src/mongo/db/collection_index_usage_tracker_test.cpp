@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <string>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/collection_index_usage_tracker.h"
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
+
+#include <string>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
+#include "mongo/db/transaction/transaction_history_iterator.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -49,11 +48,13 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 

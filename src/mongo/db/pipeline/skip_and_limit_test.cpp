@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/pipeline/skip_and_limit.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

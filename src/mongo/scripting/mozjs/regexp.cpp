@@ -27,20 +27,21 @@
  *    it in the license file.
  */
 
-#include <js/CallArgs.h>
-#include <js/TypeDecls.h>
-#include <string>
-
-#include <js/PropertySpec.h>
+#include "mongo/scripting/mozjs/regexp.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/regexp.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+
+#include <string>
+
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
 
 namespace mongo {
 namespace mozjs {

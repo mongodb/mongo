@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -43,6 +38,12 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/durable_history_pin.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

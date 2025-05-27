@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/cluster_server_parameter_server_status.h"
+
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

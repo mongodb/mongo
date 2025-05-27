@@ -29,15 +29,15 @@
 
 #include "mongo/scripting/bson_template_evaluator.h"
 
-#include <cstring>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <cstring>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

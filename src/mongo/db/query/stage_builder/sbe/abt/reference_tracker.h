@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
+#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
+
 #include <cstddef>
 #include <functional>
 #include <memory>
 
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/expr.h"
-#include "mongo/db/query/stage_builder/sbe/abt/syntax/syntax.h"
+#include <absl/container/node_hash_map.h>
 
 namespace mongo::abt {
 

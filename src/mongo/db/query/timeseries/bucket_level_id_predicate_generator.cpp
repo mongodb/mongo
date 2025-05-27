@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/timeseries/bucket_level_id_predicate_generator.h"
+
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"

@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
-#include <stack>
-#include <string>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -75,6 +66,15 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/version/releases.h"
+
+#include <memory>
+#include <set>
+#include <stack>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

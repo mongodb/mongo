@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 

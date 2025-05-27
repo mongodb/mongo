@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/version_context.h"
+
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {

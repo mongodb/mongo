@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <absl/strings/str_join.h>
-#include <absl/strings/str_split.h>
-#include <cstddef>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
@@ -48,6 +40,15 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/timer.h"
+
+#include <cstddef>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <absl/strings/str_join.h>
+#include <absl/strings/str_split.h>
 
 namespace mongo {
 namespace BasicTests {

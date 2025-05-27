@@ -33,9 +33,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <iterator>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
@@ -45,6 +42,9 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <iterator>
+#include <utility>
 
 namespace mongo {
 

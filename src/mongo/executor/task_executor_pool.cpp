@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <utility>
-
 #include "mongo/executor/task_executor_pool.h"
+
 #include "mongo/executor/task_executor_pool_parameters_gen.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"  // IWYU pragma: keep
+
+#include <cstdint>
+#include <utility>
 
 namespace mongo {
 namespace executor {

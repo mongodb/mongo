@@ -28,21 +28,22 @@
  */
 
 
-#include <boost/cstdint.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/commands/auto_compact.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/auto_compact.h"
 #include "mongo/db/commands/compact_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+
+#include <boost/cstdint.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

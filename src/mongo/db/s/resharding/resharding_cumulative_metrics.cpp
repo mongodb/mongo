@@ -29,16 +29,16 @@
 
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+
 #include <array>
-#include <boost/move/utility_core.hpp>
 #include <memory>
 #include <utility>
 #include <variant>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 

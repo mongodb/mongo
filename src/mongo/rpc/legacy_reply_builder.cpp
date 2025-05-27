@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <utility>
-
+#include "mongo/rpc/legacy_reply_builder.h"
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/util/assert_util.h"
+
+#include <utility>
 
 namespace mongo {
 namespace rpc {

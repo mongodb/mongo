@@ -29,12 +29,12 @@
 
 #include "mongo/s/shard_version.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/index_version_gen.h"
 #include "mongo/s/shard_version_gen.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

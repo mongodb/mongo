@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <shared_mutex>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag.h"
+
+#include <shared_mutex>
 
 namespace mongo {
 namespace replica_set_endpoint {

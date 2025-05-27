@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/mutex.h"
+
+#include <memory>
 
 namespace mongo {
 

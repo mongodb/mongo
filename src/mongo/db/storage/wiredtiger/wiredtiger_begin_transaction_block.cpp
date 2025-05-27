@@ -28,17 +28,19 @@
  */
 
 
-#include <fmt/format.h>
-#include <string>
-
-#include <wiredtiger.h>
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
+
+#include <wiredtiger.h>
+
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

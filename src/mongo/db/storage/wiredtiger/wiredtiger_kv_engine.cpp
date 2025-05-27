@@ -48,22 +48,11 @@
 #include <fmt/format.h>
 #include <valgrind/valgrind.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <wiredtiger.h>
+
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <wiredtiger.h>
 // IWYU pragma: no_include "cxxabi.h"
-#include <algorithm>
-#include <cerrno>
-#include <chrono>
-#include <cstddef>
-#include <exception>
-#include <iomanip>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <sstream>
-#include <utility>
-
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
@@ -116,6 +105,18 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
+
+#include <algorithm>
+#include <cerrno>
+#include <chrono>
+#include <cstddef>
+#include <exception>
+#include <iomanip>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

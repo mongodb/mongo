@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -53,6 +51,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
+
+#include <string>
 
 namespace mongo {
 namespace {

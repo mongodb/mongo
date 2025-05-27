@@ -29,15 +29,15 @@
 
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 
-#include <cstdint>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+
+#include <cstdint>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

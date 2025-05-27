@@ -29,17 +29,17 @@
 
 #include "mongo/db/fts/unicode/string.h"
 
-#include <algorithm>
-#include <boost/algorithm/searching/boyer_moore.hpp>
-#include <boost/version.hpp>
-#include <utility>
-
-
 #include "mongo/base/error_codes.h"
 #include "mongo/db/fts/unicode/byte_vector.h"
 #include "mongo/platform/bits.h"
 #include "mongo/shell/linenoise_utf8.h"
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
+#include <utility>
+
+#include <boost/algorithm/searching/boyer_moore.hpp>
+#include <boost/version.hpp>
 
 namespace mongo {
 namespace unicode {

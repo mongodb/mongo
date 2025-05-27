@@ -28,14 +28,10 @@
  */
 
 
-#include <mutex>
-#include <string>
-#include <utility>
-
+#include "mongo/db/vector_clock_mutable.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
-#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -44,6 +40,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <mutex>
+#include <string>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

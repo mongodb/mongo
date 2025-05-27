@@ -27,15 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <ostream>
-#include <string>
-#include <vector>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/index/multikey_paths.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -54,7 +46,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
@@ -69,6 +60,16 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

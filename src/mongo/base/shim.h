@@ -29,15 +29,15 @@
 
 #pragma once
 
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/config.h"     // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/config.h"     // IWYU pragma: keep
-#include "mongo/util/assert_util.h"
 
 /**
  * The `WeakFunction` mechanism allows for the creation of "weak-symbol-like" functions

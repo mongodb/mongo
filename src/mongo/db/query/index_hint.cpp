@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/index_hint.h"
 
-#include <boost/functional/hash.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,6 +38,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
+
+#include <boost/functional/hash.hpp>
 
 namespace mongo {
 namespace {

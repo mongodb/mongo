@@ -30,11 +30,6 @@
 #pragma once
 
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -48,6 +43,12 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

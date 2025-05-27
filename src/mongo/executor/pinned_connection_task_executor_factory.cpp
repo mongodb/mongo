@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-
+#include "mongo/executor/pinned_connection_task_executor_factory.h"
 
 #include "mongo/executor/pinned_connection_task_executor.h"
-#include "mongo/executor/pinned_connection_task_executor_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
 
 namespace mongo {
 namespace executor {

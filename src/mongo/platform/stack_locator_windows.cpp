@@ -29,7 +29,6 @@
 
 
 #include "mongo/platform/stack_locator.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

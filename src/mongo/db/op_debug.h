@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
@@ -49,6 +42,14 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/util/duration.h"
+
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

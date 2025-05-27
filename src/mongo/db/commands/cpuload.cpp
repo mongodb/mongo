@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstdint>
-#include <iosfwd>
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -43,6 +39,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
+
+#include <cstdint>
+#include <iosfwd>
+#include <string>
 
 namespace mongo {
 

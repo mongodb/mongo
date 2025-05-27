@@ -32,12 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <list>
-#include <memory>
-#include <ostream>
-#include <string>
-#include <utility>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -58,6 +52,12 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
+
+#include <list>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
 
 namespace mongo {
 namespace {

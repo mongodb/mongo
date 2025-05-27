@@ -29,15 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 
-#include <algorithm>
-#include <iterator>
-#include <list>
-#include <memory>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression.h"
@@ -48,6 +39,15 @@
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/idl/idl_parser.h"
+
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

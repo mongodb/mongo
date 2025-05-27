@@ -27,18 +27,6 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <queue>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -61,6 +49,18 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <queue>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace mongo::sbe {
 

@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
-#include <fmt/format.h>
-#include <limits>
-#include <utility>
-#include <vector>
+#include "mongo/db/wire_version.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/wire_version.h"
 #include "mongo/unittest/unittest.h"
+
+#include <limits>
+#include <utility>
+#include <vector>
+
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

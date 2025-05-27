@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <queue>
-#include <vector>
-
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <vector>
 
 namespace mongo::sbe {
 /**

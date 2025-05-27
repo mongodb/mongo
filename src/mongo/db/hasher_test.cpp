@@ -29,8 +29,7 @@
 
 /** Unit tests for BSONElementHasher. */
 
-#include <limits>
-#include <memory>
+#include "mongo/db/hasher.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -41,9 +40,11 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/hasher.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
+
+#include <limits>
+#include <memory>
 
 namespace mongo {
 namespace {

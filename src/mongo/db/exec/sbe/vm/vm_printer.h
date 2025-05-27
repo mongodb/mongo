@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <ostream>
-
 #include "mongo/db/exec/sbe/vm/vm.h"
+
+#include <ostream>
 
 namespace mongo::sbe::vm {
 

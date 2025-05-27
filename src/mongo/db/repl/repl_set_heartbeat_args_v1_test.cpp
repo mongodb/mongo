@@ -28,11 +28,12 @@
  */
 
 
-#include <memory>
-#include <ostream>
+#include "repl_set_heartbeat_args_v1.h"
 
 #include "mongo/unittest/unittest.h"
-#include "repl_set_heartbeat_args_v1.h"
+
+#include <memory>
+#include <ostream>
 
 namespace mongo {
 namespace repl {

@@ -29,8 +29,6 @@
 
 #include "mongo/crypto/jws_validator.h"
 
-#include <string>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +37,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
+
+#include <string>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 

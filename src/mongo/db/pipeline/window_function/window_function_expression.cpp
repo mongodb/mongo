@@ -27,19 +27,10 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-#include <cmath>
-#include <tuple>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
-#include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_expression_gen.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
@@ -47,6 +38,16 @@
 #include "mongo/db/pipeline/window_function/window_function_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 #include "mongo/db/stats/counters.h"
+
+#include <cmath>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using boost::intrusive_ptr;
 using boost::optional;

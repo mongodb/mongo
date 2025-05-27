@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
@@ -36,6 +34,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
+
+#include <memory>
 
 namespace mongo {
 namespace analyze_shard_key {

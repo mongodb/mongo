@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <queue>
-#include <string>
-
 #include "mongo/base/status.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -46,6 +41,11 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <cstddef>
+#include <memory>
+#include <queue>
+#include <string>
 
 namespace mongo {
 

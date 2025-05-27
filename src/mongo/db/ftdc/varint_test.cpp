@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ftdc/varint.h"
+
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
-#include "mongo/db/ftdc/varint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

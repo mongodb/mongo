@@ -29,16 +29,17 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-#include <vector>
-
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/rpc/object_check.h"
+
+#include <string>
+#include <vector>
+
+#include <boost/optional.hpp>
 
 namespace mongo {
 

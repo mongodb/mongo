@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view_catalog_helpers.h"
+
 #include <boost/optional/optional.hpp>
 
 

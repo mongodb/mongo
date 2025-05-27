@@ -29,12 +29,6 @@
 
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 
-#include <utility>
-#include <vector>
-
-#include <absl/container/node_hash_set.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
@@ -49,6 +43,12 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/tracking/vector.h"
+
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

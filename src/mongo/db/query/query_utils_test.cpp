@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/query_utils.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/query_utils.h"
 #include "mongo/unittest/unittest.h"
 
 using ::mongo::NE;

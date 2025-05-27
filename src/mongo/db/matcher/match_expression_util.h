@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include "mongo/bson/bsonobj.h"
+
+#include <cstddef>
 
 namespace mongo::match_expression_util {
 /**

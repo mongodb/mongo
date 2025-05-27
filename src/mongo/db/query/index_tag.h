@@ -29,17 +29,17 @@
 
 #pragma once
 
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_hasher.h"
+#include "mongo/db/query/index_entry.h"
+
 #include <cstddef>
 #include <deque>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_hasher.h"
-#include "mongo/db/query/index_entry.h"
 
 namespace mongo {
 

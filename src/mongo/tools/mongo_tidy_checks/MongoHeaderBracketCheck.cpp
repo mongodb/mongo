@@ -30,11 +30,12 @@
 
 #include "MongoHeaderBracketCheck.h"
 
+#include <filesystem>
+
 #include <clang-tidy/utils/OptionsUtils.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/PPCallbacks.h>
 #include <clang/Lex/Preprocessor.h>
-#include <filesystem>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringSet.h>
 

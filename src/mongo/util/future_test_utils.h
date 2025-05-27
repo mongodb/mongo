@@ -29,12 +29,11 @@
 
 #pragma once
 
-#include "mongo/util/future.h"
-
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/executor_test_util.h"
+#include "mongo/util/future.h"
 
 /** Workaround for bug in MSVC 2022's lambda processor. See SERVER-62480. */
 #ifdef _MSC_VER

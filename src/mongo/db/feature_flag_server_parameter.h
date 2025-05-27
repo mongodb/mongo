@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -39,6 +36,10 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
+
+#include <variant>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

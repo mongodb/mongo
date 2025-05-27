@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +42,9 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/snapshot.h"
+
+#include <functional>
+#include <vector>
 
 namespace mongo {
 namespace collection_internal {

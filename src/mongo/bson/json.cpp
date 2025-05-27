@@ -30,19 +30,6 @@
 
 #include "mongo/bson/json.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
-#include <exception>
-#include <fmt/format.h>
-#include <limits>
-#include <memory>
-#include <ostream>
-#include <type_traits>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -56,6 +43,19 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

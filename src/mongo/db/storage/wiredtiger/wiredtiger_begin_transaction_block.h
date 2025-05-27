@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <wiredtiger.h>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/recovery_unit.h"
+
+#include <wiredtiger.h>
 
 namespace mongo {
 

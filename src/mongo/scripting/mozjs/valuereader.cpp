@@ -28,23 +28,7 @@
  */
 
 
-#include <cmath>
-#include <cstdio>
-#include <iosfwd>
-#include <js/Array.h>
-#include <js/CharacterEncoding.h>
-#include <js/Date.h>
-#include <js/GCVector.h>
-#include <js/Object.h>
-#include <js/String.h>
-#include <js/Utility.h>
-#include <js/Value.h>
-#include <js/ValueArray.h>
-#include <jscustomallocator.h>
-#include <mozilla/UniquePtr.h>
-
-#include <js/RootingAPI.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/valuereader.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
@@ -64,12 +48,30 @@
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/regexp.h"
 #include "mongo/scripting/mozjs/timestamp.h"
-#include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <cmath>
+#include <cstdio>
+#include <iosfwd>
+
+#include <jscustomallocator.h>
+
+#include <js/Array.h>
+#include <js/CharacterEncoding.h>
+#include <js/Date.h>
+#include <js/GCVector.h>
+#include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <js/String.h>
+#include <js/TypeDecls.h>
+#include <js/Utility.h>
+#include <js/Value.h>
+#include <js/ValueArray.h>
+#include <mozilla/UniquePtr.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

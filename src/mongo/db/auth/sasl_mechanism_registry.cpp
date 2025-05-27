@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iterator>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/auth_name.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -48,6 +43,12 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

@@ -12,10 +12,11 @@
  */
 
 #include <cstdint>
-#include <vm/PosixNSPR.h>
 
 #include <jspubtd.h>
+
 #include <mozilla/Assertions.h>
+#include <vm/PosixNSPR.h>
 
 #define MONGO_MOZ_UNIMPLEMENTED(ReturnType, funcName, ...) \
     ReturnType funcName(__VA_ARGS__) {                     \

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
+#include "mongo/rpc/legacy_reply.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
@@ -37,10 +36,11 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <memory>
 
 namespace mongo {
 namespace rpc {

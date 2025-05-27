@@ -29,6 +29,13 @@
 
 #pragma once
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <iostream>
@@ -38,13 +45,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
 
 namespace mongo {
 namespace dns {

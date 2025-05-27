@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/db/server_options_server_helpers.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo {
 

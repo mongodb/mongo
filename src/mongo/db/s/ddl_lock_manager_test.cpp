@@ -27,21 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/util/duration.h"
-#include <chrono>
-#include <cstddef>
-#include <memory>
+#include "mongo/db/s/ddl_lock_manager.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/s/database_sharding_runtime.h"
-#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/database_version.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+
+#include <chrono>
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 

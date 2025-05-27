@@ -29,14 +29,14 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 #include <ostream>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::sdam {
 std::string toString(const ServerType serverType) {

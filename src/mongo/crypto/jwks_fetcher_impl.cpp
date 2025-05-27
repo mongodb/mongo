@@ -29,10 +29,6 @@
 
 #include "mongo/crypto/jwks_fetcher_impl.h"
 
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
@@ -49,6 +45,10 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/str.h"
+
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo::crypto {
 

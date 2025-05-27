@@ -29,10 +29,10 @@
 
 #pragma once
 
-#include <mutex>
-
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+
+#include <mutex>
 
 
 namespace mongo {

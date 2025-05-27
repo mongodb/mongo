@@ -28,15 +28,16 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <string>
+
+#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

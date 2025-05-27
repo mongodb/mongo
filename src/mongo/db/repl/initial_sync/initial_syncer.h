@@ -30,16 +30,6 @@
 
 #pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <iosfwd>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -75,6 +65,17 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iosfwd>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace repl {

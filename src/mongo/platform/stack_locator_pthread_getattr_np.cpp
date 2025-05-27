@@ -29,11 +29,10 @@
 
 
 #include "mongo/platform/stack_locator.h"
-
-#include <pthread.h>
-
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+
+#include <pthread.h>
 
 namespace mongo {
 

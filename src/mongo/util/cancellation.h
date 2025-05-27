@@ -28,13 +28,6 @@
  */
 #pragma once
 
-#include <boost/smart_ptr.hpp>
-#include <new>
-#include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/platform/atomic_word.h"
@@ -43,6 +36,13 @@
 #include "mongo/util/future_impl.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/static_immortal.h"
+
+#include <new>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

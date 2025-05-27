@@ -29,11 +29,6 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
-#include <boost/move/utility_core.hpp>
-#include <s2cellid.h>
-#include <set>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/index_names.h"
@@ -46,6 +41,13 @@
 #include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
+
+#include <set>
+#include <vector>
+
+#include <s2cellid.h>
+
+#include <boost/move/utility_core.hpp>
 
 using namespace mongo;
 

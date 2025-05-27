@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
-
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/logv2/log.h"
 

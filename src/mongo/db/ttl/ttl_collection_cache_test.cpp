@@ -29,10 +29,10 @@
 
 #include "mongo/db/ttl/ttl_collection_cache.h"
 
-#include <absl/container/node_hash_map.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace {

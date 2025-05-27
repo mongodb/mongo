@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
@@ -40,6 +36,10 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/stage_types.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 /**

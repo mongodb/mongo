@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-#include <new>
-#include <utility>
+#include "mongo/util/uuid.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +39,13 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
-#include "mongo/util/uuid.h"
+
+#include <algorithm>
+#include <new>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 

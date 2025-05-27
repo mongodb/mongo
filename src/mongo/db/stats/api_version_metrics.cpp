@@ -27,17 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <memory>
-#include <mutex>
-#include <type_traits>
-#include <utility>
-
 #include "mongo/db/stats/api_version_metrics.h"
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
@@ -46,6 +36,16 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

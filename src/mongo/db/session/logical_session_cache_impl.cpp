@@ -28,19 +28,7 @@
  */
 
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <iterator>
-#include <mutex>
-#include <shared_mutex>
-#include <string>
-#include <type_traits>
-#include <utility>
+#include "mongo/db/session/logical_session_cache_impl.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
@@ -51,7 +39,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/logical_session_cache_gen.h"
-#include "mongo/db/session/logical_session_cache_impl.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_killer.h"
@@ -62,6 +49,21 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <shared_mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

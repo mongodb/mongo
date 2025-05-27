@@ -29,9 +29,6 @@
 
 #pragma once
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <memory>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
@@ -48,6 +45,10 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
+
+#include <memory>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 /**
  * This file contains the interface for rewriting filters within CRUD commands for FLE2.

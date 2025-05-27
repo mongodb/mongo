@@ -27,23 +27,24 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
+#include "mongo/db/op_observer/batched_write_policy.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/unittest/unittest.h"
+
 #include <deque>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/op_observer/batched_write_policy.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/storage/record_store.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include <benchmark/benchmark.h>
-
 #include "mongo/db/query/ce/histogram/histogram_test_utils.h"
 #include "mongo/db/query/stats/max_diff.h"
+
+#include <benchmark/benchmark.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

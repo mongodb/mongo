@@ -29,9 +29,6 @@
 
 #include "mongo/util/options_parser/environment.h"
 
-#include <iostream>
-#include <yaml-cpp/yaml.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +37,10 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/options_parser/constraints.h"
+
+#include <iostream>
+
+#include <yaml-cpp/yaml.h>
 
 namespace mongo {
 namespace optionenvironment {

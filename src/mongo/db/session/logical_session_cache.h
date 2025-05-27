@@ -29,13 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <memory>
-#include <mutex>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/client.h"
@@ -46,6 +39,14 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

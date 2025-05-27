@@ -27,15 +27,16 @@
  *    it in the license file.
  */
 
-#include <iterator>
-#include <string>
-#include <vector>
+#include "mongo/util/dns_query.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/dns_query.h"
+
+#include <iterator>
+#include <string>
+#include <vector>
 
 // It is safe to include the implementation "headers" in an anonymous namespace, as the code is
 // meant to live in a single TU -- this one.  Include one of these headers last.

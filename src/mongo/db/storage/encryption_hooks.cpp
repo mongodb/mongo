@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/path.hpp>
-#include <boost/move/utility_core.hpp>
-#include <memory>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/storage/encryption_hooks.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/data_protector.h"
-#include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/util/decorable.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

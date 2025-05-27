@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-
 #include "mongo/db/sorter/sorter_stats.h"
 
 #include "mongo/util/assert_util.h"
+
+#include <algorithm>
 
 namespace mongo {
 SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};

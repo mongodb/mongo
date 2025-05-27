@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 #pragma once
-#include <functional>
-#include <memory>
-#include <vector>
-
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_description.h"
@@ -40,6 +36,10 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
+
+#include <functional>
+#include <memory>
+#include <vector>
 
 namespace mongo::sdam {
 

@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_operation_source.h"
-#include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
@@ -41,6 +39,9 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

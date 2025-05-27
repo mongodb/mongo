@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <cstdint>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/views/resolved_view.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
@@ -47,11 +41,18 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

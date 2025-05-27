@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-#include <absl/meta/type_traits.h>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/shard_server_catalog_cache_loader_mock.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader_mock.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/assert_util.h"
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

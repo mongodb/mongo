@@ -35,11 +35,11 @@
 #include <atomic>
 #endif
 
-#include <mutex>
-
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/mutex.h"
+
+#include <mutex>
 
 namespace mongo {
 

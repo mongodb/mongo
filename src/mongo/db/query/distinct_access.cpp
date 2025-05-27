@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/distinct_access.h"
+
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/query/planner_analysis.h"

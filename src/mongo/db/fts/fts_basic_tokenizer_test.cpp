@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace fts {

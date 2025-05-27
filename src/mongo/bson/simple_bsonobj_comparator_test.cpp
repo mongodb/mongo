@@ -27,6 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/unittest.h"
+
 #include <map>
 #include <ostream>
 #include <string>
@@ -34,12 +41,6 @@
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {

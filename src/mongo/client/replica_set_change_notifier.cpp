@@ -28,13 +28,14 @@
  */
 
 
+#include "mongo/client/replica_set_change_notifier.h"
+
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+
 #include <mutex>
 
 #include <absl/container/node_hash_map.h>
-
-#include "mongo/client/replica_set_change_notifier.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

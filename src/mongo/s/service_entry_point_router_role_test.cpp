@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/s/service_entry_point_router_role.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_test_fixture.h"
 #include "mongo/unittest/unittest.h"

@@ -29,20 +29,18 @@
 
 
 #include "mongo/base/error_codes.h"
-
-#include "mongo/util/net/ssl_options.h"
-
-#include <absl/strings/str_split.h>
-#include <boost/filesystem/operations.hpp>
-
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+
+#include <absl/strings/str_split.h>
+#include <boost/filesystem/operations.hpp>
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>

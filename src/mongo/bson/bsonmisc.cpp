@@ -28,11 +28,11 @@
  */
 #include "mongo/bson/bsonmisc.h"
 
-#include <algorithm>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+
+#include <algorithm>
 
 namespace mongo {
 

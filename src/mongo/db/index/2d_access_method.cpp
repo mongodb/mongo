@@ -29,14 +29,14 @@
 
 #include "mongo/db/index/2d_access_method.h"
 
-#include <utility>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_key_generator.h"
 #include "mongo/db/index/expression_keys_private.h"
 #include "mongo/db/index/index_descriptor.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 TwoDAccessMethod::TwoDAccessMethod(IndexCatalogEntry* btreeState,

@@ -28,15 +28,13 @@
  */
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <string>
-#include <system_error>
+#include "mongo/db/s/sharding_logging.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_logging.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -44,6 +42,9 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/text.h"  // IWYU pragma: keep
+
+#include <string>
+#include <system_error>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

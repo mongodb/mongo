@@ -30,12 +30,11 @@
 
 #pragma once
 
-#include "asio/detail/config.hpp"
-
 #include <algorithm>
 #include <cstddef>
 #include <memory>
 
+#include "asio/detail/config.hpp"
 #include <asio/detail/assert.hpp>
 #include <asio/error_code.hpp>
 #include <boost/optional.hpp>

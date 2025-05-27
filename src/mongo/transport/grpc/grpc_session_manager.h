@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/session_manager_common.h"
+
+#include <memory>
 
 namespace mongo::transport::grpc {
 

@@ -27,13 +27,7 @@
  *    it in the license file.
  */
 
-#include <limits>
-#include <mutex>
-#include <string>
-
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
+#include "mongo/tools/mongobridge_tool/bridge_commands.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -43,11 +37,18 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+
+#include <limits>
+#include <mutex>
+#include <string>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

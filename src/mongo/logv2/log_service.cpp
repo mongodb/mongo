@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include <string>
+#include "mongo/logv2/log_service.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/logv2/log_service.h"
 #include "mongo/util/assert_util.h"
+
+#include <string>
 
 namespace mongo::logv2 {
 

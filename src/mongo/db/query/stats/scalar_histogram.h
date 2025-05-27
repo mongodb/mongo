@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/stats_gen.h"
+
+#include <cstddef>
+#include <string>
+#include <vector>
 
 namespace mongo::stats {
 

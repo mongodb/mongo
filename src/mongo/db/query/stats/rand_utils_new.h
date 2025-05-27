@@ -29,7 +29,11 @@
 
 #pragma once
 
-#include <absl/random/zipf_distribution.h>
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -38,10 +42,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/value_utils.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/time_support.h"
+#include <absl/random/zipf_distribution.h>
 
 namespace mongo::stats {
 

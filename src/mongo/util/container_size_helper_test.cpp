@@ -27,13 +27,14 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <vector>
+#include "mongo/util/container_size_helper.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/container_size_helper.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
 
 namespace {
 

@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <string>
-
 #include "mongo/db/s/transaction_coordinator_curop.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+
+#include <string>
 
 namespace mongo {
 

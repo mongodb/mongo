@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_util.h"
+
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::docs_needed_bounds {

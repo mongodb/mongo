@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include <algorithm>
+#include "mongo/bson/bson_utf8.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bson_utf8.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -40,6 +39,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
 
 namespace mongo {
 

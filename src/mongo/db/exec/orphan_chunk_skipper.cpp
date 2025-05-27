@@ -29,8 +29,6 @@
 
 #include "mongo/db/exec/orphan_chunk_skipper.h"
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -38,6 +36,8 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
+
+#include <boost/optional/optional.hpp>
 namespace mongo {
 namespace {
 /**

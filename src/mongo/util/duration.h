@@ -29,15 +29,6 @@
 
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <fmt/format.h>
-#include <iosfwd>
-#include <limits>
-#include <ratio>
-#include <string>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
@@ -48,6 +39,16 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <chrono>
+#include <cstdint>
+#include <iosfwd>
+#include <limits>
+#include <ratio>
+#include <string>
+#include <type_traits>
+
+#include <fmt/format.h>
 
 namespace mongo {
 

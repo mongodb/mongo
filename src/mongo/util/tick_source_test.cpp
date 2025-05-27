@@ -29,23 +29,24 @@
 
 #include "mongo/util/tick_source.h"
 
-#include <algorithm>
-#include <chrono>  // NOLINT
-#include <cstddef>
-#include <fmt/chrono.h>  // IWYU pragma: keep
-#include <fmt/format.h>
-#include <memory>
-#include <ratio>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+
+#include <algorithm>
+#include <chrono>  // NOLINT
+#include <cstddef>
+#include <memory>
+#include <ratio>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <fmt/chrono.h>  // IWYU pragma: keep
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {

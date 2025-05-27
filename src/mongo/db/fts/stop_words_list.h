@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include "mongo/util/string_map.h"
+
 #include <set>
 #include <string>
-
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace fts {

@@ -28,21 +28,22 @@
  */
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <limits>
-#include <new>
-#include <type_traits>
-#include <vector>
+#include "mongo/db/exec/mutable_bson/document.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str_basic.h"
+
+#include <limits>
+#include <new>
+#include <type_traits>
+#include <vector>
 
 namespace mongo {
 namespace mutablebson {

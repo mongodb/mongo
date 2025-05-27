@@ -28,15 +28,15 @@
  */
 #pragma once
 
-#include <memory>
-#include <variant>
-
 #include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <memory>
+#include <variant>
 
 namespace mongo {
 

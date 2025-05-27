@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/matcher_type_set.h"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/matcher/schema/json_schema_parser.h"
+#include "mongo/db/query/bson_typemask.h"
+#include "mongo/util/str.h"
+
 #include <string>
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/db/matcher/schema/json_schema_parser.h"
-#include "mongo/db/query/bson_typemask.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

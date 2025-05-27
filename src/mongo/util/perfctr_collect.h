@@ -29,17 +29,18 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <pdh.h>
-#include <pdhmsg.h>
-#include <string>
-#include <vector>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/unordered_map.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <pdh.h>
+#include <pdhmsg.h>
 
 namespace mongo {
 

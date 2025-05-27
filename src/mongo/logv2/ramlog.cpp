@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <map>
-#include <utility>
+#include "mongo/logv2/ramlog.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/logv2/ramlog.h"
 #include "mongo/util/assert_util.h"
+
+#include <map>
+#include <utility>
 
 namespace mongo::logv2 {
 

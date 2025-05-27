@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
-#include <cstddef>
+#include "mongo/db/exec/orphan_chunk_skipper.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/orphan_chunk_skipper.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
 
 namespace mongo {
 namespace {

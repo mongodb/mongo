@@ -26,9 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/version_context.h"
-
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/version_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

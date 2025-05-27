@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <iosfwd>
-#include <memory>
-#include <string>
-#include <type_traits>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
@@ -42,6 +37,11 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <type_traits>
 
 namespace mongo {
 namespace repl {

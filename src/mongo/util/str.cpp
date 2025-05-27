@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstdio>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/util/str.h"
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
+
+#include <cstdio>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo::str {
 

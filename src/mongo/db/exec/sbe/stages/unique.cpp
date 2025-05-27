@@ -27,16 +27,18 @@
  *    it in the license file.
  */
 
-#include <absl/container/inlined_vector.h>
-#include <absl/container/node_hash_map.h>
-#include <utility>
+#include "mongo/db/exec/sbe/stages/unique.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
+
+#include <utility>
+
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace sbe {

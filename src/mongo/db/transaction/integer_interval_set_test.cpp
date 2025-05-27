@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/db/transaction/integer_interval_set.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 using unittest::match::ElementsAre;

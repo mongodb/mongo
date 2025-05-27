@@ -34,16 +34,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <algorithm>
-#include <functional>
-#include <iterator>
-#include <list>
-#include <map>
-#include <memory>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_facet.h"
@@ -53,6 +43,16 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+
+#include <algorithm>
+#include <functional>
+#include <iterator>
+#include <list>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 /**
  * A simple representation of an Aggregation Pipeline and functions for building it.

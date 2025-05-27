@@ -29,7 +29,13 @@
 
 #pragma once
 
-#include <absl/container/node_hash_map.h>
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -38,12 +44,7 @@
 #include <set>
 #include <vector>
 
-#include "mongo/base/error_extra_info.h"
-#include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/assert_util.h"
+#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

@@ -28,8 +28,6 @@
  */
 #pragma once
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace change_stream_pre_image_util {

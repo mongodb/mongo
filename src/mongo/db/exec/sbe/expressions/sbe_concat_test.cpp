@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <initializer_list>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -46,6 +38,14 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/unittest/unittest.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace mongo::sbe {
 class SBEConcatTest : public EExpressionTestFixture {

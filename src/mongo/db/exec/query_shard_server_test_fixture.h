@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mongo/client/index_spec.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
+
+#include <memory>
 
 namespace mongo {
 /**

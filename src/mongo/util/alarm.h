@@ -28,7 +28,15 @@
  */
 #pragma once
 
-#include <boost/smart_ptr.hpp>
+#include "mongo/base/status.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
+
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -38,15 +46,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/functional.h"
-#include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
-#include "mongo/util/time_support.h"
+#include <boost/smart_ptr.hpp>
 
 namespace mongo {
 

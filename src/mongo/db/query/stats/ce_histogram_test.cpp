@@ -26,6 +26,22 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/db/query/stats/ce_histogram.h"
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
@@ -35,21 +51,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/ce_histogram.h"
-#include "mongo/db/query/stats/max_diff.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
-#include "mongo/db/query/stats/scalar_histogram.h"
-#include "mongo/db/query/stats/value_utils.h"
-#include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo::stats {
 

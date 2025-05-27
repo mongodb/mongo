@@ -33,10 +33,10 @@
 #undef vector
 #undef bool
 
-#include <cstdint>
-
 #include "mongo/config.h"
 #include "mongo/platform/bits.h"
+
+#include <cstdint>
 
 namespace mongo {
 namespace unicode {

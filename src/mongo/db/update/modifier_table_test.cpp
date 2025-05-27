@@ -29,9 +29,9 @@
 
 #include "mongo/db/update/modifier_table.h"
 
-#include <memory>
-
 #include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace {
 

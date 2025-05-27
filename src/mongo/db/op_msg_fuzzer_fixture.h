@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <memory>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/client_strand.h"
@@ -38,6 +35,9 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/temp_dir.h"
+
+#include <cstddef>
+#include <memory>
 
 namespace mongo {
 /**

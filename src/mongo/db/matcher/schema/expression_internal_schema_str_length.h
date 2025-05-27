@@ -29,11 +29,6 @@
 
 #pragma once
 
-#include <functional>
-#include <memory>
-
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -43,6 +38,11 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+
+#include <functional>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

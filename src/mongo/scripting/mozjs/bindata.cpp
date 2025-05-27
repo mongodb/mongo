@@ -27,22 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <iomanip>
-#include <js/Object.h>
-#include <js/PropertyDescriptor.h>
-#include <js/RootingAPI.h>
-#include <js/Value.h>
-#include <js/ValueArray.h>
-#include <jsapi.h>
-#include <ostream>
-#include <string>
-#include <utility>
-
-#include <js/CallArgs.h>
-#include <js/PropertySpec.h>
-#include <js/TypeDecls.h>
+#include "mongo/scripting/mozjs/bindata.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
@@ -50,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
@@ -62,6 +46,24 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
+
+#include <iomanip>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include <jsapi.h>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+#include <js/ValueArray.h>
 
 namespace mongo {
 namespace mozjs {

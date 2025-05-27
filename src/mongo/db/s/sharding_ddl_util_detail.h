@@ -29,10 +29,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
@@ -43,6 +39,10 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/async_rpc_shard_retry_policy.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+
+#include <cstddef>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 namespace sharding_ddl_util_detail {

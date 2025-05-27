@@ -29,13 +29,13 @@
 
 #pragma once
 
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace mongo::stage_builder {
 

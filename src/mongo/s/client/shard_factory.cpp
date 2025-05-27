@@ -28,13 +28,13 @@
  */
 
 
-#include <memory>
-#include <utility>
-
+#include "mongo/s/client/shard_factory.h"
 
 #include "mongo/client/connection_string.h"
-#include "mongo/s/client/shard_factory.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

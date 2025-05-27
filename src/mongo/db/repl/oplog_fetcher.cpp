@@ -37,9 +37,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <mutex>
-
 #include "mongo/base/counter.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -81,6 +78,9 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+
+#include <algorithm>
+#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

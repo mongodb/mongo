@@ -26,8 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -28,11 +28,11 @@
  */
 #include "mongo/db/version_context.h"
 
-#include <fmt/format.h>
-
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+
 #include "src/mongo/bson/bsonmisc.h"
+#include <fmt/format.h>
 
 namespace mongo {
 // (Generic FCV reference): used for testing, should exist across LTS binary versions

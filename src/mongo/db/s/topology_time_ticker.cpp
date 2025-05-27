@@ -28,21 +28,21 @@
  */
 
 
-#include <cstddef>
-#include <iterator>
-#include <utility>
-
+#include "mongo/db/s/topology_time_ticker.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+
+#include <cstddef>
+#include <iterator>
+#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -27,19 +27,20 @@
  *    it in the license file.
  */
 
-#include <memory>
+#include "mongo/transport/grpc/grpc_session.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/transport/grpc/grpc_session.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

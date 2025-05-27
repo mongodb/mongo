@@ -29,11 +29,10 @@
 
 #include "mongo/db/ftdc/varint.h"
 
-#include <util/coding/varint.h>
+#include "mongo/util/assert_util.h"
 
 #include <base/integral_types.h>
-
-#include "mongo/util/assert_util.h"
+#include <util/coding/varint.h>
 
 namespace mongo {
 

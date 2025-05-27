@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/exec/working_set.h"
+
 #include <cstddef>
 #include <set>
 #include <vector>
-
-#include "mongo/db/exec/working_set.h"
 
 namespace mongo {
 

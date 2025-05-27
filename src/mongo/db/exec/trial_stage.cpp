@@ -27,16 +27,16 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
-#include <vector>
-
+#include "mongo/db/exec/trial_stage.h"
 
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/util/assert_util.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

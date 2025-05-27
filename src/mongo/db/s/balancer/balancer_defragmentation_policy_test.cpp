@@ -27,21 +27,7 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_set.h>
-#include <algorithm>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <iterator>
-#include <limits>
-#include <map>
-#include <set>
-#include <utility>
-#include <variant>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
+#include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -57,7 +43,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/idl/idl_parser.h"
@@ -69,6 +54,22 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+#include <algorithm>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <set>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

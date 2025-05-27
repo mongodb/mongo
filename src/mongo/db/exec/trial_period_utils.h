@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <cstddef>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/oplog.h"
+
+#include <cstddef>
 
 namespace mongo {
 class Collection;

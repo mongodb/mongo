@@ -28,13 +28,13 @@
  */
 
 
-#include <string>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/testing_options_gen.h"
 #include "mongo/util/testing_proctor.h"
+
+#include <string>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

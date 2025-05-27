@@ -29,14 +29,15 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <shared_mutex>
-#include <vector>
-
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/database_version.h"
+
+#include <shared_mutex>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
