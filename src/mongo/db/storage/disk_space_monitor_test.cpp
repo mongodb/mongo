@@ -45,6 +45,7 @@ protected:
 
 class SimpleAction : public DiskSpaceMonitor::Action {
 public:
+    explicit SimpleAction(int& hits) : hits(hits) {}
     int64_t getThresholdBytes() override {
         return 1024;
     }
@@ -53,26 +54,63 @@ public:
         hits += 1;
     }
 
-    int hits = 0;
+    int& hits;
 };
 
 TEST_F(DiskSpaceMonitorTest, Threshold) {
     OperationContext* opCtx = nullptr;
-    auto action = std::make_unique<SimpleAction>();
-    auto actionPtr = action.get();
-    monitor.registerAction(std::move(action));
+    auto hitsCounter = 0;
+    auto action = std::make_unique<SimpleAction>(hitsCounter);
+    int64_t actionId = monitor.registerAction(std::move(action));
 
     monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(0, actionPtr->hits);
+    ASSERT_EQ(0, hitsCounter);
 
     monitor.takeAction(opCtx, 1024);
-    ASSERT_EQ(1, actionPtr->hits);
+    ASSERT_EQ(1, hitsCounter);
 
     monitor.takeAction(opCtx, 1000);
-    ASSERT_EQ(2, actionPtr->hits);
+    ASSERT_EQ(2, hitsCounter);
 
     monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(2, actionPtr->hits);
+    ASSERT_EQ(2, hitsCounter);
+
+    monitor.deregisterAction(actionId);
 }
+
+TEST_F(DiskSpaceMonitorTest, TwoActions) {
+    OperationContext* opCtx = nullptr;
+    auto hitsCounter1 = 0;
+    auto hitsCounter2 = 0;
+    auto action1 = std::make_unique<SimpleAction>(hitsCounter1);
+    auto action2 = std::make_unique<SimpleAction>(hitsCounter2);
+    int64_t action1Id = monitor.registerAction(std::move(action1));
+    int64_t action2Id = monitor.registerAction(std::move(action2));
+
+    // Check both actions don't get incremented.
+    monitor.takeAction(opCtx, 2000);
+    ASSERT_EQ(0, hitsCounter1);
+    ASSERT_EQ(0, hitsCounter2);
+
+    // Check both actions get incremented.
+    monitor.takeAction(opCtx, 1024);
+    ASSERT_EQ(1, hitsCounter1);
+    ASSERT_EQ(1, hitsCounter2);
+
+    // Deregister action1.
+    monitor.deregisterAction(action1Id);
+
+    // Check that we increment action2.
+    monitor.takeAction(opCtx, 1000);
+    ASSERT_EQ(1, hitsCounter1);
+    ASSERT_EQ(2, hitsCounter2);
+
+    // Check both actions remain unchanged.
+    monitor.takeAction(opCtx, 2000);
+    ASSERT_EQ(1, hitsCounter1);
+    ASSERT_EQ(2, hitsCounter2);
+    monitor.deregisterAction(action2Id);
+}
+
 }  // namespace
 }  // namespace mongo

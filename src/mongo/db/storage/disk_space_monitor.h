@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/periodic_runner.h"
 
 #include <cstdint>
@@ -73,9 +74,14 @@ public:
     };
 
     /**
-     * Register an action that responds to changes in disk space.
+     * Registers an action that responds to changes in disk space and returns its id.
      */
-    void registerAction(std::unique_ptr<Action> action);
+    int64_t registerAction(std::unique_ptr<Action> action);
+
+    /**
+     * Deregisters the action corresponding to the given id.
+     */
+    void deregisterAction(int64_t actionId);
 
     /**
      * Immediately take action based on the provided available disk space in bytes.
@@ -93,7 +99,10 @@ private:
     // Copy of the dbpath which is always safe to access.
     std::string _dbpath;
     // This mutex protects _actions and the entire run loop of the disk space monitor.
+    // The mutex also enables us to increment the _actionId for each new action added to _actions.
     stdx::mutex _mutex;
-    std::vector<std::unique_ptr<Action>> _actions;
+    stdx::unordered_map<int64_t, std::unique_ptr<Action>> _actions;
+
+    int64_t _actionId = 0;
 };
 }  // namespace mongo
