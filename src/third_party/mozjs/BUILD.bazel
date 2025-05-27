@@ -264,6 +264,14 @@ mongo_cc_library(
             "-Wno-register",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:compiler_type_gcc": [
+            # The default var track size leads to an error, making the compiler have to retry without it.
+            # This may use extra memory at compile time, but we don't want to disable it completely since
+            # it may be needed for valuable optimizations.
+            "--param=max-vartrack-size=1000000000",
+        ],
+        "//conditions:default": [],
     }),
     defines = [
         "JS_USE_CUSTOM_ALLOCATOR=1",
@@ -285,15 +293,6 @@ mongo_cc_library(
             "__Wno_non_virtual_dtor__",
             "__Wno_invalid_offsetof__",
         ],
-    }),
-    exec_properties = select({
-        "@platforms//cpu:x86_64": {
-            "Pool": "large_mem_x86_64",
-        },
-        "@platforms//cpu:aarch64": {
-            "Pool": "large_memory_arm64",
-        },
-        "//conditions:default": {},
     }),
     features = select({
         "@platforms//os:linux": ["no_invalid_offsetof_warning"],
