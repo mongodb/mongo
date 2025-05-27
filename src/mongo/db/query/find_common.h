@@ -170,7 +170,7 @@ public:
         bool& _failedToAppend;
 
         // State within append() calls.
-        size_t objSize;
+        size_t objSize = 0;
     };
 
     MONGO_COMPILER_ALWAYS_INLINE static bool fitsInBatch(size_t bytesBuffered, size_t objSize) {
