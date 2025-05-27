@@ -32,6 +32,20 @@ This should be run in conjunction with the unit tests, which can be run with the
 bazel test --test_tag_filters=server-rss-sydney-smoke //...
 ```
 
+## Replication
+
+The integration tests for the smoke test suite can be run with the following command:
+
+```
+bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=replication
+```
+
+This should be run in conjunction with the unit tests, which can be run with the following:
+
+```
+bazel test --test_output=summary //src/mongo/db/repl/...
+```
+
 ## Server Programmability
 
 Running the unit tests and integration tests together can be accomplished with the following:
