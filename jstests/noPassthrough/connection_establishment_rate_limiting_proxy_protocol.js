@@ -60,8 +60,9 @@ rs.initiate();
         assert.neq(null, conn, 'Client was unable to connect');
     }
 
-    assert.gte(getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalExempted"],
-               numConnections);
+    assert.soon(
+        () => getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalExempted"] >=
+            numConnections);
 
     proxy_server.stop();
 }
@@ -101,7 +102,8 @@ rs.getPrimary().adminCommand({
         return false;
     });
 
-    assert.eq(1, getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalRejected"]);
+    assert.soon(() => 1 ==
+                    getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["totalRejected"]);
 
     proxy_server.stop();
 }
