@@ -4,6 +4,22 @@ var CheckOrphansAreDeletedHelpers = (function() {
     function runCheck(mongosConn, shardConn, shardId) {
         const configDB = shardConn.getDB('config');
 
+        // Under some conditions, migrations that hit errors simply clear the filtering metadata and
+        // are expected to be lazily recovered. Recovery can happen either on step-up or upon the
+        // next metadata refresh. Since this hook is run at the end of the test, there is no
+        // guarantee either of these happens so we force a refresh on these collections to ensure
+        // recovery happens.
+        const ensureMigrationsRecovered = (shardConn, configDB) => {
+            let pendingMigrations =
+                configDB.getCollection("migrationCoordinators").find().toArray();
+            pendingMigrations.forEach((migrationRecoveryDoc) => {
+                let nss = migrationRecoveryDoc["nss"];
+                assert.commandWorked(shardConn.adminCommand({_flushRoutingTableCacheUpdates: nss}));
+            });
+        };
+
+        ensureMigrationsRecovered(shardConn, configDB);
+
         let migrationCoordinatorDocs = [];
         assert.soon(
             () => {
