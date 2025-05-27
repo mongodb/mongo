@@ -39,11 +39,11 @@ const testExemptIPsFromRateLimit = (conn) => {
         return false;
     });
 
-    assert.eq(1, getConnectionStats(conn)["establishmentRateLimit"]["totalRejected"]);
+    assert.soon(() => 1 == getConnectionStats(conn)["establishmentRateLimit"]["totalRejected"]);
 
     // Connections over an exempted ip will succeed.
     assert(new Mongo(`mongodb://${exemptIP}:${conn.port}`));
-    assert.gte(getConnectionStats(conn)["establishmentRateLimit"]["totalExempted"], 1);
+    assert.soon(() => getConnectionStats(conn)["establishmentRateLimit"]["totalExempted"] >= 1);
 };
 
 const testExemptIPsFromRateLimitOpts = {
