@@ -1041,6 +1041,17 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           if (!opCtx->writesAreReplicated()) {
               opTime = entry.getOpTime();
           }
+
+          // renameCollectionForApplyOps assumes that the operation is being applied exclusively,
+          // with no concurrent writers. This holds because this function is only called either from
+          // - The applyOps command, which acquires the global lock in MODE_X, or
+          // - Oplog application, which processes DDLs like rename individually, in their own batch.
+          tassert(
+              10374401,
+              "expected either an exclusive global lock, or to be applying the rename exclusively",
+              mode != repl::OplogApplication::Mode::kApplyOpsCmd ||
+                  shard_role_details::getLocker(opCtx)->isW());
+
           return renameCollectionForApplyOps(
               opCtx, entry.getUuid(), entry.getTid(), entry.getObject(), opTime);
       },

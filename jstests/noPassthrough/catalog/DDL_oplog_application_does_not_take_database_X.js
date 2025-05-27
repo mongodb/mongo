@@ -1,18 +1,15 @@
 /**
- * Test that applying DDL operation on secondary does not take a global X lock.
+ * Test that applying DDL operation on secondary does not take a database X lock.
  *
  * @tags: [
  *   requires_replication,
- *   requires_snapshot_read,
  * ]
  */
-
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 const testDBName = 'test';
-const readDBName = 'read';
-const readCollName = 'readColl';
 const testCollName = 'testColl';
 const renameCollName = 'renameColl';
 
@@ -23,26 +20,21 @@ rst.initiate();
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
 
-assert.commandWorked(
-    primary.getDB(readDBName)
-        .runCommand({insert: readCollName, documents: [{x: 1}], writeConcern: {w: 2}}));
+// Hang while holding a IS lock on the test DB.
+const sleepFunction = function(sleepDB) {
+    // If oplog application of any of the DDLs below needs to wait on this lock,
+    // holding this lock will trigger a test timeout.
+    assert.commandFailedWithCode(
+        db.adminCommand(
+            {sleep: 1, secs: 18000, lockTarget: sleepDB, lock: "ir", $comment: "Lock sleep"}),
+        ErrorCodes.Interrupted);
+};
 
-// The find will hang and holds a global IS lock.
-const fp = configureFailPoint(secondary, "waitInFindBeforeMakingBatch");
-
-const findWait = startParallelShell(function() {
-    db.getMongo().setSecondaryOk();
-    assert.eq(
-        db.getSiblingDB('read').getCollection('readColl').find().comment('read hangs').itcount(),
-        1);
-}, secondary.port);
-
-assert.soon(function() {
-    let findOp = secondary.getDB('admin')
-                     .aggregate([{$currentOp: {}}, {$match: {'command.comment': 'read hangs'}}])
-                     .toArray();
-    return findOp.length == 1;
-});
+const sleepCommand = startParallelShell(funWithArgs(sleepFunction, testDBName), secondary.port);
+const sleepID =
+    waitForCommand("sleepCmd",
+                   op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep"),
+                   secondary.getDB("admin"));
 
 {
     // Run a series of DDL commands, none of which should take the global X lock.
@@ -70,7 +62,8 @@ assert.soon(function() {
     assert.commandWorked(testDB.runCommand({drop: renameCollName, writeConcern: {w: 2}}));
 }
 
-fp.off();
-findWait();
+// Interrupt the sleep command.
+assert.commandWorked(secondary.getDB("admin").killOp(sleepID));
+sleepCommand();
 
 rst.stopSet();

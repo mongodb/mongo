@@ -93,6 +93,7 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -207,23 +208,10 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
                                    const UUID& sourceUUID,
                                    Database* const targetDB,
                                    const NamespaceString& targetNs,
-                                   const UUID& targetUUID) {
+                                   const UUID& targetUUID,
+                                   const NamespaceString& tmpName) {
     repl::UnreplicatedWritesBlock uwb(opCtx);
 
-    // The generated unique collection name is only guaranteed to exist if the database is
-    // exclusively locked.
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(targetDB->name(),
-                                                                      LockMode::MODE_X));
-    auto tmpNameResult = makeUniqueCollectionName(opCtx, targetDB->name(), "tmp%%%%%.rename");
-    if (!tmpNameResult.isOK()) {
-        return tmpNameResult.getStatus().withContext(
-            str::stream() << "Cannot generate a temporary collection name for the target "
-                          << targetNs.toStringForErrorMsg() << " (" << targetUUID
-                          << ") so that the source" << sourceNs.toStringForErrorMsg() << " ("
-                          << sourceUUID << ") could be renamed to "
-                          << targetNs.toStringForErrorMsg());
-    }
-    const auto& tmpName = tmpNameResult.getValue();
     const bool stayTemp = true;
     return writeConflictRetry(opCtx, "renameCollection", targetNs, [&] {
         WriteUnitOfWork wunit(opCtx);
@@ -412,6 +400,93 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     }
 }
 
+struct RenameCollectionWithinDBForApplyOpsAcquisitions {
+    CollectionAcquisition sourceColl;
+    CollectionAcquisition targetCollBasedOnNs;
+    boost::optional<CollectionAcquisition> collToDropBasedOnUUID;
+    boost::optional<CollectionAcquisition> tempCollForRenameOutOfTheWay;
+};
+
+StatusWith<RenameCollectionWithinDBForApplyOpsAcquisitions>
+acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
+                                                   const NamespaceString& source,
+                                                   const NamespaceString& target,
+                                                   const boost::optional<UUID>& uuidToDrop) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    // We don't expect to get a stale snapshot of the catalog during oplog application or applyOps.
+    dassert(catalog == CollectionCatalog::latest(opCtx));
+
+    auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
+    auto targetCollBasedOnNs = catalog->lookupCollectionByNamespace(opCtx, target);
+    auto nsToDropBasedOnUUID =
+        uuidToDrop ? catalog->lookupNSSByUUID(opCtx, *uuidToDrop) : boost::none;
+    bool needsRenameOutOfTheWay = targetCollBasedOnNs &&
+        targetCollBasedOnNs->uuid() != sourceColl->uuid() &&
+        targetCollBasedOnNs->uuid() != uuidToDrop;
+
+    auto getCanNotCreateTemporaryCollectionErrorMsg = [&]() -> std::string {
+        return str::stream() << "Cannot generate a temporary collection name for the target "
+                             << target.toStringForErrorMsg() << " (" << targetCollBasedOnNs->uuid()
+                             << ") so that the source" << source.toStringForErrorMsg() << " ("
+                             << sourceColl->uuid() << ") could be renamed to "
+                             << target.toStringForErrorMsg();
+    };
+
+    CollectionAcquisitionRequests acquisitionRequests = {
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, source, AcquisitionPrerequisites::OperationType::kWrite),
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, target, AcquisitionPrerequisites::OperationType::kWrite)};
+    if (nsToDropBasedOnUUID) {
+        acquisitionRequests.emplace_back(CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, *nsToDropBasedOnUUID, AcquisitionPrerequisites::OperationType::kWrite));
+    }
+
+    boost::optional<NamespaceString> nsForRenameOutOfTheWay;
+    if (needsRenameOutOfTheWay) {
+        auto tmpNameResult = makeUniqueCollectionName(opCtx, target.dbName(), "tmp%%%%%.rename");
+        if (!tmpNameResult.isOK()) {
+            return tmpNameResult.getStatus().withContext(
+                getCanNotCreateTemporaryCollectionErrorMsg());
+        }
+        nsForRenameOutOfTheWay = tmpNameResult.getValue();
+        acquisitionRequests.emplace_back(CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, tmpNameResult.getValue(), AcquisitionPrerequisites::OperationType::kWrite));
+    }
+
+    auto acquisitions = acquireCollections(opCtx, acquisitionRequests, LockMode::MODE_X);
+
+    // Destructure the acquisition vector into separate variables; a multimap avoids us releasing
+    // acquisitions when the source, target and/or dropTarget are the same namespace.
+    std::multimap<NamespaceString, CollectionAcquisition> acquisitionMap;
+    for (auto&& a : acquisitions) {
+        acquisitionMap.emplace(a.nss(), std::move(a));
+    }
+
+    auto acquisitionsForRename = RenameCollectionWithinDBForApplyOpsAcquisitions{
+        .sourceColl = std::move(acquisitionMap.extract(source).mapped()),
+        .targetCollBasedOnNs = std::move(acquisitionMap.extract(target).mapped()),
+        .collToDropBasedOnUUID = nsToDropBasedOnUUID
+            ? boost::make_optional(std::move(acquisitionMap.extract(*nsToDropBasedOnUUID).mapped()))
+            : boost::none,
+        .tempCollForRenameOutOfTheWay = nsForRenameOutOfTheWay
+            ? boost::make_optional(
+                  std::move(acquisitionMap.extract(*nsForRenameOutOfTheWay).mapped()))
+            : boost::none,
+    };
+    invariant(acquisitionMap.empty());
+
+    // Rename operations are applied exclusively during applyOps, i.e. there are no concurrent
+    // writers. Therefore, we don't expect a conflict when generating a unique temp collection name.
+    if (nsForRenameOutOfTheWay) {
+        tassert(10374400,
+                getCanNotCreateTemporaryCollectionErrorMsg(),
+                !acquisitionsForRename.tempCollForRenameOutOfTheWay->exists());
+    }
+
+    return acquisitionsForRename;
+}
+
 Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                            const NamespaceString& source,
                                            const NamespaceString& target,
@@ -421,7 +496,15 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     invariant(source.isEqualDb(target));
     DisableDocumentValidation validationDisabler(opCtx);
 
-    AutoGetDb autoDb(opCtx, source.dbName(), MODE_X);
+    AutoGetDb autoDb(opCtx, source.dbName(), MODE_IX);
+    auto acqStatus =
+        acquireLocksForRenameCollectionWithinDBForApplyOps(opCtx, source, target, uuidToDrop);
+    if (!acqStatus.isOK())
+        return acqStatus.getStatus();
+    const auto& [sourceColl,
+                 targetCollBasedOnNs,
+                 collToDropBasedOnUUID,
+                 tempCollForRenameOutOfTheWay] = acqStatus.getValue();
 
     auto status = checkSourceAndTargetNamespaces(
         opCtx, source, target, options, /* targetExistsAllowed */ true);
@@ -429,8 +512,6 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
-    const auto sourceColl =
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, source);
 
     AutoStatsTracker statsTracker(opCtx,
                                   source,
@@ -440,10 +521,10 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                       .getDatabaseProfileLevel(source.dbName()));
 
     return writeConflictRetry(opCtx, "renameCollection", target, [&] {
-        auto targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, target);
+        auto targetColl = targetCollBasedOnNs.getCollectionPtr().get();
         WriteUnitOfWork wuow(opCtx);
         if (targetColl) {
-            if (sourceColl->uuid() == targetColl->uuid()) {
+            if (sourceColl.uuid() == targetColl->uuid()) {
                 if (!uuidToDrop || uuidToDrop == targetColl->uuid()) {
                     wuow.commit();
                     return Status::OK();
@@ -452,14 +533,13 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                 // During initial sync, it is possible that the collection already
                 // got renamed to the target, so there is not much left to do other
                 // than drop the dropTarget. See SERVER-40861 for more details.
-                auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, *uuidToDrop);
                 if (!collToDropBasedOnUUID) {
                     wuow.commit();
                     return Status::OK();
                 }
                 repl::UnreplicatedWritesBlock uwb(opCtx);
-                Status status =
-                    db->dropCollection(opCtx, *collToDropBasedOnUUID, renameOpTimeFromApplyOps);
+                Status status = db->dropCollection(
+                    opCtx, collToDropBasedOnUUID->nss(), renameOpTimeFromApplyOps);
                 if (!status.isOK())
                     return status;
                 wuow.commit();
@@ -468,8 +548,14 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
 
             if (!uuidToDrop || uuidToDrop != targetColl->uuid()) {
                 // We need to rename the targetColl to a temporary name.
-                auto status = renameTargetCollectionToTmp(
-                    opCtx, source, sourceColl->uuid(), db, target, targetColl->uuid());
+                invariant(tempCollForRenameOutOfTheWay);
+                auto status = renameTargetCollectionToTmp(opCtx,
+                                                          source,
+                                                          sourceColl.uuid(),
+                                                          db,
+                                                          target,
+                                                          targetColl->uuid(),
+                                                          tempCollForRenameOutOfTheWay->nss());
                 if (!status.isOK())
                     return status;
                 targetColl = nullptr;
@@ -481,19 +567,17 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         // dropping the wrong collection.
         if (!targetColl && uuidToDrop) {
             invariant(options.dropTarget);
-            auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.value());
             if (collToDropBasedOnUUID) {
-                invariant(collToDropBasedOnUUID->isEqualDb(target));
-                targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                    opCtx, *collToDropBasedOnUUID);
+                invariant(collToDropBasedOnUUID->nss().isEqualDb(target));
+                targetColl = collToDropBasedOnUUID->getCollectionPtr().get();
             }
         }
 
         Status ret = Status::OK();
         if (!targetColl) {
-            ret = renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
+            ret = renameCollectionDirectly(opCtx, db, sourceColl.uuid(), source, target, options);
         } else {
-            if (sourceColl == targetColl) {
+            if (sourceColl.uuid() == targetColl->uuid()) {
                 wuow.commit();
                 return Status::OK();
             }
@@ -502,7 +586,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             // CollectionPtr::CollectionPtr_UNSAFE
             ret = renameCollectionAndDropTarget(opCtx,
                                                 db,
-                                                sourceColl->uuid(),
+                                                sourceColl.uuid(),
                                                 source,
                                                 target,
                                                 CollectionPtr::CollectionPtr_UNSAFE(targetColl),
@@ -1092,15 +1176,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                       str::stream() << "Cannot rename collection to the oplog");
     }
 
-    // Take strong database and collection locks in order to avoid upgrading later.
-    AutoGetDb sourceDb(opCtx, sourceNss.dbName(), MODE_X);
-    AutoGetCollection sourceColl(
-        opCtx,
-        sourceNss,
-        MODE_X,
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-
-    if (!sourceColl) {
+    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, sourceNss)) {
         boost::optional<NamespaceString> dropTargetNss;
 
         if (options.dropTarget)
@@ -1111,8 +1187,6 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
         // Downgrade renameCollection to dropCollection.
         if (dropTargetNss) {
-            // TODO SERVER-99621: Remove this line once renames take locks in proper order.
-            DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
             return dropCollectionForApplyOps(
                 opCtx,
                 *dropTargetNss,
