@@ -257,7 +257,13 @@ public:
      * Return amount of memory to use for the WiredTiger cache based on either the startup
      * option chosen or the amount of available memory on the host.
      */
-    static size_t getCacheSizeMB(double requestedCacheSizeGB);
+    static size_t getMainCacheSizeMB(double requestedCacheSizeGB);
+
+    /**
+     * Returns the amount of memory to use for the spill WiredTiger cache. If `requestedCacheSizeGB`
+     * is less than or equal to 0, defaults to `spillWiredTigerCacheSizeGB.`
+     */
+    static int32_t getSpillCacheSizeMB(double requestedCacheSizeGB);
 
     class ErrorAccumulator : public WT_EVENT_HANDLER {
     public:

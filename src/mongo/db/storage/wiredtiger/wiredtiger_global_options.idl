@@ -421,3 +421,16 @@ configs:
         cpp_varname: "wiredTigerGlobalOptions.indexConfig"
         short_name: wiredTigerIndexConfigString
         hidden: true
+
+    # Spill WiredTiger engine options
+    "storage.spillWiredTiger.engineConfig.cacheSizeGB":
+        description: >-
+            Maximum amount of memory to allocate for the spill WiredTiger cache. 
+            This cache is used to prevent every write from incurring I/O.
+        arg_vartype: Double
+        cpp_varname: "spillWiredTigerGlobalOptions.cacheSizeGB"
+        short_name: spillWiredTigerCacheSizeGB
+        default: 0.1
+        validator:
+            gt: 0
+            lte: 10000

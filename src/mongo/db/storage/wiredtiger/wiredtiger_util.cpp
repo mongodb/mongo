@@ -458,10 +458,10 @@ int64_t WiredTigerUtil::getIdentCompactRewrittenExpectedSize(WiredTigerSession& 
     return result.getValue();
 }
 
-size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
+size_t WiredTigerUtil::getMainCacheSizeMB(double requestedCacheSizeGB) {
     double cacheSizeMB;
     const double kMaxSizeCacheMB = 10 * 1000 * 1000;
-    if (requestedCacheSizeGB == 0) {
+    if (requestedCacheSizeGB <= 0) {
         // Choose a reasonable amount of cache when not explicitly specified by user.
         // Set a minimum of 256MB, otherwise use 50% of available memory over 1GB.
         ProcessInfo pi;
@@ -477,7 +477,29 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
               "maximumMB"_attr = kMaxSizeCacheMB);
         cacheSizeMB = kMaxSizeCacheMB;
     }
-    return static_cast<size_t>(cacheSizeMB);
+    return static_cast<size_t>(std::floor(cacheSizeMB));
+}
+
+int32_t WiredTigerUtil::getSpillCacheSizeMB(double requestedCacheSizeGB) {
+    double cacheSizeMB = 1024 * requestedCacheSizeGB;
+    const auto kMaxSizeCacheMB = 10 * 1000 * 1000;
+
+    if (requestedCacheSizeGB <= 0) {
+        LOGV2(10375300,
+              "Requested spill WiredTiger cache size is zero or negative, resetting to default.",
+              "requestedMB"_attr = requestedCacheSizeGB,
+              "default"_attr = kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault);
+        cacheSizeMB = kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault * 1024;
+    }
+    if (cacheSizeMB > kMaxSizeCacheMB) {
+        LOGV2(10375301,
+              "Requested spill WiredTiger cache size exceeds max, setting to maximum",
+              "requestedMB"_attr = cacheSizeMB,
+              "maximumMB"_attr = kMaxSizeCacheMB);
+        cacheSizeMB = kMaxSizeCacheMB;
+    }
+
+    return static_cast<int32_t>(std::floor(cacheSizeMB));
 }
 
 logv2::LogSeverity getWTLogSeverityLevel(const BSONObj& obj) {

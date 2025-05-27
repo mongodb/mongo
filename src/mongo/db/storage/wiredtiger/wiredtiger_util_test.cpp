@@ -36,6 +36,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/death_test.h"
@@ -43,6 +44,7 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
 
 #include <memory>
@@ -1129,6 +1131,31 @@ TEST_F(WiredTigerUtilTest, DropWithDirtyData) {
     // If we tried more times than the limit, then we were not able to successfully recreate the
     // error and should fail.
     ASSERT(tryCount <= kRetryLimit);
+}
+
+TEST(WiredTigerUtilTest, WTMainCacheSizeCalculation) {
+    ProcessInfo pi;
+    const double memSizeMB = pi.getMemSizeMB();
+    const auto tooLargeCacheMB = 100 * 1000 * 1000;
+    const size_t defaultCacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
+    const auto maxCacheSizeMB = 10 * 1000 * 1000;
+
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(-10), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(10), 10 * 1024);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(tooLargeCacheMB), maxCacheSizeMB);
+}
+
+TEST(WiredTigerUtilTest, WTSpillCacheSizeCalculation) {
+    const auto defaultCacheSizeMB = static_cast<int32_t>(
+        std::floor(kStorage_spillWiredTiger_engineConfig_cacheSizeGBDefault * 1024));
+    const auto tooLargeCacheMB = 100 * 1000 * 1000;
+    const auto maxCacheSizeMB = 10 * 1000 * 1000;
+
+    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(-10), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(0), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(10), 10 * 1024);
+    ASSERT_EQUALS(WiredTigerUtil::getSpillCacheSizeMB(tooLargeCacheMB), maxCacheSizeMB);
 }
 
 }  // namespace

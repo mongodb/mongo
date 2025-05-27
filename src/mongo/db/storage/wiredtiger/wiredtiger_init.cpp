@@ -126,7 +126,7 @@ public:
         }
 #endif
 
-        size_t cacheMB = WiredTigerUtil::getCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
+        size_t cacheMB = WiredTigerUtil::getMainCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
         const double memoryThresholdPercentage = 0.8;
         ProcessInfo p;
         if (p.supported()) {
@@ -169,8 +169,8 @@ public:
 
             WiredTigerKVEngineBase::WiredTigerConfig wtConfig =
                 getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
-            // TODO(SERVER-103753): Compute cache size properly.
-            wtConfig.cacheSizeMB = 100;
+            wtConfig.cacheSizeMB =
+                WiredTigerUtil::getSpillCacheSizeMB(spillWiredTigerGlobalOptions.cacheSizeGB);
             wtConfig.inMemory = params.inMemory;
             wtConfig.logEnabled = false;
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
