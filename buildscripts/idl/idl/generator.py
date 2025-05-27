@@ -462,12 +462,14 @@ class _CppFileWriterBase(object):
         """Generate a non-system C++ include line."""
         self._writer.write_unindented_line('#include "%s"' % (include))
 
-    def gen_namespace_block(self, namespace):
+    def gen_namespace_block(self, namespace: str, mod_visibility: str = None):
         # type: (str) -> writer.NamespaceScopeBlock
         """Generate a namespace block."""
         namespace_list = namespace.split("::")
 
-        return writer.NamespaceScopeBlock(self._writer, namespace_list)
+        return writer.NamespaceScopeBlock(
+            self._writer, namespace_list, make_mod_tag(mod_visibility)
+        )
 
     def get_initializer_lambda(self, decl, unused=False, return_type=None):
         # type: (str, bool, str) -> writer.IndentedScopedBlock
@@ -554,15 +556,26 @@ class _CppFileWriterBase(object):
         return writer.MultiBlock(blocks)
 
 
+def get_all_structs(spec: ast.IDLBoundSpec):
+    return spec.structs + cast(List[ast.Struct], spec.commands)
+
+
+def make_mod_tag(vis: str):
+    if vis is None:
+        return ""
+    tag, paren, rest = vis.partition("(")
+    return f"MONGO_MOD_{tag.upper()}{paren}{rest} "
+
+
 class _CppHeaderFileWriter(_CppFileWriterBase):
     """C++ .h File writer."""
 
-    def gen_class_declaration_block(self, class_name):
+    def gen_class_declaration_block(self, struct: ast.Struct):
         # type: (str) -> writer.IndentedScopedBlock
         """Generate a class declaration block."""
-        return writer.IndentedScopedBlock(
-            self._writer, "class %s {" % common.title_case(class_name), "};"
-        )
+        cl_name = common.title_case(struct.cpp_name)
+        mod_tag = make_mod_tag(struct.mod_visibility)
+        return writer.IndentedScopedBlock(self._writer, f"class {mod_tag}{cl_name} {{", "};")
 
     def gen_class_constructors(self, struct):
         # type: (ast.Struct) -> None
@@ -937,10 +950,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum."""
         enum_type_info = enum_types.get_type_info(idl_enum)
+        enum_name = enum_type_info.get_cpp_type_name()
+        mod_tag = make_mod_tag(idl_enum.mod_visibility)
 
-        with self._block(
-            "enum class %s : std::int32_t {" % (enum_type_info.get_cpp_type_name()), "};"
-        ):
+        with self._block(f"enum class {mod_tag}{enum_name} : std::int32_t {{", "};"):
             for enum_value in idl_enum.values:
                 if enum_value.description is not None:
                     self.gen_description_comment(enum_value.description)
@@ -1274,6 +1287,17 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 return True
         return False
 
+    def has_module_tag(self, spec: ast.IDLBoundSpec):
+        if spec.globals.mod_visibility:
+            return True
+        for struct in get_all_structs(spec):
+            if struct.mod_visibility:
+                return True
+        for idl_enum in spec.enums:
+            if idl_enum.mod_visibility:
+                return True
+        return False
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
@@ -1313,6 +1337,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             "mongo/util/serialization_context.h",
         ] + spec.globals.cpp_includes
 
+        if self.has_module_tag(spec):
+            header_list.append("mongo/util/modules.h")
+
         if spec.configs:
             header_list.append("mongo/util/options_parser/option_description.h")
             config_init = spec.globals.configs and spec.globals.configs.initializer
@@ -1349,7 +1376,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
         # Generate namespace
-        with self.gen_namespace_block(spec.globals.cpp_namespace):
+        with self.gen_namespace_block(spec.globals.cpp_namespace, spec.globals.mod_visibility):
             self.write_empty_line()
 
             for idl_enum in spec.enums:
@@ -1360,11 +1387,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_enum_functions(idl_enum)
                 self._writer.write_empty_line()
 
-            all_structs = spec.structs + cast(List[ast.Struct], spec.commands)
-
-            for struct in all_structs:
+            for struct in get_all_structs(spec):
                 self.gen_description_comment(struct.description)
-                with self.gen_class_declaration_block(struct.cpp_name):
+                with self.gen_class_declaration_block(struct):
                     self.write_unindented_line("public:")
                     self.gen_field_enum(struct)
 
@@ -3684,9 +3709,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_description_comment(idl_enum.description)
                 self.gen_enum_definition(idl_enum)
 
-            all_structs = spec.structs + cast(List[ast.Struct], spec.commands)
-
-            for struct in all_structs:
+            for struct in get_all_structs(spec):
                 self.gen_field_info(struct)
                 self.write_empty_line()
 

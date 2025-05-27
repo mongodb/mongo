@@ -103,6 +103,18 @@ description: Schema for IDL files in the mongo codebase.
           A static function to call of the shape Status <function_name>(const <cpp_type> value).
           For non-simple types, value is passed by const-reference.
     minProperties: 1
+  mod_visibility:
+    description: Out-of-module visibility of the struct, enum, or namespace.
+    oneOf:
+      - type: string
+        enum:
+          - pub
+          - pub_for_technical_reasons
+          - private
+          - file_private
+          - needs_replacement
+      - type: string
+        pattern: "^use_replacement(.+)$"
   fields:
     description: Fields of an IDL struct or command.
     type: object
@@ -289,6 +301,8 @@ properties:
           unsafe_dangerous_disable_extra_field_duplicate_checks:
             type: boolean
             description: Undocumented, DO NOT USE!
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
   types:
     description: List of types which instruct IDL how deserialize/serialize primitives
     type: object
@@ -368,6 +382,8 @@ properties:
             enum:
               - string
               - int
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
           values:
             type: object
             description: A map of `enum value name` -> `enum value`.
@@ -542,6 +558,8 @@ properties:
                 type: boolean
             minProperties: 1
             maxProperties: 1
+          mod_visibility:
+            "$ref": "#/$defs/mod_visibility"
   server_parameters:
     description: >
       List of server parameters to serialize into C++. The generated code will self-register
@@ -947,6 +965,8 @@ properties:
               type: string
             uniqueItems: true
           - type: string
+      mod_visibility:
+        "$ref": "#/$defs/mod_visibility"
       configs:
         type: object
         additionalProperties: false

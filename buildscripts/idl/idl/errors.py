@@ -141,6 +141,7 @@ ERROR_ID_ILLEGALLY_FCV_GATED_FEATURE_FLAG = "ID0105"
 ERROR_ID_INCREMENTAL_FEATURE_FLAG_DEFAULT_VALUE = "ID0106"
 ERROR_ID_FEATURE_FLAG_WITHOUT_DEFAULT_VALUE = "ID0107"
 ERROR_ID_IFR_FLAG_WITH_VERSION = "ID108"
+ERROR_ID_BAD_VISIBILITY = "ID109"
 
 
 class IDLError(Exception):
@@ -1339,6 +1340,14 @@ class ParserContext(object):
             ERROR_ID_BAD_CPP_NAMESPACE,
             "cpp_namespace must start with 'mongo::' or be just 'mongo', namespace '%s' is not supported"
             % (namespace),
+        )
+
+    def add_bad_visibility(self, node: yaml.nodes.Node, mod_visibility: str):
+        """Add an error about a bad visibility value."""
+        self._add_node_error(
+            node,
+            ERROR_ID_BAD_VISIBILITY,
+            f"Bad visibility value '{mod_visibility}', only pub, pub_for_technical_reasons, private, file_private, needs_replacement, and use_replacement(...) are accepted",
         )
 
 

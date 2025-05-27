@@ -359,6 +359,7 @@ class Global(common.SourceLocation):
         """Construct a Global."""
         self.cpp_namespace = None  # type: str
         self.cpp_includes = []  # type: List[str]
+        self.mod_visibility = None  # type: str
         self.configs = None  # type: ConfigGlobal
 
         super(Global, self).__init__(file_name, line, column)
@@ -563,6 +564,7 @@ class Struct(common.SourceLocation):
 
         # Command only property
         self.cpp_name = None  # type: str
+        self.mod_visibility = None  # type: str
 
         # Internal property that is not represented as syntax. An imported struct is read from an
         # imported file, and no code is generated for it.
@@ -736,6 +738,7 @@ class Enum(common.SourceLocation):
         self.description = None  # type: str
         self.type = None  # type: str
         self.values = None  # type: List[EnumValue]
+        self.mod_visibility = None  # type: str
 
         # Internal property that is not represented as syntax. An imported enum is read from an
         # imported file, and no code is generated for it.

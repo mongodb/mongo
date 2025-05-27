@@ -32,6 +32,7 @@ Converts a YAML document to an idl.syntax tree.
 Only validates the document is syntatically correct, not semantically.
 """
 
+import re
 from abc import ABCMeta, abstractmethod
 
 import yaml
@@ -223,6 +224,18 @@ def _parse_config_global(ctxt, node):
     return config
 
 
+_mod_visibility_pattern = re.compile(
+    "(pub|pub_for_technical_reasons|private|file_private|needs_replacement|use_replacement\(.+\))"
+)
+
+
+def _validate_mod_visibility(
+    ctxt: errors.ParserContext, mod_visibility: str, node: yaml.nodes.Node
+):
+    if mod_visibility is not None and not _mod_visibility_pattern.fullmatch(mod_visibility):
+        ctxt.add_bad_visibility(node, mod_visibility)
+
+
 def _parse_global(ctxt, spec, node):
     # type: (errors.ParserContext, syntax.IDLSpec, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a global section in the IDL file."""
@@ -240,8 +253,11 @@ def _parse_global(ctxt, spec, node):
             "cpp_namespace": _RuleDesc("scalar"),
             "cpp_includes": _RuleDesc("scalar_or_sequence"),
             "configs": _RuleDesc("mapping", mapping_parser_func=_parse_config_global),
+            "mod_visibility": _RuleDesc("scalar"),
         },
     )
+
+    _validate_mod_visibility(ctxt, idlglobal.mod_visibility, node)
 
     spec.globals = idlglobal
 
@@ -581,6 +597,7 @@ def _parse_struct(ctxt, spec, name, node):
             "description": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "fields": _RuleDesc("mapping", mapping_parser_func=_parse_fields),
             "chained_structs": _RuleDesc("mapping", mapping_parser_func=_parse_chained_structs),
+            "mod_visibility": _RuleDesc("scalar"),
             "strict": _RuleDesc("bool_scalar"),
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc("bool_scalar"),
@@ -602,6 +619,8 @@ def _parse_struct(ctxt, spec, name, node):
     ):
         ctxt.add_variant_comparison_error(struct)
         return
+
+    _validate_mod_visibility(ctxt, struct.mod_visibility, node)
 
     spec.symbols.add_struct(ctxt, struct)
     if struct.is_generic_cmd_list:
@@ -683,12 +702,15 @@ def _parse_enum(ctxt, spec, name, node):
         {
             "description": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "type": _RuleDesc("scalar", _RuleDesc.REQUIRED),
+            "mod_visibility": _RuleDesc("scalar"),
             "values": _RuleDesc("mapping", mapping_parser_func=_parse_enum_values),
         },
     )
 
     if idl_enum.values is None:
         ctxt.add_empty_enum_error(node, idl_enum.name)
+
+    _validate_mod_visibility(ctxt, idl_enum.mod_visibility, node)
 
     spec.symbols.add_enum(ctxt, idl_enum)
 
@@ -804,6 +826,7 @@ def _parse_command(ctxt, spec, name, node):
             "description": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "chained_structs": _RuleDesc("mapping", mapping_parser_func=_parse_chained_structs),
             "fields": _RuleDesc("mapping", mapping_parser_func=_parse_fields),
+            "mod_visibility": _RuleDesc("scalar"),
             "namespace": _RuleDesc("scalar", _RuleDesc.REQUIRED),
             "cpp_name": _RuleDesc("scalar"),
             "type": _RuleDesc("scalar_or_mapping", mapping_parser_func=_parse_field_type),
@@ -853,6 +876,8 @@ def _parse_command(ctxt, spec, name, node):
 
     if command.api_version and command.reply_type is None:
         ctxt.add_missing_reply_type(command, command.name)
+
+    _validate_mod_visibility(ctxt, command.mod_visibility, node)
 
     # Commands may only have the first parameter, ensure the fields property is an empty array.
     if not command.fields:

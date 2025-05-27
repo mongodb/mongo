@@ -230,17 +230,20 @@ class IndentedScopedBlock(WriterBlock):
 class NamespaceScopeBlock(WriterBlock):
     """Generate an unindented blocks for a list of namespaces, and do not indent the contents."""
 
-    def __init__(self, indented_writer, namespaces):
+    def __init__(
+        self, indented_writer: IndentedTextWriter, namespaces: list[str], mod_vis_str: str = ""
+    ):
         # type: (IndentedTextWriter, List[str]) -> None
         """Create a block."""
         self._writer = indented_writer
         self._namespaces = namespaces
+        self._mod_vis_str = mod_vis_str
 
     def __enter__(self):
         # type: () -> None
         """Write the beginning of the block and do not indent."""
         for namespace in self._namespaces:
-            self._writer.write_unindented_line("namespace %s {" % (namespace))
+            self._writer.write_unindented_line(f"namespace {self._mod_vis_str}{namespace} {{")
 
     def __exit__(self, *args):
         # type: (*str) -> None
@@ -248,7 +251,7 @@ class NamespaceScopeBlock(WriterBlock):
         self._namespaces.reverse()
 
         for namespace in self._namespaces:
-            self._writer.write_unindented_line("}  // namespace %s" % (namespace))
+            self._writer.write_unindented_line(f"}}  // namespace {self._mod_vis_str}{namespace}")
 
 
 class UnindentedBlock(WriterBlock):

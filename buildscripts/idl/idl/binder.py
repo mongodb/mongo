@@ -407,6 +407,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.cpp_validator_func = struct.cpp_validator_func
     ast_struct.cpp_name = struct.cpp_name or struct.name
     ast_struct.qualified_cpp_name = _get_struct_qualified_cpp_name(struct)
+    ast_struct.mod_visibility = struct.mod_visibility
     ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     ast_struct.non_const_getter = struct.non_const_getter
     ast_struct.is_command_reply = struct.is_command_reply
@@ -1354,6 +1355,7 @@ def _bind_globals(ctxt, parsed_spec):
             parsed_spec.globals.file_name, parsed_spec.globals.line, parsed_spec.globals.column
         )
         ast_global.cpp_namespace = parsed_spec.globals.cpp_namespace
+        ast_global.mod_visibility = parsed_spec.globals.mod_visibility
         ast_global.cpp_includes = parsed_spec.globals.cpp_includes
 
         if not ast_global.cpp_namespace.startswith("mongo"):
@@ -1413,6 +1415,7 @@ def _bind_enum(ctxt, idl_enum):
     ast_enum.name = idl_enum.name
     ast_enum.description = idl_enum.description
     ast_enum.type = idl_enum.type
+    ast_enum.mod_visibility = idl_enum.mod_visibility
     ast_enum.cpp_namespace = idl_enum.cpp_namespace
 
     enum_type_info = enum_types.get_type_info(idl_enum)
