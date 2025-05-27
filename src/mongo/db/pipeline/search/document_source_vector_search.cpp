@@ -123,10 +123,8 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         // If the request is on a view, include the view information when mongos is serializing the
         // query to the shards, but do not include in explain output for this stage as the view
         // information will be present in $_internalSearchIdLookup and thus would be redundant.
-        if (!opts.verbosity && pExpCtx->getInRouter()) {
-            if (_view) {
-                spec["view"] = Value(_view->toBSON());
-            }
+        if (_view) {
+            spec["view"] = Value(_view->toBSON());
         }
         return Value(Document{{kStageName, spec.freezeToValue()}});
     }

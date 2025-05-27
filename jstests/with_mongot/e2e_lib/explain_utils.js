@@ -107,6 +107,9 @@ export function assertViewNotApplied(explainOutput, userPipeline, viewPipeline) 
  * the $unionWith is applied as intended to $_internalSearchIdLookup.
  *
  * @param {Object} explainOutput The explain output from the whole aggregation.
+ * @param {Object} collNss The underlying collection namespace of the view that the $unionWith stage
+ *     is run on.
+ * @param {Object} viewNss The view namespace that the $unionWith stage is run on.
  * @param {Array} viewPipeline The view pipeline referenced by the search query inside of the
  *     $unionWith.
  * @param {boolean} isStoredSource Whether the $search query is storedSource or not.
@@ -123,7 +126,18 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
         // its collNss in full-sharded environments, and this is intended behavior.
         if (unionWithExplain.hasOwnProperty("splitPipeline") &&
             unionWithExplain["splitPipeline"] !== null) {
-            assert.eq(unionWithExplain.splitPipeline.shardsPart[0].$search.view.nss, viewNss);
+            const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
+
+            // The first stage is either $search or $vectorSearch.
+            if (firstStage.hasOwnProperty("$search")) {
+                assert.eq(firstStage.$search.view.nss, viewNss);
+            } else if (firstStage.hasOwnProperty("$vectorSearch")) {
+                assert.eq(firstStage.$vectorSearch.view.nss, viewNss);
+            } else {
+                assert.fail(
+                    "Expected first stage to have either $search or $vectorSearch, but found neither: " +
+                    tojson(firstStage));
+            }
             assert.eq(unionWithStage.$unionWith.coll, viewNss.getName());
         } else {
             assert.eq(unionWithStage.$unionWith.coll, collNss.getName());

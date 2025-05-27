@@ -1,3 +1,6 @@
+import {createSearchIndex} from "jstests/libs/search.js";
+import {checkForExistingIndex, datasets} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+
 // Plot embeddings for 17 movies where array index corresponds to the _id of the movie, or null if
 // the entry has no plot embedding.
 const plotEmbeddings = [
@@ -5124,21 +5127,131 @@ export function getMovieDataWithTie() {
     return data;
 }
 
-export function makeMovieVectorQuery({queryVector, limit}) {
+export const enrichedTitleViewPipeline = [{
+    "$addFields": {
+        "enriched_title": {
+            $concat:
+                [{$toString: "$_id"},
+                 " - ",
+                 "$title",
+                 " (",
+                 {$arrayElemAt: ["$genres", 0]},
+                 ")"]
+        }
+    }
+}];
+
+export const actionMoviesViewPipeline = [{"$match": {"$expr": {"$in": ["Action", "$genres"]}}}];
+
+/**
+ * @returns An array of movie documents with an additional field as specified in
+ *     enrichedTitleViewPipeline above.
+ */
+export function getMovieDataWithEnrichedTitle() {
+    const data = getMovieData();
+    data.map((movie) => {
+        movie.enriched_title = movie._id + " - " + movie.title + " (" + movie.genres[0] + ")";
+    });
+    return data;
+}
+
+/**
+ * @param {Object} viewType - The type of view to create, as specified from the datasets object in
+ *     search_e2e_utils.js.
+ * @returns A view of the movies collection based on the specified viewType.
+ */
+export function createMoviesView(viewType) {
+    const testDb = db.getSiblingDB("vector_search_shared_db");
+    const coll = testDb.moviesColl;
+
+    // Populate the collection.
+    if (coll.count() === 0) {
+        assert.commandWorked(coll.insertMany(getMovieData()));
+    }
+
+    const viewName = viewType.viewName;
+
+    // Check if the view exists using collection metadata.
+    const viewExists = testDb.getCollectionInfos({name: viewName, type: "view"}).length > 0;
+    if (!viewExists) {
+        // Create the view if it doesn't exist.
+        if (viewType === datasets.MOVIES_WITH_ENRICHED_TITLE) {
+            assert.commandWorked(
+                testDb.createView(viewName, coll.getName(), enrichedTitleViewPipeline));
+        } else if (viewType === datasets.ACTION_MOVIES) {
+            assert.commandWorked(
+                testDb.createView(viewName, coll.getName(), actionMoviesViewPipeline));
+        } else if (viewType == datasets.ACTION_MOVIES_WITH_ENRICHED_TITLE) {
+            // Nested view.
+            const view = createMoviesView(datasets.MOVIES_WITH_ENRICHED_TITLE);
+            assert.commandWorked(
+                testDb.createView(viewName, view.getName(), actionMoviesViewPipeline));
+        }
+    }
+
+    return testDb[viewName];
+}
+
+/**
+ * @returns The movies collection with a vector search index on the plot_embedding field.
+ */
+export function createMoviesCollAndIndex() {
+    const testDb = db.getSiblingDB("vector_search_shared_db");
+    const coll = testDb.moviesColl;
+
+    // Populate the collection.
+    if (coll.count() === 0) {
+        assert.commandWorked(coll.insertMany(getMovieData()));
+    }
+
+    // Create an index if it doesn't already exist.
+    if (!checkForExistingIndex(coll, datasets.MOVIES.indexName)) {
+        createSearchIndex(coll, getMovieVectorSearchIndexSpec(datasets.MOVIES.indexName));
+    };
+
+    return coll;
+}
+
+/**
+ * @param {Object} viewType - The type of view to create, as specified from the datasets object in
+ *     search_e2e_utils.js.
+ * @returns The movies view with a vector search index on the plot_embedding field.
+ */
+export function createMoviesViewAndIndex(viewType) {
+    const view = createMoviesView(viewType);
+
+    if (!checkForExistingIndex(view, viewType.indexName)) {
+        createSearchIndex(view, getMovieVectorSearchIndexSpec(viewType.indexName));
+    };
+
+    return view;
+}
+
+/**
+ * @param {Array} queryVector - A plot embedding to vector search upon
+ * @param {number} limit - The maximum number of results to return.
+ * @param {string} indexName - The name of the vector search index to use.
+ * @returns A vector search query on the index specified.
+ */
+export function makeMovieVectorQuery({queryVector, limit, indexName = "vector_search_movie"}) {
     return {
         $vectorSearch: {
             queryVector: queryVector,
             path: "plot_embedding",
             exact: true,
-            index: getMovieVectorSearchIndexSpec().name,
+            index: getMovieVectorSearchIndexSpec(indexName).name,
             limit: limit,
         }
     };
 }
 
-export function getMovieVectorSearchIndexSpec() {
+/**
+ * @param {string} indexName - The name f the vector search index to generate a spec for.
+ * @returns A vector search index spec on the plot_embedding field.
+ */
+export function getMovieVectorSearchIndexSpec(indexName = "vector_search_movie") {
     return {
-        name: "vector_search_movie",
+        name: indexName,
         type: "vectorSearch",
         definition: {
             "fields": [{

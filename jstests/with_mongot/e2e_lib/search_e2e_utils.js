@@ -3,7 +3,10 @@
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {getMovieData} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {
+    getMovieData,
+    getMovieDataWithEnrichedTitle
+} from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 import {
     assertViewAppliedCorrectly,
@@ -259,8 +262,17 @@ export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
 }
 
 export const datasets = {
-    MOVIES: 1,
-    RENTALS: 2,
+    MOVIES: {id: 1, indexName: "moviesIndex"},
+    RENTALS: {id: 2},
+    MOVIES_WITH_ENRICHED_TITLE:
+        {id: 3, viewName: "moviesWithEnrichedTitle", indexName: "moviesWithEnrichedTitleIndex"},
+    ACTION_MOVIES: {id: 4, viewName: "actionMovies", indexName: "actionMoviesIndex"},
+    // Nested view.
+    ACTION_MOVIES_WITH_ENRICHED_TITLE: {
+        id: 5,
+        viewName: "actionMoviesWithEnrichedTitle",
+        indexName: "actionMoviesWithEnrichedTitleIndex"
+    }
 };
 
 /**
@@ -277,6 +289,8 @@ export function buildExpectedResults(idArray, dataset) {
         data = getMovieData();
     } else if (dataset === datasets.RENTALS) {
         data = getRentalData();
+    } else if (dataset === datasets.MOVIES_WITH_ENRICHED_TITLE) {
+        data = getMovieDataWithEnrichedTitle();
     }
     for (const id of idArray) {
         results.push(data[id]);
@@ -382,4 +396,27 @@ export function validateSearchExplain(
     if (explainValidationFn) {
         explainValidationFn(explain);
     }
+}
+
+/**
+ * @param {*} coll - The collection to check for an existing index.
+ * @param {*} indexName - The name of the index to check for.
+ * @returns True if the index exists and is queryable, false otherwise.
+ */
+export function checkForExistingIndex(coll, indexName) {
+    const initial = coll.aggregate([{$listSearchIndexes: {name: indexName}}]).toArray();
+    if (initial.length === 1) {
+        if (initial[0].queryable === true) {
+            return true;
+        }
+        // Wait for the index to be queryable.
+        assert.soon(() => {
+            const curr = coll.aggregate([{$listSearchIndexes: {name: indexName}}]).toArray();
+            assert.eq(curr.length, 1, curr);
+            return curr[0].queryable;
+        });
+        return true;
+    }
+
+    return false;
 }

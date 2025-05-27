@@ -3,6 +3,7 @@
  */
 
 import {createSearchIndex} from "jstests/libs/search.js";
+import {checkForExistingIndex} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 /**
  * The number of dimensions for a generic vector search index, set to avoid OOM errors.
@@ -38,22 +39,10 @@ function getGenericVectorSearchColl() {
 export function createGenericVectorSearchIndex() {
     const coll = getGenericVectorSearchColl();
 
-    const initial = coll.aggregate([{$listSearchIndexes: {name: kGenericIndexName}}]).toArray();
-    if (initial.length === 1) {
-        if (initial[0].queryable === true) {
-            return coll;
-        }
-        // If the index is not queryable, we need to wait for it to be queryable.
-        assert.soon(() => {
-            const curr =
-                coll.aggregate([{$listSearchIndexes: {name: kGenericIndexName}}]).toArray();
-            assert.eq(curr.length, 1, curr);
-            return curr[0].queryable;
-        });
+    // Returning the existing collection if it already has an index.
+    if (checkForExistingIndex(coll, kGenericIndexName)) {
         return coll;
-    }
-
-    assert.eq(initial.length, 0, initial);
+    };
 
     let docs = [];
     for (let i = 0; i < kGenericNumDocs; i++) {
