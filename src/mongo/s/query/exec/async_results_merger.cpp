@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -54,6 +53,7 @@
 #include <cstdint>
 
 #include <boost/cstdint.hpp>
+#include <boost/iterator/filter_iterator.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -303,6 +303,8 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                       return true;
                                   }),
                    _remotes.end());
+
+    _rebuildMergeQueueFromRemainingRemotes(lk);
 }
 
 bool AsyncResultsMerger::partialResultsReturned() const {
@@ -362,8 +364,9 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
 boost::optional<AsyncResultsMerger::MinSortKeyRemotePair>
 AsyncResultsMerger::_getMinPromisedSortKey(WithLock) const {
     // We cannot return the minimum promised sort key unless all shards have reported one.
-    return _promisedMinSortKeys.size() < _remotes.size() ? boost::optional<MinSortKeyRemotePair>{}
-                                                         : *_promisedMinSortKeys.begin();
+    return (_promisedMinSortKeys.size() < _remotes.size() || _remotes.empty())
+        ? boost::optional<MinSortKeyRemotePair>{}
+        : *_promisedMinSortKeys.begin();
 }
 
 AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk,
@@ -384,7 +387,7 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
     return remote;
 }
 
-void AsyncResultsMerger::_cancelCallbackForRemote(WithLock lk, const RemoteCursorPtr& remote) {
+void AsyncResultsMerger::_cancelCallbackForRemote(WithLock, const RemoteCursorPtr& remote) {
     if (remote->cbHandle.isValid()) {
         _executor->cancel(remote->cbHandle);
     }
@@ -394,12 +397,37 @@ void AsyncResultsMerger::_cancelCallbackForRemote(WithLock lk, const RemoteCurso
     }
 }
 
-void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock lk,
+void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock,
                                                               const RemoteCursorPtr& remote) {
     if (remote->promisedMinSortKey) {
         std::size_t erased = _promisedMinSortKeys.erase({*remote->promisedMinSortKey, remote});
         tassert(8456114, "Expected to find the promised min sort key in the set.", erased == 1);
     }
+}
+
+void AsyncResultsMerger::_rebuildMergeQueueFromRemainingRemotes(WithLock) {
+    // Predicate that determines which remotes to keep in the merge queue.
+    struct KeepRemote {
+        bool operator()(const RemoteCursorPtr& remote) const {
+            return !remote->docBuffer.empty();
+        }
+    };
+
+    // Construct a new merge queue using the 'KeepRemote' predicate, keeping only those remotes for
+    // which we currently have documents buffered.
+    auto filteredRemotesBegin =
+        boost::make_filter_iterator<KeepRemote>(_remotes.begin(), _remotes.end());
+    auto filteredRemotesEnd =
+        boost::make_filter_iterator<KeepRemote>(_remotes.end(), _remotes.end());
+
+    decltype(_mergeQueue) newMergeQueue(
+        filteredRemotesBegin,
+        filteredRemotesEnd,
+        MergingComparator(_params.getSort().value_or(BSONObj()), _params.getCompareWholeSortKey()));
+
+    // 'std::priority_queue<T>' doesn't have a clear nor assign method, so we need to swap the
+    // cleaned merge queue instead.
+    std::swap(_mergeQueue, newMergeQueue);
 }
 
 void AsyncResultsMerger::_setInitialHighWaterMark() {

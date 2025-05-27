@@ -446,12 +446,12 @@ private:
         bool operator()(const RemoteCursorPtr& lhs, const RemoteCursorPtr& rhs) const;
 
     private:
-        const BSONObj _sort;
+        BSONObj _sort;
 
         // When '_compareWholeSortKey' is true, $sortKey is a scalar value, rather than an object.
         // We extract the sort key {$sortKey: <value>}. The sort key pattern '_sort' is verified to
         // be {$sortKey: 1}.
-        const bool _compareWholeSortKey;
+        bool _compareWholeSortKey;
     };
 
     using MinSortKeyRemotePair = std::pair<BSONObj, RemoteCursorPtr>;
@@ -656,6 +656,12 @@ private:
      * Remove a remote from the _promisedMinSortKeys set, if already present in there.
      */
     void _removeRemoteFromPromisedMinSortKeys(WithLock lk, const RemoteCursorPtr& remote);
+
+    /**
+     * Rebuild the merge queue for the remaining remotes. This is supposed to be called internally
+     * after closing cursors.
+     */
+    void _rebuildMergeQueueFromRemainingRemotes(WithLock lk);
 
     /**
      * Cancel any potential in-flight callback for the remote.

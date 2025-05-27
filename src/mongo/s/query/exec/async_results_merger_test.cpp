@@ -35,7 +35,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -53,7 +52,6 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
@@ -65,13 +63,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
-#include <cstdint>
 #include <memory>
-#include <mutex>
 #include <string>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 namespace mongo {
 namespace {
@@ -599,7 +592,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
     // first shard may return further values between '6' and '9' in the future.
     ASSERT_FALSE(arm->ready());
 
-    // Close shard 1. Note that we have one buffered result from this shard in the merge queue.
+    // Close shard 1. This drops the document '{$sortKey: [9]}' from the result.
     arm->closeShardCursors({kTestShardIds[1]});
 
     // No killCursors command is supposed to be executed here, as the remote cursor was already
@@ -620,16 +613,13 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
     // Respond with a cursorId of 5, meaning the remote cursor remains open.
     responses.emplace_back(kTestNss, CursorId(5), batch3);
     scheduleNetworkResponses(std::move(responses));
-
     executor()->waitForEvent(readyEvent);
 
     ASSERT_TRUE(arm->ready());
 
-    // We can now process all responses, including the one from the closed shard that is still in
-    // the merge queue.
+    // We can now process all responses. We should not see the not-yet consumed document from the
+    // shard that we already closed.
     ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [7]}"),
-                      *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [9]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [11]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
@@ -644,12 +634,6 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedClose) {
 
     ASSERT_EQ(0, arm->getNumRemotes());
     ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
-
-    // We still have one buffered result from shard 0 in the merge queue, which we can consume now.
-    ASSERT_TRUE(arm->ready());
-    ASSERT_TRUE(arm->remotesExhausted());
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [12]}"),
-                      *unittest::assertGet(arm->nextReady()).getResult());
 
     // Now everything is fully consumed.
     ASSERT_TRUE(arm->ready());
@@ -691,7 +675,7 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [1]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
 
-    // Close shard 1
+    // Close shard 1. This removes the document '{$sortKey: [2]}' from the result.
     arm->closeShardCursors({kTestShardIds[1]});
 
     // We expect to see one killCursors command call for the remote cursor.
@@ -716,9 +700,6 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     scheduleNetworkResponses(std::move(responses));
 
     executor()->waitForEvent(readyEvent);
-
-    ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [2]}"),
-                      *unittest::assertGet(arm->nextReady()).getResult());
 
     ASSERT_BSONOBJ_EQ(fromjson("{$sortKey: [3]}"),
                       *unittest::assertGet(arm->nextReady()).getResult());
@@ -772,6 +753,115 @@ TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseAndReopen) {
     ASSERT_EQ(0, arm->getNumRemotes());
     ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
     ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+}
+
+TEST_F(AsyncResultsMergerTest, CloseCursorWithUnconsumedInitialBatch) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<BSONObj> batch = {BSON("$sortKey" << BSON_ARRAY(23)),
+                                  BSON("$sortKey" << BSON_ARRAY(42))};
+
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 42, batch)));
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+    ASSERT_EQ(1, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Close cursor immediately, without consuming any results. This drops the documents '{$sortKey:
+    // [23]}' and '{$sortKey: [42]}' from the result.
+    arm->closeShardCursors({kTestShardIds[0]});
+    ASSERT_EQ(0, arm->getNumRemotes());
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 42);
+    blackHoleNextRequest();
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+
+    // Re-add the same shard, but with different documents.
+    batch = {BSON("$sortKey" << BSON_ARRAY(123)), BSON("$sortKey" << BSON_ARRAY(456))};
+
+    cursors.clear();
+    cursors.push_back(makeRemoteCursor(
+        kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 99, batch)));
+    arm->addNewShardCursors(std::move(cursors));
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+    ASSERT_BSONOBJ_EQ(BSON("$sortKey" << BSON_ARRAY(123)),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(BSON("$sortKey" << BSON_ARRAY(456)),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+
+    // Close cursor again.
+    arm->closeShardCursors({kTestShardIds[0]});
+    ASSERT_EQ(0, arm->getNumRemotes());
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 99);
+    blackHoleNextRequest();
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_TRUE(arm->remotesExhausted());
+}
+
+TEST_F(AsyncResultsMergerTest, MultiShardSortedCloseWhileWaitingForShardResult) {
+    BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 23, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 42, {})));
+
+    auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
+    ASSERT_EQ(2, arm->getNumRemotes());
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Schedule requests.
+    unittest::assertGet(arm->nextEvent());
+
+    // One schedule a response from one of the shards.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch = {BSON("$sortKey" << BSON_ARRAY(1)),
+                                  BSON("$sortKey" << BSON_ARRAY(10))};
+    responses.emplace_back(kTestNss, CursorId(23), batch);
+
+    scheduleNetworkResponses(std::move(responses));
+
+    // Results are not ready because only one of the shards has responded.
+    ASSERT_FALSE(arm->ready());
+
+    // Close the cursor for the shard for which we have not scheduled a response yet. That
+    // immediately makes results available.
+    arm->closeShardCursors({kTestShardIds[1]});
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    ASSERT_TRUE(arm->hasCursorForShard_forTest(kTestShardIds[0]));
+    ASSERT_FALSE(arm->hasCursorForShard_forTest(kTestShardIds[1]));
+    ASSERT_EQ(1, arm->getNumRemotes());
+
+    // We expect to see one killCursors command call for the remote cursor.
+    ASSERT_TRUE(networkHasReadyRequests());
+    assertKillCursorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 42);
+    blackHoleNextRequest();
+
+    ASSERT_BSONOBJ_EQ(BSON("$sortKey" << BSON_ARRAY(1)),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(BSON("$sortKey" << BSON_ARRAY(10)),
+                      *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_FALSE(arm->ready());
 }
 
 TEST_F(AsyncResultsMergerTest, MultiShardMultipleGets) {
