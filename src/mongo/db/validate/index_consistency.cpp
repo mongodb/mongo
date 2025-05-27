@@ -1009,7 +1009,20 @@ void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
             infoBuilder.append("idKey", idKeyBuilder.obj());
         }
 
-        results.addMissingIndexEntry(infoBuilder.obj());
+        auto obj = infoBuilder.obj();
+        if (auto elem = obj.getField("idKey"); !elem.eoo() && elem.isABSONObj()) {
+            auto subObj = elem.Obj();
+            if (auto subElem = subObj.getField("_id"); !subElem.eoo() && subElem.isNull()) {
+                LOGV2(8721500,
+                      "Unexpected null _id in missingIndexEntries",
+                      "recordId"_attr = recordId.toStringHumanReadable(),
+                      "recordData"_attr = data,
+                      "generatedObject"_attr = obj,
+                      "indexKey"_attr = indexKey,
+                      "rehydratedKey"_attr = rehydratedKey);
+            }
+        }
+        results.addMissingIndexEntry(std::move(obj));
     } else {
         results.addExtraIndexEntry(infoBuilder.obj());
     }
