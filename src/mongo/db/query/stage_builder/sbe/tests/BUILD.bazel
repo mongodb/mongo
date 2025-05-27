@@ -59,7 +59,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/stage_builder/sbe/search_sbe_stage_builder_test:test_data",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fourth_group",
     ],
     deps = [

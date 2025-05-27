@@ -434,39 +434,6 @@ def mongo_cc_library(
     if "third_party" in native.package_name():
         tags = tags + ["third_party"]
 
-    if "compile_requires_large_memory_gcc" in tags:
-        exec_properties |= select({
-            "//bazel/config:gcc_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:gcc_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
-
-    if "compile_requires_large_memory_sanitizer" in tags:
-        exec_properties |= select({
-            "//bazel/config:any_sanitizer_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:any_sanitizer_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
-
-    if "compile_requires_large_memory_gcc_fission" in tags:
-        exec_properties |= select({
-            "//bazel/config:linux_gcc_fission_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:linux_gcc_fission_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
-
     copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     linkopts = get_linkopts(native.package_name(), linkopts)
@@ -718,39 +685,6 @@ def _mongo_cc_binary_and_test(
             })
     else:
         enterprise_compatible = []
-
-    if "compile_requires_large_memory_gcc" in tags:
-        exec_properties |= select({
-            "//bazel/config:gcc_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:gcc_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
-
-    if "compile_requires_large_memory_sanitizer" in tags:
-        exec_properties |= select({
-            "//bazel/config:any_sanitizer_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:any_sanitizer_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
-
-    if "compile_requires_large_memory_gcc_fission" in tags:
-        exec_properties |= select({
-            "//bazel/config:linux_gcc_fission_x86_64": {
-                "Pool": "large_mem_x86_64",
-            },
-            "//bazel/config:linux_gcc_fission_aarch64": {
-                "Pool": "large_memory_arm64",
-            },
-            "//conditions:default": {},
-        })
 
     copts = get_copts(name, native.package_name(), copts, skip_windows_crt_flags)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)

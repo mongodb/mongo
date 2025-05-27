@@ -45,7 +45,6 @@ mongo_cc_unit_test(
         "string_util_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_third_group",
     ],
     deps = [

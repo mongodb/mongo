@@ -794,7 +794,6 @@ mongo_cc_unit_test(
         "index_hint_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fifth_group",
     ],
     deps = [
@@ -834,7 +833,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/test_output/query_planner_i_x_select_test:test_data",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_first_group",
     ],
     deps = [
@@ -862,7 +860,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/test_output/query/canonical_query_encoder_test:test_data",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_first_group",
     ],
     deps = [
@@ -896,7 +893,6 @@ mongo_cc_unit_test(
         "wildcard_test_utils.h",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fifth_group",
     ],
     deps = [

@@ -120,7 +120,6 @@ mongo_cc_unit_test(
         "serialization_options_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_sixth_group",
     ],
     deps = [

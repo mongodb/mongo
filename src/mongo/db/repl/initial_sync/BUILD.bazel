@@ -211,7 +211,6 @@ mongo_cc_unit_test(
         "initial_sync_shared_data_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fifth_group",
     ],
     deps = [

@@ -135,7 +135,6 @@ mongo_cc_unit_test(
         "transaction_participant_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_eighth_group",
     ],
     deps = [

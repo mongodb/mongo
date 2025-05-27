@@ -616,7 +616,6 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
     ],
-    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:internal_transactions_feature_flag",
@@ -698,9 +697,6 @@ mongo_cc_library(
         "//src/mongo/db/s/config:placement_history_cleaner.h",
         "//src/mongo/db/s/config:sharding_catalog_manager.h",
         "//src/mongo/s:chunk_constraints.h",
-    ],
-    tags = [
-        "compile_requires_large_memory_gcc_fission",
     ],
     deps = [
         ":forwardable_operation_metadata",
@@ -917,10 +913,6 @@ mongo_cc_library(
         "//src/mongo/db/s/resharding:resharding_util.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
-    tags = [
-        "compile_requires_large_memory_gcc",
-        "compile_requires_large_memory_sanitizer",
-    ],
     deps = [
         ":analyze_shard_key_util",
         ":balancer_stats_registry",
@@ -1570,7 +1562,6 @@ mongo_cc_library(
         "//src/mongo/s/commands/query_cmd:cluster_getmore_cmd.h",
         "//src/mongo/s/commands/query_cmd:cluster_pipeline_cmd.h",
     ],
-    tags = ["compile_requires_large_memory_gcc"],
     deps = [
         ":analyze_shard_key_util",
         ":balancer_stats_registry",
@@ -1739,7 +1730,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_txn_cloner_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         # State mismatch in sandbox in resharding_recipient_service_test.cpp
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98847",
@@ -1843,7 +1833,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_util_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc_fission",
         "mongo_unittest_seventh_group",
     ],
     deps = [

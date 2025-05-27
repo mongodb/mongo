@@ -2073,7 +2073,6 @@ mongo_cc_unit_test(
         "//src/mongo/unittest:ensure_fcv.h",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fifth_group",
     ],
     deps = [
@@ -2105,7 +2104,6 @@ mongo_cc_unit_test(
         "oplog_writer_impl_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
         "mongo_unittest_fifth_group",
     ],
     deps = [

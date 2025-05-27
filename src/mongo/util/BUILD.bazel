@@ -1006,7 +1006,6 @@ mongo_cc_unit_test(
         "//conditions:default": [],
     }),
     tags = [
-        "compile_requires_large_memory_gcc_fission",
         "mongo_unittest_fourth_group",
         "server-programmability",
         # Time functions seem to be incompatible with the sandbox

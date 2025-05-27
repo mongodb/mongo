@@ -1007,15 +1007,6 @@ mongo_cc_binary(
     srcs = [
         "mongos.cpp",
     ],
-    exec_properties = select({
-        "@platforms//cpu:x86_64": {
-            "Pool": "large_mem_x86_64",
-        },
-        "@platforms//cpu:aarch64": {
-            "Pool": "large_memory_arm64",
-        },
-        "//conditions:default": {},
-    }),
     linkopts = select({
         "@platforms//os:linux": [
             "-ldl",
@@ -1162,8 +1153,6 @@ mongo_cc_unit_test(
         "//src/mongo/s/write_ops:write_without_shard_key_util_test.cpp",
     ],
     tags = [
-        "compile_requires_large_memory_gcc",
-        "compile_requires_large_memory_sanitizer",
         "mongo_unittest_sixth_group",
     ],
     deps = [

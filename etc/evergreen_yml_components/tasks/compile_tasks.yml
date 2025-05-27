@@ -215,7 +215,7 @@ tasks:
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
-  - name: hydrate_required_bazel_profile_opt
+  - name: hydrate_bazel_profile_opt
     tags:
       [
         "assigned_to_jira_team_devprod_build",
@@ -1395,18 +1395,10 @@ task_groups:
     max_hosts: -1
     tasks:
       - hydrate_bazel_profile_fastbuild
-      - hydrate_required_bazel_profile_opt
+      - hydrate_bazel_profile_opt
       - hydrate_bazel_profile_dbg
       - hydrate_bazel_profile_dbg_aubsan
       - hydrate_bazel_profile_dbg_tsan
-
-  # TODO(SERVER-99213): Remove when CI is using fission by default
-  # Run this in required to prevent breaks when building with fission on
-  - <<: *compile_task_group_template
-    name: hydrate_required_bazel_profile_TG
-    max_hosts: -1
-    tasks:
-      - hydrate_required_bazel_profile_opt
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_windows_TG
