@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 #include <map>
 #include <memory>
@@ -46,7 +46,7 @@ public:
      * raw Collection pointer as a key as there cannot be any concurrent MODE_X writer that clones
      * the Collection into a new instance.
      */
-    using MultikeyMap = std::map<const Collection*, BSONCollectionCatalogEntry::MetaData>;
+    using MultikeyMap = std::map<const Collection*, durable_catalog::CatalogEntryMetaData>;
 
     static UncommittedMultikey& get(OperationContext* opCtx);
 

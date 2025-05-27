@@ -111,6 +111,39 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "durable_catalog",
+    srcs = [
+        "durable_catalog.cpp",
+    ],
+    hdrs = [
+        "durable_catalog.h",
+    ],
+    deps = [
+        ":collection_record_store_options",
+        ":durable_catalog_entry_metadata",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:feature_document_util",
+        "//src/mongo/db/storage:ident",
+        "//src/mongo/db/storage:mdb_catalog",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "durable_catalog_entry_metadata",
+    srcs = [
+        "durable_catalog_entry_metadata.cpp",
+    ],
+    hdrs = [
+        "durable_catalog_entry_metadata.h",
+    ],
+    deps = [
+        ":collection_options",
+        "//src/mongo/db:common",
+    ],
+)
+
+mongo_cc_library(
     name = "collection_catalog",
     srcs = [
         "collection_catalog.cpp",
@@ -127,6 +160,8 @@ mongo_cc_library(
         "views_for_database.h",
     ],
     deps = [
+        ":durable_catalog",
+        ":durable_catalog_entry_metadata",
         "//src/mongo/db:audit",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
@@ -134,10 +169,9 @@ mongo_cc_library(
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:bson_collection_catalog_entry",
         "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/storage:durable_catalog",
         "//src/mongo/db/storage:exceptions",
+        "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
     ],
@@ -423,7 +457,9 @@ mongo_cc_library(
         "catalog_repair.h",
     ],
     deps = [
+        ":durable_catalog",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:storage_engine_impl",
     ],
 )
@@ -605,6 +641,7 @@ mongo_cc_library(
         "catalog_stats",
         "collection_options",
         "document_validation",
+        "durable_catalog",
         "health_log_interface",
         "index_catalog",
         "index_key_validate",
@@ -635,7 +672,7 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_settings",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/storage:capped_snapshots",
-        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:mdb_catalog",
         "//src/mongo/db/storage:record_store_base",
         "//src/mongo/db/storage:storage_engine_common",
         "//src/mongo/db/storage:storage_engine_impl",

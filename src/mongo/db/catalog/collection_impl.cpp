@@ -56,6 +56,7 @@
 #include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog/durable_catalog.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -88,7 +89,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/oplog_truncate_markers.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -350,7 +351,7 @@ CollectionImpl::SharedState::~SharedState() {
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
                                RecordId catalogId,
-                               std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+                               std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
                                std::unique_ptr<RecordStore> recordStore)
     : _ns(nss),
       _catalogId(std::move(catalogId)),
@@ -373,7 +374,7 @@ std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
     OperationContext* opCtx,
     const NamespaceString& nss,
     RecordId catalogId,
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
     std::unique_ptr<RecordStore> rs) const {
     return std::make_shared<CollectionImpl>(
         opCtx, nss, std::move(catalogId), std::move(metadata), std::move(rs));
@@ -520,7 +521,7 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
 }
 
 void CollectionImpl::_setMetadata(
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData>&& metadata) {
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata) {
     if (metadata->options.timeseries) {
         // If present, reuse the storageEngine options to work around the issue described in
         // SERVER-91194.
@@ -905,7 +906,7 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
     tassert(7625800, "This is not a time-series collection", _metadata->options.timeseries);
 
     // TODO SERVER-92265 properly set this catalog option
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91193
         md._durableTimeseriesBucketingParametersHaveChanged = value;
         md.options.storageEngine = setFlagToStorageEngineBson(
@@ -916,7 +917,7 @@ void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* o
 }
 
 void CollectionImpl::removeLegacyTimeseriesBucketingParametersHaveChanged(OperationContext* opCtx) {
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.timeseriesBucketingParametersHaveChanged_DO_NOT_USE.reset();
     });
 }
@@ -933,7 +934,7 @@ void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext
                 "setting"_attr = setting);
 
     // TODO SERVER-92265 properly set this catalog option
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         // Reuse storageEngine options to work around the issue described in SERVER-91194
         if (setting.has_value()) {
             md._durableTimeseriesBucketsMayHaveMixedSchemaData =
@@ -1010,7 +1011,7 @@ void CollectionImpl::updateClusteredIndexTTLSetting(OperationContext* opCtx,
             "The collection doesn't have a clustered index",
             _metadata->options.clusteredIndex);
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.expireAfterSeconds = expireAfterSeconds;
     });
 }
@@ -1042,7 +1043,7 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     boost::optional<long long> oldCappedSize, oldCappedMax;
     bool shouldLog = false;
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         oldCappedSize = md.options.cappedSize;
         oldCappedMax = md.options.cappedMaxDocs;
 
@@ -1082,7 +1083,7 @@ void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {
                 logAttrs(ns()),
                 logAttrs(uuid()));
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.recordIdsReplicated = false;
     });
 }
@@ -1097,7 +1098,7 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
         uassertStatusOK(validateChangeStreamPreAndPostImagesOptionIsPermitted(_ns));
     }
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.changeStreamPreAndPostImagesOptions = val;
     });
 }
@@ -1321,7 +1322,7 @@ void CollectionImpl::setValidator(OperationContext* opCtx, Validator validator) 
     auto validationLevel = validationLevelOrDefault(_metadata->options.validationLevel);
     auto validationAction = validationActionOrDefault(_metadata->options.validationAction);
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.validator = validatorDoc;
         md.options.validationLevel = validationLevel;
         md.options.validationAction = validationAction;
@@ -1359,7 +1360,7 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, ValidationLev
         return _validator.getStatus();
     }
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.validator = _validator.validatorDoc;
         md.options.validationLevel = storedValidationLevel;
         md.options.validationAction = validationActionOrDefault(md.options.validationAction);
@@ -1391,7 +1392,7 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx,
         return _validator.getStatus();
     }
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.validator = _validator.validatorDoc;
         md.options.validationLevel = validationLevelOrDefault(md.options.validationLevel);
         md.options.validationAction = storedValidationAction;
@@ -1417,7 +1418,7 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
         return validator.getStatus();
     }
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.validator = newValidator;
         md.options.validationLevel = newLevel;
         md.options.validationAction = newAction;
@@ -1433,7 +1434,7 @@ const boost::optional<TimeseriesOptions>& CollectionImpl::getTimeseriesOptions()
 
 void CollectionImpl::setTimeseriesOptions(OperationContext* opCtx,
                                           const TimeseriesOptions& tsOptions) {
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.options.timeseries = tsOptions;
     });
 }
@@ -1532,7 +1533,7 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
 }
 
 Status CollectionImpl::rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) {
-    auto metadata = std::make_shared<BSONCollectionCatalogEntry::MetaData>(*_metadata);
+    auto metadata = std::make_shared<durable_catalog::CatalogEntryMetaData>(*_metadata);
     metadata->nss = nss;
     if (!stayTemp)
         metadata->options.temp = false;
@@ -1554,7 +1555,7 @@ void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntr
               str::stream() << "cannot mark index " << indexName << " as ready @ " << getCatalogId()
                             << " : " << _metadata->toBSON());
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.indexes[offset].ready = true;
         md.indexes[offset].buildUUID = boost::none;
     });
@@ -1589,7 +1590,7 @@ void CollectionImpl::updateTTLSetting(OperationContext* opCtx,
     invariant(offset >= 0,
               str::stream() << "cannot update TTL setting for index " << idxName << " @ "
                             << getCatalogId() << " : " << _metadata->toBSON());
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.indexes[offset].updateTTLSetting(newExpireSeconds);
     });
 }
@@ -1598,7 +1599,7 @@ void CollectionImpl::updateHiddenSetting(OperationContext* opCtx, StringData idx
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.indexes[offset].updateHiddenSetting(hidden);
     });
 }
@@ -1607,7 +1608,7 @@ void CollectionImpl::updateUniqueSetting(OperationContext* opCtx, StringData idx
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.indexes[offset].updateUniqueSetting(unique);
     });
 }
@@ -1618,7 +1619,7 @@ void CollectionImpl::updatePrepareUniqueSetting(OperationContext* opCtx,
     int offset = _metadata->findIndexOffset(idxName);
     invariant(offset >= 0);
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         md.indexes[offset].updatePrepareUniqueSetting(prepareUnique);
     });
 }
@@ -1630,7 +1631,7 @@ std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationCont
         ? index_key_validate::kNonDeprecatedAllowedFieldNames
         : index_key_validate::kAllowedFieldNames;
 
-    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+    _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
         for (auto& index : md.indexes) {
             if (index.isPresent()) {
                 BSONObj oldSpec = index.spec;
@@ -1654,7 +1655,7 @@ std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationCont
 
 void CollectionImpl::setIsTemp(OperationContext* opCtx, bool isTemp) {
     _writeMetadata(opCtx,
-                   [&](BSONCollectionCatalogEntry::MetaData& md) { md.options.temp = isTemp; });
+                   [&](durable_catalog::CatalogEntryMetaData& md) { md.options.temp = isTemp; });
 }
 
 void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) {
@@ -1662,14 +1663,14 @@ void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) 
         return;  // never had the index so nothing to do.
 
     _writeMetadata(opCtx,
-                   [&](BSONCollectionCatalogEntry::MetaData& md) { md.eraseIndex(indexName); });
+                   [&](durable_catalog::CatalogEntryMetaData& md) { md.eraseIndex(indexName); });
 }
 
 Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
                                             boost::optional<UUID> buildUUID) {
 
-    BSONCollectionCatalogEntry::IndexMetaData imd;
+    durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;
     imd.multikey = false;
@@ -1697,7 +1698,7 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
     }
 
     _writeMetadata(
-        opCtx, [indexMetaData = std::move(imd)](BSONCollectionCatalogEntry::MetaData& md) mutable {
+        opCtx, [indexMetaData = std::move(imd)](durable_catalog::CatalogEntryMetaData& md) mutable {
             md.insertIndex(std::move(indexMetaData));
         });
 
@@ -1809,7 +1810,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     }
 
     auto setMultikey = [offset,
-                        multikeyPaths](const BSONCollectionCatalogEntry::MetaData& metadata) {
+                        multikeyPaths](const durable_catalog::CatalogEntryMetaData& metadata) {
         auto* index = &metadata.indexes[offset];
         stdx::lock_guard lock(index->multikeyMutex);
 
@@ -1866,7 +1867,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     if (!uncommittedMultikeys) {
         uncommittedMultikeys = std::make_shared<UncommittedMultikey::MultikeyMap>();
     }
-    BSONCollectionCatalogEntry::MetaData* metadata = nullptr;
+    durable_catalog::CatalogEntryMetaData* metadata = nullptr;
     bool hasSetMultikey = false;
 
     auto mdbCatalog = MDBCatalog::get(opCtx);
@@ -1915,7 +1916,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
     class ConcurrentMultikeyWriteTracker {
     public:
         ConcurrentMultikeyWriteTracker(
-            std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> meta, int indexOffset)
+            std::shared_ptr<const durable_catalog::CatalogEntryMetaData> meta, int indexOffset)
             : metadata(std::move(meta)), offset(indexOffset) {}
 
         ~ConcurrentMultikeyWriteTracker() {
@@ -1930,7 +1931,7 @@ bool CollectionImpl::setIndexIsMultikey(OperationContext* opCtx,
         }
 
     private:
-        std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> metadata;
+        std::shared_ptr<const durable_catalog::CatalogEntryMetaData> metadata;
         int offset;
         bool hasIncremented = false;
     };
@@ -1967,7 +1968,7 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
                              indexName = desc->indexName(),
                              accessMethod = desc->getAccessMethodName(),
                              numKeyPatternFields = desc->keyPattern().nFields(),
-                             multikeyPaths](const BSONCollectionCatalogEntry::MetaData& metadata) {
+                             multikeyPaths](const durable_catalog::CatalogEntryMetaData& metadata) {
         int offset = metadata.findIndexOffset(indexName);
         invariant(offset >= 0,
                   str::stream() << "cannot set index " << indexName << " multikey state @ "
@@ -1992,7 +1993,7 @@ void CollectionImpl::forceSetIndexIsMultikey(OperationContext* opCtx,
     if (!uncommittedMultikeys) {
         uncommittedMultikeys = std::make_shared<UncommittedMultikey::MultikeyMap>();
     }
-    BSONCollectionCatalogEntry::MetaData* metadata = nullptr;
+    durable_catalog::CatalogEntryMetaData* metadata = nullptr;
     if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
         metadata = &it->second;
     } else {
@@ -2068,7 +2069,7 @@ bool CollectionImpl::isIndexReady(StringData indexName) const {
 }
 
 void CollectionImpl::replaceMetadata(OperationContext* opCtx,
-                                     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) {
+                                     std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) {
     durable_catalog::putMetaData(opCtx, getCatalogId(), *md, MDBCatalog::get(opCtx));
     _setMetadata(std::move(md));
 }
@@ -2082,7 +2083,7 @@ void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     // Even though we are holding an exclusive lock on the Collection there may be an ongoing
     // multikey change on this OperationContext. Make sure we include that update when we copy the
     // metadata for this operation.
-    const BSONCollectionCatalogEntry::MetaData* sourceMetadata = _metadata.get();
+    const durable_catalog::CatalogEntryMetaData* sourceMetadata = _metadata.get();
     auto& uncommittedMultikeys = UncommittedMultikey::get(opCtx).resources();
     if (uncommittedMultikeys) {
         if (auto it = uncommittedMultikeys->find(this); it != uncommittedMultikeys->end()) {
@@ -2091,7 +2092,7 @@ void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     }
 
     // Copy metadata and apply provided function to make change.
-    auto metadata = std::make_shared<BSONCollectionCatalogEntry::MetaData>(*sourceMetadata);
+    auto metadata = std::make_shared<durable_catalog::CatalogEntryMetaData>(*sourceMetadata);
     func(*metadata);
 
     // Remove the cached multikey change, it is now included in the copied metadata. If we left it

@@ -39,6 +39,8 @@
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/catalog/durable_catalog_entry.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/collection_crud/capped_visibility.h"
@@ -56,8 +58,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
@@ -168,7 +168,7 @@ public:
             OperationContext* opCtx,
             const NamespaceString& nss,
             RecordId catalogId,
-            std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+            std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
             std::unique_ptr<RecordStore> rs) const = 0;
     };
 
@@ -627,7 +627,7 @@ public:
     virtual bool isIndexReady(StringData indexName) const = 0;
 
     virtual void replaceMetadata(OperationContext* opCtx,
-                                 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) = 0;
+                                 std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) = 0;
 
     virtual bool isMetadataEqual(const BSONObj& otherMetadata) const = 0;
 

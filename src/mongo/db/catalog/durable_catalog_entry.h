@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
+
+#include <string>
 
 namespace mongo {
 namespace durable_catalog {
@@ -41,7 +44,7 @@ struct CatalogEntry {
     RecordId catalogId;
     std::string ident;
     const BSONObj indexIdents;
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata;
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata;
 };
 
 }  // namespace durable_catalog

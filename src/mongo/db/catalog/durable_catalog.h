@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -32,14 +32,13 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/durable_catalog_entry.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -92,7 +91,7 @@ boost::optional<CatalogEntry> parseCatalogEntry(const RecordId& catalogId, const
  */
 void putMetaData(OperationContext* opCtx,
                  const RecordId& catalogId,
-                 BSONCollectionCatalogEntry::MetaData& md,
+                 durable_catalog::CatalogEntryMetaData& md,
                  MDBCatalog* mdbCatalog);
 
 /**
@@ -117,7 +116,7 @@ Status createIndex(OperationContext* opCtx,
  * Import a collection by inserting the given metadata into the durable catalog and instructing
  * the storage engine to import the corresponding idents. The metadata object should be a valid
  * catalog entry and contain the following fields:
- * "md": A document representing the BSONCollectionCatalogEntry::MetaData of the collection.
+ * "md": A document representing the durable_catalog::CatalogEntryMetaData of the collection.
  * "idxIdent": A document containing {<index_name>: <index_ident>} pairs for all indexes.
  * "nss": NamespaceString of the collection being imported.
  * "ident": Ident of the collection file.
@@ -147,7 +146,7 @@ StatusWith<ImportResult> importCollection(OperationContext* opCtx,
 Status renameCollection(OperationContext* opCtx,
                         const RecordId& catalogId,
                         const NamespaceString& toNss,
-                        BSONCollectionCatalogEntry::MetaData& md,
+                        durable_catalog::CatalogEntryMetaData& md,
                         MDBCatalog* mdbCatalog);
 
 /**
@@ -183,15 +182,15 @@ bool isIndexPresent(OperationContext* opCtx,
  */
 namespace internal {
 /**
- * Generates 'BSONCollectionCatalogEntry::MetaData' from 'collectionOptions'. Assumes it is for a
+ * Generates 'durable_catalog::CatalogEntryMetaData' from 'collectionOptions'. Assumes it is for a
  * new collection without no indexes present.
  */
-BSONCollectionCatalogEntry::MetaData createMetaDataForNewCollection(
+durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
     const NamespaceString& nss, const CollectionOptions& collectionOptions);
 
 BSONObj buildRawMDBCatalogEntry(const std::string& ident,
                                 const BSONObj& idxIdent,
-                                const BSONCollectionCatalogEntry::MetaData& md,
+                                const durable_catalog::CatalogEntryMetaData& md,
                                 const std::string& ns);
 
 }  // namespace internal

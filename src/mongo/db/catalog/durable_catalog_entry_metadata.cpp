@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
@@ -119,12 +119,10 @@ void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multik
         multikeyPaths->push_back(multikeyComponents);
     }
 }
-
 }  // namespace
 
-// --------------------------
-
-void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {
+namespace durable_catalog {
+void CatalogEntryMetaData::IndexMetaData::updateTTLSetting(long long newExpireSeconds) {
     BSONObjBuilder b;
     for (BSONObjIterator bi(spec); bi.more();) {
         BSONElement e = bi.next();
@@ -139,7 +137,7 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateTTLSetting(long long newEx
 }
 
 
-void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden) {
+void CatalogEntryMetaData::IndexMetaData::updateHiddenSetting(bool hidden) {
     // If hidden == false, we remove this field from catalog rather than add a field with false.
     // or else, the old binary can't startup due to the unknown field.
     BSONObjBuilder b;
@@ -157,8 +155,7 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateHiddenSetting(bool hidden)
     spec = b.obj();
 }
 
-
-void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting(bool unique) {
+void CatalogEntryMetaData::IndexMetaData::updateUniqueSetting(bool unique) {
     // If unique == false, we remove this field from catalog rather than add a field with false.
     BSONObjBuilder b;
     for (BSONObjIterator bi(spec); bi.more();) {
@@ -174,7 +171,7 @@ void BSONCollectionCatalogEntry::IndexMetaData::updateUniqueSetting(bool unique)
     spec = b.obj();
 }
 
-void BSONCollectionCatalogEntry::IndexMetaData::updatePrepareUniqueSetting(bool prepareUnique) {
+void CatalogEntryMetaData::IndexMetaData::updatePrepareUniqueSetting(bool prepareUnique) {
     // If prepareUnique == false, we remove this field from catalog rather than add a
     // field with false.
     BSONObjBuilder b;
@@ -191,21 +188,19 @@ void BSONCollectionCatalogEntry::IndexMetaData::updatePrepareUniqueSetting(bool 
     spec = b.obj();
 }
 
-// --------------------------
-
-int BSONCollectionCatalogEntry::MetaData::getTotalIndexCount() const {
+int CatalogEntryMetaData::getTotalIndexCount() const {
     return std::count_if(
         indexes.cbegin(), indexes.cend(), [](const auto& index) { return index.isPresent(); });
 }
 
-int BSONCollectionCatalogEntry::MetaData::findIndexOffset(StringData name) const {
+int CatalogEntryMetaData::findIndexOffset(StringData name) const {
     for (unsigned i = 0; i < indexes.size(); i++)
         if (indexes[i].nameStringData() == name)
             return i;
     return -1;
 }
 
-void BSONCollectionCatalogEntry::MetaData::insertIndex(IndexMetaData indexMetaData) {
+void CatalogEntryMetaData::insertIndex(IndexMetaData indexMetaData) {
     int indexOffset = findIndexOffset(indexMetaData.nameStringData());
 
     if (indexOffset < 0) {
@@ -218,7 +213,7 @@ void BSONCollectionCatalogEntry::MetaData::insertIndex(IndexMetaData indexMetaDa
     indexes[indexOffset] = std::move(indexMetaData);
 }
 
-bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
+bool CatalogEntryMetaData::eraseIndex(StringData name) {
     int indexOffset = findIndexOffset(name);
 
     if (indexOffset < 0) {
@@ -232,7 +227,7 @@ bool BSONCollectionCatalogEntry::MetaData::eraseIndex(StringData name) {
     return true;
 }
 
-BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) const {
+BSONObj CatalogEntryMetaData::toBSON(bool hasExclusiveAccess) const {
     BSONObjBuilder b;
     b.append("ns", NamespaceStringUtil::serializeForCatalog(nss));
     b.append("options", options.toBSON());
@@ -283,7 +278,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
     return b.obj();
 }
 
-void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
+void CatalogEntryMetaData::parse(const BSONObj& obj) {
     nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
         obj.getStringField("ns").toString());
 
@@ -333,4 +328,7 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             tsBucketingParametersChangedElem.Bool();
     }
 }
+
+}  // namespace durable_catalog
+
 }  // namespace mongo

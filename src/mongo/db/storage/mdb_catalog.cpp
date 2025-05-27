@@ -30,7 +30,6 @@
 #include "mongo/db/storage/mdb_catalog.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -373,7 +372,7 @@ BSONObj MDBCatalog::_buildOrphanedCatalogEntryObjAndNs(
         BSONObjBuilder indexSpecBuilder = optBuilder.subobjStart("clusteredIndex");
         indexSpecBuilder.append("v", 2);
         indexSpecBuilder.append("key", BSON("_id" << 1));
-        indexSpecBuilder.append("name", IndexConstants::kIdIndexName);
+        indexSpecBuilder.append("name", "_id_");
         indexSpecBuilder.append("unique", true);
         indexSpecBuilder.doneFast();
     }

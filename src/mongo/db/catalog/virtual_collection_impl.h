@@ -41,6 +41,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/catalog/durable_catalog_entry.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
@@ -54,8 +56,6 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/virtual_collection/external_record_store.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
@@ -440,7 +440,7 @@ public:
     }
 
     void replaceMetadata(OperationContext* opCtx,
-                         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) final {
+                         std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) final {
         unimplementedTasserted();
     }
 

@@ -29,9 +29,9 @@
 
 #include "mongo/db/catalog/catalog_repair.h"
 
+#include "mongo/db/catalog/durable_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/write_unit_of_work.h"

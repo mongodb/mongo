@@ -456,7 +456,7 @@ public:
     }
 
     void replaceMetadata(OperationContext*,
-                         std::shared_ptr<BSONCollectionCatalogEntry::MetaData>) override {
+                         std::shared_ptr<durable_catalog::CatalogEntryMetaData>) override {
         MONGO_UNREACHABLE;
     }
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,21 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/catalog/durable_catalog.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/collection_record_store_options.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/feature_document_util.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -72,20 +72,20 @@ BSONObj findEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) {
     return record->data.releaseToBson();
 }
 
-std::shared_ptr<BSONCollectionCatalogEntry::MetaData> parseMetaData(const BSONElement& mdElement) {
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md;
+std::shared_ptr<durable_catalog::CatalogEntryMetaData> parseMetaData(const BSONElement& mdElement) {
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> md;
     if (mdElement.isABSONObj()) {
         LOGV2_DEBUG(22210, 3, "returning metadata: {mdElement}", "mdElement"_attr = mdElement);
-        md = std::make_shared<BSONCollectionCatalogEntry::MetaData>();
+        md = std::make_shared<durable_catalog::CatalogEntryMetaData>();
         md->parse(mdElement.Obj());
     }
     return md;
 }
 
-BSONCollectionCatalogEntry::MetaData createMetaDataForNewCollection(
+durable_catalog::CatalogEntryMetaData createMetaDataForNewCollection(
     const NamespaceString& nss, const CollectionOptions& collectionOptions) {
     const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
-    BSONCollectionCatalogEntry::MetaData md;
+    durable_catalog::CatalogEntryMetaData md;
     md.nss = nss;
     md.options = collectionOptions;
     if (collectionOptions.timeseries) {
@@ -99,7 +99,7 @@ BSONCollectionCatalogEntry::MetaData createMetaDataForNewCollection(
 
 BSONObj buildRawMDBCatalogEntry(const std::string& ident,
                                 const BSONObj& idxIdent,
-                                const BSONCollectionCatalogEntry::MetaData& md,
+                                const durable_catalog::CatalogEntryMetaData& md,
                                 const std::string& ns) {
     BSONObjBuilder b;
     b.append("ident", ident);
@@ -157,7 +157,7 @@ boost::optional<CatalogEntry> getParsedCatalogEntry(OperationContext* opCtx,
 
 void putMetaData(OperationContext* opCtx,
                  const RecordId& catalogId,
-                 BSONCollectionCatalogEntry::MetaData& md,
+                 durable_catalog::CatalogEntryMetaData& md,
                  MDBCatalog* mdbCatalog) {
     BSONObj rawMDBCatalogEntry = [&] {
         auto cursor = mdbCatalog->getCursor(opCtx);
@@ -222,7 +222,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> createCollection(
 
     auto recordStoreOptions = getRecordStoreOptions(nss, collectionOptions);
 
-    BSONCollectionCatalogEntry::MetaData md =
+    durable_catalog::CatalogEntryMetaData md =
         internal::createMetaDataForNewCollection(nss, collectionOptions);
     const auto ns = NamespaceStringUtil::serializeForCatalog(nss);
     auto mdbCatalogEntryObj =
@@ -274,7 +274,7 @@ StatusWith<ImportResult> importCollection(OperationContext* opCtx,
     const BSONElement mdElement = metadata["md"];
     uassert(ErrorCodes::BadValue, "Malformed catalog metadata", mdElement.isABSONObj());
 
-    BSONCollectionCatalogEntry::MetaData md;
+    durable_catalog::CatalogEntryMetaData md;
     md.parse(mdElement.Obj());
 
     uassert(ErrorCodes::BadValue,
@@ -316,7 +316,7 @@ StatusWith<ImportResult> importCollection(OperationContext* opCtx,
 Status renameCollection(OperationContext* opCtx,
                         const RecordId& catalogId,
                         const NamespaceString& toNss,
-                        BSONCollectionCatalogEntry::MetaData& md,
+                        durable_catalog::CatalogEntryMetaData& md,
                         MDBCatalog* mdbCatalog) {
     auto cursor = mdbCatalog->getCursor(opCtx);
     BSONObj old = internal::findEntry(*cursor, catalogId);

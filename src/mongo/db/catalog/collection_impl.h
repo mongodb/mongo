@@ -40,6 +40,8 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_gen.h"
+#include "mongo/db/catalog/durable_catalog_entry.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/collection_crud/capped_visibility.h"
@@ -51,8 +53,6 @@
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -91,7 +91,7 @@ public:
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
                             RecordId catalogId,
-                            std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+                            std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
                             std::unique_ptr<RecordStore> recordStore);
 
     ~CollectionImpl() override;
@@ -104,7 +104,7 @@ public:
             OperationContext* opCtx,
             const NamespaceString& nss,
             RecordId catalogId,
-            std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
+            std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
             std::unique_ptr<RecordStore> rs) const final;
     };
 
@@ -410,7 +410,7 @@ public:
     bool isIndexReady(StringData indexName) const final;
 
     void replaceMetadata(OperationContext* opCtx,
-                         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) final;
+                         std::shared_ptr<durable_catalog::CatalogEntryMetaData> md) final;
 
     bool isMetadataEqual(const BSONObj& otherMetadata) const final;
 
@@ -421,7 +421,7 @@ public:
 private:
     /**
      * Writes metadata through durable_catalog. Func should have the function signature
-     * 'void(BSONCollectionCatalogEntry::MetaData&)'
+     * 'void(durable_catalog::CatalogEntryMetaData&)'
      */
     template <typename Func>
     void _writeMetadata(OperationContext* opCtx, Func func);
@@ -440,7 +440,7 @@ private:
      * Helper to set the _metadata field. Every set must check for the storageEngine option to work
      * around the issue described in SERVER-91193 and SERVER-91194.
      */
-    void _setMetadata(std::shared_ptr<BSONCollectionCatalogEntry::MetaData>&& metadata);
+    void _setMetadata(std::shared_ptr<durable_catalog::CatalogEntryMetaData>&& metadata);
 
     /**
      * Holder of shared state between CollectionImpl clones and snapshots at a point in time.
@@ -497,7 +497,7 @@ private:
 
     // Collection metadata cached from the durable_catalog. Is kept separate from the SharedState
     // because it may be updated.
-    std::shared_ptr<const BSONCollectionCatalogEntry::MetaData> _metadata;
+    std::shared_ptr<const durable_catalog::CatalogEntryMetaData> _metadata;
 
     clonable_ptr<IndexCatalog> _indexCatalog;
 

@@ -26,9 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-// IWYU pragma: no_include "cxxabi.h"
-#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/catalog/durable_catalog.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -43,6 +41,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
@@ -59,7 +58,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/mdb_catalog.h"
@@ -274,7 +272,7 @@ protected:
                                         << IndexConstants::kIdIndexName
                                         << IndexDescriptor::kIndexVersionFieldName << 2)};
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = descriptor.infoObj();
         imd.ready = true;
 
@@ -334,7 +332,7 @@ protected:
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("unittest", "import");
     std::string ident;
     std::string idxIdent;
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md;
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> md;
     BSONObj storageMetadata;
 };
 

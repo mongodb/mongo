@@ -58,6 +58,8 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/durable_catalog.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
@@ -123,9 +125,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/damage_vector.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -326,14 +326,14 @@ private:
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
-void assertIndexMetaDataMissing(std::shared_ptr<BSONCollectionCatalogEntry::MetaData> collMetaData,
+void assertIndexMetaDataMissing(std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData,
                                 StringData indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
     ASSERT_EQUALS(-1, idxOffset) << indexName << ". Collection Metdata: " << collMetaData->toBSON();
 }
 
-BSONCollectionCatalogEntry::IndexMetaData getIndexMetaData(
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> collMetaData, StringData indexName) {
+durable_catalog::CatalogEntryMetaData::IndexMetaData getIndexMetaData(
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData, StringData indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
     ASSERT_GT(idxOffset, -1) << indexName;
     return collMetaData->indexes[idxOffset];
@@ -547,7 +547,7 @@ public:
         return optRecord.value().data.getOwned().toBson();
     }
 
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaDataAtTime(
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> getMetaDataAtTime(
         const MDBCatalog* mdbCatalog, const RecordId& catalogId, const Timestamp& ts) {
         OneOffRead oor(_opCtx, ts);
         auto catalogEntry = durable_catalog::getParsedCatalogEntry(_opCtx, catalogId, mdbCatalog);
@@ -3104,12 +3104,12 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
     // succeeded. For completeness, check the index metadata.
     const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     const auto mdbCatalog = storageEngine->getMDBCatalog();
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> mdBeforeInserts =
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> mdBeforeInserts =
         getMetaDataAtTime(mdbCatalog, catalogId, tsBeforeMultikeyWrites);
     ASSERT_FALSE(getIndexMetaData(mdBeforeInserts, "a_1").multikey);
     ASSERT_FALSE(getIndexMetaData(mdBeforeInserts, "b_1").multikey);
 
-    std::shared_ptr<BSONCollectionCatalogEntry::MetaData> mdAfterInserts =
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> mdAfterInserts =
         getMetaDataAtTime(mdbCatalog, catalogId, getTopOfOplog());
     ASSERT(getIndexMetaData(mdAfterInserts, "a_1").multikey);
     ASSERT(getIndexMetaData(mdAfterInserts, "b_1").multikey);

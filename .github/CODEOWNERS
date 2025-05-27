@@ -1554,6 +1554,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/catalog/**/collection_uuid_mismatch* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/collection_writer_test.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/collection_yield_restore* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/catalog/**/durable_catalog* @10gen/server-catalog-and-routing @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/catalog/**/historical_catalogid_tracker* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_catalog* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/catalog/**/index_catalog_entry_helpers* @10gen/query-execution-write-exec @svc-auto-approve-bot
@@ -2454,11 +2455,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/storage/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/storage/**/backup* @10gen/server-backup-restore @svc-auto-approve-bot
 /src/mongo/db/storage/**/compact_options* @10gen/server-rss-sydney @svc-auto-approve-bot
+/src/mongo/db/storage/**/mdb_catalog* @10gen/server-storage-engine-api @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/storage/**/storage_engine* @10gen/server-storage-engine-api @svc-auto-approve-bot
 /src/mongo/db/storage/**/record_store* @10gen/server-storage-engine-api @svc-auto-approve-bot
 /src/mongo/db/storage/**/recovery_unit* @10gen/server-storage-engine-api @svc-auto-approve-bot
 /src/mongo/db/storage/**/sorted_data_interface* @10gen/server-storage-engine-api @svc-auto-approve-bot
-/src/mongo/db/storage/**/durable_catalog* @10gen/server-catalog-and-routing @10gen/server-storage-engine-api @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/storage/devnull/OWNERS.yml
 /src/mongo/db/storage/devnull/**/* @10gen/server-storage-engine-api @svc-auto-approve-bot

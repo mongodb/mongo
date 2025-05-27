@@ -860,7 +860,6 @@ storage_engine_api:
     - src/mongo/db/storage/devnull
     - src/mongo/db/storage/storage_engine*
     - src/mongo/db/storage/record_store*
-    - src/mongo/db/storage/durable_catalog*
     - src/mongo/db/storage/recovery_unit*
     - src/mongo/db/storage/sorted_data_interface*
     - src/mongo/db/startup_recovery*
@@ -884,6 +883,7 @@ storage_engine_integration:
     - src/mongo/db/commands/resize_oplog*
     - src/mongo/db/op_observer/batched_write*
     - src/mongo/db/stats/storage_stats*
+    - src/mongo/db/storage/mdb_catalog*
     - src/mongo/dbtests/dbhelper_tests.cpp
     - src/mongo/dbtests/dbtests*
     - src/mongo/dbtests/storage_debug_util*

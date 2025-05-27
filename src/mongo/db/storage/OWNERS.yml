@@ -9,6 +9,10 @@ filters:
   - "compact_options*":
     approvers:
       - 10gen/server-rss-sydney
+  - "mdb_catalog*":
+    approvers:
+      - 10gen/server-storage-engine-integration
+      - 10gen/server-storage-engine-api
   - "storage_engine*":
     approvers:
       - 10gen/server-storage-engine-api
@@ -20,9 +24,4 @@ filters:
       - 10gen/server-storage-engine-api
   - "sorted_data_interface*":
     approvers:
-      - 10gen/server-storage-engine-api
-  - "durable_catalog*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-      - 10gen/server-storage-engine-integration
       - 10gen/server-storage-engine-api

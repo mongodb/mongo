@@ -291,6 +291,5 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context_d",
         "//src/mongo/db:shard_role_api",
         "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/storage:durable_catalog",
     ],
 )

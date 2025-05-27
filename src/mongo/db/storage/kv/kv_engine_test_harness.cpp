@@ -37,6 +37,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/durable_catalog.h"
+#include "mongo/db/catalog/durable_catalog_entry_metadata.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
@@ -45,11 +47,10 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -162,7 +163,7 @@ protected:
     void putMetaData(OperationContext* opCtx,
                      MDBCatalog* mdbCatalog,
                      RecordId catalogId,
-                     BSONCollectionCatalogEntry::MetaData& md) {
+                     durable_catalog::CatalogEntryMetaData& md) {
         Lock::GlobalLock globalLk(opCtx, MODE_IX);
         durable_catalog::putMetaData(opCtx, catalogId, md, mdbCatalog);
     }
@@ -1051,10 +1052,10 @@ TEST_F(MDBCatalogTest, Idx1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
+        durable_catalog::CatalogEntryMetaData md;
         md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
@@ -1083,11 +1084,11 @@ TEST_F(MDBCatalogTest, Idx1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
+        durable_catalog::CatalogEntryMetaData md;
         md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
         putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
@@ -1129,10 +1130,10 @@ TEST_F(MDBCatalogTest, DirectoryPerDb1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
+        durable_catalog::CatalogEntryMetaData md;
         md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
@@ -1171,10 +1172,10 @@ TEST_F(MDBCatalogTest, Split1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
+        durable_catalog::CatalogEntryMetaData md;
         md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
@@ -1213,10 +1214,10 @@ TEST_F(MDBCatalogTest, DirectoryPerAndSplit1) {
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
 
-        BSONCollectionCatalogEntry::MetaData md;
+        durable_catalog::CatalogEntryMetaData md;
         md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
-        BSONCollectionCatalogEntry::IndexMetaData imd;
+        durable_catalog::CatalogEntryMetaData::IndexMetaData imd;
         imd.spec = BSON("name" << "foo");
         imd.ready = false;
         imd.multikey = false;
