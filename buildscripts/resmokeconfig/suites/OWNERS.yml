@@ -85,7 +85,7 @@ filters:
       - 10gen/server-backup-restore
   - "read_only*":
     approvers:
-      - 10gen/server-rss-sydney
+      - 10gen/server-storage-engine-api
   - "no_passthrough_network*":
     approvers:
       - 10gen/server-networking-and-observability

@@ -80,7 +80,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_fifth_group",
-        "server-rss-sydney-smoke",
+        "server-integration-smoke",
     ],
     target_compatible_with = select({
         "//bazel/config:use_wiredtiger_enabled": [],

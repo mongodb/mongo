@@ -1802,7 +1802,7 @@ mongo_cc_unit_test(
     ],
     tags = [
         "mongo_unittest_eighth_group",
-        "server-rss-sydney-smoke",
+        "server-integration-smoke",
     ],
     deps = [
         ":cluster_server_parameter_commands_invocation",

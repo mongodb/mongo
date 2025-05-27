@@ -958,7 +958,7 @@ tasks:
 
   - <<: *gen_task_template
     name: queryableWT_gen
-    tags: ["assigned_to_jira_team_server_rss_sydney", "release_critical"]
+    tags: ["assigned_to_jira_team_server_integration", "release_critical"]
     commands:
       - func: "generate resmoke tasks"
         vars:

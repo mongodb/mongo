@@ -44,8 +44,20 @@
   - Replication
 10gen/server-root-ownership: #Won't use
   - ~
-10gen/server-rss-sydney:
-  - RSS Sydney
+10gen/server-compact:
+  - Storage Engines Server Integration
+10gen/server-backup-restore:
+  - Storage Engines Server Integration
+10gen/server-dbcheck:
+  - Storage Engines Server Integration
+10gen/server-dbhash:
+  - Storage Engines Server Integration
+10gen/server-validate:
+  - Storage Engines Server Integration
+10gen/server-storage-engine-api:
+  - Storage Engines Server Integration
+10gen/server-storage-engine-integration:
+  - Storage Engines Server Integration
 10gen/server-security:
   - Server Security
 10gen/server-storage-execution:

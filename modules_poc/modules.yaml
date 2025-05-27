@@ -1032,8 +1032,8 @@ key_string: # authoritative: @10gen/server-key-string
 
 storage_engine_api:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/repair*
     - src/mongo/db/storage/wiredtiger
@@ -1073,8 +1073,8 @@ storage_engine_integration:
 
 validate:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/catalog/throttle_cursor*
     - src/mongo/db/commands/validate.cpp
@@ -1083,15 +1083,15 @@ validate:
 
 dbhash:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/commands/dbhash*
 
 compact:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/catalog/collection_compact*
     - src/mongo/db/commands/auto_compact*
@@ -1100,8 +1100,8 @@ compact:
 
 dbcheck:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/catalog/health_log*
     - src/mongo/db/commands/dbcheck*
@@ -1111,8 +1111,8 @@ dbcheck:
 
 server_backup_restore:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/modules/enterprise/src/hot_backups
     - src/mongo/db/modules/enterprise/src/live_import
@@ -1122,8 +1122,8 @@ server_backup_restore:
 
 cache_pressure:
   meta:
-    slack: server-rss-sydney
-    jira: RSS Sydney
+    slack: storage-engines-server-integration
+    jira: Server Integration
   files:
     - src/mongo/db/periodic_runner_cache_pressure_rollback*
 

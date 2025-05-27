@@ -6,12 +6,12 @@ filters:
   - "catalog_and_routing.yml":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "rss_sydney.yml":
+  - "server_integration.yml":
     approvers:
-      - 10gen/server-rss-sydney
-  - "rss_sydney_backup.yml":
+      - 10gen/server-storage-engine-api
+  - "server_integration_backup.yml":
     approvers:
-      - 10gen/server-rss-sydney
+      - 10gen/server-backup-restore
   - "server_collection_write_path.yml":
     approvers:
       - 10gen/server-collection-write-path

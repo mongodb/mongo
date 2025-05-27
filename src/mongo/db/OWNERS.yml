@@ -297,7 +297,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "periodic_runner_cache_pressure_rollback*":
     approvers:
-      - 10gen/server-rss-sydney
+      - 10gen/server-storage-engine-api
   - "startup_warnings_mongod_thp_test*":
     approvers:
       - 10gen/server-workload-scheduling

@@ -18,18 +18,18 @@ The integration tests for the smoke test suite can be run with the following com
 python buildscripts/run_smoke_tests.py --suites=catalog_and_routing
 ```
 
-## RSS Sydney
+## Server Integration
 
 The integration tests for the smoke test suite can be run with the following command:
 
 ```
-bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=rss_sydney
+bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=server_integration
 ```
 
 This should be run in conjunction with the unit tests, which can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-rss-sydney-smoke //...
+bazel test --test_tag_filters=server-integration-smoke //...
 ```
 
 ## Replication
