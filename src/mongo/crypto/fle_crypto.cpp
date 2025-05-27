@@ -4203,7 +4203,7 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
 
     mongo::TextSearchFindTokenSets& tokens = payload.getTokenSets();
 
-    // There must be only one of the following in the payload
+    // There must be only one of the following in the payload, previously verified.
     prefixTokens = tokens.getPrefixTokens();
     suffixTokens = tokens.getSuffixTokens();
     exactTokens = tokens.getExactTokens();
@@ -4221,9 +4221,11 @@ ParsedFindTextSearchPayload::ParsedFindTextSearchPayload(ConstDataRange cdr) {
         edc = EDCDerivedFromDataToken{substringTokens->getEdcDerivedToken().asPrfBlock()};
         esc = ESCDerivedFromDataToken{substringTokens->getEscDerivedToken().asPrfBlock()};
         server = ServerDerivedFromDataToken{substringTokens->getServerDerivedToken().asPrfBlock()};
+    } else {
+        edc = EDCDerivedFromDataToken{exactTokens->getEdcDerivedToken().asPrfBlock()};
+        esc = ESCDerivedFromDataToken{exactTokens->getEscDerivedToken().asPrfBlock()};
+        server = ServerDerivedFromDataToken{exactTokens->getServerDerivedToken().asPrfBlock()};
     }
-
-    // TODO SERVER-102560: set edc, esc, server for exact tokens.
 
     maxCounter = payload.getMaxCounter();
 }

@@ -49,16 +49,11 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(ExpressionEncStrNormalizedEq,
 
 std::vector<PrfBlock> TextSearchPredicate::generateTags(BSONValue payload) const {
     ParsedFindTextSearchPayload tokens = parseFindPayload<ParsedFindTextSearchPayload>(payload);
-
-    if (tokens.prefixTokens || tokens.suffixTokens || tokens.substringTokens) {
-        return readTags(_rewriter->getTagQueryInterface(),
-                        _rewriter->getESCNss(),
-                        tokens.esc,
-                        tokens.edc,
-                        tokens.maxCounter);
-    }
-
-    return {};
+    return readTags(_rewriter->getTagQueryInterface(),
+                    _rewriter->getESCNss(),
+                    tokens.esc,
+                    tokens.edc,
+                    tokens.maxCounter);
 }
 
 std::unique_ptr<Expression> TextSearchPredicate::rewriteToTagDisjunction(Expression* expr) const {

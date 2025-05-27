@@ -141,15 +141,15 @@ Value evaluate(const ExpressionEncStrNormalizedEq& expr,
             "ExpressionEncStrNormalizedEq can't be evaluated without binary payload",
             expr.canBeEvaluated());
 
-    // Note, when the below lambda is filled in, we must hang on to the
-    // FLE2IndexedTextEncryptedValue object to extend the lifetime of the serverValue beyond the
-    // scope of the lambda. This is because ConstDataRange is just a view on the original metadata
-    // block data.
+    // Hang on to the FLE2IndexedTextEncryptedValue object, because getSubstringMetadataBlocks
+    // returns a view on its member and its lifetime must last through the completion of evaluate.
+    boost::optional<FLE2IndexedTextEncryptedValue> value;
     return Value(expr.getEncryptedPredicateEvaluator().evaluate(
         fieldValue, EncryptedBinDataType::kFLE2TextIndexedValue, [&](auto serverValue) {
-            // TODO SERVER-102560: Implement this lambda expression's body which should extract the
-            // metadata blocks.
+            tassert(10256000, "extractMetadataBlocks should only be run once by evaluate", !value);
+            value.emplace(serverValue);
             std::vector<FLE2TagAndEncryptedMetadataBlockView> metadataBlocks;
+            metadataBlocks.push_back(value->getExactStringMetadataBlock());
             return metadataBlocks;
         }));
 }
