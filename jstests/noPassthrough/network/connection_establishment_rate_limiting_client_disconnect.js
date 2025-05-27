@@ -43,9 +43,10 @@ const testKillOnClientDisconnect = (conn) => {
     if (isLinux()) {
         assert.soon(() => checkLog.checkContainsOnceJson(
                         conn, 20883));  // Interrupted operation as its client disconnected
-        assert.eq(1,
-                  getConnectionStats(
-                      conn)["establishmentRateLimit"]["totalInterruptedDueToClientDisconnect"]);
+        assert.soon(
+            () => (1 ==
+                   getConnectionStats(
+                       conn)["establishmentRateLimit"]["totalInterruptedDueToClientDisconnect"]));
     }
 };
 
