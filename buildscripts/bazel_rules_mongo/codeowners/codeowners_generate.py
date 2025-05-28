@@ -99,7 +99,7 @@ def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) 
     if codeowners_file:
         codeowners_file_arg = f"--file {codeowners_file}"
     # This file can be bigger than the allowed subprocess buffer so we redirect output into a file
-    command = f"{codeowners_binary_path} --unowned {codeowners_file_arg} > {temp_output_file.name}"
+    command = f"{codeowners_binary_path} --unowned --tracked {codeowners_file_arg} > {temp_output_file.name}"
     process = subprocess.run(command, shell=True, stderr=subprocess.PIPE, text=True)
 
     if process.returncode != 0:

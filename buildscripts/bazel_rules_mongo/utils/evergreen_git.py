@@ -94,10 +94,9 @@ def get_diff_revision(expansions_file: str = None, branch: str = None) -> str:
     else:
         expansions = get_expansions(expansions_file)
         if expansions.get("is_patch", None):
-            # patches from the cli have the changes uncommited, we need to add them to git for git diff to work
-            # we add the files in github patches as well to make it fail consistently if new files
-            # are generated in CI before this point.
-            repo.git.execute(["git", "add", "."])
+            # patches from the cli have the changes uncommited, but are added to the git index by evergreen
+            # patches from pull requests have the changes in commits
+            # in both cases we can compare against the base commit evergreen exposes as the revision expansion
             diff_commit = expansions.get("revision")
         else:
             # in waterfall runs we just want to compare to the previous commit

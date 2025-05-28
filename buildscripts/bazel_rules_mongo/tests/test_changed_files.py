@@ -129,11 +129,11 @@ class TestChangedFiles(unittest.TestCase):
         )
 
     def test_evergreen_patch(self):
-        # the files in evergreen patches just live untracked normally so we don't have to do
-        # anything to the git state
+        # the files in evergreen patches live as uncommited files added to the index
         with open(self.expansions_file, "a") as tmp:
             tmp.write("is_patch: true\n")
             tmp.write(f"revision: {self.base_revision}\n")
+        self.repo.git.execute(["git", "add", "."])
         new_files = evergreen_git.get_new_files(expansions_file=self.expansions_file)
         self.assertEqual(
             new_files, [new_file_name], msg="New file list did not contain the new file."
