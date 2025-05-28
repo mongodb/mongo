@@ -17,15 +17,16 @@ can arise from certain antipatterns addressed by the guide. Style adherence
 enables code authors and their reviewers to productively write safer code
 without having to first rediscover those problems for themselves.
 
-> [!NOTE]
-> This document has been very thoroughly reviewed by Server Programmability but
-> is in BETA for a short shake-out period. Please bring any important errors
-> in its current contents to `#server-programmability` in Slack. We'll remove
-> this notice on or around 2025-05-15.
->
-> For proposals for future changes, please feel free to add entries to the
-> [MongoDB C++ Style Guide Proposals](https://docs.google.com/document/d/1nvmEnjw-5DNFIoXPa7WzM1PbOOl1fN19jl1sz9cpzAg)
-> document (which will remain linked below).
+## Feedback (MongoDB internal)
+
+This is maintained by the Server Programmability team.
+
+- Use `#server-programmability` on Slack for discussion and clarifications.
+  Contributors outside of MongoDB can use Jira instead.
+- For change proposals, please feel free to add entries to the
+  MongoDB C++ Style Guide Proposals document pinned to that channel.
+- Jira and PRs are fine for small fixes unrelated to C++ style, such as
+  typos, formatting, phrasing, and comments.
 
 ## Style
 
