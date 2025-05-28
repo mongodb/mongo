@@ -37,10 +37,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -82,16 +79,21 @@ public:
         directClient.createCollection(kTestNamespace);
         ASSERT_OK(dbtests::createIndex(_opCtx, kTestNamespace.ns_forTest(), kTestKeyPattern));
 
-        _autoColl.emplace(_opCtx, kTestNamespace);
-        const auto& coll = _autoColl->getCollection();
-        ASSERT(coll);
-        _mockGeoIndex = coll->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+        _coll = acquireCollectionMaybeLockFree(
+            _opCtx,
+            CollectionAcquisitionRequest(kTestNamespace,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(_opCtx),
+                                         AcquisitionPrerequisites::kRead));
+        const auto& collPtr = _coll->getCollectionPtr();
+        ASSERT(collPtr);
+        _mockGeoIndex = collPtr->getIndexCatalog()->findIndexByKeyPatternAndOptions(
             _opCtx, kTestKeyPattern, _makeMinimalIndexSpec(kTestKeyPattern));
         ASSERT(_mockGeoIndex);
     }
 
     const CollectionPtr& getCollection() const {
-        return _autoColl->getCollection();
+        return _coll->getCollectionPtr();
     }
 
 protected:
@@ -107,7 +109,7 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> _autoColl;
+    boost::optional<CollectionAcquisition> _coll;
     const IndexDescriptor* _mockGeoIndex;
 };
 
@@ -128,13 +130,13 @@ public:
 
     MockNearStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   WorkingSet* workingSet,
-                  const CollectionPtr& coll,
+                  const CollectionAcquisition& coll,
                   const IndexDescriptor* indexDescriptor)
         : NearStage(expCtx.get(),
                     "MOCK_DISTANCE_SEARCH_STAGE",
                     STAGE_UNKNOWN,
                     workingSet,
-                    &coll,
+                    coll,
                     indexDescriptor),
           _pos(0) {}
 
@@ -213,7 +215,7 @@ TEST_F(QueryStageNearTest, Basic) {
     std::vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    MockNearStage nearStage(_expCtx.get(), &workingSet, getCollection(), _mockGeoIndex);
+    MockNearStage nearStage(_expCtx.get(), &workingSet, *_coll, _mockGeoIndex);
 
     // First set of results
     mockData.clear();
@@ -248,9 +250,13 @@ TEST_F(QueryStageNearTest, EmptyResults) {
     std::vector<BSONObj> mockData;
     WorkingSet workingSet;
 
-    AutoGetCollectionForReadMaybeLockFree autoColl(_opCtx, kTestNamespace);
-    const auto& coll = autoColl.getCollection();
-    ASSERT(coll);
+    auto coll = acquireCollectionMaybeLockFree(
+        _opCtx,
+        CollectionAcquisitionRequest(kTestNamespace,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(_opCtx),
+                                     AcquisitionPrerequisites::kRead));
+    ASSERT(coll.exists());
 
     MockNearStage nearStage(_expCtx.get(), &workingSet, coll, _mockGeoIndex);
 

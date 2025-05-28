@@ -37,11 +37,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -67,7 +64,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
@@ -143,7 +139,7 @@ public:
      * Uses a forward collection scan stage to get the docs, and populates 'out' with
      * the results.
      */
-    void getCollContents(const CollectionPtr& collection, std::vector<BSONObj>* out) {
+    void getCollContents(const CollectionAcquisition& collection, std::vector<BSONObj>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
@@ -151,7 +147,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -267,10 +263,14 @@ public:
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
             std::vector<BSONObj> objs;
-            getCollContents(collection.getCollection(), &objs);
+            getCollContents(collection, &objs);
 
             // Expect a single document, {_id: 0, x: 1, y: 2}.
             ASSERT_EQUALS(1U, objs.size());
@@ -382,10 +382,14 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForReadCommand collection(&_opCtx, nss);
+            const auto collection =
+                acquireCollection(&_opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      &_opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
             std::vector<BSONObj> objs;
-            getCollContents(collection.getCollection(), &objs);
+            getCollContents(collection, &objs);
 
             // Verify that the collection now has 9 docs (one was deleted).
             ASSERT_EQUALS(9U, objs.size());
@@ -488,7 +492,7 @@ public:
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
         std::vector<BSONObj> objs;
-        getCollContents(collection.getCollectionPtr(), &objs);
+        getCollContents(collection, &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
@@ -584,7 +588,7 @@ public:
 
         // Should have done the update.
         std::vector<BSONObj> objs;
-        getCollContents(collection.getCollectionPtr(), &objs);
+        getCollContents(collection, &objs);
         ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.

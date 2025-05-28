@@ -31,13 +31,14 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/index_spec.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/query_shard_server_test_fixture.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/benchmark_util.h"
@@ -169,12 +170,22 @@ public:
         auto opCtx = operationContext();
         auto ns = nss();
 
-        _ctx = std::make_unique<AutoGetCollectionForReadCommand>(opCtx, ns);
-        const CollectionPtr& coll = _ctx->getCollection();
-        const auto& idxDesc = getIndexDescriptor(coll, "some_index");
+        _shardRole = std::make_unique<ScopedSetShardRole>(
+            opCtx,
+            ns,
+            ShardVersionFactory::make(
+                metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+            boost::none /* databaseVersion */);
+
+        _coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        const CollectionPtr& collPtr = _coll->getCollectionPtr();
+        const auto& idxDesc = getIndexDescriptor(collPtr, "some_index");
 
         // Set-up DistinctParams for a full distinct scan on the first field in the index.
-        _params = DistinctParams{opCtx, coll, &idxDesc};
+        _params = DistinctParams{opCtx, collPtr, &idxDesc};
         _params->scanDirection = testParams.scanDirection;
         _params->fieldNo = testParams.fieldNo;
         _params->bounds = std::move(testParams.bounds);
@@ -182,18 +193,12 @@ public:
         _shouldShardFilter = testParams.shouldShardFilter;
 
         // Create a shard filterer.
-        _shardRole = std::make_unique<ScopedSetShardRole>(
-            opCtx,
-            ns,
-            ShardVersionFactory::make(
-                metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-            boost::none /* databaseVersion */);
         _scopedCss = std::make_unique<CollectionShardingState::ScopedCollectionShardingState>(
             CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns));
     }
 
     std::unique_ptr<PlanStage> prepareDistinctScan() {
-        invariant(_ctx);
+        invariant(_coll);
         invariant(_scopedCss);
         invariant(_shardRole);
 
@@ -207,17 +212,14 @@ public:
 
         // Construct distinct, and verify its expected execution pattern on the given data.
         auto root = std::make_unique<DistinctScan>(expressionContext(),
-                                                   &(_ctx->getCollection()),
+                                                   *_coll,
                                                    *_params,
                                                    &_ws,
                                                    std::move(sfi),
                                                    _shouldFetch && _shouldShardFilter);
         if (_shouldFetch && !_shouldShardFilter) {
-            return std::make_unique<FetchStage>(expressionContext(),
-                                                &_ws,
-                                                std::move(root),
-                                                nullptr /* no filter */,
-                                                &(_ctx->getCollection()));
+            return std::make_unique<FetchStage>(
+                expressionContext(), &_ws, std::move(root), nullptr /* no filter */, *_coll);
         }
         return root;
     }
@@ -225,13 +227,13 @@ public:
     ~ShardFilteringDistinctScanPerfTestFixture() override {
         _scopedCss.reset();
         _shardRole.reset();
-        _ctx.reset();
+        _coll.reset();
         tearDown();
     }
 
 private:
     WorkingSet _ws;
-    std::unique_ptr<AutoGetCollectionForReadCommand> _ctx;
+    boost::optional<CollectionAcquisition> _coll;
     std::unique_ptr<ScopedSetShardRole> _shardRole;
     std::unique_ptr<CollectionShardingState::ScopedCollectionShardingState> _scopedCss;
     boost::optional<DistinctParams> _params;

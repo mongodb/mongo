@@ -32,15 +32,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -49,6 +45,7 @@
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -125,6 +122,15 @@ private:
     DBDirectClient _client;
 };
 
+CollectionAcquisition acquireCollForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
 
 // Tests distinct with single key indices.
 class QueryStageDistinctBasic : public DistinctBase {
@@ -145,16 +151,16 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto collection = acquireCollForRead(&_opCtx, nss);
+        const CollectionPtr& collPtr = collection.getCollectionPtr();
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
+        collPtr->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
 
-        DistinctParams params{&_opCtx, coll, indexes[0]};
+        DistinctParams params{&_opCtx, collPtr, indexes[0]};
         params.scanDirection = 1;
         // Distinct-ing over the 0-th field of the keypattern.
         params.fieldNo = 0;
@@ -165,7 +171,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), collection, std::move(params), &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -212,16 +218,15 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto coll = acquireCollForRead(&_opCtx, nss);
 
         // Set up the distinct stage.
         std::vector<const IndexDescriptor*> indexes;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1), IndexCatalog::InclusionPolicy::kReady, &indexes);
         MONGO_verify(indexes.size() == 1);
 
-        DistinctParams params{&_opCtx, coll, indexes[0]};
+        DistinctParams params{&_opCtx, coll.getCollectionPtr(), indexes[0]};
         ASSERT_TRUE(params.isMultiKey);
 
         params.scanDirection = 1;
@@ -234,7 +239,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
 
         // We should see each number in the range [1, 6] exactly once.
         std::set<int> seen;
@@ -280,15 +285,14 @@ public:
 
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
-        const CollectionPtr& coll = ctx.getCollection();
+        const auto coll = acquireCollForRead(&_opCtx, nss);
 
         std::vector<const IndexDescriptor*> indices;
-        coll->getIndexCatalog()->findIndexesByKeyPattern(
+        coll.getCollectionPtr()->getIndexCatalog()->findIndexesByKeyPattern(
             &_opCtx, BSON("a" << 1 << "b" << 1), IndexCatalog::InclusionPolicy::kReady, &indices);
         ASSERT_EQ(1U, indices.size());
 
-        DistinctParams params{&_opCtx, coll, indices[0]};
+        DistinctParams params{&_opCtx, coll.getCollectionPtr(), indices[0]};
 
         params.scanDirection = 1;
         params.fieldNo = 1;
@@ -303,7 +307,7 @@ public:
         params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
 
         WorkingSetID wsid;
         PlanStage::StageState state;

@@ -38,8 +38,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -49,6 +47,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/document_diff_test_helpers.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -137,7 +136,13 @@ BSONObj RandomizedIdempotencyTest::canonicalizeDocumentForDataHash(const BSONObj
     return canonicalizeBSONObjForDataHash(obj);
 }
 BSONObj RandomizedIdempotencyTest::getDoc() {
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), _nss);
+    auto coll = acquireCollection(
+        _opCtx.get(),
+        CollectionAcquisitionRequest(_nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(_opCtx.get()),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
     BSONObj doc;
     Helpers::findById(_opCtx.get(), _nss, kDocIdQuery, doc);
     return doc.getOwned();

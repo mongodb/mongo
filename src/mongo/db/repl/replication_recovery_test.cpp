@@ -41,7 +41,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -765,6 +764,16 @@ TEST_F(ReplicationRecoveryTest,
     testRecoveryToStableAppliesDocumentsWithNoAppliedThrough(false);
 }
 
+CollectionAcquisition getCollectionForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     mongo::AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 TEST_F(ReplicationRecoveryTest, UnstableRecoveryIgnoresDroppedCollections) {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
@@ -773,8 +782,8 @@ TEST_F(ReplicationRecoveryTest, UnstableRecoveryIgnoresDroppedCollections) {
 
     ASSERT_OK(getStorageInterface()->dropCollection(opCtx, testNs));
     {
-        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = getCollectionForRead(opCtx, testNs);
+        ASSERT_FALSE(coll.exists());
     }
 
     // Not setting a stable timestamp in order to perform unstable recovery,
@@ -782,8 +791,8 @@ TEST_F(ReplicationRecoveryTest, UnstableRecoveryIgnoresDroppedCollections) {
 
     _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
     {
-        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = getCollectionForRead(opCtx, testNs);
+        ASSERT_FALSE(coll.exists());
     }
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
@@ -798,8 +807,8 @@ DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
 
     ASSERT_OK(getStorageInterface()->dropCollection(opCtx, testNs));
     {
-        AutoGetCollectionForReadCommand autoColl(opCtx, testNs);
-        ASSERT_FALSE(autoColl.getCollection());
+        const auto coll = getCollectionForRead(opCtx, testNs);
+        ASSERT_FALSE(coll.exists());
     }
 
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));

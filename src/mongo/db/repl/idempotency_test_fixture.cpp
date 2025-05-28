@@ -33,13 +33,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
@@ -49,6 +46,7 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
@@ -379,13 +377,20 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     return collStates;
 }
 
+CollectionAcquisition getCollectionForRead(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     mongo::AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+
 CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     auto collUUID = [&]() -> boost::optional<UUID> {
-        AutoGetCollectionForReadCommand autoColl(_opCtx.get(), _nss);
-        if (const auto& collection = autoColl.getCollection()) {
-            return collection->uuid();
-        }
-        return boost::none;
+        auto coll = getCollectionForRead(_opCtx.get(), _nss);
+        return coll.exists() ? boost::make_optional(coll.uuid()) : boost::none;
     }();
 
     if (collUUID) {
@@ -395,9 +400,9 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
     }
 
     {
-        AutoGetCollectionForReadCommand collection(_opCtx.get(), _nss);
+        auto collection = getCollectionForRead(_opCtx.get(), _nss);
 
-        if (!collection) {
+        if (!collection.exists()) {
             // Return a mostly default initialized CollectionState struct with exists set to false
             // to indicate an unfound Collection (or a view).
             return kCollectionDoesNotExist;
@@ -418,16 +423,17 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
         ASSERT_TRUE(validateResults.isValid());
     }
 
-    AutoGetCollectionForReadCommand collection(_opCtx.get(), _nss);
+    auto collection = getCollectionForRead(_opCtx.get(), _nss);
+    const auto& collectionPtr = collection.getCollectionPtr();
 
-    std::string dataHash = computeDataHash(collection.getCollection());
+    std::string dataHash = computeDataHash(collectionPtr);
 
-    auto collectionOptions = collection->getCollectionOptions();
+    auto collectionOptions = collectionPtr->getCollectionOptions();
     std::vector<std::string> allIndexes;
     BSONObjSet indexSpecs = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    collection->getAllIndexes(&allIndexes);
+    collectionPtr->getAllIndexes(&allIndexes);
     for (auto const& index : allIndexes) {
-        indexSpecs.insert(collection->getIndexSpec(index));
+        indexSpecs.insert(collectionPtr->getIndexSpec(index));
     }
     ASSERT_EQUALS(indexSpecs.size(), allIndexes.size());
 

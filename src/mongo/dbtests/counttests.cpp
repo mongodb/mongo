@@ -35,18 +35,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -86,11 +79,15 @@ public:
                 indexCatalog->createIndexOnEmptyCollection(&_opCtx, collection, indexSpec));
 
             wunit.commit();
-
-            // TODO(SERVER-103409): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            _collection = CollectionPtr::CollectionPtr_UNSAFE(collection);
         }
+
+        _collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest(nss(),
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(&_opCtx),
+                                         AcquisitionPrerequisites::kWrite),
+            MODE_IS);
     }
 
     ~Base() {
@@ -123,12 +120,15 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            collection_internal::insertDocument(
-                &_opCtx, _collection, InsertStatement(b.obj()), nullOpDebug, false)
+            collection_internal::insertDocument(&_opCtx,
+                                                _collection->getCollectionPtr(),
+                                                InsertStatement(b.obj()),
+                                                nullOpDebug,
+                                                false)
                 .transitional_ignore();
         } else {
             collection_internal::insertDocument(
-                &_opCtx, _collection, InsertStatement(o), nullOpDebug, false)
+                &_opCtx, _collection->getCollectionPtr(), InsertStatement(o), nullOpDebug, false)
                 .transitional_ignore();
         }
         wunit.commit();
@@ -139,7 +139,7 @@ protected:
     AutoGetDb _autoDb;
 
     Database* _database;
-    CollectionPtr _collection;
+    boost::optional<CollectionAcquisition> _collection;
 
     DBDirectClient _client;
 };

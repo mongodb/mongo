@@ -35,7 +35,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -245,7 +244,6 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         const NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittests.matchertests");
-        AutoGetCollectionForReadCommand ctx(&opCtx, nss);
         const auto expCtx = ExpressionContextBuilder{}.opCtx(opCtxPtr.get()).ns(kTestNss).build();
         M m(BSON("$where" << "function(){ return this.a == 1; }"),
             expCtx,

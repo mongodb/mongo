@@ -44,7 +44,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/profile_settings.h"

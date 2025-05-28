@@ -30,7 +30,7 @@
 #include "mongo/db/exec/distinct_scan.h"
 
 #include "mongo/client/index_spec.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/query_shard_server_test_fixture.h"
 #include "mongo/db/namespace_string.h"
@@ -85,34 +85,36 @@ public:
         auto opCtx = operationContext();
         auto ns = nss();
 
-        AutoGetCollectionForReadCommand ctx(opCtx, ns);
-        const CollectionPtr& coll = ctx.getCollection();
-        const auto& idxDesc = getIndexDescriptor(coll, "some_index");
-
-        // Set-up DistinctParams for a full distinct scan on the first field in the index.
-        DistinctParams params{opCtx, coll, &idxDesc};
-        params.scanDirection = testParams.scanDirection;
-        params.fieldNo = testParams.fieldNo;
-        params.bounds = std::move(testParams.bounds);
-
-        // Create a shard filterer.
         ScopedSetShardRole scopedSetShardRole{
             opCtx,
             ns,
             ShardVersionFactory::make(
                 metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
             boost::none /* databaseVersion */};
-        auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, ns);
+
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        const CollectionPtr& collPtr = coll.getCollectionPtr();
+        const auto& idxDesc = getIndexDescriptor(collPtr, "some_index");
+
+        // Set-up DistinctParams for a full distinct scan on the first field in the index.
+        DistinctParams params{opCtx, collPtr, &idxDesc};
+        params.scanDirection = testParams.scanDirection;
+        params.fieldNo = testParams.fieldNo;
+        params.bounds = std::move(testParams.bounds);
+
+        // Create a shard filterer.
         auto sfi = testParams.shouldShardFilter
-            ? std::make_unique<ShardFiltererImpl>(scopedCss->getOwnershipFilter(
-                  opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup))
+            ? std::make_unique<ShardFiltererImpl>(*coll.getShardingFilter())
             : nullptr;
 
         // Construct distinct, and verify its expected execution pattern on the given data.
         WorkingSet ws;
         WorkingSetID wsid;
         DistinctScan distinct(expressionContext(),
-                              &coll,
+                              coll,
                               std::move(params),
                               &ws,
                               std::move(sfi),

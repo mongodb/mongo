@@ -210,7 +210,14 @@ void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
         wuow.commit();
     });
 
-    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_TRUE(acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      nss,
+                                      PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS)
+                    .exists());
 }
 
 /**

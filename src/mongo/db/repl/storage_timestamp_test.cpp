@@ -70,7 +70,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/mutable_bson/document.h"
@@ -1208,7 +1207,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
     {
-        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
     }
 
     BSONObjBuilder resultBuilder;
@@ -1223,7 +1222,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
     ASSERT_OK(swResult);
 
     {
-        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+        ASSERT(acquireCollForRead(_opCtx, nss).exists());
     }
 
     assertNamespaceInIdents(nss, _pastTs, false);
@@ -1245,10 +1244,10 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
 
     {
-        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection());
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss1).exists());
     }
     {
-        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
     }
 
     const LogicalTime dummyLt = const_cast<const LogicalTime&>(_futureLt).addTicks(1);
@@ -1270,10 +1269,10 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     ASSERT_OK(swResult);
 
     {
-        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection());
+        ASSERT(acquireCollForRead(_opCtx, nss1).exists());
     }
     {
-        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+        ASSERT(acquireCollForRead(_opCtx, nss2).exists());
     }
 
     assertNamespaceInIdents(nss1, _pastTs, false);
@@ -1316,7 +1315,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
 
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
         {
-            ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection());
+            ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
         }
 
         BSONObjBuilder resultBuilder;
@@ -1340,11 +1339,11 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
     }
 
     {
-        AutoGetCollectionForReadCommand autoColl1(_opCtx, nss1);
-        const auto& coll1 = autoColl1.getCollection();
+        auto autoColl1 = acquireCollForRead(_opCtx, nss1);
+        const auto& coll1 = autoColl1.getCollectionPtr();
         ASSERT(coll1);
-        AutoGetCollectionForReadCommand autoColl2(_opCtx, nss2);
-        const auto& coll2 = autoColl2.getCollection();
+        auto autoColl2 = acquireCollForRead(_opCtx, nss2);
+        const auto& coll2 = autoColl2.getCollectionPtr();
         ASSERT(coll2);
 
         assertDocumentAtTimestamp(coll1, _pastTs, BSONObj());
@@ -1376,7 +1375,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
     {
-        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
     }
 
     BSONObjBuilder resultBuilder;
@@ -1391,7 +1390,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
     ASSERT_OK(swResult);
 
     {
-        ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+        ASSERT(acquireCollForRead(_opCtx, nss).exists());
     }
 
     BSONObj result;
@@ -2829,12 +2828,12 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
 
     {
         // Sanity check everything exists.
-        AutoGetCollectionForReadCommand coll(_opCtx, nss);
-        ASSERT(coll);
+        auto coll = acquireCollForRead(_opCtx, nss);
+        ASSERT(coll.exists());
 
         const auto currentTime = _clock->getTime();
         const auto presentTs = currentTime.clusterTime().asTimestamp();
-        assertDocumentAtTimestamp(coll.getCollection(), presentTs, doc);
+        assertDocumentAtTimestamp(coll.getCollectionPtr(), presentTs, doc);
     }
 
     // Simulate a scenario where the node is a primary, but does not accept writes. This is
@@ -2970,16 +2969,16 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.system.users");
 
     {
-        ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection());
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
     }
 
     ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
 
     RecordId catalogId;
     {
-        AutoGetCollectionForReadCommand coll(_opCtx, nss);
-        ASSERT(coll.getCollection());
-        catalogId = coll.getCollection()->getCatalogId();
+        auto coll = acquireCollForRead(_opCtx, nss);
+        ASSERT(coll.getCollectionPtr());
+        catalogId = coll.getCollectionPtr()->getCatalogId();
     }
 
     BSONObj result = queryOplog(BSON("op" << "c"

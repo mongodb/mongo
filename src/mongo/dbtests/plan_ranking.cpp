@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -67,6 +66,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
@@ -143,8 +143,14 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     const QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
-        MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(&_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        MultipleCollectionAccessor collectionsAccessor(collection);
         QueryPlannerParams plannerParams{
             QueryPlannerParams::ArgsForSingleCollectionQuery{
                 .opCtx = &_opCtx,
@@ -161,18 +167,17 @@ public:
 
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
-        _mps = std::make_unique<MultiPlanStage>(
-            _expCtx.get(),
-            &collection.getCollection(),
-            cq,
-            plan_cache_util::ClassicPlanCacheWriter{
-                opCtx(), &collection.getCollection(), false /* executeInSbe */
-            });
+        _mps = std::make_unique<MultiPlanStage>(_expCtx.get(),
+                                                collection,
+                                                cq,
+                                                plan_cache_util::ClassicPlanCacheWriter{
+                                                    opCtx(), collection, false /* executeInSbe */
+                                                });
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the 'MultiPlanStage'.
         for (size_t i = 0; i < solutions.size(); ++i) {
             auto&& root = stage_builder::buildClassicExecutableTree(
-                &_opCtx, &collection.getCollection(), *cq, *solutions[i], ws.get());
+                &_opCtx, collection, *cq, *solutions[i], ws.get());
             _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.
@@ -198,8 +203,14 @@ public:
      * The plan object itself is owned by this->_bestCBRPlan
      */
     const QuerySolution* bestCBRPlan(CanonicalQuery* cq, size_t numDocs) {
-        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
-        MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(&_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
+        MultipleCollectionAccessor collectionsAccessor(collection);
 
         auto collCard{cbr::CardinalityEstimate{cbr::CardinalityType{static_cast<double>(numDocs)},
                                                cbr::EstimationSource::Metadata}};
@@ -341,13 +352,18 @@ public:
                    cbrSoln->root())
                    .isOK());
 
-        AutoGetCollectionForReadCommand collection(&_opCtx, nss);
-
+        const auto collection = acquireCollection(
+            &_opCtx,
+            CollectionAcquisitionRequest(nss,
+                                         PlacementConcern(boost::none, ShardVersion::UNSHARDED()),
+                                         repl::ReadConcernArgs::get(&_opCtx),
+                                         AcquisitionPrerequisites::kRead),
+            MODE_IS);
         StatusWith<std::unique_ptr<PlanCacheEntry>> planCacheEntryWithStatus =
-            CollectionQueryInfo::get(collection.getCollection())
+            CollectionQueryInfo::get(collection.getCollectionPtr())
                 .getPlanCache()
                 ->getEntry(
-                    plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection()));
+                    plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollectionPtr()));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
         auto debugInfo = planCacheEntryWithStatus.getValue()->debugInfo;
         ASSERT(debugInfo);
