@@ -34,9 +34,16 @@
         - jstests/core/timeseries/ddl/timeseries_compact.js
         - jstests/core/timeseries/ddl/timeseries_create_collection.js
         - jstests/core/timeseries/ddl/timeseries_index.js
+        - jstests/core/timeseries/ddl/timeseries_index_collation.js
+        - jstests/core/timeseries/ddl/timeseries_index_spec_with_originalSpec.js
+        - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
         - jstests/core/timeseries/ddl/timeseries_list_catalog.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js
+        - jstests/core/timeseries/ddl/timeseries_metric_index_wildcard.js
         - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
+        - jstests/core/timeseries/geo/timeseries_geonear.js
         - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
+        - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js
         - jstests/core/timeseries/geo/timeseries_geonear_random_measurements.js
         - jstests/core/timeseries/geo/timeseries_internal_bucket_geo_within.js
         - jstests/core/timeseries/libs/geo.js
@@ -47,6 +54,8 @@
         - jstests/core/timeseries/libs/timeseries_writes_util.js
         - jstests/core/timeseries/libs/viewless_timeseries_util.js
         - jstests/core/timeseries/query/bucket_unpacking_with_limit.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_collation.js
+        - jstests/core/timeseries/query/bucket_unpacking_with_sort_with_geo.js
         - jstests/core/timeseries/query/timeseries_block_explain.js
         - jstests/core/timeseries/query/timeseries_bucket_level_filter.js
         - jstests/core/timeseries/query/timeseries_cursor_batches.js
@@ -60,7 +69,9 @@
         - jstests/core/timeseries/query/timeseries_internal_bounded_sort_overflow.js
         - jstests/core/timeseries/query/timeseries_internal_bounded_sort_release_memory.js
         - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
+        - jstests/core/timeseries/query/timeseries_lastpoint.js
         - jstests/core/timeseries/query/timeseries_lastpoint_common_sort_key.js
+        - jstests/core/timeseries/query/timeseries_lookup_extended_range.js
         - jstests/core/timeseries/query/timeseries_match_pushdown.js
         - jstests/core/timeseries/query/timeseries_match_pushdown_with_project.js
         - jstests/core/timeseries/query/timeseries_merge.js
