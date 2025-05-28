@@ -500,6 +500,10 @@ Status WiredTigerKVEngineBase::reconfigureLogging() {
     return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr);
 }
 
+int WiredTigerKVEngineBase::reconfigure(const char* str) {
+    return _conn->reconfigure(_conn, str);
+}
+
 bool WiredTigerKVEngineBase::_wtHasUri(WiredTigerSession& session, const std::string& uri) const {
     // can't use WiredTigerCursor since this is called from constructor.
     WT_CURSOR* c = nullptr;
@@ -699,8 +703,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
 }
 
 WiredTigerKVEngine::~WiredTigerKVEngine() {
-    // Remove server parameters that we added in the constructor, to enable unit tests to reload the
-    // storage engine again in this same process.
+    // Unregister the server parameter set in the ctor to prevent a duplicate if we reload the
+    // storage engine.
     ServerParameterSet::getNodeParameterSet()->remove("wiredTigerEngineRuntimeConfig");
 
     cleanShutdown();
@@ -2168,10 +2172,6 @@ boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForI
         return boost::none;
     }
     return identPath;
-}
-
-int WiredTigerKVEngine::reconfigure(const char* str) {
-    return _conn->reconfigure(_conn, str);
 }
 
 stdx::unique_lock<stdx::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData ident) {

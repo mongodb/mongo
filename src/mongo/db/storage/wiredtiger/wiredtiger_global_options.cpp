@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/tenant_id.h"
@@ -108,6 +109,13 @@ void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
     *b << name << StringData{*_data.first};
 }
 
+void SpillWiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
+                                                         BSONObjBuilder* b,
+                                                         StringData name,
+                                                         const boost::optional<TenantId>&) {
+    *b << name << StringData{*_data.first};
+}
+
 Status validateExtraDiagnostics(const std::vector<std::string>& value,
                                 const boost::optional<TenantId>& tenantId) {
     try {
@@ -132,21 +140,23 @@ Status validateExtraDiagnostics(const std::vector<std::string>& value,
     return Status::OK();
 }
 
-Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
-                                                             const boost::optional<TenantId>&) {
+
+Status validateNoNullCharacter(StringData str) {
     size_t pos = str.find('\0');
     if (pos != std::string::npos) {
         return Status(ErrorCodes::BadValue,
-                      (str::stream()
-                       << "WiredTiger configuration strings cannot have embedded null characters. "
-                          "Embedded null found at position "
-                       << pos));
+                      str::stream() << "WiredTiger configuration strings cannot contain "
+                                       "embedded null characters (found at "
+                                    << pos << ')');
     }
+    return Status::OK();
+}
 
-    LOGV2(22376, "Reconfiguring WiredTiger storage engine", "config"_attr = str);
+template <typename T>
+Status setFromStringImpl(T& data, StringData str) {
+    invariant(data.second);
 
-    invariant(_data.second);
-    int ret = _data.second->reconfigure(str.toString().c_str());
+    int ret = data.second->reconfigure(std::string(str).c_str());
     if (ret != 0) {
         const char* errorStr = wiredtiger_strerror(ret);
         std::string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
@@ -159,8 +169,34 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
         return Status(ErrorCodes::BadValue, result);
     }
 
-    _data.first = str.toString();
+    data.first = std::string(str);
     return Status::OK();
+}
+
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
+                                                             const boost::optional<TenantId>&) {
+    if (auto s = validateNoNullCharacter(str); !s.isOK())
+        return s;
+
+    LOGV2(22376,
+          "WiredTiger engine runtime configuration parameter set",
+          "parameter"_attr = name(),
+          "value"_attr = str);
+
+    return setFromStringImpl(_data, str);
+}
+
+Status SpillWiredTigerEngineRuntimeConfigParameter::setFromString(
+    StringData str, const boost::optional<TenantId>&) {
+    if (auto s = validateNoNullCharacter(str); !s.isOK())
+        return s;
+
+    LOGV2(10320900,
+          "Spill WiredTiger engine runtime configuration parameter set",
+          "parameter"_attr = name(),
+          "value"_attr = str);
+
+    return setFromStringImpl(_data, str);
 }
 
 Status WiredTigerDirectoryForIndexesParameter::setFromString(StringData,

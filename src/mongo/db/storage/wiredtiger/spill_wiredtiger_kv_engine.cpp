@@ -38,9 +38,12 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
+
+#include <memory>
 
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -99,10 +102,17 @@ SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalNam
     _connection =
         std::make_unique<WiredTigerConnection>(_conn, clockSource, /*sessionCacheMax=*/33000, this);
 
-    // TODO(SERVER-103209): Add support for configuring the spill WiredTiger instance at runtime.
+    auto param = std::make_unique<SpillWiredTigerEngineRuntimeConfigParameter>(
+        "spillWiredTigerEngineRuntimeConfig", ServerParameterType::kRuntimeOnly);
+    param->_data.second = this;
+    registerServerParameter(std::move(param));
 }
 
 SpillWiredTigerKVEngine::~SpillWiredTigerKVEngine() {
+    // Unregister the server parameter set in the ctor to prevent a duplicate if we reload the
+    // storage engine.
+    ServerParameterSet::getNodeParameterSet()->remove("spillWiredTigerEngineRuntimeConfig");
+
     cleanShutdown();
 }
 

@@ -277,6 +277,15 @@ server_parameters:
         default: false
         redact: false
 
+    spillWiredTigerEngineRuntimeConfig:
+        description: "Spill WiredTiger Configuration"
+        set_at: runtime
+        cpp_class:
+            name: SpillWiredTigerEngineRuntimeConfigParameter
+            data: "std::pair<synchronized_value<std::string>, SpillWiredTigerKVEngine*>"
+        condition: {expr: false}
+        redact: false
+
     enableTemporarilyUnavailableExceptions:
         description:
             "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
