@@ -33,12 +33,14 @@ initCollection(db.coll2);
 /*
  * Drop the collection during release memory yield.
  */
-const cursor1 = initCursorId(db.coll1);
-const cursor2 = initCursorId(db.coll2);
+{
+    const cursor1 = initCursorId(db.coll1);
+    const cursor2 = initCursorId(db.coll2);
 
-const fp = configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll1.getFullName()});
+    const fp =
+        configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll1.getFullName()});
 
-const awaitShell = startParallelShell(`
+    const awaitShell = startParallelShell(`
     import {assertReleaseMemoryFailedWithCode, assertReleaseMemoryWorked} from "jstests/libs/release_memory_util.js";
 
     const res = db.runCommand({releaseMemory: [${cursor1}, ${cursor2}]});
@@ -49,15 +51,68 @@ const awaitShell = startParallelShell(`
     assertReleaseMemoryWorked(res, ${cursor2});
     `, conn.port);
 
-fp.wait();
-assert(db.coll1.drop());
-fp.off();
-awaitShell();
+    fp.wait();
+    assert(db.coll1.drop());
+    fp.off();
+    awaitShell();
 
-const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-const slowQueryLogLine =
-    findMatchingLogLine(globalLog.log, {msg: "Slow query", command: "releaseMemory"});
-assert(slowQueryLogLine, "Failed to find a log line for releaseMemory command");
-assert.gt(JSON.parse(slowQueryLogLine).attr.numYields, 0, slowQueryLogLine);
+    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
+    const slowQueryLogLine =
+        findMatchingLogLine(globalLog.log, {msg: "Slow query", command: "releaseMemory"});
+    assert(slowQueryLogLine, "Failed to find a log line for releaseMemory command");
+    assert.gt(JSON.parse(slowQueryLogLine).attr.numYields, 0, slowQueryLogLine);
+}
+
+/*
+ * Interrupt release memory during yield.
+ */
+{
+    initCollection(db.coll1);
+    const cursor1 = initCursorId(db.coll1);
+    const cursor2 = initCursorId(db.coll2);
+
+    const fp =
+        configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll1.getFullName()});
+
+    const awaitShell = startParallelShell(`
+    import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
+
+    const res = db.runCommand({releaseMemory: [${cursor1}, ${cursor2}]});
+    jsTest.log("Release memory result: " + tojson(res));
+
+    assertReleaseMemoryFailedWithCode(res, ${cursor1}, [ErrorCodes.Interrupted]);
+    assertReleaseMemoryFailedWithCode(res, ${cursor2}, [ErrorCodes.Interrupted]);
+    `, conn.port);
+
+    fp.wait();
+
+    let opId = null;
+    assert.soon(function() {
+        const ops = db.getSiblingDB("admin")
+                        .aggregate([
+                            {$currentOp: {allUsers: true, localOps: true}},
+                            {
+                                $match: {
+                                    numYields: {$gt: 0},
+                                    op: "command",
+                                    "command.releaseMemory": {$exists: true},
+                                }
+                            }
+                        ])
+                        .toArray();
+
+        if (ops.length > 0) {
+            assert.eq(ops.length, 1);
+            opId = ops[0].opid;
+            return true;
+        }
+
+        return false;
+    });
+    db.killOp(opId);
+
+    fp.off();
+    awaitShell();
+}
 
 MongoRunner.stopMongod(conn);
