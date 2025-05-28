@@ -59,6 +59,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -870,9 +871,13 @@ Status _collModInternal(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "ns does not exist");
     }
 
-    // This is necessary to set up CurOp, update the Top stats, and check shard version if the
-    // operation is not on a view.
-    OldClientContext ctx(opCtx, nss, !view);
+    // This is necessary to set up CurOp and update the Top stats.
+    AutoStatsTracker statsTracker(opCtx,
+                                  nss,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);

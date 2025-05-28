@@ -50,6 +50,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
@@ -290,8 +291,12 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
                              const BSONObj& filter,
                              const BSONObj& updateMod,
                              bool fromMigrate) {
-    OldClientContext context(opCtx, coll.nss());
-
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
     request.setNamespaceString(coll.nss());
 
@@ -312,8 +317,12 @@ void Helpers::update(OperationContext* opCtx,
                      const BSONObj& filter,
                      const BSONObj& updateMod,
                      bool fromMigrate) {
-    OldClientContext context(opCtx, coll.nss());
-
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
     request.setNamespaceString(coll.nss());
 
@@ -331,7 +340,12 @@ void Helpers::update(OperationContext* opCtx,
 Status Helpers::insert(OperationContext* opCtx,
                        const CollectionAcquisition& coll,
                        const BSONObj& doc) {
-    OldClientContext context(opCtx, coll.nss());
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     return collection_internal::insertDocument(
         opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
 }
@@ -339,14 +353,23 @@ Status Helpers::insert(OperationContext* opCtx,
 void Helpers::deleteByRid(OperationContext* opCtx,
                           const CollectionAcquisition& coll,
                           RecordId rid) {
-    OldClientContext context(opCtx, coll.nss());
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     return collection_internal::deleteDocument(
         opCtx, coll.getCollectionPtr(), kUninitializedStmtId, rid, &CurOp::get(opCtx)->debug());
 }
 
 void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll, BSONObj obj) {
-    OldClientContext context(opCtx, coll.nss());
-
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     auto request = UpdateRequest();
     request.setNamespaceString(coll.nss());
 
@@ -376,7 +399,12 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 }
 
 void Helpers::emptyCollection(OperationContext* opCtx, const CollectionAcquisition& coll) {
-    OldClientContext context(opCtx, coll.nss());
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll.nss(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll.nss().dbName()));
     repl::UnreplicatedWritesBlock uwb(opCtx);
     deleteObjects(opCtx, coll, BSONObj(), false);
 }

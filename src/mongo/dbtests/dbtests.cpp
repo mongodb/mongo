@@ -47,6 +47,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/multi_index_block.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/repl/member_state.h"
@@ -214,12 +215,15 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
     _autoDb.emplace(opCtx, _nss.dbName(), MODE_IX);
     _collLock.emplace(opCtx, _nss, MODE_X);
 
-    const bool doShardVersionCheck = false;
+    _tracker.emplace(opCtx,
+                     _nss,
+                     Top::LockType::WriteLocked,
+                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                     DatabaseProfileSettings::get(opCtx->getServiceContext())
+                         .getDatabaseProfileLevel(_nss.dbName()));
 
-    _clientContext.emplace(opCtx, _nss, doShardVersionCheck);
     auto db = _autoDb->ensureDbExists(opCtx);
     invariant(db, _nss.toStringForErrorMsg());
-    invariant(db == _clientContext->db());
 }
 
 CollectionAcquisition WriteContextForTests::getCollection() const {

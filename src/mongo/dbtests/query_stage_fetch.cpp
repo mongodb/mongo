@@ -192,9 +192,8 @@ public:
 class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
-        Lock::DBLock lk(&_opCtx, nss().dbName(), MODE_X);
-        OldClientContext ctx(&_opCtx, nss());
-        Database* db = ctx.db();
+        AutoGetDb autodb(&_opCtx, nss().dbName(), MODE_X);
+        Database* db = autodb.ensureDbExists(&_opCtx);
         // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
         CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));

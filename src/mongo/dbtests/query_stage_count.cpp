@@ -97,8 +97,7 @@ class CountStageTest {
 public:
     // TODO(SERVER-103409): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     CountStageTest()
-        : _dbLock(&_opCtx, nss().dbName(), MODE_X),
-          _ctx(&_opCtx, nss()),
+        : _autodb(&_opCtx, nss().dbName(), MODE_X),
           _expCtx(ExpressionContextBuilder{}.opCtx(&_opCtx).ns(kTestNss).build()),
           _coll(CollectionPtr::CollectionPtr_UNSAFE(nullptr)) {}
 
@@ -109,8 +108,8 @@ public:
     virtual void setup() {
         WriteUnitOfWork wunit(&_opCtx);
 
-        _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
-        auto coll = _ctx.db()->createCollection(&_opCtx, nss());
+        _autodb.ensureDbExists(&_opCtx)->dropCollection(&_opCtx, nss()).transitional_ignore();
+        auto coll = _autodb.getDb()->createCollection(&_opCtx, nss());
 
         coll->getIndexCatalog()
             ->createIndexOnEmptyCollection(&_opCtx,
@@ -284,8 +283,7 @@ protected:
     std::vector<RecordId> _recordIds;
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
-    Lock::DBLock _dbLock;
-    OldClientContext _ctx;
+    AutoGetDb _autodb;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     CollectionPtr _coll;
 };

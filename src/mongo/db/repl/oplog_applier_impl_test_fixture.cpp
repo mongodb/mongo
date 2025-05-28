@@ -540,11 +540,10 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     writeConflictRetry(opCtx, "createCollection", nss, [&] {
-        Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
+        AutoGetDb autodb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
 
-        OldClientContext ctx(opCtx, nss);
-        auto db = ctx.db();
+        auto db = autodb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
         mongo::WriteUnitOfWork wuow(opCtx);

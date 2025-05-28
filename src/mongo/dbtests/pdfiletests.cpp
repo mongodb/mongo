@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -64,13 +65,15 @@ namespace Insert {
 
 class Base {
 public:
-    Base() : _lk(&_opCtx), _context(&_opCtx, nss()) {}
+    Base()
+        : _lk(&_opCtx),
+          _db(DatabaseHolder::get(&_opCtx)->openDb(&_opCtx, nss().dbName(), nullptr)) {}
 
     virtual ~Base() {
         if (!collection())
             return;
         WriteUnitOfWork wunit(&_opCtx);
-        _context.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
+        _db->dropCollection(&_opCtx, nss()).transitional_ignore();
         wunit.commit();
     }
 
@@ -86,7 +89,7 @@ protected:
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
-    OldClientContext _context;
+    Database* _db;
 };
 
 class InsertNoId : public Base {
@@ -98,8 +101,7 @@ public:
         CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
-            coll = CollectionPtr::CollectionPtr_UNSAFE(
-                _context.db()->createCollection(&_opCtx, nss()));
+            coll = CollectionPtr::CollectionPtr_UNSAFE(_db->createCollection(&_opCtx, nss()));
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;

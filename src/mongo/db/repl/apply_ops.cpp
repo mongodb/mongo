@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -99,7 +100,6 @@ Status _applyOps(OperationContext* opCtx,
         const NamespaceString nss(NamespaceStringUtil::deserialize(
             dbName.tenantId(), opObj["ns"].String(), SerializationContext::stateDefault()));
 
-        // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())
             return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.toStringForErrorMsg()};
 
@@ -179,8 +179,13 @@ Status _applyOps(OperationContext* opCtx,
                                          "non-existent namespace "
                                       << nss.toStringForErrorMsg() << ": " << mongo::redact(opObj));
                     }
-
-                    OldClientContext ctx(opCtx, nss);
+                    AutoStatsTracker statsTracker(
+                        opCtx,
+                        nss,
+                        Top::LockType::WriteLocked,
+                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                        DatabaseProfileSettings::get(opCtx->getServiceContext())
+                            .getDatabaseProfileLevel(nss.dbName()));
 
                     // We return the status rather than merely aborting so failure of CRUD
                     // ops doesn't stop the applyOps from trying to process the rest of the

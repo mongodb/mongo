@@ -49,7 +49,8 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/oplog_constraint_violation_logger.h"
+#include "mongo/db/profile_settings.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -505,8 +506,14 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                         str::stream()
                             << "missing database (" << nss.dbName().toStringForErrorMsg() << ")",
                         db);
-                OldClientContext ctx(opCtx, coll->nss(), db);
 
+                AutoStatsTracker statsTracker(
+                    opCtx,
+                    nss,
+                    Top::LockType::WriteLocked,
+                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                    DatabaseProfileSettings::get(opCtx->getServiceContext())
+                        .getDatabaseProfileLevel(nss.dbName()));
                 // We convert updates to upserts in secondary mode when the
                 // oplogApplicationEnforcesSteadyStateConstraints parameter is false, to avoid
                 // failing on the constraint that updates in steady state mode always update

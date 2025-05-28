@@ -80,22 +80,20 @@ public:
     IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss);
+        AutoGetDb autodb(&opCtx, _nss.dbName(), MODE_X);
         WriteUnitOfWork wuow(&opCtx);
 
-        ctx.db()->createCollection(&opCtx, _nss);
+        autodb.ensureDbExists(&opCtx)->createCollection(&opCtx, _nss);
         wuow.commit();
     }
 
     ~IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss);
+        AutoGetDb autodb(&opCtx, _nss.dbName(), MODE_X);
         WriteUnitOfWork wuow(&opCtx);
 
-        ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
+        autodb.ensureDbExists(&opCtx)->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 
@@ -141,22 +139,20 @@ public:
     RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss);
+        AutoGetDb autodb(&opCtx, _nss.dbName(), MODE_X);
         WriteUnitOfWork wuow(&opCtx);
 
-        ctx.db()->createCollection(&opCtx, _nss);
+        autodb.ensureDbExists(&opCtx)->createCollection(&opCtx, _nss);
         wuow.commit();
     }
 
     ~RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss);
+        AutoGetDb autodb(&opCtx, _nss.dbName(), MODE_X);
         WriteUnitOfWork wuow(&opCtx);
 
-        ctx.db()->dropCollection(&opCtx, _nss).transitional_ignore();
+        autodb.ensureDbExists(&opCtx)->dropCollection(&opCtx, _nss).transitional_ignore();
         wuow.commit();
     }
 

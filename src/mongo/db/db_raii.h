@@ -461,38 +461,6 @@ private:
 };
 
 /**
- * Opens the database that we want to use and sets the appropriate namespace on the
- * current operation.
- */
-class OldClientContext {
-    OldClientContext(const OldClientContext&) = delete;
-    OldClientContext& operator=(const OldClientContext&) = delete;
-
-public:
-    OldClientContext(OperationContext* opCtx, const NamespaceString& nss, bool doVersion = true);
-    ~OldClientContext();
-
-    Database* db() const {
-        return _db;
-    }
-
-    /** @return if the db was created by this OldClientContext */
-    bool justCreated() const {
-        return _justCreated;
-    }
-
-private:
-    friend class CurOp;
-
-    const Timer _timer;
-
-    OperationContext* const _opCtx;
-
-    Database* _db;
-    bool _justCreated{false};
-};
-
-/**
  * Returns a MODE_IX LockMode if a read is performed under readConcern level snapshot, or a MODE_IS
  * lock otherwise. MODE_IX acquisition will allow a read to participate in two-phase locking.
  * Throws an exception if 'system.views' is being queried within a transaction.

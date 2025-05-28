@@ -65,8 +65,8 @@ namespace CountTests {
 
 class Base {
 public:
-    Base() : _lk(&_opCtx, nss().dbName(), MODE_X), _context(&_opCtx, nss()), _client(&_opCtx) {
-        _database = _context.db();
+    Base() : _autoDb(&_opCtx, nss().dbName(), MODE_X), _client(&_opCtx) {
+        _database = _autoDb.ensureDbExists(&_opCtx);
 
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -136,9 +136,7 @@ protected:
 
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
-    Lock::DBLock _lk;
-
-    OldClientContext _context;
+    AutoGetDb _autoDb;
 
     Database* _database;
     CollectionPtr _collection;

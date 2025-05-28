@@ -53,6 +53,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -590,9 +591,13 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
         writeConflictRetry(opCtx, "dropIndexes", (*collection)->ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
-
-            // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, (*collection)->ns());
+            AutoStatsTracker statsTracker(
+                opCtx,
+                (*collection)->ns(),
+                Top::LockType::WriteLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileLevel((*collection)->ns().dbName()));
 
             // Iterate through all the aborted indexes and drop any indexes that are ready in
             // the index catalog. This would indicate that while we yielded our locks during the
@@ -644,9 +649,14 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     writeConflictRetry(
         opCtx, "dropIndexes", (*collection)->ns(), [opCtx, &collection, &indexNames, &reply] {
             WriteUnitOfWork wunit(opCtx);
+            AutoStatsTracker statsTracker(
+                opCtx,
+                (*collection)->ns(),
+                Top::LockType::WriteLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileLevel((*collection)->ns().dbName()));
 
-            // This is necessary to check shard version.
-            OldClientContext ctx(opCtx, (*collection)->ns());
             CollectionWriter writer{opCtx, *collection};
             dropReadyIndexes(opCtx, writer.getWritableCollection(opCtx), indexNames, &reply, false);
             wunit.commit();
@@ -693,10 +703,12 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-
-        // This is necessary to check shard version.
-        OldClientContext ctx(opCtx, nss);
-
+        AutoStatsTracker statsTracker(opCtx,
+                                      collAcq.nss(),
+                                      Top::LockType::WriteLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(collAcq.nss().dbName()));
         CollectionWriter writer{opCtx, &collAcq};
 
         DropIndexesReply ignoredReply;

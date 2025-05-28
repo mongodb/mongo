@@ -1066,41 +1066,6 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
         opCtx, _autoCollForRead.getNss(), _autoCollForRead.getCollection(), options._expectedUUID);
 }
 
-OldClientContext::OldClientContext(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   bool doVersion)
-    : _opCtx(opCtx) {
-    const auto dbName = nss.dbName();
-    _db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
-
-    if (!_db) {
-        _db = DatabaseHolder::get(opCtx)->openDb(_opCtx, dbName, &_justCreated);
-        invariant(_db);
-    }
-
-    auto const currentOp = CurOp::get(_opCtx);
-
-    if (doVersion) {
-        switch (currentOp->getNetworkOp()) {
-            case dbGetMore:  // getMore is special and should be handled elsewhere
-            case dbUpdate:   // update & delete check shard version as part of the write executor
-            case dbDelete:   // path, so no need to check them here as well
-                break;
-            default:
-                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, nss)
-                    ->checkShardVersionOrThrow(_opCtx);
-                break;
-        }
-    }
-
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
-
-    currentOp->enter(lk,
-                     nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
-                     DatabaseProfileSettings::get(opCtx->getServiceContext())
-                         .getDatabaseProfileLevel(_db->name()));
-}
-
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
@@ -1189,26 +1154,6 @@ AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* o
     } else {
         _autoGet.emplace(opCtx, dbName, MODE_IS, deadline);
     }
-}
-
-OldClientContext::~OldClientContext() {
-    // If in an interrupt, don't record any stats.
-    // It is possible to have no lock after saving the lock state and being interrupted while
-    // waiting to restore.
-    if (_opCtx->getKillStatus() != ErrorCodes::OK)
-        return;
-
-    invariant(shard_role_details::getLocker(_opCtx)->isLocked());
-    auto currentOp = CurOp::get(_opCtx);
-    Top::getDecoration(_opCtx).record(_opCtx,
-                                      currentOp->getNSS(),
-                                      currentOp->getLogicalOp(),
-                                      shard_role_details::getLocker(_opCtx)->isWriteLocked()
-                                          ? Top::LockType::WriteLocked
-                                          : Top::LockType::ReadLocked,
-                                      _timer.elapsed(),
-                                      currentOp->isCommand(),
-                                      currentOp->getReadWriteType());
 }
 
 LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {

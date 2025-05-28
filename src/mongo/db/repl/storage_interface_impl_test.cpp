@@ -142,9 +142,8 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options = generateOptionsWithUuid()) {
     writeConflictRetry(opCtx, "createCollection", nss, [&] {
-        Lock::DBLock dblk(opCtx, nss.dbName(), MODE_X);
-        OldClientContext ctx(opCtx, nss);
-        auto db = ctx.db();
+        AutoGetDb autodb(opCtx, nss.dbName(), MODE_X);
+        auto db = autodb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
         mongo::WriteUnitOfWork wuow(opCtx);
         auto coll = db->createCollection(opCtx, nss, options);

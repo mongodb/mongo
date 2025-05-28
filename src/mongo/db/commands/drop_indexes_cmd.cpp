@@ -52,6 +52,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
@@ -205,8 +206,12 @@ public:
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             acquisition.uuid());
 
-        // This is necessary to set up CurOp and update the Top stats.
-        OldClientContext ctx(opCtx, toReIndexNss);
+        AutoStatsTracker statsTracker(opCtx,
+                                      toReIndexNss,
+                                      Top::LockType::WriteLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(toReIndexNss.dbName()));
 
         const auto defaultIndexVersion = IndexDescriptor::getDefaultIndexVersion();
 

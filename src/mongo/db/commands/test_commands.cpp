@@ -54,6 +54,7 @@
 #include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -129,9 +130,15 @@ public:
         LOGV2(20505, "Test-only command 'godinsert' invoked", "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
-        Lock::DBLock lk(opCtx, dbName, MODE_X);
-        OldClientContext ctx(opCtx, nss);
-        Database* db = ctx.db();
+        AutoGetDb autodb(opCtx, dbName, MODE_X);
+        Database* db = autodb.ensureDbExists(opCtx);
+
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::WriteLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(dbName));
 
         auto collection = acquireCollection(
             opCtx,

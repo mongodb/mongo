@@ -37,6 +37,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -63,13 +64,19 @@ public:
 
 private:
     AutoGetOplogFastPath _oplogRead;
-    OldClientContext _ctx;
+    AutoStatsTracker _tracker;
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 };
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
     : _oplogRead(opCtx, OplogAccessMode::kRead),
-      _ctx(opCtx, NamespaceString::kRsOplogNamespace),
+      _tracker(opCtx,
+               NamespaceString::kRsOplogNamespace,
+               shard_role_details::getLocker(opCtx)->isWriteLocked() ? Top::LockType::WriteLocked
+                                                                     : Top::LockType::ReadLocked,
+               AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+               DatabaseProfileSettings::get(opCtx->getServiceContext())
+                   .getDatabaseProfileLevel(NamespaceString::kRsOplogNamespace.dbName())),
       _exec(_oplogRead.getCollection()
                 ? InternalPlanner::collectionScan(opCtx,
                                                   &_oplogRead.getCollection(),
