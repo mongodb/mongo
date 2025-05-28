@@ -325,3 +325,36 @@ assertChangeStreamEventEq(event, {
     fullDocument: {_id: 0},
     documentKey: {_id: 0}
 });
+
+// Verify that collection names such as 'system_views' do not trigger fake view creation events.
+["system_views", "systemxviews", "systemviews"].forEach((collName) => {
+    assertDropCollection(testDB, collName);
+    assert.commandWorked(testDB.createCollection(collName));
+
+    // Note: excluding "createIndexes" and "shardCollection" events is necessary here because some
+    // passthroughs add index creation events to the change stream.
+    cursor = cst.startWatchingChanges({
+        pipeline: [
+            {$changeStream: {showExpandedEvents: true}},
+            {$match: {operationType: {$nin: ["shardCollection", "createIndexes"]}}}
+        ],
+        collection: 1,
+        doNotModifyInPassthroughs: true
+    });
+
+    // Insert a document into a collection with a name similar to 'system.views'.
+    testDB[collName].insert({_id: "test"});
+
+    // Verify that we only see the insert and no view creation event.
+    event = cst.getNextChanges(cursor, 1)[0];
+    assertChangeStreamEventEq(event, {
+        operationType: "insert",
+        ns: {db: dbName, coll: collName},
+        fullDocument: {_id: "test"},
+        documentKey: {_id: "test"}
+    });
+
+    cst.assertNoChange(cursor);
+
+    assertDropCollection(testDB, collName);
+});

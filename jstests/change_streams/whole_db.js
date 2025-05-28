@@ -53,7 +53,8 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 // Test that the change stream returns an inserted doc on a user-created collection whose name
 // includes "system" but is not considered an internal collection.
-const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
+const validSystemColls =
+    ["system", "systems.views", "ssystem.views", "test.system", "system_views"];
 validSystemColls.forEach(collName => {
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
     const coll = testDb.getCollection(collName);

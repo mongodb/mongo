@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
 #include "mongo/db/commands/server_status_metric.h"
@@ -60,9 +59,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -100,7 +96,6 @@ void DocumentSourceChangeStream::checkValueTypeOrMissing(const Value v,
 
 DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChangeStreamType(
     const NamespaceString& nss) {
-
     // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
     return (nss.isAdminDB()
                 ? ChangeStreamType::kAllChangesForCluster
@@ -122,9 +117,8 @@ StringData DocumentSourceChangeStream::resolveAllCollectionsRegex(
 
 std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    const auto type = getChangeStreamType(expCtx->getNamespaceString());
     const auto& nss = expCtx->getNamespaceString();
-    switch (type) {
+    switch (getChangeStreamType(nss)) {
         case ChangeStreamType::kSingleCollection:
             // Match the target namespace exactly.
             return fmt::format(
@@ -152,6 +146,15 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(
     }
 }
 
+BSONObj DocumentSourceChangeStream::getNsMatchObjForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // TODO SERVER-105554
+    // Currently we always return a BSONRegEx with the ns match string. We may optimize this to
+    // exact matches ('$eq') for single collection change streams in the future to improve matching
+    // performance. This is currently not safe because of collations that can affect the matching.
+    return BSON("" << BSONRegEx(getNsRegexForChangeStream(expCtx)));
+}
+
 std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
@@ -159,16 +162,26 @@ std::string DocumentSourceChangeStream::getViewNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // For a single database, match any events on the system.views collection on that
             // database.
-            return fmt::format("^{}\\.system.views$",
+            return fmt::format("^{}\\.system\\.views$",
                                regexEscapeNsForChangeStream(DatabaseNameUtil::serialize(
                                    nss.dbName(), expCtx->getSerializationContext())));
         case ChangeStreamType::kAllChangesForCluster:
             // Match all system.views collections on all databases.
-            return fmt::format("{}\\.system.views$", kRegexAllDBs);
+            return fmt::format("{}\\.system\\.views$", kRegexAllDBs);
         default:
             // We should never attempt to generate this regex for a single-collection stream.
             MONGO_UNREACHABLE_TASSERT(6394400);
     }
+}
+
+BSONObj DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // TODO SERVER-105554
+    // Currently we always return a BSONRegEx with the view ns match string. We may optimize this to
+    // exact matches ('$eq') for single database change streams in the future to improve matching
+    // performance. This currently may not be safe because of collations that can affect the
+    // matching.
+    return BSON("" << BSONRegEx(getViewNsRegexForChangeStream(expCtx)));
 }
 
 std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
@@ -187,6 +200,16 @@ std::string DocumentSourceChangeStream::getCollRegexForChangeStream(
     }
 }
 
+BSONObj DocumentSourceChangeStream::getCollMatchObjForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // TODO SERVER-105554
+    // Currently we always return a BSONRegEx with the collection match string. We may optimize this
+    // to exact matches ('$eq') for single collection change streams in the future to improve
+    // matching performance. This currently may not be safe because of collations that can affect
+    // the matching.
+    return BSON("" << BSONRegEx(getCollRegexForChangeStream(expCtx)));
+}
+
 std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     const auto& nss = expCtx->getNamespaceString();
@@ -203,6 +226,16 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+BSONObj DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    // TODO SERVER-105554
+    // Currently we always return a BSONRegEx with the collection-less aggregate ns match string. We
+    // may optimize this to exact matches ('$eq') for single collection and single database change
+    // streams in the future to improve matching performance. This currently may not be safe because
+    // of collations that can affect the matching.
+    return BSON("" << BSONRegEx(getCmdNsRegexForChangeStream(expCtx)));
 }
 
 std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData source) {

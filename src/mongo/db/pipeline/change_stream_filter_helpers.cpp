@@ -30,10 +30,8 @@
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -71,21 +69,21 @@ std::unique_ptr<MatchExpression> buildFromMigrateSystemOpFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
-    auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
+    BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
 
     // The filter {fromMigrate:true} allows quickly skip nonrelevant oplog entries
     auto andMigrateEvents = std::make_unique<AndMatchExpression>();
     andMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(BSON("fromMigrate" << true)), expCtx));
     andMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
-        backingBsonObjs.emplace_back(BSON("ns" << BSONRegEx(cmdNsRegex))), expCtx));
+        backingBsonObjs.emplace_back(BSON("ns" << cmdMatch.firstElement())), expCtx));
 
     auto orMigrateEvents = std::make_unique<OrMatchExpression>();
-    auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
+    BSONObj collMatch = DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx);
     orMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
-        backingBsonObjs.emplace_back(BSON("o.create" << BSONRegEx(collRegex))), expCtx));
+        backingBsonObjs.emplace_back(BSON("o.create" << collMatch.firstElement())), expCtx));
     orMigrateEvents->add(MatchExpressionParser::parseAndNormalize(
-        backingBsonObjs.emplace_back(BSON("o.createIndexes" << BSONRegEx(collRegex))), expCtx));
+        backingBsonObjs.emplace_back(BSON("o.createIndexes" << collMatch.firstElement())), expCtx));
     andMigrateEvents->add(std::move(orMigrateEvents));
     return andMigrateEvents;
 }
@@ -112,11 +110,10 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
 
-    // Regexes to match each of the necessary namespace components for the current stream type.
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
-    auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
-    auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
-
+    // Match expressions for matching each of the necessary namespace components for the current
+    // stream type.
+    BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
+    BSONObj collMatch = DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx);
     auto streamType = DocumentSourceChangeStream::getChangeStreamType(expCtx->getNamespaceString());
 
     /**
@@ -130,12 +127,12 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     // The standard event filter, before it is combined with the user filter, is as follows:
     //    {
     //      $or: [
-    //        {ns: nsRegex, $nor: [{op: "n"}, {op: "c"}]},    // CRUD events
-    //        {ns: cmdNsRegex, op: "c", $or: [                // Commands on relevant DB(s)
-    //          {"o.drop": collRegex},                        // Drops of relevant collection(s)
-    //          {"o.renameCollection": nsRegex},              // Renames of relevant collection(s)
+    //        {ns: nsMatch, $nor: [{op: "n"}, {op: "c"}]},    // CRUD events
+    //        {ns: cmdNsMatch, op: "c", $or: [                // Commands on relevant DB(s)
+    //          {"o.drop": collMatch},                        // Drops of relevant collection(s)
+    //          {"o.renameCollection": nsMatch},              // Renames of relevant collection(s)
     //          {"o.renameCollection": {$exists: true},       // Relevant collection was overwritten
-    //              "o.to": nsRegex},
+    //              "o.to": nsMatch},
     //          {"o.dropDatabase": {$exists: true}}           // Omitted for single-coll streams
     //        ]}
     //      ]
@@ -146,28 +143,31 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
 
     // (1) CRUD events on a monitored namespace.
     auto crudEvents = backingBsonObjs.emplace_back(
-        BSON("ns" << BSONRegEx(nsRegex) << "$nor"
+        BSON("ns" << nsMatch.firstElement() << "$nor"
                   << BSON_ARRAY(BSON("op" << "n") << BSON("op" << "c"))));
 
+    BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
+
     // (2.1) The namespace for matching relevant commands.
-    auto cmdNsMatch = backingBsonObjs.emplace_back(BSON("op" << "c"
-                                                             << "ns" << BSONRegEx(cmdNsRegex)));
+    auto cmdNsMatch =
+        backingBsonObjs.emplace_back(BSON("op" << "c" << "ns" << cmdMatch.firstElement()));
 
     // (2.2) Commands that are run on a monitored database and/or collection.
-    auto dropEvent = backingBsonObjs.emplace_back(BSON("o.drop" << BSONRegEx(collRegex)));
+    auto dropEvent = backingBsonObjs.emplace_back(BSON("o.drop" << collMatch.firstElement()));
     auto renameFromEvent =
-        backingBsonObjs.emplace_back(BSON("o.renameCollection" << BSONRegEx(nsRegex)));
+        backingBsonObjs.emplace_back(BSON("o.renameCollection" << nsMatch.firstElement()));
     auto renameToEvent = backingBsonObjs.emplace_back(
-        BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << BSONRegEx(nsRegex)));
-    const auto createEvent = backingBsonObjs.emplace_back(BSON("o.create" << BSONRegEx(collRegex)));
+        BSON("o.renameCollection" << BSON("$exists" << true) << "o.to" << nsMatch.firstElement()));
+    const auto createEvent =
+        backingBsonObjs.emplace_back(BSON("o.create" << collMatch.firstElement()));
     const auto createIndexesEvent =
-        backingBsonObjs.emplace_back(BSON("o.createIndexes" << BSONRegEx(collRegex)));
+        backingBsonObjs.emplace_back(BSON("o.createIndexes" << collMatch.firstElement()));
     const auto commitIndexBuildEvent =
-        backingBsonObjs.emplace_back(BSON("o.commitIndexBuild" << BSONRegEx(collRegex)));
+        backingBsonObjs.emplace_back(BSON("o.commitIndexBuild" << collMatch.firstElement()));
     const auto dropIndexesEvent =
-        backingBsonObjs.emplace_back(BSON("o.dropIndexes" << BSONRegEx(collRegex)));
+        backingBsonObjs.emplace_back(BSON("o.dropIndexes" << collMatch.firstElement()));
     const auto collModEvent =
-        backingBsonObjs.emplace_back(BSON("o.collMod" << BSONRegEx(collRegex)));
+        backingBsonObjs.emplace_back(BSON("o.collMod" << collMatch.firstElement()));
 
     auto orCmdEvents = std::make_unique<OrMatchExpression>();
     orCmdEvents->add(MatchExpressionParser::parseAndNormalize(dropEvent, expCtx));
@@ -181,10 +181,10 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
 
     if (expCtx->getChangeStreamSpec()->getShowSystemEvents()) {
         orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
-            backingBsonObjs.emplace_back(BSON("o.startIndexBuild" << BSONRegEx{collRegex})),
+            backingBsonObjs.emplace_back(BSON("o.startIndexBuild" << collMatch.firstElement())),
             expCtx));
         orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
-            backingBsonObjs.emplace_back(BSON("o.abortIndexBuild" << BSONRegEx{collRegex})),
+            backingBsonObjs.emplace_back(BSON("o.abortIndexBuild" << collMatch.firstElement())),
             expCtx));
     }
 
@@ -227,9 +227,10 @@ std::unique_ptr<MatchExpression> buildViewDefinitionEventFilter(
     //     {op: "c"}
     //   ]
     // }
-    auto nsSystemViewsRegex = DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx);
+    BSONObj nsSystemViewsMatch =
+        DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx);
     auto viewEventsFilter = backingBsonObjs.emplace_back(
-        BSON("ns" << BSONRegEx(nsSystemViewsRegex) << "$nor"
+        BSON("ns" << nsSystemViewsMatch.firstElement() << "$nor"
                   << BSON_ARRAY(BSON("op" << "n") << BSON("op" << "c"))));
 
     return MatchExpressionParser::parseAndNormalize(viewEventsFilter, expCtx);
@@ -278,7 +279,7 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     BSONObjBuilder applyOpsBuilder;
 
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
+    BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
 
     // "o.applyOps" stores the list of operations, so it must be an array.
     applyOpsBuilder.append("op", "c");
@@ -290,31 +291,34 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
         // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.
         BSONArrayBuilder orBuilder(applyOpsBuilder.subarrayStart("$or"));
         {
-            // Regexes for full-namespace, collection, and command-namespace matching.
-            auto collRegex = DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx);
-            auto cmdNsRegex = DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx);
+            // Regex or exact match for collection name.
+            BSONObj collMatch = DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx);
+
+            // Regex for matching collection-less aggregate.
+            BSONObj cmdMatch = DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx);
 
             // Match relevant CRUD events on the monitored namespaces.
-            orBuilder.append(BSON("o.applyOps.ns" << BSONRegEx(nsRegex)));
+            orBuilder.append(BSON("o.applyOps.ns" << nsMatch.firstElement()));
 
             // Match relevant command events on the monitored namespaces.
             orBuilder.append(BSON(
                 "o.applyOps" << BSON(
                     "$elemMatch" << BSON(
-                        "ns" << BSONRegEx(cmdNsRegex)
-                             << OR(BSON("o.create" << BSONRegEx(collRegex)),
+                        "ns" << cmdMatch.firstElement()
+                             << OR(BSON("o.create" << collMatch.firstElement()),
                                    // We don't need to consider 'o.commitIndexBuild' here because
                                    // creating an index on a non-empty collection is not allowed.
-                                   BSON("o.createIndexes" << BSONRegEx(collRegex)))))));
+                                   BSON("o.createIndexes" << collMatch.firstElement()))))));
 
             // The default repl::OpTime is the value used to indicate a null "prevOpTime" link.
             orBuilder.append(BSON(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName
                                   << BSON("$ne" << repl::OpTime().toBSON())));
         }
     }
+
     auto applyOpsFilter = applyOpsBuilder.obj();
     auto endOfTransactionFilter = BSON("op" << "n"
-                                            << "o2.endOfTransaction" << BSONRegEx(nsRegex));
+                                            << "o2.endOfTransaction" << nsMatch.firstElement());
     auto commitTransactionFilter = BSON("op" << "c"
                                              << "o.commitTransaction" << 1);
 
@@ -373,10 +377,10 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     // Finalize the array of $or filter predicates.
     internalOpTypeOrBuilder.done();
 
-    auto nsRegex = DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx);
+    BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
     return MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(BSON("op" << "n"
-                                               << "ns" << BSONRegEx(nsRegex) << "$or"
+                                               << "ns" << nsMatch.firstElement() << "$or"
                                                << internalOpTypeOrBuilder.arr())),
         expCtx);
 }

@@ -36,6 +36,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
@@ -684,6 +686,130 @@ TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
 
     ASSERT_THROWS_CODE(
         DSChangeStream::createFromBson(spec.firstElement(), expCtx), AssertionException, 31123);
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamRegexEscape) {
+    ASSERT_EQ(""_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream(""));
+    ASSERT_EQ(" "_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream(" "));
+    ASSERT_EQ("foo bar"_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream("foo bar"));
+    ASSERT_EQ("qux-QUX "_sd, DocumentSourceChangeStream::regexEscapeNsForChangeStream("qux-QUX "));
+    ASSERT_EQ("\\^foo\\*bar\\$"_sd,
+              DocumentSourceChangeStream::regexEscapeNsForChangeStream("^foo*bar$"));
+    ASSERT_EQ("\\*\\+\\|\\(\\)\\^\\?\\[\\]\\.\\/\\\\\\$"_sd,
+              DocumentSourceChangeStream::regexEscapeNsForChangeStream("*+|()^?[]./\\$"));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeSingleCollection) {
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kSingleCollection,
+              DocumentSourceChangeStream::getChangeStreamType(nss));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeSingleDatabase) {
+    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+    ASSERT_TRUE(nss.isCollectionlessAggregateNS());
+    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kSingleDatabase,
+              DocumentSourceChangeStream::getChangeStreamType(nss));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamGetTypeWholeCluster) {
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    ASSERT_TRUE(nss.isAdminDB());
+    ASSERT_EQ(DocumentSourceChangeStream::ChangeStreamType::kAllChangesForCluster,
+              DocumentSourceChangeStream::getChangeStreamType(nss));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleCollection) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("unittest"_sd, "someCollection"_sd);
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ("^unittest\\.someCollection$",
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.someCollection$")),
+                      DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^someCollection$", DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^someCollection$")),
+                      DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesSingleDatabase) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::makeCollectionlessAggregateNSS(
+        NamespaceString::createNamespaceString_forTest("unittest"_sd).dbName());
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ(fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(
+                 fmt::format("^unittest\\.{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.system\\.views$",
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.system\\.views$")),
+                      DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ("^unittest\\.\\$cmd$",
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx("^unittest\\.\\$cmd$")),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
+}
+
+TEST_F(ChangeStreamStageTest, ChangeStreamBuiltInRegexesWholeCluster) {
+    auto expCtx = getExpCtx();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("admin"_sd);
+    expCtx->setNamespaceString(nss);
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("{}\\.{}",
+                                         DocumentSourceChangeStream::kRegexAllDBs,
+                                         DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.system\\.views$", DocumentSourceChangeStream::kRegexAllDBs),
+              DocumentSourceChangeStream::getViewNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format(
+                 "{}\\.system\\.views$",
+                 DocumentSourceChangeStream::DocumentSourceChangeStream::kRegexAllDBs))),
+        DocumentSourceChangeStream::getViewNsMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections),
+              DocumentSourceChangeStream::getCollRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(
+        BSON("" << BSONRegEx(fmt::format("^{}", DocumentSourceChangeStream::kRegexAllCollections))),
+        DocumentSourceChangeStream::getCollMatchObjForChangeStream(expCtx));
+
+    ASSERT_EQ(fmt::format("{}\\.{}",
+                          DocumentSourceChangeStream::kRegexAllDBs,
+                          DocumentSourceChangeStream::kRegexCmdColl),
+              DocumentSourceChangeStream::getCmdNsRegexForChangeStream(expCtx));
+    ASSERT_BSONOBJ_EQ(BSON("" << BSONRegEx(fmt::format("{}\\.{}",
+                                                       DocumentSourceChangeStream::kRegexAllDBs,
+                                                       DocumentSourceChangeStream::kRegexCmdColl))),
+                      DocumentSourceChangeStream::getCmdNsMatchObjForChangeStream(expCtx));
 }
 
 TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
