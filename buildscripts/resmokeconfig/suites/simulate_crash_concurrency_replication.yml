@@ -11,6 +11,7 @@ selector:
   exclude_with_any_tags:
     - requires_standalone
     - requires_sharding
+    - excluded_from_simulate_crash_suites
 
 executor:
   archive:
