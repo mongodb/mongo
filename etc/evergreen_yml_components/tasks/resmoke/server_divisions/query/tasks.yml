@@ -565,6 +565,7 @@ tasks:
           change_streams_downgrade_last_lts_new_old_old_new: last_lts
       - func: "generate resmoke tasks"
         vars:
+          use_large_distro: "true"
           resmoke_args: >-
             --runNoFeatureFlagTests
 
