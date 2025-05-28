@@ -99,3 +99,6 @@ filters:
   - "*reshard*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "sampling_based_initial_split_policy_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

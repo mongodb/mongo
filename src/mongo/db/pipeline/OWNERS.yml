@@ -280,6 +280,3 @@ filters:
   - "*sharded_data_distribution*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "sampling_based_initial_split_policy_test.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing

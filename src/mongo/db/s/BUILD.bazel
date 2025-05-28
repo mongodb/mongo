@@ -1808,6 +1808,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/config:configsvr_coordinator_service_test.cpp",
         "//src/mongo/db/s/config:index_on_config_test.cpp",
         "//src/mongo/db/s/config:initial_split_policy_test.cpp",
+        "//src/mongo/db/s/config:sampling_based_initial_split_policy_test.cpp",
         "//src/mongo/db/s/config:set_cluster_parameter_coordinator_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_add_shard_test.cpp",
         "//src/mongo/db/s/config:sharding_catalog_manager_add_shard_to_zone_test.cpp",
@@ -1831,6 +1832,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/s/resharding:resharding_coordinator_test.cpp",
         "//src/mongo/db/s/resharding:resharding_service_test_helpers.h",
         "//src/mongo/db/s/resharding:resharding_util_test.cpp",
+        "//src/mongo/s/query/exec:sharded_agg_test_fixture.h",
     ],
     tags = [
         "mongo_unittest_seventh_group",
@@ -1861,6 +1863,7 @@ mongo_cc_unit_test(
         "//src/mongo/executor:mock_async_rpc",
         "//src/mongo/idl:cluster_server_parameter_common",
         "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/util:version_impl",
     ],
 )

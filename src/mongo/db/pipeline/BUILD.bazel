@@ -1396,7 +1396,6 @@ mongo_cc_unit_test(
         "pipeline_test.cpp",
         "plan_executor_pipeline_test.cpp",
         "resume_token_test.cpp",
-        "sampling_based_initial_split_policy_test.cpp",
         "semantic_analysis_test.cpp",
         "sequential_document_cache_test.cpp",
         "serverless_aggregation_context_fixture.cpp",
