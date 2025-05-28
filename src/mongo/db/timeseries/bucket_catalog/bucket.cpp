@@ -88,7 +88,7 @@ Bucket::~Bucket() {
 }
 
 bool allCommitted(const Bucket& bucket) {
-    return bucket.batches.empty() && !bucket.preparedBatch;
+    return bucket.batches.empty() && !bucket.groupCommitBatch && !bucket.preparedBatch;
 }
 
 bool schemaIncompatible(Bucket& bucket,
@@ -164,23 +164,37 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts& trackingContexts,
 
 std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
-                                        OperationId opId,
+                                        boost::optional<OperationId> opId,
                                         std::uint8_t stripe,
                                         ExecutionStatsController& stats) {
-    auto it = bucket.batches.find(opId);
-    if (it == bucket.batches.end()) {
-        it = bucket.batches
-                 .try_emplace(opId,
-                              std::make_shared<WriteBatch>(
-                                  trackingContexts,
-                                  bucket.bucketId,
-                                  bucket.key,
-                                  opId,
-                                  stats,
-                                  StringData{bucket.timeField.data(), bucket.timeField.size()}))
-                 .first;
+    if (opId) {
+        auto it = bucket.batches.find(*opId);
+        if (it == bucket.batches.end()) {
+            it = bucket.batches
+                     .try_emplace(*opId,
+                                  std::make_shared<WriteBatch>(
+                                      trackingContexts,
+                                      bucket.bucketId,
+                                      bucket.key,
+                                      *opId,
+                                      stats,
+                                      StringData{bucket.timeField.data(), bucket.timeField.size()}))
+                     .first;
+        }
+        return it->second;
     }
-    return it->second;
+
+    if (!bucket.groupCommitBatch) {
+        bucket.groupCommitBatch = std::make_shared<WriteBatch>(
+            trackingContexts,
+            bucket.bucketId,
+            bucket.key,
+            opId,
+            stats,
+            StringData{bucket.timeField.data(), bucket.timeField.size()});
+    }
+
+    return bucket.groupCommitBatch;
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

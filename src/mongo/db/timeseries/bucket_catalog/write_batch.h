@@ -98,7 +98,7 @@ struct WriteBatch {
     WriteBatch(TrackingContexts& trackingContexts,
                const BucketId& bucketId,
                BucketKey bucketKey,
-               OperationId opId,
+               boost::optional<OperationId> opId,
                ExecutionStatsController& stats,
                StringData timeField);
 
@@ -122,7 +122,7 @@ struct WriteBatch {
 
     AtomicWord<bool> commitRights{false};
 
-    const OperationId opId;
+    boost::optional<const OperationId> opId;
 
     uint32_t numPreviouslyCommittedMeasurements = 0;
 

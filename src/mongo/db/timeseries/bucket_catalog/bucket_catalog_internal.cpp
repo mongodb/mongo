@@ -100,10 +100,11 @@ Mutex _bucketIdGenLock =
 PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 AtomicWord<uint64_t> _bucketIdGenCounter{static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64())};
 
-OperationId getOpId(OperationContext* opCtx, CombineWithInsertsFromOtherClients combine) {
+boost::optional<OperationId> getOpId(OperationContext* opCtx,
+                                     CombineWithInsertsFromOtherClients combine) {
     switch (combine) {
         case CombineWithInsertsFromOtherClients::kAllow:
-            return 0;
+            return boost::none;
         case CombineWithInsertsFromOtherClients::kDisallow:
             invariant(opCtx->getOpID());
             return opCtx->getOpID();
@@ -770,7 +771,11 @@ void waitToCommitBatch(BucketStateRegistry& registry,
             if (!waiter.has_value()) {
                 // No other batches for this bucket are currently committing, so we can proceed.
                 bucket->preparedBatch = batch;
-                bucket->batches.erase(batch->opId);
+                if (batch->opId) {
+                    bucket->batches.erase(*(batch->opId));
+                } else {
+                    bucket->groupCommitBatch.reset();
+                }
                 return;
             }
         }
@@ -791,8 +796,7 @@ void removeBucket(BucketCatalog& catalog,
                   Bucket& bucket,
                   ExecutionStatsController& stats,
                   RemovalMode mode) {
-    invariant(bucket.batches.empty());
-    invariant(!bucket.preparedBatch);
+    invariant(allCommitted(bucket));
 
     auto allIt = stripe.openBucketsById.find(bucket.bucketId);
     invariant(allIt != stripe.openBucketsById.end());
@@ -1042,6 +1046,11 @@ void abort(BucketCatalog& catalog,
     // preventing anyone else from using these.
     for (const auto& [_, current] : bucket.batches) {
         abortWriteBatch(*current, status);
+    }
+
+    if (bucket.groupCommitBatch) {
+        abortWriteBatch(*(bucket.groupCommitBatch), status);
+        bucket.groupCommitBatch.reset();
     }
     bucket.batches.clear();
 

@@ -174,6 +174,7 @@ public:
 
     // Batches, per operation, that haven't been committed or aborted yet.
     tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
+    std::shared_ptr<WriteBatch> groupCommitBatch;
 
     // The minimum and maximum values for each field in the bucket.
     MinMax minmax;
@@ -227,7 +228,7 @@ void calculateBucketFieldsAndSizeChange(TrackingContexts&,
  */
 std::shared_ptr<WriteBatch> activeBatch(TrackingContexts& trackingContexts,
                                         Bucket& bucket,
-                                        OperationId opId,
+                                        boost::optional<OperationId> opId,
                                         std::uint8_t stripe,
                                         ExecutionStatsController& stats);
 

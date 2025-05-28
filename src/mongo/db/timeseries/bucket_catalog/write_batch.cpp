@@ -48,7 +48,7 @@ namespace mongo::timeseries::bucket_catalog {
 WriteBatch::WriteBatch(TrackingContexts& tcs,
                        const BucketId& b,
                        BucketKey k,
-                       OperationId o,
+                       boost::optional<OperationId> o,
                        ExecutionStatsController& s,
                        StringData timeField)
     : opId(o),
