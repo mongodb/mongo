@@ -1930,6 +1930,15 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*.idl @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulation_statement* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/accumulator* @10gen/query-execution-classic @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_covariance.cpp @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_exp_moving_avg.cpp @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_for_window_functions.h @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_integral.cpp @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_js_* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_locf.cpp @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_percentile* @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_test.cpp @10gen/query-execution-classic @10gen/query-integration-extensions @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/accumulator_internal_construct_stats.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_request* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_mongod_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot

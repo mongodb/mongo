@@ -23,6 +23,34 @@ filters:
   - "accumulator*":
     approvers:
       - 10gen/query-execution-classic
+  - "accumulator_covariance.cpp":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_exp_moving_avg.cpp":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_for_window_functions.h":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_integral.cpp":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_js_*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_locf.cpp":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_percentile*":
+    approvers:
+      - 10gen/query-integration-extensions
+  - "accumulator_test.cpp":
+    approvers:
+      - 10gen/query-integration-extensions
+      - 10gen/query-execution-classic
+  - "accumulator_internal_construct_stats.cpp":
+    approvers:
+      - 10gen/query-optimization
   - "aggregation_request*":
     approvers:
       - 10gen/query-optimization
