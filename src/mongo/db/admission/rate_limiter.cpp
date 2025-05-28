@@ -118,6 +118,11 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
         }
 
         try {
+            LOGV2_DEBUG(10550200,
+                        4,
+                        "Going to sleep waiting for token acquisition",
+                        "rateLimiterName"_attr = _impl->name,
+                        "napTimeMillis"_attr = napTime.toString());
             opCtx->sleepFor(napTime);
         } catch (const DBException& e) {
             LOGV2_DEBUG(10440800,
