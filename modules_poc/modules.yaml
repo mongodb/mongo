@@ -633,6 +633,15 @@ routing_and_topology:
     - src/mongo/db/s/sharding_runtime_d*
     - src/mongo/db/s/sharding_server_status.cpp
 
+sharding_clients:
+  meta:
+    slack: server-sharding
+    jira: Catalog and Routing
+  files:
+    - src/mongo/db/rs_local_client*
+    - src/mongo/s/client/config_shard_wrapper*
+    - src/mongo/s/client/shard*
+
 transactions:
   meta:
     slack: server-replication
