@@ -255,3 +255,10 @@ feature_flags:
         cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
         default: false
         shouldBeFCVGated: false
+    featureFlagReplicateLocalCatalogIdentifiers:
+        description: >-
+            Enable replication of local catalog identifiers across replica set nodes, ensuring the
+            _mdb_catalog and its associated storage table 'ident' mappings remain consistent.
+        cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
+        default: false
+        shouldBeFCVGated: true
