@@ -142,7 +142,10 @@ mongo_install(
     name = "mongod",
     srcs = [
         "//src/mongo/db:mongod",
-    ],
+    ] + select({
+        "@platforms//os:windows": ["@windows_sasl//:bins"],
+        "//conditions:default": [],
+    }),
 )
 
 # This sets up targets for install-mongos and archive-mongos
