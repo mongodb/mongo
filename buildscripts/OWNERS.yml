@@ -4,14 +4,37 @@ version: 2.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/devprod-correctness
       - 10gen/devprod-build
   - "burn_in_tests.py":
     approvers:
       - 10gen/devprod-correctness
-  - "publish_new_bazel_version.py":
+  - "auto_install_db_contrib_tool.sh":
     approvers:
-      - 10gen/devprod-build
+      - 10gen/devprod-correctness
+  - "resmoke.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "setup_multiversion_mongodb.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "setup_spawnhost_coredump":
+    approvers:
+      - 10gen/devprod-correctness
+  - "hang_analyzer.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "evergreen_resmoke_job_count.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "evergreen_gen_smoke_test_tasks.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "resmoke_tests_runtime_validate.py":
+    approvers:
+      - 10gen/devprod-correctness
+  - "powercycle*":
+    approvers:
+      - 10gen/devprod-correctness
   - "golden_test.py":
     approvers:
       - 10gen/query-optimization

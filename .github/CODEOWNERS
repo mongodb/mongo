@@ -37,14 +37,34 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildfarm/**/* @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/OWNERS.yml
-/buildscripts/ @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/ @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/burn_in_tests.py @10gen/devprod-correctness @svc-auto-approve-bot
-/buildscripts/publish_new_bazel_version.py @10gen/devprod-build @svc-auto-approve-bot
+/buildscripts/auto_install_db_contrib_tool.sh @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/resmoke.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/setup_multiversion_mongodb.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/setup_spawnhost_coredump @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/hang_analyzer.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/evergreen_resmoke_job_count.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/evergreen_gen_smoke_test_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/resmoke_tests_runtime_validate.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/powercycle* @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/antithesis/OWNERS.yml
+/buildscripts/antithesis/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/bazel_rules_mongo/OWNERS.yml
+/buildscripts/bazel_rules_mongo/ @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/bazel_testbuilds/OWNERS.yml
+/buildscripts/bazel_testbuilds/ @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/cost_model/OWNERS.yml
 /buildscripts/cost_model/**/* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/cost_model/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/docs/OWNERS.yml
+/buildscripts/docs/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/idl/OWNERS.yml
 /buildscripts/idl/**/* @10gen/server-programmability @svc-auto-approve-bot
@@ -53,6 +73,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/idl/**/idl_check_compatibility.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/idl/**/idl_compatibility_errors.py @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/idl/**/test_compatibility.py @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/resmoke_proxy/OWNERS.yml
+/buildscripts/resmoke_proxy/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/resmokeconfig/OWNERS.yml
+/buildscripts/resmokeconfig/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/**/*
@@ -140,7 +166,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/query_correctness_query_shape_hash_stability_generated_test.yml @10gen/query-execution-query-settings @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
-/buildscripts/resmokelib/**/* @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/OWNERS.yml
 /buildscripts/resmokelib/testing/**/queryable_server.py @10gen/server-backup-restore @svc-auto-approve-bot
@@ -174,6 +200,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/server_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/server_storage_engine_integration.yml @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/server_ttl.yml @10gen/server-ttl @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/timeouts/OWNERS.yml
+/buildscripts/timeouts/ @10gen/devprod-correctness @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tracing_profiler/OWNERS.yml
 /buildscripts/tracing_profiler/**/* @10gen/query @svc-auto-approve-bot
