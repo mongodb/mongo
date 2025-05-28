@@ -1,11 +1,14 @@
 /**
  * Tests for the ingress handshake metrics.
  *
+ * These tests are tagged "multiversion_incompatible" because they assert the
+ * presence of some metrics that are not necessarily present on older servers.
+ *
  * @tags: [
- *   requires_fcv_70,
  *   # TODO (SERVER-97257): Re-enable this test.
  *   # Test doesn't start enough mongods to have num_mongos routers
  *   embedded_router_incompatible,
+ *   multiversion_incompatible,
  * ]
  */
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
@@ -20,9 +23,6 @@ let runTest = (connectionHealthLoggingOn) => {
         connectionHealthLoggingOn: connectionHealthLoggingOn,
         preAuthDelayMillis: 50,
         postAuthDelayMillis: 100,
-        helloProcessingDelayMillis: 50,
-        helloResponseDelayMillis: 100,
-        helloFailPointName: "routerWaitInHello",
     });
 
     jsTestLog("Connecting to mongos and running the test.");

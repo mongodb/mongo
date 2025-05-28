@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,13 +27,35 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/util/moving_average_metric.h"
 
-// This is a shim header to ease transition to new name. Prefer the new name in new code.
-// The new name is "Atomic." The old name is "AtomicWord."
-#include "mongo/platform/atomic.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-template <typename T>
-using AtomicWord = Atomic<T>;
+namespace {
+
+TEST(MovingAverageMetricTest, MetricBuilderMovingAverage) {
+    MetricTreeSet trees;
+    auto& someAverageMetricThing =
+        *MetricBuilder<MovingAverageMetric>{"some.averageMetricThing"}.bind(0.2).setTreeSet(&trees);
+
+    // No mention of "averageMetricThing" at first.
+    {
+        BSONObjBuilder b;
+        appendMergedTrees({&trees[ClusterRole::None]}, b);
+        ASSERT_BSONOBJ_EQ(b.obj(), BSON("metrics" << BSON("some" << BSONObj{})));
+    }
+
+    // But once we `addSample`, the metric appears (and its first value is the first sample).
+    {
+        someAverageMetricThing.addSample(-8.3);
+        BSONObjBuilder b;
+        appendMergedTrees({&trees[ClusterRole::None]}, b);
+        ASSERT_BSONOBJ_EQ(b.obj(),
+                          BSON("metrics" << BSON("some" << BSON("averageMetricThing" << -8.3))));
+    }
+}
+
+}  // namespace
 }  // namespace mongo

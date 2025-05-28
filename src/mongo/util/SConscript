@@ -68,6 +68,18 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="moving_average_metric_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
+    target="moving_average_test",
+    source=[],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
     target="thread_safety_context_test",
     source=[],
     LIBDEPS=[],
