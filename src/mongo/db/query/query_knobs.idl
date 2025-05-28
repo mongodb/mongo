@@ -119,22 +119,6 @@ server_parameters:
             gt: 0
         redact: false
 
-    internalQueryPlanEvaluationWorksSbe:
-        description: >-
-            The maximum number of individual storage cursor reads performed by any candidate
-            plan during the runtime plan selection trial period. Applies only to queries using the SBE
-            execution engine. This is the analog of the 'internalQueryPlanEvaluationWorks' knob above but
-            for SBE. When 'internalQueryPlanEvaluationCollFractionSbe' has its default value of 0, this
-            parameter acts as a hard limit on trial period length regardless of collection size.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryPlanEvaluationWorksSbe"
-        cpp_vartype: AtomicWord<int>
-        default: 10000
-        validator:
-            gt: 0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
-        redact: false
-
     internalQueryPlanEvaluationCollFraction:
         description: >-
             For large collections, the ceiling for the number times we work() candidate plans
@@ -158,22 +142,6 @@ server_parameters:
         default: 2.0
         validator:
             gte: 0.0
-        redact: false
-
-    internalQueryPlanEvaluationCollFractionSbe:
-        description: >-
-            For large collections, the ceiling for the number of individual storage cursor
-            reads allowed during the multi-planning trial period is calculated based on this constant.
-            Applies only for for queries using the SBE execution engine. This is the analog of the
-            'internalQueryPlanEvaluationCollFraction' knob above but for SBE.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryPlanEvaluationCollFractionSbe"
-        cpp_vartype: AtomicDouble
-        default: 0.0
-        validator:
-            gte: 0.0
-            lte: 1.0
-        on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
     internalQueryPlanEvaluationMaxResults:

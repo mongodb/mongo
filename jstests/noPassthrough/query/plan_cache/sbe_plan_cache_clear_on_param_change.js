@@ -12,8 +12,6 @@ import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 // the parameter is modified. Along with each parameter, includes a valid new value of the parameter
 // that the test can use when invoking the 'setParameter' command.
 const paramList = [
-    {name: "internalQueryPlanEvaluationWorksSbe", value: 10},
-    {name: "internalQueryPlanEvaluationCollFractionSbe", value: 0.3},
     {name: "internalQueryPlanEvaluationMaxResults", value: 200},
     {name: "internalQueryForceIntersectionPlans", value: true},
     {name: "internalQueryPlannerEnableIndexIntersection", value: false},
