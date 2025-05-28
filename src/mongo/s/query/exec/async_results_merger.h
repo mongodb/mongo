@@ -45,6 +45,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -161,6 +162,16 @@ public:
      * detachFromOperationContext() before 'opCtx' is deleted.
      */
     void reattachToOperationContext(OperationContext* opCtx);
+
+    /**
+     * Checks if the 'proposed' high water mark is greater or equal to 'current' high water mark,
+     * w.r.t. to the 'sortKeyPattern'. Return true if 'proposed' compares greater or equal to
+     * 'current', false otherwise.
+     */
+    static bool checkHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
+                                                            const BSONObj& proposed,
+                                                            const BSONObj& sortKeyPattern);
+
 
     /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
@@ -287,6 +298,18 @@ public:
     BSONObj getHighWaterMark();
 
     /**
+     * Set the initial high watermark to return when no cursors are tracked.
+     */
+    void setInitialHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Set the strategy to determine the next high water mark.
+     * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
+     */
+    void setNextHighWaterMarkDeterminingStrategy(
+        NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy);
+
+    /**
      * Starts shutting down this ARM by canceling all pending requests and scheduling killCursors
      * on all of the unexhausted remotes. Returns a 'future' that is signaled when this ARM is safe
      * to destroy.
@@ -315,6 +338,26 @@ public:
      * double counting.
      */
     query_stats::DataBearingNodeMetrics takeMetrics();
+
+    /**
+     * Returns the sort key out of the $sortKey metadata field in 'obj'. The sort key should be
+     * formatted as an array with one value per field of the sort pattern:
+     *  {..., $sortKey: [<firstSortKeyComponent>, <secondSortKeyComponent>, ...], ...}
+     *
+     * This function returns the sort key not as an array, but as the equivalent BSONObj:
+     *   {"0": <firstSortKeyComponent>, "1": <secondSortKeyComponent>}
+     *
+     * The return value is allowed to omit the key names, so the caller should not rely on the key
+     * names being present. That is, the return value could consist of an object such as
+     *   {"": <firstSortKeyComponent>, "": <secondSortKeyComponent>}
+     *
+     * If 'compareWholeSortKey' is true, then the value inside the $sortKey is directly interpreted
+     * as a single-element sort key. For example, given the document
+     *   {..., $sortKey: <value>, ...}
+     * and 'compareWholeSortKey'=true, this function will return
+     *   {"": <value>}
+     */
+    static BSONObj extractSortKey(const BSONObj& obj, bool compareWholeSortKey);
 
 private:
     /**
@@ -474,6 +517,15 @@ private:
     };
 
     enum LifecycleState { kAlive, kKillStarted, kKillComplete };
+
+    /**
+     * Ensures that the high watermark token in 'proposed' compares equal or higher to the high
+     * watermark token in 'proposed', compared to the internal sort key pattern. Tasserts if this
+     * assumption is violated.
+     */
+    void _ensureHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
+                                                       const BSONObj& proposed,
+                                                       StringData context) const;
 
     /**
      * Parses the find or getMore command response object to a CursorResponse.
@@ -753,6 +805,10 @@ private:
     // For sorted tailable cursors, records the current high-water-mark sort key. Empty
     // otherwise.
     BSONObj _highWaterMark;
+
+    // Strategy for determining the next high watermark in tailable, awaitData mode. Not used in
+    // other modes.
+    NextHighWaterMarkDeterminingStrategyPtr _nextHighWaterMarkDeterminingStrategy;
 
     // For tailable cursors, set to true if the next result returned from nextReady() should be
     // boost::none. Can only ever be true for 'TailableModeEnum::kTailable' cursors, but not for

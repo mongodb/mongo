@@ -875,7 +875,7 @@ TEST(MetaFields, ChangeStreamControlDocument) {
     // Creating a document from BSON with the flag present should set the flag correctly.
     for (auto value : {true, false}) {
         Document doc = Document::fromBsonWithMetaData(
-            BSON("foo" << "bar" << "$changeStreamControlEvent" << value));
+            BSON("foo" << "bar" << Document::metaFieldChangeStreamControlEvent << value));
 
         // Note: the presence of '$changeStreamControlEvent' is enough to set the equivalent
         // metadata bit. The value that '$changeStreamControlEvent' is set to does not matter.

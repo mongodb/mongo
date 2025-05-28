@@ -668,6 +668,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/window_function:window_function_exec_non_removable_common.h",
         "//src/mongo/s:shard_key_pattern_query_util.h",
         "//src/mongo/s/query/exec:async_results_merger.h",
+        "//src/mongo/s/query/exec:next_high_watermark_determining_strategy.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_non_removable_range.h",
         "//src/mongo/db/pipeline/window_function:window_function_exec_non_removable_range_common.h",
         "//src/mongo/s/query/exec:router_stage_merge.h",

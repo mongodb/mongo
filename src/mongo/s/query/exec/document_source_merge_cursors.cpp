@@ -33,7 +33,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/resource_yielders.h"
@@ -156,6 +155,18 @@ void DocumentSourceMergeCursors::doForceSpill() {
         10249800, "releaseMemory command requires BlockingResultsMerger", _blockingResultsMerger);
     auto status = _blockingResultsMerger->releaseMemory();
     uassertStatusOK(status);
+}
+
+void DocumentSourceMergeCursors::setInitialHighWaterMark(const BSONObj& highWaterMark) {
+    tassert(
+        10359100, "setInitialHighWaterMark requires BlockingResultsMerger", _blockingResultsMerger);
+    _blockingResultsMerger->setInitialHighWaterMark(highWaterMark);
+}
+
+void DocumentSourceMergeCursors::setNextHighWaterMarkDeterminingStrategy(
+    NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer) {
+    _blockingResultsMerger->setNextHighWaterMarkDeterminingStrategy(
+        std::move(nextHighWaterMarkDeterminer));
 }
 
 Value DocumentSourceMergeCursors::serialize(const SerializationOptions& opts) const {

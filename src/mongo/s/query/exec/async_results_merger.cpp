@@ -45,6 +45,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -65,34 +66,6 @@ const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
 
 namespace {
-
-/**
- * Returns the sort key out of the $sortKey metadata field in 'obj'. The sort key should be
- * formatted as an array with one value per field of the sort pattern:
- *  {..., $sortKey: [<firstSortKeyComponent>, <secondSortKeyComponent>, ...], ...}
- *
- * This function returns the sort key not as an array, but as the equivalent BSONObj:
- *   {"0": <firstSortKeyComponent>, "1": <secondSortKeyComponent>}
- *
- * The return value is allowed to omit the key names, so the caller should not rely on the key names
- * being present. That is, the return value could consist of an object such as
- *   {"": <firstSortKeyComponent>, "": <secondSortKeyComponent>}
- *
- * If 'compareWholeSortKey' is true, then the value inside the $sortKey is directly interpreted as a
- * single-element sort key. For example, given the document
- *   {..., $sortKey: <value>, ...}
- * and 'compareWholeSortKey'=true, this function will return
- *   {"": <value>}
- */
-BSONObj extractSortKey(const BSONObj& obj, bool compareWholeSortKey) {
-    auto key = obj[AsyncResultsMerger::kSortKeyField];
-    invariant(key);
-    if (compareWholeSortKey) {
-        return key.wrap();
-    }
-    invariant(key.type() == BSONType::Array);
-    return key.embeddedObject();
-}
 
 /**
  * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
@@ -133,6 +106,24 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       _mergeQueue(MergingComparator(_params.getSort().value_or(BSONObj()),
                                     _params.getCompareWholeSortKey())),
       _promisedMinSortKeys(PromisedMinSortKeyComparator(_params.getSort().value_or(BSONObj()))) {
+
+    if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+        // Build a default handler for determining the next high water mark. This can be replaced
+        // later via a call to `setNextHighWaterMarkDeterminingStrategy()'.
+        _nextHighWaterMarkDeterminingStrategy =
+            NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
+                _params, false /* recognizeControlEvents */);
+    } else {
+        // In all other modes than tailable, awaitData, we should never call the function to
+        // determine the next high water mark. The following strategy object will ensure that.
+        _nextHighWaterMarkDeterminingStrategy = NextHighWaterMarkDeterminingStrategyFactory::
+            createInvalidHighWaterMarkDeterminingStrategy();
+    }
+
+    tassert(10359105,
+            "Expecting _nextHighWaterMarkDeterminingStrategy object to be set",
+            _nextHighWaterMarkDeterminingStrategy);
+
     if (_params.getTxnNumber()) {
         invariant(_params.getSessionId());
     }
@@ -170,6 +161,7 @@ std::shared_ptr<AsyncResultsMerger> AsyncResultsMerger::create(
                               AsyncResultsMergerParams params)
             : AsyncResultsMerger(opCtx, std::move(executor), std::move(params)) {}
     };
+
     return std::make_shared<SharedFromThisEnabler>(opCtx, std::move(executor), std::move(params));
 }
 
@@ -238,6 +230,11 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
 }
 
+bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
+    const BSONObj& current, const BSONObj& proposed, const BSONObj& sortKeyPattern) {
+    return compareSortKeys(current, proposed, sortKeyPattern) <= 0;
+}
+
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -251,8 +248,8 @@ void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCurso
 void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
     // Closing remote cursors is not supported in tailable mode.
     tassert(8456101,
-            "closeShardCursors() can only be used for tailableAndAwaitData cursors.",
-            _tailableMode != TailableModeEnum::kTailableAndAwaitData);
+            "closeShardCursors() cannot be used for tailable cursors.",
+            _tailableMode != TailableModeEnum::kTailable);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -307,6 +304,16 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
     _rebuildMergeQueueFromRemainingRemotes(lk);
 }
 
+void AsyncResultsMerger::setNextHighWaterMarkDeterminingStrategy(
+    NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy) {
+    tassert(10359108,
+            "expecting AsyncResultsMerger to be in tailable, awaitData mode",
+            _tailableMode == TailableModeEnum::kTailableAndAwaitData);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _nextHighWaterMarkDeterminingStrategy = std::move(nextHighWaterMarkDeterminingStrategy);
+}
+
 bool AsyncResultsMerger::partialResultsReturned() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
@@ -344,13 +351,19 @@ std::size_t AsyncResultsMerger::numberOfBufferedRemoteResponses_forTest() const 
 
 BSONObj AsyncResultsMerger::getHighWaterMark() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    // At this point, the high water mark may be the resume token of the last document we returned.
-    // If no further results are eligible for return, we advance to the minimum promised sort key.
-    // If the remote associated with the minimum promised sort key is not currently eligible to
-    // provide a high water mark, then we do not advance even if no further results are ready.
+
+    // At this point, the high water mark may be the resume token of the last document we
+    // returned. If no further results are eligible for return, we advance to the minimum
+    // promised sort key. If the remote associated with the minimum promised sort key is not
+    // currently eligible to provide a high water mark, then we do not advance even if no
+    // further results are ready.
     if (auto minPromisedSortKey = _getMinPromisedSortKey(lk); minPromisedSortKey && !_ready(lk)) {
         const auto& minRemote = minPromisedSortKey->second;
         if (minRemote->eligibleForHighWaterMark) {
+            // The following check is potentially very costly on large resume tokens, so we only
+            // execute it in debug mode.
+            dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
+                _highWaterMark, minPromisedSortKey->first, *_params.getSort()));
             _highWaterMark = minPromisedSortKey->first;
         }
     }
@@ -361,10 +374,21 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
+void AsyncResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
+    // Extra wrapping necessary here because the high water mark is stored in sort-key format: {"":
+    // <high watermark>}.
+    auto newHighWaterMark = BSON("" << highWaterMark);
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _ensureHighWaterMarkIsMonotonicallyIncreasing(
+        _highWaterMark, newHighWaterMark, "setInitialHighWaterMark");
+    _highWaterMark = std::move(newHighWaterMark);
+}
+
 boost::optional<AsyncResultsMerger::MinSortKeyRemotePair>
 AsyncResultsMerger::_getMinPromisedSortKey(WithLock) const {
-    // We cannot return the minimum promised sort key unless all shards have reported one.
-    return (_promisedMinSortKeys.size() < _remotes.size() || _remotes.empty())
+    const bool allRemotesReturnedMinSortKeys = _promisedMinSortKeys.size() == _remotes.size();
+    return (_remotes.empty() || !allRemotesReturnedMinSortKeys)
         ? boost::optional<MinSortKeyRemotePair>{}
         : *_promisedMinSortKeys.begin();
 }
@@ -403,6 +427,15 @@ void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock,
         std::size_t erased = _promisedMinSortKeys.erase({*remote->promisedMinSortKey, remote});
         tassert(8456114, "Expected to find the promised min sort key in the set.", erased == 1);
     }
+}
+
+void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
+                                                                       const BSONObj& proposed,
+                                                                       StringData context) const {
+    tassert(10359104,
+            str::stream() << "Cannot make high watermark go backwards (in " << context
+                          << "()). Current: " << current << ", proposed: " << proposed,
+            checkHighWaterMarkIsMonotonicallyIncreasing(current, proposed, *_params.getSort()));
 }
 
 void AsyncResultsMerger::_rebuildMergeQueueFromRemainingRemotes(WithLock) {
@@ -588,7 +621,13 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
         smallestRemote->eligibleForHighWaterMark) {
-        _highWaterMark = extractSortKey(front, _params.getCompareWholeSortKey()).getOwned();
+        BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(front, _highWaterMark);
+
+        // The following check is potentially very costly on large resume tokens, so we only
+        // execute it in debug mode.
+        dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
+            _highWaterMark, nextHighWaterMark, *_params.getSort()));
+        _highWaterMark = std::move(nextHighWaterMark);
     }
 
     return {std::move(front), smallestRemote->shardId};
@@ -935,7 +974,8 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock lk,
         // The most recent minimum sort key should never be smaller than the previous promised
         // minimum sort key for this remote, if a previous promised minimum sort key exists.
         if (auto& oldMinSortKey = remote->promisedMinSortKey) {
-            invariant(compareSortKeys(newMinSortKey, *oldMinSortKey, *_params.getSort()) >= 0);
+            _ensureHighWaterMarkIsMonotonicallyIncreasing(
+                *oldMinSortKey, newMinSortKey, "_updateRemoteMetadata");
             invariant(_promisedMinSortKeys.size() <= _remotes.size());
             std::size_t erased = _promisedMinSortKeys.erase({*oldMinSortKey, remote});
             tassert(8456106, "Expected to find the promised min sort key in the set.", erased == 1);
@@ -1345,6 +1385,18 @@ query_stats::DataBearingNodeMetrics AsyncResultsMerger::takeMetrics() {
     auto metrics = _metrics;
     _metrics = {};
     return metrics;
+}
+
+BSONObj AsyncResultsMerger::extractSortKey(const BSONObj& obj, bool compareWholeSortKey) {
+    auto key = obj[kSortKeyField];
+    tassert(10359101,
+            str::stream() << "expecting sort key field '" << kSortKeyField << "' in input",
+            key);
+    if (compareWholeSortKey) {
+        return key.wrap();
+    }
+    tassert(10359106, "expecting BSON type Array for sort keys", key.type() == BSONType::Array);
+    return key.embeddedObject();
 }
 
 //

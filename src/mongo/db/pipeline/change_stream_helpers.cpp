@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/change_stream_helpers.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -37,6 +38,7 @@
 
 namespace mongo {
 namespace change_stream {
+
 ResumeTokenData resolveResumeTokenFromSpec(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const DocumentSourceChangeStreamSpec& spec) {
 

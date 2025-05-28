@@ -26,12 +26,14 @@ mongo_cc_library(
         "async_results_merger.cpp",
         "blocking_results_merger.cpp",
         "establish_cursors.cpp",
+        "next_high_watermark_determining_strategy.cpp",
         ":async_results_merger_params_gen",
     ],
     hdrs = [
         "async_results_merger.h",
         "blocking_results_merger.h",
         "establish_cursors.h",
+        "next_high_watermark_determining_strategy.h",
     ],
     deps = [
         "//src/mongo/db:server_feature_flags",

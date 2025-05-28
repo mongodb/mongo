@@ -43,7 +43,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
 
 BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
@@ -59,6 +58,10 @@ BlockingResultsMerger::~BlockingResultsMerger() = default;
 
 const AsyncResultsMergerParams& BlockingResultsMerger::asyncResultsMergerParams() const {
     return _arm->params();
+}
+
+void BlockingResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
+    _arm->setInitialHighWaterMark(highWaterMark);
 }
 
 StatusWith<stdx::cv_status> BlockingResultsMerger::doWaiting(

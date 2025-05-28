@@ -47,6 +47,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/router_stage_merge.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
@@ -195,6 +196,18 @@ public:
         _stats.dataBearingNodeMetrics = {};
         return metrics;
     }
+
+    /**
+     * Set the initial high watermark to return when no cursors are tracked.
+     * */
+    void setInitialHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Set the strategy to determine the next high water mark.
+     * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
+     */
+    void setNextHighWaterMarkDeterminingStrategy(
+        NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminer);
 
 protected:
     GetNextResult doGetNext() final;

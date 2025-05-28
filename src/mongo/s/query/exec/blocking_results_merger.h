@@ -41,6 +41,7 @@
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/query/exec/router_exec_stage.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
@@ -107,6 +108,11 @@ public:
         return _arm->getHighWaterMark();
     }
 
+    /**
+     * Set the initial high watermark to return when no cursors are tracked.
+     * */
+    void setInitialHighWaterMark(const BSONObj& highWaterMark);
+
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors) {
         _arm->addNewShardCursors(std::move(newCursors));
     }
@@ -122,6 +128,16 @@ public:
      */
     void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds) {
         _arm->closeShardCursors(shardIds);
+    }
+
+    /**
+     * Set the stategy to determine the next high water mark.
+     * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
+     */
+    void setNextHighWaterMarkDeterminingStrategy(
+        NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy) {
+        _arm->setNextHighWaterMarkDeterminingStrategy(
+            std::move(nextHighWaterMarkDeterminingStrategy));
     }
 
     /**

@@ -36,6 +36,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/change_stream_constants.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
@@ -51,6 +53,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/query/exec/async_results_merger.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -88,7 +91,48 @@ public:
 
     void setUp() override;
 
+    static BSONObj makePostBatchResumeToken(Timestamp clusterTime) {
+        auto pbrt =
+            ResumeToken::makeHighWaterMarkToken(clusterTime, ResumeTokenData::kDefaultTokenVersion)
+                .toDocument()
+                .toBson();
+        invariant(pbrt.firstElement().type() == BSONType::String);
+        return pbrt;
+    }
+
+    static AsyncResultsMergerParams buildARMParamsForChangeStream() {
+        const NamespaceString kTestNss =
+            NamespaceString::createNamespaceString_forTest("testdb.testcoll");
+
+        AsyncResultsMergerParams params;
+
+        params.setNss(kTestNss);
+        params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+        params.setCompareWholeSortKey(false);
+        params.setSort(change_stream_constants::kSortSpec);
+
+        return params;
+    }
+
 protected:
+    std::shared_ptr<AsyncResultsMerger> buildARM(AsyncResultsMergerParams params,
+                                                 bool recognizeControlEvents = false) {
+        NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy;
+        if (params.getTailableMode().value_or(TailableModeEnum::kNormal) ==
+            TailableModeEnum::kTailableAndAwaitData) {
+            nextHighWaterMarkDeterminingStrategy =
+                NextHighWaterMarkDeterminingStrategyFactory::createForChangeStream(
+                    params, recognizeControlEvents);
+        }
+
+        auto arm = AsyncResultsMerger::create(operationContext(), executor(), std::move(params));
+        if (nextHighWaterMarkDeterminingStrategy) {
+            arm->setNextHighWaterMarkDeterminingStrategy(
+                std::move(nextHighWaterMarkDeterminingStrategy));
+        }
+        return arm;
+    }
+
     /**
      * Constructs an AsyncResultsMergerParams object with the given vector of existing cursors.
      *
@@ -105,7 +149,6 @@ protected:
         AsyncResultsMergerParams params;
         params.setNss(kTestNss);
         params.setRemotes(std::move(remoteCursors));
-
 
         if (findCmd) {
             // If there is no '$db', append it.
@@ -143,6 +186,7 @@ protected:
         }
         return params;
     }
+
     /**
      * Constructs an ARM with the given vector of existing cursors.
      *
@@ -157,10 +201,107 @@ protected:
         boost::optional<BSONObj> findCmd = boost::none,
         boost::optional<std::int64_t> getMoreBatchSize = boost::none) {
 
-        return AsyncResultsMerger::create(
-            operationContext(),
-            executor(),
-            makeARMParamsFromExistingCursors(std::move(remoteCursors), findCmd, getMoreBatchSize));
+        return buildARM(
+            makeARMParamsFromExistingCursors(std::move(remoteCursors), findCmd, getMoreBatchSize),
+            false /* recognizeControlEvents */);
+    }
+
+    /**
+     * Runs tests for the ARM's high water mark, which is set initially and then updated from
+     * multiple responses.
+     */
+    void runHighWaterMarkTest(bool recognizeControlEvents) {
+        // Create an AsyncResultsMerger without any remote cursors.
+        auto arm = buildARM(buildARMParamsForChangeStream(), recognizeControlEvents);
+        ASSERT_EQ(0, arm->getNumRemotes());
+
+        // No high water mark set initially.
+        ASSERT_BSONOBJ_EQ(BSONObj(), arm->getHighWaterMark());
+
+        // Inject a high water mark.
+        auto highWaterMark = makePostBatchResumeToken(Timestamp(42, 1));
+
+        arm->setInitialHighWaterMark(highWaterMark);
+
+        ASSERT_BSONOBJ_EQ(highWaterMark, arm->getHighWaterMark());
+
+        // Add a remote cursor.
+        auto pbrt = makePostBatchResumeToken(Timestamp(42, 2));
+        std::vector<RemoteCursor> cursors;
+        cursors.push_back(makeRemoteCursor(kTestShardIds[0],
+                                           kTestShardHosts[0],
+                                           CursorResponse(kTestNss, 1, {}, boost::none, pbrt)));
+        arm->addNewShardCursors(std::move(cursors));
+
+        // Expect PBRT from the first batch, and not the original high water mark.
+        ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
+
+        auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+        // Deliver response with an updated PBRT.
+        BSONObj oldPBRT = pbrt;
+        std::vector<CursorResponse> responses;
+        pbrt = makePostBatchResumeToken(Timestamp(42, 3));
+        BSONObj doc = BSON("_id" << pbrt << "$sortKey" << BSON_ARRAY(pbrt) << "value" << 1);
+        std::vector<BSONObj> batch1 = {doc};
+        responses.emplace_back(kTestNss, CursorId(1), batch1, boost::none, pbrt);
+        scheduleNetworkResponses(std::move(responses));
+
+        executor()->waitForEvent(readyEvent);
+
+        ASSERT_TRUE(arm->ready());
+
+        // Still expect the same high water mark as before.
+        ASSERT_BSONOBJ_EQ(oldPBRT, arm->getHighWaterMark());
+
+        // Consume next buffered document. This updates the high watermark.
+        ASSERT_BSONOBJ_EQ(doc, *unittest::assertGet(arm->nextReady()).getResult());
+        ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
+        ASSERT_FALSE(arm->ready());
+
+        readyEvent = unittest::assertGet(arm->nextEvent());
+
+        // Deliver empty response with the same PBRT.
+        responses.clear();
+        std::vector<BSONObj> batch2 = {};
+        responses.emplace_back(kTestNss, CursorId(1), batch2, boost::none, pbrt);
+        scheduleNetworkResponses(std::move(responses));
+
+        executor()->waitForEvent(readyEvent);
+
+        // No change expected for the high water mark.
+        ASSERT_FALSE(arm->ready());
+        ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
+
+        readyEvent = unittest::assertGet(arm->nextEvent());
+
+        // Deliver response with an updated PBRT.
+        oldPBRT = pbrt;
+        responses.clear();
+        pbrt = makePostBatchResumeToken(Timestamp(42, 4));
+        doc = BSON("_id" << pbrt << "$sortKey" << BSON_ARRAY(pbrt) << "value" << 2);
+        std::vector<BSONObj> batch3 = {doc};
+        responses.emplace_back(kTestNss, CursorId(1), batch3, boost::none, pbrt);
+
+        scheduleNetworkResponses(std::move(responses));
+
+        executor()->waitForEvent(readyEvent);
+
+        // High water mark should not have been updated by receiving the batch.
+        ASSERT_TRUE(arm->ready());
+        ASSERT_BSONOBJ_EQ(oldPBRT, arm->getHighWaterMark());
+
+        // Consume next buffered document. This should update the high watermark.
+        ASSERT_BSONOBJ_EQ(doc, *unittest::assertGet(arm->nextReady()).getResult());
+        ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
+        ASSERT_FALSE(arm->ready());
+
+        // Close the cursor. Now the ARM manages no open cursors.
+        arm->closeShardCursors({kTestShardIds[0]});
+        ASSERT_EQ(0, arm->getNumRemotes());
+
+        // Still expect the same high water mark as before.
+        ASSERT_BSONOBJ_EQ(pbrt, arm->getHighWaterMark());
     }
 
     /**
