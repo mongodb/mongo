@@ -31,12 +31,10 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
-#include "mongo/util/time_support.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -47,6 +45,18 @@ namespace mongo::transport {
 /**
  * A decoration on the Session object used to capture and report the metrics around connection
  * handshake and authentication handshake for an ingress session.
+ *
+ * IngressHandshakeMetrics recognizes the following sequence of events:
+ *
+ *     session-start  auth-related-cmd* hello-cmd?  auth-related-cmd*  non-auth-related-cmd
+ *
+ * The state machine does not know which "auth-related-cmd" is the last until a
+ * "non-auth-related-cmd" is received, and so the total duration of
+ * authentication is determined retroactively when the first
+ * "non-auth-related-cmd" is received.
+ *
+ * See the implementation for a description of the metrics published.
+ *
  */
 class IngressHandshakeMetrics {
 public:
@@ -57,6 +67,12 @@ public:
      * valid for at least as long as the last method call on this instance.
      */
     void onSessionStarted(TickSource* tickSource);
+
+    /**
+     * Marks the time when the TLS (SSL) handshake with the client was completed, if the
+     * connection uses TLS.
+     */
+    void onTLSHandshakeCompleted();
 
     /**
      * Checks if the command is part of the handshake conversation and, if so, records the
@@ -71,25 +87,35 @@ public:
      * Checks if the command is a hello command and, if so, records the observations necessary to
      * generate the associated metrics. Note that the response argument is not const, because the
      * ReplyBuilderInterface does not expose any const methods to inspect the response body.
-     * However, onCommandProcessed does not mutate the response body.
+     * However, onCommandProcessed will never mutate the response body, and the
+     * response argument is currently unused.
      */
     void onCommandProcessed(const Command* command, rpc::ReplyBuilderInterface* response);
 
     /**
-     * If the response was just sent for the first hello command for this session, reports the
-     * associated metrics. The processing duration and sending duration are already being measured
-     * in SessionWorkflowMetrics, so they are expected as arguments, rather than having this class
-     * record them separately.
+     * This function is unused.
      */
-    void onResponseSent(Milliseconds processingDuration, Milliseconds sendingDuration);
+    void onResponseSent(Microseconds processingDuration, Microseconds sendingDuration);
 
 private:
-    TickSource* _tickSource{nullptr};
-    boost::optional<TickSource::Tick> _sessionStartedTicks;
-    boost::optional<Date_t> _helloReceivedTime;
-    boost::optional<bool> _helloSucceeded;
-    boost::optional<TickSource::Tick> _lastHandshakeCommandTicks;
-    boost::optional<TickSource::Tick> _firstNonAuthCommandTicks;
+    // The name of the state tells you which event(s) will cause a state
+    // transition (except for `kDone`, which means done).
+    // For example, we transition out of the `kWaitingForFirstCommand` state
+    // when we receive the first command. We transition out of the
+    // `kWaitingForNonAuthCommand` state when we receive a non-auth-related
+    // command.
+    enum class State {
+        kWaitingForSessionStart,
+        kWaitingForFirstCommand,
+        kWaitingForHelloOrNonAuthCommand,
+        kWaitingForNonAuthCommand,
+        kDone
+    };
+    State _state = State::kWaitingForSessionStart;
+    TickSource* _tickSource = nullptr;
+    TickSource::Tick _sessionStartedTicks;
+    TickSource::Tick _mostRecentHandshakeCommandReceivedTicks;
+    TickSource::Tick _mostRecentHandshakeCommandProcessedTicks;
 };
 
 /**

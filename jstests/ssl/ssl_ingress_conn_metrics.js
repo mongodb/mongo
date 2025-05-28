@@ -60,6 +60,13 @@ let runTest = (connectionHealthLoggingOn) => {
         assert.eq(checkLog.checkContainsOnceJson(mongod, 6723804, {}), false);
     }
 
+    // The metric for the average time between session start and TLS handshake
+    // completion should have received a sample, which means it will be present
+    // and have a non-negative numeric value.
+    const avg = ssNetworkMetrics.averageTimeToCompletedTLSHandshakeMicros;
+    assert.eq('number', typeof avg, ssNetworkMetrics);
+    assert.gte(avg, 0);
+
     assert.commandWorked(mongod.adminCommand({clearLog: 'global'}));
     assert.eq(1, ssNetworkMetrics.totalIngressTLSConnections, ssNetworkMetrics);
 

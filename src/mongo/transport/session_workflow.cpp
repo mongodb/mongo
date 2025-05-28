@@ -269,8 +269,8 @@ public:
     void sent(Session& session) {
         _t->notify(TimeSplitId::sentResponse);
         IngressHandshakeMetrics::get(session).onResponseSent(
-            duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::processWork)),
-            duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::sendResponse)));
+            *_t->getSplitInterval(IntervalId::processWork),
+            *_t->getSplitInterval(IntervalId::sendResponse));
     }
     void yieldedAfterSend() {
         _t->notify(TimeSplitId::yieldedAfterSend);

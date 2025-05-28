@@ -27,6 +27,8 @@ filegroup(
         "inline_memory.h",
         "log_with_sampling.h",
         "make_array_type.h",
+        "moving_average.h",
+        "moving_average_metric.h",
         "namespace_string_util.h",
         "overloaded_visitor.h",
         "periodic_runner.h",
@@ -1058,6 +1060,25 @@ mongo_cc_unit_test(
         ":version_impl",
         "//src/mongo:base",
         "//src/mongo/db:service_context_non_d",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "moving_average_test",
+    srcs = [
+        "moving_average_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+)
+
+mongo_cc_unit_test(
+    name = "moving_average_metric_test",
+    srcs = [
+        "moving_average_metric_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        "//src/mongo/db/commands:server_status_core",
     ],
 )
 

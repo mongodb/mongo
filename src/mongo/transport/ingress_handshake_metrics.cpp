@@ -28,17 +28,15 @@
  */
 #include "mongo/transport/ingress_handshake_metrics.h"
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/counter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/moving_average_metric.h"
+#include "mongo/util/tick_source.h"
 
 #include <memory>
 #include <utility>
@@ -59,6 +57,20 @@ bool connHealthMetricsLoggingEnabled() {
 
 auto& totalTimeToFirstNonAuthCommandMillis =
     *MetricBuilder<Counter64>("network.totalTimeToFirstNonAuthCommandMillis");
+// `averageTimeToCompletedAuthMicros` tracks the time from when the session is
+// started until the last handshake-related command is finished running.
+auto& averageTimeToCompletedAuthMicros =
+    *MetricBuilder<MovingAverageMetric>("network.averageTimeToCompletedAuthMicros").bind(0.2);
+// `averageTimeToCompletedHelloMicros` tracks the time from when the session is
+// started until when the hello command is finished running.
+auto& averageTimeToCompletedHelloMicros =
+    *MetricBuilder<MovingAverageMetric>("network.averageTimeToCompletedHelloMicros").bind(0.2);
+// `averageTimeToCompletedTLSHandshakeMicros` tracks the time from when the
+// session is started until when the TLS (SSL) handshake with the client has
+// completed. It's only relevant for secure connections.
+auto& averageTimeToCompletedTLSHandshakeMicros =
+    *MetricBuilder<MovingAverageMetric>("network.averageTimeToCompletedTLSHandshakeMicros")
+         .bind(0.2);
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
@@ -66,76 +78,97 @@ IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
 }
 
 void IngressHandshakeMetrics::onSessionStarted(TickSource* tickSource) {
-    invariant(!_tickSource);
-    invariant(!_sessionStartedTicks);
-
+    invariant(_state == State::kWaitingForSessionStart);
     _tickSource = tickSource;
     _sessionStartedTicks = _tickSource->getTicks();
+    _state = State::kWaitingForFirstCommand;
+}
+
+void IngressHandshakeMetrics::onTLSHandshakeCompleted() {
+    if (_state == State::kWaitingForSessionStart) {
+        // We're being called from inside of a unit test that isn't using
+        // `SessionManagerCommon::startSession`. Pretend that we don't exist.
+        return;
+    }
+    invariant(_state == State::kWaitingForFirstCommand);
+    invariant(_tickSource);
+    const auto micros =
+        _tickSource->ticksTo<Microseconds>(_tickSource->getTicks() - _sessionStartedTicks);
+    averageTimeToCompletedTLSHandshakeMicros.addSample(micros.count());
 }
 
 void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
-    if (MONGO_likely(_firstNonAuthCommandTicks))
+    if (_state == State::kDone) {
         return;
+    }
 
-    invariant(_sessionStartedTicks);
+    invariant(_tickSource);
+    const TickSource::Tick now = _tickSource->getTicks();
 
-    auto now = _tickSource->getTicks();
-
-    if (command->handshakeRole() != Command::HandshakeRole::kNone) {
-        _lastHandshakeCommandTicks = now;
-
-        if (command->handshakeRole() == Command::HandshakeRole::kHello) {
-            _helloReceivedTime = Date_t::now();
+    if (command->handshakeRole() == Command::HandshakeRole::kNone) {
+        TickSource::Tick relativeStart;
+        if (_state == State::kWaitingForFirstCommand) {
+            relativeStart = _sessionStartedTicks;
+        } else {
+            relativeStart = _mostRecentHandshakeCommandReceivedTicks;
+            const auto micros = _tickSource->ticksTo<Microseconds>(
+                _mostRecentHandshakeCommandProcessedTicks - _sessionStartedTicks);
+            averageTimeToCompletedAuthMicros.addSample(micros.count());
         }
 
+        if (connHealthMetricsLoggingEnabled()) {
+            LOGV2(6788700,
+                  "Received first command on ingress connection since session start or auth "
+                  "handshake",
+                  "elapsed"_attr = _tickSource->ticksTo<Milliseconds>(now - relativeStart));
+        }
+        totalTimeToFirstNonAuthCommandMillis.increment(
+            _tickSource->ticksTo<Milliseconds>(now - _sessionStartedTicks).count());
+
+        _state = State::kDone;
         return;
     }
 
-    _firstNonAuthCommandTicks = now;
-
-    auto lastAuthOrStartTicks = _lastHandshakeCommandTicks.value_or(*_sessionStartedTicks);
-    auto elapsedSinceAuth = now - lastAuthOrStartTicks;
-
-    if (connHealthMetricsLoggingEnabled()) {
-        LOGV2(6788700,
-              "Received first command on ingress connection since session start or auth handshake",
-              "elapsed"_attr = _tickSource->ticksTo<Milliseconds>(elapsedSinceAuth));
+    switch (_state) {
+        case State::kWaitingForFirstCommand:
+            _state = State::kWaitingForHelloOrNonAuthCommand;
+            [[fallthrough]];
+        case State::kWaitingForHelloOrNonAuthCommand:
+        case State::kWaitingForNonAuthCommand:
+            _mostRecentHandshakeCommandReceivedTicks = now;
+            return;
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    auto elapsedSinceStart = now - *_sessionStartedTicks;
-    totalTimeToFirstNonAuthCommandMillis.increment(
-        _tickSource->ticksTo<Milliseconds>(elapsedSinceStart).count());
 }
 
 void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
-                                                 rpc::ReplyBuilderInterface* response) {
-    if (MONGO_likely(_firstNonAuthCommandTicks || _helloSucceeded))
+                                                 rpc::ReplyBuilderInterface* /*response*/) {
+    if (_state == State::kDone) {
         return;
+    }
 
-    if (command->handshakeRole() != Command::HandshakeRole::kHello)
-        return;
-
-    invariant(_helloReceivedTime);
-
-    // At this point in execution, we might not have the "ok" in the response. We could check if
-    // the command succeeded by calling CommandHelpers::extractOrAppendOk(), but that would mutate
-    // the response. Instead, we will simply assume that the absence of failure indicates success.
-    auto body = response->getBodyBuilder();
-    auto okField = body.asTempObj()["ok"];
-    _helloSucceeded = (!okField) || okField.trueValue();
+    invariant(_tickSource);
+    const auto now = _tickSource->getTicks();
+    switch (_state) {
+        case State::kWaitingForHelloOrNonAuthCommand:
+            if (command->handshakeRole() == Command::HandshakeRole::kHello) {
+                const auto micros = _tickSource->ticksTo<Microseconds>(now - _sessionStartedTicks);
+                averageTimeToCompletedHelloMicros.addSample(micros.count());
+                _state = State::kWaitingForNonAuthCommand;
+            }
+            [[fallthrough]];
+        case State::kWaitingForNonAuthCommand:
+            _mostRecentHandshakeCommandProcessedTicks = now;
+            return;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
-void IngressHandshakeMetrics::onResponseSent(Milliseconds processingDuration,
-                                             Milliseconds sendingDuration) {
-    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsLoggingEnabled())
-        return;
-
-    LOGV2(6724100,
-          "Hello completed",
-          "received"_attr = _helloReceivedTime,
-          "processingDuration"_attr = processingDuration,
-          "sendingDuration"_attr = sendingDuration,
-          "okCode"_attr = _helloSucceeded ? 1.0 : 0.0);
+void IngressHandshakeMetrics::onResponseSent(Microseconds /*processingDuration*/,
+                                             Microseconds /*sendingDuration*/) {
+    // TODO(SERVER-63883): This function is never invoked.
 }
 
 void IngressHandshakeMetricsCommandHooks::onBeforeRun(OperationContext* opCtx,
