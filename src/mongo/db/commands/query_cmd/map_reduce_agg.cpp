@@ -31,8 +31,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/query_cmd/map_reduce_gen.h"
 #include "mongo/db/commands/query_cmd/map_reduce_global_variable_scope.h"
@@ -48,6 +46,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/map_reduce_output_format.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -87,22 +87,33 @@ Rarely _sampler;
 auto makeExpressionContext(OperationContext* opCtx,
                            const MapReduceCommandRequest& parsedMr,
                            boost::optional<ExplainOptions::Verbosity> verbosity) {
-    // AutoGetCollectionForReadCommand will throw if the sharding version for this connection is
-    // out of date.
-    AutoGetCollectionForReadCommandMaybeLockFree ctx(
-        opCtx,
-        parsedMr.getNamespace(),
-        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+    AutoStatsTracker statsTracker(opCtx,
+                                  parsedMr.getNamespace(),
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(parsedMr.getNamespace().dbName()));
+
+    // acquireCollectionOrViewMaybeLockFree will throw if the sharding version for this connection
+    // is out of date.
+    const auto collOrView =
+        acquireCollectionOrViewMaybeLockFree(opCtx,
+                                             CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                                 opCtx,
+                                                 parsedMr.getNamespace(),
+                                                 AcquisitionPrerequisites::kRead,
+                                                 AcquisitionPrerequisites::ViewMode::kCanBeView));
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
-            !ctx.getView());
+            !collOrView.isView());
+
+    const auto& coll = collOrView.getCollection();
 
     auto [resolvedCollator, _] = resolveCollator(
-        opCtx, parsedMr.getCollation().get_value_or(BSONObj()), ctx.getCollection());
+        opCtx, parsedMr.getCollation().get_value_or(BSONObj()), coll.getCollectionPtr());
 
     // The UUID of the collection for the execution namespace of this aggregation.
-    auto uuid =
-        ctx.getCollection() ? boost::make_optional(ctx.getCollection()->uuid()) : boost::none;
+    auto uuid = coll.exists() ? boost::make_optional(coll.uuid()) : boost::none;
 
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
     if (parsedMr.getScope()) {
