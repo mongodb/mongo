@@ -422,7 +422,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                         // The conversion to capped failed so there was no catalog change, it is
                         // then safe to simply return the error to the router that will retry
                         triggerCleanup(opCtx, status);
-                        MONGO_UNREACHABLE;
+                        MONGO_UNREACHABLE_TASSERT(10083518);
                     }
                 } catch (const DBException& e) {
                     LOGV2_WARNING(8577202,
@@ -442,7 +442,7 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
 
             if (_doc.getPhase() >= Phase::kAcquireCriticalSectionOnCoordinator) {
                 triggerCleanup(opCtx, status);
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(10083519);
             }
 
             return status;

@@ -1414,8 +1414,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
         return status;
     }
-
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083534);
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(

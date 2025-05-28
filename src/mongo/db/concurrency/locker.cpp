@@ -809,7 +809,7 @@ bool Locker::isCollectionLockedForMode(const NamespaceString& nss, LockMode mode
             break;
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083510);
 }
 
 bool Locker::isGlobalLockedRecursively() const {
@@ -1192,7 +1192,7 @@ bool Locker::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             break;
 
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083508);
     }
 
     switch (mode) {
@@ -1205,7 +1205,7 @@ bool Locker::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             return _sharedLocksShouldTwoPhaseLock;
 
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083509);
     }
 }
 

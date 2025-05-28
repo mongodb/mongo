@@ -56,6 +56,6 @@ StringData toString(OperationSource source) {
             return kTimeseriesBucketCompressionString;
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083501);
 }
 }  // namespace mongo

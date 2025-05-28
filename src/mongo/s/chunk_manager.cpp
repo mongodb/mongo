@@ -99,7 +99,7 @@ void checkChunksAreContiguous(const ChunkInfo& left, const ChunkInfo& right) {
                                 << right.getRange().toString());
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083535);
 }
 
 using ChunkVector = ChunkMap::ChunkVector;
@@ -1148,7 +1148,7 @@ bool EndpointComp::operator()(const ShardEndpoint* endpointA,
         return !endpointA->databaseVersion && endpointB->databaseVersion;
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083536);
 }
 
 Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {

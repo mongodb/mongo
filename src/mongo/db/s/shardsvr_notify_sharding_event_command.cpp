@@ -113,7 +113,7 @@ public:
                 return;
             }
 
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083526);
         }
 
     private:

@@ -101,7 +101,7 @@ StringData toString(IndexBuildMethod method) {
             return "Foreground"_sd;
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083503);
 }
 
 // Returns normalized versions of 'indexSpecs' for the catalog.

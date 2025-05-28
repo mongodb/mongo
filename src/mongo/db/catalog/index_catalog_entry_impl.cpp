@@ -433,11 +433,11 @@ public:
     }
 
     void setIdent(std::shared_ptr<Ident> newIdent) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083543);
     }
 
     IndexDescriptor* descriptor() final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083544);
     }
 
     const IndexDescriptor* descriptor() const final {
@@ -449,7 +449,7 @@ public:
     }
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083545);
     }
 
     bool isHybridBuilding() const final {
@@ -461,7 +461,7 @@ public:
     }
 
     void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083546);
     }
 
     const Ordering& ordering() const final {
@@ -481,11 +481,11 @@ public:
     }
 
     void setIsReady(bool newIsReady) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083547);
     }
 
     void setIsFrozen(bool newIsFrozen) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083548);
     }
 
     bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const final {
@@ -534,7 +534,7 @@ public:
 
     std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
         IndexDescriptor descriptor) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083549);
     }
 
 private:
@@ -559,11 +559,11 @@ public:
     }
 
     void setIdent(std::shared_ptr<Ident> newIdent) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083550);
     }
 
     IndexDescriptor* descriptor() final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083551);
     }
 
     const IndexDescriptor* descriptor() const final {
@@ -575,7 +575,7 @@ public:
     }
 
     void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083552);
     }
 
     bool isHybridBuilding() const final {
@@ -587,7 +587,7 @@ public:
     }
 
     void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083553);
     }
 
     const Ordering& ordering() const final {
@@ -607,11 +607,11 @@ public:
     }
 
     void setIsReady(bool newIsReady) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083554);
     }
 
     void setIsFrozen(bool newIsFrozen) final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083555);
     }
 
     bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const final {
@@ -655,7 +655,7 @@ public:
 
     std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
         OperationContext* opCtx, const CollectionPtr& coll) const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083556);
     };
 
     std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(

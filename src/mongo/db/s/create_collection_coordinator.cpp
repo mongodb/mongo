@@ -1627,7 +1627,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     std::find(allShardIds.begin(), allShardIds.end(), *_doc.getDataShard()) ==
                         allShardIds.end()) {
                     triggerCleanup(opCtx, status);
-                    MONGO_UNREACHABLE;
+                    MONGO_UNREACHABLE_TASSERT(10083520);
                 }
 
                 _doc.setShardIds(std::move(involvedShardIds));
@@ -2081,7 +2081,7 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
             // addZone and/or addShard violating the actual set of involved shards or the shard key
             // selected.
             triggerCleanup(opCtx, ex.toStatus());
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083521);
         }
     }
 

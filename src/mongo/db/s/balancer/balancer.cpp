@@ -696,7 +696,7 @@ void Balancer::onShutdown() {
 void Balancer::onBecomeArbiter() {
     // The Balancer is only active on config servers, and arbiters are not permitted in config
     // server replica sets.
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083512);
 }
 
 void Balancer::initiate(OperationContext* opCtx) {

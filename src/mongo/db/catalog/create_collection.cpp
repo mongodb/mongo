@@ -369,7 +369,7 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     if (bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
         bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
         bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083502);
     }
     // '$jsonSchema' : {
     //     bsonType: 'object',

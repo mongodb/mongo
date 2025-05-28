@@ -1377,7 +1377,7 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
         if (auto released = _frozenIndexes.release(entry->descriptor())) {
             return released;
         }
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083504);
     }();
 
     LOGV2(6987700,
@@ -1455,7 +1455,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
         if (auto released = _frozenIndexes.release(entry->descriptor())) {
             return released;
         }
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083505);
     }();
 
     _rebuildIndexUpdateIdentifier();

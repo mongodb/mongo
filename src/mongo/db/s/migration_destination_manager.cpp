@@ -225,7 +225,7 @@ std::string stateToString(MigrationDestinationManager::State state) {
         case MigrationDestinationManager::kAbort:
             return "abort";
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083523);
     }
 }
 

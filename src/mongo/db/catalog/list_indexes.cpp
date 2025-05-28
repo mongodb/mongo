@@ -145,7 +145,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
                 }
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(10083506);
         }
     }
     return indexSpecs;

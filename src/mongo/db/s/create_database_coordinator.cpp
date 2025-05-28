@@ -258,7 +258,7 @@ ExecutorFuture<void> CreateDatabaseCoordinator::_runImpl(
             if (status == ErrorCodes::ShardNotFound) {
                 create_database_util::logCommitCreateDatabaseFailed(dbName, status.reason());
                 triggerCleanup(opCtx, status);
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(10083522);
             }
 
             return status;

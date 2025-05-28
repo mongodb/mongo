@@ -171,7 +171,7 @@ void checkCollectionOptions(OperationContext* opCtx,
         uassertStatusOK(originalStatus);
         // The assertion above should always fail, as this function should only ever be called
         // if the original attempt to create the collection failed.
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083507);
     }
 
     auto fullNewNamespace = NamespaceStringUtil::deserialize(ns.dbName(), options.viewOn);

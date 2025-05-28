@@ -159,7 +159,7 @@ public:
                                     kGlobalUserWritesNamespace);
                     } break;
                     default:
-                        MONGO_UNREACHABLE;
+                        MONGO_UNREACHABLE_TASSERT(10083527);
                 }
             } else {
                 switch (request.getPhase()) {
@@ -178,7 +178,7 @@ public:
                                     kGlobalUserWritesNamespace);
                         break;
                     default:
-                        MONGO_UNREACHABLE;
+                        MONGO_UNREACHABLE_TASSERT(10083528);
                 }
             }
         }

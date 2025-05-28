@@ -136,7 +136,7 @@ boost::optional<std::string> ResourceCatalog::name(ResourceId id) const {
         default:
             return boost::none;
     }
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083514);
 }
 
 }  // namespace mongo

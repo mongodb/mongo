@@ -463,7 +463,7 @@ bool BalancerSettingsType::isTimeInBalancingWindow(const boost::posix_time::ptim
             return true;
         }
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083533);
     }
 
     return false;

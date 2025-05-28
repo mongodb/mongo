@@ -223,7 +223,7 @@ ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequ
 
             resolvedAcquisitionRequests.emplace_back(std::move(resolvedAcquisitionRequest));
         } else {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083530);
         }
     }
 
@@ -591,7 +591,7 @@ void validateRequests(OperationContext* opCtx,
                     DatabaseName::isValid(ar.nssOrUUID.dbName(),
                                           DatabaseName::DollarInDbNameBehavior::Allow));
         } else {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083531);
         }
 
         // Check that if the operation came from a router, all collection acquisitions declare an

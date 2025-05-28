@@ -466,7 +466,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         }
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083515);
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFuture(
@@ -492,7 +492,7 @@ CollectionShardingRuntime::_getCurrentMetadataIfKnown(
             tassert(10016213, "MetadataManager must be initialized", _metadataManager);
             return _metadataManager->getActiveMetadata(atClusterTime, preserveRange);
     };
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083516);
 }
 
 std::shared_ptr<ScopedCollectionDescription::Impl>
@@ -619,7 +619,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     }
 
     // Those are all the reasons the versions can mismatch
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10083517);
 }
 
 void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) const {

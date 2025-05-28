@@ -768,7 +768,6 @@ StatusWith<ShardEndpoint> CollectionRoutingInfoTargeter::_targetShardKey(
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
-    MONGO_UNREACHABLE;
 }
 
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(

@@ -224,7 +224,6 @@ bool ShardKeyPattern::isValidHashedValue(const BSONElement& el) {
         default:
             return false;
     }
-    MONGO_UNREACHABLE;
 }
 
 

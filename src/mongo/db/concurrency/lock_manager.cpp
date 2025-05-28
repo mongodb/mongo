@@ -541,7 +541,7 @@ bool LockManager::unlock(LockRequest* request) {
         _onLockModeChanged(lock, true);
     } else {
         // Invalid request status
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083513);
     }
 
     return (request->recursiveCount == 0);

@@ -819,7 +819,7 @@ boost::optional<ShardIdentity> ShardingInitializationMongoD::getShardIdentityDoc
             return boost::none;
         }
 
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(10083525);
     }
 
     // In sharded *non*-readOnly mode, error if --overrideShardIdentity is provided

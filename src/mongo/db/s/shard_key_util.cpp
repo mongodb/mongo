@@ -500,7 +500,7 @@ void ValidationBehaviorsLocalRefineShardKey::createShardKeyIndex(
     const boost::optional<BSONObj>& defaultCollation,
     bool unique,
     boost::optional<TimeseriesOptions> tsOpts) const {
-    MONGO_UNREACHABLE;
+    MONGO_UNIMPLEMENTED_TASSERT(10083524);
 }
 
 ValidationBehaviorsReshardingBulkIndex::ValidationBehaviorsReshardingBulkIndex()

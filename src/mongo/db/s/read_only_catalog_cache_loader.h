@@ -63,10 +63,10 @@ public:
     void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
                                                 const Timestamp& commitTime) override {}
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083541);
     }
     void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) override {
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083542);
     }
 
 private:

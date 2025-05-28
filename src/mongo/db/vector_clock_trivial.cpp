@@ -64,22 +64,22 @@ private:
 
     SharedSemiFuture<void> waitForDurableConfigTime() override {
         // VectorClockTrivial does not support persistence
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083537);
     }
 
     SharedSemiFuture<void> waitForDurableTopologyTime() override {
         // VectorClockTrivial does not support persistence
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083538);
     }
 
     SharedSemiFuture<void> waitForDurable() override {
         // VectorClockTrivial does not support persistence
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083539);
     }
 
     VectorClock::VectorTime recoverDirect(OperationContext* opCtx) override {
         // VectorClockTrivial does not support persistence
-        MONGO_UNREACHABLE;
+        MONGO_UNIMPLEMENTED_TASSERT(10083540);
     }
 
     LogicalTime _tick(Component component, uint64_t nTicks) override;

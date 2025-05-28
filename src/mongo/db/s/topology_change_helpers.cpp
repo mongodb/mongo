@@ -1084,7 +1084,7 @@ std::string getRemoveShardMessage(const ShardDrainingStateEnum& status) {
         case ShardDrainingStateEnum::kCompleted:
             return "removeshard completed successfully";
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083529);
     }
 }
 

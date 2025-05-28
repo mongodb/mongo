@@ -914,7 +914,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         // recursively. But this is not known when we create the Query plan for this sub operation.
         // Pretend that we are yieldable but don't allow yield to actually be called.
         _collectionPtr.makeYieldable(opCtx, [](OperationContext*, boost::optional<UUID>) {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(10083511);
             return ConsistentCollection{};
         });
     } else {
