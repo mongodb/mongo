@@ -347,6 +347,25 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntr
     getTypedCumulativeMetrics()->onOplogEntriesApplied(numEntries);
 }
 
+void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogFetching(
+    Milliseconds elapsed) {
+    getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(
+    const Milliseconds& elapsed) {
+    getTypedCumulativeMetrics()->onLocalInsertDuringOplogFetching(elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogApplying(
+    const Milliseconds& elapsed) {
+    getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogApplying(elapsed);
+}
+
+void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
+    getTypedCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
+}
+
 ShardingDataTransformInstanceMetrics::UniqueScopedObserver
 ShardingDataTransformInstanceMetrics::registerInstanceMetrics() {
     return _cumulativeMetrics->registerInstanceMetrics(_observer.get());

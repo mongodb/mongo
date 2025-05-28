@@ -36,7 +36,6 @@
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics/with_oplog_application_latency_metrics_interface_updating_cumulative_metrics.h"
 #include "mongo/db/s/metrics/with_phase_duration_management.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -70,10 +69,9 @@ constexpr auto kNumTimedPhase = 4;
 
 namespace detail {
 
-using PartialBaseFinal =
+using Base =
     WithPhaseDurationManagement<ShardingDataTransformInstanceMetrics, TimedPhase, kNumTimedPhase>;
 
-using Base = WithOplogApplicationLatencyMetricsInterfaceUpdatingCumulativeMetrics<PartialBaseFinal>;
 }  // namespace detail
 }  // namespace resharding_metrics
 

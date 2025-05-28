@@ -140,6 +140,11 @@ public:
     void onOplogEntriesFetched(int64_t numEntries);
     void onOplogEntriesApplied(int64_t numEntries);
 
+    void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
+    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);
+    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
+
 protected:
     static constexpr auto kNoDate = Date_t::min();
     using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
