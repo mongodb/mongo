@@ -45,9 +45,10 @@ function avg(arrOfInts) {
 
 const experimentColl = db.pbt_self_test_experiment;
 
-// Test that runs of PBT have certain characteristics that are required to be useful tests. Average
-// number of documents, indexes, etc.
-function testModelMetrics(isTS, allowOrs) {
+// Test the number of documents and indexes are high enough for PBT to be effective.
+// This can be tested with timeseries and non-timeseries collections because the index models are
+// different.
+function testNumDocsAndIndexes(isTS) {
     // Test that we create enough indexes and documents per run.
     const numDocs = [];
     const numIndexes = [];
@@ -62,7 +63,7 @@ function testModelMetrics(isTS, allowOrs) {
                  {experimentColl},
                  makeWorkloadModel({
                      collModel: getCollectionModel({isTS}),
-                     aggModel: getAggPipelineModel({allowOrs}),
+                     aggModel: getAggPipelineModel(),
                      numQueriesPerRun
                  }),
                  numRuns);
@@ -76,7 +77,14 @@ function testModelMetrics(isTS, allowOrs) {
     assert.eq(numIndexes.length, numRuns);
     assert.gt(avgNumIndexes, 4);
     jsTestLog('Average number of indexes was: ' + avgNumIndexes);
+}
 
+testNumDocsAndIndexes(false /* isTS */);
+testNumDocsAndIndexes(true /* isTS */);
+
+// Test that average number of documents matched is high enough to have meaningful results.
+// This does not test time-series because results should be the same with a TS collection.
+function testMatchedDocsMetrics(allowOrs) {
     // Now test that queries return an acceptable number of results on average.
     const testCases = [
         {
@@ -90,7 +98,7 @@ function testModelMetrics(isTS, allowOrs) {
             minimumAcceptedAvgNumDocs: 30
         },
         {
-            name: 'nondeterministic aggregations ',
+            name: 'nondeterministic aggregations',
             aggModel: getAggPipelineModel({allowOrs, deterministicBag: false}),
             minimumAcceptedAvgNumDocs: 30
         }
@@ -107,12 +115,12 @@ function testModelMetrics(isTS, allowOrs) {
             return {passed: true};
         }
         // Run 100 queries total.
-        numRuns = 20;
-        numQueriesPerRun = 5;
+        const numRuns = 20;
+        const numQueriesPerRun = 5;
         testProperty(
             mockProperty,
             {experimentColl},
-            makeWorkloadModel({collModel: getCollectionModel({isTS}), aggModel, numQueriesPerRun}),
+            makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
             numRuns);
 
         const avgNumDocsReturned = avg(numDocsReturned);
@@ -123,10 +131,11 @@ function testModelMetrics(isTS, allowOrs) {
     }
 }
 
-testModelMetrics(false, false);
-testModelMetrics(true, false);
-testModelMetrics(false, true);
-testModelMetrics(true, true);
+/*
+ * allowOrs=false is acceptable because including OR predicates would only increase the number of
+ * documents matched compared to a regular predicate or an AND predicate.
+ */
+testMatchedDocsMetrics(false /* allowOrs */);
 
 MongoRunner.stopMongod(conn);
 
