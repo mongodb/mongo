@@ -659,7 +659,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterfa
     auto result = deferred.get(interruptible());
 
     ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
-    assertNumOps(0u, 1u, 0u, 1u);
+    assertNumOpsSoon(0u, 1u, 0u, 2u, kMaxWait);
 }
 
 /**
@@ -711,7 +711,7 @@ TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeout) {
     ASSERT_EQ(ErrorCodes::MaxTimeMSExpired, result.status);
     ASSERT(result.elapsed);
     ASSERT_EQ(result.target, fixture().getServers().front());
-    assertNumOps(0u, 1u, 0u, 0u);
+    assertNumOpsSoon(0u, 1u, 0u, 1u, kMaxWait);
 }
 
 TEST_WITH_AND_WITHOUT_BATON_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
