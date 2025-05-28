@@ -30,17 +30,15 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/dependencies.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 
 #include <functional>
-#include <vector>
 
 namespace mongo {
 namespace document_path_support {
@@ -66,13 +64,42 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
 
 /**
  * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
+ *
+ * The template parameter 'EnsureUniquePrefixes' controls whether or not prefixes in the result
+ * BSONObj will be checked for uniqueness. Setting it to 'false' can be used as a performance
+ * optimization in case it is known that all prefixes in the result object will be unique.
+ * Note: the version that needs to ensure that prefixes are unique has quadratic asymptotic
+ * complexity in the worst case.
  */
-void documentToBsonWithPaths(const Document&, const OrderedPathSet& paths, BSONObjBuilder* builder);
+template <bool EnsureUniquePrefixes = true>
+void documentToBsonWithPaths(const Document& input,
+                             const OrderedPathSet& paths,
+                             BSONObjBuilder* builder) {
+    for (auto&& path : paths) {
+        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
+        // entire path, we just extract the first element of the path.
+        auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
 
-template <typename BSONTraits = BSONObj::DefaultSizeTrait>
+        // Avoid adding the same prefix twice. Note: 'hasField()' iterates over all existing
+        // fields in the builder until it finds a field with the given name or it reaches the
+        // end of the object.
+        if (!EnsureUniquePrefixes || !builder->hasField(prefix)) {
+            input.getField(prefix).addToBsonObj(builder, prefix);
+        }
+    }
+}
+
+/**
+ * Converts a 'Document' to a BSON object.
+ *
+ * The template parameter 'EnsureUniquePrefixes' controls whether or not prefixes in the result
+ * BSONObj will be checked for uniqueness. Setting it to 'false' can be used as a performance
+ * optimization in case it is known that all prefixes in the result object will be unique.
+ */
+template <typename BSONTraits = BSONObj::DefaultSizeTrait, bool EnsureUniquePrefixes = true>
 BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
     BSONObjBuilder outputBuilder;
-    documentToBsonWithPaths(input, paths, &outputBuilder);
+    documentToBsonWithPaths<EnsureUniquePrefixes>(input, paths, &outputBuilder);
     return outputBuilder.obj<BSONTraits>();
 }
 

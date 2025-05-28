@@ -40,8 +40,6 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
-#include <set>
-#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -144,20 +142,6 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
     }
 
     return curValue;
-}
-
-void documentToBsonWithPaths(const Document& input,
-                             const OrderedPathSet& paths,
-                             BSONObjBuilder* builder) {
-    for (auto&& path : paths) {
-        // getNestedField does not handle dotted paths correctly, so instead of retrieving the
-        // entire path, we just extract the first element of the path.
-        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
-        if (!builder->hasField(prefix)) {
-            // Avoid adding the same prefix twice.
-            input.getField(prefix).addToBsonObj(builder, prefix);
-        }
-    }
 }
 
 }  // namespace document_path_support

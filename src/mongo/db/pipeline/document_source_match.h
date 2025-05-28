@@ -291,7 +291,7 @@ public:
 
     virtual Value doSerialize(const SerializationOptions& opts) const {
         return DocumentSourceMatch::serialize(opts);
-    };
+    }
 
 protected:
     DocumentSourceInternalChangeStreamMatch(const BSONObj& query,

@@ -33,25 +33,49 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
 
 MatchProcessor::MatchProcessor(std::unique_ptr<MatchExpression> expr, DepsTracker dependencies)
-    : _expression(std::move(expr)), _dependencies(std::move(dependencies)) {}
+    : _expression(std::move(expr)),
+      _dependencies(std::move(dependencies)),
+      _hasUniquePrefixes(_dependencies.fields.size() < 2 ||
+                         hasUniquePrefixes(_dependencies.fields)) {}
 
 bool MatchProcessor::process(const Document& input) const {
     // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
     // only serialize the fields we need to do the match. Specify BSONObj::LargeSizeTrait so
     // that matching against a large document mid-pipeline does not throw a BSON max-size error.
-    BSONObj toMatch = _dependencies.needWholeDocument
-        ? input.toBson<BSONObj::LargeSizeTrait>()
-        : document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait>(
-              input, _dependencies.fields);
+    BSONObj toMatch = [&]() {
+        if (_dependencies.needWholeDocument) {
+            return input.toBson<BSONObj::LargeSizeTrait>();
+        }
+        if (_hasUniquePrefixes) {
+            // Use optimized function that does not check whether we have already seen a specific
+            // prefix.
+            return document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait,
+                                                                  /* EnsureUniquePrefixes */ false>(
+                input, _dependencies.fields);
+        }
+
+        // Use slow function that will check for prefix uniqueness.
+        return document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait,
+                                                              /* EnsureUniquePrefixes */ true>(
+            input, _dependencies.fields);
+    }();
     return exec::matcher::matchesBSON(_expression.get(), toMatch);
+}
+
+bool MatchProcessor::hasUniquePrefixes(const OrderedPathSet& fields) {
+    StringDataSet prefixes;
+    for (auto&& path : fields) {
+        auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
+        if (!prefixes.insert(prefix).second) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace mongo

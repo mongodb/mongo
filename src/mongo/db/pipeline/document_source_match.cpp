@@ -117,7 +117,7 @@ void DocumentSourceMatch::rebuild(BSONObj predicate, std::unique_ptr<MatchExpres
     DepsTracker dependencies =
         DepsTracker(_isTextQuery ? DepsTracker::kOnlyTextScore : DepsTracker::kNoMetadata);
     getDependencies(expr.get(), &dependencies);
-    _matchProcessor.emplace(MatchProcessor(std::move(expr), std::move(dependencies)));
+    _matchProcessor.emplace(std::move(expr), std::move(dependencies));
 }
 
 const char* DocumentSourceMatch::getSourceName() const {

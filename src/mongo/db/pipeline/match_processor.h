@@ -31,8 +31,6 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/matcher.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <memory>
 
@@ -63,10 +61,20 @@ public:
     }
 
 private:
+    // Determines whether all fields have unique prefixes. This is called once during object
+    // construction to determine the value of '_hasUniquePrefixes'.
+    static bool hasUniquePrefixes(const OrderedPathSet& fields);
+
     std::unique_ptr<MatchExpression> _expression;
+
     // Cache the dependencies so that we know what fields we need to serialize to BSON for
     // matching.
     DepsTracker _dependencies;
+
+    // Whether or not the paths in '_dependencies.fields' have unique prefixes or not. Based on the
+    // uniqueness check outcome the match processor may be able to use an optimized code path when
+    // converting input Documents to BSONObjs.
+    const bool _hasUniquePrefixes;
 };
 
 }  // namespace mongo
