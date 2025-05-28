@@ -75,7 +75,8 @@ protected:
         if (auto filterOrUnset = request.getFilter()) {
             auto newSettings = oldSettings;
             if (auto filter = filterOrUnset->obj) {
-                newSettings.filter = std::make_shared<ProfileFilterImpl>(*filter);
+                newSettings.filter = std::make_shared<ProfileFilterImpl>(
+                    *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
             } else {
                 newSettings.filter = nullptr;
             }

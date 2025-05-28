@@ -43,11 +43,13 @@ public:
         opCtx = opCtxPtr.get();
         curop = CurOp::get(*opCtx);
         opDebug = &curop->debug();
+        expCtx = ExpressionContextBuilder{}.opCtx(opCtx).build();
     }
     ServiceContext::UniqueOperationContext opCtxPtr;
     OperationContext* opCtx;
     CurOp* curop;
     OpDebug* opDebug;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 
 TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
@@ -118,7 +120,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
     for (const auto& fieldName : allowedOpDebugFields) {
         auto filterExpr = BSON(fieldName << BSON("$exists" << true));
 
-        ProfileFilterImpl profileFilter{filterExpr};
+        ProfileFilterImpl profileFilter{filterExpr, expCtx};
         ASSERT_TRUE(profileFilter.dependsOn(fieldName))
             << "Profile filter failed to report dependency on " << fieldName;
 
@@ -135,7 +137,7 @@ TEST_F(ProfileFilterTest, FilterOnAllOpDebugFields) {
 TEST_F(ProfileFilterTest, FilterOnNestedField) {
     auto filterExpr = BSON("originatingCommand.pipeline" << BSON("$exists" << true));
 
-    ProfileFilterImpl profileFilter{filterExpr};
+    ProfileFilterImpl profileFilter{filterExpr, expCtx};
     ASSERT_TRUE(profileFilter.dependsOn("originatingCommand"))
         << "Profile filter failed to report dependency on originatingCommand";
 
@@ -152,7 +154,7 @@ TEST_F(ProfileFilterTest, FilterOnNestedField) {
 TEST_F(ProfileFilterTest, FilterOnOptionalField) {
     auto filterExpr = BSON("replanReason" << "a good reason");
 
-    ProfileFilterImpl profileFilter{filterExpr};
+    ProfileFilterImpl profileFilter{filterExpr, expCtx};
 
     // Field doesn't exist.
     opDebug->replanReason = boost::none;
@@ -163,9 +165,30 @@ TEST_F(ProfileFilterTest, FilterOnOptionalField) {
     ASSERT_TRUE(profileFilter.matches(opCtx, *opDebug, *curop));
 }
 
+TEST_F(ProfileFilterTest, FilterDependsOnEnabledFeatureFlag) {
+    // TODO SERVER-104457 Add a permanent test for this scenario.
+    // $sigmoid is gated by 'featureFlagRankFusionBasic' under FCV 8.1.
+    auto filterExpr = fromjson(R"({
+        $expr: {
+            $gte: [{$sigmoid : '$nreturned'}, 0.6]
+        }
+    })");
+
+    ProfileFilterImpl profileFilter{filterExpr, expCtx};
+    ASSERT_TRUE(profileFilter.dependsOn("nreturned"));
+
+    // $sigmoid will be ~0.7 when 'nreturned' is 1.
+    opDebug->additiveMetrics.nreturned = 1;
+    ASSERT_TRUE(profileFilter.matches(opCtx, *opDebug, *curop));
+
+    // $sigmoid will be ~0.5 when 'nreturned' is 0.1.
+    opDebug->additiveMetrics.nreturned = 0.1;
+    ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));
+}
+
 TEST_F(ProfileFilterTest, FilterOnUnavailableField) {
     auto filterExpr = BSON("notAnOpDebugField" << "some value");
-    ASSERT_THROWS_CODE(ProfileFilterImpl{filterExpr}, DBException, 4910200);
+    ASSERT_THROWS_CODE(ProfileFilterImpl(filterExpr, expCtx), DBException, 4910200);
 }
 
 TEST_F(ProfileFilterTest, FilterThrowsException) {
@@ -176,7 +199,7 @@ TEST_F(ProfileFilterTest, FilterThrowsException) {
         }
     })");
 
-    ProfileFilterImpl profileFilter{filterExpr};
+    ProfileFilterImpl profileFilter{filterExpr, expCtx};
     ASSERT_TRUE(profileFilter.dependsOn("nreturned"));
 
     ASSERT_FALSE(profileFilter.matches(opCtx, *opDebug, *curop));

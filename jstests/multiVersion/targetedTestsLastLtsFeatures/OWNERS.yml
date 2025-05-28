@@ -9,3 +9,6 @@ filters:
   - "create_coll_validator_new_feature_no_applyops_check.js":
     approvers:
       - 10gen/query-optimization
+  - "profile_filter_query_feature_flag.js":
+    approvers:
+      - 10gen/query-integration-observability

@@ -1,6 +1,9 @@
 // @tags: [requires_profiling]
 
-import {testGetCmdLineOptsMongod} from "jstests/libs/command_line/test_parsed_options.js";
+import {
+    testGetCmdLineOptsMongod,
+    testGetCmdLineOptsMongos
+} from "jstests/libs/command_line/test_parsed_options.js";
 
 var baseName = "jstests_core_profile_options";
 
@@ -33,6 +36,8 @@ expectedResult = {
     }
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filter.json"},
+                         expectedResult);
+testGetCmdLineOptsMongos({config: "jstests/libs/config_files/set_profiling_filter.json"},
                          expectedResult);
 
 print(baseName + " succeeded.");

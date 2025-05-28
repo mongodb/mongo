@@ -46,7 +46,7 @@ namespace mongo {
 
 class ProfileFilterImpl final : public ProfileFilter {
 public:
-    ProfileFilterImpl(BSONObj expr);
+    ProfileFilterImpl(BSONObj expr, boost::intrusive_ptr<ExpressionContext> parserExpCtx);
     bool matches(OperationContext* opCtx, const OpDebug& op, const CurOp& curop) const override;
     BSONObj serialize() const override {
         return _matcher.getMatchExpression()->serialize();

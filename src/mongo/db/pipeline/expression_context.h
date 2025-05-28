@@ -539,8 +539,8 @@ public:
      */
     bool shouldParserIgnoreFeatureFlagCheck() const {
         tassert(10499200, "Operation context is not initialized", _params.opCtx);
-        return !_params.opCtx->isEnforcingConstraints() &&
-            (_params.isParsingCollectionValidator || _params.isParsingViewDefinition);
+        return (_params.isParsingCollectionValidator || _params.isParsingViewDefinition) &&
+            !_params.opCtx->isEnforcingConstraints();
     }
 
     /**

@@ -57,8 +57,10 @@
 
 namespace mongo {
 
-ProfileFilterImpl::ProfileFilterImpl(BSONObj expr)
-    : _matcher(expr.getOwned(), ExpressionContextBuilder{}.build()) {
+ProfileFilterImpl::ProfileFilterImpl(BSONObj expr,
+                                     boost::intrusive_ptr<ExpressionContext> parserExpCtx)
+    : _matcher(expr.getOwned(), parserExpCtx) {
+
     DepsTracker deps;
     match_expression::addDependencies(_matcher.getMatchExpression(), &deps);
     uassert(4910201,
@@ -73,6 +75,10 @@ ProfileFilterImpl::ProfileFilterImpl(BSONObj expr)
 
     // Remember a list of functions we'll call whenever we need to build BSON from CurOp.
     _makeBSON = OpDebug::appendStaged(_dependencies, _needWholeDocument);
+
+    // The operation context is necessary for parsing, but should not be used for the rest of the
+    // lifetime of the filter, since the filter exists for longer than a single operation.
+    parserExpCtx->setOperationContext(nullptr);
 }
 
 bool ProfileFilterImpl::matches(OperationContext* opCtx,
@@ -92,7 +98,11 @@ void ProfileFilterImpl::initializeDefaults(ServiceContext* service) {
 
     try {
         if (auto expr = serverGlobalParams.defaultProfileFilter) {
-            dbProfileSettings.setDefaultFilter(std::make_shared<ProfileFilterImpl>(*expr));
+            // Create a temporary operation context that will only be valid for parsing, and will
+            // be deleted after the try/catch block.
+            const auto tempOpCtx = cc().makeOperationContext();
+            dbProfileSettings.setDefaultFilter(std::make_shared<ProfileFilterImpl>(
+                *expr, ExpressionContextBuilder{}.opCtx(tempOpCtx.get()).build()));
         }
     } catch (AssertionException& e) {
         // Add more context to the error

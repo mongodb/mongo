@@ -79,10 +79,11 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
 
     // Save off the old global default setting so that we can log it and return in the result.
     auto oldDefault = dbProfileSettings.getDefaultFilter();
-    auto newDefault = [&request] {
+    auto newDefault = [&request, opCtx] {
         const auto& filterOrUnset = request.getFilter();
         if (auto filter = filterOrUnset.obj) {
-            return std::make_shared<ProfileFilterImpl>(*filter);
+            return std::make_shared<ProfileFilterImpl>(
+                *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
         }
         return std::shared_ptr<ProfileFilterImpl>(nullptr);
     }();

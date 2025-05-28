@@ -126,7 +126,8 @@ protected:
             if (auto filterOrUnset = request.getFilter()) {
                 if (auto filter = filterOrUnset->obj) {
                     // filter: <match expression>
-                    newSettings.filter = std::make_shared<ProfileFilterImpl>(*filter);
+                    newSettings.filter = std::make_shared<ProfileFilterImpl>(
+                        *filter, ExpressionContextBuilder{}.opCtx(opCtx).build());
                 } else {
                     // filter: "unset"
                     newSettings.filter = nullptr;
