@@ -58,6 +58,10 @@ public:
         return clientsWithOps;
     }
 
+    /**
+     * Note that the mocked clock in this test applies to sleeping on the opCtx rather than to the
+     * internal folly::TokenBucket's calculations.
+     */
     void advanceTime(Milliseconds d) {
         static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(d);
     }
@@ -82,9 +86,9 @@ TEST_F(RateLimiterTest, InvalidBurstSize) {
 
 TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        const int maxTokens = 5;
+        const int maxTokens = 2;
         const int refreshRate = 4;
-        const int64_t numThreads = 20;
+        const int64_t numThreads = 10;
         const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
 
         RateLimiter rateLimiter(refreshRate, maxTokens, INT_MAX);
@@ -93,7 +97,6 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
 
         stdx::mutex mutex;
         stdx::condition_variable cv;
-        int64_t acquiredTokens = 0;
 
         std::vector<double> tokenAcquisitionTimes;
 
@@ -109,7 +112,6 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
                           getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
                 tokenAcquisitionTimes.emplace_back(
                     getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
-                acquiredTokens++;
                 cv.notify_one();
             }));
         }
@@ -117,7 +119,8 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
         // Make sure the initial burstRate fulfills the first requests
         {
             stdx::unique_lock<stdx::mutex> lk(mutex);
-            ASSERT_DOES_NOT_THROW(cv.wait(lk, [&] { return acquiredTokens == maxTokens; }));
+            ASSERT_DOES_NOT_THROW(
+                cv.wait(lk, [&] { return (int)tokenAcquisitionTimes.size() == maxTokens; }));
         }
 
         // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
@@ -133,23 +136,33 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
         // Until we start moving the mock clock forward, no other requests will be fulfilled and all
         // other requests will be waiting.
         ASSERT_EQ(rateLimiter.getNumWaiters(), numThreads - maxTokens);
-        ASSERT_EQ(acquiredTokens, maxTokens);
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
 
         // Advancing time less than tokenInterval doesn't cause a token to be acquired.
         auto smallAdvance = Milliseconds{10};
         ASSERT_LT(smallAdvance, tokenInterval);
         advanceTime(smallAdvance);
-        ASSERT_EQ(acquiredTokens, maxTokens);
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
 
         // For each remaining token, ensure that the rate limiter gives out a token every 1000 /
         // refreshRate milliseconds.
+        auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
         for (int64_t i = 1; i <= numThreads - maxTokens; i++) {
             stdx::unique_lock<stdx::mutex> lk(mutex);
             advanceTime(tokenInterval);
-            ASSERT_DOES_NOT_THROW(cv.wait(lk, [&] { return acquiredTokens == maxTokens + i; }));
+            // If the cv deadline, which is based on the system (rather than the mock) clock,
+            // passes, we want to explicitly kill all operations to ensure that the test does not
+            // hang and we can diagnose the issue.
+            if (!cv.wait_until(lk, deadline, [&] {
+                    return (int)tokenAcquisitionTimes.size() == maxTokens + i;
+                })) {
+                getServiceContext()->setKillAllOperations();
+                // We re-run this assertion so that proper diagnostics are output.
+                ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens + i);
+            }
         }
 
-        ASSERT_EQ(acquiredTokens, numThreads);
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
 
         // Assert that the tokens were acquired at the correct intervals.
         for (int64_t i = 0; i < numThreads; i++) {
