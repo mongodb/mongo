@@ -41,6 +41,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
@@ -908,15 +909,22 @@ SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(
     SampleDocumentPipeline pipeline, int skip)
     : _pipeline(std::move(pipeline)), _skip(skip) {}
 
+exec::agg::Pipeline& SamplingBasedSplitPolicy::PipelineDocumentSource::_getExecPipeline() {
+    if (!_execPipeline) {
+        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+    }
+    return *_execPipeline;
+}
+
 boost::optional<BSONObj> SamplingBasedSplitPolicy::PipelineDocumentSource::getNext() {
-    auto val = _pipeline->getNext();
+    auto val = _getExecPipeline().getNext();
 
     if (!val) {
         return boost::none;
     }
 
     for (int skippedSamples = 0; skippedSamples < _skip; skippedSamples++) {
-        auto newVal = _pipeline->getNext();
+        auto newVal = _getExecPipeline().getNext();
 
         if (!newVal) {
             // If there are not enough samples, just select the last sample.

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -90,6 +91,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
         }
         try {
             _pipeline = Pipeline::makePipeline(stages, foreignExpCtx);
+            _execPipeline = exec::agg::buildPipeline((_pipeline->getSources()));
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             LOGV2(7807800,
                   "Failed to create aggregation pipeline to list sampled queries",
@@ -98,7 +100,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
         }
     }
 
-    if (auto doc = _pipeline->getNext()) {
+    if (auto doc = _execPipeline->getNext()) {
         auto queryDoc = SampledQueryDocument::parse(
             IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
         DocumentSourceListSampledQueriesResponse response;

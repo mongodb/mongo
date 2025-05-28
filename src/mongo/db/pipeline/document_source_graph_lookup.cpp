@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -308,7 +309,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             // Query for all keys that were in the frontier and not in the cache, populating
             // '_queue' for the next iteration of search.
             auto pipeline = makePipeline(std::move(*query.match), allowForeignSharded);
-            while (auto next = pipeline->getNext()) {
+            auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+            while (auto next = execPipeline->getNext()) {
                 uassert(40271,
                         str::stream()
                             << "Documents in the '" << _from.toStringForErrorMsg()
@@ -319,7 +321,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
                 addToCache(*next, query.queried);
             }
             checkMemoryUsage();
-            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+            execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
     }
     updateSpillingStats();

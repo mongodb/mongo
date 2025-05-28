@@ -28,6 +28,7 @@
  */
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -157,16 +158,16 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             pipeline =
                 pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
                     pipeline.release(), boost::none, false, _shardFilterPolicy);
-
-            result = pipeline->getNext();
-            if (auto next = pipeline->getNext()) {
+            auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+            result = execPipeline->getNext();
+            if (auto next = execPipeline->getNext()) {
                 uasserted(ErrorCodes::TooManyMatchingDocuments,
                           str::stream() << "found more than one document with document key "
                                         << documentKey.toString() << ": [" << result->toString()
                                         << ", " << next->toString() << "]");
             }
 
-            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+            execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
     }
 

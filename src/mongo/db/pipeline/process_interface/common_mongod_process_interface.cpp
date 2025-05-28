@@ -53,6 +53,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -794,10 +795,11 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         return boost::none;
     }
 
-    auto lookedUpDocument = pipeline->getNext();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto lookedUpDocument = execPipeline->getNext();
 
     // Ensure that there are no two documents for the same 'documentKey'.
-    if (auto next = pipeline->getNext()) {
+    if (auto next = execPipeline->getNext()) {
         uasserted(ErrorCodes::TooManyMatchingDocuments,
                   str::stream() << "found more than one document with document key "
                                 << documentKey.toString() << " [" << lookedUpDocument->toString()

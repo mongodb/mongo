@@ -38,6 +38,7 @@
 namespace mongo::exec::agg {
 class Pipeline {
 public:
+    // TODO SERVER-105494: Use 'std::unique_ptr' instead of 'boost::intrusive_ptr'.
     using StagePtr = boost::intrusive_ptr<Stage>;
     using StageContainer = std::vector<StagePtr>;
 
@@ -47,6 +48,21 @@ public:
     const StageContainer& getStages() const {
         return _stages;
     }
+
+    /**
+     * Returns the next document from the pipeline, or boost::none if there are no more documents.
+     */
+    boost::optional<Document> getNext();
+    /**
+     * Returns the next result from the pipeline.
+     */
+    GetNextResult getNextResult();
+
+    /**
+     * Method to accumulate the plan summary stats from all stages of the pipeline into the given
+     * `planSummaryStats` object.
+     */
+    void accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) const;
 
 private:
     StageContainer _stages;

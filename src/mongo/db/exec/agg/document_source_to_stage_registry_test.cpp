@@ -29,12 +29,12 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_test_optimizations.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace exec {
@@ -43,43 +43,60 @@ namespace agg {
 namespace {
 
 constexpr auto overridenStagePtr = nullptr;
+
+class DocumentSourceUniqueForThisTest : public DocumentSourceTestOptimizations {
+public:
+    DocumentSourceUniqueForThisTest(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : DocumentSourceTestOptimizations(expCtx) {}
+    static const Id& id;
+    Id getId() const override {
+        return id;
+    }
+};
+
+// Allocate a unique id for 'DocumentSourceUniqueForThisTest'.
+ALLOCATE_DOCUMENT_SOURCE_ID(uniqueForThisTest, DocumentSourceUniqueForThisTest::id)
+
 int mappingFnCallCount = 0;
-boost::intrusive_ptr<exec::agg::Stage> documentSourceSortMappingFnForTest(
+
+boost::intrusive_ptr<exec::agg::Stage> documentSourceUniqueForThisTestMappingFn(
     const boost::intrusive_ptr<const DocumentSource>& ds) {
     mappingFnCallCount++;
     return overridenStagePtr;
 }
 
-// This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using DocumentSourceToStageRegistryTest = AggregationContextFixture;
-
 /**
  * Use default mapper for all unregistered document sources.
  * The default is to return static_cast<Stage*>(documentSourcePtr);
  */
-TEST_F(DocumentSourceToStageRegistryTest, DefaultMapper) {
-    auto matchDS =
-        DocumentSourceMatch::create(fromjson("{$text: {$search: 'hello'} }"), getExpCtx());
-    auto matchStage = buildStage(matchDS);
+TEST(DocumentSourceToStageRegistryTest, DefaultMapper) {
+    auto fakeDS =
+        make_intrusive<DocumentSourceTestOptimizations>(make_intrusive<ExpressionContextForTest>());
+    mappingFnCallCount = 0;
 
-    ASSERT_EQ(matchDS.get(), matchStage.get());
+    auto fakeStage = buildStage(fakeDS);
+
+    ASSERT_EQ(fakeDS.get(), fakeStage.get());
+    ASSERT_EQ(mappingFnCallCount, 0);
 }
 
-REGISTER_AGG_STAGE_MAPPING(sort, DocumentSourceSort::id, documentSourceSortMappingFnForTest)
+REGISTER_AGG_STAGE_MAPPING(uniqueForThisTest,
+                           DocumentSourceUniqueForThisTest::id,
+                           documentSourceUniqueForThisTestMappingFn)
 
 /**
  * Verify that REGISTER_AGG_STAGE_MAPPING macro overrides the default
  * DocumentSource -> Stage function. The default is to return
  * static_cast<Stage*>(documentSourcePtr);
  */
-TEST_F(DocumentSourceToStageRegistryTest, OverriddenMapper) {
-    BSONObj spec = fromjson("{$sort: {a: 1}}");
-    auto sortDS = DocumentSourceSort::createFromBson(spec.firstElement(), getExpCtx());
+TEST(DocumentSourceToStageRegistryTest, OverriddenMapper) {
+    auto uniqueForThisTestDS =
+        make_intrusive<DocumentSourceUniqueForThisTest>(make_intrusive<ExpressionContextForTest>());
     mappingFnCallCount = 0;
 
-    auto sortStage = buildStage(sortDS);
+    auto uniqueForThisTestStage = buildStage(uniqueForThisTestDS);
 
-    ASSERT_EQ(overridenStagePtr, sortStage.get());
+    ASSERT_EQ(overridenStagePtr, uniqueForThisTestStage.get());
     ASSERT_GT(mappingFnCallCount, 0);
 }
 

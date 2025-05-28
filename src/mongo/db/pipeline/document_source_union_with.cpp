@@ -34,6 +34,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -103,6 +104,23 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
 }  // namespace
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
+    const DocumentSourceUnionWith& original,
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
+    : DocumentSource(kStageName, newExpCtx),
+      _pipeline(original._pipeline->clone(
+          newExpCtx ? newExpCtx->copyForSubPipeline(
+                          newExpCtx->getResolvedNamespace(original._userNss).ns,
+                          newExpCtx->getResolvedNamespace(original._userNss).uuid)
+                    : nullptr)),
+      _userNss(original._userNss),
+      _userPipeline(original._userPipeline),
+      _variables(original._variables),
+      _variablesParseState(original._variablesParseState) {
+    _pipeline->getContext()->setInUnionWith(true);
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+}
+
+DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
     : DocumentSource(kStageName, expCtx),
@@ -112,6 +130,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
     _pipeline->getContext()->setInUnionWith(true);
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -141,6 +160,7 @@ DocumentSourceUnionWith::~DocumentSourceUnionWith() {
     if (_pipeline && _pipeline->getContext()->getExplain()) {
         _pipeline->dispose(pExpCtx->getOperationContext());
         _pipeline.reset();
+        _execPipeline.reset();
     }
 }
 
@@ -301,6 +321,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                         "pipeline"_attr = _pipeline->serializeToBson());
             _pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
                 _pipeline.release());
+            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
             LOGV2_DEBUG(9497003,
                         5,
                         "$unionWith POST pipeline prep: ",
@@ -313,6 +334,7 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe),
                 _userNss);
+            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
             logShardedViewFound(e);
             return doGetNext();
         }
@@ -323,12 +345,12 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     // subpipeline.
     _pipeline.get_deleter().dismissDisposal();
 
-    auto res = _pipeline->getNext();
+    auto res = _execPipeline->getNext();
     if (res)
         return std::move(*res);
 
     // Record the plan summary stats after $unionWith operation is done.
-    _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+    _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
     _executionState = ExecutionProgress::kFinished;
     return GetNextResult::makeEOF();
@@ -390,13 +412,15 @@ void DocumentSourceUnionWith::doDispose() {
         _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-        _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+        std::cout << "BANANA UnionWith::doDispose called on " << this << "\n";
+        _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
         if (!_pipeline->getContext()->getExplain()) {
             _pipeline->dispose(pExpCtx->getOperationContext());
             _userPipeline.clear();
             _pushedDownStages.clear();
             _pipeline.reset();
+            _execPipeline.reset();
         }
     }
 }

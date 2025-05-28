@@ -29,9 +29,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -44,7 +44,6 @@
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <deque>
 #include <memory>
@@ -76,16 +75,17 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProject
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // We sample all of the documents and the document source has 2 chunks. So we can assert on the
     // returned values.
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 5);
     ASSERT(next.value().getField("_id").missing());
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 15);
     ASSERT(next.value().getField("_id").missing());
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
@@ -99,16 +99,17 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // We sample all of the documents and the document source has 2 chunks. So we can assert on the
     // returned values.
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("_id").getInt(), 3);
     ASSERT(next.value().getField("a").missing());
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("_id").getInt(), 10);
     ASSERT(next.value().getField("a").missing());
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSucceeds) {
@@ -122,19 +123,20 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSuc
                                     expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 1, b: 16, a: 15}", "{x: 2, b: 123, a: 5}"}, expCtx());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
     pipeline->addInitialSource(mockSource.get());
 
     // We sample all of the documents and the document source has 2 chunks. So we can assert on the
     // returned values.
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 5);
     ASSERT_EQUALS(next.value().getField("b").getLong(), -6548868637522515075LL);
     ASSERT(next.value().getField("x").missing());
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 15);
     ASSERT_EQUALS(next.value().getField("b").getLong(), 2598032665634823220LL);
     ASSERT(next.value().getField("x").missing());
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
@@ -148,14 +150,15 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20}, c: 1}", "{x: 3, a: {b: 10}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // We sample all of the documents and the document source has 2 chunks. So we can assert on the
     // returned values.
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a.b" << 10 << "c" << 5));
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a.b" << 20 << "c" << 1));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds) {
@@ -170,16 +173,17 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSuccee
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20, c: 16}, c: 1}", "{x: 3, a: {b: 10, c: 123}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // We sample all of the documents and the document source has 2 chunks. So we can assert on the
     // returned values.
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
                       BSON("a.b" << 10 << "c" << 5 << "a.c" << -6548868637522515075LL));
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
                       BSON("a.b" << 20 << "c" << 1 << "a.c" << 2598032665634823220LL));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 std::string dumpValues(const std::vector<int>& values) {
@@ -286,11 +290,12 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSu
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, b: 10}", "{_id: {a: 5}, b:1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-    auto next = pipeline->getNext();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("b" << 1));
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("b" << 10));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjectedSucceeds) {
@@ -304,11 +309,12 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjec
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, c: 10}", "{_id: {a: 5}, c: 1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-    auto next = pipeline->getNext();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("_id.a" << 5 << "c" << 1));
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("_id.a" << 15 << "c" << 10));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) {
@@ -323,14 +329,15 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceed
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, _id: {a: 20, b: 16}, b: 1}", "{x: 3, _id: {a: 10, b: 123}, b: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
                       BSON("_id.a" << 10 << "b" << 5 << "_id.b" << -6548868637522515075LL));
-    next = pipeline->getNext();
+    next = execPipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
                       BSON("_id.a" << 20 << "b" << 1 << "_id.b" << 2598032665634823220LL));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOperation) {
@@ -384,12 +391,13 @@ TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnOneChunk) {
         },
         expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     int numSamples = 0;
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     while (next) {
         ++numSamples;
-        next = pipeline->getNext();
+        next = execPipeline->getNext();
     }
     ASSERT_EQ(numSamplesPerChunk * numInitialChunks, numSamples);
 }
@@ -418,12 +426,13 @@ TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnMultipleChun
         },
         expCtx());
     pipeline->addInitialSource(mockSource.get());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     int numSamples = 0;
-    auto next = pipeline->getNext();
+    auto next = execPipeline->getNext();
     while (next) {
         ++numSamples;
-        next = pipeline->getNext();
+        next = execPipeline->getNext();
     }
     ASSERT_EQ(numSamplesPerChunk * numInitialChunks, numSamples);
 }

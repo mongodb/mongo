@@ -239,6 +239,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/matcher:matcher_serialization_test.cpp",
         "//src/mongo/db/exec/matcher:matcher_test.cpp",
         "//src/mongo/db/exec/timeseries:bucket_unpacker_test.cpp",
+        "//src/mongo/db/pipeline:document_source_test_optimizations.h",
     ],
     tags = ["mongo_unittest_fourth_group"],
     deps = [

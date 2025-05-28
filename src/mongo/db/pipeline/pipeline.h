@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -406,15 +407,6 @@ public:
     void addFinalSource(boost::intrusive_ptr<DocumentSource> source);
 
     /**
-     * Returns the next document from the pipeline, or boost::none if there are no more documents.
-     */
-    boost::optional<Document> getNext();
-    /**
-     * Returns the next result from the pipeline.
-     */
-    exec::agg::GetNextResult getNextResult();
-
-    /**
      * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
      * specified by 'verbosity'.
      */
@@ -570,12 +562,6 @@ public:
         return CursorType_serializer(pipelineType);
     }
 
-    /**
-     * Method to accumulate the plan summary stats from all stages of the pipeline into the given
-     * `planSummaryStats` object.
-     */
-    void accumulatePipelinePlanSummaryStats(PlanSummaryStats& planSummaryStats);
-
 private:
     friend class PipelineDeleter;
 
@@ -609,6 +595,7 @@ private:
     void checkValidOperationContext() const;
 
     SourceContainer _sources;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
 
     SplitState _splitState = SplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;

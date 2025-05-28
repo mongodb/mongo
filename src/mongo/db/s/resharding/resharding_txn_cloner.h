@@ -30,6 +30,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -116,7 +117,9 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
-    boost::optional<SessionTxnRecord> _getNextRecord(OperationContext* opCtx, Pipeline& pipeline);
+    boost::optional<SessionTxnRecord> _getNextRecord(OperationContext* opCtx,
+                                                     Pipeline& pipeline,
+                                                     exec::agg::Pipeline& execPipeline);
 
     void _updateProgressDocument(OperationContext* opCtx, const LogicalSessionId& progress);
 

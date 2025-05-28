@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -113,7 +114,7 @@ public:
     void dispose(OperationContext* opCtx) override;
 
 private:
-    std::vector<repl::OplogEntry> _fillBatch(Pipeline& pipeline);
+    std::vector<repl::OplogEntry> _fillBatch();
 
     const NamespaceString _oplogBufferNss;
 
@@ -125,6 +126,7 @@ private:
     resharding::OnInsertAwaitable* const _insertNotifier;
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     bool _hasSeenFinalOplogEntry{false};
 };
 

@@ -68,10 +68,15 @@ using DocumentSourceToStageFn =
  * Registers a DocumentSource with a function that builds an aggregation 'Stage' from
  * a 'DocumentSource'.
  *
- * DO NOT call this funciton directly. Instead, use the REGISTER_AGG_STAGE_MAPPING
+ * DO NOT call this function directly. Instead, use the REGISTER_AGG_STAGE_MAPPING
  * macro defined in this file.
  */
 void registerDocumentSourceToStageFn(DocumentSource::Id dsid, DocumentSourceToStageFn fn);
+
+/**
+ * This method is for unit-testing only. DO NOT use it in productive code.
+ */
+stdx::unordered_map<DocumentSource::Id, DocumentSourceToStageFn>& getStageBuildersMap_forTest();
 
 /**
  * For an instance of DocumentSource create appropriate Stage object.

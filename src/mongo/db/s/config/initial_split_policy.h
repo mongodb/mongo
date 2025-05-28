@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -279,7 +280,9 @@ public:
         }
 
     private:
+        exec::agg::Pipeline& _getExecPipeline();
         SampleDocumentPipeline _pipeline;
+        std::unique_ptr<exec::agg::Pipeline> _execPipeline;
         const int _skip;
     };
 

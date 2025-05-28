@@ -205,14 +205,14 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     while (!allPipelinesEOF) {
         allPipelinesEOF = true;  // Set this to false if any pipeline isn't EOF.
         for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
-            const auto& pipeline = _facets[facetId].pipeline;
-            auto next = pipeline->getNextResult();
-            for (; next.isAdvanced(); next = pipeline->getNextResult()) {
+            auto& execPipeline = _facets[facetId].getExecPipeline();
+            auto next = execPipeline.getNextResult();
+            for (; next.isAdvanced(); next = execPipeline.getNextResult()) {
                 ensureUnderMemoryLimit(next.getDocument().getApproximateSize());
                 results[facetId].emplace_back(next.releaseDocument());
             }
             allPipelinesEOF = allPipelinesEOF && next.isEOF();
-            pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+            execPipeline.accumulatePlanSummaryStats(_stats.planSummaryStats);
         }
     }
 

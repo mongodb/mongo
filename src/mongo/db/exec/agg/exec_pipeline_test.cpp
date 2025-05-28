@@ -83,16 +83,12 @@ TEST(PipelineTest, ThreeStagePipeline) {
     ASSERT_EQ(stage0.get(), pl.getStages()[0].get());
     ASSERT_EQ(stage1.get(), pl.getStages()[1].get());
     ASSERT_EQ(stage2.get(), pl.getStages()[2].get());
-
-    // Assert that the stages are 'stitched' correctly.
-    ASSERT_EQ(nullptr, dynamic_cast<FakeStage*>(stage0.get())->getSource());
-    ASSERT_EQ(stage0.get(), dynamic_cast<FakeStage*>(stage1.get())->getSource());
-    ASSERT_EQ(stage1.get(), dynamic_cast<FakeStage*>(stage2.get())->getSource());
 }
 
-DEATH_TEST_REGEX(PipelineTest, CreatingEmptyPipelineThrows, "Tripwire assertion.*10395600") {
+DEATH_TEST_REGEX(PipelineTest, GetNextResultOnEmptyPipelineThrows, "Tripwire assertion.*10394800") {
     StageContainer stages;
-    ASSERT_THROWS_CODE(Pipeline(std::move(stages)), AssertionException, 10395600);
+    Pipeline pl(std::move(stages));
+    ASSERT_THROWS_CODE(pl.getNextResult(), AssertionException, 10395600);
 }
 
 }  // namespace mongo::test

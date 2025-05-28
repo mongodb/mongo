@@ -29,15 +29,16 @@
 
 #include "mongo/db/exec/agg/pipeline_builder.h"
 
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+
 namespace mongo::exec::agg {
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
     const std::list<boost::intrusive_ptr<DocumentSource>>& sources) {
-    std::vector<boost::intrusive_ptr<Stage>> stages;
+    Pipeline::StageContainer stages;
     stages.reserve(sources.size());
 
-    // TODO SERVER-103957: Replace this trivial mapping with the dynamic mapping from SERVER-103954.
     for (const auto& source : sources) {
-        stages.push_back(boost::dynamic_pointer_cast<Stage>(source));
+        stages.push_back(buildStage(source));
     }
 
     return std::make_unique<Pipeline>(std::move(stages));

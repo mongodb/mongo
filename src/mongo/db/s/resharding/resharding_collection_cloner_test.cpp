@@ -41,6 +41,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -201,6 +202,7 @@ protected:
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));
+        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
         _resumeTokenNum = 0;
     }
 
@@ -270,6 +272,7 @@ protected:
      */
     bool doOneBatch(OperationContext* opCtx,
                     Pipeline& pipeline,
+                    exec::agg::Pipeline& execPipeline,
                     TxnNumber& txnNum,
                     ShardId donorShard,
                     HostAndPort donorHost,
@@ -280,7 +283,7 @@ protected:
 
         std::vector<InsertStatement> batch;
         do {
-            auto doc = pipeline.getNext();
+            auto doc = execPipeline.getNext();
             if (!doc) {
                 break;
             }
@@ -319,7 +322,8 @@ protected:
         // Make the documents require multiple insert batches.
         const size_t batchSize = std::max(static_cast<int64_t>(1), expectedDocumentsCount / 2);
 
-        while (doOneBatch(opCtx, *_pipeline, txnNum, kMyShardName, _myHostAndPort, batchSize)) {
+        while (doOneBatch(
+            opCtx, *_pipeline, *_execPipeline, txnNum, kMyShardName, _myHostAndPort, batchSize)) {
             AutoGetCollection tempColl{opCtx, _tempNss, MODE_IX};
             ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
             ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());
@@ -383,6 +387,7 @@ private:
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingCollectionCloner> _cloner;
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // Mock 'postBatchResumeToken'. Incremented every a mock batch is processed.
     int _resumeTokenNum = 0;
 };

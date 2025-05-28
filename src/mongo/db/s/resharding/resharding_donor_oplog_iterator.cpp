@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -119,12 +120,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
     return Pipeline::create(std::move(stages), expCtx);
 }
 
-std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline& pipeline) {
+std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch() {
     std::vector<repl::OplogEntry> batch;
 
     int numBytes = 0;
     do {
-        auto doc = pipeline.getNext();
+        auto doc = _execPipeline->getNext();
         if (!doc) {
             break;
         }
@@ -139,7 +140,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
             // The ReshardingOplogFetcher should never insert documents after the reshardFinalOp
             // entry. We defensively check each oplog entry for being the reshardFinalOp and confirm
             // the pipeline has been exhausted.
-            if (auto nextDoc = pipeline.getNext()) {
+            if (auto nextDoc = _execPipeline->getNext()) {
                 tasserted(6077499,
                           fmt::format("Unexpectedly found entry after reshardFinalOp: {}",
                                       redact(nextDoc->toString())));
@@ -173,9 +174,10 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                             ->getMongoProcessInterface()
                             ->attachCursorSourceToPipelineForLocalRead(pipeline.release());
             _pipeline.get_deleter().dismissDisposal();
+            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
         }
 
-        auto batch = _fillBatch(*_pipeline);
+        auto batch = _fillBatch();
 
         if (!batch.empty()) {
             const auto& lastEntryInBatch = batch.back();
@@ -212,6 +214,7 @@ void ReshardingDonorOplogIterator::dispose(OperationContext* opCtx) {
     if (_pipeline) {
         _pipeline->dispose(opCtx);
         _pipeline.reset();
+        _execPipeline.reset();
     }
 }
 

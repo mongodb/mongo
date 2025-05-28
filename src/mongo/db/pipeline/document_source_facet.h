@@ -33,6 +33,8 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
@@ -91,8 +93,18 @@ public:
         FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
 
+
+        // TODO SERVER-105370: Remove this lazy 'exec::agg::Pipeline' creation during the
+        // refactoring of this stage.
+        exec::agg::Pipeline& getExecPipeline() {
+            if (!execPipeline) {
+                execPipeline = exec::agg::buildPipeline(this->pipeline->getSources());
+            }
+            return *execPipeline;
+        }
         std::string name;
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        std::unique_ptr<exec::agg::Pipeline> execPipeline;
     };
 
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/exec_shard_filter_policy.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -198,6 +199,7 @@ private:
 
     // If a search query is run on a view, we store the parsed view pipeline.
     std::unique_ptr<Pipeline, PipelineDeleter> _viewPipeline;
+    std::unique_ptr<exec::agg::Pipeline> _viewExecPipeline;
 };
 
 }  // namespace mongo

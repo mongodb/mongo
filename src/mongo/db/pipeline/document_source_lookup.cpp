@@ -640,8 +640,10 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     invariant(!_matchSrc);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    std::unique_ptr<exec::agg::Pipeline> execPipeline;
     try {
         pipeline = buildPipeline(_fromExpCtx, inputDoc);
+        execPipeline = exec::agg::buildPipeline(pipeline->getSources());
         LOGV2_DEBUG(
             9497000, 5, "Built pipeline", "pipeline"_attr = pipeline->serializeForLogging());
     } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
@@ -662,7 +664,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     const auto maxBytes = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
 
     LOGV2_DEBUG(9497001, 5, "Beginning to iterate sub-pipeline");
-    while (auto result = pipeline->getNext()) {
+    while (auto result = execPipeline->getNext()) {
         long long safeSum = 0;
         bool hasOverflowed = overflow::add(objsize, result->getApproximateSize(), &safeSum);
         uassert(4568,
@@ -674,7 +676,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
         objsize = safeSum;
         results.emplace_back(std::move(*result));
     }
-    pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+    execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
     // Check if pipeline uses disk.
     _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || pipeline->usedDisk();
@@ -1098,9 +1100,10 @@ bool DocumentSourceLookUp::usedDisk() {
 
 void DocumentSourceLookUp::doDispose() {
     if (_pipeline) {
-        _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+        _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
         _pipeline->dispose(pExpCtx->getOperationContext());
         _pipeline.reset();
+        _execPipeline.reset();
     }
 }
 
@@ -1141,7 +1144,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         // avoid missing the accumulation of stats on an early exit (below) if the input (i.e., left
         // side of the lookup) is done.
         if (_pipeline) {
-            _pipeline->accumulatePipelinePlanSummaryStats(_stats.planSummaryStats);
+            _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
             _pipeline->dispose(pExpCtx->getOperationContext());
         }
 
@@ -1153,6 +1156,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         _input = nextInput.releaseDocument();
 
         _pipeline = buildPipeline(_fromExpCtx, *_input);
+        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
 
         // The $lookup stage takes responsibility for disposing of its Pipeline, since it will
         // potentially be used by multiple OperationContexts, and the $lookup stage is part of an
@@ -1160,7 +1164,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
         _pipeline.get_deleter().dismissDisposal();
 
         _cursorIndex = 0;
-        _nextValue = _pipeline->getNext();
+        _nextValue = _execPipeline->getNext();
 
         if (_unwindSrc->preserveNullAndEmptyArrays() && !_nextValue) {
             // There were no results for this cursor, but the $unwind was asked to preserve empty
@@ -1178,7 +1182,7 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
 
     invariant(bool(_input) && bool(_nextValue));
     auto currentValue = *_nextValue;
-    _nextValue = _pipeline->getNext();
+    _nextValue = _execPipeline->getNext();
 
     // Move input document into output if this is the last or only result, otherwise perform a copy.
     MutableDocument output(_nextValue ? *_input : std::move(*_input));

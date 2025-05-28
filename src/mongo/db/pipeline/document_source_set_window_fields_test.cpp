@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -391,9 +392,10 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest,
         auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
         pipelineStages.push_front(source);
         auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
+        auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
         auto exhaustPipeline = [&]() {
-            while (pipeline->getNext().has_value()) {
+            while (execPipeline->getNext().has_value()) {
             }
         };
 
@@ -444,6 +446,7 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
     auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
     pipelineStages.push_front(source);
     auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     int nextDocIndex = 0;
     auto assertNextDocument = [&](const boost::optional<Document>& doc) {
@@ -453,12 +456,12 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
     };
 
     for (int i = 0; i < 20; ++i) {
-        assertNextDocument(pipeline->getNext());
+        assertNextDocument(execPipeline->getNext());
     }
 
     pipeline->forceSpill();
 
-    while (auto next = pipeline->getNext()) {
+    while (auto next = execPipeline->getNext()) {
         assertNextDocument(next);
     };
     ASSERT_EQ(nextDocIndex, docs.size());

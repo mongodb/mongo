@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -549,19 +550,19 @@ protected:
         return pipeline;
     }
 
-    bool pipelineMatchesDeque(const std::unique_ptr<Pipeline, PipelineDeleter>& pipeline,
+    bool pipelineMatchesDeque(const std::unique_ptr<exec::agg::Pipeline>& execPipeline,
                               const std::deque<SessionTxnRecord>& transactions) {
         auto expected = transactions.begin();
         boost::optional<Document> next;
         for (size_t i = 0; i < transactions.size(); i++) {
-            next = pipeline->getNext();
+            next = execPipeline->getNext();
             if (expected == transactions.end() || !next ||
                 !expected->toBSON().binaryEqual(next->toBson())) {
                 return false;
             }
             expected++;
         }
-        return !pipeline->getNext() && expected == transactions.end();
+        return !execPipeline->getNext() && expected == transactions.end();
     }
 };
 
@@ -570,8 +571,9 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineSorted) {
         makeTransactions(10, 10, [](size_t) { return Timestamp::min(); });
 
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), boost::none);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
-    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+    ASSERT(pipelineMatchesDeque(execPipeline, expectedTransactions));
 }
 
 TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
@@ -583,8 +585,9 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     expectedTransactions.erase(expectedTransactions.begin(), middleTransaction + 1);
 
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), middleTransactionSessionId);
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
-    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+    ASSERT(pipelineMatchesDeque(execPipeline, expectedTransactions));
 }
 
 }  // namespace

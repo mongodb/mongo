@@ -46,7 +46,6 @@ void registerDocumentSourceToStageFn(DocumentSource::Id dsid, DocumentSourceToSt
     tassert(10395400, "Duplicate DocumentSource to Stage mapping", inserted);
 }
 
-
 // Populate 'DocumentSource' to 'agg::Stage' mapping function registry after every 'DocumentSource'
 // subclass got its unique 'Id' assigned.
 MONGO_INITIALIZER_GROUP(BeginDocumentSourceStageRegistration, ("EndDocumentSourceIdAllocation"), ())

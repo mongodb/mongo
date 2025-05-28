@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
@@ -509,6 +510,7 @@ private:
     // not null.
     long long _cursorIndex = 0;
     PipelinePtr _pipeline;
+    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
 };  // class DocumentSourceLookUp

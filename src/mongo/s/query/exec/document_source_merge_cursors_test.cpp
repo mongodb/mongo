@@ -43,6 +43,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -298,14 +299,15 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // Iterate the $mergeCursors stage asynchronously on a different thread, since it will block
     // waiting for network responses, which we will manually schedule below.
-    auto future = launchAsync([&pipeline]() {
+    auto future = launchAsync([&execPipeline]() {
         for (int i = 0; i < 5; ++i) {
-            ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 1}}));
+            ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 1}}));
         }
-        ASSERT_FALSE(static_cast<bool>(pipeline->getNext()));
+        ASSERT_FALSE(static_cast<bool>(execPipeline->getNext()));
     });
 
 
@@ -369,12 +371,14 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
     // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
     // network responses, which we will manually schedule below.
-    auto future = launchAsync([&pipeline]() {
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 1}}));
-        pipeline.reset();  // Stop iterating and delete the pipeline.
+    auto future = launchAsync([&]() {
+        ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 1}}));
+        execPipeline.reset();  // Stop iterating and delete the pipeline.
+        pipeline.reset();
     });
 
     // Note we do not use 'kExhaustedCursorID' here, so the cursor is still open.
@@ -420,14 +424,16 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     ASSERT_EQ(pipeline->getSources().size(), 1UL);
     ASSERT_TRUE(dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+
     // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
     // network responses, which we will manually schedule below.
-    auto future = launchAsync([&pipeline]() {
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 1}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 2}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 3}}));
-        ASSERT_DOCUMENT_EQ(*pipeline->getNext(), (Document{{"x", 4}}));
-        ASSERT_FALSE(static_cast<bool>(pipeline->getNext()));
+    auto future = launchAsync([&execPipeline]() {
+        ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 1}}));
+        ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 2}}));
+        ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 3}}));
+        ASSERT_DOCUMENT_EQ(*execPipeline->getNext(), (Document{{"x", 4}}));
+        ASSERT_FALSE(static_cast<bool>(execPipeline->getNext()));
     });
 
     onCommand([&](const auto& request) {

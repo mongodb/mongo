@@ -38,6 +38,8 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -169,8 +171,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_restartPipeline
     return pipeline;
 }
 
-boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(OperationContext* opCtx,
-                                                                      Pipeline& pipeline) {
+boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
+    OperationContext* opCtx, Pipeline& pipeline, exec::agg::Pipeline& execPipeline) {
     pipeline.reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
 
@@ -181,7 +183,7 @@ boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(OperationC
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
-    auto doc = pipeline.getNext();
+    auto doc = execPipeline.getNext();
     return doc ? SessionTxnRecord::parse(IDLParserContext{"resharding config.transactions cloning"},
                                          doc->toBson())
                : boost::optional<SessionTxnRecord>{};
@@ -244,6 +246,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
     struct ChainContext {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+        std::unique_ptr<exec::agg::Pipeline> execPipeline;
         boost::optional<SessionTxnRecord> donorRecord;
         bool moreToCome = true;
         int progressCounter = 0;
@@ -260,6 +263,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
                                                 : MongoProcessInterface::create(opCtx.get()));
+                       chainCtx->execPipeline =
+                           exec::agg::buildPipeline(chainCtx->pipeline->getSources());
                        chainCtx->donorRecord = boost::none;
                    }
 
@@ -270,8 +275,10 @@ SemiFuture<void> ReshardingTxnCloner::run(
                        ScopeGuard guard([&] {
                            chainCtx->pipeline->dispose(opCtx.get());
                            chainCtx->pipeline.reset();
+                           chainCtx->execPipeline.reset();
                        });
-                       chainCtx->donorRecord = _getNextRecord(opCtx.get(), *chainCtx->pipeline);
+                       chainCtx->donorRecord = _getNextRecord(
+                           opCtx.get(), *chainCtx->pipeline, *chainCtx->execPipeline);
                        guard.dismiss();
                    }
 
@@ -320,6 +327,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                 auto opCtx = factory.makeOperationContext(&cc());
                 chainCtx->pipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
+                chainCtx->execPipeline.reset();
             }
 
             return status.isOK() && !chainCtx->moreToCome;
@@ -345,6 +353,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
 
                 chainCtx->pipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
+                chainCtx->execPipeline.reset();
             }
 
             // Propagate the result of the AsyncTry.

@@ -53,6 +53,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
@@ -392,15 +393,19 @@ void runClusterAggregate(OperationContext* opCtx,
     if (MONGO_unlikely(analyzeShardKeyMaxNumStaleVersionRetries > 0)) {
         altNumRetries = analyzeShardKeyMaxNumStaleVersionRetries;
     }
-    auto pipeline = shardVersionRetry(
+    auto&& [pipeline, execPipeline] = shardVersionRetry(
         opCtx,
         Grid::get(opCtx)->catalogCache(),
         nss,
         "AnalyzeShardKey"_sd,
-        [&] { return Pipeline::makePipeline(aggRequest, expCtx); },
+        [&] {
+            auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
+            auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+            return std::make_pair(std::move(pipeline), std::move(execPipeline));
+        },
         altNumRetries);
 
-    while (auto doc = pipeline->getNext()) {
+    while (auto doc = execPipeline->getNext()) {
         callbackFn(doc->toBson());
     }
 }

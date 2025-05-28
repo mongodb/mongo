@@ -79,6 +79,8 @@ mongo_cc_library(
         ":internal_search_cluster_parameters_gen",
         ":internal_search_mongot_remote_spec_gen",
         ":search_query_view_spec_gen",
+        "//src/mongo/db/exec/agg:exec_pipeline.h",
+        "//src/mongo/db/exec/agg:pipeline_builder.h",
         "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
         "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",

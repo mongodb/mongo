@@ -132,14 +132,14 @@ DocumentSource::GetNextResult DocumentSourceSetVariableFromSubPipeline::doGetNex
         tassert(6448002,
                 "Expected to have already attached a cursor source to the pipeline",
                 !_subPipeline->peekFront()->constraints().requiresInputDocSource);
-        auto nextSubPipelineInput = _subPipeline->getNext();
+        auto nextSubPipelineInput = _subExecPipeline->getNext();
         uassert(625296,
                 "No document returned from $SetVariableFromSubPipeline subpipeline",
                 nextSubPipelineInput);
         uassert(625297,
                 "Multiple documents returned from $SetVariableFromSubPipeline subpipeline when "
                 "only one expected",
-                !_subPipeline->getNext());
+                !_subExecPipeline->getNext());
         pExpCtx->variables.setReservedValue(_variableID, Value(*nextSubPipelineInput), true);
     }
     _firstCallForInput = false;

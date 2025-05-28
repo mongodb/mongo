@@ -32,6 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/agg/exec_pipeline.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -138,6 +140,7 @@ protected:
                                              Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
           _subPipeline(std::move(subpipeline)),
+          _subExecPipeline(exec::agg::buildPipeline(_subPipeline->getSources())),
           _variableID(varID) {}
 
     void doDispose() final;
@@ -147,6 +150,7 @@ private:
     GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
+    std::unique_ptr<exec::agg::Pipeline> _subExecPipeline;
     Variables::Id _variableID;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to
     // doGetNext().

@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
@@ -110,6 +111,7 @@ PipelineExecutor::PipelineExecutor(const boost::intrusive_ptr<ExpressionContext>
     }
 
     _pipeline->addInitialSource(DocumentSourceQueue::create(expCtx));
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
 }
 
 UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParams) const {
@@ -118,7 +120,7 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
     DocumentSourceQueue* queueStage = static_cast<DocumentSourceQueue*>(_pipeline->peekFront());
     queueStage->emplace_back(Document{originalDoc});
 
-    const auto transformedDoc = _pipeline->getNext()->toBson();
+    const auto transformedDoc = _execPipeline->getNext()->toBson();
     const auto transformedDocHasIdField = transformedDoc.hasField(kIdFieldName);
 
     // Replace the pre-image document in applyParams with the post image we got from running the

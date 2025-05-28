@@ -29,22 +29,44 @@
 
 #include "mongo/db/exec/agg/exec_pipeline.h"
 
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::exec::agg {
-Pipeline::Pipeline(StageContainer&& stages) : _stages(std::move(stages)) {
-    tassert(10395600, "cannot open an empty aggregation pipeline for execution", !_stages.empty());
 
-    // Stitch the pipeline stages together.
-    auto prevIt = _stages.begin();
+Pipeline::Pipeline(StageContainer&& stages) : _stages(std::move(stages)) {}
 
-    // By default 'Stage::_source' is already nullptr, but we correct it here because we cannot
-    // assert on it ('Stage::_source' is protected and there is no public getter).
-    (*prevIt)->setSource(nullptr);
+boost::optional<Document> Pipeline::getNext() {
+    // TODO SERVER-105493: Remove the following early exit after we prohibit creating empty
+    // execution pipelines.
+    if (MONGO_unlikely(_stages.empty())) {
+        return boost::none;
+    }
+    auto nextResult = _stages.back()->getNext();
+    while (nextResult.isPaused()) {
+        nextResult = _stages.back()->getNext();
+    }
+    if (!nextResult.isEOF()) {
+        // We'll get here for both statuses 'GetNextResult::ReturnStatus::kAdvanced' and
+        // 'GetNextResult::ReturnStatus::kAdvancedControlDocument'.
+        return nextResult.releaseDocument();
+    }
+    return boost::none;
+}
 
-    for (auto it(std::next(prevIt)), listEnd(_stages.end()); it != listEnd; ++it) {
-        (*it)->setSource(prevIt->get());
-        prevIt = it;
+GetNextResult Pipeline::getNextResult() {
+    // TODO SERVER-105493: Remove the following assertion after we prohibit creating empty execution
+    // pipelines.
+    tassert(10394800, "cannon execute an empty aggregation pipeline", _stages.size());
+    return _stages.back()->getNext();
+}
+
+void Pipeline::accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) const {
+    auto visitor = PlanSummaryStatsVisitor(planSummaryStats);
+    for (auto&& stage : _stages) {
+        if (auto specificStats = stage->getSpecificStats()) {
+            specificStats->acceptVisitor(&visitor);
+        }
     }
 }
 }  // namespace mongo::exec::agg

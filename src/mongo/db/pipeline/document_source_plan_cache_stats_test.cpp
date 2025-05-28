@@ -30,9 +30,9 @@
 #include "mongo/db/pipeline/document_source_plan_cache_stats.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/matcher/expression.h"
@@ -269,16 +269,17 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     pipeline->optimizePipeline();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
 
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "host"
                                  << "testHostName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "match" << true << "host"
                                  << "testHostName"));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
@@ -289,15 +290,16 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "host"
                                  << "testHostName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "baz"
                                  << "host"
                                  << "testHostName"));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) {
@@ -309,19 +311,20 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) 
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "host"
                                  << "testHostName"
                                  << "shard"
                                  << "testShardName"));
-    ASSERT_BSONOBJ_EQ(pipeline->getNext()->toBson(),
+    ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "baz"
                                  << "host"
                                  << "testHostName"
                                  << "shard"
                                  << "testShardName"));
-    ASSERT(!pipeline->getNext());
+    ASSERT(!execPipeline->getNext());
 }
 
 }  // namespace mongo

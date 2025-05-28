@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/storage/key_string/key_string.h"
@@ -161,6 +162,7 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
     // We will manually detach and reattach when iterating '_pipeline', we expect it to start in the
     // detached state.
     _pipeline->detachFromOperationContext();
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
 }
 
 std::vector<std::string> Exchange::extractBoundaries(
@@ -356,9 +358,9 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
 }
 
 size_t Exchange::loadNextBatch() {
-    auto input = _pipeline->getNextResult();
+    auto input = _execPipeline->getNextResult();
 
-    for (; input.isAdvanced(); input = _pipeline->getNextResult()) {
+    for (; input.isAdvanced(); input = _execPipeline->getNextResult()) {
         // We have a document and we will deliver it to a consumer(s) based on the policy.
         switch (_policy) {
             case ExchangePolicyEnum::kBroadcast: {

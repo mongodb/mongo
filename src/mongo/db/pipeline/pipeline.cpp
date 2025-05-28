@@ -40,6 +40,7 @@
 #include "mongo/base/exact_cast.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -660,26 +661,6 @@ void Pipeline::stitch(SourceContainer* container) {
     }
 }
 
-boost::optional<Document> Pipeline::getNext() {
-    if (MONGO_likely(!_sources.empty())) {
-        auto nextResult = _sources.back()->getNext();
-        while (nextResult.isPaused()) {
-            nextResult = _sources.back()->getNext();
-        }
-        if (!nextResult.isEOF()) {
-            // We'll get here for both statuses 'GetNextResult::ReturnStatus::kAdvanced' and
-            // 'GetNextResult::ReturnStatus::kAdvancedControlDocument'.
-            return nextResult.releaseDocument();
-        }
-    }
-    return boost::none;
-}
-
-exec::agg::GetNextResult Pipeline::getNextResult() {
-    tassert(10394800, "cannon execute an empty aggregation pipeline", _sources.size());
-    return _sources.back()->getNext();
-}
-
 std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) const {
     std::vector<Value> array;
     for (auto&& stage : _sources) {
@@ -1092,14 +1073,4 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinit
 
     return Pipeline::makePipeline(resolvedPipeline, subPipelineExpCtx, opts);
 }
-
-void Pipeline::accumulatePipelinePlanSummaryStats(PlanSummaryStats& planSummaryStats) {
-    auto visitor = PlanSummaryStatsVisitor(planSummaryStats);
-    for (auto&& source : this->getSources()) {
-        if (auto specificStats = source->getSpecificStats()) {
-            specificStats->acceptVisitor(&visitor);
-        }
-    }
-}
-
 }  // namespace mongo

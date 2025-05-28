@@ -30,58 +30,16 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::test {
 
-// This is a very simple fake subclass of 'DocumentSource'.
-class DocumentSourceFake : public DocumentSource {
-public:
-    DocumentSourceFake()
-        : DocumentSource("$fake", make_intrusive<ExpressionContextForTest>()),
-          mockConstraints(StreamType::kStreaming,
-                          PositionRequirement::kNone,
-                          HostTypeRequirement::kNone,
-                          DiskUseRequirement::kNoDiskUse,
-                          FacetRequirement::kAllowed,
-                          TransactionRequirement::kAllowed,
-                          LookupRequirement::kAllowed,
-                          UnionRequirement::kAllowed) {}
-
-    const char* getSourceName() const final {
-        return nullptr;
-    };
-
-    GetNextResult doGetNext() final {
-        return GetNextResult::makeEOF();
-    }
-
-    StageConstraints constraints(
-        Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const final {
-        return mockConstraints;
-    }
-
-    Id getId() const final {
-        return 0;
-    }
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
-    }
-
-    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {
-        return Value();
-    }
-
-private:
-    StageConstraints mockConstraints;
-};
 
 TEST(PipelineBuilderTest, OneStagePipeline) {
-    auto dsFake = make_intrusive<DocumentSourceFake>();
+    auto dsFake =
+        make_intrusive<DocumentSourceTestOptimizations>(make_intrusive<ExpressionContextForTest>());
     std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
 
     auto pl = exec::agg::buildPipeline(sources);

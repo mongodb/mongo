@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
@@ -88,6 +89,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
         // For a resumable scan, set the initial _latestOplogTimestamp and _postBatchResumeToken.
         _initializeResumableScanState();
     }
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
 }
 
 PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId* recordIdOut) {
@@ -157,7 +159,7 @@ boost::optional<Document> PlanExecutorPipeline::_getNext() {
 }
 
 boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
-    return _pipeline->getNext();
+    return _execPipeline->getNext();
 } catch (const ExceptionFor<ErrorCodes::ChangeStreamTopologyChange>& ex) {
     // This exception contains the next document to be returned by the pipeline.
     const auto extraInfo = ex.extraInfo<ChangeStreamTopologyChangeInfo>();

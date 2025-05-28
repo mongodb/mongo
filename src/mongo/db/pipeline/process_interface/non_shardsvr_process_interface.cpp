@@ -47,6 +47,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -365,7 +366,9 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            while (pipelineWithCursor->getNext()) {
+            auto execPipelineWithCursor =
+                exec::agg::buildPipeline(pipelineWithCursor->getSources());
+            while (execPipelineWithCursor->getNext()) {
             }
         }
         pipelineVec = pipelineWithCursor->writeExplainOps(opts);
