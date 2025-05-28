@@ -1446,6 +1446,8 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/window_function:window_function_covariance_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_derivative_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_first_last_test.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_exec_min_max_scaler_non_removable_range_test.cpp",
+        "//src/mongo/db/pipeline/window_function:window_function_exec_min_max_scaler_non_removable_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_non_removable_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_exec_removable_test.cpp",
         "//src/mongo/db/pipeline/window_function:window_function_integral_test.cpp",

@@ -38,8 +38,6 @@ namespace mongo {
 /**
  * An executor specifically for the implementation of $minMaxScaler
  * for document based WindowBounds that do not remove documents from the window (left unbounded).
- *
- * TODO SERVER-102701: Add unit test coverage.
  */
 class WindowFunctionExecMinMaxScalerNonRemovable final
     : public WindowFunctionExecNonRemovableCommon {
