@@ -35,6 +35,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -72,9 +73,13 @@ Status cursorNotFoundStatus(CursorId cursorId) {
             str::stream() << "Cursor not found (id: " << cursorId << ")."};
 }
 
-Status cursorInUseStatus(CursorId cursorId) {
-    return {ErrorCodes::CursorInUse,
-            str::stream() << "Cursor already in use (id: " << cursorId << ")."};
+Status cursorInUseStatus(CursorId cursorId, StringData commandUsingCursor) {
+    std::string reason = str::stream() << "Cursor already in use (id: " << cursorId << ").";
+    if (!commandUsingCursor.empty()) {
+        return {CursorInUseInfo(commandUsingCursor), std::move(reason)};
+    } else {
+        return {ErrorCodes::CursorInUse, std::move(reason)};
+    }
 }
 
 }  // namespace
@@ -221,7 +226,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     CursorId cursorId,
     OperationContext* opCtx,
     AuthzCheckFn authChecker,
-    AuthCheck checkSessionAuth) {
+    AuthCheck checkSessionAuth,
+    StringData commandName) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -250,10 +256,10 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
 
     if (entry->getOperationUsingCursor()) {
-        return cursorInUseStatus(cursorId);
+        return cursorInUseStatus(cursorId, entry->getCommandUsingCursor());
     }
 
-    auto cursorGuard = entry->releaseCursor(opCtx);
+    auto cursorGuard = entry->releaseCursor(opCtx, commandName);
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor. Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
@@ -273,7 +279,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursorNoAuthCheck(
-    CursorId cursorId, OperationContext* opCtx) {
+    CursorId cursorId, OperationContext* opCtx, StringData commandName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_inShutdown) {
@@ -287,10 +293,10 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
 
     if (entry->getOperationUsingCursor()) {
-        return cursorInUseStatus(cursorId);
+        return cursorInUseStatus(cursorId, entry->getCommandUsingCursor());
     }
 
-    auto cursorGuard = entry->releaseCursor(opCtx);
+    auto cursorGuard = entry->releaseCursor(opCtx, commandName);
     cursorGuard->reattachToOperationContext(opCtx);
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
@@ -627,7 +633,7 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     }
 
     if (entry->getOperationUsingCursor()) {
-        return cursorInUseStatus(cursorId);
+        return cursorInUseStatus(cursorId, entry->getCommandUsingCursor());
     }
 
     // Transfer ownership away from the entry.

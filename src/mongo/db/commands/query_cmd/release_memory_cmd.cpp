@@ -100,8 +100,7 @@ public:
                     if (MONGO_unlikely(releaseMemoryHangAfterPinCursor.shouldFail())) {
                         LOGV2(9745500,
                               "releaseMemoryHangAfterPinCursor fail point enabled. Blocking until "
-                              "fail "
-                              "point is disabled");
+                              "failpoint is disabled");
                         releaseMemoryHangAfterPinCursor.pauseWhileSet(opCtx);
                     }
 

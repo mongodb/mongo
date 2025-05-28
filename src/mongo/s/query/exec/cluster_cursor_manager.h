@@ -336,11 +336,13 @@ public:
          * ClusterClientCursorGuard; callers that want to assume ownership over the cursor directly
          * must unpack the cursor from the returned guard.
          */
-        ClusterClientCursorGuard releaseCursor(OperationContext* opCtx) {
+        ClusterClientCursorGuard releaseCursor(OperationContext* opCtx,
+                                               StringData commandName = "") {
             invariant(!_operationUsingCursor);
             invariant(_cursor);
             invariant(opCtx);
             _operationUsingCursor = opCtx;
+            _commandUsingCursor = commandName.toString();
             return ClusterClientCursorGuard(opCtx, std::move(_cursor));
         }
 
@@ -356,6 +358,10 @@ public:
             return _operationUsingCursor;
         }
 
+        StringData getCommandUsingCursor() const {
+            return _commandUsingCursor;
+        }
+
         /**
          * Indicate that the cursor is no longer in use by an operation. Once this is called,
          * another operation may check the cursor out.
@@ -367,6 +373,7 @@ public:
 
             _cursor = std::move(cursor);
             _operationUsingCursor = nullptr;
+            _commandUsingCursor = "";
         }
 
         void setLastActive(Date_t lastActive) {
@@ -400,6 +407,7 @@ public:
          * Current operation using the cursor. Non-null if the cursor is checked out.
          */
         OperationContext* _operationUsingCursor = nullptr;
+        std::string _commandUsingCursor;
 
         /**
          * The UUID of the Client that opened the cursor.
@@ -487,7 +495,8 @@ public:
     StatusWith<PinnedCursor> checkOutCursor(CursorId cursorId,
                                             OperationContext* opCtx,
                                             AuthzCheckFn authChecker,
-                                            AuthCheck checkSessionAuth = kCheckSession);
+                                            AuthCheck checkSessionAuth = kCheckSession,
+                                            StringData commandName = "");
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the
@@ -503,7 +512,9 @@ public:
      * It does not check if the current client is authorized to use this cursor, assuming that this
      * check has already been done.
      */
-    StatusWith<PinnedCursor> checkOutCursorNoAuthCheck(CursorId cursorId, OperationContext* opCtx);
+    StatusWith<PinnedCursor> checkOutCursorNoAuthCheck(CursorId cursorId,
+                                                       OperationContext* opCtx,
+                                                       StringData commandName = "");
 
     /**
      * This method will find the given cursor, and if it exists, call 'authChecker', passing the

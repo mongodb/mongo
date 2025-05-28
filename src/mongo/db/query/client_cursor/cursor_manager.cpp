@@ -282,6 +282,7 @@ void CursorManager::unpin(OperationContext* opCtx,
     // destroyed, and subsequent getMores with a fresh opCtx will succeed.
     auto interruptStatus = cursor->_operationUsingCursor->checkForInterruptNoAssert();
     cursor->_operationUsingCursor = nullptr;
+    cursor->_commandUsingCursor = "";
     cursor->_lastUseDate = now;
 
     // If someone was trying to kill this cursor with a killOp or a killCursors, they are likely

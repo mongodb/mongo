@@ -53,6 +53,9 @@
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(clusterReleaseMemoryHangAfterPinCursor);
+
 class ClusterReleaseMemoryCmd final : public TypedCommand<ClusterReleaseMemoryCmd> {
 public:
     using Request = ReleaseMemoryCommandRequest;
@@ -107,7 +110,8 @@ public:
             };
 
             for (CursorId id : cursorIds) {
-                auto pinnedCursor = cursorManager->checkOutCursorNoAuthCheck(id, opCtx);
+                auto pinnedCursor =
+                    cursorManager->checkOutCursorNoAuthCheck(id, opCtx, definition()->getName());
 
                 if (pinnedCursor.isOK()) {
                     OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
@@ -122,6 +126,13 @@ public:
 
                     Status response = Status::OK();
                     {
+                        if (MONGO_unlikely(clusterReleaseMemoryHangAfterPinCursor.shouldFail())) {
+                            LOGV2(10546602,
+                                  "releaseMemoryHangAfterPinCursor fail point enabled. Blocking "
+                                  "until failpoint is disabled");
+                            clusterReleaseMemoryHangAfterPinCursor.pauseWhileSet(opCtx);
+                        }
+
                         // If the 'failGetMoreAfterCursorCheckout' failpoint is enabled, throw an
                         // exception with the given 'errorCode' value, or ErrorCodes::InternalError
                         // if 'errorCode' is omitted.

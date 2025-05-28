@@ -51,6 +51,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/generic_argument_util.h"
@@ -621,6 +622,54 @@ CursorId earlyExitWithNoResults(OperationContext* opCtx,
 
     return CursorId(0);
 }
+
+StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
+    OperationContext* opCtx,
+    CursorId cursorId,
+    AuthorizationSession* authzSession,
+    StringData commandName) {
+    auto cursorManager = Grid::get(opCtx)->getCursorManager();
+    AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
+        return authzSession->isCoauthorizedWith(userName)
+            ? Status::OK()
+            : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
+    };
+
+    Backoff retryBackoff{Seconds(1), Milliseconds::max()};
+
+    const size_t maxAttempts = internalQueryGetMoreMaxCursorPinRetryAttempts.loadRelaxed();
+    for (size_t attempt = 1; attempt <= maxAttempts; ++attempt) {
+        auto statusWithCursorPin =
+            cursorManager->checkOutCursor(cursorId,
+                                          opCtx,
+                                          authChecker,
+                                          ClusterCursorManager::AuthCheck::kCheckSession,
+                                          commandName);
+        auto status = statusWithCursorPin.getStatus();
+        if (status.isOK()) {
+            return statusWithCursorPin;
+        }
+        // We only return CursorInUse errors if the command that is holding the cursor is
+        // "releaseMemory".
+        if (attempt == maxAttempts || status.code() != ErrorCodes::CursorInUse) {
+            return statusWithCursorPin;
+        }
+        auto extraInfo = status.extraInfo<CursorInUseInfo>();
+        if (extraInfo == nullptr || extraInfo->commandName() != "releaseMemory") {
+            return statusWithCursorPin;
+        }
+        Milliseconds sleepDuration = retryBackoff.nextSleep();
+        LOGV2_DEBUG(10546601,
+                    3,
+                    "getMore failed to pin cursor, because it is held by releaseMemory "
+                    "command. Will retry after sleep.",
+                    "sleepDuration"_attr = sleepDuration,
+                    "attempt"_attr = attempt);
+        opCtx->sleepFor(sleepDuration);
+    }
+    MONGO_UNREACHABLE_TASSERT(10546600);
+}
+
 }  // namespace
 
 const size_t ClusterFind::kMaxRetries = 10;
@@ -916,19 +965,12 @@ StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForSh
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                                                    const GetMoreCommandRequest& cmd) {
-    auto cursorManager = Grid::get(opCtx)->getCursorManager();
-
     auto authzSession = AuthorizationSession::get(opCtx->getClient());
-    AuthzCheckFn authChecker = [&authzSession](AuthzCheckFnInputType userName) -> Status {
-        return authzSession->isCoauthorizedWith(userName)
-            ? Status::OK()
-            : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
-    };
-
     NamespaceString nss(NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCollection()));
     int64_t cursorId = cmd.getCommandParameter();
 
-    auto pinnedCursor = cursorManager->checkOutCursor(cursorId, opCtx, authChecker);
+    auto pinnedCursor = checkOutCursorWithRetries(
+        opCtx, cursorId, authzSession, GetMoreCommandRequest::kCommandParameterFieldName);
     if (!pinnedCursor.isOK()) {
         return pinnedCursor.getStatus();
     }
