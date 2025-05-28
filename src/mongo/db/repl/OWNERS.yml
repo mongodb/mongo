@@ -27,6 +27,9 @@ filters:
   - "*replication_recovery*":
     approvers:
       - 10gen/server-recovery
+  - "*rollback*":
+    approvers:
+      - 10gen/server-recovery
   - "*replica_set_aware_service*":
     approvers:
       - 10gen/server-rs-aware-service

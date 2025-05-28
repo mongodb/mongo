@@ -2258,6 +2258,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/*read_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/repl/**/*write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /src/mongo/db/repl/**/*replication_recovery* @10gen/server-recovery @svc-auto-approve-bot
+/src/mongo/db/repl/**/*rollback* @10gen/server-recovery @svc-auto-approve-bot
 /src/mongo/db/repl/**/*replica_set_aware_service* @10gen/server-rs-aware-service @svc-auto-approve-bot
 /src/mongo/db/repl/**/*primary_only_service* @10gen/server-rs-aware-service @svc-auto-approve-bot
 /src/mongo/db/repl/**/*replication_coordinator* @10gen/server-replication-coordinator @svc-auto-approve-bot
