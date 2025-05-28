@@ -109,7 +109,6 @@ buildvariants:
       - name: .replica_sets !.encrypt !.fcbis
       - name: replica_sets_reconfig_jscore_passthrough_gen
       - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-      - name: replica_sets_max_mirroring_large_txns_format_gen
       - name: .retry
       - name: .read_only
       - name: session_jscore_passthrough

@@ -301,8 +301,8 @@ buildvariants:
       - name: sharded_collections_jscore_passthrough_gen
       - name: noPassthrough_gen
       - name: noPassthroughWithMongod_gen
-      - name: initial_sync_fuzzer_sanity_patch
-      - name: rollback_fuzzer_sanity_patch
+      - name: initial_sync_fuzzer_sanity_patch_gen
+      - name: rollback_fuzzer_sanity_patch_gen
       - name: query_cbr_heuristic_jscore_passthrough
         cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_cbr_heuristic_aggregation_passthrough
@@ -368,8 +368,8 @@ buildvariants:
       - name: sharded_collections_jscore_passthrough_gen
       - name: noPassthrough_gen
       - name: noPassthroughWithMongod_gen
-      - name: initial_sync_fuzzer_sanity_patch
-      - name: rollback_fuzzer_sanity_patch
+      - name: initial_sync_fuzzer_sanity_patch_gen
+      - name: rollback_fuzzer_sanity_patch_gen
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only

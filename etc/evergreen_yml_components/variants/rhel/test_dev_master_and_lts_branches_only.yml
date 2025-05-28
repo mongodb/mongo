@@ -97,7 +97,6 @@ buildvariants:
       - name: replica_sets_gen
       - name: .replica_sets .common
       - name: .replica_sets .multi_oplog !.encrypt
-      - name: replica_sets_max_mirroring_large_txns_format_gen
       - name: replica_sets_multi_stmt_txn_jscore_passthrough_gen
       - name: replica_sets_multi_stmt_txn_stepdown_jscore_passthrough_gen
         distros:
@@ -146,7 +145,6 @@ buildvariants:
       - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
       - name: concurrency_sharded_multi_stmt_txn_gen
       - name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
-      - name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
       - name: concurrency_sharded_with_stepdowns_gen
       - name: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_gen
       - name: concurrency_sharded_initial_sync_gen
@@ -171,8 +169,6 @@ buildvariants:
       - name: .sharding .txns
       - name: sharding_gen
       - name: sharding_auth_audit_gen
-      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-      - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
       - name: sharding_csrs_continuous_config_stepdown_gen
       - name: sharded_multi_stmt_txn_jscore_passthrough_gen
         distros:
