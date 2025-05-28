@@ -1873,7 +1873,8 @@ export class ReplSetTest {
 
         jsTest.log.info("AwaitLastStableRecoveryTimestamp: Beginning for " + id);
 
-        let replSetStatus = assert.commandWorked(primary.adminCommand("replSetGetStatus"));
+        let replSetStatus = asCluster(
+            rst, primary, () => assert.commandWorked(primary.adminCommand({replSetGetStatus: 1})));
         if (replSetStatus["configsvr"]) {
             // Performing dummy replicated writes against a configsvr is hard, especially if auth
             // is also enabled.
