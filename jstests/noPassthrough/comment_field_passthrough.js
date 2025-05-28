@@ -18,8 +18,11 @@ const tests = authCommandsLib.tests;
 
 // The following commands require additional start up configuration and hence need to be skipped.
 const denylistedTests = [
+    "getTrafficRecordingStatus",
     "startRecordingTraffic",
     "stopRecordingTraffic",
+    "startTrafficRecording",
+    "stopTrafficRecording",
     "addShardToZone",
     "removeShardFromZone",
     "oidcListKeys",

@@ -30,9 +30,11 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <system_error>
+#include <vector>
 
 #include <fcntl.h>
 
@@ -201,24 +203,48 @@ void addOpType(TrafficReaderPacket& packet, BSONObjBuilder* builder) {
 BSONArray trafficRecordingFileToBSONArr(const std::string& inputFile) {
     BSONArrayBuilder builder{};
 
-// Open the connection to the input file
-#ifdef _WIN32
-    auto inputFd = ::open(inputFile.c_str(), O_RDONLY | O_BINARY);
-#else
-    auto inputFd = ::open(inputFile.c_str(), O_RDONLY);
-#endif
-
     uassert(ErrorCodes::FileNotOpen,
-            str::stream() << "Specified file does not exist (" << inputFile << ")",
-            inputFd > 0);
+            str::stream() << "Specified file/directory does not exist (" << inputFile << ")",
+            std::filesystem::exists(inputFile));
 
-    const ScopeGuard guard([&] { ::close(inputFd); });
+    std::vector<std::string> files;
+
+    if (std::filesystem::is_directory(inputFile)) {
+        for (const auto& entry : std::filesystem::directory_iterator{inputFile}) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            if (entry.path().extension() != ".bin") {
+                continue;
+            }
+            files.push_back(entry.path().string());
+        }
+        std::sort(files.begin(), files.end());
+    } else {
+        files.push_back(inputFile);
+    }
 
     auto buf = SharedBuffer::allocate(MaxMessageSizeBytes);
-    while (auto packet = readPacket(buf.get(), inputFd)) {
-        BSONObjBuilder bob(builder.subobjStart());
-        getBSONObjFromPacket(*packet, &bob);
-        addOpType(*packet, &bob);
+
+    for (const auto& file : files) {
+// Open the connection to the input file
+#ifdef _WIN32
+        auto inputFd = ::open(file.c_str(), O_RDONLY | O_BINARY);
+#else
+        auto inputFd = ::open(file.c_str(), O_RDONLY);
+#endif
+
+        uassert(ErrorCodes::FileNotOpen,
+                str::stream() << "Specified file does not exist (" << file << ")",
+                inputFd > 0);
+
+        const ScopeGuard guard([&] { ::close(inputFd); });
+
+        while (auto packet = readPacket(buf.get(), inputFd)) {
+            BSONObjBuilder bob(builder.subobjStart());
+            getBSONObjFromPacket(*packet, &bob);
+            addOpType(*packet, &bob);
+        }
     }
 
     return builder.arr();

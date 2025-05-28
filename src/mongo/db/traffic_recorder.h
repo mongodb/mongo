@@ -45,8 +45,8 @@ namespace mongo {
 
 /**
  * A service context level global which captures packet capture through the transport layer if it is
- * enabled.  The service is intended to be turned on and off via startRecordingTrafficTraffic and
- * stopRecordingTrafficTraffic.
+ * enabled.  The service is intended to be turned on and off via startTrafficRecording and
+ * stopTrafficRecording.
  *
  * The recording can have one recording running at a time and the intention is that observe() blocks
  * callers for the least amount of time possible.
@@ -61,7 +61,7 @@ public:
     // Start and stop block until the associate operation has succeeded or failed
     //
     // On failure these methods throw
-    void start(const StartRecordingTraffic& options);
+    void start(const StartTrafficRecording& options);
     void stop();
 
     void observe(const std::shared_ptr<transport::Session>& ts,

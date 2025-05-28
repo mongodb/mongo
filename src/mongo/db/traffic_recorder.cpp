@@ -100,12 +100,13 @@ MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
  */
 class TrafficRecorder::Recording {
 public:
-    Recording(const StartRecordingTraffic& options)
-        : _path(_getPath(options.getFilename().toString())), _maxLogSize(options.getMaxFileSize()) {
+    Recording(const StartTrafficRecording& options)
+        : _path(_getPath(options.getDestination().toString())),
+          _maxLogSize(options.getMaxFileSize()) {
 
         MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Options
             queueOptions;
-        queueOptions.maxQueueDepth = options.getBufferSize();
+        queueOptions.maxQueueDepth = options.getMaxMemUsage();
         if (!shouldAlwaysRecordTraffic) {
             queueOptions.maxProducerQueueDepth = 0;
         }
@@ -113,8 +114,8 @@ public:
             queueOptions);
 
         _trafficStats.setRunning(true);
-        _trafficStats.setBufferSize(options.getBufferSize());
-        _trafficStats.setRecordingFile(_recordingFile);
+        _trafficStats.setBufferSize(options.getMaxMemUsage());
+        _trafficStats.setRecordingDir(_path);
         _trafficStats.setMaxFileSize(_maxLogSize);
     }
 
@@ -127,14 +128,10 @@ public:
                     boost::filesystem::create_directory(recordingFile);
                 }
                 recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+                recordingFile += ".bin";
                 boost::filesystem::ofstream out(recordingFile,
                                                 std::ios_base::binary | std::ios_base::trunc |
                                                     std::ios_base::out);
-                {
-                    stdx::lock_guard<stdx::mutex> lk(_mutex);
-                    _recordingFile = recordingFile.string();
-                    _trafficStats.setRecordingFile(_recordingFile);
-                }
 
                 while (true) {
                     std::deque<TrafficRecordingPacket> storage;
@@ -170,7 +167,8 @@ public:
                             // recording file.
                             boost::filesystem::path recordingFile(
                                 boost::filesystem::absolute(_path));
-                            recordingFile /= dateToISOStringLocal(Date_t::now());
+                            recordingFile /= std::to_string(Date_t::now().toMillisSinceEpoch());
+                            recordingFile += ".bin";
                             out.close();
                             out.open(recordingFile,
                                      std::ios_base::binary | std::ios_base::trunc |
@@ -181,8 +179,6 @@ public:
                             {
                                 stdx::lock_guard<stdx::mutex> lk(_mutex);
                                 _written = size;
-                                _recordingFile = recordingFile.string();
-                                _trafficStats.setRecordingFile(_recordingFile);
                             }
                         }
 
@@ -289,8 +285,7 @@ private:
     }
 
     const std::string _path;
-    std::string _recordingFile;
-    const size_t _maxLogSize;
+    const int64_t _maxLogSize;
 
     MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
     stdx::thread _thread;
@@ -298,7 +293,7 @@ private:
     stdx::mutex _mutex;
     bool _inShutdown = false;
     TrafficRecorderStats _trafficStats;
-    size_t _written = 0;
+    int64_t _written = 0;
     Status _result = Status::OK();
 };
 
@@ -318,7 +313,7 @@ TrafficRecorder::~TrafficRecorder() {
     }
 }
 
-void TrafficRecorder::start(const StartRecordingTraffic& options) {
+void TrafficRecorder::start(const StartTrafficRecording& options) {
     invariant(!shouldAlwaysRecordTraffic);
 
     uassert(ErrorCodes::BadValue,
@@ -361,9 +356,9 @@ void TrafficRecorder::observe(const std::shared_ptr<transport::Session>& ts,
             stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (!_recording) {
-                StartRecordingTraffic options;
-                options.setFilename(gAlwaysRecordTraffic);
-                options.setMaxFileSize(std::numeric_limits<int64_t>::max());
+                StartTrafficRecording options;
+                options.setDestination(gAlwaysRecordTraffic);
+                options.setMaxFileSize({double(std::numeric_limits<int64_t>::max())});
 
                 _recording = std::make_shared<Recording>(options);
                 _recording->run();

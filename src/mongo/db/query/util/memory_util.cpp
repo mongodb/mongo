@@ -31,6 +31,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
@@ -44,13 +45,44 @@
 
 namespace mongo::memory_util {
 
+MemorySize MemorySize::parseFromBSON(const BSONElement& element) {
+    switch (element.type()) {
+        case String:
+            return uassertStatusOK(parse(element.str()));
+        case NumberDouble:
+        case NumberInt:
+        case NumberLong:
+        case NumberDecimal:
+            return {element.safeNumberDouble(), MemoryUnits::kBytes};
+        default:
+            uasserted(ErrorCodes::InvalidBSONType,
+                      "Byte fields must be numeric or strings with a suffix KB, MB, GB, %");
+    }
+}
+
+void MemorySize::serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+    builder->append(fieldName, static_cast<long long>(convertToSizeInBytes(*this)));
+}
+
+void MemorySize::serializeToBSON(BSONArrayBuilder* builder) const {
+    builder->append(static_cast<long long>(convertToSizeInBytes(*this)));
+}
+
 StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit) {
     if (strUnit.empty()) {
-        return Status(ErrorCodes::Error{6007010}, "Unit value cannot be empty");
+        return MemoryUnits::kBytes;
     }
 
     if (strUnit[0] == '%') {
         return MemoryUnits::kPercent;
+    } else if (strUnit[0] == 'B' || strUnit[0] == 'b') {
+        // Arguably lower case b should refer to bits, but the regex used
+        // is case insensitive, and the second char is not checked for KB etc.
+        // Allow lowercase b here.
+        return MemoryUnits::kBytes;
+
+    } else if (strUnit[0] == 'K' || strUnit[0] == 'k') {
+        return MemoryUnits::kKB;
     } else if (strUnit[0] == 'M' || strUnit[0] == 'm') {
         return MemoryUnits::kMB;
     } else if (strUnit[0] == 'G' || strUnit[0] == 'g') {
@@ -61,8 +93,10 @@ StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit) {
 }
 
 StatusWith<MemorySize> MemorySize::parse(const std::string& str) {
-    // Looks for a floating point number with followed by a unit suffix (MB, GB, %).
-    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(MB|GB|%)\s*$)re");
+    // Looks for a floating point number optionally followed by a unit suffix (B, KB, MB, GB, %).
+    // Values which cannot be exactly represented as a number of bytes will be truncated
+    // (e.g., 1.00001KB = 1024B).
+    static auto& re = *new pcre::Regex(R"re((?i)^\s*(\d+\.?\d*)\s*(B|KB|MB|GB|%)?\s*$)re");
     auto m = re.matchView(str);
     if (!m) {
         return {ErrorCodes::Error{6007012}, "Unable to parse memory size string"};
@@ -78,24 +112,23 @@ StatusWith<MemorySize> MemorySize::parse(const std::string& str) {
     return MemorySize{size, statusWithUnit.getValue()};
 }
 
-size_t convertToSizeInBytes(const MemorySize& memSize) {
-    constexpr size_t kBytesInMB = 1024 * 1024;
-    constexpr size_t kMBytesInGB = 1024;
-
-    double sizeInMB = memSize.size;
+uint64_t convertToSizeInBytes(const MemorySize& memSize) {
+    const double size = memSize.size;
 
     switch (memSize.units) {
         case MemoryUnits::kPercent:
-            sizeInMB *= ProcessInfo::getMemSizeMB() / 100.0;
-            break;
+            return uint64_t(size * (double(ProcessInfo::getMemSizeBytes()) / 100.0));
+        case MemoryUnits::kBytes:
+            return uint64_t(size);
+        case MemoryUnits::kKB:
+            return uint64_t(size * 1024);
         case MemoryUnits::kMB:
-            break;
+            return uint64_t(size * 1024 * 1024);
         case MemoryUnits::kGB:
-            sizeInMB *= kMBytesInGB;
+            return uint64_t(size * 1024 * 1024 * 1024);
             break;
     }
-
-    return static_cast<size_t>(sizeInMB * kBytesInMB);
+    MONGO_UNREACHABLE;
 }
 
 size_t getRequestedMemSizeInBytes(const MemorySize& memSize) {

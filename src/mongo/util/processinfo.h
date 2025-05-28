@@ -93,6 +93,13 @@ public:
     }
 
     /**
+     * Get the size of total memory available to the process in bytes
+     */
+    static unsigned long long getMemSizeBytes() {
+        return sysInfo().memLimit;
+    }
+
+    /**
      * Get the size of total memory available to the process in MB
      */
     static unsigned long long getMemSizeMB() {

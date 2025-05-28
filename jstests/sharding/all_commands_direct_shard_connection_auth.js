@@ -707,6 +707,11 @@ const allCommands = {
         },
         isAdminCommand: true,
     },
+    getTrafficRecordingStatus: {
+        isAdminCommand: true,
+        command: {getTrafficRecordingStatus: 1},
+        shouldFail: false,
+    },
     godinsert: {
         setUp: function(mongoS) {
             assert.commandWorked(mongoS.getDB(dbName).runCommand({create: collName}));
@@ -1122,7 +1127,9 @@ const allCommands = {
     split: {skip: requiresMongoS},
     splitChunk: {skip: isAnInternalCommand},
     splitVector: {skip: isAnInternalCommand},
-    startRecordingTraffic: {
+    startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
+    stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
     },
@@ -1133,7 +1140,7 @@ const allCommands = {
             assert.commandWorked(withoutDirectConnections.adminCommand({endSessions: [res.id]}));
         }
     },
-    stopRecordingTraffic: {
+    stopTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
     },

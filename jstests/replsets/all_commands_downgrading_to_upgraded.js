@@ -849,6 +849,7 @@ const allCommands = {
         isShardedOnly: true,
         isAdminCommand: true,
     },
+    getTrafficRecordingStatus: {skip: isAnInternalCommand},
     godinsert: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
@@ -1541,6 +1542,12 @@ const allCommands = {
     splitChunk: {skip: isAnInternalCommand},
     splitVector: {skip: isAnInternalCommand},
     startRecordingTraffic: {
+        skip: "Renamed to startTrafficRecording",
+    },
+    stopRecordingTraffic: {
+        skip: "Renamed to stopTrafficRecording",
+    },
+    startTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
     },
@@ -1551,7 +1558,7 @@ const allCommands = {
             assert.commandWorked(conn.adminCommand({endSessions: [res.id]}));
         }
     },
-    stopRecordingTraffic: {
+    stopTrafficRecording: {
         // Skipping command because it requires an actual file path for recording traffic to.
         skip: "requires an actual file path to record traffic to",
     },

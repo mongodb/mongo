@@ -31,10 +31,26 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes: "mongo/db/traffic_recorder_validators.h"
+    cpp_includes:
+        - "mongo/db/traffic_recorder_validators.h"
+        - "src/mongo/db/query/util/memory_util.h"
 
 imports:
     - "mongo/db/basic_types.idl"
+
+types:
+    numBytes:
+        description: Represents a number of bytes; either a numerical type (truncating to an integer) or a string containing a number with a suffix KB, MB, GB, %
+        cpp_type: mongo::memory_util::MemorySize
+        bson_serialization_type:
+            - long
+            - int
+            - decimal
+            - double
+            - string
+        deserializer: "mongo::memory_util::MemorySize::parseFromBSON"
+        serializer: "mongo::memory_util::MemorySize::serializeToBSON"
+        is_view: false
 
 structs:
     TrafficRecorderStats:
@@ -47,7 +63,7 @@ structs:
                 type: long
             bufferedBytes:
                 type: long
-            recordingFile:
+            recordingDir:
                 type: string
             maxFileSize:
                 type: long
@@ -55,27 +71,37 @@ structs:
                 type: long
 
 commands:
-    startRecordingTraffic:
+    startTrafficRecording:
         description: "start recording Command"
-        command_name: startRecordingTraffic
+        command_name: startTrafficRecording
         namespace: ignored
         api_version: ""
         fields:
-            filename:
-                description: "output file name"
+            destination:
+                description: "output directory"
                 type: string
-            bufferSize:
-                description: "size of buffer"
-                default: 134217728
-                type: long
             maxFileSize:
-                description: "size of log file"
-                default: 6294967296
+                description: "max size of each recording file"
+                default: 1073741824
+                type: numBytes
+            maxFileAgeMins:
+                description: "max duration for a single recording file to span"
+                optional: true
                 type: long
+            maxMemUsage:
+                description: "max additional memory the recording is allowed to use"
+                default: 134217728
+                type: numBytes
 
-    stopRecordingTraffic:
+    stopTrafficRecording:
         description: "stop recording Command"
-        command_name: stopRecordingTraffic
+        command_name: stopTrafficRecording
+        namespace: ignored
+        api_version: ""
+
+    getTrafficRecordingStatus:
+        description: "Get the status of the ongoing traffic recording, if any"
+        command_name: getTrafficRecordingStatus
         namespace: ignored
         api_version: ""
 

@@ -34,7 +34,7 @@ adminDB.auth("admin", "pass");
 
 // Start recording traffic
 assert.commandWorked(
-    adminDB.runCommand({'startRecordingTraffic': 1, 'filename': recordingDirCustom}));
+    adminDB.runCommand({'startTrafficRecording': 1, 'destination': recordingDirCustom}));
 
 // Run a few commands
 assert.commandWorked(testDB.runCommand({"serverStatus": 1}));
@@ -48,10 +48,10 @@ assert.commandWorked(coll.update({}, {}));
 
 let serverStatus = testDB.runCommand({"serverStatus": 1});
 assert("trafficRecording" in serverStatus, serverStatus);
-let recordingFilePath = serverStatus["trafficRecording"]['recordingFile'];
+let recordingFilePath = serverStatus["trafficRecording"]['recordingDir'];
 
 // Stop recording traffic
-assert.commandWorked(testDB.runCommand({'stopRecordingTraffic': 1}));
+assert.commandWorked(testDB.runCommand({'stopTrafficRecording': 1}));
 
 // Shutdown Mongod
 MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'password'});
@@ -82,4 +82,4 @@ assert.eq(opTypes['insert'], 2);
 assert.eq(opTypes['delete'], 1);
 assert.eq(opTypes['update'], 1);
 assert.eq(opTypes['aggregate'], 1);
-assert.eq(opTypes['stopRecordingTraffic'], 1);
+assert.eq(opTypes['stopTrafficRecording'], 1);

@@ -7147,30 +7147,60 @@ export const authCommandsLib = {
           testcases: testcases_transformationOnlyExpectFail
         },
         {
-          testname: "startRecordingTraffic",
-          command: {startRecordingTraffic: 1, filename: "notARealPath"},
+          testname: "getTrafficRecordingStatus",
+          command: {getTrafficRecordingStatus: 1},
+          testcases: [
+              {runOnDb: adminDbName, roles: roles_hostManager},
+          ],
+          setup: function(db) {
+              db.runCommand({stopTrafficRecording: 1});
+              assert.commandWorked(db.runCommand({startTrafficRecording: 1, destination: "notARealPath"}));
+          },
+          teardown: function(db) {
+            db.runCommand({stopTrafficRecording: 1});
+            removeFile("notARealPath");
+          },
+        },
+        {
+          testname: "startTrafficRecording",
+          command: {startTrafficRecording: 1, destination: "notARealPath"},
           testcases: [
               {runOnDb: adminDbName, roles: roles_hostManager},
           ],
           teardown: (db, response) => {
               if (response.ok) {
-                  assert.commandWorked(db.runCommand({stopRecordingTraffic: 1}));
+                  assert.commandWorked(db.runCommand({stopTrafficRecording: 1}));
               }
           }
         },
         {
-          testname: "stopRecordingTraffic",
-          command: {stopRecordingTraffic: 1},
+          testname: "stopTrafficRecording",
+          command: {stopTrafficRecording: 1},
           testcases: [
               {runOnDb: adminDbName, roles: roles_hostManager},
           ],
           setup: function(db) {
-              db.runCommand({stopRecordingTraffic: 1});
-              assert.commandWorked(db.runCommand({startRecordingTraffic: 1, filename: "notARealPath"}));
+              db.runCommand({stopTrafficRecording: 1});
+              assert.commandWorked(db.runCommand({startTrafficRecording: 1, destination: "notARealPath"}));
           },
           teardown: function(db) {
-            db.runCommand({stopRecordingTraffic: 1});
+            db.runCommand({stopTrafficRecording: 1});
+            removeFile("notARealPath");
           },
+        },
+        {
+          // Internal command, renamed to startTrafficRecording. Test case remains for multi-version tests.
+          testname: "startRecordingTraffic",
+          skipTest: () => true,
+          command: {startRecordingTraffic: 1, destination: "notARealPath"},
+          testcases: [],
+        },
+        {
+          // Internal command, renamed to stopTrafficRecording. Test case remains for multi-version tests.
+          testname: "stopRecordingTraffic",
+          skipTest: () => true,
+          command: {stopRecordingTraffic: 1},
+          testcases: [],
         },
         {
           testname: "clearJumboFlag",

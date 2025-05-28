@@ -551,6 +551,7 @@ let testCases = {
     getQueryableEncryptionCountInfo: {skip: "not profiled or logged"},
     getShardMap: {skip: "internal command"},
     getShardVersion: {skip: "internal command"},
+    getTrafficRecordingStatus: {skip: "does not accept read or write concern"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {
         setUp: function(conn) {
@@ -777,9 +778,11 @@ let testCases = {
     split: {skip: "does not accept read or write concern"},
     splitChunk: {skip: "does not accept read or write concern"},
     splitVector: {skip: "internal command"},
-    startRecordingTraffic: {skip: "does not accept read or write concern"},
+    startRecordingTraffic: {skip: "Renamed to startTrafficRecording"},
+    stopRecordingTraffic: {skip: "Renamed to stopTrafficRecording"},
+    startTrafficRecording: {skip: "does not accept read or write concern"},
     startSession: {skip: "does not accept read or write concern"},
-    stopRecordingTraffic: {skip: "does not accept read or write concern"},
+    stopTrafficRecording: {skip: "does not accept read or write concern"},
     sysprofile: {skip: "internal command"},
     testCommandFeatureFlaggedOnLatestFCV: {skip: "internal command"},
     testDeprecation: {skip: "does not accept read or write concern"},

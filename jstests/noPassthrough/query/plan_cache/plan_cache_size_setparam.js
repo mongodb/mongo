@@ -33,7 +33,7 @@ setPlanCacheSize(paramCorrectValue);
 validatePlanCacheSize(paramCorrectValue);
 
 // Validates that an incorrect value is not accepted.
-const paramIncorrectValue = "100KB";
+const paramIncorrectValue = "100A";
 setPlanCacheSizeThrows(paramIncorrectValue, 6007012);
 validatePlanCacheSize(paramCorrectValue);
 

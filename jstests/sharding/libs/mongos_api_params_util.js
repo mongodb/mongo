@@ -1313,8 +1313,11 @@ export let MongosAPIParametersUtil = (function() {
                 })
             }
         },
+        {commandName: "getTrafficRecordingStatus", skip: "executes locally on targeted node"},
+        {commandName: "startRecordingTraffic", skip: "Renamed to startTrafficRecording"},
+        {commandName: "stopRecordingTraffic", skip: "Renamed to stopTrafficRecording"},
         {
-            commandName: "startRecordingTraffic",
+            commandName: "startTrafficRecording",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {
@@ -1322,7 +1325,7 @@ export let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {
-            commandName: "stopRecordingTraffic",
+            commandName: "stopTrafficRecording",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {

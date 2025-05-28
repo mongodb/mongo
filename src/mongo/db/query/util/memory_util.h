@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsontypes.h"
 
 #include <cstddef>
 #include <string>
@@ -41,9 +42,14 @@ namespace mongo::memory_util {
  */
 enum class MemoryUnits {
     kPercent,
+    kBytes,
+    kKB,
     kMB,
     kGB,
 };
+
+struct MemorySize;
+uint64_t convertToSizeInBytes(const MemorySize& memSize);
 
 /**
  * Represents parsed memory size parameter.
@@ -51,12 +57,20 @@ enum class MemoryUnits {
 struct MemorySize {
     static StatusWith<MemorySize> parse(const std::string& str);
 
-    const double size;
-    const MemoryUnits units;
+    static MemorySize parseFromBSON(const BSONElement& element);
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
+    void serializeToBSON(BSONArrayBuilder* builder) const;
+
+    operator uint64_t() const {
+        return convertToSizeInBytes(*this);
+    }
+
+    double size;
+    MemoryUnits units = MemoryUnits::kBytes;
 };
 
 StatusWith<MemoryUnits> parseUnitString(const std::string& strUnit);
-size_t convertToSizeInBytes(const MemorySize& memSize);
 size_t capMemorySize(size_t requestedSizeBytes,
                      size_t maximumSizeGB,
                      double percentTotalSystemMemory);
