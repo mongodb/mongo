@@ -1538,6 +1538,20 @@ functions:
         - "src/evergreen/run_python_script.sh"
         - "evergreen/generate_clang_tidy_report.py"
 
+  "enable run_for_clang_tidy expansions update":
+    &enable_run_for_clang_tidy_expansions_update
+    command: expansions.update
+    display_name: "enable bazel test report creation"
+    params:
+      updates:
+        - key: run_for_clang_tidy
+          value: "true"
+
+  "enable run_for_clang_tidy expansions":
+    - *f_expansions_write
+    - *enable_run_for_clang_tidy_expansions_update
+    - *f_expansions_write
+
   "generate clang-tidy report":
     - *f_expansions_write
     - *generate_clang_tidy_report_sh

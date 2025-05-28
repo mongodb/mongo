@@ -320,6 +320,7 @@ tasks:
         variant: generate-tasks-for-version
     commands:
       - func: "do bazel setup"
+      - func: "enable run_for_clang_tidy expansions"
       - func: "bazel run"
         vars:
           target: >-

@@ -88,6 +88,7 @@ post:
   - func: "cleanup external auth OIDC resources"
   - func: "debug full disk"
   - func: "upload npm logs"
+  - func: "generate clang-tidy report"
   - func: "attach local resmoke invocation"
   - func: "attach bazel invocation"
   - func: "create bazel test report"
