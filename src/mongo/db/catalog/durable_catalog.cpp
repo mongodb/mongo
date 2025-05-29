@@ -249,12 +249,11 @@ Status createIndex(OperationContext* opCtx,
                                           indexConfig,
                                           collectionOptions.indexOptionDefaults.getStorageEngine());
     if (status.isOK()) {
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [engine, ident, recoveryUnit = shard_role_details::getRecoveryUnit(opCtx)](
-                OperationContext*) {
-                // Intentionally ignoring failure.
-                engine->dropIdent(recoveryUnit, ident, /*identHasSizeInfo=*/false).ignore();
-            });
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        ru.onRollback([engine, ident, &ru](OperationContext*) {
+            // Intentionally ignoring failure.
+            engine->dropIdent(ru, ident, /*identHasSizeInfo=*/false).ignore();
+        });
     }
     return status;
 }

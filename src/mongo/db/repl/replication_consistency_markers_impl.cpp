@@ -287,8 +287,11 @@ Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument
                 const IndexCatalogEntry* entry = collection->getIndexCatalog()->getEntry(idIndex);
                 auto indexAccess = entry->accessMethod()->asSortedData();
 
-                auto recordId =
-                    indexAccess->findSingle(opCtx, collection, entry, kOplogTruncateAfterPointId);
+                auto recordId = indexAccess->findSingle(opCtx,
+                                                        *shard_role_details::getRecoveryUnit(opCtx),
+                                                        collection,
+                                                        entry,
+                                                        kOplogTruncateAfterPointId);
 
                 if (recordId.isNull()) {
                     // insert case.

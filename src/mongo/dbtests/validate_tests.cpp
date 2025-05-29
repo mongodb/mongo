@@ -999,8 +999,12 @@ public:
                 nullptr,
                 id1);
 
-            auto removeStatus = iam->removeKeys(
-                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                descriptor->getEntry(),
+                                                {keys.begin(), keys.end()},
+                                                options,
+                                                &numDeleted);
             auto insertStatus = iam->insert(&_opCtx,
                                             pooledBuilder,
                                             coll(),
@@ -1126,7 +1130,10 @@ public:
                                         recordId)
                     .release();
             ASSERT_SDI_INSERT_OK(
-                sortedDataInterface->insert(&_opCtx, indexKey, true /* dupsAllowed */));
+                sortedDataInterface->insert(&_opCtx,
+                                            *shard_role_details::getRecoveryUnit(&_opCtx),
+                                            indexKey,
+                                            true /* dupsAllowed */));
             commitTransaction();
         }
 
@@ -1147,7 +1154,10 @@ public:
                                         sortedDataInterface->getOrdering(),
                                         recordId)
                     .release();
-            sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
+            sortedDataInterface->unindex(&_opCtx,
+                                         *shard_role_details::getRecoveryUnit(&_opCtx),
+                                         indexKey,
+                                         true /* dupsAllowed */);
             commitTransaction();
         }
 
@@ -1243,7 +1253,10 @@ public:
                                         sortedDataInterface->getOrdering(),
                                         recordId)
                     .release();
-            sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
+            sortedDataInterface->unindex(&_opCtx,
+                                         *shard_role_details::getRecoveryUnit(&_opCtx),
+                                         indexKey,
+                                         true /* dupsAllowed */);
             commitTransaction();
         }
         releaseDb();
@@ -1405,8 +1418,12 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus = iam->removeKeys(
-                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                descriptor->getEntry(),
+                                                {keys.begin(), keys.end()},
+                                                options,
+                                                &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -1772,8 +1789,12 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus = iam->removeKeys(
-                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                descriptor->getEntry(),
+                                                {keys.begin(), keys.end()},
+                                                options,
+                                                &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -2118,6 +2139,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -2382,6 +2404,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -2638,6 +2661,7 @@ public:
                     nullptr,
                     rid1);
                 auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    *shard_role_details::getRecoveryUnit(&_opCtx),
                                                     descriptor->getEntry(),
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -2701,6 +2725,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -2748,6 +2773,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -2974,6 +3000,7 @@ public:
 
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    *shard_role_details::getRecoveryUnit(&_opCtx),
                                                     descriptor->getEntry(),
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -3173,8 +3200,12 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus = iam->removeKeys(
-                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                descriptor->getEntry(),
+                                                {keys.begin(), keys.end()},
+                                                options,
+                                                &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -3211,8 +3242,12 @@ public:
                 nullptr,
                 nullptr,
                 rid);
-            auto removeStatus = iam->removeKeys(
-                &_opCtx, descriptor->getEntry(), {keys.begin(), keys.end()}, options, &numDeleted);
+            auto removeStatus = iam->removeKeys(&_opCtx,
+                                                *shard_role_details::getRecoveryUnit(&_opCtx),
+                                                descriptor->getEntry(),
+                                                {keys.begin(), keys.end()},
+                                                options,
+                                                &numDeleted);
 
             ASSERT_EQUALS(numDeleted, 1);
             ASSERT_OK(removeStatus);
@@ -3328,6 +3363,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -3375,6 +3411,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},
@@ -3717,6 +3754,7 @@ public:
 
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    *shard_role_details::getRecoveryUnit(&_opCtx),
                                                     descriptor->getEntry(),
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -3756,11 +3794,14 @@ public:
                 ASSERT_EQ(keys.size(), 2);
                 ASSERT_EQ(multikeyPaths.size(), 1);
 
+                auto& ru = *shard_role_details::getRecoveryUnit(&_opCtx);
+
                 // Insert index keys one at a time in order to avoid marking index as multikey
                 // and allows us to pass in an empty set of MultikeyPaths.
                 int64_t numInserted;
                 auto keysIterator = keys.begin();
                 auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
+                                                                          ru,
                                                                           coll(),
                                                                           descriptor->getEntry(),
                                                                           {*keysIterator},
@@ -3775,6 +3816,7 @@ public:
                 keysIterator++;
                 numInserted = 0;
                 insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
+                                                                     ru,
                                                                      coll(),
                                                                      descriptor->getEntry(),
                                                                      {*keysIterator},
@@ -3948,6 +3990,7 @@ public:
 
                 int64_t numDeleted;
                 auto removeStatus = iam->removeKeys(&_opCtx,
+                                                    *shard_role_details::getRecoveryUnit(&_opCtx),
                                                     descriptor->getEntry(),
                                                     {keys.begin(), keys.end()},
                                                     options,
@@ -3988,15 +4031,17 @@ public:
                 ASSERT_EQ(keys.size(), 2);
 
                 int64_t numInserted;
-                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(&_opCtx,
-                                                                          coll(),
-                                                                          descriptor->getEntry(),
-                                                                          keys,
-                                                                          {},
-                                                                          oldMultikeyPaths,
-                                                                          options,
-                                                                          nullptr,
-                                                                          &numInserted);
+                auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
+                    &_opCtx,
+                    *shard_role_details::getRecoveryUnit(&_opCtx),
+                    coll(),
+                    descriptor->getEntry(),
+                    keys,
+                    {},
+                    oldMultikeyPaths,
+                    options,
+                    nullptr,
+                    &numInserted);
 
                 ASSERT_EQUALS(numInserted, 2);
                 ASSERT_OK(insertStatus);
@@ -4547,6 +4592,7 @@ public:
                     int64_t numInserted;
                     auto insertStatus = iam->insertKeysAndUpdateMultikeyPaths(
                         &_opCtx,
+                        *shard_role_details::getRecoveryUnit(&_opCtx),
                         coll(),
                         entry,
                         {keys.begin(), keys.end()},

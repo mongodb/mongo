@@ -94,8 +94,9 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
-    _indexCursor = indexAccessMethod()->newCursor(opCtx(), _forward);
+    _indexCursor = indexAccessMethod()->newCursor(opCtx(), ru, _forward);
 
     // We always seek once to establish the cursor position.
     ++_specificStats.seeks;
@@ -114,7 +115,7 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
             _forward,
             _startKeyInclusive,
             builder);
-        return _indexCursor->seek(keyStringForSeek);
+        return _indexCursor->seek(ru, keyStringForSeek);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
         // of an end cursor.  For all other index scans, we fall back on using
@@ -131,7 +132,7 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
                 _forward,
                 _startKeyInclusive,
                 builder);
-            return _indexCursor->seek(keyStringForSeek);
+            return _indexCursor->seek(ru, keyStringForSeek);
         } else {
             _checker.reset(new IndexBoundsChecker(&_bounds, _keyPattern, _direction));
 
@@ -140,8 +141,9 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
             key_string::Builder builder(
                 indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                 indexAccessMethod()->getSortedDataInterface()->getOrdering());
-            return _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                _seekPoint, _forward, builder));
+            return _indexCursor->seek(ru,
+                                      IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                          _seekPoint, _forward, builder));
         }
     }
 }
@@ -154,20 +156,22 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         expCtx(),
         "IndexScan",
         [&] {
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
             switch (_scanState) {
                 case INITIALIZING:
                     kv = initIndexScan();
                     break;
                 case GETTING_NEXT:
-                    kv = _indexCursor->next();
+                    kv = _indexCursor->next(ru);
                     break;
                 case NEED_SEEK: {
                     ++_specificStats.seeks;
                     key_string::Builder builder(
                         indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
                         indexAccessMethod()->getSortedDataInterface()->getOrdering());
-                    kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                        _seekPoint, _forward, builder));
+                    kv = _indexCursor->seek(ru,
+                                            IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                                _seekPoint, _forward, builder));
                     break;
                 }
                 case HIT_END:
@@ -304,7 +308,8 @@ void IndexScan::doRestoreStateRequiresIndex() {
                                                  << "Hit failpoint '"
                                                  << throwDuringIndexScanRestore.getName() << "'.");
         }
-        _indexCursor->restore();
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
+        _indexCursor->restore(ru);
     }
 }
 

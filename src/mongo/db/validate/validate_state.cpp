@@ -136,7 +136,7 @@ void ValidateState::yieldCursors(OperationContext* opCtx) {
 
     // Restore all the cursors.
     for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->restore();
+        indexCursor.second->restore(opCtx);
     }
 
     uassert(ErrorCodes::Interrupted,

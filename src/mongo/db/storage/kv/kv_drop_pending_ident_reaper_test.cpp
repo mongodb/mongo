@@ -62,7 +62,7 @@ namespace {
  */
 class KVEngineMock : public KVEngine {
 public:
-    Status dropIdent(RecoveryUnit* ru,
+    Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop) override;
@@ -81,6 +81,7 @@ public:
         return {};
     }
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
                                                                 StringData ident,
@@ -200,13 +201,13 @@ public:
     std::vector<std::string> droppedIdents;
 
     // Override to modify dropIdent() behavior.
-    using DropIdentFn = std::function<Status(RecoveryUnit*, StringData)>;
-    DropIdentFn dropIdentFn = [](RecoveryUnit*, StringData) {
+    using DropIdentFn = std::function<Status(RecoveryUnit&, StringData)>;
+    DropIdentFn dropIdentFn = [](RecoveryUnit&, StringData) {
         return Status::OK();
     };
 };
 
-Status KVEngineMock::dropIdent(RecoveryUnit* ru,
+Status KVEngineMock::dropIdent(RecoveryUnit& ru,
                                StringData ident,
                                bool identHasSizeInfo,
                                const StorageEngine::DropIdentCallback& onDrop) {
@@ -524,8 +525,7 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
     ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
 
     // Make KVEngineMock::dropIndent() fail.
-    engine->dropIdentFn = [&identName](RecoveryUnit* ru, StringData identToDropName) {
-        ASSERT(ru);
+    engine->dropIdentFn = [&identName](RecoveryUnit& ru, StringData identToDropName) {
         ASSERT_EQUALS(identName, identToDropName);
         return Status(ErrorCodes::OperationFailed, "Mock KV engine dropIndent() failed.");
     };

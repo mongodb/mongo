@@ -103,13 +103,14 @@ public:
     }
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
                                                                 StringData ident,
                                                                 const IndexConfig& config,
                                                                 KeyFormat keyFormat) override;
 
-    Status dropIdent(RecoveryUnit* ru,
+    Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop) override {

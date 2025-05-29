@@ -436,7 +436,11 @@ public:
                 "Id lookup query filter must contain a single field",
                 _queryFilter.nFields() == 1);
         auto rid = _indexCatalogEntry->accessMethod()->asSortedData()->findSingle(
-            opCtx, accessCollectionPtr(collection), _indexCatalogEntry, _queryFilter);
+            opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
+            accessCollectionPtr(collection),
+            _indexCatalogEntry,
+            _queryFilter);
         if (rid.isNull()) {
             _exhausted = true;
             return Exhausted();
@@ -691,7 +695,8 @@ public:
 
         // Now seek to the first matching key in the index.
         auto sortedAccessMethod = _indexCatalogEntry->accessMethod()->asSortedData();
-        auto indexCursor = sortedAccessMethod->newCursor(opCtx, true /* forward */);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto indexCursor = sortedAccessMethod->newCursor(opCtx, ru, true /* forward */);
         indexCursor->setEndPosition(endKey, true /* endKeyInclusive */);
         key_string::Builder builder(
             sortedAccessMethod->getSortedDataInterface()->getKeyStringVersion());
@@ -702,7 +707,7 @@ public:
             true /* startKeyInclusive */,
             builder);
 
-        auto keyEntry = indexCursor->seekForKeyValueView(keyStringForSeek);
+        auto keyEntry = indexCursor->seekForKeyValueView(ru, keyStringForSeek);
         if (keyEntry.isEmpty()) {
             _exhausted = true;
             return Exhausted();

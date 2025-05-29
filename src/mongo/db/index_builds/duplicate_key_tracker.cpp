@@ -147,7 +147,8 @@ boost::optional<SortedDataInterface::DuplicateKey> DuplicateKeyTracker::checkCon
 
         BufReader reader(record->data.data(), record->data.size());
         auto key = key_string::View::deserialize(reader, index->getKeyStringVersion(), boost::none);
-        if (auto duplicateKey = index->dupKeyCheck(opCtx, key)) {
+        if (auto duplicateKey =
+                index->dupKeyCheck(opCtx, *shard_role_details::getRecoveryUnit(opCtx), key)) {
             return duplicateKey;
         }
 

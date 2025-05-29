@@ -264,8 +264,15 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // not have to account for potential dupes, since all metadata keys are indexed against a single
     // RecordId. An attempt to write a duplicate key will therefore be ignored.
     if (!multikeyMetadataKeys.empty()) {
-        uassertStatusOK(accessMethod()->asSortedData()->insertKeys(
-            opCtx, collection, _descriptor.getEntry(), multikeyMetadataKeys, {}, {}, nullptr));
+        uassertStatusOK(
+            accessMethod()->asSortedData()->insertKeys(opCtx,
+                                                       *shard_role_details::getRecoveryUnit(opCtx),
+                                                       collection,
+                                                       _descriptor.getEntry(),
+                                                       multikeyMetadataKeys,
+                                                       {},
+                                                       {},
+                                                       nullptr));
     }
 
     // Mark the catalog as multikey, and record the multikey paths if applicable.

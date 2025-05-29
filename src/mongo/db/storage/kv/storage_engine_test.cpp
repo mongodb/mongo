@@ -122,7 +122,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
-    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+    ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
                         swCollInfo.getValue().ident,
                         /*identHasSizeInfo=*/true));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
@@ -140,7 +140,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+    ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
                         swCollInfo.getValue().ident,
                         /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
@@ -726,7 +726,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(shard_role_details::getRecoveryUnit(opCtx.get()),
+    ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
                         swCollInfo.getValue().ident,
                         /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
@@ -1094,7 +1094,7 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
     const auto indexIdent = _storageEngine->getMDBCatalog()->getIndexIdent(
         opCtx.get(), coll.getValue().catalogId, indexName);
     ASSERT_OK(dropIdent(
-        shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent, /*identHasSizeInfo=*/true));
+        *shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent, /*identHasSizeInfo=*/true));
     ASSERT_FALSE(identExists(opCtx.get(), indexIdent));
 
     // Since the index build never completed, startup repair should treat a missing ident

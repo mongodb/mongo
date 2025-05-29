@@ -65,7 +65,9 @@ struct Fixture {
           opCtx(harness->newOperationContext()),
           sorted(harness->newSortedDataInterface(
               opCtx.get(), uniqueness == kUnique, /*partial*/ false, keyFormat)),
-          cursor(sorted->newCursor(opCtx.get(), direction == kForward)),
+          cursor(sorted->newCursor(opCtx.get(),
+                                   *shard_role_details::getRecoveryUnit(opCtx.get()),
+                                   direction == kForward)),
           firstKey(makeKeyStringForSeek(sorted.get(),
                                         BSON("" << (direction == kForward ? 1 : nToInsert)),
                                         direction == kForward,
@@ -79,15 +81,15 @@ struct Fixture {
             if (keyFormat == KeyFormat::Long) {
                 RecordId loc(42, i * 2);
                 ASSERT_SDI_INSERT_OK(
-                    sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key, loc), true));
+                    sorted->insert(opCtx.get(), ru, makeKeyString(sorted.get(), key, loc), true));
             } else {
                 RecordId loc(record_id_helpers::keyForObj(key));
                 ASSERT_SDI_INSERT_OK(sorted->insert(
-                    opCtx.get(), makeKeyString(sorted.get(), key, std::move(loc)), true));
+                    opCtx.get(), ru, makeKeyString(sorted.get(), key, std::move(loc)), true));
             }
         }
         txn.commit();
-        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
+        ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get(), ru));
     }
 
     const Uniqueness uniqueness;
@@ -110,13 +112,14 @@ void BM_SDIAdvance(benchmark::State& state,
 
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
+        fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer());
         for (int i = 1; i < fix.nToInsert; i++)
-            fix.cursor->next(keyInclusion);
+            fix.cursor->next(ru, keyInclusion);
         fix.itemsProcessed += fix.nToInsert;
     }
-    ASSERT(!fix.cursor->next());
+    ASSERT(!fix.cursor->next(ru));
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
@@ -126,8 +129,9 @@ void BM_SDISeek(benchmark::State& state,
                 Uniqueness uniqueness) {
 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey.finishAndGetBuffer(), keyInclusion);
+        fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer(), keyInclusion);
         fix.itemsProcessed += 1;
     }
     state.SetItemsProcessed(fix.itemsProcessed);
@@ -137,10 +141,11 @@ void BM_SDISaveRestore(benchmark::State& state, Direction direction, Uniqueness 
 
     Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
 
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
+        fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer());
         fix.cursor->save();
-        fix.cursor->restore();
+        fix.cursor->restore(ru);
         fix.itemsProcessed += 1;
     }
     state.SetItemsProcessed(fix.itemsProcessed);
@@ -153,15 +158,16 @@ void BM_SDIAdvanceWithEnd(benchmark::State& state,
 
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
+    auto& ru = *shard_role_details::getRecoveryUnit(fix.opCtx.get());
     for (auto _ : state) {
         BSONObj lastKey = BSON("" << (direction == kForward ? fix.nToInsert : 1));
         fix.cursor->setEndPosition(lastKey, /*inclusive*/ true);
-        fix.cursor->seek(fix.firstKey.finishAndGetBuffer());
+        fix.cursor->seek(ru, fix.firstKey.finishAndGetBuffer());
         for (int i = 1; i < fix.nToInsert; i++)
-            fix.cursor->next(kRecordId);
+            fix.cursor->next(ru, kRecordId);
         fix.itemsProcessed += fix.nToInsert;
     }
-    ASSERT(!fix.cursor->next());
+    ASSERT(!fix.cursor->next(ru));
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 

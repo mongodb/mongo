@@ -235,7 +235,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         } else {
             WriteUnitOfWork wuow(opCtx);
             Status status =
-                engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                engine->getEngine()->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                                toRemove,
                                                ident::isCollectionIdent(toRemove));
             if (!status.isOK()) {
@@ -355,7 +355,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                       "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
                 Status status =
-                    engine->getEngine()->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+                    engine->getEngine()->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                                    indexIdent,
                                                    /*identHasSizeInfo=*/false);
                 if (!status.isOK()) {
@@ -393,7 +393,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
         Status status = engine->getEngine()->dropIdent(
-            shard_role_details::getRecoveryUnit(opCtx), temp, ident::isCollectionIdent(temp));
+            *shard_role_details::getRecoveryUnit(opCtx), temp, ident::isCollectionIdent(temp));
         if (!status.isOK()) {
             // A concurrent operation, such as a checkpoint could be holding an open data handle on
             // the ident. Handoff the ident drop to the ident reaper to retry later.

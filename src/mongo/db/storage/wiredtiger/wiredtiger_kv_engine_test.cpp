@@ -218,7 +218,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!err) << err.message();
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
     // engine and the restoration process can be tested.
@@ -265,7 +265,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     _helper.getWiredTigerKVEngine()->checkpoint();
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
     auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
@@ -447,7 +447,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // WiredTiger drops files asynchronously.
     for (size_t check = 0; check < 30; check++) {
@@ -929,7 +929,7 @@ protected:
 
     Status removeIdent(StringData ident) {
         return _helper.getWiredTigerKVEngine()->dropIdent(
-            shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
+            *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }
 
 private:

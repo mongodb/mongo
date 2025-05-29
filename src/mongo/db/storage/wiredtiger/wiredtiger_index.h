@@ -40,7 +40,6 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/db/validate/validate_results.h"
@@ -140,6 +139,7 @@ public:
      * Constructs an index. The rsKeyFormat is the RecordId key format of the related RecordStore.
      */
     WiredTigerIndex(OperationContext* ctx,
+                    RecoveryUnit& ru,
                     const std::string& uri,
                     const UUID& collectionUUID,
                     StringData ident,
@@ -148,42 +148,51 @@ public:
                     bool isLogged);
 
     std::variant<Status, DuplicateKey> insert(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               const key_string::View& keyString,
                                               bool dupsAllowed,
                                               IncludeDuplicateRecordId includeDuplicateRecordId =
                                                   IncludeDuplicateRecordId::kOff) override;
 
     void unindex(OperationContext* opCtx,
+                 RecoveryUnit& ru,
                  const key_string::View& keyString,
                  bool dupsAllowed) override;
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
                                       std::span<const char> keyString) const override;
 
     IndexValidateResults validate(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         const CollectionValidation::ValidationOptions& options) const override;
 
     bool appendCustomStats(OperationContext* opCtx,
+                           RecoveryUnit& ru,
                            BSONObjBuilder* output,
                            double scale) const override;
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               const key_string::View& keyString) override;
 
-    bool isEmpty(OperationContext* opCtx) override;
+    bool isEmpty(OperationContext* opCtx, RecoveryUnit& ru) override;
 
-    int64_t numEntries(OperationContext* opCtx) const override;
+    int64_t numEntries(OperationContext* opCtx, RecoveryUnit& ru) const override;
 
-    long long getSpaceUsedBytes(OperationContext* opCtx) const override;
+    long long getSpaceUsedBytes(OperationContext* opCtx, RecoveryUnit& ru) const override;
 
-    long long getFreeStorageBytes(OperationContext* opCtx) const override;
+    long long getFreeStorageBytes(OperationContext* opCtx, RecoveryUnit& ru) const override;
 
     Status initAsEmpty() override;
 
     void printIndexEntryMetadata(OperationContext* opCtx,
+                                 RecoveryUnit& ru,
                                  const key_string::View& keyString) const override;
 
-    StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) override;
+    StatusWith<int64_t> compact(OperationContext* opCtx,
+                                RecoveryUnit& ru,
+                                const CompactOptions& options) override;
 
     const std::string& uri() const {
         return _uri;
@@ -208,6 +217,7 @@ public:
     }
 
     virtual bool isDup(OperationContext* opCtx,
+                       RecoveryUnit& ru,
                        WT_CURSOR* c,
                        WiredTigerSession* session,
                        const key_string::View& keyString) = 0;
@@ -222,6 +232,7 @@ public:
 protected:
     virtual std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         WT_CURSOR* c,
         WiredTigerSession* session,
         const key_string::View& keyString,
@@ -229,6 +240,7 @@ protected:
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           WT_CURSOR* c,
                           const key_string::View& keyString,
                           bool dupsAllowed) = 0;
@@ -244,6 +256,7 @@ protected:
      * on that key.
      */
     boost::optional<RecordId> _keyExists(OperationContext* opCtx,
+                                         RecoveryUnit& ru,
                                          WT_CURSOR* c,
                                          WiredTigerSession* session,
                                          const key_string::View& keyString);
@@ -263,6 +276,7 @@ protected:
      */
     std::variant<bool, DuplicateKey> _checkDups(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         WT_CURSOR* c,
         WiredTigerSession* session,
         const key_string::View& keyString,
@@ -273,6 +287,7 @@ protected:
      * Returns the corresponding KeyString version.
      */
     key_string::Version _handleVersionInfo(OperationContext* ctx,
+                                           RecoveryUnit& ru,
                                            const std::string& uri,
                                            StringData ident,
                                            const IndexConfig& config,
@@ -283,6 +298,7 @@ protected:
      * to the index type during startup.
      */
     void _repairDataFormatVersion(OperationContext* opCtx,
+                                  RecoveryUnit& ru,
                                   const std::string& uri,
                                   StringData ident,
                                   const IndexConfig& config);
@@ -302,6 +318,7 @@ protected:
 class WiredTigerIndexUnique : public WiredTigerIndex {
 public:
     WiredTigerIndexUnique(OperationContext* ctx,
+                          RecoveryUnit& ru,
                           const std::string& uri,
                           const UUID& collectionUUID,
                           StringData ident,
@@ -310,9 +327,11 @@ public:
                           bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           RecoveryUnit& ru,
                                                            bool forward) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                RecoveryUnit& ru) override;
 
     bool unique() const override {
         return true;
@@ -321,6 +340,7 @@ public:
     bool isTimestampSafeUniqueIdx() const override;
 
     bool isDup(OperationContext* opCtx,
+               RecoveryUnit& ru,
                WT_CURSOR* c,
                WiredTigerSession* session,
                const key_string::View& keyString) override;
@@ -329,6 +349,7 @@ public:
 protected:
     std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         WT_CURSOR* c,
         WiredTigerSession* session,
         const key_string::View& keyString,
@@ -337,6 +358,7 @@ protected:
             IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
+                  RecoveryUnit& ru,
                   WT_CURSOR* c,
                   const key_string::View& keyString,
                   bool dupsAllowed) override;
@@ -347,6 +369,7 @@ protected:
      * cannot be found, and this function will check for the old format.
      */
     void _unindexTimestampUnsafe(OperationContext* opCtx,
+                                 RecoveryUnit& ru,
                                  WT_CURSOR* c,
                                  const key_string::View& keyString,
                                  bool dupsAllowed);
@@ -355,6 +378,7 @@ protected:
 class WiredTigerIdIndex : public WiredTigerIndex {
 public:
     WiredTigerIdIndex(OperationContext* ctx,
+                      RecoveryUnit& ru,
                       const std::string& uri,
                       const UUID& collectionUUID,
                       StringData ident,
@@ -362,9 +386,11 @@ public:
                       bool isLogged);
 
     std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
                                       bool isForward = true) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                RecoveryUnit& ru) override;
 
     bool unique() const override {
         return true;
@@ -379,6 +405,7 @@ public:
     }
 
     bool isDup(OperationContext* opCtx,
+               RecoveryUnit& ru,
                WT_CURSOR* c,
                WiredTigerSession* session,
                const key_string::View& keyString) override {
@@ -389,6 +416,7 @@ public:
 protected:
     std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         WT_CURSOR* c,
         WiredTigerSession* session,
         const key_string::View& keyString,
@@ -397,6 +425,7 @@ protected:
             IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
+                  RecoveryUnit& ru,
                   WT_CURSOR* c,
                   const key_string::View& keyString,
                   bool dupsAllowed) override;
@@ -405,6 +434,7 @@ protected:
      * This is not applicable to id indexes. See base class comments.
      */
     Status _checkDups(OperationContext* opCtx,
+                      RecoveryUnit& ru,
                       WT_CURSOR* c,
                       const key_string::View& keyString,
                       IncludeDuplicateRecordId includeDuplicateRecordId) = delete;
@@ -413,6 +443,7 @@ protected:
 class WiredTigerIndexStandard : public WiredTigerIndex {
 public:
     WiredTigerIndexStandard(OperationContext* ctx,
+                            RecoveryUnit& ru,
                             const std::string& uri,
                             const UUID& collectionUUID,
                             StringData ident,
@@ -421,9 +452,11 @@ public:
                             bool isLogged);
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           RecoveryUnit& ru,
                                                            bool forward) const override;
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override;
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                RecoveryUnit& ru) override;
 
     bool unique() const override {
         return false;
@@ -434,6 +467,7 @@ public:
     }
 
     bool isDup(OperationContext* opCtx,
+               RecoveryUnit& ru,
                WT_CURSOR* c,
                WiredTigerSession* session,
                const key_string::View& keyString) override {
@@ -444,6 +478,7 @@ public:
 protected:
     std::variant<Status, SortedDataInterface::DuplicateKey> _insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         WT_CURSOR* c,
         WiredTigerSession* session,
         const key_string::View& keyString,
@@ -452,6 +487,7 @@ protected:
             IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
+                  RecoveryUnit& ru,
                   WT_CURSOR* c,
                   const key_string::View& keyString,
                   bool dupsAllowed) override;

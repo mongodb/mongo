@@ -126,7 +126,7 @@ protected:
     };
 
     // Seeks and returns the first/next index KeyStringEntry or boost::none if no such key exists.
-    virtual SortedDataKeyValueView seek() = 0;
+    virtual SortedDataKeyValueView seek(RecoveryUnit& ru) = 0;
     // Returns true if the 'key' is within the bounds and false otherwise. Implementations may set
     // state internally to reflect whether the scan is done, or whether a new seek point should be
     // used.
@@ -248,7 +248,7 @@ public:
 
 protected:
     void doSaveState() override;
-    SortedDataKeyValueView seek() override;
+    SortedDataKeyValueView seek(RecoveryUnit& ru) override;
     bool validateKey(const SortedDataKeyValueView& key) override;
 
 private:
@@ -315,7 +315,7 @@ public:
     size_t estimateCompileTimeSize() const override;
 
 protected:
-    SortedDataKeyValueView seek() override;
+    SortedDataKeyValueView seek(RecoveryUnit& ru) override;
     bool validateKey(const SortedDataKeyValueView& key) override;
 
     const GenericIndexScanStageParams _params;

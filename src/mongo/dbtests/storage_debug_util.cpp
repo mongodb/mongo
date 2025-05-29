@@ -82,6 +82,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
     // Iterate and print each index's table of documents.
     const auto indexCatalog = coll->getIndexCatalog();
     const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     while (it->more()) {
         const auto indexCatalogEntry = it->next();
         const auto indexDescriptor = indexCatalogEntry->descriptor();
@@ -92,7 +93,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
                   "index_name"_attr = indexDescriptor->indexName());
             continue;
         }
-        auto indexCursor = iam->newCursor(opCtx, /*forward*/ true);
+        auto indexCursor = iam->newCursor(opCtx, ru, /*forward*/ true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();
         const auto ordering = Ordering::make(keyPattern);
@@ -101,8 +102,8 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
               "[Debugging] {keyPattern_str} index table entries:",
               "keyPattern_str"_attr = keyPattern);
 
-        for (auto keyStringEntry = indexCursor->nextKeyString(); keyStringEntry;
-             keyStringEntry = indexCursor->nextKeyString()) {
+        for (auto keyStringEntry = indexCursor->nextKeyString(ru); keyStringEntry;
+             keyStringEntry = indexCursor->nextKeyString(ru)) {
             auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getView(),
                                                     ordering,
                                                     keyStringEntry->keyString.getTypeBits());

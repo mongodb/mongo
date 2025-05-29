@@ -226,13 +226,15 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                     onResolved();
                     continue;
                 }
+                auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
                 auto status = iam->insertKeys(
-                    opCtx, collection, indexCatalogEntry, *keys, options, nullptr, nullptr);
+                    opCtx, ru, collection, indexCatalogEntry, *keys, options, nullptr, nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
 
                 status = iam->insertKeys(opCtx,
+                                         ru,
                                          collection,
                                          indexCatalogEntry,
                                          *multikeyMetadataKeys,

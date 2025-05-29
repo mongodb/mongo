@@ -218,14 +218,15 @@ void IndexScanStageBase::doRestoreState() {
         }
     }
     restoreCollectionAndIndex();
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
     if (_cursor) {
-        _cursor->restore();
+        _cursor->restore(ru);
     }
 
     // Yield is the only time during plan execution that the snapshotId can change. As such, we
     // update it accordingly as part of yield recovery.
     if (_snapshotIdSlot) {
-        _latestSnapshotId = shard_role_details::getRecoveryUnit(_opCtx)->getSnapshotId().toNumber();
+        _latestSnapshotId = ru.getSnapshotId().toNumber();
     }
 }
 
@@ -263,7 +264,8 @@ void IndexScanStageBase::openImpl(bool reOpen) {
     restoreCollectionAndIndex();
 
     if (!_cursor) {
-        _cursor = _entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
+        _cursor = _entry->accessMethod()->asSortedData()->newCursor(
+            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), _forward);
     }
 
     _open = true;
@@ -288,17 +290,18 @@ PlanState IndexScanStageBase::getNext() {
 
     checkForInterruptAndYield(_opCtx);
 
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
     do {
         switch (_scanState) {
             case ScanState::kNeedSeek:
                 ++_specificStats.seeks;
                 trackIndexRead();
                 // Seek for key and establish the cursor position.
-                _nextKeyString = seek();
+                _nextKeyString = seek(ru);
                 break;
             case ScanState::kScanning:
                 trackIndexRead();
-                _nextKeyString = _cursor->nextKeyValueView();
+                _nextKeyString = _cursor->nextKeyValueView(ru);
                 break;
             case ScanState::kFinished:
                 return trackPlanState(PlanState::IS_EOF);
@@ -628,9 +631,9 @@ size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
-SortedDataKeyValueView SimpleIndexScanStage::seek() {
+SortedDataKeyValueView SimpleIndexScanStage::seek(RecoveryUnit& ru) {
     auto& query = getSeekKeyLow();
-    return _cursor->seekForKeyValueView(query.getView());
+    return _cursor->seekForKeyValueView(ru, query.getView());
 }
 
 bool SimpleIndexScanStage::validateKey(const SortedDataKeyValueView& key) {
@@ -745,10 +748,10 @@ size_t GenericIndexScanStage::estimateCompileTimeSize() const {
     return size;
 }
 
-SortedDataKeyValueView GenericIndexScanStage::seek() {
+SortedDataKeyValueView GenericIndexScanStage::seek(RecoveryUnit& ru) {
     key_string::Builder builder(_params.version, _params.ord);
     return _cursor->seekForKeyValueView(
-        IndexEntryComparison::makeKeyStringFromSeekPointForSeek(_seekPoint, _forward, builder));
+        ru, IndexEntryComparison::makeKeyStringFromSeekPointForSeek(_seekPoint, _forward, builder));
 }
 
 bool GenericIndexScanStage::validateKey(const SortedDataKeyValueView& key) {

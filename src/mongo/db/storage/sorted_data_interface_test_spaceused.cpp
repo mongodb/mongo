@@ -48,7 +48,7 @@ TEST_F(SortedDataInterfaceTest, GetSpaceUsedBytesEmpty) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 }
 
 // Verify that a nonempty index takes up some space.
@@ -56,7 +56,8 @@ TEST_F(SortedDataInterfaceTest, GetSpaceUsedBytesNonEmpty) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    auto& ru = recoveryUnit();
+    ASSERT(sorted->isEmpty(opCtx(), ru));
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
@@ -64,11 +65,12 @@ TEST_F(SortedDataInterfaceTest, GetSpaceUsedBytesNonEmpty) {
         StorageWriteTransaction txn(ru);
         BSONObj key = BSON("" << i);
         RecordId loc(42, i * 2);
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), makeKeyString(sorted.get(), key, loc), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), ru, makeKeyString(sorted.get(), key, loc), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 }  // namespace

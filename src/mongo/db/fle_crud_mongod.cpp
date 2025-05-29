@@ -322,7 +322,8 @@ private:
 
         incrementRead();
 
-        auto loc = _indexCursor->seekExact(kb.finishAndGetBuffer());
+        auto& ru = *shard_role_details::getRecoveryUnit(_opCtx);
+        auto loc = _indexCursor->seekExact(ru, kb.finishAndGetBuffer());
         if (!loc) {
             return boost::none;
         }
@@ -566,7 +567,8 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
             auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();
 
             auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
-            auto indexCursor = sdi->newCursor(opCtx, true);
+            auto indexCursor =
+                sdi->newCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), true);
 
             StorageEngineIndexCollectionReader reader(opCtx,
                                                       docCount,

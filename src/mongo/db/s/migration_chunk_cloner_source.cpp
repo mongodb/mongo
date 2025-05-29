@@ -1117,8 +1117,9 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
                                   << nss().toStringForErrorMsg()};
         }
 
-        averageObjectIdSize =
-            idIdx->getEntry()->accessMethod()->getSpaceUsedBytes(opCtx) / totalRecs;
+        averageObjectIdSize = idIdx->getEntry()->accessMethod()->getSpaceUsedBytes(
+                                  opCtx, *shard_role_details::getRecoveryUnit(opCtx)) /
+            totalRecs;
     }
 
     if (isLargeChunk) {

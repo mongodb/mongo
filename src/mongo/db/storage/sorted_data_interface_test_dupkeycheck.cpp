@@ -42,11 +42,15 @@ namespace {
 
 bool dupKeyCheck(SortedDataInterface& sorted,
                  OperationContext* opCtx,
+                 RecoveryUnit& ru,
                  const key_string::Value& keyString) {
-    return sorted.dupKeyCheck(opCtx, keyString).has_value();
+    return sorted.dupKeyCheck(opCtx, ru, keyString).has_value();
 }
-bool dupKeyCheck(SortedDataInterface& sorted, OperationContext* opCtx, BSONObj bsonKey) {
-    return dupKeyCheck(sorted, opCtx, makeKeyString(&sorted, bsonKey));
+bool dupKeyCheck(SortedDataInterface& sorted,
+                 OperationContext* opCtx,
+                 RecoveryUnit& ru,
+                 BSONObj bsonKey) {
+    return dupKeyCheck(sorted, opCtx, ru, makeKeyString(&sorted, bsonKey));
 }
 
 // Insert a key and verify that dupKeyCheck() returns a non-OK status for
@@ -56,20 +60,20 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckAfterInsert) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
         txn.commit();
     }
 }
@@ -84,17 +88,17 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckAfterInsertKeyString) {
     auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
     auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), keyString1WithoutRecordId));
+    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), keyString1WithoutRecordId));
 }
 
 // Verify that dupKeyCheck() returns an OK status for a key that does
@@ -103,9 +107,9 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckEmpty) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
-    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
 }
 
 // Verify that dupKeyCheck() returns an OK status for a KeyString that does
@@ -116,9 +120,9 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckEmptyKeyString) {
 
     auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
-    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), keyString1WithoutRecordId));
+    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), keyString1WithoutRecordId));
 }
 
 // Insert a key and verify that dupKeyCheck() acknowledges the duplicate key, even
@@ -127,20 +131,20 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckWhenDiskLocBefore) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
         txn.commit();
     }
 }
@@ -151,20 +155,20 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckWhenDiskLocAfter) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+        ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
         txn.commit();
     }
 }
@@ -173,20 +177,20 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckWithDuplicates) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
 
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc2), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
-    ASSERT_TRUE(dupKeyCheck(*sorted, opCtx(), key1));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
+    ASSERT_TRUE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
 }
 
 TEST_F(SortedDataInterfaceTest, DupKeyCheckWithDuplicateKeyStrings) {
@@ -197,67 +201,67 @@ TEST_F(SortedDataInterfaceTest, DupKeyCheckWithDuplicateKeyStrings) {
     auto keyString2 = makeKeyString(sorted.get(), key1, loc2);
     auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString2, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString2, true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
-    ASSERT_TRUE(dupKeyCheck(*sorted, opCtx(), keyString1WithoutRecordId));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
+    ASSERT_TRUE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), keyString1WithoutRecordId));
 }
 
 TEST_F(SortedDataInterfaceTest, DupKeyCheckWithDeletedFirstEntry) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc2), true));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key1, loc1), true);
+        sorted->unindex(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true);
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
-    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
 }
 
 TEST_F(SortedDataInterfaceTest, DupKeyCheckWithDeletedSecondEntry) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc2), true));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key1, loc2), true);
+        sorted->unindex(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc2), true);
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
-    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), key1));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
+    ASSERT_FALSE(dupKeyCheck(*sorted, opCtx(), recoveryUnit(), key1));
 }
 
 }  // namespace

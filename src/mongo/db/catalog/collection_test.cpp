@@ -342,10 +342,11 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     auto idxCatalog = coll->getIndexCatalog();
     auto idIndex = idxCatalog->findIdIndex(opCtx);
     auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, idIndex->getEntry(), BSON("_id" << 1));
+        opCtx, ru, coll, idIndex->getEntry(), BSON("_id" << 1));
     auto oldIndexRecordID = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
+        opCtx, ru, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(!oldRecordId.isNull());
     ASSERT_EQ(oldRecordId, oldIndexRecordID);
     {
@@ -357,8 +358,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     auto newDoc = BSON("_id" << 1 << "a" << 5);
     {
         WriteUnitOfWork wuow(opCtx);
-        Snapshotted<BSONObj> oldSnap(shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId(),
-                                     oldDoc);
+        Snapshotted<BSONObj> oldSnap(ru.getSnapshotId(), oldDoc);
         CollectionUpdateArgs args{oldDoc};
         collection_internal::updateDocument(opCtx,
                                             coll,
@@ -372,10 +372,10 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
+        opCtx, ru, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(indexRecordId.isNull());
     indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, userIdx->getEntry(), BSON("a" << 5));
+        opCtx, ru, coll, userIdx->getEntry(), BSON("a" << 5));
     ASSERT_EQ(indexRecordId, oldRecordId);
 }
 
@@ -399,8 +399,9 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
     auto idxCatalog = coll->getIndexCatalog();
     auto idIndex = idxCatalog->findIdIndex(opCtx);
     auto userIdx = idxCatalog->findIndexByName(opCtx, indexName);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     auto oldRecordId = idIndex->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, idIndex->getEntry(), BSON("_id" << 1));
+        opCtx, ru, coll, idIndex->getEntry(), BSON("_id" << 1));
     ASSERT_TRUE(!oldRecordId.isNull());
 
     auto newDoc = BSON("_id" << 1 << "a" << 5 << "b" << 32);
@@ -428,10 +429,10 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, userIdx->getEntry(), BSON("a" << 1));
+        opCtx, ru, coll, userIdx->getEntry(), BSON("a" << 1));
     ASSERT_TRUE(indexRecordId.isNull());
     indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
-        opCtx, coll, userIdx->getEntry(), BSON("a" << 5));
+        opCtx, ru, coll, userIdx->getEntry(), BSON("a" << 5));
     ASSERT_EQ(indexRecordId, oldRecordId);
 }
 

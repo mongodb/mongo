@@ -400,7 +400,12 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 writeConflictRetry(opCtx, "removingExtraIndexEntries", _validateState->nss(), [&] {
                     WriteUnitOfWork wunit(opCtx);
                     Status status = indexInfo->accessMethod->asSortedData()->removeKeys(
-                        opCtx, entry, {ks}, options, &numDeleted);
+                        opCtx,
+                        *shard_role_details::getRecoveryUnit(opCtx),
+                        entry,
+                        {ks},
+                        options,
+                        &numDeleted);
                     wunit.commit();
                 });
                 auto& indexResults = results->getIndexValidateResult(indexInfo->indexName);
@@ -988,7 +993,8 @@ void KeyStringIndexConsistency::_foundInconsistency(OperationContext* opCtx,
     // Print the metadata associated with the inconsistency.
     _validateState->getCollection()->getRecordStore()->printRecordMetadata(
         recordId, results.getRecordTimestampsPtr());
-    info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(opCtx, ks);
+    info.accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), ks);
 
     const BSONObj& indexKey = key_string::toBsonSafe(ks.getView(), info.ord, ks.getTypeBits());
     BSONObj rehydratedKey = _rehydrateKey(info.keyPattern, indexKey);

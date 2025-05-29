@@ -53,10 +53,14 @@ public:
                                   const std::string& uri);
 
     static StatusWith<int64_t> compact(OperationContext* opCtx,
+                                       WiredTigerRecoveryUnit& wtRu,
                                        const std::string& uri,
                                        const CompactOptions& options);
 
-    static bool isEmpty(OperationContext* opCtx, const std::string& uri, uint64_t tableId);
+    static bool isEmpty(OperationContext* opCtx,
+                        WiredTigerRecoveryUnit& wtRu,
+                        const std::string& uri,
+                        uint64_t tableId);
 
     static void validateStructure(WiredTigerRecoveryUnit&,
                                   const std::string& uri,

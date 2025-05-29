@@ -902,6 +902,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
             const IndexCatalogEntry* entry = _indexes[i].block->getEntry(opCtx, collection);
             Status status = _indexes[i].bulk->commit(
                 opCtx,
+                *shard_role_details::getRecoveryUnit(opCtx),
                 collection,
                 entry,
                 dupsAllowed,

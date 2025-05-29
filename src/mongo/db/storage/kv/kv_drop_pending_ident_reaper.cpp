@@ -205,7 +205,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                         "dropTimestamp"_attr = dropTimestamp);
         // Ident drops are non-transactional and cannot be rolled back. So this does not
         // need to be in a WriteUnitOfWork.
-        auto status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx),
+        auto status = _engine->dropIdent(*shard_role_details::getRecoveryUnit(opCtx),
                                          identName,
                                          ident::isCollectionIdent(identName),
                                          identInfo->onDrop);

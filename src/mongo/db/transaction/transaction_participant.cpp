@@ -496,7 +496,11 @@ void updateSessionEntry(OperationContext* opCtx,
         auto indexAccess = entry->accessMethod()->asSortedData();
         // Since we are looking up a key inside the _id index, create a key object consisting of
         // only the _id field.
-        recordId = indexAccess->findSingle(opCtx, collectionPtr, entry, toUpdateIdDoc);
+        recordId = indexAccess->findSingle(opCtx,
+                                           *shard_role_details::getRecoveryUnit(opCtx),
+                                           collectionPtr,
+                                           entry,
+                                           toUpdateIdDoc);
     }
 
     RecordData originalRecordData;

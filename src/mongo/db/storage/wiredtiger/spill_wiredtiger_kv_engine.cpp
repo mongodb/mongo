@@ -175,13 +175,13 @@ std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru)
     return _wtGetAllIdents(wtRu);
 }
 
-Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
+Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                           StringData ident,
                                           bool identHasSizeInfo,
                                           const StorageEngine::DropIdentCallback& onDrop) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
-    auto& wtRu = SpillRecoveryUnit::get(*ru);
+    auto& wtRu = SpillRecoveryUnit::get(ru);
     wtRu.getSessionNoTxn()->closeAllCursors(uri);
 
     WiredTigerSession session(_connection.get());

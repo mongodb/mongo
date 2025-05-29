@@ -79,7 +79,7 @@ public:
 
     std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
-    Status dropIdent(RecoveryUnit* ru,
+    Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
@@ -93,6 +93,7 @@ public:
     }
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
                                                                 StringData ident,

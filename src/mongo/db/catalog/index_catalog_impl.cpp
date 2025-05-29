@@ -647,22 +647,26 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     IndexDescriptor* desc = entry->descriptor();
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
     // In some cases, it may be necessary to update the index metadata in the storage engine in
     // order to obtain the correct SortedDataInterface. One such scenario is found in converting an
     // index to be unique.
     bool isUpdateMetadata = CreateIndexEntryFlags::kUpdateMetadata & flags;
     if (isUpdateMetadata) {
         bool isForceUpdateMetadata = CreateIndexEntryFlags::kForceUpdateMetadata & flags;
-        engine->getEngine()->alterIdentMetadata(*shard_role_details::getRecoveryUnit(opCtx),
-                                                ident,
-                                                desc->toIndexConfig(),
-                                                isForceUpdateMetadata);
+        engine->getEngine()->alterIdentMetadata(
+            ru, ident, desc->toIndexConfig(), isForceUpdateMetadata);
     }
 
     if (!frozen) {
         try {
-            entry->setAccessMethod(IndexAccessMethod::make(
-                opCtx, collection->ns(), collection->getCollectionOptions(), entry.get(), ident));
+            entry->setAccessMethod(IndexAccessMethod::make(opCtx,
+                                                           ru,
+                                                           collection->ns(),
+                                                           collection->getCollectionOptions(),
+                                                           entry.get(),
+                                                           ident));
         } catch (const ExceptionFor<ErrorCodes::NoSuchKey>& ex) {
             // Ready indexes should always exist in the storage engine, and if they're missing
             // something has gone significantly wrong.
@@ -1388,11 +1392,12 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
 
     invariant(released.get() == entry);
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
     // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
     auto engine = opCtx->getServiceContext()->getStorageEngine();
     const std::string ident = released->getIdent();
-    Status status = engine->getEngine()->dropIdent(
-        shard_role_details::getRecoveryUnit(opCtx), ident, /*identHasSizeInfo=*/false);
+    Status status = engine->getEngine()->dropIdent(ru, ident, /*identHasSizeInfo=*/false);
     if (!status.isOK()) {
         return status;
     }
@@ -1413,7 +1418,7 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     // Update the index entry state in preparation to rebuild the index.
     if (!entry->accessMethod()) {
         entry->setAccessMethod(IndexAccessMethod::make(
-            opCtx, collection->ns(), collection->getCollectionOptions(), entry, ident));
+            opCtx, ru, collection->ns(), collection->getCollectionOptions(), entry, ident));
     }
 
     entry->setIsFrozen(false);
@@ -1794,6 +1799,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
     int64_t keysDeleted = 0;
 
     auto status = index->accessMethod()->update(opCtx,
+                                                *shard_role_details::getRecoveryUnit(opCtx),
                                                 pooledBuilder,
                                                 oldDoc,
                                                 newDoc,
@@ -2051,7 +2057,8 @@ StatusWith<int64_t> IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
                     1,
                     "compacting index: {entry_descriptor}",
                     "entry_descriptor"_attr = *(entry->descriptor()));
-        auto status = entry->accessMethod()->compact(opCtx, options);
+        auto status = entry->accessMethod()->compact(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx), options);
         if (!status.isOK()) {
             LOGV2_ERROR(20377,
                         "Failed to compact index",

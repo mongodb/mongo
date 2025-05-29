@@ -1237,7 +1237,7 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
         const IndexDescriptor* descriptor = entry->descriptor();
         const IndexAccessMethod* iam = entry->accessMethod();
 
-        long long ds = iam->getSpaceUsedBytes(opCtx);
+        long long ds = iam->getSpaceUsedBytes(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 
         totalSize += ds;
         if (details) {
@@ -1265,7 +1265,8 @@ uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx)
     uint64_t totalSize = 0;
     while (indexIt->more()) {
         auto entry = indexIt->next();
-        totalSize += entry->accessMethod()->getFreeStorageBytes(opCtx);
+        totalSize += entry->accessMethod()->getFreeStorageBytes(
+            opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
     return totalSize;
 }

@@ -183,7 +183,11 @@ bool Helpers::findById(OperationContext* opCtx,
     const IndexCatalogEntry* entry = catalog->getEntry(desc);
     // TODO(SERVER-103399): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     auto recordId = entry->accessMethod()->asSortedData()->findSingle(
-        opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), entry, query["_id"].wrap());
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        CollectionPtr::CollectionPtr_UNSAFE(collection),
+        entry,
+        query["_id"].wrap());
     if (recordId.isNull())
         return false;
     result = collection->docFor(opCtx, recordId).value();
@@ -206,7 +210,11 @@ RecordId Helpers::findById(OperationContext* opCtx,
     uassert(13430, "no _id index", desc);
     const IndexCatalogEntry* entry = catalog->getEntry(desc);
     return entry->accessMethod()->asSortedData()->findSingle(
-        opCtx, collection, entry, idquery["_id"].wrap());
+        opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
+        collection,
+        entry,
+        idquery["_id"].wrap());
 }
 
 // Acquires necessary locks to read the collection with the given namespace. If this is an oplog

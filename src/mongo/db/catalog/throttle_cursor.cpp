@@ -83,13 +83,14 @@ boost::optional<Record> SeekableRecordThrottleCursor::next(OperationContext* opC
 
 SortedDataInterfaceThrottleCursor::SortedDataInterfaceThrottleCursor(
     OperationContext* opCtx, const SortedDataIndexAccessMethod* iam, DataThrottle* dataThrottle) {
-    _cursor = iam->newCursor(opCtx, /*forward=*/true);
+    _cursor = iam->newCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), /*forward=*/true);
     _dataThrottle = dataThrottle;
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(OperationContext* opCtx,
                                                                        std::span<const char> key) {
-    boost::optional<IndexKeyEntry> entry = _cursor->seek(key);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    boost::optional<IndexKeyEntry> entry = _cursor->seek(ru, key);
     if (entry) {
         const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
@@ -100,7 +101,8 @@ boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::seek(Operation
 
 boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::seekForKeyString(
     OperationContext* opCtx, std::span<const char> key) {
-    boost::optional<KeyStringEntry> entry = _cursor->seekForKeyString(key);
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    boost::optional<KeyStringEntry> entry = _cursor->seekForKeyString(ru, key);
     if (entry) {
         const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
@@ -110,7 +112,8 @@ boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::seekForKeyStr
 }
 
 boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::next(OperationContext* opCtx) {
-    boost::optional<IndexKeyEntry> entry = _cursor->next();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    boost::optional<IndexKeyEntry> entry = _cursor->next(ru);
     if (entry) {
         const int64_t dataSize = entry->key.objsize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);
@@ -121,7 +124,8 @@ boost::optional<IndexKeyEntry> SortedDataInterfaceThrottleCursor::next(Operation
 
 boost::optional<KeyStringEntry> SortedDataInterfaceThrottleCursor::nextKeyString(
     OperationContext* opCtx) {
-    boost::optional<KeyStringEntry> entry = _cursor->nextKeyString();
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    boost::optional<KeyStringEntry> entry = _cursor->nextKeyString(ru);
     if (entry) {
         const int64_t dataSize = entry->keyString.getSize() + sizeof(entry->loc);
         _dataThrottle->awaitIfNeeded(opCtx, dataSize);

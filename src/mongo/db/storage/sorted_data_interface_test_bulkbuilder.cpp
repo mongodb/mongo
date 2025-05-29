@@ -45,17 +45,17 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc1));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 /*
@@ -68,38 +68,38 @@ TEST_F(SortedDataInterfaceTest, BuilderAddKeyString) {
     key_string::Builder keyString1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(keyString1.getValueCopy());
+        builder->addKey(recoveryUnit(), keyString1.getValueCopy());
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add a reserved RecordId using a bulk builder.
 TEST_F(SortedDataInterfaceTest, BuilderAddKeyWithReservedRecordIdLong) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         RecordId reservedLoc(record_id_helpers::reservedIdFor(
             record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
         ASSERT(record_id_helpers::isReserved(reservedLoc));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, reservedLoc));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add a compound key using a bulk builder.
@@ -107,17 +107,17 @@ TEST_F(SortedDataInterfaceTest, BuilderAddCompoundKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add the same key multiple times using a bulk builder results in an invalid index with duplicates.
@@ -125,18 +125,18 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
-        builder->addKey(makeKeyString(sorted.get(), key1, loc2));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc2));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add the same key multiple times using a bulk builder and verify that
@@ -145,18 +145,18 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKeyWithDupsAllowed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
-        builder->addKey(makeKeyString(sorted.get(), key1, loc2));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc2));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 /*
@@ -172,18 +172,18 @@ TEST_F(SortedDataInterfaceTest, BuilderAddSameKeyStringWithDupsAllowed) {
     key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(keyStringLoc1.getValueCopy());
-        builder->addKey(keyStringLoc2.getValueCopy());
+        builder->addKey(recoveryUnit(), keyStringLoc1.getValueCopy());
+        builder->addKey(recoveryUnit(), keyStringLoc2.getValueCopy());
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add multiple keys using a bulk builder.
@@ -191,19 +191,19 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleKeys) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), key1, loc1));
-        builder->addKey(makeKeyString(sorted.get(), key2, loc2));
-        builder->addKey(makeKeyString(sorted.get(), key3, loc3));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key1, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key2, loc2));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), key3, loc3));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 /*
@@ -220,19 +220,19 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleKeyStrings) {
     key_string::Builder keyString3(
         sorted->getKeyStringVersion(), key3, sorted->getOrdering(), loc3);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(keyString1.getValueCopy());
-        builder->addKey(keyString2.getValueCopy());
-        builder->addKey(keyString3.getValueCopy());
+        builder->addKey(recoveryUnit(), keyString1.getValueCopy());
+        builder->addKey(recoveryUnit(), keyString2.getValueCopy());
+        builder->addKey(recoveryUnit(), keyString3.getValueCopy());
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Add multiple compound keys using a bulk builder.
@@ -240,21 +240,21 @@ TEST_F(SortedDataInterfaceTest, BuilderAddMultipleCompoundKeys) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
-        const auto builder(sorted->makeBulkBuilder(opCtx()));
+        const auto builder(sorted->makeBulkBuilder(opCtx(), recoveryUnit()));
 
         StorageWriteTransaction txn(recoveryUnit());
-        builder->addKey(makeKeyString(sorted.get(), compoundKey1a, loc1));
-        builder->addKey(makeKeyString(sorted.get(), compoundKey1b, loc2));
-        builder->addKey(makeKeyString(sorted.get(), compoundKey1c, loc4));
-        builder->addKey(makeKeyString(sorted.get(), compoundKey2b, loc3));
-        builder->addKey(makeKeyString(sorted.get(), compoundKey3a, loc5));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey1b, loc2));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey1c, loc4));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc3));
+        builder->addKey(recoveryUnit(), makeKeyString(sorted.get(), compoundKey3a, loc5));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 }  // namespace

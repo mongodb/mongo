@@ -163,12 +163,14 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     InsertDeleteOptions options;
     options.dupsAllowed = !index->descriptor()->unique();
     int64_t numInserted = 0;
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
     Status insertStatus = Status::OK();
     writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss, [&] {
         WriteUnitOfWork wunit(opCtx);
         insertStatus =
             accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
+                                                           ru,
                                                            coll,
                                                            index,
                                                            {ks},
@@ -228,7 +230,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                     writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss, [&] {
                         WriteUnitOfWork wunit(opCtx);
                         insertStatus = accessMethod->insertKeysAndUpdateMultikeyPaths(
-                            opCtx, coll, index, {ks}, {}, {}, options, nullptr, nullptr);
+                            opCtx, ru, coll, index, {ks}, {}, {}, options, nullptr, nullptr);
                         wunit.commit();
                     });
                     if (!insertStatus.isOK()) {

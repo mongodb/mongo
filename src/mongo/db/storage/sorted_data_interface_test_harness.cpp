@@ -71,7 +71,7 @@ void insertToIndex(OperationContext* opCtx,
     StorageWriteTransaction txn(ru);
     for (auto&& entry : toInsert) {
         ASSERT_SDI_INSERT_OK(
-            index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
+            index->insert(opCtx, ru, makeKeyString(index, entry.key, entry.loc), dupsAllowed));
     }
     txn.commit();
 }
@@ -82,7 +82,7 @@ void removeFromIndex(OperationContext* opCtx,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     StorageWriteTransaction txn(ru);
     for (auto&& entry : toRemove) {
-        index->unindex(opCtx, makeKeyString(index, entry.key, entry.loc), true);
+        index->unindex(opCtx, ru, makeKeyString(index, entry.key, entry.loc), true);
     }
     txn.commit();
 }

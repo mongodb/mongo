@@ -127,9 +127,10 @@ public:
      * builder.
      *
      * @param opCtx the transaction under which keys are added to 'this' index
+     * @param ru the RecoveryUnit for the current operation.
      */
-    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(
-        OperationContext* opCtx) = 0;
+    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                        RecoveryUnit& ru) = 0;
 
     /**
      * Inserts the given key into the index, which must have a RecordId appended to the end. Returns
@@ -141,6 +142,7 @@ public:
      */
     virtual std::variant<Status, DuplicateKey> insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
@@ -154,6 +156,7 @@ public:
      *        match, false otherwise
      */
     virtual void unindex(OperationContext* opCtx,
+                         RecoveryUnit& ru,
                          const key_string::View& keyString,
                          bool dupsAllowed) = 0;
 
@@ -163,6 +166,7 @@ public:
      * This will not accept a KeyString with a Discriminator other than kInclusive.
      */
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               std::span<const char> keyString) const = 0;
 
     /**
@@ -173,6 +177,7 @@ public:
      * @param opCtx the transaction under which this operation takes place
      */
     virtual boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                                      RecoveryUnit& ru,
                                                       const key_string::View& keyString) = 0;
 
     /**
@@ -180,7 +185,9 @@ public:
      * indexed record store supports compaction-in-place.
      * Returns an estimated number of bytes when doing a dry run.
      */
-    virtual StatusWith<int64_t> compact(OperationContext* opCtx, const CompactOptions& options) {
+    virtual StatusWith<int64_t> compact(OperationContext* opCtx,
+                                        RecoveryUnit& ru,
+                                        const CompactOptions& options) {
         return Status::OK();
     }
 
@@ -194,9 +201,12 @@ public:
      * structure.
      */
     virtual IndexValidateResults validate(
-        OperationContext* opCtx, const CollectionValidation::ValidationOptions& options) const = 0;
+        OperationContext* opCtx,
+        RecoveryUnit& ru,
+        const CollectionValidation::ValidationOptions& options) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
+                                   RecoveryUnit& ru,
                                    BSONObjBuilder* output,
                                    double scale) const = 0;
 
@@ -208,28 +218,29 @@ public:
      *
      * @see IndexAccessMethod::getSpaceUsedBytes
      */
-    virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
+    virtual long long getSpaceUsedBytes(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
     /**
      * The number of unused free bytes consumed by this index on disk.
      */
-    virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
+    virtual long long getFreeStorageBytes(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
     /**
      * Return true if 'this' index is empty, and false otherwise.
      */
-    virtual bool isEmpty(OperationContext* opCtx) = 0;
+    virtual bool isEmpty(OperationContext* opCtx, RecoveryUnit& ru) = 0;
 
     /**
      * Prints any storage engine provided metadata for the index entry with key 'keyString'.
      */
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
+                                         RecoveryUnit& ru,
                                          const key_string::View& keyString) const = 0;
 
     /**
      * Return the number of entries in 'this' index.
      */
-    virtual int64_t numEntries(OperationContext* opCtx) const = 0;
+    virtual int64_t numEntries(OperationContext* opCtx, RecoveryUnit& ru) const = 0;
 
     /*
      * Return the KeyString version for 'this' index.
@@ -325,9 +336,9 @@ public:
          * calling a next() or seek() variant, a save(), or when the cursor is destructed.
          */
         virtual boost::optional<IndexKeyEntry> next(
-            KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
-        virtual boost::optional<KeyStringEntry> nextKeyString() = 0;
-        virtual SortedDataKeyValueView nextKeyValueView() = 0;
+            RecoveryUnit& ru, KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
+        virtual boost::optional<KeyStringEntry> nextKeyString(RecoveryUnit& ru) = 0;
+        virtual SortedDataKeyValueView nextKeyValueView(RecoveryUnit& ru) = 0;
 
         //
         // Seeking
@@ -340,7 +351,7 @@ public:
          * obtained from BuilderBase::finishAndGetBuffer().
          */
         virtual boost::optional<KeyStringEntry> seekForKeyString(
-            std::span<const char> keyString) = 0;
+            RecoveryUnit& ru, std::span<const char> keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the SortedDataKeyValueView.
@@ -351,7 +362,8 @@ public:
          * Returns unowned data, which is invalidated upon calling a next() or seek()
          * variant, a save(), or when the cursor is destructed.
          */
-        virtual SortedDataKeyValueView seekForKeyValueView(std::span<const char> keyString) = 0;
+        virtual SortedDataKeyValueView seekForKeyValueView(RecoveryUnit& ru,
+                                                           std::span<const char> keyString) = 0;
 
         /**
          * Seeks to the provided keyString and returns the IndexKeyEntry.
@@ -360,6 +372,7 @@ public:
          * obtained from BuilderBase::finishAndGetBuffer().
          */
         virtual boost::optional<IndexKeyEntry> seek(
+            RecoveryUnit& ru,
             std::span<const char> keyString,
             KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;
 
@@ -370,7 +383,8 @@ public:
          * The keyString should not have RecordId or TypeBits encoded, which is guaranteed if
          * obtained from BuilderBase::finishAndGetBuffer().
          */
-        virtual boost::optional<RecordId> seekExact(std::span<const char> keyString) = 0;
+        virtual boost::optional<RecordId> seekExact(RecoveryUnit& ru,
+                                                    std::span<const char> keyString) = 0;
 
         //
         // Saving and restoring state
@@ -407,7 +421,7 @@ public:
          *
          * This handles restoring after either save() or saveUnpositioned().
          */
-        virtual void restore() = 0;
+        virtual void restore(RecoveryUnit& ru) = 0;
 
         /**
          * Detaches from the OperationContext. Releases storage-engine resources, unless
@@ -455,6 +469,7 @@ public:
      * Implementations can assume that 'this' index outlives all cursors it produces.
      */
     virtual std::unique_ptr<Cursor> newCursor(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               bool isForward = true) const = 0;
 
     //
@@ -489,7 +504,7 @@ public:
      * transactionally. Other storage engines do not perform inserts transactionally and will ignore
      * any parent WriteUnitOfWork.
      */
-    virtual void addKey(const key_string::View& keyString) = 0;
+    virtual void addKey(RecoveryUnit& ru, const key_string::View& keyString) = 0;
 };
 
 /**

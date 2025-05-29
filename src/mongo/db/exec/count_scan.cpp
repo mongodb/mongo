@@ -128,9 +128,10 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         expCtx(),
         "CountScan",
         [&] {
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
             if (needInit) {
                 // First call to work().  Perform cursor init.
-                _cursor = indexAccessMethod()->newCursor(opCtx());
+                _cursor = indexAccessMethod()->newCursor(opCtx(), ru);
                 _cursor->setEndPosition(_endKey, _endKeyInclusive);
 
                 key_string::Builder builder(
@@ -141,10 +142,10 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
                     true, /* forward */
                     _startKeyInclusive,
                     builder);
-                entry = _cursor->seek(keyStringForSeek,
-                                      SortedDataInterface::Cursor::KeyInclusion::kExclude);
+                entry = _cursor->seek(
+                    ru, keyStringForSeek, SortedDataInterface::Cursor::KeyInclusion::kExclude);
             } else {
-                entry = _cursor->next(SortedDataInterface::Cursor::KeyInclusion::kExclude);
+                entry = _cursor->next(ru, SortedDataInterface::Cursor::KeyInclusion::kExclude);
             }
             return PlanStage::ADVANCED;
         },
@@ -192,8 +193,9 @@ void CountScan::doSaveStateRequiresIndex() {
 }
 
 void CountScan::doRestoreStateRequiresIndex() {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
     if (_cursor)
-        _cursor->restore();
+        _cursor->restore(ru);
 }
 
 void CountScan::doDetachFromOperationContext() {

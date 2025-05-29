@@ -380,7 +380,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, TableCreation) {
         recordStores[i].reset();
 
         auto ident = "a." + std::to_string(i + 1);
-        ASSERT_OK(_kvEngine->dropIdent(&wtRu, ident, false));
+        ASSERT_OK(_kvEngine->dropIdent(wtRu, ident, false));
         ASSERT_FALSE(_kvEngine->hasIdent(wtRu, ident));
     }
 

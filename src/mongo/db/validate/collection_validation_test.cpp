@@ -365,41 +365,43 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         auto entry = indexCatalog->getEntry(descriptor);
         ASSERT(entry) << "Cannot look up index catalog entry for index a_1";
 
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+
         auto sortedDataInterface = entry->accessMethod()->asSortedData()->getSortedDataInterface();
-        ASSERT_FALSE(sortedDataInterface->isEmpty(opCtx)) << "index a_1 should not be empty";
+        ASSERT_FALSE(sortedDataInterface->isEmpty(opCtx, ru)) << "index a_1 should not be empty";
 
         // Check key in index for only document.
         auto first = makeFirstKeyString(*sortedDataInterface);
         auto firstKeyString = first.getView();
         key_string::Value keyStringWithRecordId;
         {
-            auto cursor = sortedDataInterface->newCursor(opCtx);
-            auto indexEntry = cursor->seekForKeyString(firstKeyString);
+            auto cursor = sortedDataInterface->newCursor(opCtx, ru);
+            auto indexEntry = cursor->seekForKeyString(ru, firstKeyString);
             ASSERT(indexEntry);
             ASSERT(cursor->isRecordIdAtEndOfKeyString());
             keyStringWithRecordId = indexEntry->keyString;
-            ASSERT_FALSE(cursor->nextKeyString());
+            ASSERT_FALSE(cursor->nextKeyString(ru));
         }
 
         // Replace key with old format (without record id).
         {
             WriteUnitOfWork wuow(opCtx);
             bool dupsAllowed = false;
-            sortedDataInterface->unindex(opCtx, keyStringWithRecordId, dupsAllowed);
+            sortedDataInterface->unindex(opCtx, ru, keyStringWithRecordId, dupsAllowed);
             FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
             ASSERT_SDI_INSERT_OK(
-                sortedDataInterface->insert(opCtx, keyStringWithRecordId, dupsAllowed));
+                sortedDataInterface->insert(opCtx, ru, keyStringWithRecordId, dupsAllowed));
             wuow.commit();
         }
 
         // Confirm that key in index is in old format.
         {
-            auto cursor = sortedDataInterface->newCursor(opCtx);
-            auto indexEntry = cursor->seekForKeyString(firstKeyString);
+            auto cursor = sortedDataInterface->newCursor(opCtx, ru);
+            auto indexEntry = cursor->seekForKeyString(ru, firstKeyString);
             ASSERT(indexEntry);
             ASSERT_FALSE(cursor->isRecordIdAtEndOfKeyString());
             ASSERT_EQ(indexEntry->keyString.compareWithoutRecordIdLong(keyStringWithRecordId), 0);
-            ASSERT_FALSE(cursor->nextKeyString());
+            ASSERT_FALSE(cursor->nextKeyString(ru));
         }
     }
 

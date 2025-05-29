@@ -179,7 +179,8 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
         [&]() -> std::set<FieldRef> {
             stats->numSeeks = 0;
             stats->keysExamined = 0;
-            auto cursor = wam->newCursor(opCtx);
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            auto cursor = wam->newCursor(opCtx, ru);
 
             constexpr int kForward = 1;
             const auto keyPattern = buildIndexBoundsKeyPattern(entry->descriptor()->keyPattern());
@@ -192,8 +193,9 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
             std::set<FieldRef> multikeyPaths{};
             key_string::Builder builder(wam->getSortedDataInterface()->getKeyStringVersion(),
                                         wam->getSortedDataInterface()->getOrdering());
-            auto entry = cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                seekPoint, kForward, builder));
+            auto entry = cursor->seek(ru,
+                                      IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                          seekPoint, kForward, builder));
 
             ++stats->numSeeks;
             while (entry) {
@@ -202,7 +204,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
                 switch (checker.checkKey(entry->key, &seekPoint)) {
                     case IndexBoundsChecker::VALID:
                         multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
-                        entry = cursor->next();
+                        entry = cursor->next(ru);
                         break;
 
                     case IndexBoundsChecker::MUST_ADVANCE: {
@@ -211,8 +213,9 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
                             wam->getSortedDataInterface()->getKeyStringVersion(),
                             wam->getSortedDataInterface()->getOrdering());
                         entry =
-                            cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                                seekPoint, kForward, builder));
+                            cursor->seek(ru,
+                                         IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                             seekPoint, kForward, builder));
                         break;
                     }
 
@@ -396,7 +399,8 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
 
             const WildcardAccessMethod* wam =
                 static_cast<const WildcardAccessMethod*>(entry->accessMethod());
-            auto cursor = wam->newCursor(opCtx);
+            auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+            auto cursor = wam->newCursor(opCtx, ru);
 
             const auto [metadataKeyRangeBegin, metadataKeyRangeEnd] =
                 buildMetadataKeyRange(entry->descriptor()->keyPattern());
@@ -411,7 +415,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
                 true, /* forward */
                 inclusive,
                 builder);
-            auto entry = cursor->seek(keyStringForSeek);
+            auto entry = cursor->seek(ru, keyStringForSeek);
             ++stats->numSeeks;
 
             // Iterate the cursor, copying the multikey paths into an in-memory set.
@@ -420,7 +424,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
                 ++stats->keysExamined;
                 multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
 
-                entry = cursor->next();
+                entry = cursor->next(ru);
             }
 
             return multikeyPaths;

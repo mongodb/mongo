@@ -383,6 +383,7 @@ public:
         const boost::optional<mongo::BSONObj>& storageEngineIndexOptions) override;
 
     std::unique_ptr<SortedDataInterface> getSortedDataInterface(OperationContext* opCtx,
+                                                                RecoveryUnit& ru,
                                                                 const NamespaceString& nss,
                                                                 const UUID& uuid,
                                                                 StringData ident,
@@ -415,7 +416,7 @@ public:
      */
     Status dropSortedDataInterface(RecoveryUnit&, StringData ident) override;
 
-    Status dropIdent(RecoveryUnit* ru,
+    Status dropIdent(RecoveryUnit& ru,
                      StringData ident,
                      bool identHasSizeInfo,
                      const StorageEngine::DropIdentCallback& onDrop = nullptr) override;

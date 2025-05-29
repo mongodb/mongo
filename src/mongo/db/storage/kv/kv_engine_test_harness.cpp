@@ -329,20 +329,17 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     std::unique_ptr<SortedDataInterface> sorted;
     {
         auto opCtx = _makeOperationContext(engine);
-        ASSERT_OK(
-            engine->createSortedDataInterface(*shard_role_details::getRecoveryUnit(opCtx.get()),
-                                              kNss,
-                                              kUUID,
-                                              kIdent,
-                                              config,
-                                              boost::none /* storageEngineIndexOptions */));
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        ASSERT_OK(engine->createSortedDataInterface(
+            ru, kNss, kUUID, kIdent, config, boost::none /* storageEngineIndexOptions */));
         sorted = engine->getSortedDataInterface(
-            opCtx.get(), kNss, kUUID, kIdent, config, kRecordStoreOptions.keyFormat);
+            opCtx.get(), ru, kNss, kUUID, kIdent, config, kRecordStoreOptions.keyFormat);
         ASSERT(sorted);
     }
 
     {
         auto opCtx = _makeOperationContext(engine);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
         const RecordId recordId(6, 4);
@@ -350,14 +347,15 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
             key_string::HeapBuilder(
                 sorted->getKeyStringVersion(), BSON("" << 5), sorted->getOrdering(), recordId)
                 .release();
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(), keyString, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx.get(), ru, keyString, true));
         uow.commit();
     }
 
     {
         auto opCtx = _makeOperationContext(engine);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx.get(), ru));
     }
 }
 
@@ -401,7 +399,7 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(engine->dropIdent(
-            shard_role_details::getRecoveryUnit(opCtx.get()), ident, /*identHasSizeInfo=*/true));
+            *shard_role_details::getRecoveryUnit(opCtx.get()), ident, /*identHasSizeInfo=*/true));
         wuow.commit();
     }
 }

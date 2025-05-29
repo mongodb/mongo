@@ -100,6 +100,7 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
  */
 std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
     OperationContext* opCtx,
+    RecoveryUnit& ru,
     const NamespaceString& nss,
     const CollectionOptions& collectionOptions,
     IndexCatalogEntry* entry,
@@ -111,7 +112,7 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
         collectionOptions.clusteredIndex.has_value() ? KeyFormat::String : KeyFormat::Long;
     auto makeSDI = [&] {
         return engine->getSortedDataInterface(
-            opCtx, nss, *collectionOptions.uuid, ident, desc->toIndexConfig(), keyFormat);
+            opCtx, ru, nss, *collectionOptions.uuid, ident, desc->toIndexConfig(), keyFormat);
     };
     const std::string& type = desc->getAccessMethodName();
 
@@ -321,6 +322,7 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
 }
 
 Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
+                                           RecoveryUnit& ru,
                                            SharedBufferFragmentBuilder& pooledBufferBuilder,
                                            const BSONObj& oldDoc,
                                            const BSONObj& newDoc,
@@ -355,12 +357,13 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                             options,
                                             numInserted);
     } else {
-        return doUpdate(opCtx, coll, entry, updateTicket, numInserted, numDeleted);
+        return doUpdate(opCtx, ru, coll, entry, updateTicket, numInserted, numDeleted);
     }
 }
 
 Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     OperationContext* opCtx,
+    RecoveryUnit& ru,
     const CollectionPtr& coll,
     const IndexCatalogEntry* entry,
     const KeyStringSet& keys,
@@ -372,6 +375,7 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     IncludeDuplicateRecordId includeDuplicateRecordId) {
     // Insert the specified data keys into the index.
     auto status = insertKeys(opCtx,
+                             ru,
                              coll,
                              entry,
                              keys,
@@ -395,6 +399,7 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
 }
 
 Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
+                                               RecoveryUnit& ru,
                                                const CollectionPtr& coll,
                                                const IndexCatalogEntry* entry,
                                                const KeyStringSet& keys,
@@ -429,7 +434,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
         auto result =
-            _newInterface->insert(opCtx, keyString, dupsAllowed, includeDuplicateRecordId);
+            _newInterface->insert(opCtx, ru, keyString, dupsAllowed, includeDuplicateRecordId);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
@@ -438,7 +443,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
             invariant(unique);
 
             result = _newInterface->insert(
-                opCtx, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
+                opCtx, ru, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
             if (auto status = std::get_if<Status>(&result)) {
                 if (status->isOK() && onDuplicateKey) {
                     result = onDuplicateKey(keyString);
@@ -464,12 +469,13 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
 }
 
 void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
+                                               RecoveryUnit& ru,
                                                const IndexCatalogEntry* entry,
                                                const key_string::Value& keyString,
                                                bool dupsAllowed) const {
 
     try {
-        _newInterface->unindex(opCtx, keyString, dupsAllowed);
+        _newInterface->unindex(opCtx, ru, keyString, dupsAllowed);
     } catch (AssertionException& e) {
         if (e.code() == ErrorCodes::DataCorruptionDetected) {
             // DataCorruptionDetected errors are expected to have logged an error and added an entry
@@ -490,18 +496,19 @@ void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
 }
 
 std::unique_ptr<SortedDataInterface::Cursor> SortedDataIndexAccessMethod::newCursor(
-    OperationContext* opCtx, bool isForward) const {
-    return _newInterface->newCursor(opCtx, isForward);
+    OperationContext* opCtx, RecoveryUnit& ru, bool isForward) const {
+    return _newInterface->newCursor(opCtx, ru, isForward);
 }
 
 Status SortedDataIndexAccessMethod::removeKeys(OperationContext* opCtx,
+                                               RecoveryUnit& ru,
                                                const IndexCatalogEntry* entry,
                                                const KeyStringSet& keys,
                                                const InsertDeleteOptions& options,
                                                int64_t* numDeleted) const {
 
     for (const auto& key : keys) {
-        removeOneKey(opCtx, entry, key, options.dupsAllowed);
+        removeOneKey(opCtx, ru, entry, key, options.dupsAllowed);
     }
 
     *numDeleted = keys.size();
@@ -513,6 +520,7 @@ Status SortedDataIndexAccessMethod::initializeAsEmpty() {
 }
 
 RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
+                                                 RecoveryUnit& ru,
                                                  const CollectionPtr& collection,
                                                  const IndexCatalogEntry* entry,
                                                  const BSONObj& requestedKey) const {
@@ -544,12 +552,12 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                                                     getSortedDataInterface()->getOrdering(),
                                                     actualKey.getTypeBits()) ==
                     key_string::Discriminator::kInclusive);
-            return _newInterface->findLoc(opCtx, actualKey.getView());
+            return _newInterface->findLoc(opCtx, ru, actualKey.getView());
         } else {
             key_string::Builder requestedKeyString(getSortedDataInterface()->getKeyStringVersion(),
                                                    requestedKey,
                                                    getSortedDataInterface()->getOrdering());
-            return _newInterface->findLoc(opCtx, requestedKeyString.finishAndGetBuffer());
+            return _newInterface->findLoc(opCtx, ru, requestedKeyString.finishAndGetBuffer());
         }
     }();
 
@@ -562,26 +570,31 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
 }
 
 IndexValidateResults SortedDataIndexAccessMethod::validate(
-    OperationContext* opCtx, const CollectionValidation::ValidationOptions& options) const {
-    return _newInterface->validate(opCtx, options);
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const CollectionValidation::ValidationOptions& options) const {
+    return _newInterface->validate(opCtx, ru, options);
 }
 
-int64_t SortedDataIndexAccessMethod::numKeys(OperationContext* opCtx) const {
-    return _newInterface->numEntries(opCtx);
+int64_t SortedDataIndexAccessMethod::numKeys(OperationContext* opCtx, RecoveryUnit& ru) const {
+    return _newInterface->numEntries(opCtx, ru);
 }
 
 bool SortedDataIndexAccessMethod::appendCustomStats(OperationContext* opCtx,
+                                                    RecoveryUnit& ru,
                                                     BSONObjBuilder* output,
                                                     double scale) const {
-    return _newInterface->appendCustomStats(opCtx, output, scale);
+    return _newInterface->appendCustomStats(opCtx, ru, output, scale);
 }
 
-long long SortedDataIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx) const {
-    return _newInterface->getSpaceUsedBytes(opCtx);
+long long SortedDataIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx,
+                                                         RecoveryUnit& ru) const {
+    return _newInterface->getSpaceUsedBytes(opCtx, ru);
 }
 
-long long SortedDataIndexAccessMethod::getFreeStorageBytes(OperationContext* opCtx) const {
-    return _newInterface->getFreeStorageBytes(opCtx);
+long long SortedDataIndexAccessMethod::getFreeStorageBytes(OperationContext* opCtx,
+                                                           RecoveryUnit& ru) const {
+    return _newInterface->getFreeStorageBytes(opCtx, ru);
 }
 
 pair<KeyStringSet, KeyStringSet> SortedDataIndexAccessMethod::setDifference(
@@ -679,6 +692,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
 }
 
 Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
+                                             RecoveryUnit& ru,
                                              const CollectionPtr& coll,
                                              const IndexCatalogEntry* entry,
                                              const UpdateTicket& ticket,
@@ -698,7 +712,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
     }
 
     for (const auto& remKey : ticket.removed) {
-        _newInterface->unindex(opCtx, remKey, ticket.dupsAllowed);
+        _newInterface->unindex(opCtx, ru, remKey, ticket.dupsAllowed);
     }
 
     // Add all new data keys into the index.
@@ -706,7 +720,7 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
         bool dupsAllowed =
             (!entry->descriptor()->prepareUnique() || !opCtx->isEnforcingConstraints()) &&
             ticket.dupsAllowed;
-        auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
+        auto result = _newInterface->insert(opCtx, ru, keyString, dupsAllowed);
         if (auto duplicate = std::get_if<SortedDataInterface::DuplicateKey>(&result)) {
             return buildDupKeyErrorStatus(duplicate->key,
                                           coll->ns(),
@@ -735,8 +749,9 @@ Status SortedDataIndexAccessMethod::doUpdate(OperationContext* opCtx,
 }
 
 StatusWith<int64_t> SortedDataIndexAccessMethod::compact(OperationContext* opCtx,
+                                                         RecoveryUnit& ru,
                                                          const CompactOptions& options) {
-    return this->_newInterface->compact(opCtx, options);
+    return this->_newInterface->compact(opCtx, ru, options);
 }
 
 std::shared_ptr<Ident> SortedDataIndexAccessMethod::getSharedIdent() const {
@@ -777,10 +792,12 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
                                        getSortedDataInterface()->getKeyStringVersion(),
                                        getSortedDataInterface()->rsKeyFormat());
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     const KeyStringSet keySet{keyString};
     if (opType == IndexBuildInterceptor::Op::kInsert) {
         int64_t numInserted;
         auto status = insertKeysAndUpdateMultikeyPaths(opCtx,
+                                                       ru,
                                                        coll,
                                                        entry,
                                                        {keySet.begin(), keySet.end()},
@@ -794,19 +811,19 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
 
         *keysInserted += numInserted;
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
+        ru.onRollback(
             [keysInserted, numInserted](OperationContext*) { *keysInserted -= numInserted; });
     } else {
         invariant(opType == IndexBuildInterceptor::Op::kDelete);
         int64_t numDeleted;
-        Status s = removeKeys(opCtx, entry, {keySet.begin(), keySet.end()}, options, &numDeleted);
+        Status s =
+            removeKeys(opCtx, ru, entry, {keySet.begin(), keySet.end()}, options, &numDeleted);
         if (!s.isOK()) {
             return s;
         }
 
         *keysDeleted += numDeleted;
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
+        ru.onRollback([keysDeleted, numDeleted](OperationContext*) { *keysDeleted -= numDeleted; });
     }
     return Status::OK();
 }
@@ -916,6 +933,7 @@ public:
                         const RecordIdHandlerFn& onDuplicateRecord);
 
     Status commit(OperationContext* opCtx,
+                  RecoveryUnit& ru,
                   const CollectionPtr& collection,
                   const IndexCatalogEntry* entry,
                   bool dupsAllowed,
@@ -1169,6 +1187,7 @@ bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
 
 Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
     OperationContext* opCtx,
+    RecoveryUnit& ru,
     const CollectionPtr& collection,
     const IndexCatalogEntry* entry,
     bool dupsAllowed,
@@ -1178,7 +1197,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
     Timer timer;
 
     _ns = entry->getNSSFromCatalog(opCtx);
-    auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx);
+    auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, ru);
     auto it = finalizeSort();
 
     ProgressMeterHolder pm;
@@ -1243,7 +1262,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
         try {
             writeConflictRetry(opCtx, "addingKey", _ns, [&] {
                 WriteUnitOfWork wunit(opCtx);
-                builder->addKey(data.first);
+                builder->addKey(ru, data.first);
                 wunit.commit();
             });
         } catch (DBException& e) {
@@ -1410,6 +1429,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         int64_t numInserted = 0;
         status = insertKeysAndUpdateMultikeyPaths(
             opCtx,
+            *shard_role_details::getRecoveryUnit(opCtx),
             coll,
             entry,
             keys,
@@ -1465,8 +1485,9 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On'.
     options.dupsAllowed = options.dupsAllowed || checkRecordId == CheckRecordId::On;
 
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     int64_t removed = 0;
-    Status status = removeKeys(opCtx, entry, keys, options, &removed);
+    Status status = removeKeys(opCtx, ru, entry, keys, options, &removed);
 
     if (!status.isOK()) {
         LOGV2(20362,

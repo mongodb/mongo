@@ -44,31 +44,31 @@ TEST_F(SortedDataInterfaceTest, IsEmpty) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc3), false));
         txn.commit();
     }
 
-    ASSERT(!sorted->isEmpty(opCtx()));
+    ASSERT(!sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key1, loc1), false);
-        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key2, loc2), false);
-        sorted->unindex(opCtx(), makeKeyString(sorted.get(), key3, loc3), false);
-        ASSERT(sorted->isEmpty(opCtx()));
+        sorted->unindex(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false);
+        sorted->unindex(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), false);
+        sorted->unindex(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc3), false);
+        ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
         txn.commit();
     }
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 }
 
 }  // namespace

@@ -130,10 +130,10 @@ public:
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)->getCatalogId();
         std::string indexIdent =
             _storageEngine->getMDBCatalog()->getIndexIdent(opCtx, catalogId, indexName);
-        return dropIdent(shard_role_details::getRecoveryUnit(opCtx), indexIdent, false);
+        return dropIdent(*shard_role_details::getRecoveryUnit(opCtx), indexIdent, false);
     }
 
-    Status dropIdent(RecoveryUnit* ru, StringData ident, bool identHasSizeInfo) {
+    Status dropIdent(RecoveryUnit& ru, StringData ident, bool identHasSizeInfo) {
         return _storageEngine->getEngine()->dropIdent(ru, ident, identHasSizeInfo);
     }
 

@@ -109,15 +109,13 @@ public:
                                                   isLogged);
         ASSERT_OK(result.getStatus());
 
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
         invariant(Status::OK() ==
-                  WiredTigerIndex::create(
-                      WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
-                      uri,
-                      result.getValue()));
+                  WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
-            opCtx, uri, UUID::gen(), "" /* ident */, config, isLogged);
+            opCtx, ru, uri, UUID::gen(), "" /* ident */, config, isLogged);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(OperationContext* opCtx,
@@ -152,16 +150,15 @@ public:
             WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
         ASSERT_OK(result.getStatus());
 
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
         invariant(Status::OK() ==
-                  WiredTigerIndex::create(
-                      WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)),
-                      uri,
-                      result.getValue()));
+                  WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(
                 opCtx,
+                ru,
                 uri,
                 UUID::gen(),
                 "" /* ident */,
@@ -172,6 +169,7 @@ public:
         }
         return std::make_unique<WiredTigerIndexStandard>(
             opCtx,
+            ru,
             uri,
             UUID::gen(),
             "" /* ident */,

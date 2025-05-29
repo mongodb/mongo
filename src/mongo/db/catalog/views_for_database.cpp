@@ -78,6 +78,7 @@ RecordId find(OperationContext* opCtx,
     const IndexCatalogEntry* entry = systemViews->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
     return entry->accessMethod()->asSortedData()->findSingle(
         opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx),
         systemViews,
         entry,
         BSON("_id" << NamespaceStringUtil::serialize(viewName,

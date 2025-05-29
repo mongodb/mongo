@@ -36,6 +36,7 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 
@@ -107,8 +108,8 @@ public:
         _cursor->save();
     }
 
-    void restore() {
-        _cursor->restore();
+    void restore(OperationContext* opCtx) {
+        _cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
     }
 
     void detachFromOperationContext() {

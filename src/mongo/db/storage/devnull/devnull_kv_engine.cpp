@@ -299,7 +299,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    void addKey(const key_string::View& keyString) override {}
+    void addKey(RecoveryUnit& ru, const key_string::View& keyString) override {}
 };
 
 class DevNullSortedDataInterface : public SortedDataInterface {
@@ -312,12 +312,14 @@ public:
 
     ~DevNullSortedDataInterface() override {}
 
-    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx) override {
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                RecoveryUnit& ru) override {
         return {};
     }
 
     std::variant<Status, DuplicateKey> insert(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         const key_string::View& keyString,
         bool dupsAllowed,
         IncludeDuplicateRecordId includeDuplicateRecordId) override {
@@ -325,51 +327,58 @@ public:
     }
 
     void unindex(OperationContext* opCtx,
+                 RecoveryUnit& ru,
                  const key_string::View& keyString,
                  bool dupsAllowed) override {}
 
     boost::optional<DuplicateKey> dupKeyCheck(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               const key_string::View& keyString) override {
         return boost::none;
     }
 
     boost::optional<RecordId> findLoc(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
                                       std::span<const char> keyString) const override {
         return boost::none;
     }
 
     IndexValidateResults validate(
         OperationContext* opCtx,
+        RecoveryUnit& ru,
         const CollectionValidation::ValidationOptions& options) const override {
         return IndexValidateResults{};
     }
 
     bool appendCustomStats(OperationContext* opCtx,
+                           RecoveryUnit& ru,
                            BSONObjBuilder* output,
                            double scale) const override {
         return false;
     }
 
-    long long getSpaceUsedBytes(OperationContext* opCtx) const override {
+    long long getSpaceUsedBytes(OperationContext* opCtx, RecoveryUnit& ru) const override {
         return 0;
     }
 
-    long long getFreeStorageBytes(OperationContext* opCtx) const override {
+    long long getFreeStorageBytes(OperationContext* opCtx, RecoveryUnit& ru) const override {
         return 0;
     }
 
-    bool isEmpty(OperationContext* opCtx) override {
+    bool isEmpty(OperationContext* opCtx, RecoveryUnit& ru) override {
         return true;
     }
 
-    int64_t numEntries(OperationContext* opCtx) const override {
+    int64_t numEntries(OperationContext* opCtx, RecoveryUnit& ru) const override {
         return 0;
     }
 
     void printIndexEntryMetadata(OperationContext* opCtx,
+                                 RecoveryUnit& ru,
                                  const key_string::View& keyString) const override {}
 
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           RecoveryUnit& ru,
                                                            bool isForward) const override {
         return {};
     }
@@ -421,6 +430,7 @@ std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(Operation
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(
     OperationContext* opCtx,
+    RecoveryUnit& ru,
     const NamespaceString& nss,
     const UUID& uuid,
     StringData ident,

@@ -55,20 +55,21 @@ TEST_F(SortedDataInterfaceTest, Insert) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx()));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
     ASSERT_EQ(
-        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        cursor->seek(recoveryUnit(),
+                     makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
         IndexKeyEntry(key1, loc1));
 }
 
@@ -79,19 +80,20 @@ TEST_F(SortedDataInterfaceTest, InsertKeyString) {
 
     auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx()));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
     ASSERT_EQ(
-        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        cursor->seek(recoveryUnit(),
+                     makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
         IndexKeyEntry(key1, loc1));
 }
 
@@ -100,16 +102,16 @@ TEST_F(SortedDataInterfaceTest, InsertCompoundKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Insert multiple, distinct keys at the same RecordId and verify that the
@@ -119,27 +121,27 @@ TEST_F(SortedDataInterfaceTest, InsertSameDiskLoc) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Insert multiple, distinct keys at the same RecordId and verify that the
@@ -149,27 +151,31 @@ TEST_F(SortedDataInterfaceTest, InsertSameDiskLocWithDupsAllowed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
-
-    {
-        StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key2, loc1), true /* allow duplicates */));
-        txn.commit();
-    }
-
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key3, loc1), true /* allow duplicates */));
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key2, loc1),
+                                            true /* allow duplicates */));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
+
+    {
+        StorageWriteTransaction txn(recoveryUnit());
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key3, loc1),
+                                            true /* allow duplicates */));
+        txn.commit();
+    }
+
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 // Insert the same key multiple times and verify that only 1 entry exists
@@ -178,21 +184,23 @@ TEST_F(SortedDataInterfaceTest, InsertSameKey) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
                                                        makeKeyString(sorted.get(), key1, loc2),
                                                        false,
                                                        IncludeDuplicateRecordId::kOff),
                                         key1,
                                         boost::none);
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
                                                        makeKeyString(sorted.get(), key1, loc2),
                                                        false,
                                                        IncludeDuplicateRecordId::kOn),
@@ -202,23 +210,26 @@ TEST_F(SortedDataInterfaceTest, InsertSameKey) {
     }
 
     {
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
                                                        makeKeyString(sorted.get(), key1, loc2),
                                                        false,
                                                        IncludeDuplicateRecordId::kOff),
                                         key1,
                                         boost::none);
         ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
                                                        makeKeyString(sorted.get(), key1, loc2),
                                                        false,
                                                        IncludeDuplicateRecordId::kOn),
@@ -227,11 +238,12 @@ TEST_F(SortedDataInterfaceTest, InsertSameKey) {
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx()));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
     ASSERT_EQ(
-        cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+        cursor->seek(recoveryUnit(),
+                     makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
         IndexKeyEntry(key1, loc1));
 }
 
@@ -248,54 +260,65 @@ TEST_F(SortedDataInterfaceTest, InsertSameKeyString) {
     key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyStringLoc1.getValueCopy(), false));
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sorted->insert(
-                opCtx(), keyStringLoc2.getValueCopy(), false, IncludeDuplicateRecordId::kOff),
-            key1,
-            boost::none);
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sorted->insert(
-                opCtx(), keyStringLoc2.getValueCopy(), false, IncludeDuplicateRecordId::kOn),
-            key1,
-            loc1);
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), recoveryUnit(), keyStringLoc1.getValueCopy(), false));
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
+                                                       keyStringLoc2.getValueCopy(),
+                                                       false,
+                                                       IncludeDuplicateRecordId::kOff),
+                                        key1,
+                                        boost::none);
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
+                                                       keyStringLoc2.getValueCopy(),
+                                                       false,
+                                                       IncludeDuplicateRecordId::kOn),
+                                        key1,
+                                        loc1);
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sorted->insert(
-                opCtx(), keyStringLoc2.getValueCopy(), false, IncludeDuplicateRecordId::kOff),
-            key1,
-            boost::none);
-        ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sorted->insert(
-                opCtx(), keyStringLoc2.getValueCopy(), false, IncludeDuplicateRecordId::kOn),
-            key1,
-            loc1);
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
+                                                       keyStringLoc2.getValueCopy(),
+                                                       false,
+                                                       IncludeDuplicateRecordId::kOff),
+                                        key1,
+                                        boost::none);
+        ASSERT_SDI_INSERT_DUPLICATE_KEY(sorted->insert(opCtx(),
+                                                       recoveryUnit(),
+                                                       keyStringLoc2.getValueCopy(),
+                                                       false,
+                                                       IncludeDuplicateRecordId::kOn),
+                                        key1,
+                                        loc1);
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
     }
 }
@@ -314,35 +337,36 @@ void testInsertSameKeyWithDupsAllowed(OperationContext* opCtx,
     const auto sorted(
         harnessHelper->newSortedDataInterface(opCtx, /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx));
+    ASSERT(sorted->isEmpty(opCtx, recoveryUnit));
 
     {
         StorageWriteTransaction txn(recoveryUnit);
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx, makeKeyString(sorted.get(), key1, locs[0]), false));
+            sorted->insert(opCtx, recoveryUnit, makeKeyString(sorted.get(), key1, locs[0]), false));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx, makeKeyString(sorted.get(), key1, locs[1]), true));
+            sorted->insert(opCtx, recoveryUnit, makeKeyString(sorted.get(), key1, locs[1]), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx, makeKeyString(sorted.get(), key1, locs[2]), true));
+            sorted->insert(opCtx, recoveryUnit, makeKeyString(sorted.get(), key1, locs[2]), true));
         txn.commit();
     }
-
     {
         StorageWriteTransaction txn(recoveryUnit);
         for (int i = 0; i < 3; i++) {
             if (i != keeper) {
-                sorted->unindex(opCtx, makeKeyString(sorted.get(), key1, locs[i]), true);
+                sorted->unindex(
+                    opCtx, recoveryUnit, makeKeyString(sorted.get(), key1, locs[i]), true);
             }
         }
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx, recoveryUnit));
 
-        const auto cursor(sorted->newCursor(opCtx));
+        const auto cursor(sorted->newCursor(opCtx, recoveryUnit));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit,
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, locs[keeper]));
     }
 }
@@ -381,48 +405,53 @@ TEST_F(SortedDataInterfaceTest, InsertMultiple) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key2, loc2));
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc3), false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key2, loc2));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key3, loc3));
     }
 }
@@ -439,45 +468,50 @@ TEST_F(SortedDataInterfaceTest, InsertMultipleKeyStrings) {
     auto keyString2 = makeKeyString(sorted.get(), key2, loc2);
     auto keyString3 = makeKeyString(sorted.get(), key3, loc3);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, false));
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString2, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString2, false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key2, loc2));
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString3, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString3, false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key2, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key2, loc2));
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key3, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key3, loc3));
     }
 }
@@ -495,31 +529,35 @@ TEST_F(SortedDataInterfaceTest, InsertAndSeekKeyString) {
     auto keyString1WithoutRecordId = makeKeyString(sorted.get(), key1);
     auto keyString2WithoutRecordId = makeKeyString(sorted.get(), key2);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, false));
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString2, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString2, false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
-        auto ksEntry1 = cursor->seekForKeyString(keyString1WithoutRecordId.getView());
+        auto ksEntry1 =
+            cursor->seekForKeyString(recoveryUnit(), keyString1WithoutRecordId.getView());
         ASSERT_EQ(ksEntry1->keyString.compare(keyString1), 0);
         ASSERT(ksEntry1->keyString.compare(keyString2) < 0);
-        auto kvEntry1 = cursor->seekForKeyValueView(keyString1WithoutRecordId.getView());
+        auto kvEntry1 =
+            cursor->seekForKeyValueView(recoveryUnit(), keyString1WithoutRecordId.getView());
         ASSERT(!kvEntry1.isEmpty());
         ASSERT_EQ(ksEntry1->keyString.compare(kvEntry1.getValueCopy()), 0);
 
-        auto ksEntry2 = cursor->seekForKeyString(keyString2WithoutRecordId.getView());
+        auto ksEntry2 =
+            cursor->seekForKeyString(recoveryUnit(), keyString2WithoutRecordId.getView());
         ASSERT_EQ(ksEntry2->keyString.compare(keyString2), 0);
         ASSERT(ksEntry2->keyString.compare(keyString1) > 0);
-        auto kvEntry2 = cursor->seekForKeyValueView(keyString2WithoutRecordId.getView());
+        auto kvEntry2 =
+            cursor->seekForKeyValueView(recoveryUnit(), keyString2WithoutRecordId.getView());
         ASSERT(!kvEntry2.isEmpty());
         ASSERT_EQ(ksEntry2->keyString.compare(kvEntry2.getValueCopy()), 0);
     }
@@ -535,23 +573,25 @@ TEST_F(SortedDataInterfaceTest, InsertAndSeekExactKeyString) {
     auto keyString1 = makeKeyString(sorted.get(), key1, loc1);
     auto keyString2 = makeKeyString(sorted.get(), key2, loc2);
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString1, false));
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), keyString2, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString1, false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), keyString2, false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    ASSERT_EQ(
-        loc1,
-        sorted->findLoc(opCtx(), makeKeyStringForSeek(sorted.get(), key1).finishAndGetBuffer()));
-    ASSERT_EQ(
-        loc2,
-        sorted->findLoc(opCtx(), makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()));
+    ASSERT_EQ(loc1,
+              sorted->findLoc(opCtx(),
+                              recoveryUnit(),
+                              makeKeyStringForSeek(sorted.get(), key1).finishAndGetBuffer()));
+    ASSERT_EQ(loc2,
+              sorted->findLoc(opCtx(),
+                              recoveryUnit(),
+                              makeKeyStringForSeek(sorted.get(), key2).finishAndGetBuffer()));
 }
 
 /**
@@ -562,47 +602,48 @@ TEST_F(SortedDataInterfaceTest, InsertMultipleCompoundKeys) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/true, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc3), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1b, loc2), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc3), false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc4), false));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3a, loc5), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1c, loc4), false));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey3a, loc5), false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdLong) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
     StorageWriteTransaction txn(recoveryUnit());
     RecordId reservedLoc(record_id_helpers::reservedIdFor(
         record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
     invariant(record_id_helpers::isReserved(reservedLoc));
     ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                        recoveryUnit(),
                                         makeKeyString(sorted.get(), key1, reservedLoc),
                                         /*dupsAllowed*/ true));
     txn.commit();
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
@@ -620,13 +661,14 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
 
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
                                             makeKeyString(sorted.get(), key1, reservedId),
                                             /*dupsAllowed=*/false));
         txn.commit();
     }
 
     {
-        ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+        ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
         // There is only one reserved RecordId, kWildcardMultikeyMetadataId. In order to test that
         // the upper bound for unique indexes works properly we insert a key with RecordId
@@ -641,6 +683,7 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), key1, reservedId),
                            false,
                            IncludeDuplicateRecordId::kOff),
@@ -648,6 +691,7 @@ TEST_F(SortedDataInterfaceTest, InsertReservedRecordIdIntoUniqueIndex) {
             boost::none);
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), key1, reservedId),
                            false,
                            IncludeDuplicateRecordId::kOn),
@@ -663,19 +707,25 @@ TEST_F(SortedDataInterfaceTest, InsertWithDups1) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)),
+                           true));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(6, 2)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(6, 2)),
+                           true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertWithDups2) {
@@ -684,19 +734,25 @@ TEST_F(SortedDataInterfaceTest, InsertWithDups2) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)),
+                           true));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 20)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 20)),
+                           true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertWithDups3AndRollback) {
@@ -705,19 +761,25 @@ TEST_F(SortedDataInterfaceTest, InsertWithDups3AndRollback) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)),
+                           true));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 20)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 20)),
+                           true));
         // no commit
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertNoDups1) {
@@ -726,19 +788,25 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups1) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 18)),
+                           false));
         txn.commit();
     }
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 2), RecordId(5, 20)), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 2), RecordId(5, 20)),
+                           false));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertNoDups2) {
@@ -747,8 +815,11 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups2) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)),
+                           false));
         txn.commit();
     }
 
@@ -756,6 +827,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups2) {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 4)),
                            false,
                            IncludeDuplicateRecordId::kOff),
@@ -763,6 +835,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups2) {
             boost::none);
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 4)),
                            false,
                            IncludeDuplicateRecordId::kOn),
@@ -771,7 +844,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups2) {
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, InsertNoDups3) {
@@ -780,8 +853,11 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups3) {
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)), false));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 2)),
+                           false));
         txn.commit();
     }
 
@@ -789,6 +865,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups3) {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 4)),
                            false,
                            IncludeDuplicateRecordId::kOff),
@@ -796,6 +873,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups3) {
             boost::none);
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
             sorted->insert(opCtx(),
+                           recoveryUnit(),
                            makeKeyString(sorted.get(), BSON("" << 1), RecordId(5, 4)),
                            false,
                            IncludeDuplicateRecordId::kOn),
@@ -804,7 +882,7 @@ TEST_F(SortedDataInterfaceTest, InsertNoDups3) {
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 }
 }  // namespace
 }  // namespace mongo

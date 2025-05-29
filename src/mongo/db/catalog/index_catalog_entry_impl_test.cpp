@@ -31,6 +31,7 @@
 #include "mongo/db/catalog/index_catalog_entry_helpers.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 
 namespace mongo {
 
@@ -174,12 +175,18 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     auto uuid = UUID::gen();
     DevNullKVEngine engine{};
+    RecoveryUnitNoop ru{};
 
     auto indexDescriptor = makeIndexDescriptor(
         "wildcardIndex", BSON("a" << 1 << "b" << 1 << "$**" << 1), BSON("c" << 1 << "_id" << 1));
 
-    auto sortedDataInterface = engine.getSortedDataInterface(
-        nullptr, nss, uuid, "wildcardIndent", indexDescriptor->toIndexConfig(), KeyFormat::Long);
+    auto sortedDataInterface = engine.getSortedDataInterface(nullptr,
+                                                             ru,
+                                                             nss,
+                                                             uuid,
+                                                             "wildcardIndent",
+                                                             indexDescriptor->toIndexConfig(),
+                                                             KeyFormat::Long);
 
     ASSERT_EQ(IndexNames::WILDCARD, indexDescriptor->getAccessMethodName());
 
@@ -204,12 +211,18 @@ TEST(IndexCatalogEntryTest, computeUpdateIndexDataForCompoundWildcardIndex_Exclu
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test"_sd);
     auto uuid = UUID::gen();
     DevNullKVEngine engine{};
+    RecoveryUnitNoop ru{};
 
     auto indexDescriptor = makeIndexDescriptor(
         "wildcardIndex", BSON("a" << 1 << "b" << 1 << "$**" << 1), BSON("c" << 0));
 
-    auto sortedDataInterface = engine.getSortedDataInterface(
-        nullptr, nss, uuid, "wildcardIndent", indexDescriptor->toIndexConfig(), KeyFormat::Long);
+    auto sortedDataInterface = engine.getSortedDataInterface(nullptr,
+                                                             ru,
+                                                             nss,
+                                                             uuid,
+                                                             "wildcardIndent",
+                                                             indexDescriptor->toIndexConfig(),
+                                                             KeyFormat::Long);
 
     ASSERT_EQ(IndexNames::WILDCARD, indexDescriptor->getAccessMethodName());
 

@@ -185,8 +185,9 @@ size_t getNumIndexEntries(OperationContext* opCtx,
 
     if (desc) {
         auto iam = catalog->getEntry(desc)->accessMethod()->asSortedData();
-        auto cursor = iam->newCursor(opCtx);
-        for (auto kv = cursor->next(); kv; kv = cursor->next()) {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto cursor = iam->newCursor(opCtx, ru);
+        for (auto kv = cursor->next(ru); kv; kv = cursor->next(ru)) {
             numEntries++;
         }
     }

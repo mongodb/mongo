@@ -191,7 +191,8 @@ TimestampedBSONObj makeOplogEntry(OpTime opTime) {
 int64_t getIndexKeyCount(OperationContext* opCtx,
                          const IndexCatalog* cat,
                          const IndexDescriptor* desc) {
-    return cat->getEntry(desc)->accessMethod()->numKeys(opCtx);
+    return cat->getEntry(desc)->accessMethod()->numKeys(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 }
 
 std::vector<InsertStatement> transformInserts(std::vector<BSONObj> docs) {

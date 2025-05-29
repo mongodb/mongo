@@ -270,7 +270,8 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
         invariant(iam);
 
         BSONObjBuilder bob;
-        if (iam->appendCustomStats(opCtx, &bob, scale)) {
+        if (iam->appendCustomStats(
+                opCtx, *shard_role_details::getRecoveryUnit(opCtx), &bob, scale)) {
             if (redactForQE) {
                 indexDetails.append(descriptor->indexName(), filterQEIndexStats(bob.obj()));
             } else {

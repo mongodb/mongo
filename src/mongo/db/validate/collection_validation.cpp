@@ -129,7 +129,8 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
                                 "index"_attr = descriptor->indexName(),
                                 logAttrs(validateState->nss()));
 
-        auto indexResults = iam->validate(opCtx, *validateState);
+        auto indexResults =
+            iam->validate(opCtx, *shard_role_details::getRecoveryUnit(opCtx), *validateState);
 
         results->getIndexValidateResult(descriptor->indexName()) = std::move(indexResults);
     }

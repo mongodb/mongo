@@ -53,18 +53,19 @@ TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     {
         StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         txn.commit();
     }
 
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
-        auto cursor = sdi->newCursor(opCtx());
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
         auto res = cursor->seek(
+            recoveryUnit(),
             makeKeyStringForSeek(sdi.get(), BSONObj(), true, true).finishAndGetBuffer());
         ASSERT(res);
 
@@ -77,7 +78,7 @@ TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
         ASSERT_FALSE(recoveryUnit().isActive());
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
-        ASSERT(cursor->next());
+        ASSERT(cursor->next(recoveryUnit()));
         ASSERT_TRUE(recoveryUnit().isActive());
     }
 }
@@ -91,22 +92,22 @@ TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     {
         StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, true));
 
         txn.commit();
     }
 
     // Cursors should always ensure they are in an active transaction when seek() is called.
     {
-        auto cursor = sdi->newCursor(opCtx());
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
 
         bool forward = true;
         bool inclusive = true;
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
-        ASSERT(cursor->seek(seekKs.finishAndGetBuffer()));
+        ASSERT(cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer()));
         ASSERT_TRUE(recoveryUnit().isActive());
 
         // Committing a transaction will end the current transaction.
@@ -117,7 +118,7 @@ TEST_F(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new
         // transaction.
-        ASSERT(cursor->seek(seekKs.finishAndGetBuffer()));
+        ASSERT(cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer()));
         ASSERT_TRUE(recoveryUnit().isActive());
     }
 }
@@ -138,33 +139,33 @@ TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
         FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
         StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, dupsAllowed));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, dupsAllowed));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
 
         ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, dupsAllowed));
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
 
         txn.commit();
     }
 
     // Ensure cursors return the correct data
     {
-        auto cursor = sdi->newCursor(opCtx());
+        auto cursor = sdi->newCursor(opCtx(), recoveryUnit());
 
         bool forward = true;
         bool inclusive = true;
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
-        auto record = cursor->seek(seekKs.finishAndGetBuffer());
+        auto record = cursor->seek(recoveryUnit(), seekKs.finishAndGetBuffer());
         ASSERT(record);
         ASSERT_EQ(RecordId(1), record->loc);
 
-        record = cursor->next();
+        record = cursor->next(recoveryUnit());
         ASSERT(record);
         ASSERT_EQ(RecordId(2), record->loc);
 
-        record = cursor->next();
+        record = cursor->next(recoveryUnit());
         ASSERT(record);
         ASSERT_EQ(RecordId(3), record->loc);
     }
@@ -174,15 +175,15 @@ TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
         StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sdi->insert(opCtx(), ks, dupsAllowed), BSON("" << 1), boost::none);
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 1), boost::none);
 
         ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sdi->insert(opCtx(), ks, dupsAllowed), BSON("" << 2), boost::none);
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 2), boost::none);
 
         ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
         ASSERT_SDI_INSERT_DUPLICATE_KEY(
-            sdi->insert(opCtx(), ks, dupsAllowed), BSON("" << 3), boost::none);
+            sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed), BSON("" << 3), boost::none);
     }
 
     // Ensure that it is not possible to remove a key with a mismatched RecordId.
@@ -190,12 +191,12 @@ TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
         StorageWriteTransaction txn(recoveryUnit());
         // The key "1" exists, but with RecordId 1, so this should not remove anything.
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(2));
-        sdi->unindex(opCtx(), ks, dupsAllowed);
+        sdi->unindex(opCtx(), recoveryUnit(), ks, dupsAllowed);
         txn.commit();
 
-        auto cur = sdi->newCursor(opCtx());
+        auto cur = sdi->newCursor(opCtx(), recoveryUnit());
         auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), true, true);
-        auto result = cur->seek(seekKs.finishAndGetBuffer());
+        auto result = cur->seek(recoveryUnit(), seekKs.finishAndGetBuffer());
         ASSERT(result);
         ASSERT_EQ(result->loc, RecordId(1));
     }
@@ -204,10 +205,10 @@ TEST_F(WiredTigerUniqueIndexTest, OldFormatKeys) {
     {
         StorageWriteTransaction txn(recoveryUnit());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
-        sdi->unindex(opCtx(), ks, dupsAllowed);
+        sdi->unindex(opCtx(), recoveryUnit(), ks, dupsAllowed);
 
-        auto res = sdi->insert(opCtx(), ks, dupsAllowed);
-        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), ks, dupsAllowed));
+        auto res = sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed);
+        ASSERT_SDI_INSERT_OK(sdi->insert(opCtx(), recoveryUnit(), ks, dupsAllowed));
         txn.commit();
     }
 }

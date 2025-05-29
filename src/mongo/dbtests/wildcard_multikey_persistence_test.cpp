@@ -164,13 +164,14 @@ protected:
         auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             BSONObj(), Ordering::make(BSONObj()), true, true, builder);
 
-        auto indexKey = indexCursor->seek(keyStringForSeek);
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx());
+        auto indexKey = indexCursor->seek(ru, keyStringForSeek);
         try {
             for (const auto& expectedKey : expectedKeys) {
                 ASSERT(indexKey);
                 ASSERT_BSONOBJ_EQ(expectedKey.key, indexKey->key);
                 ASSERT_EQ(expectedKey.loc, indexKey->loc);
-                indexKey = indexCursor->next();
+                indexKey = indexCursor->next(ru);
             }
             // Confirm that there are no further keys in the index.
             ASSERT(!indexKey);
@@ -181,7 +182,7 @@ protected:
                       "{{ key: {indexKey_key}, loc: {indexKey_loc} }}",
                       "indexKey_key"_attr = indexKey->key,
                       "indexKey_loc"_attr = indexKey->loc);
-                indexKey = indexCursor->next();
+                indexKey = indexCursor->next(ru);
             }
             throw ex;
         }
@@ -300,7 +301,7 @@ protected:
         return getIndexCatalogEntry(collection, indexName)
             ->accessMethod()
             ->asSortedData()
-            ->newCursor(opCtx());
+            ->newCursor(opCtx(), *shard_role_details::getRecoveryUnit(opCtx()));
     }
 
     CollectionOptions collOptions() {

@@ -55,28 +55,30 @@ TEST_F(SortedDataInterfaceTest, CursorIsEOFWhenEmpty) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx()));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
     ASSERT(!cursor->seek(
+        recoveryUnit(),
         makeKeyStringForSeek(sorted.get(), BSONObj(), true, true).finishAndGetBuffer()));
     // Cursor at EOF should remain at EOF when advanced
-    ASSERT(!cursor->next());
+    ASSERT(!cursor->next(recoveryUnit()));
 }
 
 // Verify that a reverse cursor is positioned at EOF when the index is empty.
 TEST_F(SortedDataInterfaceTest, CursorIsEOFWhenEmptyReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx(), false));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
 
     ASSERT(!cursor->seek(
+        recoveryUnit(),
         makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true).finishAndGetBuffer()));
 
     // Cursor at EOF should remain at EOF when advanced
-    ASSERT(!cursor->next());
+    ASSERT(!cursor->next(recoveryUnit()));
 }
 
 // Call advance() on a forward cursor until it is exhausted.
@@ -84,35 +86,36 @@ TEST_F(SortedDataInterfaceTest, CursorIsEOFWhenEmptyReversed) {
 TEST_F(SortedDataInterfaceTest, ExhaustCursor) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         StorageWriteTransaction txn(recoveryUnit());
         BSONObj key = BSON("" << i);
         RecordId loc(42, i * 2);
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), makeKeyString(sorted.get(), key, loc), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key, loc), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 
-    const auto cursor(sorted->newCursor(opCtx()));
+    const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
     for (int i = 0; i < nToInsert; i++) {
-        auto entry = cursor->next();
+        auto entry = cursor->next(recoveryUnit());
         ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
     }
-    ASSERT(!cursor->next());
+    ASSERT(!cursor->next(recoveryUnit()));
 
     // Cursor at EOF should remain at EOF when advanced
-    ASSERT(!cursor->next());
+    ASSERT(!cursor->next(recoveryUnit()));
 }
 
 TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursor) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     std::vector<key_string::Value> keyStrings;
     int nToInsert = 10;
@@ -122,36 +125,36 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursor) {
         RecordId loc(42, i * 2);
         key_string::Value ks = makeKeyString(sorted.get(), key, loc);
         keyStrings.push_back(ks);
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), ks, true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         for (int i = 0; i < nToInsert; i++) {
-            auto entry = cursor->nextKeyString();
+            auto entry = cursor->nextKeyString(recoveryUnit());
             ASSERT(entry);
             ASSERT_EQ(entry->keyString, keyStrings.at(i));
         }
-        ASSERT(!cursor->nextKeyString());
+        ASSERT(!cursor->nextKeyString(recoveryUnit()));
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(!cursor->nextKeyString());
+        ASSERT(!cursor->nextKeyString(recoveryUnit()));
     }
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         for (int i = 0; i < nToInsert; i++) {
-            auto entry = cursor->nextKeyValueView();
+            auto entry = cursor->nextKeyValueView(recoveryUnit());
             ASSERT(!entry.isEmpty());
             ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
         }
-        ASSERT(cursor->nextKeyValueView().isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(cursor->nextKeyValueView().isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
     }
 }
 
@@ -161,29 +164,30 @@ TEST_F(SortedDataInterfaceTest, ExhaustCursorReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         StorageWriteTransaction txn(recoveryUnit());
         BSONObj key = BSON("" << i);
         RecordId loc(42, i * 2);
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), makeKeyString(sorted.get(), key, loc), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key, loc), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx(), false));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = cursor->next();
+            auto entry = cursor->next(recoveryUnit());
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
         }
-        ASSERT(!cursor->next());
+        ASSERT(!cursor->next(recoveryUnit()));
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(!cursor->next());
+        ASSERT(!cursor->next(recoveryUnit()));
     }
 }
 
@@ -191,7 +195,7 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursorReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     std::vector<key_string::Value> keyStrings;
     int nToInsert = 10;
@@ -201,36 +205,36 @@ TEST_F(SortedDataInterfaceTest, ExhaustKeyStringCursorReversed) {
         RecordId loc(42, i * 2);
         key_string::Value ks = makeKeyString(sorted.get(), key, loc);
         keyStrings.push_back(ks);
-        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), ks, true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(), recoveryUnit(), ks, true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx(), false));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = cursor->nextKeyString();
+            auto entry = cursor->nextKeyString(recoveryUnit());
             ASSERT(entry);
             ASSERT_EQ(entry->keyString, keyStrings.at(i));
         }
-        ASSERT(!cursor->nextKeyString());
+        ASSERT(!cursor->nextKeyString(recoveryUnit()));
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(!cursor->nextKeyString());
+        ASSERT(!cursor->nextKeyString(recoveryUnit()));
     }
 
     {
-        const auto cursor(sorted->newCursor(opCtx(), false));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
         for (int i = nToInsert - 1; i >= 0; i--) {
-            auto entry = cursor->nextKeyValueView();
+            auto entry = cursor->nextKeyValueView(recoveryUnit());
             ASSERT(!entry.isEmpty());
             ASSERT_EQ(entry.getValueCopy(), keyStrings.at(i));
         }
-        ASSERT(cursor->nextKeyValueView().isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
 
         // Cursor at EOF should remain at EOF when advanced
-        ASSERT(cursor->nextKeyValueView().isEmpty());
+        ASSERT(cursor->nextKeyValueView(recoveryUnit()).isEmpty());
     }
 }
 
@@ -242,15 +246,19 @@ TEST_F(SortedDataInterfaceTest, CursorIterate1) {
     int N = 5;
     for (int i = 0; i < N; i++) {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)),
+                           true));
         txn.commit();
     }
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         int n = 0;
-        for (auto entry = cursor->next(); entry; entry = cursor->next()) {
+        for (auto entry = cursor->next(recoveryUnit()); entry;
+             entry = cursor->next(recoveryUnit())) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
         }
@@ -265,19 +273,23 @@ TEST_F(SortedDataInterfaceTest, CursorIterate1WithSaveRestore) {
     int N = 5;
     for (int i = 0; i < N; i++) {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << i), RecordId(5, i * 2)),
+                           true));
         txn.commit();
     }
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         int n = 0;
-        for (auto entry = cursor->next(); entry; entry = cursor->next()) {
+        for (auto entry = cursor->next(recoveryUnit()); entry;
+             entry = cursor->next(recoveryUnit())) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << n), RecordId(5, n * 2)));
             n++;
             cursor->save();
-            cursor->restore();
+            cursor->restore(recoveryUnit());
         }
         ASSERT_EQUALS(N, n);
     }
@@ -291,19 +303,23 @@ TEST_F(SortedDataInterfaceTest, CursorIterateAllDupKeysWithSaveRestore) {
     int N = 5;
     for (int i = 0; i < N; i++) {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), BSON("" << 5), RecordId(5, i * 2)), true));
+        ASSERT_SDI_INSERT_OK(
+            sorted->insert(opCtx(),
+                           recoveryUnit(),
+                           makeKeyString(sorted.get(), BSON("" << 5), RecordId(5, i * 2)),
+                           true));
         txn.commit();
     }
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
         int n = 0;
-        for (auto entry = cursor->next(); entry; entry = cursor->next()) {
+        for (auto entry = cursor->next(recoveryUnit()); entry;
+             entry = cursor->next(recoveryUnit())) {
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << 5), RecordId(5, n * 2)));
             n++;
             cursor->save();
-            cursor->restore();
+            cursor->restore(recoveryUnit());
         }
         ASSERT_EQUALS(N, n);
     }
@@ -322,20 +338,22 @@ public:
                                                              /*partial=*/false);
         }
 
-        ASSERT(sorted->isEmpty(opCtx()));
+        ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
         int nToInsert = 10;
         for (int i = 0; i < nToInsert; i++) {
             StorageWriteTransaction txn(recoveryUnit());
             BSONObj key = BSON("" << i);
             RecordId loc(42 + i * 2);
-            ASSERT_SDI_INSERT_OK(sorted->insert(
-                opCtx(), makeKeyString(sorted.get(), key, loc), false /* dupsAllowed*/));
+            ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                                recoveryUnit(),
+                                                makeKeyString(sorted.get(), key, loc),
+                                                false /* dupsAllowed*/));
             txn.commit();
         }
 
         {
-            const auto cursor(sorted->newCursor(opCtx(), forward));
+            const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), forward));
             int startVal = 2;
             int endVal = 6;
             if (!forward)
@@ -346,7 +364,8 @@ public:
             cursor->setEndPosition(endKey, inclusive);
 
             auto entry =
-                cursor->seek(makeKeyStringForSeek(sorted.get(), startKey, forward, inclusive)
+                cursor->seek(recoveryUnit(),
+                             makeKeyStringForSeek(sorted.get(), startKey, forward, inclusive)
                                  .finishAndGetBuffer());
 
             // Check that the cursor returns the expected values in range.
@@ -354,12 +373,12 @@ public:
             for (int i = startVal + (inclusive ? 0 : step); i != endVal + (inclusive ? step : 0);
                  i += step) {
                 ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42 + i * 2)));
-                entry = cursor->next();
+                entry = cursor->next(recoveryUnit());
             }
             ASSERT(!entry);
 
             // Cursor at EOF should remain at EOF when advanced
-            ASSERT(!cursor->next());
+            ASSERT(!cursor->next(recoveryUnit()));
         }
     }
 };

@@ -219,12 +219,11 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> MDBCatalog::initia
     if (!status.isOK())
         return status;
 
-    auto ru = shard_role_details::getRecoveryUnit(opCtx);
-    shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [ru, catalog = this, ident = entry.ident](OperationContext*) {
-            // Intentionally ignoring failure
-            catalog->_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
-        });
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    ru.onRollback([&ru, catalog = this, ident = entry.ident](OperationContext*) {
+        // Intentionally ignoring failure
+        catalog->_engine->dropIdent(ru, ident, /*identHasSizeInfo=*/true).ignore();
+    });
 
     auto rs = _engine->getRecordStore(opCtx, nss, ident, recordStoreOptions, uuid);
     invariant(rs);

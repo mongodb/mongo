@@ -53,30 +53,35 @@ TEST_F(SortedDataInterfaceTest, AdvanceTo) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key1, loc2),
+                                            true /* allow duplicates */));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key1, loc3),
+                                            true /* allow duplicates */));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc4), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc4), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc5), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -84,26 +89,30 @@ TEST_F(SortedDataInterfaceTest, AdvanceTo) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key2, loc4));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key3;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key3, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key4;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -117,31 +126,36 @@ TEST_F(SortedDataInterfaceTest, AdvanceToReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc3), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key3, loc4),
+                                            true /* allow duplicates */));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key3, loc5),
+                                            true /* allow duplicates */));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         bool isForward = false;
-        const auto cursor(sorted->newCursor(opCtx(), isForward));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), isForward));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key3, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key3, loc5));
 
@@ -150,26 +164,30 @@ TEST_F(SortedDataInterfaceTest, AdvanceToReversed) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key3, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key2, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key1;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   boost::none);
     }
 }
@@ -181,24 +199,25 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyBeforeCursorPosition) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -206,14 +225,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyBeforeCursorPosition) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.firstExclusive = 0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key1, loc1));
     }
 }
@@ -225,25 +246,26 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAfterCursorPositionReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(2, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(2, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         bool isForward = false;
-        const auto cursor(sorted->newCursor(opCtx(), isForward));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), isForward));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key2, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key2, loc2));
 
@@ -252,14 +274,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAfterCursorPositionReversed) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key2, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.firstExclusive = 0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key2, loc2));
     }
 }
@@ -273,22 +297,23 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAtCursorPosition) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -296,14 +321,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAtCursorPosition) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.firstExclusive = 0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -317,23 +344,24 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAtCursorPositionReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(1, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         bool isForward = false;
-        const auto cursor(sorted->newCursor(opCtx(), isForward));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), isForward));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key1, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
@@ -342,14 +370,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToKeyAtCursorPositionReversed) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = -1;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.firstExclusive = 0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   boost::none);
     }
 }
@@ -362,30 +392,35 @@ TEST_F(SortedDataInterfaceTest, AdvanceToExclusive) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key1, loc2), true /* allow duplicates */));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key1, loc3), true /* allow duplicates */));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key1, loc2),
+                                            true /* allow duplicates */));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key1, loc3),
+                                            true /* allow duplicates */));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc4), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc4), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc5), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -393,26 +428,30 @@ TEST_F(SortedDataInterfaceTest, AdvanceToExclusive) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = 0;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key2, loc4));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key3, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key3;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key4;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -425,31 +464,36 @@ TEST_F(SortedDataInterfaceTest, AdvanceToExclusiveReversed) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key2, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key2, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc3), true));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key3, loc4), true /* allow duplicates */));
-        ASSERT_SDI_INSERT_OK(sorted->insert(
-            opCtx(), makeKeyString(sorted.get(), key3, loc5), true /* allow duplicates */));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc3), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key3, loc4),
+                                            true /* allow duplicates */));
+        ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
+                                            makeKeyString(sorted.get(), key3, loc5),
+                                            true /* allow duplicates */));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         bool isForward = false;
-        const auto cursor(sorted->newCursor(opCtx(), isForward));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), isForward));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key3, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key3, loc5));
 
@@ -458,26 +502,30 @@ TEST_F(SortedDataInterfaceTest, AdvanceToExclusiveReversed) {
         seekPoint.prefixLen = 1;
         seekPoint.firstExclusive = 0;
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key2, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key2;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key1;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   boost::none);
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keyPrefix = key0;
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   boost::none);
     }
 }
@@ -491,26 +539,27 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirect) {
 
     BSONObj unusedKey = key6;  // larger than any inserted key
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key5, loc3), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key5, loc3), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -519,14 +568,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirect) {
         seekPoint.firstExclusive = -1;
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key3, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keySuffix = {key4.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key5, loc3));
     }
 }
@@ -540,25 +591,26 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectReversed) {
 
     BSONObj unusedKey = key0;  // smaller than any inserted key
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key5, loc3), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key5, loc3), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx(), false));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), false));
 
         ASSERT_EQ(cursor->seek(
+                      recoveryUnit(),
                       makeKeyStringForSeek(sorted.get(), key5, false, true).finishAndGetBuffer()),
                   IndexKeyEntry(key5, loc3));
 
@@ -568,14 +620,16 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectReversed) {
         seekPoint.firstExclusive = -1;
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key3, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keySuffix = {key2.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key1, loc1));
     }
 }
@@ -591,26 +645,27 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectExclusive) {
 
     BSONObj unusedKey = key6;  // larger than any inserted key
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key5, loc3), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key5, loc3), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         IndexSeekPoint seekPoint;
@@ -619,24 +674,28 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectExclusive) {
         seekPoint.firstExclusive = 0;
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key3, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keySuffix = {key4.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key5, loc3));
         builder.resetToEmpty(sorted->getOrdering());
 
         ASSERT_EQ(
-            cursor->seek(makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
+            cursor->seek(recoveryUnit(),
+                         makeKeyStringForSeek(sorted.get(), key1, true, true).finishAndGetBuffer()),
             IndexKeyEntry(key1, loc1));
 
         seekPoint.keySuffix = {key3.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(key5, loc3));
     }
 }
@@ -652,27 +711,28 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectExclusiveReversed) {
 
     BSONObj unusedKey = key0;  // smaller than any inserted key
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key1, loc1), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key1, loc1), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key3, loc2), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key3, loc2), true));
         ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), key5, loc3), true));
+            sorted->insert(opCtx(), recoveryUnit(), makeKeyString(sorted.get(), key5, loc3), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(3, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(3, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
         bool isForward = false;
-        const auto cursor(sorted->newCursor(opCtx(), isForward));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit(), isForward));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key5, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key5, loc3));
 
@@ -682,25 +742,29 @@ TEST_F(SortedDataInterfaceTest, AdvanceToIndirectExclusiveReversed) {
         seekPoint.firstExclusive = 0;
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key3, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
         seekPoint.keySuffix = {key2.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key1, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), key5, isForward, true).finishAndGetBuffer()),
             IndexKeyEntry(key5, loc3));
 
         seekPoint.keySuffix = {key3.firstElement()};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, isForward, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, isForward, builder)),
                   IndexKeyEntry(key1, loc1));
     }
 }
@@ -712,32 +776,35 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
         ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
                                             makeKeyString(sorted.get(), compoundKey1a, loc2),
                                             true /* allow duplicates */));
         ASSERT_SDI_INSERT_OK(sorted->insert(opCtx(),
+                                            recoveryUnit(),
                                             makeKeyString(sorted.get(), compoundKey1a, loc3),
                                             true /* allow duplicates */));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()),
             IndexKeyEntry(compoundKey1a, loc1));
 
@@ -750,8 +817,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
         seekPoint.firstExclusive = -1;  // Get second field from the suffix, no exclusive fields
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey1a, loc1));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -759,8 +827,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
         suffix.clear();
         compoundKey2b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey2b, loc4));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -768,8 +837,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
         suffix.clear();
         compoundKey3b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey3b, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -777,8 +847,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixInclusive) {
         suffix.clear();
         compoundKey3c.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -791,30 +862,31 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixExclusive) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()),
             IndexKeyEntry(compoundKey1a, loc1));
 
@@ -827,8 +899,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixExclusive) {
         seekPoint.firstExclusive = 0;  // Ignore the suffix, make prefix exclusive
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey2b, loc4));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -836,8 +909,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixExclusive) {
         suffix.clear();
         compoundKey2b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey3b, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -845,8 +919,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixExclusive) {
         suffix.clear();
         compoundKey3b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -854,8 +929,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixExclusive) {
         suffix.clear();
         compoundKey3c.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -867,30 +943,31 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()),
             IndexKeyEntry(compoundKey1a, loc1));
 
@@ -903,8 +980,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
         seekPoint.firstExclusive = 1;  // Get second field from suffix, make it exclusive
 
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey1b, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -912,8 +990,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
         suffix.clear();
         compoundKey2b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey3b, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -921,8 +1000,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
         suffix.clear();
         compoundKey3b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -930,8 +1010,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithPrefixAndSuffixExclusive) {
         suffix.clear();
         compoundKey3c.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
@@ -943,30 +1024,31 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithSuffixExclusive) {
     const auto sorted(
         harnessHelper()->newSortedDataInterface(opCtx(), /*unique=*/false, /*partial=*/false));
 
-    ASSERT(sorted->isEmpty(opCtx()));
+    ASSERT(sorted->isEmpty(opCtx(), recoveryUnit()));
 
     {
         StorageWriteTransaction txn(recoveryUnit());
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
-        ASSERT_SDI_INSERT_OK(
-            sorted->insert(opCtx(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1a, loc1), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1b, loc2), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey1c, loc3), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey2b, loc4), true));
+        ASSERT_SDI_INSERT_OK(sorted->insert(
+            opCtx(), recoveryUnit(), makeKeyString(sorted.get(), compoundKey3b, loc5), true));
         txn.commit();
     }
 
-    ASSERT_EQUALS(5, sorted->numEntries(opCtx()));
+    ASSERT_EQUALS(5, sorted->numEntries(opCtx(), recoveryUnit()));
 
     {
-        const auto cursor(sorted->newCursor(opCtx()));
+        const auto cursor(sorted->newCursor(opCtx(), recoveryUnit()));
 
         ASSERT_EQ(
             cursor->seek(
+                recoveryUnit(),
                 makeKeyStringForSeek(sorted.get(), compoundKey1a, true, true).finishAndGetBuffer()),
             IndexKeyEntry(compoundKey1a, loc1));
 
@@ -979,8 +1061,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithSuffixExclusive) {
         seekPoint.firstExclusive = 1;  // Get both fields from the suffix, make the second exclusive
         key_string::Builder builder(sorted->getKeyStringVersion(), sorted->getOrdering());
 
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey1b, loc2));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -988,8 +1071,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithSuffixExclusive) {
         suffix.clear();
         compoundKey2b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   IndexKeyEntry(compoundKey3b, loc5));
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -997,8 +1081,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithSuffixExclusive) {
         suffix.clear();
         compoundKey3b.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
         builder.resetToEmpty(sorted->getOrdering());
 
@@ -1006,8 +1091,9 @@ TEST_F(SortedDataInterfaceTest, AdvanceToCompoundWithSuffixExclusive) {
         suffix.clear();
         compoundKey3c.elems(suffix);
         seekPoint.keySuffix = {suffix[0], suffix[1]};
-        ASSERT_EQ(cursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                      seekPoint, true, builder)),
+        ASSERT_EQ(cursor->seek(recoveryUnit(),
+                               IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                                   seekPoint, true, builder)),
                   boost::none);
     }
 }
