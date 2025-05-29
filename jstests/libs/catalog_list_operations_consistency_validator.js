@@ -438,29 +438,40 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
             // Happens on tests that launch mongod with a very low `maxBSONDepth` server param.
             5729100,  // "FieldPath is too long"
         ];
-        try {
-            const nsPrefix = (tenantId ? tenantId + "_" + db.getName() : db.getName()) + ".";
-            let listCatalog =
-                db.getSiblingDB("admin")
-                    .aggregate([
-                        {$listCatalog: {}},
-                        {
-                            $match:
-                                {...filter, ns: {$regex: new RegExp(`^${RegExp.escape(nsPrefix)}`)}}
-                        }
-                    ])
-                    .toArray();
+        let allowedNetworkErrorRetries = 3;
+        while (true) {
+            try {
+                const nsPrefix = (tenantId ? tenantId + "_" + db.getName() : db.getName()) + ".";
+                let listCatalog =
+                    db.getSiblingDB("admin")
+                        .aggregate([
+                            {$listCatalog: {}},
+                            {
+                                $match: {
+                                    ...filter,
+                                    ns: {$regex: new RegExp(`^${RegExp.escape(nsPrefix)}`)}
+                                }
+                            }
+                        ])
+                        .toArray();
 
-            // We don't need to call `filterListCatalogEntriesFromShardsWithoutChunks` here,
-            // as currently the only part the catalog that is inconsistent in shards without chunks
-            // are indexes, and we already skip validating those due to SERVER-75675.
+                // We don't need to call `filterListCatalogEntriesFromShardsWithoutChunks` here,
+                // as currently the only part the catalog that is inconsistent in shards without
+                // chunks are indexes, and we already skip validating those due to SERVER-75675.
 
-            return listCatalog;
-        } catch (ex) {
-            if (acceptableErrorCodes.includes(ex.code)) {
-                return null;
+                return listCatalog;
+            } catch (ex) {
+                if (acceptableErrorCodes.includes(ex.code)) {
+                    return null;
+                }
+                if ((isNetworkError(ex) || ErrorCodes.isNetworkTimeoutError(ex.code)) &&
+                    allowedNetworkErrorRetries > 0) {
+                    --allowedNetworkErrorRetries;
+                    jsTest.log.info("Retrying $listCatalog due to network error: " + ex);
+                    continue;
+                }
+                throw ex;
             }
-            throw ex;
         }
     }
 
