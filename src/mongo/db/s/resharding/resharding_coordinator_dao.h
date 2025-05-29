@@ -78,6 +78,12 @@ public:
                                                             DaoStorageClient* client,
                                                             Date_t now,
                                                             const UUID& reshardingUUID);
+
+    ReshardingCoordinatorDocument transitionToBlockingWritesPhase(OperationContext* opCtx,
+                                                                  DaoStorageClient* client,
+                                                                  Date_t now,
+                                                                  Date_t criticalSectionExpireTime,
+                                                                  const UUID& reshardingUUID);
 };
 
 }  // namespace resharding

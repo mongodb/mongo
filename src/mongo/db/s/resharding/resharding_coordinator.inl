@@ -1281,17 +1281,22 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
             }
 
             // set the criticalSectionExpiresAt on the coordinator doc
+            const auto now = (*executor)->now();
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
-            const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
+            const auto criticalSectionExpiresAt = now + criticalSectionTimeout;
 
-            ReshardingCoordinatorDocument updatedCSExpirationDoc = _coordinatorDoc;
-            updatedCSExpirationDoc.setCriticalSectionExpiresAt(criticalSectionExpiresAt);
-            this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
-                                                              updatedCSExpirationDoc);
-
-            _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                  resharding::getCurrentTime());
+            _updateCoordinatorDocStateAndCatalogEntries(
+                [=, this](OperationContext* opCtx, resharding::DaoStorageClient* client) {
+                    auto updatedDocument = _coordinatorDao.transitionToBlockingWritesPhase(
+                        opCtx,
+                        client,
+                        now,
+                        criticalSectionExpiresAt,
+                        _coordinatorDoc.getReshardingUUID());
+                    _metrics->setStartFor(ReshardingMetrics::TimedPhase::kCriticalSection, now);
+                    return updatedDocument;
+                });
         })
         .then([this] {
             return resharding::waitForMajority(_ctHolder->getAbortToken(),

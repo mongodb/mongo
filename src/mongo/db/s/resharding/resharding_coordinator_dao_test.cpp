@@ -157,5 +157,46 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
     dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
 }
 
+TEST(ReshardingCoordinatorDaoTest, TransitionToBlockingWritesPhase) {
+    ClockSourceMock clock;
+    SpyingDocumentUpdater updater;
+    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
+    ReshardingCoordinatorDao dao;
+    OperationContext* opCtx = nullptr;
+
+    auto uuid = UUID::gen();
+    auto now = clock.now();
+    auto criticalSectionExpiresAt = now + Seconds(5);
+    dao.transitionToBlockingWritesPhase(opCtx, &updater, now, criticalSectionExpiresAt, uuid);
+    const auto& lastRequest = updater.getLastRequest();
+
+    auto expectedUpdates = BSON_ARRAY(BSON(
+        "q" << BSON("_id" << uuid) << "u"
+            << BSON("$set" << BSON("state" << "blocking-writes"
+                                           << "criticalSectionExpiresAt" << criticalSectionExpiresAt
+                                           << "metrics.oplogApplication.stop" << now))
+            << "multi" << false << "upsert" << false));
+
+    ASSERT_EQUALS(lastRequest.getStringField("update"),
+                  NamespaceString::kConfigReshardingOperationsNamespace.coll());
+    auto updates = lastRequest.getObjectField("updates");
+    ASSERT_BSONOBJ_EQ_UNORDERED(updates, expectedUpdates);
+}
+
+DEATH_TEST(ReshardingCoordinatorDaoTest,
+           TransitionToBlockingWritesPhasePreviousStateInvariant,
+           "invariant") {
+    ClockSourceMock clock;
+    SpyingDocumentUpdater updater;
+    updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kAborting);
+    ReshardingCoordinatorDao dao;
+    OperationContext* opCtx = nullptr;
+
+    auto uuid = UUID::gen();
+    auto now = clock.now();
+    auto criticalSectionExpiresAt = now + Seconds(5);
+    dao.transitionToBlockingWritesPhase(opCtx, &updater, now, criticalSectionExpiresAt, uuid);
+}
+
 }  // namespace resharding
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 namespace mongo {
+namespace resharding {
 
 namespace {
 BSONObj executeConfigRequest(OperationContext* opCtx, const BatchedCommandRequest& request) {
@@ -54,9 +55,22 @@ void verifyUpdateResult(const BatchedCommandRequest& request, const BSONObj& res
                           << numDocsMatched << " for write request " << request.toString(),
             1 == numDocsMatched);
 }
-}  // namespace
 
-namespace resharding {
+ReshardingCoordinatorDocument buildAndExecuteRequest(OperationContext* opCtx,
+                                                     DaoStorageClient* client,
+                                                     const UUID& reshardingUUID,
+                                                     BSONObjBuilder& bob) {
+    auto request =
+        BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
+                                             BSON("_id" << reshardingUUID),
+                                             bob.obj(),
+                                             false,  // upsert
+                                             false   // multi
+        );
+    client->alterState(opCtx, request);
+    return client->readState(opCtx, reshardingUUID);
+}
+}  // namespace
 
 void DaoStorageClientImpl::alterState(OperationContext* opCtx,
                                       const BatchedCommandRequest& request) {
@@ -131,16 +145,35 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToCloningPhase
                           now);
     }
 
-    auto updateRequest =
-        BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                             BSON("_id" << reshardingUUID),
-                                             updateBuilder.obj(),
-                                             false,  // upsert
-                                             false   // multi
-        );
-    client->alterState(opCtx, updateRequest);
+    return buildAndExecuteRequest(opCtx, client, reshardingUUID, updateBuilder);
+}
 
-    return client->readState(opCtx, reshardingUUID);
+ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToBlockingWritesPhase(
+    OperationContext* opCtx,
+    DaoStorageClient* client,
+    Date_t now,
+    Date_t criticalSectionExpireTime,
+    const UUID& reshardingUUID) {
+
+    auto doc = client->readState(opCtx, reshardingUUID);
+    invariant(doc.getState() == CoordinatorStateEnum::kApplying);
+
+    BSONObjBuilder updateBuilder;
+    {
+        BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+        setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
+                          CoordinatorState_serializer(CoordinatorStateEnum::kBlockingWrites));
+
+        setBuilder.append(getIntervalEndFieldName<ReshardingCoordinatorDocument>(
+                              ReshardingRecipientMetrics::kOplogApplicationFieldName),
+                          now);
+
+        setBuilder.append(ReshardingCoordinatorDocument::kCriticalSectionExpiresAtFieldName,
+                          criticalSectionExpireTime);
+    }
+
+    return buildAndExecuteRequest(opCtx, client, reshardingUUID, updateBuilder);
 }
 
 ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhase(
@@ -165,16 +198,7 @@ ReshardingCoordinatorDocument ReshardingCoordinatorDao::transitionToApplyingPhas
                           now);
     }
 
-    auto updateRequest =
-        BatchedCommandRequest::buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
-                                             BSON("_id" << reshardingUUID),
-                                             updateBuilder.obj(),
-                                             false,  // upsert
-                                             false   // multi
-        );
-    client->alterState(opCtx, updateRequest);
-
-    return client->readState(opCtx, reshardingUUID);
+    return buildAndExecuteRequest(opCtx, client, reshardingUUID, updateBuilder);
 }
 
 }  // namespace resharding
