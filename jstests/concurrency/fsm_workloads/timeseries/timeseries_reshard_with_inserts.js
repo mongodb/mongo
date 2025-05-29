@@ -85,7 +85,10 @@ export const $config = (function() {
                     [timeField]: new Date(),
                 });
             }
-            TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
+
+            retryOnRetryableError(() => {
+                TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
+            }, 100 /* numRetries */, undefined /* sleepMs */, [ErrorCodes.NoProgressMade]);
 
             print(`Finished Inserting documents.`);
         },
