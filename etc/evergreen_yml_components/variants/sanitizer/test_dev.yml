@@ -136,7 +136,7 @@ variables:
     resmoke_jobs_factor: 0.3 # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     max_sub_suites: 3
-    large_distro_name: rhel8.8-large
+    large_distro_name: rhel8.8-xlarge
     xlarge_distro_name: rhel8.8-xxlarge
     multiversion_platform: rhel80
     multiversion_platform_50_or_later: rhel8
@@ -324,19 +324,19 @@ buildvariants:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel8.8-xlarge
       - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel8.8-xlarge
       - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel8.8-xlarge
       - name: .non_deterministic !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .non_deterministic .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_aubsan !.incompatible_system_allocator !.requires_all_feature_flags
         distros:
-          - rhel8.8-large
+          - rhel8.8-xlarge
 
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: rhel8-debug-aubsan-experimental

@@ -62,14 +62,45 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
         {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough.*", "factor": 0.125},
     ],
     "rhel8-debug-aubsan-classic-engine": [
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
+        {"task": r"change_streams_mongos_sessions_passthrough", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.25},
+        {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
+        {
+            "task": r"sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard",
+            "factor": 0.25,
+        },
+        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough", "factor": 0.125},
     ],
     "rhel8-debug-aubsan-all-feature-flags": [
-        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25},
         {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
+        {"task": r"change_streams_mongos_sessions_passthrough", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.25},
+        {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
+        {
+            "task": r"sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard",
+            "factor": 0.25,
+        },
+        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough", "factor": 0.125},
     ],
     "rhel8-debug-aubsan": [
+        {"task": r"change_streams_mongos_sessions_passthrough", "factor": 0.25},
         {"task": r"bulk_write_targeted_override.*", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharded_collections_jscore_passthrough", "factor": 0.25},
+        {"task": r"fcv_upgrade_downgrade_sharding_jscore_passthrough", "factor": 0.25},
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125},
+        {"task": r"sharded_causally_consistent_jscore_passthrough", "factor": 0.25},
+        {"task": "sharded_causally_consistent_read_concern_snapshot_passthrough", "factor": 0.25},
+        {
+            "task": r"sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard",
+            "factor": 0.25,
+        },
+        {"task": r"sharding_kill_stepdown_terminate_jscore_passthrough", "factor": 0.125},
     ],
     "enterprise-rhel-8-64-bit-dynamic-debug-mode": [
         {"task": "aggregation_one_shard_sharded_collections", "factor": 0.25},
