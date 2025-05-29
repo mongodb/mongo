@@ -37,7 +37,7 @@ assert.commandWorked(playerColl.insertMany([{
     name: "De'Aaron Fox",
 }]));
 
-const runTest = function({name, pipeline, errorCode}) {
+const runInvalidViewPipelineTest = function({name, pipeline, errorCode}) {
     assert.commandWorked(db.createView(name, teamColl.getName(), pipeline));
     const nestedView = `${name}_nested_view`;
     assert.commandWorked(db.createView(nestedView, name, [{$project: {_id: 0}}]));
@@ -61,7 +61,7 @@ const runTest = function({name, pipeline, errorCode}) {
         [errorCode]);
 };
 
-runTest({
+runInvalidViewPipelineTest({
     name: "begins_with_lookup_view",
     pipeline: [
         {
@@ -77,7 +77,7 @@ runTest({
     errorCode: 9475802
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "contains_lookup_view",
     pipeline: [
         { $match: {} },
@@ -93,7 +93,7 @@ runTest({
     errorCode: 9475802
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "nested_lookup_view",
     pipeline: [
         { $match: {} },
@@ -117,25 +117,27 @@ runTest({
     errorCode: 9475802
 });
 
-runTest({name: "search_view", pipeline: [{$search: {}}], errorCode: 9475801});
+runInvalidViewPipelineTest({name: "search_view", pipeline: [{$search: {}}], errorCode: 9475801});
 
-runTest({name: "vectorSearch_view", pipeline: [{$vectorSearch: {}}], errorCode: 9475801});
+runInvalidViewPipelineTest(
+    {name: "vectorSearch_view", pipeline: [{$vectorSearch: {}}], errorCode: 9475801});
 
-runTest({name: "searchMeta_view", pipeline: [{$searchMeta: {}}], errorCode: 9475801});
+runInvalidViewPipelineTest(
+    {name: "searchMeta_view", pipeline: [{$searchMeta: {}}], errorCode: 9475801});
 
-runTest({
+runInvalidViewPipelineTest({
     name: "begins_with_unionWith_view",
     pipeline: [{$unionWith: {coll: playerColl.getName(), pipeline: []}}],
     errorCode: 9475802
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "contains_unionWith_view",
     pipeline: [{$match: {}}, {$unionWith: {coll: playerColl.getName(), pipeline: []}}],
     errorCode: 9475802
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "nested_unionWith_view",
     pipeline: [
         {$match: {}},
@@ -152,27 +154,27 @@ runTest({
 // TODO SERVER-101721 $rankFusion is currently banned in views outright. Re-enable these error case
 // tests when we re-enable it.
 /**
-runTest({
+runInvalidViewPipelineTest({
     name: "rankFusion_search_view",
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$search: {}}]}}}}],
     errorCode: 9475801
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "rankFusion_vectorSearch_view",
     pipeline: [{$rankFusion: {input: {pipelines: {search: [{$vectorSearch: {}}]}}}}],
     errorCode: 9475801
 });
 */
 
-runTest({
+runInvalidViewPipelineTest({
     name: "scoreFusion_search_view",
     pipeline:
         [{$scoreFusion: {input: {pipelines: {search1: [{$search: {}}]}, normalization: "none"}}}],
     errorCode: 9475801
 });
 
-runTest({
+runInvalidViewPipelineTest({
     name: "scoreFusion_vectorSearch_view",
     pipeline: [{
         $scoreFusion:
@@ -180,6 +182,46 @@ runTest({
     }],
     errorCode: 9475801
 });
+
+const addFieldsViewName = "addFieldsView";
+const addFieldsViewPipeline = [{$addFields: {number: 4}}];
+assert.commandWorked(db.createView(addFieldsViewName, playerColl.getName(), addFieldsViewPipeline));
+
+const matchViewName = "matchView";
+const matchViewPipeline = [{$match: {name: "Sacramento Kings"}}];
+assert.commandWorked(db.createView(matchViewName, teamColl.getName(), matchViewPipeline));
+
+// "Manually" injecting a view into any search query is not allowed.
+const injectingViewTest = function(coll) {
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll,
+        pipeline:
+            [{$search: {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}}],
+        cursor: {}
+    }),
+                                 [5491300]);
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll,
+        pipeline: [{
+            $vectorSearch:
+                {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
+        }],
+        cursor: {}
+    }),
+                                 [5491300]);
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: coll,
+        pipeline: [{
+            $searchMeta: {view: {nss: addFieldsViewName, effectivePipeline: addFieldsViewPipeline}}
+        }],
+        cursor: {}
+    }),
+                                 [5491300]);
+};
+
+injectingViewTest(playerColl.getName());
+injectingViewTest(matchViewName);
+injectingViewTest(addFieldsViewName);
 
 // Make sure the server is still running.
 assert.commandWorked(db.runCommand("ping"));
