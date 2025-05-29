@@ -56,6 +56,10 @@ else
 fi
 
 if [ -n "${test_timeout_sec}" ]; then
+  # s390x and ppc64le often run slower than other architectures
+  if is_s390x_or_ppc64le; then
+    test_timeout_sec=$(($test_timeout_sec * 4))
+  fi
   bazel_args="${bazel_args} --test_timeout=${test_timeout_sec}"
 fi
 
