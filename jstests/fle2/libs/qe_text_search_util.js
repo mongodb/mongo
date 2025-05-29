@@ -102,3 +102,19 @@ export class SuffixAndPrefixField {
             this._prefixField.calculateExpectedTagCount(byte_len) - 1;
     }
 }
+
+export function encStrContainsExpr(field, value) {
+    return {$expr: {$encStrContains: {input: `$${field}`, substring: value}}};
+}
+
+export function encStrStartsWithExpr(field, value) {
+    return {$expr: {$encStrStartsWith: {input: `$${field}`, prefix: value}}};
+}
+
+export function encStrEndsWithExpr(field, value) {
+    return {$expr: {$encStrEndsWith: {input: `$${field}`, suffix: value}}};
+}
+
+export function encStrNormalizedEqExpr(field, value) {
+    return {$expr: {$encStrNormalizedEq: {input: `$${field}`, string: value}}};
+}
