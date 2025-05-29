@@ -27,7 +27,6 @@ MongoRunner.runHangAnalyzer.disable();
 try {
     withEachKindOfWriteStage(target, (stageSpec) => {
         assert.commandWorked(target.remove({}));
-        rst.awaitReplication();
 
         // Start an aggregate cursor with a writing stage, but use batchSize: 0 to prevent any
         // writes from happening in this command.
@@ -65,7 +64,6 @@ try {
         assert(tojson(error).indexOf("writeConcernError") != -1, tojson(error));
 
         restartServerReplication(rst.getSecondary());
-        rst.awaitReplication();
     });
 } finally {
     MongoRunner.runHangAnalyzer.enable();

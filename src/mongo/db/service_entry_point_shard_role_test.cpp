@@ -62,7 +62,6 @@ public:
 
         auto replCoordMock = std::make_unique<repl::ReplicationCoordinatorMock>(
             getGlobalServiceContext(), replSettings);
-        _replCoordMock = replCoordMock.get();
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
         repl::ReplicationCoordinator::set(getGlobalServiceContext(), std::move(replCoordMock));
 
@@ -73,9 +72,6 @@ public:
     void testProcessInternalCommand();
     void testCommandFailsRunInvocationWithCloseConnectionError();
     void testCommandMaxTimeMSOpOnly();
-
-protected:
-    repl::ReplicationCoordinatorMock* _replCoordMock;
 };
 
 void ServiceEntryPointShardRoleTest::testProcessInternalCommand() {
@@ -259,17 +255,14 @@ TEST_F(ServiceEntryPointShardServerTest, TestExhaustCommandNextInvocationSet) {
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientSpecified) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientSpecified();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedNoDefault) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientUnspecifiedNoDefault();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDefault) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientUnspecifiedWithDefault(false);
 }
 
@@ -371,17 +364,14 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestExhaustCommandNextInvocationSet) {
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientSpecified) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientSpecified();
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedNoDefault) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientUnspecifiedNoDefault();
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDefault) {
-    _replCoordMock->setWriteConcernMajorityShouldJournal(false);
     testWriteConcernClientUnspecifiedWithDefault(true);
 }
 
