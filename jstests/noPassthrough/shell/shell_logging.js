@@ -3,125 +3,138 @@
  */
 const tests = [];
 
-const jsTestLogUtils = {
-    setup: (test, logLevel = 4) => {
-        const oldTestData = TestData;
-        const printOriginal = print;
-        // In case an exception is thrown, revert the original print and TestData states.
-        try {
-            // Override the TestData object.
-            TestData = {...TestData, logFormat: "json", logLevel};
-            // Override the print function.
-            print = msg => {
-                print.console.push(msg);
-            };
-            print.console = [];
-            test();
-        } finally {
-            // Reset state.
-            print = printOriginal;
-            TestData = oldTestData;
-        }
-    },
-    getCapturedJSONOutput: (loggingFn, assertPrinted = true) => {
-        loggingFn();
-        // Assert we only print once.
-        if (assertPrinted)
-            assert.eq(1, print.console.length);
-        let printedJson = print.console[0] ? JSON.parse(print.console[0]) : {};
-        delete printedJson["t"];
-        // Reset the console
-        print.console = [];
-        return printedJson;
-    }
+const logLevelInfo = 3;
+const severityMap = {
+    E: 1,
+    W: 2,
+    I: 3,
+    D: 4
 };
+;
+
+/**
+ * A helper function to capture log output from 'jsTest.log*()' calls.
+ */
+function captureLogOutput({fn, logLevel = logLevelInfo, logFormat = "json"} = {}) {
+    const oldTestData = TestData;
+    const printOriginal = print;
+    // In case an exception is thrown, revert the original print and TestData states.
+    try {
+        // Override the TestData object.
+        TestData = {...TestData, logFormat, logLevel};
+        // Override the print function.
+        print = msg => {
+            print.console.push(msg);
+        };
+        print.console = [];
+        fn();
+        if (print.console.length === 0)
+            return undefined;
+        assert.eq(1, print.console.length);
+        let actualLogEntry = print.console[0];
+        if (logFormat === "json") {
+            actualLogEntry = actualLogEntry ? JSON.parse(actualLogEntry) : {};
+            // Remove time-dependent property 't'.
+            delete actualLogEntry["t"];
+        }
+        return actualLogEntry;
+    } finally {
+        // Reset state.
+        print = printOriginal;
+        TestData = oldTestData;
+    }
+}
+
+/**
+ * A helper function to assert on log output from 'jsTest.log*()' calls.
+ */
+function assertLogOutput({fn, expectedLogEntry, logLevel = logLevelInfo, logFormat = "json"} = {}) {
+    const logOutput = captureLogOutput({fn, logLevel, logFormat});
+    assert.docEq(expectedLogEntry, logOutput);
+}
 
 tests.push(function assertJsTestLogJsonFormat() {
-    const extraArgs = {attr: {hello: "world", foo: "bar"}};
-    jsTestLogUtils.setup(() => {
-        const printedJson =
-            jsTestLogUtils.getCapturedJSONOutput(() => jsTestLog("test message", extraArgs));
-        const expectedJson = {
-            "s": "I",
-            "c": "js_test",
-            "ctx": "shell_logging",
-            "msg": "test message",
-            "attr": extraArgs.attr,
-        };
-        assert.docEq(expectedJson, printedJson, "expected a different log format");
+    const extraArgs = {hello: "world", foo: "bar"};
+    const expectedLogEntry = {
+        "s": "I",
+        "c": "js_test",
+        "ctx": "shell_logging",
+        "msg": "test message",
+        "attr": extraArgs,
+    };
 
-        // Assert the plain format works as before.
-        TestData.logFormat = "plain";
-        jsTestLog("test message plain", extraArgs);
-        assert.eq(1, print.console.length);
-        const expectedLegacyResult =
-            ["----", "test message plain " + tojson(extraArgs.attr), "----"].map(
-                s => `[jsTest] ${s}`);
-        assert.eq(`\n\n${expectedLegacyResult.join("\n")}\n\n`,
-                  print.console,
-                  "expected a different log format when plain mode is on");
+    assertLogOutput({fn: () => jsTestLog("test message", extraArgs), expectedLogEntry});
+
+    // Assert the plain format works as before.
+    const expectedLegacyResult =
+        ["----", "test message plain " + tojson(extraArgs), "----"].map(s => `[jsTest] ${s}`);
+    assertLogOutput({
+        fn: () => jsTestLog("test message plain", extraArgs),
+        expectedLogEntry: `\n\n${expectedLegacyResult.join("\n")}\n\n`,
+        logFormat: "plain"
     });
 });
 
 tests.push(function assertLogSeverities() {
     const severities = {"I": "info", "D": "debug", "W": "warning", "E": "error"};
-    const extraArgs = {attr: {hello: "world", foo: "bar"}, id: 87};
-    jsTestLogUtils.setup(() => {
-        for (const [severity, logFnName] of Object.entries(severities)) {
-            const printedJson = jsTestLogUtils.getCapturedJSONOutput(
-                () => jsTest.log[logFnName]("test message", extraArgs.attr));
-            const expectedJson = {
-                "s": severity,
-                "c": "js_test",
-                "ctx": "shell_logging",
-                "msg": "test message",
-                "attr": extraArgs.attr,
-            };
-            assert.docEq(expectedJson, printedJson, "expected a different log to be printed");
-        }
-        // Assert default logging uses the info severity and that extra arguments are ignored.
-        const testMsg = "info is default.";
-        const printedLogInfo = jsTestLogUtils.getCapturedJSONOutput(
-            () => jsTest.log(testMsg, {...extraArgs, nonUsefulProp: "some value"}));
-        const printedLogDefault =
-            jsTestLogUtils.getCapturedJSONOutput(() => jsTest.log.info(testMsg, extraArgs.attr));
-        assert.docEq(printedLogInfo, printedLogDefault, "Expected default log severity to be info");
-    });
+    const extraArgs = {hello: "world", foo: "bar"};
+    for (const [severity, logFnName] of Object.entries(severities)) {
+        const expectedLogEntry = {
+            "s": severity,
+            "c": "js_test",
+            "ctx": "shell_logging",
+            "msg": "test message",
+            "attr": extraArgs,
+        };
+        assertLogOutput({
+            fn: () => jsTest.log[logFnName]("test message", extraArgs),
+            expectedLogEntry,
+            logLevel: severityMap[severity]
+        });
+    }
+
+    // Assert default logging uses the info severity and that extra arguments are ignored.
+    const testMsg = "info is default.";
+    const printedLogInfo = captureLogOutput({fn: () => jsTest.log(testMsg, extraArgs)});
+    const printedLogDefault = captureLogOutput({fn: () => jsTest.log.info(testMsg, extraArgs)});
+    assert.docEq(printedLogInfo, printedLogDefault, "expected default log severity to be info");
 });
 
 tests.push(function assertLogsAreFilteredBySeverity() {
-    const extraArgs = {attr: {hello: "world", foo: "bar"}, id: 87};
+    const extraArgs = {hello: "world", foo: "bar"};
     const severityFunctionNames = ["info", "debug", "warning", "error"];
-    // For each possible log level, test that all logs with greater severity are skipped.
-    [1, 2, 3, 4].forEach(logLevel => {
-        jsTestLogUtils.setup(() => {
+
+    ["json", "plain"].forEach(logFormat => {
+        // For each possible log level, test that all logs with greater severity are skipped.
+        [1, 2, 3, 4].forEach(logLevel => {
             const printedLogs =
                 severityFunctionNames
-                    .map(logFnName => {
-                        return jsTestLogUtils.getCapturedJSONOutput(
-                            () => jsTest.log[logFnName]("test message", extraArgs), false);
-                    })
-                    .filter(log => Object.keys(log).length > 0);
+                    .map(logFnName => captureLogOutput({
+                             fn: () => jsTest.log[logFnName]("test message", extraArgs),
+                             logLevel,
+                             logFormat
+                         }))
+                    .filter(log => log);
             assert.eq(
-                logLevel, printedLogs.length, "Printed a different number of logs: " + logLevel);
-        }, logLevel);
+                logLevel, printedLogs.length, "printed a different number of logs: " + logLevel);
+        });
     });
 });
 
 tests.push(function assertInvalidLogLevelAndSeverityThrows() {
-    [0, 5, "a", {a: 4}, {}].forEach(invalidLogLevel => {
-        jsTestLogUtils.setup(() => {
-            assert.throws(() => jsTest.log.info("This should throw."),
-                          [],
-                          "Invalid log levels should throw an exception.");
-        }, invalidLogLevel);
+    // Invalid log level is not accepted.
+    [0, 5, "a", {a: 4}, {}].forEach(logLevel => {
+        assert.throws(
+            () => captureLogOutput({fn: () => jsTest.log.info("This should throw."), logLevel}),
+            [],
+            "invalid log levels should throw an exception");
     });
-    ["q", 0, 12, {hello: "world"}, {}].forEach(invalidSeverity => {
-        jsTestLogUtils.setup(() => {
-            assert.throws(() => jsTest.log("This should throw.", {severity: invalidSeverity}),
-                          [],
-                          "Invalid severity should throw an exception.");
-        }, 4);
+
+    // Invalid log level severity is not accepted.
+    ["q", 0, 12, {hello: "world"}, {}].forEach(severity => {
+        assert.throws(() => jsTest.log("This should throw.", null, {severity}),
+                      [],
+                      "invalid severity should throw an exception");
     });
 });
 

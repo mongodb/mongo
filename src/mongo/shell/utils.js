@@ -547,28 +547,26 @@ jsTestOptions = function() {
  * Depending on the format, it can either be in plain text, or as a stringified JSON.
  *
  * @param {string} msg - The message to be printed.
+ * @param {object} [attr] - An object used to declare extra logging params.
  * @param {object} args
- * @param {object} args.attr - An object used to declare extra logging params.
  * @param {("I"|"D"|"W"|"E")} args.severity - An unique identified to help with filtering logs.
  */
-jsTestLog = function(
-    msg,
-    {severity, attr} = {},
-) {
-    if (TestData?.logFormat === "json") {
-        severity = severity === undefined ? "I" : severity;
-        const severityLevel = {E: 1, W: 2, I: 3, D: 4}[severity];
-        const logLevel = TestData?.logLevel;
-        if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) ||
-            !severityLevel) {
-            throw new Error(`Invalid log severity (${severity}) and/or log level (${logLevel}).`);
-        }
-        // If log level is smaller than the current severity level and both values are defined with
-        // expected values, skip printing.
-        if (severityLevel > logLevel) {
-            return;
-        }
+jsTestLog = function(msg, attr, {severity = "I"} = {}) {
+    const severityMap = {E: 1, W: 2, I: 3, D: 4};
+    const severityLevel = severityMap[severity];
+    const logLevel = TestData?.logLevel ?? severityMap["I"];  // The default log level is 'INFO'.
+    if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) ||
+        !severityLevel) {
+        throw new Error(`invalid log severity (${severity}) and/or log level (${logLevel})`);
+    }
 
+    // If log level is smaller than the current severity level and both values are defined with
+    // expected values, skip printing.
+    if (severityLevel > logLevel) {
+        return;
+    }
+
+    if (TestData?.logFormat === "json") {
         // Syntax sugar for 'jsTestLog({someObject}) = jsTestLog(null, {attr: someObject})'.
         if (!attr && typeof msg === "object" && msg !== null) {
             attr = msg;
@@ -619,19 +617,19 @@ jsTest.adminUserRoles = ["root"];
 jsTest.log = jsTestLog;
 
 jsTest.log.info = function(msg, attr) {
-    jsTestLog(msg, {attr, severity: "I"});
+    jsTestLog(msg, attr, {severity: "I"});
 };
 
 jsTest.log.debug = function(msg, attr) {
-    jsTestLog(msg, {attr, severity: "D"});
+    jsTestLog(msg, attr, {severity: "D"});
 };
 
 jsTest.log.warning = function(msg, attr) {
-    jsTestLog(msg, {attr, severity: "W"});
+    jsTestLog(msg, attr, {severity: "W"});
 };
 
 jsTest.log.error = function(msg, attr) {
-    jsTestLog(msg, {attr, severity: "E"});
+    jsTestLog(msg, attr, {severity: "E"});
 };
 
 jsTest.authenticate = function(conn) {
