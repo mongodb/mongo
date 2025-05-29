@@ -170,6 +170,7 @@ query:
     - src/mongo/db/op_observer/change_stream_pre_images_op_observer*
     - src/mongo/db/set_change_stream*
     - src/mongo/db/curop*
+    - src/mongo/db/cursor*
     - src/mongo/db/fts/
     - src/mongo/db/geo/
     - src/mongo/db/index_names*
@@ -558,6 +559,7 @@ routing_and_topology:
     # are stored in the config server and are replicated to all shards. They are used to control
     # the behavior of the cluster as a whole, rather than individual shards.
     - src/mongo/db/commands/*cluster_parameter*
+    - src/mongo/db/commands/cluster_server_parameter*
     - src/mongo/db/s/config/*cluster_parameter*
     - src/mongo/db/s/shardsvr_set_cluster_parameter_command.cpp
     - src/mongo/idl/cluster_server_parameter*
@@ -617,6 +619,7 @@ routing_and_topology:
 
     # user writes block
     - src/mongo/db/commands/*user_write_block*
+    - src/mongo/db/op_observer/*user_write_block*
     - src/mongo/db/write_block_bypass[._]*
     - src/mongo/db/s/*user_write*
     - src/mongo/db/s/config/*user_write*
