@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -34,13 +34,10 @@
 
 namespace mongo {
 
-template <typename Base, typename PhaseEnum, size_t Size>
-class WithPhaseDurationManagement : public Base {
+template <typename PhaseEnum, size_t Size>
+class PhaseDurationTracker {
 public:
     using TimedPhaseNameMap = stdx::unordered_map<PhaseEnum, StringData>;
-
-    template <typename... Args>
-    WithPhaseDurationManagement(Args&&... args) : Base{std::forward<Args>(args)...} {}
 
     boost::optional<ReshardingMetricsTimeInterval> getIntervalFor(PhaseEnum phase) const {
         auto start = getStartFor(phase);
@@ -75,7 +72,6 @@ public:
         return _durations[toIndex(phase)].template getElapsed<TimeUnit>(clock);
     }
 
-protected:
     template <typename TimeUnit>
     void reportDurationsForAllPhases(const TimedPhaseNameMap& names,
                                      ClockSource* clock,

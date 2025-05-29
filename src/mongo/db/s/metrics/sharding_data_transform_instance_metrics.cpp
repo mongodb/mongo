@@ -366,6 +366,27 @@ void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds
     getTypedCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
 }
 
+boost::optional<ReshardingMetricsTimeInterval> ShardingDataTransformInstanceMetrics::getIntervalFor(
+    PhaseEnum phase) const {
+    return _phaseDurations.getIntervalFor(phase);
+}
+
+boost::optional<Date_t> ShardingDataTransformInstanceMetrics::getStartFor(PhaseEnum phase) const {
+    return _phaseDurations.getStartFor(phase);
+}
+
+boost::optional<Date_t> ShardingDataTransformInstanceMetrics::getEndFor(PhaseEnum phase) const {
+    return _phaseDurations.getEndFor(phase);
+}
+
+void ShardingDataTransformInstanceMetrics::setStartFor(PhaseEnum phase, Date_t date) {
+    _phaseDurations.setStartFor(phase, date);
+}
+
+void ShardingDataTransformInstanceMetrics::setEndFor(PhaseEnum phase, Date_t date) {
+    _phaseDurations.setEndFor(phase, date);
+}
+
 ShardingDataTransformInstanceMetrics::UniqueScopedObserver
 ShardingDataTransformInstanceMetrics::registerInstanceMetrics() {
     return _cumulativeMetrics->registerInstanceMetrics(_observer.get());

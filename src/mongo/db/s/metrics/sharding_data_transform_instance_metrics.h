@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
+#include "mongo/db/s/metrics/phase_duration_tracker.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
@@ -51,12 +52,22 @@
 
 namespace mongo {
 
+namespace resharding_metrics {
+
+enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
+constexpr auto kNumTimedPhase = 4;
+using PhaseDurationTracker = PhaseDurationTracker<TimedPhase, kNumTimedPhase>;
+
+}  // namespace resharding_metrics
+
 class ShardingDataTransformInstanceMetrics {
 public:
     using Role = ShardingDataTransformMetrics::Role;
     using ObserverPtr = std::unique_ptr<ShardingDataTransformMetricsObserverInterface>;
     using FieldNameProviderPtr =
         std::unique_ptr<ShardingDataTransformInstanceMetricsFieldNameProvider>;
+    using TimedPhaseNameMap = resharding_metrics::PhaseDurationTracker::TimedPhaseNameMap;
+    using PhaseEnum = resharding_metrics::TimedPhase;
 
     ShardingDataTransformInstanceMetrics(UUID instanceId,
                                          BSONObj originalCommand,
@@ -145,6 +156,17 @@ public:
     void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
 
+    boost::optional<ReshardingMetricsTimeInterval> getIntervalFor(PhaseEnum phase) const;
+    boost::optional<Date_t> getStartFor(PhaseEnum phase) const;
+    boost::optional<Date_t> getEndFor(PhaseEnum phase) const;
+    void setStartFor(PhaseEnum phase, Date_t date);
+    void setEndFor(PhaseEnum phase, Date_t date);
+
+    template <typename TimeUnit>
+    boost::optional<TimeUnit> getElapsed(PhaseEnum phase, ClockSource* clock) const {
+        return _phaseDurations.getElapsed<TimeUnit>(phase, clock);
+    }
+
 protected:
     static constexpr auto kNoDate = Date_t::min();
     using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
@@ -203,6 +225,14 @@ protected:
         bob->append(names->getForDeletesApplied(), getDeletesApplied());
     }
 
+    template <typename TimeUnit>
+    void reportDurationsForAllPhases(const TimedPhaseNameMap& names,
+                                     ClockSource* clock,
+                                     BSONObjBuilder* bob,
+                                     boost::optional<TimeUnit> defaultValue = boost::none) const {
+        _phaseDurations.reportDurationsForAllPhases(names, clock, bob, defaultValue);
+    }
+
     const UUID _instanceId;
     const BSONObj _originalCommand;
     const NamespaceString _sourceNs;
@@ -236,6 +266,8 @@ private:
     AtomicWord<int64_t> _deletesApplied{0};
     AtomicWord<int64_t> _oplogEntriesApplied{0};
     AtomicWord<int64_t> _oplogEntriesFetched{0};
+
+    resharding_metrics::PhaseDurationTracker _phaseDurations;
 };
 
 }  // namespace mongo

@@ -36,7 +36,6 @@
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics/with_phase_duration_management.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
@@ -62,23 +61,10 @@
 
 namespace mongo {
 
-namespace resharding_metrics {
-
-enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
-constexpr auto kNumTimedPhase = 4;
-
-namespace detail {
-
-using Base =
-    WithPhaseDurationManagement<ShardingDataTransformInstanceMetrics, TimedPhase, kNumTimedPhase>;
-
-}  // namespace detail
-}  // namespace resharding_metrics
-
-class ReshardingMetrics : public resharding_metrics::detail::Base {
+class ReshardingMetrics : public ShardingDataTransformInstanceMetrics {
 public:
     using State = ReshardingCumulativeMetrics::AnyState;
-    using Base = resharding_metrics::detail::Base;
+    using Base = ShardingDataTransformInstanceMetrics;
     using TimedPhase = resharding_metrics::TimedPhase;
 
     struct ExternallyTrackedRecipientFields {
