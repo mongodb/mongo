@@ -93,7 +93,7 @@ const expectToReopenBuckets = function() {
     };
 
     const bucketDoc = {
-        "_id": ObjectId("01091c2c050b7495eaef4580"),
+        "_id": ObjectId("63091ca4050b7495eaef4580"),
         "control": {
             "version": 1,
             "min": {
@@ -113,7 +113,7 @@ const expectToReopenBuckets = function() {
         }
     };
     const missingClosedFlagBucketDoc = {
-        "_id": ObjectId("02091c2c050b7495eaef4581"),
+        "_id": ObjectId("63091ca4050b7495eaef4581"),
         "control": {
             "version": 1,
             "min": {
@@ -159,7 +159,7 @@ const expectToReopenBucketsWithComplexMeta = function() {
     const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z"), [metaField]: {b: 2, a: 2}};
 
     const bucketDoc = {
-        "_id": ObjectId("03091c2c050b7495eaef4580"),
+        "_id": ObjectId("63091ca4050b7495eaef4580"),
         "control": {
             "version": 1,
             "min": {
@@ -242,7 +242,7 @@ const failToReopenNonSuitableBuckets = function() {
     };
 
     const closedBucketDoc = {
-        "_id": ObjectId("04091c2c050b7495eaef4582"),
+        "_id": ObjectId("63091ca4050b7495eaef4582"),
         "control": {
             "version": 1,
             "min": {
@@ -262,47 +262,43 @@ const failToReopenNonSuitableBuckets = function() {
         }
     };
     const compressedBucketDoc = {
-        "_id": ObjectId("05091c2c050b7495eaef4583"),
+        "_id": ObjectId("63091ca4050b7495eaef4583"),
         "control": {
             "version": 2,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("6778565dce0551cf37a25cdb"),
                 "time": ISODate("2022-08-26T19:19:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("6778565dce0551cf37a25cdb"),
                 "time": ISODate("2022-08-26T19:19:30Z")
             },
-            "closed": false
+            "closed": false,
+            "count": 1,
         },
         "meta": "NonSuitableBucket2",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBneFZdzgVRzzeiXNsA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
     };
     const closedAndCompressedBucketDoc = {
-        "_id": ObjectId("06091c2c050b7495eaef4584"),
+        "_id": ObjectId("63091ca4050b7495eaef4584"),
         "control": {
             "version": 2,
             "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("6778565dce0551cf37a25cdb"),
                 "time": ISODate("2022-08-26T19:19:00Z")
             },
             "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "_id": ObjectId("6778565dce0551cf37a25cdb"),
                 "time": ISODate("2022-08-26T19:19:30Z")
             },
-            "closed": true
+            "closed": true,
+            "count": 1,
         },
         "meta": "NonSuitableBucket3",
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
+        "data": {"_id": BinData(7, "BwBneFZdzgVRzzeiXNsA"), "time": BinData(7, "CQDQVZjbggEAAAA=")}
     };
     const year2000BucketDoc = {
-        "_id": ObjectId("07091c2c050b7495eaef4585"),
+        "_id": ObjectId("39a81824050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -318,11 +314,11 @@ const failToReopenNonSuitableBuckets = function() {
         "meta": "NonSuitableBucket4",
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+            "time": {"0": ISODate("2000-08-26T19:19:30Z")}
         }
     };
     const metaMismatchFieldBucketDoc = {
-        "_id": ObjectId("08091c2c050b7495eaef4586"),
+        "_id": ObjectId("63091ca4050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
@@ -384,7 +380,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("09091c2c050b7495eaef4581"),
+        "_id": ObjectId("63091ca4050b7495eaef4581"),
         "control": {
             "version": 1,
             "min": {
@@ -404,7 +400,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
         }
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("10091c2c050b7495eaef4582"),
+        "_id": ObjectId("63091ca4050b7495eaef4582"),
         "control": {
             "version": 1,
             "min": {
@@ -424,7 +420,7 @@ const failToReopenBucketWithNoMetaTimeIndex = function() {
         }
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("11091c2c050b7495eaef4583"),
+        "_id": ObjectId("63091ca4050b7495eaef4583"),
         "control": {
             "version": 1,
             "min": {
@@ -499,7 +495,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
     };
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("12091c2c050b7495eaef4584"),
+        "_id": ObjectId("63091ca4050b7495eaef4584"),
         "control": {
             "version": 1,
             "min": {
@@ -519,7 +515,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("13091c2c050b7495eaef4585"),
+        "_id": ObjectId("63091ca4050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -539,7 +535,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("14091c2c050b7495eaef4586"),
+        "_id": ObjectId("63091ca4050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
@@ -559,7 +555,7 @@ const reopenBucketsWhenSuitableIndexExists = function() {
         }
     };
     const closedBucketDoc4 = {
-        "_id": ObjectId("15091c2c050b7495eaef4587"),
+        "_id": ObjectId("63091ca4050b7495eaef4587"),
         "control": {
             "version": 1,
             "min": {
@@ -636,7 +632,7 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
     const measurement3 = {[timeField]: ISODate("2022-07-26T19:19:00Z")};
 
     const closedBucketDoc1 = {
-        "_id": ObjectId("16091c2c050b7495eaef4584"),
+        "_id": ObjectId("6331fb24050b7495eaef4584"),
         "control": {
             "version": 1,
             "min": {
@@ -655,7 +651,7 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
         }
     };
     const closedBucketDoc2 = {
-        "_id": ObjectId("17091c2c050b7495eaef4585"),
+        "_id": ObjectId("63091ca4050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -674,7 +670,7 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
         }
     };
     const closedBucketDoc3 = {
-        "_id": ObjectId("18091c2c050b7495eaef4586"),
+        "_id": ObjectId("62e03e24050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
