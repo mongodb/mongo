@@ -64,9 +64,7 @@ def get_all_feature_flags(idl_dirs: List[str] = None):
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
             for feature_flag in doc.spec.feature_flags:
-                all_flags[feature_flag.name] = (
-                    "true" if binder.is_feature_flag_enabled_by_default(feature_flag) else "false"
-                )
+                all_flags[feature_flag.name] = feature_flag
 
     return all_flags
 
@@ -75,18 +73,35 @@ def get_all_feature_flags_turned_on_by_default(idl_dirs: List[str] = None):
     """Generate a list of all feature flags that default to true."""
     all_flags = get_all_feature_flags(idl_dirs)
 
-    return [flag for flag in all_flags if all_flags[flag] == "true"]
+    return [
+        name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
+    ]
 
 
 def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
     """Generate a list of all feature flags that default to false."""
     all_flags = get_all_feature_flags(idl_dirs)
-    all_default_false_flags = [flag for flag in all_flags if all_flags[flag] != "true"]
+    all_default_false_flags = [
+        name
+        for name, flag in all_flags.items()
+        if not binder.is_feature_flag_enabled_by_default(flag)
+    ]
 
     with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_default_false_flags) - set(force_disabled_flags))
+
+
+def get_all_unreleased_ifr_feature_flags(idl_dirs: List[str] = None):
+    """Generate a list of all features flags in the 'in_development' incremental rollout phase."""
+    all_flags = get_all_feature_flags(idl_dirs)
+
+    return [
+        name
+        for name, flag in all_flags.items()
+        if binder.is_unreleased_incremental_rollout_feature_flag(flag)
+    ]
 
 
 def write_feature_flags_to_file(flags: List[str], filename: str):
@@ -111,6 +126,33 @@ def turned_on_by_default(filename: str = "all_feature_flags.txt"):
     """Generate a list of feature flags that default to ON."""
     flags = get_all_feature_flags_turned_on_by_default()
     write_feature_flags_to_file(flags, filename)
+
+
+@cli.command("feature-flag-status")
+def feature_flag_status():
+    """Generate lists of all default-enabled feature flags, all default-disabled feature flags and
+    all 'in_development' IFR feature flags, with each list on its own line
+    """
+    all_flags = get_all_feature_flags()
+
+    default_enabled_flags = [
+        name for name, flag in all_flags.items() if binder.is_feature_flag_enabled_by_default(flag)
+    ]
+    print(f"on_feature_flags {' '.join(default_enabled_flags)}")
+
+    default_disabled_flags = [
+        name
+        for name, flag in all_flags.items()
+        if not binder.is_feature_flag_enabled_by_default(flag)
+    ]
+    print(f"off_feature_flags {' '.join(default_disabled_flags)}")
+
+    unreleased_ifr_flags = [
+        name
+        for name, flag in all_flags.items()
+        if binder.is_unreleased_incremental_rollout_feature_flag(flag)
+    ]
+    print(f"unreleased_ifr_flags {' '.join(unreleased_ifr_flags)}")
 
 
 if __name__ == "__main__":

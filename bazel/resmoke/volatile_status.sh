@@ -19,7 +19,8 @@ echo build_variant ${build_variant}
 echo version_id ${version_id}
 echo requester ${requester}
 
-# The current set of disabled feature flags. It would be better to remove this
-# as it risks breaking the contract of volatile-status.txt. Changes to feature
-# flag state should invalidate actions that consume this. SERVER-103590
-echo off_feature_flags $(python bazel/resmoke/get_off_feature_flags.py)
+# The current sets of enabled, disabled, and unrleased IFR feature flags. It
+# would be better to remove this as it risks breaking the contract of
+# volatile-status.txt. Changes to feature flag state should invalidate actions
+# that consume this. SERVER-103590
+python buildscripts/idl/gen_all_feature_flag_list.py feature-flag-status

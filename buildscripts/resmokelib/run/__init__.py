@@ -1666,7 +1666,7 @@ class RunPlugin(PluginInterface):
             dest="additional_feature_flags",
             action="append",
             metavar="featureFlag1, featureFlag2, ...",
-            help="Additional feature flags",
+            help="Additional feature flags to enable, even if they would be disabled by --disableUnreleasedIFRFlags.",
         )
 
         parser.add_argument(
@@ -1679,10 +1679,17 @@ class RunPlugin(PluginInterface):
 
         parser.add_argument(
             "--disableFeatureFlags",
-            dest="disable_feature_flags",
+            dest="excluded_feature_flags",
             action="append",
             metavar="featureFlag1, featureFlag2, ...",
-            help="Disable tests with certain feature flags",
+            help="Explicitly disable feature flags, even if they wouold be enabled by --runAllFeatureFlagTests.",
+        )
+
+        parser.add_argument(
+            "--disableUnreleasedIFRFlags",
+            dest="disable_unreleased_ifr_flags",
+            action="store_true",
+            help="Explicitly disable Incremental Rollout Feature (IFR) flags in the 'in_development' or 'rollout' state, even if they would be enabled by --runAllFeatureFlagTests.",
         )
 
         parser.add_argument(

@@ -11,11 +11,35 @@ genrule(
 )
 
 genrule(
+    name = "on_feature_flags",
+    srcs = [],
+    outs = ["on_feature_flags.txt"],
+    cmd = """
+    awk '/^on_feature_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "off_feature_flags",
     srcs = [],
     outs = ["off_feature_flags.txt"],
     cmd = """
-    grep ^off_feature_flags bazel-out/volatile-status.txt | cut -d' ' -f2- | tr ' ' '\n'  > $@
+    awk '/^off_feature_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "unreleased_ifr_flags",
+    srcs = [],
+    outs = ["unreleased_ifr_flags.txt"],
+    cmd = """
+    awk '/^unreleased_ifr_flags/ { for (i=2; i<=NF; i++) print $$i }' bazel-out/volatile-status.txt > $@
     """,
     stamp = True,
     tags = ["external"],  # Consuming the feature flag information from volatile-status, so this should always execute.

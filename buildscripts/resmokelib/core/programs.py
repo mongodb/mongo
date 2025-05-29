@@ -355,6 +355,9 @@ def mongo_shell_program(
     if config.ENABLED_FEATURE_FLAGS is not None:
         feature_flag_dict = {ff: "true" for ff in config.ENABLED_FEATURE_FLAGS}
 
+    if config.DISABLED_FEATURE_FLAGS is not None:
+        feature_flag_dict |= {ff: "false" for ff in config.DISABLED_FEATURE_FLAGS}
+
     # Propagate additional setParameters to mongod processes spawned by the mongo shell. Command
     # line options to resmoke.py override the YAML configuration.
     if config.MONGOD_SET_PARAMETERS is not None:

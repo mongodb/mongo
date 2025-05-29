@@ -115,7 +115,9 @@ def resmoke_suite_test(
         data = data + [
             config,
             "//bazel/resmoke:resmoke_mongo_version",
+            "//bazel/resmoke:on_feature_flags",
             "//bazel/resmoke:off_feature_flags",
+            "//bazel/resmoke:unreleased_ifr_flags",
             "//buildscripts/resmokeconfig:all_files",  # This needs to be reduced, SERVER-103610
             "//src/mongo/util/version:releases.yml",
         ] + select({

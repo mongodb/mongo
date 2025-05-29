@@ -109,7 +109,8 @@ DEFAULTS = {
     "run_no_feature_flag_tests": False,
     "additional_feature_flags": None,
     "additional_feature_flags_file": None,
-    "disable_feature_flags": None,
+    "excluded_feature_flags": None,
+    "disable_unreleased_ifr_flags": False,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,
@@ -490,9 +491,9 @@ RUN_NO_FEATURE_FLAG_TESTS = None
 ADDITIONAL_FEATURE_FLAGS_FILE = None
 
 # List of feature flags to disable
-DISABLE_FEATURE_FLAGS = None
+DISABLED_FEATURE_FLAGS = None
 
-# List of enabled feature flags.
+# List of feature flags to enable.
 ENABLED_FEATURE_FLAGS = []
 
 # The path to the mongo executable used by resmoke.py.

@@ -1601,6 +1601,14 @@ def _is_ifr_feature_flag_enabled_by_default(feature_flag_phase):
     return feature_flag_phase != ast.FeatureFlagRolloutPhase.IN_DEVELOPMENT
 
 
+def _is_ifr_feature_flag_unreleased(feature_flag_phase):
+    # type: (ast.FeatureFlagRolloutPhase) -> bool
+    return (
+        feature_flag_phase == ast.FeatureFlagRolloutPhase.IN_DEVELOPMENT
+        or feature_flag_phase == ast.FeatureFlagRolloutPhase.ROLLOUT
+    )
+
+
 def _bind_ifr_feature_flag_default(ctxt, param, feature_flag_phase):
     # type: (errors.ParserContext, syntax.FeatureFlag, ast.FeatureFlagRolloutPhase) -> ast.Expression
 
@@ -1878,6 +1886,17 @@ def is_feature_flag_enabled_by_default(feature_flag):
         )
     else:
         return feature_flag.default.literal == "true"
+
+
+def is_unreleased_incremental_rollout_feature_flag(feature_flag):
+    """Determine if an idl.FeatureFlag is an Incremental Feature Rollout (IFR) flag in the
+    'in_development' or 'rollout' state without validating its syntax.
+    """
+    # type: (syntax.FeatureFlag) -> bool
+
+    return feature_flag.incremental_rollout_phase and _is_ifr_feature_flag_unreleased(
+        ast.FeatureFlagRolloutPhase.bind(feature_flag.incremental_rollout_phase)
+    )
 
 
 def bind(parsed_spec):

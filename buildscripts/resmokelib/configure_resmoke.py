@@ -36,6 +36,7 @@ from evergreen.config import get_auth
 BASE_16_TO_INT = 16
 COLLECTOR_ENDPOINT = "otel-collector.prod.corp.mongodb.com:443"
 BAZEL_GENERATED_OFF_FEATURE_FLAGS = "bazel/resmoke/off_feature_flags.txt"
+BAZEL_GENERATED_UNRELEASED_IFR_FEATURE_FLAGS = "bazel/resmoke/unreleased_ifr_feature_flags.txt"
 
 
 def validate_and_update_config(parser, args, should_configure_otel=True):
@@ -324,50 +325,93 @@ be invoked as either:
         with open(path) as fd:
             return fd.read().split()
 
-    def setup_feature_flags():
-        _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
-        _config.RUN_NO_FEATURE_FLAG_TESTS = config.pop("run_no_feature_flag_tests")
-        _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
-        _config.DISABLE_FEATURE_FLAGS = config.pop("disable_feature_flags")
-
-        if values.command == "run":
-            # These logging messages start with # becuase the output of this file must produce
-            # valid yaml. This comments out these print statements when the output is parsed.
-            print("# Fetching feature flags...")
-            if os.path.exists(BAZEL_GENERATED_OFF_FEATURE_FLAGS):
-                all_ff = process_feature_flag_file(BAZEL_GENERATED_OFF_FEATURE_FLAGS)
-            else:
-                all_ff = gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
-            print("# Fetched feature flags...")
+    def set_up_feature_flags():
+        # These logging messages start with # becuase the output of this file must produce
+        # valid yaml. This comments out these print statements when the output is parsed.
+        print("# Fetching feature flags...")
+        if os.path.exists(BAZEL_GENERATED_OFF_FEATURE_FLAGS):
+            default_disabled_feature_flags = set(
+                process_feature_flag_file(BAZEL_GENERATED_OFF_FEATURE_FLAGS)
+            )
         else:
-            all_ff = []
+            default_disabled_feature_flags = set(
+                gen_all_feature_flag_list.get_all_feature_flags_turned_off_by_default()
+            )
+        default_disabled_set = set(default_disabled_feature_flags)
+        print("# Fetched feature flags...")
 
-        enabled_feature_flags = []
-        if _config.RUN_ALL_FEATURE_FLAG_TESTS:
-            enabled_feature_flags = all_ff[:]
+        # Get feature flags that are to be explicitly enabled or disabled.
+        additional_feature_flags = _tags_from_list(config.pop("additional_feature_flags"))
+        excluded_feature_flags = _tags_from_list(config.pop("excluded_feature_flags"))
+
+        added_set = set(additional_feature_flags) if additional_feature_flags is not None else set()
+        excluded_set = set(excluded_feature_flags) if excluded_feature_flags is not None else set()
 
         if _config.ADDITIONAL_FEATURE_FLAGS_FILE:
-            enabled_feature_flags.extend(
-                process_feature_flag_file(_config.ADDITIONAL_FEATURE_FLAGS_FILE)
-            )
+            added_set |= set(process_feature_flag_file(_config.ADDITIONAL_FEATURE_FLAGS_FILE))
 
-        # Specify additional feature flags from the command line.
-        # Set running all feature flag tests to True if this options is specified.
-        additional_feature_flags = _tags_from_list(config.pop("additional_feature_flags"))
-        if additional_feature_flags is not None:
-            enabled_feature_flags.extend(additional_feature_flags)
+        common_set = set.intersection(added_set, excluded_set)
+        if len(common_set) > 0:
+            err = textwrap.dedent(f"""\
+The --additionalFeatureFlags and --disableFeatureFlags arguments must not have
+flags in common: {common_set}
+""")
+            raise ValueError(err)
 
-        # Remove feature flags which enabled with other feature flags arguments
-        if _config.DISABLE_FEATURE_FLAGS:
-            disable_feature_flags = _tags_from_list(_config.DISABLE_FEATURE_FLAGS)
-            for flag in disable_feature_flags:
-                if flag in enabled_feature_flags:
-                    enabled_feature_flags.remove(flag)
+        enabled_feature_flags_set = (
+            (default_disabled_set - excluded_set) | added_set
+            if _config.RUN_ALL_FEATURE_FLAG_TESTS
+            else added_set
+        )
 
-        return enabled_feature_flags, all_ff
+        if _config.DISABLE_UNRELEASED_IFR_FLAGS:
+            print("# Fetching unreleased incremental rollout feature flags...")
+            if os.path.exists(BAZEL_GENERATED_UNRELEASED_IFR_FEATURE_FLAGS):
+                unreleased_ifr_set = set(
+                    process_feature_flag_file(BAZEL_GENERATED_UNRELEASED_IFR_FEATURE_FLAGS)
+                )
+            else:
+                unreleased_ifr_set = set(
+                    gen_all_feature_flag_list.get_all_unreleased_ifr_feature_flags()
+                )
+            print("# Fetched unreleased incremental rollout feature flags...")
 
-    _config.ENABLED_FEATURE_FLAGS, all_feature_flags = setup_feature_flags()
-    not_enabled_feature_flags = list(set(all_feature_flags) - set(_config.ENABLED_FEATURE_FLAGS))
+            disabled_feature_flags_set = (unreleased_ifr_set - added_set) | excluded_set
+        else:
+            disabled_feature_flags_set = excluded_set
+
+        # This list includes flags that are disabled by default, even if they are not explicitly
+        # disabled.
+        off_feature_flags = list(
+            (default_disabled_set | disabled_feature_flags_set) - enabled_feature_flags_set
+        )
+
+        return (
+            list(enabled_feature_flags_set),
+            list(disabled_feature_flags_set),
+            default_disabled_feature_flags,
+            off_feature_flags,
+        )
+
+    _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
+    _config.RUN_NO_FEATURE_FLAG_TESTS = config.pop("run_no_feature_flag_tests")
+    _config.DISABLE_UNRELEASED_IFR_FLAGS = config.pop("disable_unreleased_ifr_flags")
+    _config.ADDITIONAL_FEATURE_FLAGS_FILE = config.pop("additional_feature_flags_file")
+    _config.ENABLED_FEATURE_FLAGS = []
+    _config.DISABLED_FEATURE_FLAGS = []
+    default_disabled_feature_flags = []
+    off_feature_flags = []
+    if values.command == "run":
+        (
+            _config.ENABLED_FEATURE_FLAGS,
+            _config.DISABLED_FEATURE_FLAGS,
+            default_disabled_feature_flags,
+            off_feature_flags,
+        ) = set_up_feature_flags()
+    else:
+        # Explicitly ignore these run-related options.
+        config.pop("additional_feature_flags")
+        config.pop("excluded_feature_flags")
 
     # This must be set before the fuzzers instantiated
     _config.STORAGE_ENGINE = config.pop("storage_engine")
@@ -400,11 +444,11 @@ be invoked as either:
         _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
 
     if _config.RUN_NO_FEATURE_FLAG_TESTS:
-        # Don't run any feature flag tests.
-        _config.EXCLUDE_WITH_ANY_TAGS.extend(all_feature_flags)
+        # Don't run tests tagged with feature flags that are disabled by default.
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(default_disabled_feature_flags)
     else:
         # Don't run tests with feature flags that are not enabled.
-        _config.EXCLUDE_WITH_ANY_TAGS.extend(not_enabled_feature_flags)
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(off_feature_flags)
 
     # Don't run tests that are incompatible with enabled feature flags.
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
