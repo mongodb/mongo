@@ -204,4 +204,7 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
     return res;
 }
 
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+
 OverrideHelpers.overrideRunCommand(runCommandWithRetries);

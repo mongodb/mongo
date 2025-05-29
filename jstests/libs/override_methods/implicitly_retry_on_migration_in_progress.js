@@ -157,4 +157,7 @@ function runCommandWithRetryUponMigration(
     }
 }
 
+OverrideHelpers.prependOverrideInParallelShell(
+    "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+
 OverrideHelpers.overrideRunCommand(runCommandWithRetryUponMigration);
