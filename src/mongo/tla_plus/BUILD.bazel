@@ -1,0 +1,7 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "model_check",
+    srcs = ["model-check.sh"],
+    visibility = ["//visibility:public"],
+)

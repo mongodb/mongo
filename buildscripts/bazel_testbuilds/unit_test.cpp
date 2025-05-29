@@ -1,7 +1,8 @@
 // C++ compilation file used for testing bazel compilation.
 
-#include <dlfcn.h>
 #include <iostream>
+
+#include <dlfcn.h>
 
 int main() {
     void* tcmalloc_so = dlopen(

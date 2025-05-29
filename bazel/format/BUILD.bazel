@@ -32,6 +32,8 @@ py_binary(
 
 format_multirun(
     name = "rules_lint_format",
+    c = "//:clang_format",
+    cc = "//:clang_format",
     css = "//:prettier",
     graphql = "//:prettier",
     html = "//:prettier",
@@ -39,9 +41,6 @@ format_multirun(
     sql = "//:prettier",
     starlark = "@buildifier_prebuilt//:buildifier",
     visibility = ["//visibility:public"],
-    # TODO(SERVER-101033): Enable clang_format once a way to only format a user's changeset is set up
-    #   cc = "//:clang_format",
-    #   c = "//:clang_format",
     # TODO(SERVER-101034): Enable rules_lint shfmt after sh files are reformatted with .editorconfig
     #   shell = "@shfmt//:shfmt",
 )

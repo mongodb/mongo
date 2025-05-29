@@ -1,6 +1,562 @@
+package(default_visibility = ["//visibility:public"])
+
 py_binary(
     name = "validate_compile_commands",
     srcs = ["validate_compile_commands.py"],
     main = "validate_compile_commands.py",
-    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "wiki_page_minimized_agg_query_fuzzer",
+    srcs = ["wiki_page_minimized_agg_query_fuzzer.sh"],
+)
+
+sh_binary(
+    name = "antithesis_image_build_and_push",
+    srcs = ["antithesis_image_build_and_push.sh"],
+)
+
+sh_binary(
+    name = "bazel_RBE_supported",
+    srcs = ["bazel_RBE_supported.sh"],
+)
+
+sh_binary(
+    name = "bazel_compile",
+    srcs = ["bazel_compile.sh"],
+)
+
+sh_binary(
+    name = "bazel_coverage",
+    srcs = ["bazel_coverage.sh"],
+)
+
+sh_binary(
+    name = "bazel_get_binary_path",
+    srcs = ["bazel_get_binary_path.sh"],
+)
+
+sh_binary(
+    name = "bazel_run",
+    srcs = ["bazel_run.sh"],
+)
+
+sh_binary(
+    name = "bazel_scons_diff",
+    srcs = ["bazel_scons_diff.sh"],
+)
+
+sh_binary(
+    name = "bazel_utility_functions",
+    srcs = ["bazel_utility_functions.sh"],
+)
+
+sh_binary(
+    name = "check_idl_compat",
+    srcs = ["check_idl_compat.sh"],
+)
+
+sh_binary(
+    name = "check_legacy_command_types",
+    srcs = ["check_legacy_command_types.sh"],
+)
+
+sh_binary(
+    name = "check_resmoke_failure",
+    srcs = ["check_resmoke_failure.sh"],
+)
+
+sh_binary(
+    name = "check_run_tests_infrastructure_failure",
+    srcs = ["check_run_tests_infrastructure_failure.sh"],
+)
+
+sh_binary(
+    name = "cleanup_environment",
+    srcs = ["cleanup_environment.sh"],
+)
+
+sh_binary(
+    name = "compile_ninja",
+    srcs = ["compile_ninja.sh"],
+)
+
+sh_binary(
+    name = "compiled_binaries_get",
+    srcs = ["compiled_binaries_get.sh"],
+)
+
+sh_binary(
+    name = "consolidate_benchmark_txt",
+    srcs = ["consolidate_benchmark_txt.sh"],
+)
+
+sh_binary(
+    name = "container_registry_login",
+    srcs = ["container_registry_login.sh"],
+)
+
+sh_binary(
+    name = "crypt_run_tests",
+    srcs = ["crypt_run_tests.sh"],
+)
+
+sh_binary(
+    name = "do_watchdog_setup",
+    srcs = ["do_watchdog_setup.sh"],
+)
+
+sh_binary(
+    name = "download_tlc",
+    srcs = ["download_tlc.sh"],
+)
+
+sh_binary(
+    name = "engflow_workspace_status",
+    srcs = ["engflow_workspace_status.sh"],
+)
+
+sh_binary(
+    name = "external_auth_aws_setup",
+    srcs = ["external_auth_aws_setup.sh"],
+)
+
+sh_binary(
+    name = "external_auth_azure_setup",
+    srcs = ["external_auth_azure_setup.sh"],
+)
+
+sh_binary(
+    name = "external_auth_azure_teardown",
+    srcs = ["external_auth_azure_teardown.sh"],
+)
+
+sh_binary(
+    name = "external_auth_gcp_setup",
+    srcs = ["external_auth_gcp_setup.sh"],
+)
+
+sh_binary(
+    name = "external_auth_gcp_teardown",
+    srcs = ["external_auth_gcp_teardown.sh"],
+)
+
+sh_binary(
+    name = "external_auth_oidc_setup",
+    srcs = ["external_auth_oidc_setup.sh"],
+)
+
+sh_binary(
+    name = "external_auth_oidc_teardown",
+    srcs = ["external_auth_oidc_teardown.sh"],
+)
+
+sh_binary(
+    name = "extract_generated_test_configuration",
+    srcs = ["extract_generated_test_configuration.sh"],
+)
+
+sh_binary(
+    name = "failed_unittests_gather",
+    srcs = ["failed_unittests_gather.sh"],
+)
+
+sh_binary(
+    name = "fcv_test_git_tag",
+    srcs = ["fcv_test_git_tag.sh"],
+)
+
+sh_binary(
+    name = "feature_flag_tags_check",
+    srcs = ["feature_flag_tags_check.sh"],
+)
+
+sh_binary(
+    name = "garasign_gpg_crypt_sign",
+    srcs = ["garasign_gpg_crypt_sign.sh"],
+)
+
+sh_binary(
+    name = "garasign_gpg_sign",
+    srcs = ["garasign_gpg_sign.sh"],
+)
+
+sh_binary(
+    name = "garasign_jsign_sign",
+    srcs = ["garasign_jsign_sign.sh"],
+)
+
+sh_binary(
+    name = "gather_mongo_coredumps",
+    srcs = ["gather_mongo_coredumps.sh"],
+)
+
+sh_binary(
+    name = "gen_feature_flags",
+    srcs = ["gen_feature_flags.sh"],
+)
+
+sh_binary(
+    name = "gen_supplementary_data",
+    srcs = ["gen_supplementary_data.sh"],
+)
+
+sh_binary(
+    name = "gen_tasks_activate",
+    srcs = ["gen_tasks_activate.sh"],
+)
+
+sh_binary(
+    name = "generate_buildid_debug_symbols_mapping",
+    srcs = ["generate_buildid_debug_symbols_mapping.sh"],
+)
+
+sh_binary(
+    name = "generate_evergreen_bazelrc",
+    srcs = ["generate_evergreen_bazelrc.sh"],
+)
+
+sh_binary(
+    name = "generate_version",
+    srcs = ["generate_version.sh"],
+)
+
+sh_binary(
+    name = "generate_version_burn_in",
+    srcs = ["generate_version_burn_in.sh"],
+)
+
+sh_binary(
+    name = "get_bin_and_fcv_versions",
+    srcs = ["get_bin_and_fcv_versions.sh"],
+)
+
+sh_binary(
+    name = "hang_analyzer",
+    srcs = ["hang_analyzer.sh"],
+)
+
+sh_binary(
+    name = "idl_tests_run",
+    srcs = ["idl_tests_run.sh"],
+)
+
+sh_binary(
+    name = "jepsen_report",
+    srcs = ["jepsen_report.sh"],
+)
+
+sh_binary(
+    name = "jepsen_test_fail",
+    srcs = ["jepsen_test_fail.sh"],
+)
+
+sh_binary(
+    name = "jepsen_test_run",
+    srcs = ["jepsen_test_run.sh"],
+)
+
+sh_binary(
+    name = "jstestfuzz_minimize",
+    srcs = ["jstestfuzz_minimize.sh"],
+)
+
+sh_binary(
+    name = "jstestfuzz_run",
+    srcs = ["jstestfuzz_run.sh"],
+)
+
+sh_binary(
+    name = "jstestfuzz_setup",
+    srcs = ["jstestfuzz_setup.sh"],
+)
+
+sh_binary(
+    name = "kill_processes",
+    srcs = ["kill_processes.sh"],
+)
+
+sh_binary(
+    name = "libdeps_run",
+    srcs = ["libdeps_run.sh"],
+)
+
+sh_binary(
+    name = "libdeps_setup",
+    srcs = ["libdeps_setup.sh"],
+)
+
+sh_binary(
+    name = "lint_fuzzer_sanity_all",
+    srcs = ["lint_fuzzer_sanity_all.sh"],
+)
+
+sh_binary(
+    name = "lint_fuzzer_sanity_patch",
+    srcs = ["lint_fuzzer_sanity_patch.sh"],
+)
+
+sh_binary(
+    name = "lint_shellscripts",
+    srcs = ["lint_shellscripts.sh"],
+)
+
+sh_binary(
+    name = "lint_yaml",
+    srcs = ["lint_yaml.sh"],
+)
+
+sh_binary(
+    name = "local_client_logs_tar",
+    srcs = ["local_client_logs_tar.sh"],
+)
+
+sh_binary(
+    name = "modify_debug_symbols",
+    srcs = ["modify_debug_symbols.sh"],
+)
+
+sh_binary(
+    name = "monitor_build_status_run",
+    srcs = ["monitor_build_status_run.sh"],
+)
+
+sh_binary(
+    name = "move_npm_logs",
+    srcs = ["move_npm_logs.sh"],
+)
+
+sh_binary(
+    name = "multiversion_exclude_tags_generate",
+    srcs = ["multiversion_exclude_tags_generate.sh"],
+)
+
+sh_binary(
+    name = "multiversion_setup",
+    srcs = ["multiversion_setup.sh"],
+)
+
+sh_binary(
+    name = "ninja_compile",
+    srcs = ["ninja_compile.sh"],
+)
+
+sh_binary(
+    name = "package",
+    srcs = ["package.sh"],
+)
+
+sh_binary(
+    name = "packager.py_run",
+    srcs = ["packager.py_run.sh"],
+)
+
+sh_binary(
+    name = "packages_publish",
+    srcs = ["packages_publish.sh"],
+)
+
+sh_binary(
+    name = "papertrail_generate_expansions",
+    srcs = ["papertrail_generate_expansions.sh"],
+)
+
+sh_binary(
+    name = "powercycle_check_host",
+    srcs = ["powercycle_check_host.sh"],
+)
+
+sh_binary(
+    name = "powercycle_exit",
+    srcs = ["powercycle_exit.sh"],
+)
+
+sh_binary(
+    name = "powercycle_run_test",
+    srcs = ["powercycle_run_test.sh"],
+)
+
+sh_binary(
+    name = "powercycle_save_artifacts",
+    srcs = ["powercycle_save_artifacts.sh"],
+)
+
+sh_binary(
+    name = "powercycle_sentinel_run",
+    srcs = ["powercycle_sentinel_run.sh"],
+)
+
+sh_binary(
+    name = "powercycle_setup_host",
+    srcs = ["powercycle_setup_host.sh"],
+)
+
+sh_binary(
+    name = "powercycle_ssh_failure_exit",
+    srcs = ["powercycle_ssh_failure_exit.sh"],
+)
+
+sh_binary(
+    name = "powercycle_tasks_generate",
+    srcs = ["powercycle_tasks_generate.sh"],
+)
+
+sh_binary(
+    name = "prelude",
+    srcs = ["prelude.sh"],
+)
+
+sh_binary(
+    name = "prelude_db_contrib_tool",
+    srcs = ["prelude_db_contrib_tool.sh"],
+)
+
+sh_binary(
+    name = "prelude_mongo_task_generator",
+    srcs = ["prelude_mongo_task_generator.sh"],
+)
+
+sh_binary(
+    name = "prelude_python",
+    srcs = ["prelude_python.sh"],
+)
+
+sh_binary(
+    name = "prelude_system_env_variables",
+    srcs = ["prelude_system_env_variables.sh"],
+)
+
+sh_binary(
+    name = "prelude_venv",
+    srcs = ["prelude_venv.sh"],
+)
+
+sh_binary(
+    name = "prelude_workdir",
+    srcs = ["prelude_workdir.sh"],
+)
+
+sh_binary(
+    name = "query_tester_test_repo_setup",
+    srcs = ["query_tester_test_repo_setup.sh"],
+)
+
+sh_binary(
+    name = "query_tester_test_sparse_checkout",
+    srcs = ["query_tester_test_sparse_checkout.sh"],
+)
+
+sh_binary(
+    name = "randomized_multiversion_tasks_generate",
+    srcs = ["randomized_multiversion_tasks_generate.sh"],
+)
+
+sh_binary(
+    name = "record_mongodb_server_version",
+    srcs = ["record_mongodb_server_version.sh"],
+)
+
+sh_binary(
+    name = "resmoke_tests_execute",
+    srcs = ["resmoke_tests_execute.sh"],
+)
+
+sh_binary(
+    name = "resmoke_tests_runtime_validate",
+    srcs = ["resmoke_tests_runtime_validate.sh"],
+)
+
+sh_binary(
+    name = "restore_git_history_and_tags",
+    srcs = ["restore_git_history_and_tags.sh"],
+)
+
+sh_binary(
+    name = "run_python_script",
+    srcs = ["run_python_script.sh"],
+)
+
+sh_binary(
+    name = "run_python_script_with_report",
+    srcs = ["run_python_script_with_report.sh"],
+)
+
+sh_binary(
+    name = "run_upload_lock_push",
+    srcs = ["run_upload_lock_push.sh"],
+)
+
+sh_binary(
+    name = "sasl_windows_cyrussasl_setup",
+    srcs = ["sasl_windows_cyrussasl_setup.sh"],
+)
+
+sh_binary(
+    name = "sasl_windows_cyrussasl_teardown",
+    srcs = ["sasl_windows_cyrussasl_teardown.sh"],
+)
+
+sh_binary(
+    name = "scons_compile",
+    srcs = ["scons_compile.sh"],
+)
+
+sh_binary(
+    name = "scons_raw_compile",
+    srcs = ["scons_raw_compile.sh"],
+)
+
+sh_binary(
+    name = "scons_splunk",
+    srcs = ["scons_splunk.sh"],
+)
+
+sh_binary(
+    name = "selinux_run_test",
+    srcs = ["selinux_run_test.sh"],
+)
+
+sh_binary(
+    name = "selinux_test_executor",
+    srcs = ["selinux_test_executor.sh"],
+)
+
+sh_binary(
+    name = "selinux_test_setup",
+    srcs = ["selinux_test_setup.sh"],
+)
+
+sh_binary(
+    name = "stitch_support_create_lib_tar",
+    srcs = ["stitch_support_create_lib_tar.sh"],
+)
+
+sh_binary(
+    name = "stitch_support_run_tests",
+    srcs = ["stitch_support_run_tests.sh"],
+)
+
+sh_binary(
+    name = "todos_check",
+    srcs = ["todos_check.sh"],
+)
+
+sh_binary(
+    name = "verify_build_output_present",
+    srcs = ["verify_build_output_present.sh"],
+)
+
+sh_binary(
+    name = "wait_for_resmoke_to_shutdown",
+    srcs = ["wait_for_resmoke_to_shutdown.sh"],
+)
+
+sh_binary(
+    name = "wiki_page",
+    srcs = ["wiki_page.sh"],
+)
+
+sh_binary(
+    name = "write_mongo_binary_url_to_downstream_expansions",
+    srcs = ["write_mongo_binary_url_to_downstream_expansions.sh"],
 )

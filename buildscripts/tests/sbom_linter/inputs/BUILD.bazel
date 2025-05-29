@@ -1,0 +1,16 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "kafka_missing_version_import",
+    srcs = ["kafka_missing_version_import.sh"],
+)
+
+sh_binary(
+    name = "kafka_valid_import",
+    srcs = ["kafka_valid_import.sh"],
+)
+
+sh_binary(
+    name = "kafka_wrong_version_import",
+    srcs = ["kafka_wrong_version_import.sh"],
+)

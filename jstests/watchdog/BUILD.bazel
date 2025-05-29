@@ -8,3 +8,8 @@ mongo_js_library(
         "*.js",
     ]),
 )
+
+sh_binary(
+    name = "charybdefs_setup",
+    srcs = ["charybdefs_setup.sh"],
+)

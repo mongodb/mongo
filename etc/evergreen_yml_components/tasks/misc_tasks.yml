@@ -613,7 +613,7 @@ tasks:
       - func: "bazel run"
         vars:
           target: >-
-            //:format -- --check
+            //:format -- --check --all
 
   - name: bazel_run_codeowners
     tags:

@@ -8,3 +8,8 @@ mongo_js_library(
         "*.js",
     ]),
 )
+
+sh_binary(
+    name = "mkcrl",
+    srcs = ["mkcrl.sh"],
+)

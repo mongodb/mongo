@@ -354,7 +354,7 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        found_symbol:;
+found_symbol:;
     }
     if (found_symbol_dep == 1) {
         // delete the last comma

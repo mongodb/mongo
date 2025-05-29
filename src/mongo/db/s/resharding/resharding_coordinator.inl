@@ -26,13 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/s/resharding/resharding_coordinator.h"
-
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/balancer/balance_stats.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -161,8 +160,7 @@ ReshardingCoordinator::ReshardingCoordinator(
     _metrics->onStateTransition(boost::none, coordinatorDoc.getState());
 }
 
-void ReshardingCoordinator::_installCoordinatorDoc(
-    const ReshardingCoordinatorDocument& doc) {
+void ReshardingCoordinator::_installCoordinatorDoc(const ReshardingCoordinatorDocument& doc) {
     invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());
     _coordinatorDoc = doc;
 }
@@ -1224,7 +1222,9 @@ void ReshardingCoordinator::_startCommitMonitor(
         resharding::extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards()),
         **executor,
         _ctHolder->getCommitMonitorToken(),
-        _coordinatorDoc.getDemoMode() ? 0 : resharding::gReshardingDelayBeforeRemainingOperationTimeQueryMillis.load());
+        _coordinatorDoc.getDemoMode()
+            ? 0
+            : resharding::gReshardingDelayBeforeRemainingOperationTimeQueryMillis.load());
 
     _commitMonitorQuiesced = _commitMonitor->waitUntilRecipientsAreWithinCommitThreshold()
                                  .thenRunOn(**executor)
@@ -1602,7 +1602,9 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
         opCtx.get(), _metrics.get(), updatedCoordinatorDoc, boost::none);
 
     // Update in-memory coordinator doc
-    installCoordinatorDocOnStateTransition(opCtx.get(), resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
+    installCoordinatorDocOnStateTransition(
+        opCtx.get(),
+        resharding::getCoordinatorDoc(opCtx.get(), _coordinatorDoc.getReshardingUUID()));
 }
 
 void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
@@ -1621,7 +1623,8 @@ void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFie
     auto updatedCoordinatorDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
         opCtx,
         _metrics.get(),
-        resharding::tryGetCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID()).value_or(_coordinatorDoc),
+        resharding::tryGetCoordinatorDoc(opCtx, _coordinatorDoc.getReshardingUUID())
+            .value_or(_coordinatorDoc),
         abortReason);
 
     // Update in-memory coordinator doc.
@@ -2006,7 +2009,8 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     statsBuilder.append("totals", totalsBuilder.obj());
 
     bool hadCriticalSection = false;
-    if (auto criticalSectionInterval = _metrics->getIntervalFor(resharding_metrics::TimedPhase::kCriticalSection)) {
+    if (auto criticalSectionInterval =
+            _metrics->getIntervalFor(resharding_metrics::TimedPhase::kCriticalSection)) {
         criticalSectionBuilder.append("interval", criticalSectionInterval->toBSON());
         hadCriticalSection = true;
     }
@@ -2015,7 +2019,8 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
         hadCriticalSection = true;
     }
     if (hadCriticalSection) {
-        criticalSectionBuilder.append("totalWritesDuringCriticalSection", totalWritesDuringCriticalSection);
+        criticalSectionBuilder.append("totalWritesDuringCriticalSection",
+                                      totalWritesDuringCriticalSection);
         statsBuilder.append("criticalSection", criticalSectionBuilder.obj());
     }
 

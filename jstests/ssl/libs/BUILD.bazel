@@ -8,3 +8,8 @@ mongo_js_library(
         "*.js",
     ]),
 )
+
+sh_binary(
+    name = "localhost_cn_with_san",
+    srcs = ["localhost-cn-with-san.pem.sh"],
+)

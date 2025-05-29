@@ -1,0 +1,126 @@
+package(default_visibility = ["//visibility:public"])
+
+sh_binary(
+    name = "add_git_tag",
+    srcs = ["add_git_tag.sh"],
+)
+
+sh_binary(
+    name = "bolt",
+    srcs = ["bolt.sh"],
+)
+
+sh_binary(
+    name = "compile_expansions_generate",
+    srcs = ["compile_expansions_generate.sh"],
+)
+
+sh_binary(
+    name = "credentials_setup",
+    srcs = ["credentials_setup.sh"],
+)
+
+sh_binary(
+    name = "download_pgo_profile",
+    srcs = ["download_pgo_profile.sh"],
+)
+
+sh_binary(
+    name = "evergreen_api_credentials_configure",
+    srcs = ["evergreen_api_credentials_configure.sh"],
+)
+
+sh_binary(
+    name = "files_remove",
+    srcs = ["files_remove.sh"],
+)
+
+sh_binary(
+    name = "fuse_watchdog_cleanup",
+    srcs = ["fuse_watchdog_cleanup.sh"],
+)
+
+sh_binary(
+    name = "get_mongot_version",
+    srcs = ["get_mongot_version.sh"],
+)
+
+sh_binary(
+    name = "modified_patch_files_get_all",
+    srcs = ["modified_patch_files_get_all.sh"],
+)
+
+sh_binary(
+    name = "notary_client_credentials_setup",
+    srcs = ["notary_client_credentials_setup.sh"],
+)
+
+sh_binary(
+    name = "process_threads_monitor",
+    srcs = ["process_threads_monitor.sh"],
+)
+
+sh_binary(
+    name = "remote_credentials_setup",
+    srcs = ["remote_credentials_setup.sh"],
+)
+
+sh_binary(
+    name = "resmoke_jobs_determine",
+    srcs = ["resmoke_jobs_determine.sh"],
+)
+
+sh_binary(
+    name = "run_diskstats",
+    srcs = ["run_diskstats.sh"],
+)
+
+sh_binary(
+    name = "shared_scons_directory_umount",
+    srcs = ["shared_scons_directory_umount.sh"],
+)
+
+sh_binary(
+    name = "system_resource_info_collect",
+    srcs = ["system_resource_info_collect.sh"],
+)
+
+sh_binary(
+    name = "task_timeout_determine",
+    srcs = ["task_timeout_determine.sh"],
+)
+
+sh_binary(
+    name = "tmp_directory_umount",
+    srcs = ["tmp_directory_umount.sh"],
+)
+
+sh_binary(
+    name = "ulimit_info_collect",
+    srcs = ["ulimit_info_collect.sh"],
+)
+
+sh_binary(
+    name = "venv_adjust",
+    srcs = ["venv_adjust.sh"],
+)
+
+sh_binary(
+    name = "venv_setup",
+    srcs = ["venv_setup.sh"],
+)
+
+sh_binary(
+    name = "version_expansions_generate",
+    srcs = ["version_expansions_generate.sh"],
+)
+
+sh_binary(
+    name = "win_mount_script_setup",
+    srcs = ["win_mount_script_setup.sh"],
+)
+
+sh_binary(
+    name = "wiredtiger_develop_use",
+    srcs = ["wiredtiger_develop_use.sh"],
+)
