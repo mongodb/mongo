@@ -80,7 +80,12 @@ const expectedReplSection = {
         "numTimesCouldNotFind": 0
     },
     "timestamps": {"oldestTimestamp": 0},
-    "waiters": {"opTime": 0, "replication": 0}
+    "waiters": {
+        "opTime": 0,
+        "replication": 0,
+        "replCoordMutexTotalWaitTimeInOplogServerStatusMillis": 0,
+        "numReplCoordMutexAcquisitionsInOplogServerStatus": 0
+    }
 };
 assert(serverStatusResponse.metrics.hasOwnProperty("repl"),
        () => (`The serverStatus response did not have the repl \
