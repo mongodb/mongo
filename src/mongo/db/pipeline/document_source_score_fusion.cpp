@@ -615,17 +615,16 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
  * the input pipeline names to pipeline objects and a map of pipeline names to score paths.
  */
 std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>
-parseAndValidateScoredSelectionPipelines(const BSONElement& elem,
-                                         const ScoreFusionSpec& spec,
+parseAndValidateScoredSelectionPipelines(const ScoreFusionSpec& spec,
                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
-    for (const auto& elem : spec.getInput().getPipelines()) {
-        auto pipeline = Pipeline::parse(parsePipelineFromBSON(elem), pExpCtx);
+    for (const auto& innerPipelineBsonElem : spec.getInput().getPipelines()) {
+        auto pipeline = Pipeline::parse(parsePipelineFromBSON(innerPipelineBsonElem), pExpCtx);
         // Ensure that all pipelines are valid scored selection pipelines.
         scoreFusionPipelineValidator(*pipeline);
 
         // Validate pipeline name.
-        auto inputName = elem.fieldName();
+        auto inputName = innerPipelineBsonElem.fieldName();
         uassertStatusOKWithContext(
             FieldPath::validateFieldName(inputName),
             "$scoreFusion pipeline names must follow the naming rules of field path expressions.");
@@ -719,7 +718,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
 
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
-    const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(elem, spec, pExpCtx);
+    const auto& inputPipelines = parseAndValidateScoredSelectionPipelines(spec, pExpCtx);
     return constructDesugaredOutput(spec, inputPipelines, pExpCtx);
 }
 }  // namespace mongo
