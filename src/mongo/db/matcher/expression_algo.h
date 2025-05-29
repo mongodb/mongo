@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/util/string_map.h"
 
@@ -43,22 +44,20 @@
 
 namespace mongo {
 
-class ExprMatchExpression;
-class MatchExpression;
-
 class PathMatchExpression;
-struct DepsTracker;
 
 namespace expression {
 
 using NodeTraversalFunc = std::function<void(MatchExpression*, std::string)>;
 
 /**
- * Returns true if 'expr' has an $exists or $type predicate on 'path.' Note that this only returns
- * true for occurrences predicatated on the exact path given: it will not return true if there is
- * either on a prefix of the path.
+ * Returns true if 'expr' has a 'searchType' predicated on something in 'paths'. Note that this only
+ * returns true for occurrences predicatated on an exact path given: it will not return true if
+ * there is searchType on a prefix of the path.
  */
-bool hasExistenceOrTypePredicateOnPath(const MatchExpression& expr, StringData path);
+bool hasPredicateOnPaths(const MatchExpression& expr,
+                         mongo::MatchExpression::MatchType searchType,
+                         const stdx::unordered_set<std::string>& paths);
 
 using PathOrExprMatchExpression = std::variant<PathMatchExpression*, ExprMatchExpression*>;
 using Renameables = std::vector<std::pair<PathOrExprMatchExpression, std::string>>;

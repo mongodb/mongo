@@ -2010,6 +2010,8 @@ TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringOnID) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+/* ----- GROUP & MATCH ----- */
+/* ----- GROUP & MATCH : Nonexistence/nontype queries ----- */
 TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchOnExprIfFilteringOnID) {
     std::string inputPipe =
         "[{$group: {_id: '$a'}}, "
@@ -2038,6 +2040,20 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchOnExprIfNotFiltering
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST_F(PipelineOptimizationTest, GroupShouldSwapWithCompoundMatchIfFilteringOnID) {
+    std::string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {$or : [ {_id : {$lte : 50}}, {_id : {$gt : 70}}]}}]";
+    std::string outputPipe =
+        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
+        "{$group : {_id:'$x', $willBeMerged: false}}]";
+    std::string serializedPipe =
+        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
+        "{$group : {_id:'$x', $willBeMerged: false}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfNotFilteringOnID) {
     std::string inputPipe =
         "[{$group : {_id:'$a'}}, "
@@ -2048,6 +2064,35 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfNotFilteringOnID) 
     std::string serializedPipe =
         "[{$group : {_id:'$a', $willBeMerged: false}}, "
         " {$match: {b : 4}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+/* ----- GROUP & MATCH : Exsistence queries ----- */
+TEST_F(PipelineOptimizationTest, GroupShouldntSwapWithMatchIfFilteringByExistenceOnSemiCompoundID) {
+    std::string inputPipe =
+        "[{$group : {_id: {a: '$a'}}}, "
+        " {$match: {'_id.a': {$exists: true}}}]";
+    std::string outputPipe =
+        "[{$group : {_id: {a: '$a'}, $willBeMerged: false}}, "
+        " {$match: {'_id.a': {$exists: true}}}]";
+    std::string serializedPipe =
+        "[{$group : {_id: {a: '$a'}, $willBeMerged: false}}, "
+        " {$match: {'_id.a': {$exists: true}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, GroupShouldSwapWithMatchIfFilteringByExistenceOnCompoundID) {
+    std::string inputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}}}, "
+        " {$match: {'_id.b': {$exists: true}}}]";
+    std::string outputPipe =
+        "[{$match: {'b': {$exists: true}}}, "
+        " {$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}]";
+    std::string serializedPipe =
+        "[{$match: {'b': {$exists: true}}}, "
+        " {$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
@@ -2066,20 +2111,6 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfExistsPredicateOnI
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfTypePredicateOnID) {
-    std::string inputPipe =
-        "[{$group : {_id:'$x'}}, "
-        " {$match: {_id : {$type: [1]}}}]";
-    std::string outputPipe =
-        "[{$group : {_id:'$x', $willBeMerged: false}}, "
-        " {$match: {_id : {$type: [1]}}}]";
-    std::string serializedPipe =
-        "[{$group : {_id:'$x', $willBeMerged: false}}, "
-        " {$match: {_id : {$type: [1]}}}]";
-
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
-}
-
 TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPredicateOnID) {
     std::string inputPipe =
         "[{$group : {_id:'$x'}}, "
@@ -2094,6 +2125,49 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfExistsPred
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+/* ----- GROUP & MATCH : Type queries ----- */
+TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfFilteringByTypeOnCompoundID) {
+    std::string inputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}}}, "
+        " {$match: {$or: [{'_id.a' : 4}, {'_id.b': {$type: [5]}}]}}]";
+    std::string outputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
+        " {$match: {$or: [{'_id.a' : {$eq: 4}}, {'_id.b': {$type: [5]}}]}}]";
+    std::string serializedPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
+        " {$match: {$or: [{'_id.a' : 4}, {'_id.b': {$type: [5]}}]}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfFilteringByTypeOnCompoundIDSimple) {
+    std::string inputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}}}, "
+        " {$match: {'_id.b': {$type: [5]}}}]";
+    std::string outputPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
+        " {$match: {'_id.b': {$type: [5]}}}]";
+    std::string serializedPipe =
+        "[{$group : {_id: {a: '$a', b: '$b'}, $willBeMerged: false}}, "
+        " {$match: {'_id.b': {$type: [5]}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithMatchIfTypePredicateOnID) {
+    std::string inputPipe =
+        "[{$group : {_id:'$x'}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+    std::string outputPipe =
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+    std::string serializedPipe =
+        "[{$group : {_id:'$x', $willBeMerged: false}}, "
+        " {$match: {_id : {$type: [1]}}}]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfTypePredicateOnID) {
     std::string inputPipe =
         "[{$group : {_id:'$x'}}, "
@@ -2104,20 +2178,6 @@ TEST_F(PipelineOptimizationTest, GroupShouldNotSwapWithCompoundMatchIfTypePredic
     std::string serializedPipe =
         "[{$group : {_id:'$x', $willBeMerged: false}}, "
         " {$match: {$or : [ {_id : {$type: [18]}}, {_id : {$gt : 70}}]}}]";
-
-    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
-}
-
-TEST_F(PipelineOptimizationTest, GroupShouldSwapWithCompoundMatchIfFilteringOnID) {
-    std::string inputPipe =
-        "[{$group : {_id:'$x'}}, "
-        " {$match: {$or : [ {_id : {$lte : 50}}, {_id : {$gt : 70}}]}}]";
-    std::string outputPipe =
-        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
-        "{$group : {_id:'$x', $willBeMerged: false}}]";
-    std::string serializedPipe =
-        "[{$match: {$or : [  {x : {$lte : 50}}, {x : {$gt : 70}}]}},"
-        "{$group : {_id:'$x', $willBeMerged: false}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }

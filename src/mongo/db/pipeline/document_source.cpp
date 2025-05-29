@@ -143,18 +143,47 @@ namespace {
  * ---->
  *   {$match: {x: {$exists: true}}
  *   {$group: {_id: "$x"}}
-
+ * However with a compound _id spec (something of the form {_id: {x: ..., y: ..., ...}}) existence
+ * predicates would be correct to push before as these preserve missing.
+ * Note: singular id specs can also be of the form {_id: {x: ...}}.
+ *
  * For $type, the $type operator can distinguish between values that compare equal in the $group
  * stage, meaning documents that are regarded unequally in the $match stage are equated in the
  * $group stage. This leads to varied results depending on the order of the $match and $group.
+ * Type predicates are incorrect to push ahead regardless of _id spec.
  */
 bool groupMatchSwapVerified(const DocumentSourceMatch& nextMatch,
                             const DocumentSourceGroup& thisGroup) {
+    // Construct a set of id fields.
+    stdx::unordered_set<std::string> idFields;
+    for (const auto& key : thisGroup.getIdFieldNames()) {
+        idFields.insert(std::string("_id.").append(key));
+    }
+
+    // getIdFieldsNames will be 0 if the spec is of the forms {_id: ...}.
+    if (idFields.empty()) {
+        idFields.insert("_id");
+    }
+
+    // If there's any type predicate we cannot swap.
+    if (expression::hasPredicateOnPaths(*(nextMatch.getMatchExpression()),
+                                        MatchExpression::MatchType::TYPE_OPERATOR,
+                                        idFields)) {
+        return false;
+    }
+
+    /**
+     * If there's a compound _id spec (e.g. {_id: {x: ..., y: ..., ...}}), we can swap regardless of
+     * existence predicate.
+     * getIdFields will be 1 if the spec is of the forms {_id: ...} or {_id: {x: ...}}.
+     */
     if (thisGroup.getIdFields().size() != 1) {
         return true;
     }
-    return !expression::hasExistenceOrTypePredicateOnPath(*(nextMatch.getMatchExpression()),
-                                                          "_id"_sd);
+
+    // If there's an existence predicate in a non-compound _id spec, we cannot swap.
+    return !expression::hasPredicateOnPaths(
+        *(nextMatch.getMatchExpression()), MatchExpression::MatchType::EXISTS, idFields);
 }
 
 /**

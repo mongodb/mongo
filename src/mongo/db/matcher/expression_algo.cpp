@@ -39,7 +39,6 @@
 #include "mongo/db/exec/matcher/matcher_geo.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/geo/geometry_container.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -702,15 +701,17 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
 
 namespace expression {
 
-bool hasExistenceOrTypePredicateOnPath(const MatchExpression& expr, StringData path) {
+bool hasPredicateOnPaths(const MatchExpression& expr,
+                         mongo::MatchExpression::MatchType searchType,
+                         const stdx::unordered_set<std::string>& paths) {
     if (expr.getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        return ((expr.matchType() == MatchExpression::MatchType::EXISTS ||
-                 expr.matchType() == MatchExpression::MatchType::TYPE_OPERATOR) &&
-                expr.path() == path);
+        const FieldRef* fieldRef = expr.fieldRef();
+        return ((expr.matchType() == searchType) &&
+                paths.contains(toStdStringViewForInterop(fieldRef->dottedField())));
     }
     for (size_t i = 0; i < expr.numChildren(); i++) {
         MatchExpression* child = expr.getChild(i);
-        if (hasExistenceOrTypePredicateOnPath(*child, path)) {
+        if (hasPredicateOnPaths(*child, searchType, paths)) {
             return true;
         }
     }
