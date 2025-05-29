@@ -38,8 +38,6 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
@@ -55,7 +53,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbcommands_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/drop_database_gen.h"
@@ -92,7 +89,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/buildinfo.h"
 #include "mongo/util/debug_util.h"
@@ -305,10 +301,13 @@ public:
 
             Reply reply;
 
-            AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-            const auto& collection = autoColl.getCollection();
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, nss, AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
 
-            if (!collection) {
+            if (!collection.exists()) {
                 // Collection does not exist
                 reply.setNumObjects(0);
                 reply.setSize(0);
@@ -316,8 +315,9 @@ public:
                 return reply;
             }
 
-            if (collection.isSharded_DEPRECATED()) {
-                const auto& shardKeyPattern = collection.getShardKeyPattern();
+            const auto& collectionShardingDescription = collection.getShardingDescription();
+            if (collectionShardingDescription.isSharded()) {
+                const auto& shardKeyPattern = collectionShardingDescription.getShardKeyPattern();
                 uassert(ErrorCodes::BadValue,
                         "keyPattern must be empty or must be an object that equals the shard key",
                         keyPattern.isEmpty() ||
@@ -335,7 +335,7 @@ public:
                 max = shardKeyPattern.normalizeShardKey(max);
             }
 
-            const long long numRecords = collection->numRecords(opCtx);
+            const long long numRecords = collection.getCollectionPtr()->numRecords(opCtx);
             reply.setNumObjects(numRecords);
 
             if (numRecords == 0) {
@@ -354,12 +354,13 @@ public:
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             if (min.isEmpty() && max.isEmpty()) {
                 if (estimate) {
-                    reply.setSize(static_cast<long long>(collection->dataSize(opCtx)));
+                    reply.setSize(
+                        static_cast<long long>(collection.getCollectionPtr()->dataSize(opCtx)));
                     reply.setMillis(timer.millis());
                     return reply;
                 }
                 exec = InternalPlanner::collectionScan(
-                    opCtx, &collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+                    opCtx, collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             } else {
                 if (keyPattern.isEmpty()) {
                     // if keyPattern not provided, try to infer it from the fields in 'min'
@@ -367,7 +368,7 @@ public:
                 }
 
                 const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                                   collection,
+                                                                   collection.getCollectionPtr(),
                                                                    keyPattern,
                                                                    /*requireSingleKey=*/true);
 
@@ -381,7 +382,7 @@ public:
                 max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
                 exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                          &collection,
+                                                          collection,
                                                           *shardKeyIdx,
                                                           min,
                                                           max,
@@ -398,7 +399,7 @@ public:
 
             std::remove_const_t<decltype(maxSize)> size = 0;
             std::remove_const_t<decltype(size)> avgObjSize =
-                collection->dataSize(opCtx) / numRecords;
+                collection.getCollectionPtr()->dataSize(opCtx) / numRecords;
             std::remove_const_t<decltype(maxObjects)> numObjects = 0;
 
             try {
@@ -408,7 +409,10 @@ public:
                     if (estimate) {
                         size += avgObjSize;
                     } else {
-                        size += collection->getRecordStore()->dataFor(opCtx, loc).size();
+                        size += collection.getCollectionPtr()
+                                    ->getRecordStore()
+                                    ->dataFor(opCtx, loc)
+                                    .size();
                     }
 
                     ++numObjects;

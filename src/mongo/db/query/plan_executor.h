@@ -101,6 +101,10 @@ public:
             _collectionPtrOrAcquisition);
     }
 
+    bool exists() const {
+        return static_cast<bool>(getCollectionPtr());
+    }
+
 private:
     static const NamespaceString& nss(const CollectionPtr* collectionPtr) {
         return (*collectionPtr)->ns();
