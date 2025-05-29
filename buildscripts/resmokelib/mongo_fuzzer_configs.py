@@ -454,13 +454,17 @@ def fuzz_mongod_set_parameters(seed, user_provided_params):
             value = json.dumps(value)
         ret[key] = value
 
+    encryption_config = generate_encryption_config(rng)
+    if encryption_config:
+        ret["disableSpillKVEngine"] = True
+
     return (
         utils.dump_yaml(ret),
         generate_mongod_extra_configs(rng),
         generate_eviction_configs(rng),
         generate_table_configs(rng),
         generate_table_configs(rng),
-        generate_encryption_config(rng),
+        encryption_config,
     )
 
 

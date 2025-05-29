@@ -14,6 +14,10 @@ executor:
           enableEncryption: ""
           encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
       nodb: ""
+  fixture:
+    mongod_options:
+      set_parameters:
+        disableSpillKVEngine: true
 matrix_suite: true
 selector:
   exclude_files: null

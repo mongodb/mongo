@@ -1116,7 +1116,7 @@ std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
     Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
-    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled() && !gDisableSpillKVEngine) {
         return expCtx->getOperationContext()
             ->getServiceContext()
             ->getStorageEngine()

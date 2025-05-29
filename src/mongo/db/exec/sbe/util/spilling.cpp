@@ -89,7 +89,7 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
 }
 
 SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
-    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled() && !gDisableSpillKVEngine) {
         _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(opCtx, format);
         return;
     }

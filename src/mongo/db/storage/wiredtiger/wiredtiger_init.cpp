@@ -158,7 +158,7 @@ public:
         kv->setSortedDataInterfaceExtraOptions(wiredTigerGlobalOptions.indexConfig);
 
         std::unique_ptr<SpillWiredTigerKVEngine> spillWiredTigerKVEngine;
-        if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled() && !gDisableSpillKVEngine) {
             boost::system::error_code ec;
             boost::filesystem::remove_all(params.getSpillDbPath(), ec);
             if (ec) {

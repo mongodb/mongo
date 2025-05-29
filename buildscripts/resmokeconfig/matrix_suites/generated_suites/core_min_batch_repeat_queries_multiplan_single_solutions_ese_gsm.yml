@@ -30,6 +30,7 @@ executor:
       encryptionCipherMode: AES256-GCM
       encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
       set_parameters:
+        disableSpillKVEngine: true
         enableTestCommands: 1
         internalQueryFindCommandBatchSize: 2
   hooks:
