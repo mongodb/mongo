@@ -603,6 +603,8 @@ last-continuous:
     ticket: SERVER-95807
   - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
+  - test_file: jstests/change_streams/ddl_view_events.js
+    ticket: SERVER-94731
   suites: null
 last-lts:
   all:
@@ -1256,4 +1258,6 @@ last-lts:
     ticket: SERVER-95807
   - test_file: jstests/core/query/json_schema_validate_empty_path.js
     ticket: SERVER-97254
+  - test_file: jstests/change_streams/ddl_view_events.js
+    ticket: SERVER-94731
   suites: null
