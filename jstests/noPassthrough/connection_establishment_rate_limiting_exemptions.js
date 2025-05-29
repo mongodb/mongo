@@ -33,7 +33,8 @@ const testExemptIPsFromRateLimit = (conn) => {
             jsTestLog(e);
             return e.message.includes("Connection closed by peer") ||
                 e.message.includes("Connection reset by peer") ||
-                e.message.includes("established connection was aborted");
+                e.message.includes("established connection was aborted") ||
+                e.message.includes("Broken pipe");
         }
 
         return false;
