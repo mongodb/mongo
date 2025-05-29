@@ -59,6 +59,89 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            &feature_flags::gFeatureFlagSearchHybridScoringFull);
 namespace {
+
+// The ScoreFusionScoringOptions class validates and stores the normalization,
+// combination.method, and combination.expression fields. combination.expression is not
+// immediately parsed into an expression because any pipelines variables it references will be
+// considered undefined and will therefore throw an error at parsing time.
+// combination.expression will only be parsed into an expression when the enclosing $let var
+// (which defines the pipeline variables) is constructed.
+class ScoreFusionScoringOptions {
+public:
+    ScoreFusionScoringOptions(const ScoreFusionSpec& spec) {
+        _normalizationMethod = spec.getInput().getNormalization();
+        auto& combination = spec.getCombination();
+        // The default combination method is avg if no combination method is specified.
+        ScoreFusionCombinationMethodEnum combinationMethod = ScoreFusionCombinationMethodEnum::kAvg;
+        boost::optional<IDLAnyType> combinationExpression = boost::none;
+        if (combination.has_value() && combination->getMethod().has_value()) {
+            combinationMethod = combination->getMethod().get();
+            uassert(10017300,
+                    "combination.expression should only be specified when combination.method "
+                    "has the value \"expression\"",
+                    (combinationMethod != ScoreFusionCombinationMethodEnum::kExpression &&
+                     !combination->getExpression().has_value()) ||
+                        (combinationMethod == ScoreFusionCombinationMethodEnum::kExpression &&
+                         combination->getExpression().has_value()));
+            combinationExpression = combination->getExpression();
+            uassert(10017301,
+                    "both combination.expression and combination.weights cannot be specified",
+                    !(combination->getWeights().has_value() && combinationExpression.has_value()));
+        }
+        _combinationMethod = std::move(combinationMethod);
+        _combinationExpression = std::move(combinationExpression);
+    }
+
+    ScoreFusionNormalizationEnum getNormalizationMethod() const {
+        return _normalizationMethod;
+    }
+
+    std::string getNormalizationString(ScoreFusionNormalizationEnum normalization) const {
+        switch (normalization) {
+            case ScoreFusionNormalizationEnum::kSigmoid:
+                return "sigmoid";
+            case ScoreFusionNormalizationEnum::kMinMaxScaler:
+                return "minMaxScaler";
+            case ScoreFusionNormalizationEnum::kNone:
+                return "none";
+            default:
+                // Only one of the above options can be specified for normalization.
+                MONGO_UNREACHABLE_TASSERT(9467100);
+        }
+    }
+
+    ScoreFusionCombinationMethodEnum getCombinationMethod() const {
+        return _combinationMethod;
+    }
+
+    std::string getCombinationMethodString(ScoreFusionCombinationMethodEnum comboMethod) const {
+        switch (comboMethod) {
+            case ScoreFusionCombinationMethodEnum::kExpression:
+                return "custom expression";
+            case ScoreFusionCombinationMethodEnum::kAvg:
+                return "average";
+            default:
+                // Only one of the above options can be specified for combination.method.
+                MONGO_UNREACHABLE_TASSERT(9467101);
+        }
+    }
+
+    boost::optional<IDLAnyType> getCombinationExpression() const {
+        return _combinationExpression;
+    }
+
+private:
+    // The default normalization value is ScoreFusionCombinationMethodEnum::kNone. The IDL
+    // handles the default behavior.
+    ScoreFusionNormalizationEnum _normalizationMethod;
+    // The default combination.method value is ScoreFusionCombinationMethodEnum::kAvg. The IDL
+    // handles the default behavior.
+    ScoreFusionCombinationMethodEnum _combinationMethod;
+    // This field should only be populated when combination.method has the value
+    // ScoreFusionCombinationMethodEnum::kExpression.
+    boost::optional<IDLAnyType> _combinationExpression = boost::none;
+};
+
 // Description that gets set as part of $scoreFusion's scoreDetails metadata.
 static const std::string scoreFusionScoreDetailsDescription =
     "the value calculated by combining the scores (either normalized or raw) across "
@@ -388,7 +471,7 @@ BSONObj groupEachScore(
 boost::intrusive_ptr<DocumentSource> buildSetScoreStage(
     const auto& expCtx,
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
-    const DocumentSourceScoreFusion::ScoreFusionScoringOptions scoreFusionScoringOptions) {
+    const ScoreFusionScoringOptions scoreFusionScoringOptions) {
     ScoreFusionCombinationMethodEnum combinationMethod =
         scoreFusionScoringOptions.getCombinationMethod();
     // Default is to average the scores.
@@ -514,7 +597,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
 
  */
 boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
-    const DocumentSourceScoreFusion::ScoreFusionScoringOptions scoreFusionScoringOptions,
+    const ScoreFusionScoringOptions scoreFusionScoringOptions,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     BSONObjBuilder combinationBob(
         BSON("method" << scoreFusionScoringOptions.getCombinationMethodString(
@@ -555,7 +638,7 @@ boost::intrusive_ptr<DocumentSource> constructScoreDetailsMetadata(
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildScoreAndMergeStages(
     const std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>>& inputPipelines,
-    const DocumentSourceScoreFusion::ScoreFusionScoringOptions metadata,
+    const ScoreFusionScoringOptions metadata,
     const StringMap<double>& weights,
     const bool includeScoreDetails,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -699,7 +782,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     // the correct user input after performing the necessary error checks (ex: verify that if
     // combination.method is 'custom', then the combination.expression should've been specified).
     // Average is the default combination method if no other method is specified.
-    DocumentSourceScoreFusion::ScoreFusionScoringOptions scoreFusionScoringOptions(spec);
+    ScoreFusionScoringOptions scoreFusionScoringOptions(spec);
     auto finalStages = buildScoreAndMergeStages(
         inputPipelines, scoreFusionScoringOptions, weights, includeScoreDetails, pExpCtx);
     for (auto&& stage : finalStages) {
