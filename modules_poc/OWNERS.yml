@@ -9,3 +9,6 @@ filters:
   - "*.jq":
     approvers:
       - 10gen/server-programmability
+  - "*.sh":
+    approvers:
+      - 10gen/server-programmability
