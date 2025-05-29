@@ -74,6 +74,7 @@ py_library(
             "retry",
             group = "testing",
         ),
+        "//buildscripts/s3_binary:download",
     ],
 )
 

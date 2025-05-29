@@ -3,6 +3,7 @@
 import hashlib
 import os
 import pathlib
+import re
 import subprocess
 from pprint import pformat
 
@@ -46,11 +47,15 @@ def _upload(local_source_directory: str, s3_destination_directory: str) -> None:
                 f"{s3_path_to_check} already exists, aborting upload. Delete the file from S3 or use a different directory."
             )
 
-    print("Storing hashes in buildscripts/s3_binary_hashes.py...")
+    print("Storing hashes in buildscripts/s3_binary/hashes.py...")
     for file in files_to_upload:
-        S3_SHA256_HASHES[s3_destination_directory + file.name] = _sha256_file(file)
+        https_path = (
+            re.sub(r"s3://(.*?)/(.*)", r"https://\1.s3.amazonaws.com/\2", s3_destination_directory)
+            + file.name
+        )
+        S3_SHA256_HASHES[https_path] = _sha256_file(file)
 
-    with open("buildscripts/s3_binary_hashes.py", "w", encoding="utf-8") as hash_file:
+    with open("buildscripts/s3_binary/hashes.py", "w", encoding="utf-8") as hash_file:
         hash_dict = (
             pformat(S3_SHA256_HASHES, indent=4).replace("'", '"').replace("}", "").replace("{", "")
         )

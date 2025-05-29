@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import hashlib
+import shutil
+import tempfile
 import time
 import urllib.request
 
@@ -42,5 +44,7 @@ def download_s3_binary(
 ) -> None:
     if local_path is None:
         local_path = s3_path.split("/")[-1]
-    _download_path_with_retry(s3_path, local_path)
-    _verify_s3_hash(s3_path, local_path, S3_SHA256_HASHES[s3_path])
+    with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+        _download_path_with_retry(s3_path, temp_file.name)
+        _verify_s3_hash(s3_path, temp_file.name, S3_SHA256_HASHES[s3_path])
+        shutil.copy(temp_file.name, local_path)
