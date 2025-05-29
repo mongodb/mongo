@@ -784,7 +784,7 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     # if this fails, something is missing in context_kinds or namespace_scope_context_kinds
     assert context
 
-    usage = f"{pretty_location(c.location)}\t{context.string_for_context}"
+    usage = f"{pretty_location(c.location)} {context.string_for_context}"
     d.used_from.setdefault(mod, set()).add(usage)
 
 

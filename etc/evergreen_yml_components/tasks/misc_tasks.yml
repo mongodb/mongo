@@ -1110,6 +1110,16 @@ tasks:
             - "./src/evergreen/run_python_script_with_report.sh"
             - "validate-module-calls"
             - "modules_poc/merge_decls.py"
+      - command: subprocess.exec
+        type: test
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/run_python_script_with_report.sh"
+            - "ensure-browser-can-parse-output"
+            - "modules_poc/browse.py"
+            - "merged_decls.json"
+            - "--parse-only"
 
   - name: bazel_coverage
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

@@ -49,7 +49,7 @@ class LocAndContext(NamedTuple):
 
     @classmethod
     def parse(cls, usage: str):
-        loc, ctx = usage.split("\t")
+        loc, _, ctx = usage.partition(" ")
         return cls(Loc.parse(loc), sys.intern(ctx))
 
 
@@ -224,11 +224,11 @@ def add_mod_loc_mapping_nodes(node: TreeNode, usages: Usages, kind: str, expand=
                 continue
 
             # Currently only STATIC_ASSERT doesn't have a name.
-            [kind, *name] = loc.ctx.split(" ", 1)
+            kind, _, name = loc.ctx.partition(" ")
             mod_node.add_leaf(
                 Text.assemble(
                     fancy_kind(kind),
-                    Text(" " + name[0], style="bold bright_white") if name else "",
+                    Text(" " + name, style="bold bright_white") if name else "",
                     f" {loc.loc}",
                 ),
                 loc.loc,
@@ -516,6 +516,9 @@ for d in raw_decls:
         for mod, locs in d["other_mods"].items():
             locs.sort()
             d["other_mods"][mod] = [Loc.parse(loc) for loc in locs]
+    # For now these aren't used in the browser
+    del d["vis_from"]
+    del d["vis_from_non_ns"]
 
 decls = sorted((Decl(**d) for d in raw_decls), key=lambda d: d.loc)
 del raw_decls
@@ -565,7 +568,7 @@ for f in files.values():
 files = {k: v for k, v in sorted(files.items(), key=lambda kv: kv[1].unknown_count, reverse=True)}
 modules = {d.mod for d in decls}
 
-if __name__ == "__main__":
+if __name__ == "__main__" and "--parse-only" not in sys.argv:
     app = ModularityApp()
     app.run()
 

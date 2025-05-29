@@ -11,7 +11,14 @@ def _group_by_vis_map(vis_from):
             group_by(.mod) |
             map({
                 mod: .[0].mod,
-                locs: [.[].locs[]] | map(split("\t") | .[1]) | unique,
+                locs: [
+                    .[].locs[] |
+                    split(" ") |
+                    if length == 3
+                        then "\(.[1]) \(.[2])" # CXX_METHOD Foo::bar
+                        else "\(.[1]) \(.[0])" # STATIC_ASSERT src/mongo/foo.cpp:123:45
+                    end
+                ] | unique,
             }),
     });
 
