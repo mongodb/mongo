@@ -8,12 +8,15 @@
 //   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
 //   assumes_read_concern_unchanged,
 //   does_not_support_repeated_reads,
-//   does_not_support_stepdowns,
 //   # Uses $where operator
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 //   requires_getmore,
+//   # The count operation can't be retried, otherwise we may get a timeout waiting for the parallel
+//   # shell to finish.
+//   does_not_support_stepdowns,
+//   assumes_balancer_off,
 // ]
 
 var t = db.jstests_count_plan_summary;
