@@ -108,7 +108,7 @@ const outputColl = db.mr_fail_invalid_js_out;
         mapReduce: coll.getName(),
         map: badMapFn,
         reduce: goodReduceFn,
-        out: outputColl.getName()
+        out: {replace: outputColl.getName()}
     }));
     assert(error.errmsg.indexOf("emit") >= 0, () => tojson(error));
 

@@ -146,7 +146,6 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
             return originalRunCommand.apply(this, arguments);
         }
         this.getDB(dbName)[outputColl].drop();  // This will implicitly shard it.
-        outputSpec.sharded = true;
     }
 
     cmdObj.out = outputSpec;
