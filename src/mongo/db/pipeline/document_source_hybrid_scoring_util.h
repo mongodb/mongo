@@ -78,21 +78,6 @@ void failWeightsValidationWithPipelineSuggestions(
     StringData stageName);
 
 namespace score_details {
-
-/**
- * Builds and returns an $addFields stage that materializes scoreDetails for an individual input
- * pipeline. The way we materialize scoreDetails depends on if the input pipeline generates "score"
- * or "scoreDetails" metadata.
- *
- * Later, these individual input pipeline scoreDetails will be gathered together in order to build
- * scoreDetails for the overall $rankFusion pipeline (see calculateFinalScoreDetails()).
- */
-boost::intrusive_ptr<DocumentSource> addScoreDetails(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    StringData inputPipelinePrefix,
-    bool inputGeneratesScore,
-    bool inputGeneratesScoreDetails);
-
 /**
  * Construct the scoreDetails field name and obj (ex: name_scoreDetails: {$mergeObjects:
  * $name_scoreDetails}) for the grouping stage.
@@ -119,8 +104,8 @@ std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(std::string pip
         calculatedScoreDetails: [
         {
             $mergeObjects: [
-                {inputPipelineName: "name2", inputPipelineRawScore: "$name2_inputPipelineRawScore",
-                    weight: <weight>},
+                {inputPipelineName: "name2", inputPipelineRawScore: "$name2_rawScore",
+                    weight: <weight>, value: "$name2_score"},
                 "$name2_scoreDetails"
             ]
         }

@@ -5216,9 +5216,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                 {
                     "$addFields": {
                         "name1_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -5276,7 +5273,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckOnePipelineScoreDetailsDesugaring) {
                                         "inputPipelineRawScore": "$name1_rawScore",
                                         "weight": {
                                             "$const": 5
-                                        }
+                                        },
+                                        "value": "$name1_score"
                                     },
                                     "$name1_scoreDetails"
                                 ]
@@ -5423,9 +5421,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                 {
                     "$addFields": {
                         "name1_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -5484,7 +5479,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                             {
                                 "$addFields": {
                                     "searchPipe_scoreDetails": {
-                                        "$meta": "scoreDetails"
+                                        "details": {
+                                            "$meta": "scoreDetails"
+                                        }
                                     }
                                 }
                             }
@@ -5568,7 +5565,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                                         "inputPipelineRawScore": "$name1_rawScore",
                                         "weight": {
                                             "$const": 3
-                                        }
+                                        },
+                                        "value": "$name1_score"
                                     },
                                     "$name1_scoreDetails"
                                 ]
@@ -5582,7 +5580,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchWithScoreDetailsDesu
                                         "inputPipelineRawScore": "$searchPipe_rawScore",
                                         "weight": {
                                             "$const": 2
-                                        }
+                                        },
+                                        "value": "$searchPipe_score"
                                     },
                                     "$searchPipe_scoreDetails"
                                 ]
@@ -5728,9 +5727,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                 {
                     "$addFields": {
                         "search_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -5788,9 +5784,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                             {
                                 "$addFields": {
                                     "vector_scoreDetails": {
-                                        "value": {
-                                            "$meta": "score"
-                                        },
                                         "details": []
                                     }
                                 }
@@ -5875,7 +5868,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                                         "inputPipelineRawScore": "$search_rawScore",
                                         "weight": {
                                             "$const": 2
-                                        }
+                                        },
+                                        "value": "$search_score"
                                     },
                                     "$search_scoreDetails"
                                 ]
@@ -5889,7 +5883,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineSearchNoScoreDetailsDesuga
                                         "inputPipelineRawScore": "$vector_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$vector_score"
                                     },
                                     "$vector_scoreDetails"
                                 ]
@@ -6034,9 +6029,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineCustomExpressionScoreDetai
                 {
                     "$addFields": {
                         "name1_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -6095,7 +6087,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineCustomExpressionScoreDetai
                             {
                                 "$addFields": {
                                     "searchPipe_scoreDetails": {
-                                        "$meta": "scoreDetails"
+                                        "details": {
+                                            "$meta": "scoreDetails"
+                                        }
                                     }
                                 }
                             }
@@ -6189,7 +6183,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineCustomExpressionScoreDetai
                                         "inputPipelineRawScore": "$name1_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$name1_score"
                                     },
                                     "$name1_scoreDetails"
                                 ]
@@ -6203,7 +6198,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineCustomExpressionScoreDetai
                                         "inputPipelineRawScore": "$searchPipe_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$searchPipe_score"
                                     },
                                     "$searchPipe_scoreDetails"
                                 ]
@@ -6331,9 +6327,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                 {
                     "$addFields": {
                         "scorePipe1_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -6346,8 +6339,12 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                 "$setMetadata": {
                                     "score": {
                                         "$add": [
-                                            {"$const": 10},
-                                            {"$const": 2}
+                                            {
+                                                "$const": 10
+                                            },
+                                            {
+                                                "$const": 2
+                                            }
                                         ]
                                     }
                                 }
@@ -6420,9 +6417,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                             {
                                 "$addFields": {
                                     "scorePipe2_scoreDetails": {
-                                        "value": {
-                                            "$meta": "score"
-                                        },
                                         "details": []
                                     }
                                 }
@@ -6507,7 +6501,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                         "inputPipelineRawScore": "$scorePipe1_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe1_score"
                                     },
                                     "$scorePipe1_scoreDetails"
                                 ]
@@ -6521,7 +6516,8 @@ TEST_F(DocumentSourceScoreFusionTest, CheckTwoPipelineScoreInputPipelineScoreDet
                                         "inputPipelineRawScore": "$scorePipe2_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe2_score"
                                     },
                                     "$scorePipe2_scoreDetails"
                                 ]
@@ -6672,9 +6668,6 @@ TEST_F(DocumentSourceScoreFusionTest,
                 {
                     "$addFields": {
                         "scorePipe1_scoreDetails": {
-                            "value": {
-                                "$meta": "score"
-                            },
                             "details": []
                         }
                     }
@@ -6758,9 +6751,6 @@ TEST_F(DocumentSourceScoreFusionTest,
                             {
                                 "$addFields": {
                                     "scorePipe2_scoreDetails": {
-                                        "value": {
-                                            "$meta": "score"
-                                        },
                                         "details": []
                                     }
                                 }
@@ -6845,7 +6835,8 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "inputPipelineRawScore": "$scorePipe1_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe1_score"
                                     },
                                     "$scorePipe1_scoreDetails"
                                 ]
@@ -6859,7 +6850,8 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "inputPipelineRawScore": "$scorePipe2_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe2_score"
                                     },
                                     "$scorePipe2_scoreDetails"
                                 ]
@@ -7038,7 +7030,9 @@ TEST_F(DocumentSourceScoreFusionTest,
                 {
                     "$addFields": {
                         "scorePipe1_scoreDetails": {
-                            "$meta": "scoreDetails"
+                            "details": {
+                                "$meta": "scoreDetails"
+                            }
                         }
                     }
                 },
@@ -7199,7 +7193,9 @@ TEST_F(DocumentSourceScoreFusionTest,
                             {
                                 "$addFields": {
                                     "scorePipe2_scoreDetails": {
-                                        "$meta": "scoreDetails"
+                                        "details": {
+                                            "$meta": "scoreDetails"
+                                        }
                                     }
                                 }
                             }
@@ -7284,7 +7280,8 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "inputPipelineRawScore": "$scorePipe1_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe1_score"
                                     },
                                     "$scorePipe1_scoreDetails"
                                 ]
@@ -7298,7 +7295,8 @@ TEST_F(DocumentSourceScoreFusionTest,
                                         "inputPipelineRawScore": "$scorePipe2_rawScore",
                                         "weight": {
                                             "$const": 1
-                                        }
+                                        },
+                                        "value": "$scorePipe2_score"
                                     },
                                     "$scorePipe2_scoreDetails"
                                 ]

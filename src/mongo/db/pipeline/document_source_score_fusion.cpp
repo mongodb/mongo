@@ -162,8 +162,8 @@ boost::intrusive_ptr<DocumentSource> buildScoreAddFieldsStage(
 }
 
 /**
- * Builds and returns an $addFields stage. Here, rawScore refers the incoming score from the input
- * pipeline prior to any normalization or weighting:
+ * Builds and returns an $addFields stage. Here, rawScore refers to the incoming score from the
+ * input pipeline prior to any normalization or weighting:
  * {$addFields:
  *     {<inputPipelineName>_rawScore:
  *         {
@@ -195,8 +195,43 @@ boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
 }
 
 /**
+ * Builds and returns an $addFields stage that materializes scoreDetails for an individual input
+ * pipeline. The way we materialize scoreDetails depends on if the input pipeline generates "score"
+ * or "scoreDetails" metadata.
+ *
+ * Later, these individual input pipeline scoreDetails will be gathered together in order to build
+ * scoreDetails for the overall $scoreFusion pipeline (see calculateFinalScoreDetails()).
+ */
+boost::intrusive_ptr<DocumentSource> addInputPipelineScoreDetails(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const StringData inputPipelinePrefix,
+    const bool inputGeneratesScoreDetails) {
+    const std::string scoreDetails = fmt::format("{}_scoreDetails", inputPipelinePrefix);
+    BSONObjBuilder bob;
+    {
+        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
+
+        if (inputGeneratesScoreDetails) {
+            // If the input pipeline generates scoreDetails (for example, $search may generate
+            // searchScoreDetails), then we'll use the existing details:
+            // {$addFields: {prefix_scoreDetails: details: {$meta: "scoreDetails"}}}}
+            addFieldsBob.append(scoreDetails, BSON("details" << BSON("$meta" << "scoreDetails")));
+        } else {
+            // All $scoreFusion input pipelines must be scored (generate a score).
+
+            // Build our own scoreDetails for the pipeline like:
+            // {$addFields: {prefix_scoreDetails: {details: []}}}
+            addFieldsBob.append(scoreDetails, BSON("details" << BSONArrayBuilder().arr()));
+        }
+    }
+    const auto spec = bob.obj();
+    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
+}
+
+/**
  * Adds the following stages for scoreDetails:
  * {$addFields: {<inputPipelineName>_rawScore: { "$meta": "score" } } }
+ * {$setMetadata: {score: "$<inputPipelineName>_score"}
  * {$addFields: {<inputPipelineName>_scoreDetails: ...} }. See addScoreDetails' comment for what the
  * possible values for <inputPipelineName>_scoreDetails are.
  */
@@ -212,12 +247,8 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
             expCtx,
             ExpressionFieldPath::parse(expCtx.get(), scoreName, expCtx->variablesParseState),
             DocumentMetadataFields::MetaType::kScore);
-    // All input pipleines for $scoreFusion generate score metadata so always pass true for the
-    // 'inputGeneratesScore' parameter.
-    const bool inputGeneratesScore = true;
     boost::intrusive_ptr<DocumentSource> scoreDetailsAddFields =
-        hybrid_scoring_util::score_details::addScoreDetails(
-            expCtx, inputPipelineName, inputGeneratesScore, inputGeneratesScoreDetails);
+        addInputPipelineScoreDetails(expCtx, inputPipelineName, inputGeneratesScoreDetails);
     std::list<boost::intrusive_ptr<DocumentSource>> initialScoreDetails = {
         std::move(rawScoreAddFields),
         std::move(setPipelineScoreMetadata),

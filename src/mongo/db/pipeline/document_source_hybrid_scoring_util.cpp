@@ -189,44 +189,6 @@ void failWeightsValidationWithPipelineSuggestions(
 
 namespace score_details {
 
-boost::intrusive_ptr<DocumentSource> addScoreDetails(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const StringData inputPipelinePrefix,
-    const bool inputGeneratesScore,
-    const bool inputGeneratesScoreDetails) {
-    const std::string scoreDetails = fmt::format("{}_scoreDetails", inputPipelinePrefix);
-    BSONObjBuilder bob;
-    {
-        BSONObjBuilder addFieldsBob(bob.subobjStart("$addFields"_sd));
-
-        if (inputGeneratesScoreDetails) {
-            // If the input pipeline generates scoreDetails (for example, $search may generate
-            // searchScoreDetails), then we'll use the existing details:
-            // {$addFields: {prefix_scoreDetails: {$meta: "scoreDetails"}}}
-            // We don't grab {$meta: "score"} because we assume any existing scoreDetails already
-            // includes its own score at "scoreDetails.value".
-            addFieldsBob.append(scoreDetails, BSON("$meta" << "scoreDetails"));
-        } else if (inputGeneratesScore) {
-            // If the input pipeline does not generate scoreDetails but does generate a "score" (for
-            // example, a $text query sorted on the text score), we'll build our own scoreDetails
-            // for the pipeline like:
-            // {$addFields: {prefix_scoreDetails: {value: {$meta: "score"}, details: []}}}
-            addFieldsBob.append(
-                scoreDetails,
-                BSON("value" << BSON("$meta" << "score") << "details" << BSONArrayBuilder().arr()));
-        } else {
-            // If the input pipeline generates neither "score" not "scoreDetails" (for example, a
-            // pipeline with just a $sort), we don't have any interesting information to include in
-            // scoreDetails (rank is added later). We'll still build empty scoreDetails to
-            // reflect that:
-            // {$addFields: {prefix_scoreDetails: {details: []}}}
-            addFieldsBob.append(scoreDetails, BSON("details" << BSONArrayBuilder().arr()));
-        }
-    }
-    const auto spec = bob.obj();
-    return DocumentSourceAddFields::createFromBson(spec.firstElement(), expCtx);
-}
-
 std::pair<std::string, BSONObj> constructScoreDetailsForGrouping(const std::string pipelineName) {
     const std::string scoreDetailsName = fmt::format("{}_scoreDetails", pipelineName);
     return std::make_pair(scoreDetailsName,
@@ -254,6 +216,9 @@ boost::intrusive_ptr<DocumentSource> constructCalculatedFinalScoreDetails(
                                          fmt::format("${}_rawScore", pipelineName));
         }
         mergeObjectsArrSubObj.append("weight"_sd, weight);
+        if (!isRankFusion) {
+            mergeObjectsArrSubObj.append("value"_sd, fmt::format("${}_score", pipelineName));
+        }
         mergeObjectsArrSubObj.done();
         BSONArrayBuilder mergeObjectsArr;
         mergeObjectsArr.append(mergeObjectsArrSubObj.obj());

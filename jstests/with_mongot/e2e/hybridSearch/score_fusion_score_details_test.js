@@ -74,9 +74,9 @@ function fieldPresent(field, containingObj) {
 
 /**
  * Example of the expected score and scoreDetails metadata structure for a given results document:
- * "score" : 4.1042046546936035,
+ * "score" : 2.0521023273468018,
  * "details" : {
-        "value" : 4.1042046546936035,
+        "value" : 2.0521023273468018,
         "description" : "the value calculated by...",
         "normalization" : "none",
         "combination": {
@@ -87,9 +87,14 @@ function fieldPresent(field, containingObj) {
                 "inputPipelineName" : "search",
                 "inputPipelineRawScore" : 1.5521023273468018,
                 "weight" : 2,
-                "value" : 1.5521023273468018,
-                "description" : "average of:",
-                "details" : [ {...} ]
+                "value" : 3.1042046546936035,
+                "details" : [ // search's score details
+                    {
+                        "value" : 1.5521023273468018,
+                        "description" : "average of:",
+                        "details" : [ {...} ]
+                    }
+                ]
             },
             {
                 "inputPipelineName" : "vector",
@@ -135,16 +140,23 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineRawScore", searchDetails);
     assertFieldPresent("weight", searchDetails);
     assert.eq(searchDetails["weight"], 2);
-    // If there isn't a value, we didn't get this back from search at all.
-    if (searchDetails.hasOwnProperty("value")) {
-        assertFieldPresent("value", searchDetails);
-        assertFieldPresent("details",
-                           searchDetails);  // Not checking description contents, just that its
-                                            // present and not our placeholder value.
+    assertFieldPresent("value", searchDetails);
+    // No normalization applied to score value in this query, so the total score is the raw score
+    // multiplied by the weight.
+    assert.eq(searchDetails["value"],
+              searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
+    // If there isn't a details, we didn't get this back from search at all.
+    if (searchDetails.hasOwnProperty("details")) {
+        assertFieldPresent("details", searchDetails);
         assert.neq(searchDetails["details"], []);
-        // Note we won't check the shape of the search scoreDetails beyond here.
+        const searchSearchDetails = searchDetails["details"];
+        assertFieldPresent("value", searchSearchDetails);
+        assert.eq(searchSearchDetails["value"], searchDetails["inputPipelineRawScore"]);
+        assertFieldPresent("details",
+                           searchSearchDetails);  // Not checking description contents, just that
+                                                  // its present and not our placeholder value.
+        assert.neq(searchSearchDetails["details"], []);
     }
-
     const vectorDetails = subDetails[1];
     assertFieldPresent("inputPipelineName", vectorDetails);
     assert.eq(vectorDetails["inputPipelineName"], "vector");
@@ -340,9 +352,11 @@ for (const foundDoc of results) {
     assertFieldPresent("inputPipelineRawScore", searchDetails);
     assertFieldPresent("weight", searchDetails);
     assert.eq(searchDetails["weight"], 1);
-    // If there isn't a value, we didn't get this back from search at all.
-    if (searchDetails.hasOwnProperty("value")) {
-        assertFieldPresent("value", searchDetails);
+    assertFieldPresent("value", searchDetails);
+    assert.eq(searchDetails["value"],
+              searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
+    // If there isn't a details, we didn't get this back from search at all.
+    if (searchDetails.hasOwnProperty("details")) {
         assertFieldPresent("details", searchDetails);
         assert.eq(searchDetails["details"], []);
         // Note we won't check the shape of the search scoreDetails beyond here.
