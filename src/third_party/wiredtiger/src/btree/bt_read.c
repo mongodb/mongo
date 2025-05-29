@@ -229,7 +229,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     }
 
     /* There's an address, read the backing disk page and build an in-memory version of the page. */
-    WT_ERR(__wt_blkcache_read(session, &tmp, addr.addr, addr.size));
+    WT_ERR(__wt_blkcache_read(session, &tmp, NULL, addr.addr, addr.size));
 
     /*
      * Build the in-memory version of the page. Clear our local reference to the allocated copy of

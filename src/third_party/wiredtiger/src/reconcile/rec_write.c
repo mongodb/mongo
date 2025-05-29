@@ -912,8 +912,8 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_
         WT_RET(ret);
     }
 
-    return (__wt_blkcache_write(
-      session, buf, addr, addr_sizep, compressed_sizep, checkpoint, checkpoint_io, compressed));
+    return (__wt_blkcache_write(session, buf, NULL, addr, addr_sizep, compressed_sizep, checkpoint,
+      checkpoint_io, compressed));
 }
 
 /*
@@ -2515,7 +2515,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_PAGE *page)
         ref = r->ref;
         if (__wt_ref_is_root(ref)) {
             __wt_checkpoint_tree_reconcile_update(session, &ta);
-            WT_RET(bm->checkpoint(bm, session, NULL, btree->ckpt, false));
+            WT_RET(bm->checkpoint(bm, session, NULL, NULL, btree->ckpt, false));
         }
 
         /*

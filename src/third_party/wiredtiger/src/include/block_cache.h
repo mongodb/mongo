@@ -40,6 +40,15 @@
 #define WT_BLKCACHE_RM_EVICTION 3
 
 /*
+ * WT_BLKCACHE_DELTA --
+ *     A delta associated with a block in the block cache.
+ */
+struct __wt_blkcache_delta {
+    void *data;
+    uint32_t data_size;
+};
+
+/*
  * WT_BLKCACHE_ITEM --
  *     Block cache item. It links with other items in the same hash bucket.
  */
@@ -49,6 +58,9 @@ struct __wt_blkcache_item {
     void *data;
     uint32_t data_size;
     uint32_t num_references;
+
+    WT_BLKCACHE_DELTA *deltas;
+    uint32_t num_deltas;
 
     /*
      * This counter is incremented every time a block is referenced and decremented every time the
@@ -60,8 +72,9 @@ struct __wt_blkcache_item {
 
     wt_shared uint32_t ref_count; /* References */
 
-    uint32_t fid;      /* File ID */
-    uint8_t addr_size; /* Address cookie */
+    WT_PAGE_BLOCK_META *block_meta; /* Block metadata returned by the read call */
+    uint32_t fid;                   /* File ID */
+    uint8_t addr_size;              /* Address cookie */
     uint8_t addr[];
 };
 

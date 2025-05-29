@@ -126,6 +126,82 @@ __wt_page_header_byteswap(WT_PAGE_HEADER *dsk)
     ((void *)((uint8_t *)(dsk) + WT_PAGE_HEADER_BYTE_SIZE(btree)))
 
 /*
+ * WT_DELTA_HEADER --
+ *	A delta is a durable record of changes to a page since the previous delta or full-page image
+ * was recorded. It is composed of a WT_DELTA_HEADER, followed by a variable number of delta
+ * entries. The number of entries does not explicitly appear, it is inferred by the size of the
+ * overall delta. Each delta entry has a one header 'flags' byte (flags from WT_DELTA_CELL_UNPACK),
+ * followed by up to 4 timestamps as indicated by the flags, followed by the key size and the key
+ * bytes. If the WT_DELTA_LEAF_IS_DELETE flag is not set, the entry then includes the value size and
+ * the value bytes.
+ */
+struct __wt_delta_header {
+    uint64_t write_gen; /* 0-7: write generation */
+    /*
+     * Memory size of the delta.
+     */
+    uint32_t mem_size; /* 08-11: in-memory size */
+
+    union {
+        uint32_t entries; /* 12-15: number of cells on page */
+        uint32_t datalen; /* 12-15: overflow data length */
+    } u;
+
+    uint8_t version; /* 16: version */
+
+    uint8_t type; /* 17: page type */
+
+    uint8_t flags; /* 18: flags */
+
+    uint8_t unused; /* 19: unused padding */
+};
+
+/*
+ * WT_DELTA_HEADER_SIZE is the number of bytes we allocate for the structure: if the compiler
+ * inserts padding it will break the world.
+ */
+#define WT_DELTA_HEADER_SIZE 20
+
+/*
+ * The number of deltas for a base page must be strictly less than or equal to WT_DELTA_LIMIT.
+ * Though we have made the number of consecutive deltas adjustable through the max_consecutive_delta
+ * config, 32 remains the maximum value we support. Thus WT_DELTA_LIMIT can be used to size arrays
+ * that contain the base page plus all associated deltas.
+ */
+#define WT_DELTA_LIMIT 32
+
+/*
+ * WT_DELTA_HEADER_BYTE --
+ * WT_DELTA_HEADER_BYTE_SIZE --
+ *	The first usable data byte on the block (past the combined headers).
+ */
+#define WT_DELTA_HEADER_BYTE_SIZE(btree) ((u_int)(WT_DELTA_HEADER_SIZE + (btree)->block_header))
+#define WT_DELTA_HEADER_BYTE(btree, dsk) \
+    ((void *)((uint8_t *)(dsk) + WT_DELTA_HEADER_BYTE_SIZE(btree)))
+
+/*
+ * A variant of WT_BLOCK_HEADER_REF that must be used with deltas. XXX It's a hack, needed because
+ * the block manager's header is not first.
+ */
+#define WT_BLOCK_HEADER_REF_FOR_DELTAS(dsk) ((void *)((uint8_t *)(dsk) + WT_DELTA_HEADER_SIZE))
+
+/*
+ * __wt_delta_header_byteswap --
+ *     Handle big- and little-endian transformation of a page header.
+ */
+static WT_INLINE void
+__wt_delta_header_byteswap(WT_DELTA_HEADER *dsk)
+{
+#ifdef WORDS_BIGENDIAN
+    dsk->write_gen = __wt_bswap64(dsk->write_gen);
+    dsk->mem_size = __wt_bswap64(dsk->mem_size);
+    dsk->u.entries = __wt_bswap32(dsk->u.entries);
+#else
+    WT_UNUSED(dsk);
+#endif
+}
+
+/*
  * WT_ADDR --
  *	An in-memory structure to hold a block's location.
  */
@@ -238,6 +314,25 @@ struct __wt_save_upd {
     WT_UPDATE *onpage_upd;
     WT_UPDATE *onpage_tombstone;
     bool restore; /* Whether to restore this saved update chain */
+};
+
+/*
+ * WT_PAGE_BLOCK_META --
+ *  Block management metadata associated with a page.
+ */
+struct __wt_page_block_meta {
+    uint64_t page_id;
+    uint64_t checkpoint_id;
+    uint64_t reconciliation_id;
+
+    uint64_t backlink_lsn;
+    uint64_t base_lsn;
+    uint64_t backlink_checkpoint_id;
+    uint64_t base_checkpoint_id;
+    uint32_t delta_count;
+    uint64_t disagg_lsn;
+
+    uint32_t checksum;
 };
 
 /*
@@ -789,6 +884,8 @@ struct __wt_page {
 
     uint64_t cache_create_gen; /* Page create timestamp */
     uint64_t evict_pass_gen;   /* Eviction pass generation */
+
+    WT_PAGE_BLOCK_META block_meta;
 
 #ifdef HAVE_DIAGNOSTIC
 #define WT_SPLIT_SAVE_STATE_MAX 3

@@ -711,22 +711,28 @@ __evict_update_work(WT_SESSION_IMPL *session)
      */
     bytes_max = conn->cache_size + 1;
     bytes_inuse = __wt_cache_bytes_inuse(cache);
-    if (__wt_evict_clean_needed(session, NULL))
+    if (__wt_evict_clean_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_CLEAN_HARD);
-    else if (bytes_inuse > (target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_clean_reached);
+    } else if (bytes_inuse > (target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_CLEAN);
+    }
 
     bytes_dirty = __wt_cache_dirty_leaf_inuse(cache);
-    if (__wt_evict_dirty_needed(session, NULL))
+    if (__wt_evict_dirty_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_DIRTY | WT_EVICT_CACHE_DIRTY_HARD);
-    else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_dirty_reached);
+    } else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_DIRTY);
+    }
 
     bytes_updates = __wt_cache_bytes_updates(cache);
-    if (__wti_evict_updates_needed(session, NULL))
+    if (__wti_evict_updates_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_UPDATES | WT_EVICT_CACHE_UPDATES_HARD);
-    else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_updates_reached);
+    } else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_UPDATES);
+    }
 
     /*
      * If application threads are blocked by the total volume of data in cache, try dirty pages as

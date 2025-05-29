@@ -185,6 +185,9 @@ struct __wt_block_ckpt {
     WT_EXTLIST ckpt_discard; /* Checkpoint archive */
 };
 
+#define WT_BLOCK_INVALID_PAGE_ID 0 /* Invalid page ID, e.g., if it's not allocated. */
+#define WT_BLOCK_MIN_PAGE_ID 100   /* Minimum page ID that can be used for user data. */
+
 /*
  * WT_BM --
  *	Block manager handle, references a single checkpoint in a btree.
@@ -195,7 +198,7 @@ struct __wt_bm {
     int (*addr_string)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
     u_int (*block_header)(WT_BM *);
     bool (*can_truncate)(WT_BM *, WT_SESSION_IMPL *);
-    int (*checkpoint)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, bool);
+    int (*checkpoint)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, WT_CKPT *, bool);
     int (*checkpoint_last)(WT_BM *, WT_SESSION_IMPL *, char **, char **, WT_ITEM *);
     int (*checkpoint_load)(
       WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, uint8_t *, size_t *, bool);
@@ -210,10 +213,14 @@ struct __wt_bm {
     void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+    size_t (*encrypt_skip)(WT_BM *, WT_SESSION_IMPL *, bool);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     bool (*is_mapped)(WT_BM *, WT_SESSION_IMPL *);
     int (*map_discard)(WT_BM *, WT_SESSION_IMPL *, void *, size_t);
-    int (*read)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, size_t);
+    int (*read)(
+      WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, const uint8_t *, size_t);
+    int (*read_multiple)(WT_BM *, WT_SESSION_IMPL *, WT_PAGE_BLOCK_META *, const uint8_t *, size_t,
+      WT_ITEM *items, uint32_t *item_count);
     int (*salvage_end)(WT_BM *, WT_SESSION_IMPL *);
     int (*salvage_next)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, bool *);
     int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
@@ -226,7 +233,8 @@ struct __wt_bm {
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
     int (*verify_start)(WT_BM *, WT_SESSION_IMPL *, WT_CKPT *, const char *[]);
-    int (*write)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, size_t *, bool, bool);
+    int (*write)(
+      WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, uint8_t *, size_t *, bool, bool);
     int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
     WT_BLOCK *block; /* Underlying file. For a multi-handle tree this will be the writable file. */
@@ -236,6 +244,7 @@ struct __wt_bm {
     void *map; /* Mapped region */
     size_t maplen;
     void *mapped_cookie;
+    bool is_remote; /* Whether the storage is on a remote host. */
 
     /*
      * For trees, such as tiered tables, that are allowed to have more than one backing file or
@@ -418,6 +427,13 @@ struct __wt_block_header {
 #define WT_BLOCK_HEADER_SIZE 12
 
 /*
+ * WT_BLOCK_HEADER_BYTE_SIZE --
+ *	The first usable data byte on the block (past the combined headers).
+ */
+#define WT_BLOCK_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_HEADER_SIZE)
+#define WT_BLOCK_HEADER_BYTE(dsk) ((void *)((uint8_t *)(dsk) + WT_BLOCK_HEADER_BYTE_SIZE))
+
+/*
  * __wt_block_header_byteswap_copy --
  *     Handle big- and little-endian transformation of a header block, copying from a source to a
  *     target.
@@ -464,7 +480,34 @@ __wt_block_header_byteswap(WT_BLOCK_HEADER *blk)
  * engine, and skipping 64B shouldn't make any difference in terms of compression efficiency.
  */
 #define WT_BLOCK_COMPRESS_SKIP 64
-#define WT_BLOCK_ENCRYPT_SKIP WT_BLOCK_HEADER_BYTE_SIZE
+
+/*
+ * WT_BLOCK_DISAGG --
+ *	Block manager handle for disaggregated storage block manager.
+ */
+struct __wt_block_disagg {
+    const char *name;  /* Name */
+    uint32_t objectid; /* Object id */
+    uint32_t ref;      /* References */
+
+    TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
+    TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
+
+    /*
+     * Custom disaggregated fields - above this line the structure needs to exactly match the
+     * WT_BLOCK structure, since it can be treated as one for connection caching and a few other
+     * things. Ideally we would split this into a public/private structure, similar to session
+     * handles, and customize file and disagg handles as necessary. That's invasive so save the
+     * grunt work for now.
+     */
+
+    WT_PAGE_LOG_HANDLE *plhandle;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_BLOCK_DISAGG_HS 0x1u
+    /*AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
+};
 
 /*
  * __wt_block_header --
@@ -488,3 +531,71 @@ __wt_block_eligible_for_sweep(WT_BM *bm, WT_BLOCK *block)
 {
     return (!block->remote && block->objectid <= bm->max_flushed_objectid);
 }
+
+/*
+ * WT_BLOCK_DISAGG_HEADER --
+ *	The disaggregated block manager custom header
+ */
+struct __wt_block_disagg_header {
+#define WT_BLOCK_DISAGG_MAGIC_BASE 0xdb
+#define WT_BLOCK_DISAGG_MAGIC_DELTA 0xdd
+    uint8_t magic; /* 00: magic byte, one of the values above */
+
+    /*
+     * As we create new versions, we bump the version number here, and consider what previous
+     * versions are compatible with it.
+     */
+#define WT_BLOCK_DISAGG_VERSION 0x1u
+    uint8_t version; /* 01: version of writer */
+
+#define WT_BLOCK_DISAGG_COMPATIBLE_VERSION 0x1u
+    uint8_t compatible_version; /* 02: minimum version of reader */
+
+    uint8_t header_size; /* 03: size of unencrypted, uncompressed header */
+
+    /*
+     * Page checksums are stored in two places. Similarly to the default block header, except that
+     * for pages that have deltas, the checksum of the most recent delta is stored in the internal
+     * page, which must match the checksum found in this header. The checksum of the previous delta
+     * or base page is stored in this block header, that must in turn match the checksum found in
+     * the block header for the previous one. This is how we can verify that we have every expected
+     * delta and that each delta is not corrupted.
+     */
+    uint32_t checksum;          /* 04-07: checksum */
+    uint32_t previous_checksum; /* 08-11: checksum for previous delta or page */
+
+    /*
+     * The reconciliation id tracks the "version" of a page or delta within a checkpoint. The first
+     * write of a page at a checkpoint has id 0, the second has id 1. We use this number as a
+     * diagnostic to detect the kind of discrepancy that occurred when there is a checksum error.
+     * Thus, overflowing a byte is not a cause for concern. Besides, overflows should be exceedingly
+     * rare. It means checkpointing is much less frequent than the number of times a page needed to
+     * be reconciled.
+     */
+#define WT_BLOCK_OVERFLOW_RECONCILIATION_ID 0xff
+    uint8_t reconciliation_id; /* 12: disaggregated identifier */
+
+/*
+ * No automatic generation: flag values cannot change, they're written to disk.
+ */
+#define WT_BLOCK_DISAGG_DATA_CKSUM 0x1u /* Block data is part of the checksum */
+#define WT_BLOCK_DISAGG_ENCRYPTED 0x2u  /* Data following header is encrypted */
+#define WT_BLOCK_DISAGG_COMPRESSED 0x4u /* Data following header is compressed */
+    uint8_t flags;                      /* 13: flags */
+
+    /*
+     * End the structure with 2 bytes of padding: it wastes space, but it leaves the structure
+     * 32-bit aligned and having an extra couple bytes to play with in the future can't hurt.
+     */
+    uint8_t unused[2]; /* 14-15: unused padding */
+};
+
+/*
+ * WT_BLOCK_DISAGG_BASE_HEADER_SIZE is the number of bytes we allocate for a base page structure,
+ * and WT_BLOCK_DISAGG_DELTA_HEADER_SIZE is the number of bytes we allocated for a delta: if the
+ * compiler inserts padding it will break the world.
+ */
+#define WT_BLOCK_DISAGG_HEADER_SIZE 16
+#define WT_BLOCK_DISAGG_BASE_HEADER_BYTE_SIZE (WT_PAGE_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
+#define WT_BLOCK_DISAGG_DELTA_HEADER_BYTE_SIZE (WT_DELTA_HEADER_SIZE + WT_BLOCK_DISAGG_HEADER_SIZE)
+#define WT_BLOCK_DISAGG_CHECKPOINT_BUFFER (1024)

@@ -5,6 +5,9 @@ __bit_ffs
 __bit_nclr
 __ovfl_discard_dump
 __ovfl_reuse_dump
+__wt_block_disagg_manager_create
+__wt_block_disagg_manager_open
+__wt_block_disagg_manager_owns_object
 __wt_bloom_create
 __wt_bloom_drop
 __wt_bloom_finalize

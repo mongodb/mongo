@@ -52,6 +52,10 @@ class BlockCacheStat(Stat):
     prefix = 'block-cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, BlockCacheStat.prefix, desc, flags)
+class BlockDisaggStat(Stat):
+    prefix = 'block-disagg'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, BlockDisaggStat.prefix, desc, flags)
 class BlockStat(Stat):
     prefix = 'block-manager'
     def __init__(self, name, desc, flags=''):
@@ -635,6 +639,36 @@ conn_stats = [
     ##########################################
     # Performance Histogram Stats
     ##########################################
+    PerfHistStat('perf_hist_bmread_latency_gt1000', 'block manager read latency histogram (bucket 7) - 1000ms+'),
+    PerfHistStat('perf_hist_bmread_latency_lt10', 'block manager read latency histogram (bucket 1) - 0-10ms'),
+    PerfHistStat('perf_hist_bmread_latency_lt50', 'block manager read latency histogram (bucket 2) - 10-49ms'),
+    PerfHistStat('perf_hist_bmread_latency_lt100', 'block manager read latency histogram (bucket 3) - 50-99ms'),
+    PerfHistStat('perf_hist_bmread_latency_lt250', 'block manager read latency histogram (bucket 4) - 100-249ms'),
+    PerfHistStat('perf_hist_bmread_latency_lt500', 'block manager read latency histogram (bucket 5) - 250-499ms'),
+    PerfHistStat('perf_hist_bmread_latency_lt1000', 'block manager read latency histogram (bucket 6) - 500-999ms'),
+    PerfHistStat('perf_hist_bmread_latency_total_msecs', 'block manager read latency histogram total (msecs)'),
+    PerfHistStat('perf_hist_bmwrite_latency_gt1000', 'block manager write latency histogram (bucket 7) - 1000ms+'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt10', 'block manager write latency histogram (bucket 1) - 0-10ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt50', 'block manager write latency histogram (bucket 2) - 10-49ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt100', 'block manager write latency histogram (bucket 3) - 50-99ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt250', 'block manager write latency histogram (bucket 4) - 100-249ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt500', 'block manager write latency histogram (bucket 5) - 250-499ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_lt1000', 'block manager write latency histogram (bucket 6) - 500-999ms'),
+    PerfHistStat('perf_hist_bmwrite_latency_total_msecs', 'block manager write latency histogram total (msecs)'),
+    PerfHistStat('perf_hist_disaggbmread_latency_gt10000', 'disagg block manager read latency histogram (bucket 6) - 10000us+'),
+    PerfHistStat('perf_hist_disaggbmread_latency_lt100', 'disagg block manager read latency histogram (bucket 1) - 50-99us'),
+    PerfHistStat('perf_hist_disaggbmread_latency_lt250', 'disagg block manager read latency histogram (bucket 2) - 100-249us'),
+    PerfHistStat('perf_hist_disaggbmread_latency_lt500', 'disagg block manager read latency histogram (bucket 3) - 250-499us'),
+    PerfHistStat('perf_hist_disaggbmread_latency_lt1000', 'disagg block manager read latency histogram (bucket 4) - 500-999us'),
+    PerfHistStat('perf_hist_disaggbmread_latency_lt10000', 'disagg block manager read latency histogram (bucket 5) - 1000-9999us'),
+    PerfHistStat('perf_hist_disaggbmread_latency_total_usecs', 'disagg block manager read latency histogram total (usecs)'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_gt10000', 'disagg block manager write latency histogram (bucket 6) - 10000us+'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_lt100', 'disagg block manager write latency histogram (bucket 1) - 50-99us'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_lt250', 'disagg block manager write latency histogram (bucket 2) - 100-249us'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_lt500', 'disagg block manager write latency histogram (bucket 3) - 250-499us'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_lt1000', 'disagg block manager write latency histogram (bucket 4) - 500-999us'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_lt10000', 'disagg block manager write latency histogram (bucket 5) - 1000-9999us'),
+    PerfHistStat('perf_hist_disaggbmwrite_latency_total_usecs', 'disagg block manager write latency histogram total (usecs)'),
     PerfHistStat('perf_hist_fsread_latency_gt1000', 'file system read latency histogram (bucket 7) - 1000ms+'),
     PerfHistStat('perf_hist_fsread_latency_lt10', 'file system read latency histogram (bucket 1) - 0-10ms'),
     PerfHistStat('perf_hist_fsread_latency_lt50', 'file system read latency histogram (bucket 2) - 10-49ms'),
@@ -1026,6 +1060,9 @@ conn_dsrc_stats = [
     CacheStat('cache_eviction_target_page_lt32', 'eviction walk target pages histogram - 10-31'),
     CacheStat('cache_eviction_target_page_lt64', 'eviction walk target pages histogram - 32-63'),
     CacheStat('cache_eviction_target_page_reduced', 'eviction walk target pages reduced due to history store cache pressure'),
+    CacheStat('cache_eviction_trigger_clean_reached', 'number of times clean trigger was reached'),
+    CacheStat('cache_eviction_trigger_dirty_reached', 'number of times dirty trigger was reached'),
+    CacheStat('cache_eviction_trigger_updates_reached', 'number of times updates trigger was reached'),
     CacheStat('cache_hs_btree_truncate', 'history store table truncation to remove all the keys of a btree'),
     CacheStat('cache_hs_btree_truncate_dryrun', 'history store table truncations that would have happened in non-dryrun mode'),
     CacheStat('cache_hs_insert', 'history store table insert calls'),
@@ -1125,6 +1162,16 @@ conn_dsrc_stats = [
     CursorErrorStat('cursor_search_error', 'cursor search calls that return an error'),
     CursorErrorStat('cursor_search_near_error', 'cursor search near calls that return an error'),
     CursorErrorStat('cursor_update_error', 'cursor update calls that return an error'),
+
+    ##########################################
+    # Disaggregated block manager statistics
+    ##########################################
+    BlockDisaggStat('disagg_block_get', 'Disaggregated block manager get'),
+    BlockDisaggStat('disagg_block_hs_byte_read', 'Bytes read from the shared history store in SLS', 'size'),
+    BlockDisaggStat('disagg_block_hs_byte_write', 'Bytes written to the shared history store in SLS', 'size'),
+    BlockDisaggStat('disagg_block_hs_get', 'Disaggregated block manager get from the shared history store in SLS'),
+    BlockDisaggStat('disagg_block_hs_put', 'Disaggregated block manager put to the shared history store in SLS'),
+    BlockDisaggStat('disagg_block_put', 'Disaggregated block manager put '),
 
     ##########################################
     # Reconciliation statistics

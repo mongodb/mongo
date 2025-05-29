@@ -67,6 +67,10 @@ __wt_wiredtiger_error(int error)
         return ("WT_CONFLICT_TABLE_LOCK: Another thread currently holds the table lock");
     case WT_CONFLICT_CHECKPOINT_LOCK:
         return ("WT_CONFLICT_CHECKPOINT_LOCK: Another thread currently holds the checkpoint lock");
+    case WT_MODIFY_READ_UNCOMMITTED:
+        return (
+          "WT_MODIFY_READ_UNCOMMITTED: Read-uncommitted readers do not support reconstructing a "
+          "record with modifies");
     case WT_CONFLICT_LIVE_RESTORE:
         return (
           "WT_CONFLICT_LIVE_RESTORE: Conflict performing operation due to an in-progress live "

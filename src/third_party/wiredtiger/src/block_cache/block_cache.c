@@ -201,6 +201,7 @@ __blkcache_eviction_thread(void *arg)
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item, *blkcache_item_tmp;
     WT_SESSION_IMPL *session;
+    uint32_t data_size, u;
     int i, reason;
     bool no_eviction_candidates;
 
@@ -244,10 +245,20 @@ __blkcache_eviction_thread(void *arg)
             {
                 if (__blkcache_should_evict(session, blkcache_item, &reason)) {
                     TAILQ_REMOVE(&blkcache->hash[i], blkcache_item, hashq);
+
+                    data_size = blkcache_item->data_size;
+                    for (u = 0; u < blkcache_item->num_deltas; u++) {
+                        data_size += blkcache_item->deltas[u].data_size;
+                        __blkcache_free(session, blkcache_item->deltas[u].data);
+                    }
+                    __wt_free(session, blkcache_item->deltas);
+
+                    __wt_free(session, blkcache_item->block_meta);
                     __blkcache_free(session, blkcache_item->data);
+
                     __blkcache_update_ref_histogram(
                       session, blkcache_item, WT_BLKCACHE_RM_EVICTION);
-                    (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
+                    (void)__wt_atomic_sub64(&blkcache->bytes_used, data_size);
 
                     /*
                      * Update the number of removals because it is used to estimate the overhead,
@@ -257,7 +268,7 @@ __blkcache_eviction_thread(void *arg)
                     blkcache->removals++;
 
                     WT_STAT_CONN_INCR(session, block_cache_blocks_evicted);
-                    WT_STAT_CONN_DECRV(session, block_cache_bytes, blkcache_item->data_size);
+                    WT_STAT_CONN_DECRV(session, block_cache_bytes, data_size);
                     WT_STAT_CONN_DECR(session, block_cache_blocks);
                     __wt_free(session, blkcache_item);
                 } else {
@@ -389,17 +400,24 @@ __wti_blkcache_get(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_si
  *     Put a block into the cache.
  */
 int
-__wti_blkcache_put(
-  WT_SESSION_IMPL *session, WT_ITEM *data, const uint8_t *addr, size_t addr_size, bool write)
+__wti_blkcache_put(WT_SESSION_IMPL *session, WT_ITEM *data, WT_ITEM *deltas, uint32_t num_deltas,
+  WT_PAGE_BLOCK_META *block_meta, const uint8_t *addr, size_t addr_size, bool write)
 {
     WT_BLKCACHE *blkcache;
+    WT_BLKCACHE_DELTA *blkcache_deltas;
     WT_BLKCACHE_ITEM *blkcache_item, *blkcache_store;
     WT_DECL_RET;
+    WT_PAGE_BLOCK_META *block_meta_ptr;
     uint64_t bucket, hash;
+    uint32_t i, total_data_size;
     void *data_ptr;
 
     blkcache = &S2C(session)->blkcache;
+    blkcache_deltas = NULL;
     blkcache_store = NULL;
+    block_meta_ptr = NULL;
+    data_ptr = NULL;
+    total_data_size = 0;
 
     /* Are we within cache size limits? */
     if (blkcache->bytes_used > blkcache->max_bytes)
@@ -430,11 +448,35 @@ __wti_blkcache_put(
      */
     WT_RET(__blkcache_alloc(session, data->size, &data_ptr));
     if (data_ptr == NULL)
-        return (0);
+        goto err;
+    memcpy(data_ptr, data->data, data->size);
+    total_data_size += WT_STORE_SIZE(data->size);
+
+    if (num_deltas > 0) {
+        WT_ERR(__wt_calloc_def(session, num_deltas, &blkcache_deltas));
+        for (i = 0; i < num_deltas; i++) {
+            total_data_size += WT_STORE_SIZE(deltas[i].size);
+            blkcache_deltas[i].data_size = WT_STORE_SIZE(deltas[i].size);
+            WT_ERR(__blkcache_alloc(session, deltas[i].size, &blkcache_deltas[i].data));
+            if (blkcache_deltas[i].data == NULL)
+                goto err;
+            memcpy(blkcache_deltas[i].data, deltas[i].data, deltas[i].size);
+        }
+    }
+
     WT_ERR(__wt_calloc(session, 1, sizeof(*blkcache_store) + addr_size, &blkcache_store));
     blkcache_store->data = data_ptr;
     blkcache_store->data_size = WT_STORE_SIZE(data->size);
-    memcpy(blkcache_store->data, data->data, data->size);
+
+    blkcache_store->deltas = blkcache_deltas;
+    blkcache_store->num_deltas = num_deltas;
+
+    if (block_meta != NULL) {
+        WT_ERR(__wt_calloc(session, 1, sizeof(*block_meta_ptr), &block_meta_ptr));
+        *block_meta_ptr = *block_meta;
+        blkcache_store->block_meta = block_meta_ptr;
+    }
+
     blkcache_store->fid = S2BT(session)->id;
     blkcache_store->addr_size = (uint8_t)addr_size;
     memcpy(blkcache_store->addr, addr, addr_size);
@@ -462,7 +504,7 @@ __wti_blkcache_put(
                 __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
                 WT_ASSERT(session, !write);
 
-                WT_STAT_CONN_INCRV(session, block_cache_bytes_update, data->size);
+                WT_STAT_CONN_INCRV(session, block_cache_bytes_update, total_data_size);
                 WT_STAT_CONN_INCR(session, block_cache_blocks_update);
                 __blkcache_verbose(
                   session, WT_VERBOSE_DEBUG_2, "block already in cache", hash, addr, addr_size);
@@ -477,18 +519,18 @@ __wti_blkcache_put(
 
     TAILQ_INSERT_HEAD(&blkcache->hash[bucket], blkcache_store, hashq);
 
-    (void)__wt_atomic_add64(&blkcache->bytes_used, data->size);
+    (void)__wt_atomic_add64(&blkcache->bytes_used, total_data_size);
     blkcache->inserts++;
 
     __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
 
-    WT_STAT_CONN_INCRV(session, block_cache_bytes, data->size);
+    WT_STAT_CONN_INCRV(session, block_cache_bytes, total_data_size);
     WT_STAT_CONN_INCR(session, block_cache_blocks);
     if (write) {
-        WT_STAT_CONN_INCRV(session, block_cache_bytes_insert_write, data->size);
+        WT_STAT_CONN_INCRV(session, block_cache_bytes_insert_write, total_data_size);
         WT_STAT_CONN_INCR(session, block_cache_blocks_insert_write);
     } else {
-        WT_STAT_CONN_INCRV(session, block_cache_bytes_insert_read, data->size);
+        WT_STAT_CONN_INCRV(session, block_cache_bytes_insert_read, total_data_size);
         WT_STAT_CONN_INCR(session, block_cache_blocks_insert_read);
     }
 
@@ -498,7 +540,13 @@ __wti_blkcache_put(
 
 err:
     __blkcache_free(session, data_ptr);
-    __blkcache_free(session, blkcache_store);
+    if (blkcache_deltas != NULL) {
+        for (i = 0; i < num_deltas; i++)
+            __blkcache_free(session, blkcache_deltas[i].data);
+        __wt_free(session, blkcache_deltas);
+    }
+    __wt_free(session, block_meta_ptr);
+    __wt_free(session, blkcache_store);
     return (ret);
 }
 
@@ -511,7 +559,8 @@ __wti_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
 {
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
-    uint64_t bucket, hash, sleep_usecs, total_usecs, yield_count;
+    uint64_t bucket, data_size, hash, sleep_usecs, total_usecs, yield_count;
+    unsigned u;
 
     blkcache = &S2C(session)->blkcache;
     hash = __wt_hash_city64(addr, addr_size);
@@ -525,8 +574,7 @@ __wti_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
             TAILQ_REMOVE(&blkcache->hash[bucket], blkcache_item, hashq);
             __blkcache_update_ref_histogram(session, blkcache_item, WT_BLKCACHE_RM_FREE);
             __wt_spin_unlock(session, &blkcache->hash_locks[bucket]);
-            (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
-            WT_STAT_CONN_DECRV(session, block_cache_bytes, blkcache_item->data_size);
+
             /*
              * The block might be in use by another thread, wait for it to be released before
              * freeing it.
@@ -536,11 +584,22 @@ __wti_blkcache_remove(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
                 total_usecs += sleep_usecs;
             }
             WT_STAT_CONN_INCRV(session, block_cache_blocks_removed_blocked, total_usecs);
+
+            data_size = blkcache_item->data_size;
+            for (u = 0; u < blkcache_item->num_deltas; u++) {
+                data_size += blkcache_item->deltas[u].data_size;
+                __blkcache_free(session, blkcache_item->deltas[u].data);
+            }
+            __wt_free(session, blkcache_item->deltas);
+            __wt_free(session, blkcache_item->block_meta);
             __blkcache_free(session, blkcache_item->data);
             __wt_overwrite_and_free(session, blkcache_item);
+
             blkcache->removals++;
             WT_STAT_CONN_INCR(session, block_cache_blocks_removed);
             WT_STAT_CONN_DECR(session, block_cache_blocks);
+            (void)__wt_atomic_sub64(&blkcache->bytes_used, data_size);
+            WT_STAT_CONN_DECRV(session, block_cache_bytes, data_size);
             __blkcache_verbose(
               session, WT_VERBOSE_DEBUG_1, "block removed from cache", hash, addr, addr_size);
             return;
@@ -622,7 +681,8 @@ __wt_blkcache_destroy(WT_SESSION_IMPL *session)
     WT_BLKCACHE *blkcache;
     WT_BLKCACHE_ITEM *blkcache_item;
     WT_DECL_RET;
-    uint64_t i;
+    uint64_t data_size, i;
+    uint32_t u;
 
     blkcache = &S2C(session)->blkcache;
 
@@ -652,9 +712,17 @@ __wt_blkcache_destroy(WT_SESSION_IMPL *session)
              * Some workloads crash on freeing NVRAM arenas. If that occurs the call to free can be
              * removed and the library/OS will clean up for us once the process exits.
              */
+            data_size = blkcache_item->data_size;
+            for (u = 0; u < blkcache_item->num_deltas; u++) {
+                data_size += blkcache_item->deltas[u].data_size;
+                __blkcache_free(session, blkcache_item->deltas[u].data);
+            }
+            __wt_free(session, blkcache_item->deltas);
+            __wt_free(session, blkcache_item->block_meta);
             __blkcache_free(session, blkcache_item->data);
+
             __blkcache_update_ref_histogram(session, blkcache_item, WT_BLKCACHE_RM_EXIT);
-            (void)__wt_atomic_sub64(&blkcache->bytes_used, blkcache_item->data_size);
+            (void)__wt_atomic_sub64(&blkcache->bytes_used, data_size);
             __wt_free(session, blkcache_item);
         }
         __wt_spin_unlock(session, &blkcache->hash_locks[i]);

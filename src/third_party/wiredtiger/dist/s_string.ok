@@ -91,6 +91,8 @@ DBI
 DESC
 DEST
 DHANDLE
+DISAGG
+DISAGGREGATED
 DNE
 DONTNEED
 DS
@@ -98,6 +100,7 @@ DUPLICATEV
 Decrypt
 DeleteFileW
 Deterministically
+Disaggregated
 Dk
 DmpRvXx
 Dxxx
@@ -295,6 +298,7 @@ PREFETCH
 PREV
 PRId
 PRIu
+PRIx
 PRNG
 PSD
 PSE
@@ -352,6 +356,7 @@ Rogerio
 Runtime
 SDK
 SIMD
+SLS
 SLVG
 SMT
 SPINLOCK
@@ -462,6 +467,8 @@ WiredTigerHS
 WiredTigerLAS
 WiredTigerLog
 WiredTigerPreplog
+WiredTigerShared
+WiredTigerSharedHS
 WiredTigerTmplog
 WithSeeds
 Wl
@@ -539,6 +546,7 @@ blkincr
 blkmod
 blkmods
 bm
+bmd
 bms
 bnd
 bool
@@ -707,6 +715,7 @@ difftime
 dir
 directio
 dirlist
+disagg
 disaggregated
 disproportionally
 dlclose
@@ -998,6 +1007,7 @@ maxv
 mb
 mbll
 mbss
+md
 mem
 membar
 memcmp
@@ -1125,6 +1135,7 @@ pfx
 pid
 pindexp
 plh
+plhandle
 pmem
 poptable
 popthreads

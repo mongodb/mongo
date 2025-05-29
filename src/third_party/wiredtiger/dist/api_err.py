@@ -184,6 +184,10 @@ sub_errors = [
         "Another thread currently holds the checkpoint lock", '''
         This sub-level error indicates that a concurrent operation is performing
         a checkpoint.'''),
+    Error('WT_MODIFY_READ_UNCOMMITTED', -32012,
+        "Read-uncommitted readers do not support reconstructing a record with modifies", '''
+        This sub-level error indicates that a reader with uncommitted isolation 
+        is trying to reconstruct a record with modifies. This is not supported.'''),
     Error('WT_CONFLICT_LIVE_RESTORE', -32013,
         "Conflict performing operation due to an in-progress live restore", '''
         This sub-level error indicates that there is a conflict performing the operation

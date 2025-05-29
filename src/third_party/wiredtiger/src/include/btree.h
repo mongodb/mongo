@@ -159,6 +159,8 @@ struct __wt_btree {
     WT_BUCKET_STORAGE *bstorage;    /* Tiered storage source */
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
 
+    WT_PAGE_LOG *page_log; /* Page and log service for disaggregated storage */
+
     WT_RWLOCK ovfl_lock; /* Overflow lock */
 
     int maximum_depth;        /* Maximum tree depth during search */

@@ -244,7 +244,7 @@ TEST_CASE("Block manager: size and stat", "[block_api_misc]")
         size_t addr_size;
         wt_off_t bm_size, prev_size;
         REQUIRE(bm.size(&bm, s, &prev_size) == 0);
-        REQUIRE(bm.write(&bm, s, &buf, addr, &addr_size, false, false) == 0);
+        REQUIRE(bm.write(&bm, s, &buf, NULL, addr, &addr_size, false, false) == 0);
         REQUIRE(bm.size(&bm, s, &bm_size) == 0);
 
         check_bm_stats(s, &bm);

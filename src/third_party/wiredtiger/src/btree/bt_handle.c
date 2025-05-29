@@ -632,9 +632,12 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
     WT_DECL_RET;
     WT_ITEM dsk;
     WT_PAGE *page;
+    WT_PAGE_BLOCK_META block_meta;
 
     btree = S2BT(session);
     bm = btree->bm;
+
+    WT_CLEAR(block_meta);
 
     /*
      * A buffer into which we read a root page; don't use a scratch buffer, the buffer's allocated
@@ -652,7 +655,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
     WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
 
     F_SET(session, WT_SESSION_QUIET_CORRUPT_FILE);
-    if ((ret = __wt_blkcache_read(session, &dsk, addr, addr_size)) == 0)
+    if ((ret = __wt_blkcache_read(session, &dsk, &block_meta, addr, addr_size)) == 0)
         ret = __wt_verify_dsk(session, tmp->data, &dsk);
     /*
      * Flag any failed read or verification: if we're in startup, it may be fatal.
@@ -684,6 +687,7 @@ __wti_btree_tree_open(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
     WT_ERR(__wti_page_inmem(session, NULL, dsk.data,
       WT_DATA_IN_ITEM(&dsk) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED, &page, NULL));
     dsk.mem = NULL;
+    page->block_meta = block_meta;
 
     /* Finish initializing the root, root reference links. */
     __wt_root_ref_init(session, &btree->root, page, btree->type != BTREE_ROW);
@@ -836,7 +840,11 @@ __btree_preload(WT_SESSION_IMPL *session)
     /* Pre-load the second-level internal pages. */
     WT_INTL_FOREACH_BEGIN (session, btree->root.page, ref)
         if (__wt_ref_addr_copy(session, ref, &addr)) {
-            WT_ERR(__wt_blkcache_read(session, tmp, addr.addr, addr.size));
+            /*
+             * FIXME-WT-14612: If we want to use prefetch with disaggregated storage we will need to
+             * supply block metadata.
+             */
+            WT_ERR(__wt_blkcache_read(session, tmp, NULL, addr.addr, addr.size));
             ++block_preload;
         }
     WT_INTL_FOREACH_END;

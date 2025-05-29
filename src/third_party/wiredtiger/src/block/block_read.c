@@ -13,14 +13,16 @@
  *     Map or read address cookie referenced block into a buffer.
  */
 int
-__wt_bm_read(
-  WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
+__wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_meta,
+  const uint8_t *addr, size_t addr_size)
 {
     WT_BLOCK *block;
     WT_DECL_RET;
     wt_off_t offset;
     uint32_t checksum, objectid, size;
     bool last_release;
+
+    WT_UNUSED(block_meta);
 
     block = bm->block;
 
@@ -59,11 +61,11 @@ err:
 }
 
 /*
- * __bm_corrupt_dump --
+ * __wt_bm_corrupt_dump --
  *     Dump a block into the log in 1KB chunks.
  */
-static int
-__bm_corrupt_dump(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t objectid, wt_off_t offset,
+int
+__wt_bm_corrupt_dump(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t objectid, wt_off_t offset,
   uint32_t size, uint32_t checksum) WT_GCC_FUNC_ATTRIBUTE((cold))
 {
     WT_DECL_ITEM(tmp);
@@ -112,12 +114,12 @@ __wt_bm_corrupt(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t
 
     /* Read the block. */
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
-    WT_ERR(__wt_bm_read(bm, session, tmp, addr, addr_size));
+    WT_ERR(__wt_bm_read(bm, session, tmp, NULL, addr, addr_size));
 
     /* Crack the cookie, dump the block. */
     WT_ERR(__wt_block_addr_unpack(
       session, bm->block, addr, addr_size, &objectid, &offset, &size, &checksum));
-    WT_ERR(__bm_corrupt_dump(session, tmp, objectid, offset, size, checksum));
+    WT_ERR(__wt_bm_corrupt_dump(session, tmp, objectid, offset, size, checksum));
 
 err:
     __wt_scr_free(session, &tmp);
@@ -274,7 +276,7 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
               "B block at offset %" PRIuMAX ": block header checksum of %#" PRIx32
               " doesn't match expected checksum of %#" PRIx32,
               block->name, size, (uintmax_t)offset, swap.checksum, checksum);
-        WT_IGNORE_RET(__bm_corrupt_dump(session, buf, objectid, offset, size, checksum));
+        WT_IGNORE_RET(__wt_bm_corrupt_dump(session, buf, objectid, offset, size, checksum));
     }
 
     /* Panic if a checksum fails during an ordinary read. */

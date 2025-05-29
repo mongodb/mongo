@@ -191,12 +191,15 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *     Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr,
-  size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+  WT_PAGE_BLOCK_META *block_meta, uint8_t *addr, size_t *addr_sizep, bool data_checksum,
+  bool checkpoint_io)
 {
     wt_off_t offset;
     uint32_t checksum, size;
     uint8_t *endp;
+
+    WT_UNUSED(block_meta);
 
     WT_RET(__wti_block_write_off(
       session, block, buf, &offset, &size, &checksum, data_checksum, checkpoint_io, false));
