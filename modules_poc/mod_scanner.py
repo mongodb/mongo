@@ -276,31 +276,34 @@ def get_visibility(
 ) -> GetVisibilityResult:
     if c.kind != CursorKind.NAMESPACE:
         last_non_ns_parent = c
-    if c.has_attrs():
-        for child in c.get_children():
-            if child.kind != CursorKind.ANNOTATE_ATTR:
-                continue
-            terms = child.spelling.split("::")
-            if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
-                continue
-            if terms[0] == "shallow":
-                terms.pop(0)
-                assert terms
-                if scanning_parent:
-                    continue  # shallow doesn't apply to children
-            attr = terms.pop(0)
-            if terms:
-                alt = "::".join(terms)
-                assert attr in ("use_replacement",)
-            else:
-                alt = None
-                assert attr in (
-                    "public",
-                    "private",
-                    "file_private",
-                    "needs_replacement",
-                )
-            return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
+
+    # ideally this would be in an if c.has_attrs() block, but that seems to not work in all cases.
+    # TODO: try again when on a newer clang. Also might be worth seeing if we can narrow down
+    # the cases where it doesn't work.
+    for child in c.get_children():
+        if child.kind != CursorKind.ANNOTATE_ATTR:
+            continue
+        terms = child.spelling.split("::")
+        if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
+            continue
+        if terms[0] == "shallow":
+            terms.pop(0)
+            assert terms
+            if scanning_parent:
+                continue  # shallow doesn't apply to children
+        attr = terms.pop(0)
+        if terms:
+            alt = "::".join(terms)
+            assert attr in ("use_replacement",)
+        else:
+            alt = None
+            assert attr in (
+                "public",
+                "private",
+                "file_private",
+                "needs_replacement",
+            )
+        return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
 
     # Apply high-priority defaults that override parent's visibility
     if not scanning_parent:
