@@ -84,7 +84,6 @@ const expectedGlobalVars = [
     "WeakRef",
     "WeakSet",
     "__lastres__",
-    "_convertExceptionToReturnStatus",
     "assert",
     "bsonBinaryEqual",
     "bsonObjToArray",

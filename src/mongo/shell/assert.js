@@ -1,4 +1,36 @@
-export function doassert(msg, obj) {
+/**
+ * Assertion Library
+ */
+
+/**
+ * Throws test exception with message.
+ *
+ * @param {string|Function|object} msg Failure message.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number| BulkWriteResult | BulkWriteError | WriteResult | {
+ *         code?: any,
+ *         writeErrors?: any,
+ *         errorLabels?: any,
+ *         writeConcernError?: any,
+ *         writeConcernErrors?: any,
+ *         hasWriteConcernError?: any }} [obj] Error object to reference in the exception.
+ *
+ * @throws {Error}
+ *
+ * @example
+ * switch (scenario.type) {
+ *   case 'A':
+ *     assert.eq(scenario.result, 1);
+ *     break;
+ *   case 'B':
+ *     assert.eq(scenario.result, 2);
+ *     break;
+ *   default:
+ *     doassert('scenario was not type A or B');
+ * }
+ */
+function doassert(msg, obj) {
     // eval if msg is a function
     if (typeof (msg) == "function")
         msg = msg();
@@ -25,17 +57,19 @@ export function doassert(msg, obj) {
     throw ex;
 };
 
-// Sort doc/obj fields and return new sorted obj
-export function sortDoc(doc) {
+/**
+ * Sort document object fields.
+ *
+ * @param doc
+ *
+ * @returns Sorted document object.
+ */
+function sortDoc(doc) {
     // Helper to sort the elements of the array
     const sortElementsOfArray = function(arr) {
-        let newArr = [];
         if (!arr || arr.constructor != Array)
             return arr;
-        for (let i = 0; i < arr.length; i++) {
-            newArr.push(sortDoc(arr[i]));
-        }
-        return newArr;
+        return arr.map(el => sortDoc(el));
     };
 
     // not a container we can sort
@@ -78,7 +112,7 @@ export function sortDoc(doc) {
  * in any instance where 'func' throws an exception. 'safeFunc' also prints
  * message 'excMsg' upon catching such a thrown exception.
  */
-export function _convertExceptionToReturnStatus(func, excMsg) {
+function _convertExceptionToReturnStatus(func, excMsg) {
     const safeFunc = () => {
         try {
             return func();
@@ -90,7 +124,18 @@ export function _convertExceptionToReturnStatus(func, excMsg) {
     return safeFunc;
 }
 
-export function formatErrorMsg(msg, attr = {}, serializeFn = tojson) {
+/**
+ * Format error message by replacing occurrences of '{key}'s in 'msg' with 'value' in [key, value]
+ * pairs from 'attr'.
+ *
+ * @param {string} msg Failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ * @param {Function} [serializeFn] Additional function to serialize 'value' in [key, value] pairs
+ *     from 'attr'.
+ *
+ * @returns Failure message.
+ */
+function formatErrorMsg(msg, attr = {}, serializeFn = tojson) {
     for (const [key, value] of Object.entries(attr)) {
         msg = msg.replaceAll(`{${key}}`, serializeFn(value));
     }
@@ -160,7 +205,26 @@ function _buildAssertionMessage(msg, prefix) {
     return fullMessage;
 }
 
-export function assert(value, msg, attr) {
+/**
+ * Assert that a value is true.
+ *
+ * This is a "truthy" condition test for any object/type, not just booleans (ie, not `=== true`).
+ *
+ * Consider using more specific methods of the assert module, such as `assert.eq`,
+ * which produce richer failure diagnostics.
+ *
+ * @param {*} value Value under test
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert(coll.drop())
+ */
+function assert(value, msg, attr) {
     if (arguments.length > 3) {
         _doassert("Too many parameters to assert().");
     }
@@ -221,9 +285,23 @@ function _isDocEq(a, b) {
 }
 
 /**
- * Throws if 'actualDoc' object is not equal to 'expectedDoc' object. The order of fields
- * (properties) within objects is disregarded.
- * Throws if object representation in BSON exceeds 16793600 bytes.
+ * Assert equality of document objects.
+ *
+ * The order of fields (properties) within objects is ignored.
+ * The bsonUnorderedFieldsCompare function is leveraged.
+ *
+ * @param docA Document object
+ * @param docB Document object
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied or the object representation in BSON exceeds
+ *     16793600 bytes.
+ *
+ * @example
+ * assert.docEq(results[0], {_id: null, result: ["abc"]})
  */
 assert.docEq = function(expectedDoc, actualDoc, msg, attr) {
     _validateAssertionMessage(msg, attr);
@@ -238,8 +316,19 @@ assert.docEq = function(expectedDoc, actualDoc, msg, attr) {
 };
 
 /**
- * Throws if the elements of the two given sets are not the same. Use only for primitive
- * (non-object) set element types.
+ * Assert set equality, for primitive (non-object) set element types.
+ *
+ * @param setA
+ * @param setB
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.setEq(new Set([7, 8, 9, 10]), new Set(matchingIds))
  */
 assert.setEq = function(expectedSet, actualSet, msg, attr) {
     _validateAssertionMessage(msg, attr);
@@ -261,10 +350,22 @@ assert.setEq = function(expectedSet, actualSet, msg, attr) {
 };
 
 /**
- * Throws if the two arrays do not have the same members, in any order. By default, nested
- * arrays must have the same order to be considered equal.
+ * Assert that array have the same members.
  *
- * Optionally accepts a compareFn to compare values instead of using docEq.
+ * Order of the elements is ignored.
+ *
+ * @param {any[]} aArr
+ * @param {any[]} bArr
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {Function} [compareFn] Custom element-comparison function
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.sameMembers(res, [{_id: 1, count: 500}, {_id: 2, count: 5001}]);
  */
 assert.sameMembers = function(aArr, bArr, msg, compareFn = _isDocEq, attr) {
     _validateAssertionMessage(msg, attr);
@@ -296,9 +397,26 @@ assert.sameMembers = function(aArr, bArr, msg, compareFn = _isDocEq, attr) {
     }
 };
 
-// Given two arrays of documents, check that each array has the same members, but,
-// for the numeric fields specified in 'fuzzyFields,' the values need to be 'close,' but do
-// not have to be equal.
+/**
+ * Assert that document arrays have the same members, within a tolerance.
+ *
+ * Order of the elements is ignored.
+ *
+ * @param aArr
+ * @param bArr
+ * @param {string[]} fuzzyFields Fields whose values should be "close".
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [places] Number of decimal places to match. Default 4.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.fuzzySameMembers(
+    res, [{"title": "King Kong", "score": 0.802}], ["score"]);
+ */
 assert.fuzzySameMembers = function(aArr, bArr, fuzzyFields, msg, places = 4, attr) {
     function fuzzyCompare(docA, docB) {
         return _fieldsClose(docA, docB, fuzzyFields, msg, places);
@@ -306,6 +424,26 @@ assert.fuzzySameMembers = function(aArr, bArr, fuzzyFields, msg, places = 4, att
     return assert.sameMembers(aArr, bArr, msg, fuzzyCompare, attr);
 };
 
+/**
+ * Assert inequality.
+ *
+ * Inequality is based on '`a != b`', with a fallthrough to comparing JSON representations.
+ * This is not a strict equality (`a !== b`) assertion.
+ *
+ * @param a Left-hand side operand
+ * @param b Right-hand side operand
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const actual = getValue();
+ * const forbidden = 'foobar';
+ * assert.neq(actual, forbidden);
+ */
 assert.neq = function(a, b, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -316,23 +454,53 @@ assert.neq = function(a, b, msg, attr) {
     _doassert(msg, "[{a}] and [{b}] are equal", {a, b, ...attr});
 };
 
-assert.hasFields = function(result, arr, msg, attr) {
+/**
+ * Assert that an object has specific fields.
+ *
+ * @param {object} obj
+ * @param {string[]} arr Array of fields that the object must have.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.hasFields(result.serverInfo, ['host', 'port', 'version', 'gitVersion']);
+ */
+assert.hasFields = function(obj, arr, msg, attr) {
     if (!Array.isArray(arr)) {
         _doassert("The second argument to assert.hasFields must be an array.");
     }
 
     let count = 0;
-    for (let field in result) {
+    for (let field in obj) {
         if (arr.includes(field)) {
             count += 1;
         }
     }
 
     if (count != arr.length) {
-        _doassert(msg, "Not all of the values from {arr} were in {result}", {result, arr, ...attr});
+        _doassert(msg, "Not all of the values from {arr} were in {obj}", {obj, arr, ...attr});
     }
 };
 
+/**
+ * Assert that an array contains a specific element.
+ *
+ * @param element Element to be found
+ * @param {any[]} arr Array to search
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.contains(res.nMatched, [0, 1]);
+ */
 assert.contains = function(element, arr, msg, attr) {
     if (!Array.isArray(arr)) {
         _doassert("The second argument to assert.contains() must be an array.");
@@ -350,6 +518,21 @@ assert.contains = function(element, arr, msg, attr) {
     _doassert(msg, "{element} was not in {arr}", {element, arr, ...attr});
 };
 
+/**
+ * Assert that an array does not contain a specific element.
+ *
+ * @param element Element to not be found
+ * @param {any[]} arr Array to search
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.doesNotContain(errorCode, [401, 404, 500]);
+ */
 assert.doesNotContain = function(element, arr, msg, attr) {
     if (!Array.isArray(arr)) {
         _doassert("The second argument to assert.doesNotContain must be an array.");
@@ -365,6 +548,21 @@ assert.doesNotContain = function(element, arr, msg, attr) {
     }
 };
 
+/**
+ * Assert that an array contains a string that starts with a prefix.
+ *
+ * @param {string} prefix
+ * @param {any[]} arr Array to search
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.containsPrefix("Detected a time-series bucket with mixed schema data", res.warnings);
+ */
 assert.containsPrefix = function(prefix, arr, msg, attr) {
     if (typeof (prefix) !== "string") {
         _doassert("The first argument to containsPrefix must be a string.");
@@ -387,10 +585,26 @@ assert.containsPrefix = function(prefix, arr, msg, attr) {
     _doassert(msg, "{prefix} was not a prefix in {arr}", {prefix, arr, ...attr});
 };
 
-/*
+/**
+ * Assert that a function eventually evaluates to true.
+ *
  * Calls a function 'func' at repeated intervals until either func() returns true
- * or more than 'timeout' milliseconds have elapsed. Throws an exception with
- * message 'msg' after timing out.
+ * or more than 'timeout' milliseconds have elapsed.
+ *
+ * @param {Function} func Function to be executed, or string to be `eval`ed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [timeout] Timeout in ms. In CI, this is 10min, otherwise 90sec.
+ * @param {number} [interval] Interval in ms to wait between tries, default 200ms.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.soon(() => changeStream.hasNext());
  */
 assert.soon = function(func, msg, timeout, interval = 200, {runHangAnalyzer = true} = {}, attr) {
     _validateAssertionMessage(msg, attr);
@@ -435,10 +649,33 @@ assert.soon = function(func, msg, timeout, interval = 200, {runHangAnalyzer = tr
     }
 };
 
-/*
- * Calls a function 'func' at repeated intervals until either func() returns true without
- * throwing an exception or more than 'timeout' milliseconds have elapsed. Throws an exception
- * with message 'msg' after timing out.
+/**
+ * Assert that a function eventually evaluates to true.
+ *
+ * This is a special case of {@link assert.soon}.
+ *
+ * Calls a function 'func' at repeated intervals until either func() returns true
+ * or more than 'timeout' milliseconds have elapsed. Exceptions are allowed and suppressed.
+ *
+ * @param {Function} func Function to be executed, or string to be `eval`ed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [timeout] Timeout in ms. In CI, this is 10min, otherwise 90sec.
+ * @param {number} [interval] Interval in ms to wait between tries, default 200ms.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.soonNoExcept(() => {
+ *    let numIndices = secondaryDB.getCollection(collectionName).getIndexes().length;
+ *    // this might fail/throw a few times, but that is okay
+ *    assert.eq(numIndices, 4);
+ *    return true;
+ * });
  */
 assert.soonNoExcept = function(func, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
     const safeFunc = _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
@@ -466,12 +703,29 @@ assert.soonNoExcept = function(func, msg, timeout, interval, {runHangAnalyzer = 
     assert.soon(getFunc(), msg, timeout, interval, {runHangAnalyzer}, attr);
 };
 
-/*
- * Calls the given function 'func' repeatedly at time intervals specified by
- * 'intervalMS' (milliseconds) until either func() returns true or the number of
- * attempted function calls is equal to 'num_attempts'. Throws an exception with
- * message 'msg' after all attempts are used up. If no 'intervalMS' argument is passed,
- * it defaults to 0.
+/**
+ * Assert that a function eventually evaluates to true.
+ *
+ * This calls a function up to a specified number of times, whereas {@link assert.soon}
+ * calls the function until a timeout is exceeded.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {string|Function|object} msg Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} num_attempts Number of attempts to try the function execution.
+ * @param {number} [intervalMS] Interval in ms to wait between tries, default 0.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.retry(
+ *     () => db.serverStatus().metrics.cursor.open.pinned == 0,
+ *     "Expected 0 pinned cursors, but have " + tojson(db.serverStatus().metrics.cursor),
+ *     10);
  */
 assert.retry = function(
     func, msg, num_attempts, intervalMS = 0, {runHangAnalyzer = true} = {}, attr) {
@@ -498,12 +752,29 @@ assert.retry = function(
     _doassert(msg, null, attr);
 };
 
-/*
- * Calls the given function 'func' repeatedly at time intervals specified by
- * 'intervalMS' (milliseconds) until either func() returns true without throwing
- * an exception or the number of attempted function calls is equal to 'num_attempts'.
- * Throws an exception with message 'msg' after all attempts are used up. If no 'intervalMS'
- * argument is passed, it defaults to 0.
+/**
+ * Assert that a function eventually evaluates to true, ignoring exceptions.
+ *
+ * Special case of {@link assert.retry} where the function is executed "safely" within
+ * a try/catch to continue retries.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [num_attempts] Number of attempts to try the function execution.
+ * @param {number} [intervalMS] Interval in ms to wait between tries, default 0.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.retryNoExcept(() => {
+ *     assert.commandWorked(configDB.chunks.update({_id: chunkDoc._id}, {$set: {jumbo: true}}));
+ *     return true;
+ * }, "Setting jumbo flag update failed on config server", 10);
  */
 assert.retryNoExcept = function(
     func, msg, num_attempts, intervalMS, {runHangAnalyzer = true} = {}, attr) {
@@ -512,11 +783,19 @@ assert.retryNoExcept = function(
 };
 
 /**
- * Runs the given command on the 'admin' database of the provided node. Asserts that the command
- * worked but allows network errors to occur.
+ * Asserts that a command run on the 'admin' database worked, ignoring network errors.
  *
  * Returns the response if the command succeeded, or undefined if the command failed, *even* if
  * the failure was due to a network error.
+ *
+ * @param {DB} node
+ * @param {object} commandObj Command object to be called inside `node.adminCommand`.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.adminCommandWorkedAllowingNetworkError(replTest.getPrimary(), {replSetReconfig: config});
  */
 assert.adminCommandWorkedAllowingNetworkError = function(node, commandObj) {
     let res;
@@ -533,6 +812,30 @@ assert.adminCommandWorkedAllowingNetworkError = function(node, commandObj) {
     return res;
 };
 
+/**
+ * Assert that function execution completes within a specified timeout.
+ *
+ * @param {Function} f Function to be executed, or string to be `eval`ed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [timeout] Timeout in ms, default 30_000.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @returns Result of the function evaluation/execution.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * let ok = assert.time(() => {
+ *     const testDB = db.getMongo().getDB('test');
+ *     const res = testDB.runCommand(
+ *         {usersInfo: user.userName, maxTimeMS: 30_000});
+ *     return res.ok;
+ *  });
+ *  assert(ok);
+ */
 assert.time = function(f, msg, timeout = 30_000 /*ms*/, {runHangAnalyzer = true} = {}, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -614,6 +917,22 @@ function assertThrowsHelper(func, params) {
     return {error: error, res: res};
 }
 
+/**
+ * Assert that a function throws an exception.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {any[]} [params] Parameters to apply into the function execution.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @returns {Error} that the function threw.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.throws(() => local.aggregate(pipeline));
+ */
 assert.throws = function(func, params, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -628,6 +947,26 @@ assert.throws = function(func, params, msg, attr) {
     return error;
 };
 
+/**
+ * Assert that a function throws an exception matching a specific error code.
+ *
+ * This is an extension of {@link assert.throws}.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {number | number[]} expectedCode Code (or array of possible Codes) to match on
+ *     the `code` field of the resulting error.
+ * @param {any[]} [params] Parameters to apply into the function execution.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @returns {Error} that the function threw.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.throwsWithCode(() => coll.aggregate({$project: {x: "$$ref"}}).toArray(), 17276);
+ */
 assert.throwsWithCode = function(func, expectedCode, params, msg, attr) {
     if (arguments.length < 2) {
         _doassert("assert.throwsWithCode expects at least 2 arguments");
@@ -647,6 +986,25 @@ assert.throwsWithCode = function(func, expectedCode, params, msg, attr) {
     return error;
 };
 
+/**
+ * Assert that a function does not throw an exception.
+ *
+ * This is typically used when the test wants to verify that a function executes safely,
+ * but does not warrant any further verifications of its output or effects.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {any[]} [params] Parameters to apply into the function execution.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @returns The output of the function.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.doesNotThrow(() => source.aggregate(pipeline, options));
+ */
 assert.doesNotThrow = function(func, params, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -664,6 +1022,26 @@ assert.doesNotThrow = function(func, params, msg, attr) {
     return res;
 };
 
+/**
+ * Assert that a function throws an exception matching a specific error code,
+ * and trigger a callback function with those as inputs.
+ *
+ * This is an extension of {@link assert.throwsWithCode}.
+ *
+ * @param {Function} func Function to be executed.
+ * @param {number | number[]} dropCodes Code (or array of Codes) that are expected
+ *     to be thrown.
+ * @param {Function} onDrop Function to execute on matched {@link dropCodes}.
+ *
+ * @returns The output of {@onDrop}, invoked with exceptions matching {@link dropCodes}
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.dropExceptionsWithCode(
+ *     () => runBackgroundDbCheck(hosts),
+ *     ErrorCodes.Interrupted,
+ *     (e) => jsTestLog("Skipping dbCheck due to transient error: " + tojson(e)));
+ */
 assert.dropExceptionsWithCode = function(func, dropCodes, onDrop) {
     if (typeof func !== "function") {
         _doassert('assert.dropExceptionsWithCode 1st argument must be a function');
@@ -884,8 +1262,29 @@ function _assertCommandFailed(res, expectedCode, msg) {
     return res;
 }
 
-assert.commandWorkedOrFailedWithCode = function commandWorkedOrFailedWithCode(
-    res, errorCodeSet, msg) {
+/**
+ * Assert that a command worked, or otherwise failed with a specific code.
+ *
+ * This is a convenience wrapper around {@link assert.commandWorked}
+ * and {@link assert.commandFailedWithCode}.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {number | number[]} errorCodeSet Code (or array of possible Codes) to match on failed
+ *     results.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorkedOrFailedWithCode(res. 58712);
+ */
+assert.commandWorkedOrFailedWithCode = function(res, errorCodeSet, msg) {
     try {
         // First check if the command worked.
         return assert.commandWorked(res, msg);
@@ -895,8 +1294,28 @@ assert.commandWorkedOrFailedWithCode = function commandWorkedOrFailedWithCode(
     }
 };
 
-assert.commandWorkedIgnoringWriteConcernErrorsOrFailedWithCode =
-    function commandWorkedOrFailedWithCode(res, errorCodeSet, msg) {
+/**
+ * Assert that a command worked, ignoring write concern errors or specific failure codes.
+ *
+ * This is an extension of {@link assert.commandWorked} and {@link assert.commandFailedWithCode}.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {number | number[]} [errorCodeSet] Code (or array of possible Codes) to match on failed
+ *     results.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorkedIgnoringWriteErrors(res);
+ */
+assert.commandWorkedIgnoringWriteConcernErrorsOrFailedWithCode = function(res, errorCodeSet, msg) {
     try {
         // First check if the command worked.
         return _assertCommandWorked(res, msg, {ignoreWriteConcernErrors: true});
@@ -906,32 +1325,154 @@ assert.commandWorkedIgnoringWriteConcernErrorsOrFailedWithCode =
     }
 };
 
+/**
+ * Assert that a command worked by testing a result object.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorked(res);
+ */
 assert.commandWorked = function(res, msg) {
     return _assertCommandWorked(res, msg, {ignoreWriteErrors: false});
 };
 
+/**
+ * Assert that a command worked, ignoring write errors.
+ *
+ * This is an extension of {@link assert.commandWorked}.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorkedIgnoringWriteErrors(res);
+ */
 assert.commandWorkedIgnoringWriteErrors = function(res, msg) {
     return _assertCommandWorked(res, msg, {ignoreWriteErrors: true});
 };
 
+/**
+ * Assert that a command worked, ignoring write concern errors.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorkedIgnoringWriteConcernErrors(res);
+ */
 assert.commandWorkedIgnoringWriteConcernErrors = function(res, msg) {
     return _assertCommandWorked(res, msg, {ignoreWriteConcernErrors: true});
 };
 
+/**
+ * Assert that a command worked, ignoring write errors and write concern errors.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
+ */
 assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors = function(res, msg) {
     return _assertCommandWorked(
         res, msg, {ignoreWriteConcernErrors: true, ignoreWriteErrors: true});
 };
 
+/**
+ * Assert that a command failed.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should be successful ("worked").
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandFailed(res);
+ */
 assert.commandFailed = function(res, msg) {
     return _assertCommandFailed(res, assert._kAnyErrorCode, msg);
 };
 
-// expectedCode can be an array of possible codes.
+/**
+ * Assert that a command failed with a specific code.
+ *
+ * @param {WriteResult | BulkWriteResult |  WriteCommandError | WriteError | BulkWriteError} res
+ *     Result that should have failed.
+ * @param {number | number[]} expectedCode Code (or array of possible Codes) to match
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.commandFailedWithCode(res, 17260);
+ */
 assert.commandFailedWithCode = function(res, expectedCode, msg) {
     return _assertCommandFailed(res, expectedCode, msg);
 };
 
+/**
+ * Assert that a command resulted in successful writes.
+ *
+ * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} res
+ *     Result object.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.writeOK(res);
+ */
 assert.writeOK = function(res, msg, {ignoreWriteConcernErrors} = {}) {
     let errMsg = null;
 
@@ -965,12 +1506,47 @@ assert.writeOK = function(res, msg, {ignoreWriteConcernErrors} = {}) {
     return res;
 };
 
+/**
+ * Assert that a command resulted in write errors.
+ *
+ * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError} res
+ *     Result object.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.writeError(res);
+ */
 assert.writeError = function(res, msg) {
     return assert.writeErrorWithCode(res, assert._kAnyErrorCode, msg);
 };
 
-// If expectedCode is an array then this asserts that the found code is one of the codes in
-// the expectedCode array.
+/**
+ * Assert that a command resulted in write errors matching specific Codes.
+ *
+ * This is a stricter check of {@link assert.writeError}.
+ *
+ * @param {WriteResult | BulkWriteResult | WriteCommandError | WriteError | BulkWriteError } res
+ *     Result object.
+ * @param {number | number[]} expectedCode Code (or array of possible Codes) to match
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ *
+ * @returns The result object to continue any chaining.
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const dbTest = db.getSiblingDB(jsTestName());
+ * const res = dbTest.createCollection("coll1");
+ * assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
+ */
 assert.writeErrorWithCode = function(res, expectedCode, msg) {
     if (expectedCode === undefined) {
         _doassert("assert.writeErrorWithCode called with undefined error code");
@@ -1030,6 +1606,21 @@ assert.writeErrorWithCode = function(res, expectedCode, msg) {
     return res;
 };
 
+/**
+ * Assert that a value is null.
+ *
+ * @param value Value under test
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const value = getValue();
+ * assert.isnull(value);
+ */
 assert.isnull = function(value, msg, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -1077,30 +1668,115 @@ function _assertCompare(f, a, b, description, msg, attr) {
     _doassert(msg, "{a} is not " + description + " {b}", {a, b, ...attr});
 }
 
+/**
+ * Assert that a < b.
+ *
+ * @param a Left-hand side operand
+ * @param b Right-hand side operand
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const actual = getValue();
+ * const ceiling = 12;
+ * assert.lt(actual, ceiling);
+ */
 assert.lt = function(a, b, msg, attr) {
     _assertCompare((a, b) => {
         return a < b;
     }, a, b, "less than", msg, attr);
 };
 
+/**
+ * Assert that a > b.
+ *
+ * @param a Left-hand side operand
+ * @param b Right-hand side operand
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const actual = getValue();
+ * const floor = 12;
+ * assert.gt(actual, floor);
+ */
 assert.gt = function(a, b, msg, attr) {
     _assertCompare((a, b) => {
         return a > b;
     }, a, b, "greater than", msg, attr);
 };
 
+/**
+ * Assert that a <= b.
+ *
+ * @param a Left-hand side operand
+ * @param b Right-hand side operand
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const actual = getValue();
+ * const ceiling = 12;
+ * assert.lte(actual, ceiling);
+ */
 assert.lte = function(a, b, msg, attr) {
     _assertCompare((a, b) => {
         return a <= b;
     }, a, b, "less than or eq", msg, attr);
 };
 
+/**
+ * Assert that a >= b.
+ *
+ * @param a Left-hand side operand
+ * @param b Right-hand side operand
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * const actual = getValue();
+ * const floor = 12;
+ * assert.gte(actual, floor);
+ */
 assert.gte = function(a, b, msg, attr) {
     _assertCompare((a, b) => {
         return a >= b;
     }, a, b, "greater than or eq", msg, attr);
 };
 
+/**
+ * Assert that a <= b <= c, or a < b < c.
+ *
+ * @param a
+ * @param b
+ * @param c
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {boolean} [inclusive] Whether to use inclusive (<=) comparisons, default true.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.between(1_000, totalSpillingStats.spilledBytes, 100_000);
+ */
 assert.between = function(a, b, c, msg, inclusive = true, attr) {
     _validateAssertionMessage(msg, attr);
 
@@ -1115,9 +1791,45 @@ assert.between = function(a, b, c, msg, inclusive = true, attr) {
     _doassert(msg, "{b} is not between {a} and {c}", {a, b, c, inclusive, ...attr});
 };
 
+/**
+ * Assert that a <= b <= c, inclusively.
+ *
+ * This is a convenience wrapper around {@link assert.between}.
+ *
+ * @param a
+ * @param b
+ * @param c
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.between(1000, totalSpillingStats.spilledBytes, 100000);
+ */
 assert.betweenIn = function(a, b, c, msg, attr) {
     assert.between(a, b, c, msg, true, attr);
 };
+/**
+ * Assert that a < b < c, exclusively.
+ *
+ * This is a convenience wrapper around {@link assert.between}.
+ *
+ * @param a
+ * @param b
+ * @param c
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.between(1000, totalSpillingStats.spilledBytes, 100000);
+ */
 assert.betweenEx = function(a, b, c, msg, attr) {
     assert.between(a, b, c, msg, false, attr);
 };
@@ -1140,7 +1852,21 @@ function _isClose(a, b, places = 4) {
     return [false, msgPrefix];
 }
 
-// Assert that numerical values are equivalent to 'places' significant figures.
+/**
+ * Assert that numerical values are equivalent to within significant figures.
+ *
+ * @param {number} a
+ * @param {number} b
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [places] Number of significant figures to allow for tolerance, default 4.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.close(res.pop, popExpected, '', 10);
+ */
 assert.close = function(a, b, msg, places = 4) {
     const [isClose, errMsg] = _isClose(a, b, places);
     if (!isClose) {
@@ -1174,8 +1900,23 @@ function _fieldsClose(docA, docB, fuzzyFields, places = 4) {
 }
 
 /**
- * Asserts if the times in millis are not withing delta milliseconds, in either direction.
- * Default Delta: 1 second
+ * Asserts if the times in millis are equal to within a tolerance.
+ *
+ * @param {Date | number} a
+ * @param {Date | number} b
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [deltaMS] Tolerance in milliseconds, default 1000 ms.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.closeWithinMS(startTime,
+ *                     latestStartUpLog.startTime,
+ *                     "StartTime doesn't match one from _id",
+ *                     2000); // Expect less than 2 sec delta
  */
 assert.closeWithinMS = function(a, b, msg, deltaMS = 1_000, attr) {
     const aMS = a instanceof Date ? a.getTime() : a;
@@ -1193,6 +1934,24 @@ assert.closeWithinMS = function(a, b, msg, deltaMS = 1_000, attr) {
     _doassert(msg, msgPrefix, {a: forLog(a), b: forLog(b), deltaMS, ...attr});
 };
 
+/**
+ * Assert that the "haystack" includes the "needle".
+ *
+ * This defers to the builtin "includes" method of the "haystack" object,
+ * which might be an array (for element containment), string (for substring-matching), etc.
+ *
+ * @param haystack
+ * @param needle
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.includes(res.message, "$merge failed due to a DuplicateKey error");
+ */
 assert.includes = function(haystack, needle, msg, attr) {
     if (haystack.includes(needle)) {
         return;
@@ -1202,6 +1961,18 @@ assert.includes = function(haystack, needle, msg, attr) {
     _doassert(msg, prefix, {haystack, needle, ...attr});
 };
 
+/**
+ * Assert that a command object does not have any of the fields
+ * `apiVersion`, `apiStruct`, or `apiDeprecationErrors`.
+ *
+ * @param {object} cmdOptions Object to validate.
+ *                   If it is not an Object, the assertion passes.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.noAPIParams(options);
+ */
 assert.noAPIParams = function(cmdOptions) {
     if (!(cmdOptions instanceof Object)) {
         return;
@@ -1211,6 +1982,31 @@ assert.noAPIParams = function(cmdOptions) {
            "API parameters are not allowed in this context");
 };
 
+/**
+ * Assert that a function eventually evaluates to true, retrying on any acceptable errors.
+ *
+ * This is a special case of {@link assert.soon}.
+ *
+ * @param {Function} func Function to be executed, or string to be `eval`ed.
+ * @param {Error|Error[]} acceptableErrors Error (or array of Errors) that are allowed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [timeout] Timeout in ms. In CI, this is 10min, otherwise 90sec.
+ * @param {number} [interval] Interval in ms to wait between tries, default 200ms.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.soonRetryOnAcceptableErrors(() => {
+ *     assert.commandWorked(
+ *         db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+ *     return true;
+ * }, ErrorCodes.FailedToSatisfyReadPreference);
+ */
 assert.soonRetryOnAcceptableErrors = function(
     func, acceptableErrors, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
     if (!Array.isArray(acceptableErrors)) {
@@ -1232,13 +2028,28 @@ assert.soonRetryOnAcceptableErrors = function(
     assert.soon(funcWithRetries, msg, timeout, interval, {runHangAnalyzer}, attr);
 };
 
-/*
- * Calls a function 'func' at repeated intervals of 'interval' milliseconds until either func()
- * returns true or more than 'timeout' milliseconds have elapsed. Throws an exception with
- * message 'msg' after timing out.
+/**
+ * Assert that a function eventually evaluates to true, retrying on Network errors.
  *
- * If 'func' encounters a NetworkError, the exception will be ignored, and 'func' will be called
- * again.
+ * This is a special case of {@link assert.soonRetryOnAcceptableErrors}.
+ *
+ * @param {Function} func Function to be executed, or string to be `eval`ed.
+ * @param {string|Function|object} [msg] Failure message, displayed when the assertion fails.
+ *            If a function, it is invoked and its result is used as the failure message.
+ *            If an object, its conversion to json is used as the failure message.
+ * @param {number} [timeout] Timeout in ms. In CI, this is 10min, otherwise 90sec.
+ * @param {number} [interval] Interval in ms to wait between tries, default 200ms.
+ * @param {{runHangAnalyzer: boolean}} [opts] Options to control hang analyzer via `runHangAnalyzer`
+ *     property.
+ * @param {object} [attr] Additional attributes to be included in failure messages.
+ *
+ * @throws {Error} if assertion is not satisfied.
+ *
+ * @example
+ * assert.soonRetryOnNetworkErrors(() => {
+ *     primaryInfo = db.isMaster();
+ *     return primaryInfo.hasOwnProperty("ismaster") && primaryInfo.ismaster;
+ * });
  */
 assert.soonRetryOnNetworkErrors = function(
     func, msg, timeout, interval, {runHangAnalyzer = true} = {}, attr) {
@@ -1246,3 +2057,5 @@ assert.soonRetryOnNetworkErrors = function(
     assert.soonRetryOnAcceptableErrors(
         func, acceptableErrors, msg, timeout, interval, runHangAnalyzer, attr);
 };
+
+export {doassert, sortDoc, assert, formatErrorMsg};

@@ -846,8 +846,8 @@ tests.push(function assertHasFieldsJsonFormat() {
     assertThrowsErrorWithJson(() => {
         assert.hasFields({hello: "world"}, ["goodbye"], "Oops!", kAttr);
     }, {
-        msg: "Not all of the values from {arr} were in {result} : Oops!",
-        attr: {result: {hello: "world"}, arr: ["goodbye"], ...kAttr}
+        msg: "Not all of the values from {arr} were in {obj} : Oops!",
+        attr: {obj: {hello: "world"}, arr: ["goodbye"], ...kAttr}
     });
 });
 

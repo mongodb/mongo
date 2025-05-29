@@ -34,7 +34,7 @@ export default [
                 // jstests/libs/parallelTester.d.ts
                 CountDownLatch: true,
 
-                // src/mongo/shell/assert.d.ts
+                // src/mongo/shell/assert.js
                 assert: true,
                 doassert: true,
                 sortDoc: true,
