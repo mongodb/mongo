@@ -61,28 +61,6 @@ std::string nextFileName() {
 }
 }  // namespace
 
-
-void AccuratePercentile::incorporate(double input) {
-    if (std::isnan(input)) {
-        return;
-    }
-    if (std::isinf(input)) {
-        if (input < 0) {
-            _negInfCount++;
-        } else {
-            _posInfCount++;
-        }
-        return;
-    }
-
-    // Take advantage of already sorted input -- avoid resorting it later.
-    if (!_shouldSort && !_accumulatedValues.empty() && input < _accumulatedValues.back()) {
-        _shouldSort = true;
-    }
-
-    _accumulatedValues.push_back(input);
-}
-
 void AccuratePercentile::incorporate(const std::vector<double>& inputs) {
     _accumulatedValues.reserve(_accumulatedValues.size() + inputs.size());
     for (double val : inputs) {

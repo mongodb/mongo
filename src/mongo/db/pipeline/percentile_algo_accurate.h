@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/platform/compiler.h"
 
 #include <vector>
 
@@ -48,7 +49,27 @@ class AccuratePercentile : public PercentileAlgorithm, public PartialPercentile<
 public:
     AccuratePercentile() = default;  // no config required for this algorithm
 
-    void incorporate(double input) final;
+    MONGO_COMPILER_ALWAYS_INLINE void incorporate(double input) final {
+        if (std::isnan(input)) {
+            return;
+        }
+        if (std::isinf(input)) {
+            if (input < 0) {
+                _negInfCount++;
+            } else {
+                _posInfCount++;
+            }
+            return;
+        }
+
+        // Take advantage of already sorted input -- avoid resorting it later.
+        if (!_shouldSort && !_accumulatedValues.empty() && input < _accumulatedValues.back()) {
+            _shouldSort = true;
+        }
+
+        _accumulatedValues.push_back(input);
+    }
+
     void incorporate(const std::vector<double>& inputs) final;
 
     long memUsageBytes() const final {
