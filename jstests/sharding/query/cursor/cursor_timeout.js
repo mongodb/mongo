@@ -1,5 +1,5 @@
 // Basic integration tests for the background job that periodically kills idle cursors, in both
-// mongod and mongos.  This test creates the following four cursors:
+// mongod and mongos.  This test creates the following cursors:
 //
 // 1. A no-timeout cursor through mongos, not attached to a session.
 // 2. A no-timeout cursor through mongod, not attached to a session.
@@ -7,16 +7,18 @@
 // 4. A normal cursor through mongod, not attached to a session.
 // 5. A normal cursor through mongos, attached to a session.
 // 6. A normal cursor through mongod, attached to a session.
+// 7. A normal aggregation cursor through mongos, not attached to a session.
 //
-// After a period of inactivity, the test asserts that cursors #1 and #2 are still alive, cursors #3
-// and #4 have been killed, and cursors #5 and #6 are still alive (as of SERVER-6036, only cursors
-// not opened as part of a session should be killed by the cursor-timeout mechanism). It then kills
-// the session cursors #5 and #6 are attached to to simulate that session timing out, and ensures
-// that cursors #5 and #6 are killed as a result.
+// After a period of inactivity, the test asserts that cursors #1 and #2 are still alive, cursors
+// #3, #4, and #7 have been killed, and cursors #5 and #6 are still alive (as of SERVER-6036,
+// only cursors not opened as part of a session should be killed by the cursor-timeout mechanism).
+// It then kills the session cursors #5 and #6 are attached to simulate that session timing out, and
+// ensures that cursors #5 and #6 are killed as a result.
 //
 // @tags: [
 //   requires_fcv_51,
 //   requires_sharding,
+//   requires_getmore,
 // ]
 // This test manually simulates a session, which is not compatible with implicit sessions.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -157,7 +159,7 @@ assert.throws(function() {
 });
 
 // Verify that the session cursors are really gone by running a killCursors command, and checking
-// that the cursorors are reported as "not found". Credit to kill_pinned_cursor_js_test for this
+// that the cursors are reported as "not found". Credit to kill_pinned_cursor_js_test for this
 // idea.
 let killRes = mongosDB.runCommand({
     killCursors: routerColl.getName(),
@@ -214,6 +216,38 @@ assert.throws(function() {
 assert.throws(function() {
     shardCursorWithTimeout.itcount();
 });
+
+{
+    // Test that aggregation cursors on mongos time out properly.
+
+    // Insert some additional data to ensure proper grouping.
+    for (let x = 0; x < 30; x++) {
+        assert.commandWorked(routerColl.insert({x: x, group: x % 5, value: x * 10}));
+    }
+
+    const shard0Count = st.shard0.getDB(mongosDB.getName())[routerColl.getName()].count();
+    const shard1Count = st.shard1.getDB(mongosDB.getName())[routerColl.getName()].count();
+    assert.gt(shard0Count, 0, "Expected documents on shard0");
+    assert.gt(shard1Count, 0, "Expected documents on shard1");
+
+    // Use a small batch size to ensure multiple batches.
+    const batchSize = 2;
+
+    // Create aggregation cursors on mongos.
+    const routerAggCursor = routerColl.aggregate(
+        [{$group: {_id: "$group", count: {$sum: 1}, total: {$sum: "$value"}}}, {$sort: {_id: 1}}],
+        {cursor: {batchSize: batchSize}});
+
+    const routerTimeoutCount = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+
+    assert.soon(function() {
+        return routerColl.getDB().serverStatus().metrics.cursor.timedOut > routerTimeoutCount;
+    }, "mongos aggregation cursor with $group failed to time out");
+
+    assert.throws(function() {
+        routerAggCursor.itcount();
+    }, [], "Expected mongos aggregation cursor to be timed out");
+}
 
 assert.commandWorked(
     mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));

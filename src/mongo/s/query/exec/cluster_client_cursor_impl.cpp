@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/service_context.h"
@@ -171,6 +172,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     tassert(7448200,
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
+    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(this, opCtx);
 
     query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
                                                       _queryStatsKeyHash,
