@@ -10,6 +10,21 @@ case "${unameOut}" in
     *)          machine="UNKNOWN:${unameOut}"
 esac
 
+HOME_DIR=$(pwd)
+
+# needed for the python install to be successful on windows
+if [[ "${machine}" = "Cygwin" ]]; then
+    # We want everything to be in the Administrator home directory because that is what user they
+    # log in with
+    export USERPROFILE=$(cygpath -w ~Administrator)
+    HOME_DIR=$(cygpath -u $USERPROFILE)
+
+    # the evergreen yml file is only added to the Administrator user on windows and not the actual
+    # user currently running
+    cp ${HOME_DIR}/.evergreen.yml ~/.evergreen.yml
+    cd $HOME_DIR
+fi
+
 TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v5
 
 SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
@@ -21,14 +36,6 @@ popd
 
 echo "# This is a fake expansions file to allow our setup scripts to function correctly." > "/data/mci/expansions.yml"
 echo "spawn_host: \"true\"" >> "/data/mci/expansions.yml"
-
-HOME_DIR=$(pwd)
-
-# needed for the python install to be successful on windows
-if [[ "${machine}" = "Cygwin" ]]; then
-    export USERPROFILE=$(cygpath -w ~)
-    HOME_DIR=$(cygpath -u $USERPROFILE)
-fi
 
 # On some RHEL distros TMPDIR was not being set on the spawnhost.
 # This does not show up during evergreen tasks because evergreen sets this var.
@@ -58,7 +65,7 @@ archive_fail() {
 }
 
 if [[ "${machine}" = "Cygwin" ]]; then
-    echo "source $(pwd)/venv/Scripts/activate" >> ~/.bashrc
+    echo "source $(pwd)/venv/Scripts/activate" >> $HOME_DIR/.bashrc
     out_dir="/cygdrive/c/setup_script_output.txt"
     desktop_dir="/cygdrive/c/Users/Administrator/Desktop"
 
