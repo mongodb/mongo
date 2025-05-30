@@ -375,7 +375,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
         std::list<boost::intrusive_ptr<DocumentSource>> initialScoreDetailsStages =
             buildInputPipelineScoreDetails(
                 inputPipelineOneName, inputGeneratesScoreDetails, expCtx);
-        outputStages.splice(outputStages.end(), initialScoreDetailsStages);
+        outputStages.splice(outputStages.end(), std::move(initialScoreDetailsStages));
     }
     return outputStages;
 }
@@ -685,9 +685,11 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
 
     // Parse each pipeline.
     std::vector<LiteParsedPipeline> liteParsedPipelines;
-    for (const auto& elem : inputPipesObj) {
-        liteParsedPipelines.emplace_back(nss, parsePipelineFromBSON(elem));
-    }
+    std::transform(
+        inputPipesObj.begin(),
+        inputPipesObj.end(),
+        std::back_inserter(liteParsedPipelines),
+        [nss](const auto& elem) { return LiteParsedPipeline(nss, parsePipelineFromBSON(elem)); });
 
     return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
         spec.fieldName(), nss, std::move(liteParsedPipelines));
@@ -760,9 +762,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
                                                                 inputGeneratesScoreDetails,
                                                                 inputPipelineStages,
                                                                 pExpCtx);
-            for (auto&& stage : firstPipelineStages) {
-                outputStages.emplace_back(stage);
-            }
+            outputStages.splice(outputStages.end(), std::move(firstPipelineStages));
         } else {
             // For the input pipelines other than the first,
             // we wrap then in a $unionWith stage to append it to the total desugared output.
@@ -785,9 +785,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> constructDesugaredOutput(
     ScoreFusionScoringOptions scoreFusionScoringOptions(spec);
     auto finalStages = buildScoreAndMergeStages(
         inputPipelines, scoreFusionScoringOptions, weights, includeScoreDetails, pExpCtx);
-    for (auto&& stage : finalStages) {
-        outputStages.emplace_back(stage);
-    }
+    outputStages.splice(outputStages.end(), std::move(finalStages));
     return outputStages;
 }
 

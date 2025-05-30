@@ -462,9 +462,11 @@ std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::
 
     // Ensure that all pipelines are valid ranked selection pipelines.
     std::vector<LiteParsedPipeline> liteParsedPipelines;
-    for (const auto& elem : inputPipesObj) {
-        liteParsedPipelines.emplace_back(nss, parsePipelineFromBSON(elem));
-    }
+    std::transform(
+        inputPipesObj.begin(),
+        inputPipesObj.end(),
+        std::back_inserter(liteParsedPipelines),
+        [nss](const auto& elem) { return LiteParsedPipeline(nss, parsePipelineFromBSON(elem)); });
 
     return std::make_unique<DocumentSourceRankFusion::LiteParsed>(
         spec.fieldName(), nss, std::move(liteParsedPipelines));
@@ -559,9 +561,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
                                                                 inputGeneratesScore,
                                                                 inputGeneratesScoreDetails,
                                                                 pExpCtx);
-            for (const auto& stage : firstPipelineStages) {
-                outputStages.push_back(std::move(stage));
-            }
+            outputStages.splice(outputStages.end(), std::move(firstPipelineStages));
         } else {
             auto unionWithStage = buildUnionWithPipeline(name,
                                                          rankConstant,
@@ -578,9 +578,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     // Build all remaining stages to perform the fusion.
     auto finalStages =
         buildScoreAndMergeStages(inputPipelines, weights, includeScoreDetails, pExpCtx);
-    for (const auto& stage : finalStages) {
-        outputStages.push_back(stage);
-    }
+    outputStages.splice(outputStages.end(), std::move(finalStages));
 
     return outputStages;
 }
