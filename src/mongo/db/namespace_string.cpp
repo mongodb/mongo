@@ -100,6 +100,8 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (collectionName == kConfigsvrCoordinatorsNamespace.coll())
             return true;
+        if (collectionName == kBlockFCVChangesNamespace.coll())
+            return true;
     } else if (isLocalDB()) {
         if (collectionName == kSystemReplSetNamespace.coll())
             return true;

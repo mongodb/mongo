@@ -54,7 +54,10 @@ namespace mongo {
 namespace {
 static constexpr size_t kMaxFailedRetryCount = 3;
 static const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+static constexpr auto kBlockFCVDocumentId = "block_fcv_changes";
 }  // namespace
+
+MONGO_FAIL_POINT_DEFINE(hangAfterLockingNewShard);
 
 AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
                                          const BSONObj& initialState)
@@ -66,7 +69,6 @@ AddShardCoordinator::AddShardCoordinator(ShardingDDLCoordinatorService* service,
             std::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net)));
     _executorWithoutGossip->startup();
 }
-
 
 ExecutorFuture<void> AddShardCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -117,6 +119,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                     throw;
                 }
 
+                _blockFCVChangesOnReplicaSet(opCtx, **executor);
+
                 // For the first shard we check if it's a promotion of a populated replicaset or
                 // adding a clean state replicaset.
                 // If the replicaset is the configserver or it's not the first shard, we always
@@ -144,6 +148,8 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                         _doc.getConnectionString().toString()),
                             _isPristineReplicaset(opCtx, targeter));
                 }
+
+                hangAfterLockingNewShard.pauseWhileSet(opCtx);
 
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
                 // versions.
@@ -295,9 +301,10 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kCleanup,
-            [this, _ = shared_from_this()](auto* opCtx) {
+            [this, _ = shared_from_this(), executor](auto* opCtx) {
                 topology_change_helpers::propagateClusterUserWriteBlockToReplicaSet(
                     opCtx, _getTargeter(opCtx), _executorWithoutGossip);
+                _unblockFCVChangesOnNewShard(opCtx, **executor);
                 topology_change_helpers::unblockDDLCoordinators(opCtx,
                                                                 /*removeRecoveryDocument*/ false);
             }))
@@ -327,21 +334,33 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
         });
 }
 
+void AddShardCoordinator::_dropBlockFCVChangesCollection(
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+    auto& targeter = _getTargeter(opCtx);
+    auto dropCommand = BSON("drop" << NamespaceString::kBlockFCVChangesNamespace.coll()
+                                   << "writeConcern" << BSON("w" << "majority"));
+    auto dropCommandResponse = topology_change_helpers::runCommandForAddShard(
+        opCtx, targeter, DatabaseName::kConfig, dropCommand, executor);
+    uassertStatusOK(dropCommandResponse.commandStatus);
+}
+
 ExecutorFuture<void> AddShardCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const Status& status) noexcept {
-    return ExecutorFuture<void>(**executor).then([this, token, status, _ = shared_from_this()] {
-        const auto opCtxHolder = makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, status, _ = shared_from_this(), executor] {
+            const auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
 
-        if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
-            _restoreUserWrites(opCtx);
-        }
-        topology_change_helpers::unblockDDLCoordinators(opCtx,
-                                                        /*removeRecoveryDocument*/ false);
-        topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
-    });
+            if (!_doc.getIsConfigShard() && _doc.getOriginalUserWriteBlockingLevel().has_value()) {
+                _restoreUserWrites(opCtx);
+            }
+            _dropBlockFCVChangesCollection(opCtx, **executor);
+            topology_change_helpers::unblockDDLCoordinators(opCtx,
+                                                            /*removeRecoveryDocument*/ false);
+            topology_change_helpers::removeReplicaSetMonitor(opCtx, _doc.getConnectionString());
+        });
 }
 
 void AddShardCoordinator::checkIfOptionsConflict(const BSONObj& stateDoc) const {
@@ -569,6 +588,47 @@ void AddShardCoordinator::_restoreUserWrites(OperationContext* opCtx) {
                                                        true, /* block writes */
                                                        _osiGenerator(),
                                                        _executorWithoutGossip);
+}
+
+void AddShardCoordinator::_blockFCVChangesOnReplicaSet(
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+    // The block does not synchronize with ongoing setFCV commands. This is okay
+    // because the addShard operation will later send its own setFCV command in its execution,
+    // which will serialize with any ongoing setFCV commands.
+    BSONObjBuilder builder;
+    builder.append("_id", kBlockFCVDocumentId);
+    write_ops::InsertCommandRequest insertOp(NamespaceString::kBlockFCVChangesNamespace,
+                                             {builder.obj()});
+    insertOp.setWriteConcern(defaultMajorityWriteConcern());
+    const auto sessionInfo = getNewSession(opCtx);
+    generic_argument_util::setOperationSessionInfo(insertOp, sessionInfo);
+    const auto commandResponse = topology_change_helpers::runCommandForAddShard(
+        opCtx, _getTargeter(opCtx), DatabaseName::kConfig, insertOp.toBSON(), executor);
+    Status status = getStatusFromWriteCommandReply(commandResponse.response);
+    // In case of phase retrial, it is okay to swallow the duplicate key exception on the next try.
+    if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
+        uassertStatusOK(status);
+    }
+}
+
+void AddShardCoordinator::_unblockFCVChangesOnNewShard(
+    OperationContext* opCtx, std::shared_ptr<executor::TaskExecutor> executor) {
+    // Drop the collection to clean up the namespace
+    auto& targeter = _getTargeter(opCtx);
+    const auto osi = (*_osiGenerator())(opCtx);
+    ShardsvrDropCollectionParticipant dropCollectionParticipantCommand(
+        NamespaceString::kBlockFCVChangesNamespace);
+    dropCollectionParticipantCommand.setDropSystemCollections(true);
+    dropCollectionParticipantCommand.setRequireCollectionEmpty(false);
+    generic_argument_util::setMajorityWriteConcern(dropCollectionParticipantCommand);
+    generic_argument_util::setOperationSessionInfo(dropCollectionParticipantCommand, osi);
+    const auto dropCmdResponse =
+        topology_change_helpers::runCommandForAddShard(opCtx,
+                                                       targeter,
+                                                       DatabaseName::kConfig,
+                                                       dropCollectionParticipantCommand.toBSON(),
+                                                       executor);
+    uassertStatusOK(getStatusFromWriteCommandReply(dropCmdResponse.response));
 }
 
 topology_change_helpers::UserWriteBlockingLevel

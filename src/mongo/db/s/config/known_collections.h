@@ -84,5 +84,6 @@ const StringDataSet kConfigCollections{
     NamespaceString::kUserWritesCriticalSectionsNamespace.coll(),
     NamespaceString::kVectorClockNamespace.coll(),
     NamespaceString::kConfigShardCatalogDatabasesNamespace.coll(),
+    NamespaceString::kBlockFCVChangesNamespace.coll(),
 };
 }  // namespace mongo

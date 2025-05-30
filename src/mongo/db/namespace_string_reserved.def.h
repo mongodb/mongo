@@ -315,3 +315,6 @@ NSS_CONSTANT(kDurableHistoryTestNamespace, DatabaseName::kMdbTesting, "pinned_ti
 NSS_CONSTANT(kAggTempCollections, DatabaseName::kConfig, "agg_temp_collections"_sd)
 
 NSS_CONSTANT(kEmpty, DatabaseName::kEmpty, ""_sd)
+
+// Namespace for storing feature compatibility version changes block documents
+NSS_CONSTANT(kBlockFCVChangesNamespace, DatabaseName::kConfig, "system.block_fcv_changes"_sd)

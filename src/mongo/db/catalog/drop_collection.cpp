@@ -732,7 +732,8 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
             nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
             nss.isChangeStreamPreImagesCollection() ||
             nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
-            nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
+            nss.isSystemDotJavascript() || nss.isSystemStatsCollection() ||
+            nss == NamespaceString::kBlockFCVChangesNamespace;
     };
 
     if (nss.isSystemDotProfile()) {

@@ -425,6 +425,22 @@ public:
         return Status::OK();
     }
 
+    void checkBlockFCVChanges(OperationContext* opCtx,
+                              const SetFeatureCompatibilityVersion& request) {
+        DBDirectClient dbClient(opCtx);
+        FindCommandRequest findRequest{NamespaceString::kBlockFCVChangesNamespace};
+        const auto response = dbClient.findOne(std::move(findRequest));
+        if (!response.isEmpty()) {
+            // The block is skipped if the request is from a config server
+            const auto fromConfigServer = request.getFromConfigServer().value_or(false);
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    "setFeatureCompatibilityVersion command is blocked. It might be that the "
+                    "replica set is being added to a sharded cluster. If this is the case, the "
+                    "command cannot be run via direct replica set connection.",
+                    fromConfigServer);
+        }
+    }
+
     bool run(OperationContext* opCtx,
              const DatabaseName&,
              const BSONObj& cmdObj,
@@ -441,6 +457,9 @@ public:
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         Lock::ExclusiveLock setFCVCommandLock(opCtx, commandMutex);
+
+        // Check there is no block on setFeatureCompatibilityVersion.
+        checkBlockFCVChanges(opCtx, request);
 
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion =

@@ -72,6 +72,9 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    void _dropBlockFCVChangesCollection(OperationContext* opCtx,
+                                        std::shared_ptr<executor::TaskExecutor> executor);
+
     ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token,
                                          const Status& status) noexcept override;
@@ -98,6 +101,12 @@ private:
     void _blockUserWrites(OperationContext* opCtx);
 
     void _restoreUserWrites(OperationContext* opCtx);
+
+    void _blockFCVChangesOnReplicaSet(OperationContext* opCtx,
+                                      std::shared_ptr<executor::TaskExecutor> executor);
+
+    void _unblockFCVChangesOnNewShard(OperationContext* opCtx,
+                                      std::shared_ptr<executor::TaskExecutor> executor);
 
     topology_change_helpers::UserWriteBlockingLevel _getUserWritesBlockFromReplicaSet(
         OperationContext* opCtx);
