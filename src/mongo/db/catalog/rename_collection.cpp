@@ -414,7 +414,8 @@ acquireLocksForRenameCollectionWithinDBForApplyOps(OperationContext* opCtx,
                                                    const boost::optional<UUID>& uuidToDrop) {
     auto catalog = CollectionCatalog::get(opCtx);
     // We don't expect to get a stale snapshot of the catalog during oplog application or applyOps.
-    dassert(catalog == CollectionCatalog::latest(opCtx));
+    // Assert that no storage snapshot is open, so the catalog we got can't be a stashed instance.
+    dassert(!shard_role_details::getRecoveryUnit(opCtx)->isActive());
 
     auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     auto targetCollBasedOnNs = catalog->lookupCollectionByNamespace(opCtx, target);
