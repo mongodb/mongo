@@ -412,7 +412,6 @@ void DocumentSourceUnionWith::doDispose() {
         _pipeline.get_deleter().dismissDisposal();
         _stats.planSummaryStats.usedDisk =
             _stats.planSummaryStats.usedDisk || _pipeline->usedDisk();
-        std::cout << "BANANA UnionWith::doDispose called on " << this << "\n";
         _execPipeline->accumulatePlanSummaryStats(_stats.planSummaryStats);
 
         if (!_pipeline->getContext()->getExplain()) {
