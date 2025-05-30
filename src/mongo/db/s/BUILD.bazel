@@ -1655,8 +1655,6 @@ mongo_cc_unit_test(
         "namespace_metadata_change_notifications_test.cpp",
         "op_observer_sharding_test.cpp",
         "operation_sharding_state_test.cpp",
-        "persistent_task_queue.h",
-        "persistent_task_queue_test.cpp",
         "query_analysis_writer_test.cpp",
         "range_arithmetic_test.cpp",
         "range_deleter_service_op_observer_test.cpp",

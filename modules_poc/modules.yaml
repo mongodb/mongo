@@ -29,6 +29,7 @@ core:
     - src/mongo/platform/
     - src/mongo/stdx/
     - src/mongo/util/
+    - src/mongo/db/catalog/util/partitioned*
     - src/mongo/db/field_parser[._]*
     - src/mongo/db/generic_argument_util.*
     - src/mongo/db/nesting_depth_test.cpp
@@ -78,6 +79,11 @@ core.service:
     - src/mongo/db/error_labels*
     - src/mongo/db/server_feature_flags.idl
     - src/mongo/db/windows_options.idl
+    - src/mongo/db/initialize_server_global_state.*
+    - src/mongo/db/default_max_time_ms_cluster_parameter*
+    - src/mongo/db/commands/test_deprecation_command.cpp
+    - src/mongo/s/client_metadata_propagation_egress_hook*
+    - src/mongo/db/s/forwardable_operation_metadata*
 
 # stuff that is part of a *specific* mongo server (eg mongos, mongod)
 core.servers:
@@ -110,7 +116,6 @@ core.commands:
     - src/mongo/db/commands/kill_operations.idl
     - src/mongo/db/commands/killoperations_cmd.cpp
     - src/mongo/db/commands/killoperations_common.h
-    - src/mongo/db/commands/sessions_commands.idl
     - src/mongo/db/commands/shutdown.*
     - src/mongo/db/commands/shutdown_d.cpp
     - src/mongo/db/commands/sleep_command.cpp
@@ -226,6 +231,17 @@ query:
     - src/mongo/s/commands/*query_analyze*
     - src/mongo/db/s/migration_blocking_operation/*multi_update*
     - src/mongo/s/request_types/*multi_update*
+    - src/mongo/dbtests/pdfiletests.cpp
+    - src/mongo/dbtests/wildcard*
+    - src/mongo/s/query_analysis*
+    - src/mongo/s/commands/cluster_filemd5_cmd.cpp
+    - src/mongo/db/diagnostic_printers_test.cpp
+    - src/mongo/db/keypattern*
+    - src/mongo/db/commands/shardsvr_run_search_index_command*
+    - src/mongo/db/s/shardsvr_resolve_view_command_test.cpp
+    - src/mongo/dbtests/commandtests.cpp
+    - src/mongo/s/would_change_owning_shard_exception*
+    - src/mongo/db/op_observer/fallback_op_observer*
 
 car_common:
   meta:
@@ -256,6 +272,7 @@ car_common:
     - src/mongo/s/sharding_types.idl
     - src/mongo/s/type_collection_common_types.idl
     - src/mongo/db/s/operation_sharding_state*
+    - src/mongo/db/persistent_task_store*
 
     # Observers overlaps between shard_catalog, ddl and routing_and_topology. Putting them in this
     # module because it is "generic infrastructure", but likely their contents need to be moved
@@ -315,6 +332,7 @@ shard_catalog:
     - src/mongo/db/collection_acquisition_bm.cpp
     - src/mongo/db/dump_lock_manager[._]*
     - src/mongo/db/commands/lock_info*
+    - src/mongo/db/resource_yielder*
     - src/mongo/s/commands/cluster_lock_info_cmd.cpp
 
     # shard_role_api: The public Shard Role API that the rest of the teams use to build the shard
@@ -390,6 +408,7 @@ ddl:
     - src/mongo/db/s/shard_key*util*
     - src/mongo/db/s/shard_metadata_util*
     - src/mongo/db/s/sharding_ddl_coordinator[._]*
+    - src/mongo/db/s/sharding_test_helpers.h
     - src/mongo/db/s/sharding_util[._]*
     - src/mongo/db/s/sharding_ddl_util[._]*
     - src/mongo/s/shard_util*
@@ -482,6 +501,8 @@ ddl:
     - src/mongo/s/commands/*reshard*
     - src/mongo/s/commands/*unshard*
     - src/mongo/s/request_types/*reshard_collection*
+    - src/mongo/s/commands/cluster_set_allow_migrations_cmd.cpp
+    - src/mongo/s/commands/cluster_untrack_unsplittable_collection.cpp
 
     # unsorted: Everything else.
     - src/mongo/s/cluster_ddl.*
@@ -492,6 +513,11 @@ ddl:
     - src/mongo/db/s/sharding_catalog_client_aggregations_test.cpp
     - src/mongo/s/request_types/migration_blocking_operation*
     - src/mongo/s/migration_blocking_operation*
+    - src/mongo/db/metadata_consistency_types.idl
+    - src/mongo/db/commands/shuffle_list_command_results*
+    - src/mongo/db/s/shardsvr_validate_shard_key_candidate.cpp
+    - src/mongo/db/s/config/configsvr_run_restore*
+    - src/mongo/db/s/config/known_collections.h
 
 routing_and_topology:
   meta:
@@ -575,6 +601,7 @@ routing_and_topology:
     - src/mongo/db/s/shardsvr_check_can_connect_to_config_server_cmd.cpp
     - src/mongo/s/commands/cluster_is_db_grid_cmd.cpp
     - src/mongo/s/s_sharding_server_status.cpp
+    - src/mongo/s/commands/cluster_multicast_cmd.cpp
 
     # config shard
     - src/mongo/db/s/config/*transition*dedicated_config*
@@ -635,6 +662,12 @@ routing_and_topology:
     - src/mongo/db/s/sharding_api_d_params.idl
     - src/mongo/db/s/sharding_runtime_d*
     - src/mongo/db/s/sharding_server_status.cpp
+    - src/mongo/db/s/transition_to_sharded_cluster*
+    - src/mongo/s/mongos_hello_response*
+    - src/mongo/s/mongos_server_parameters*
+    - src/mongo/s/mongos_topology_coordinator*
+    - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
+    - src/mongo/s/router_uptime_reporter*
 
 sharding_clients:
   meta:
@@ -644,12 +677,14 @@ sharding_clients:
     - src/mongo/db/rs_local_client*
     - src/mongo/s/client/config_shard_wrapper*
     - src/mongo/s/client/shard*
+    - src/mongo/db/s/shard_local*
 
 transactions:
   meta:
     slack: server-replication
     jira: Replication
   files:
+    - src/mongo/db/cluster_command_translations.h
     - src/mongo/db/commands/*transaction*
     - src/mongo/db/commands/*txn*
     - src/mongo/db/transaction/
@@ -665,6 +700,12 @@ transactions:
     - src/mongo/s/*transaction*
     - src/mongo/db/session/
     - src/mongo/s/session_catalog_router*
+    - src/mongo/db/service_liaison_mock.*
+    - src/mongo/db/logical_session*
+    - src/mongo/db/initialize_operation_session_info*
+    - src/mongo/db/commands/*session*
+    - src/mongo/dbtests/logical_sessions_tests.cpp
+    - src/mongo/s/client_transport_observer_mongos*
 
 fcv:
   meta:
@@ -773,6 +814,7 @@ field_level_encryption.cryptd:
   files:
     - src/mongo/db/modules/enterprise/src/fle/commands
     - src/mongo/util/cryptd
+    - src/mongo/embedded
 
 field_level_encryption.crypt_shared:
   meta:
@@ -787,6 +829,9 @@ causal_consistency:
     jira: Cluster Scalability
   files:
     - src/mongo/db/keys_collection*
+    - src/mongo/db/key_generator*
+    - src/mongo/db/*logical_time*
+    - src/mongo/db/time_proof_service*
 
 data_movement:
   meta:
@@ -796,6 +841,7 @@ data_movement:
     # resharding
     - src/mongo/db/s/*reshard*
     - src/mongo/db/s/config/*reshard*
+    - src/mongo/db/s/config/sampling_based_initial_split_policy_test.cpp
     - src/mongo/s/*reshard*
     - src/mongo/db/s/metrics/**
     - src/mongo/s/request_types/flush_resharding_state_change.idl
@@ -859,6 +905,7 @@ observability:
     jira: Networking & Observability
   files:
     - src/mongo/db/connection_health_metrics_parameter.idl
+    - src/mongo/db/not_primary_error_tracker*
     - src/mongo/db/operation_cpu_timer*
     - src/mongo/db/process_health/
     - src/mongo/executor/split_timer*
@@ -931,6 +978,7 @@ networking.core:
     - src/mongo/db/op_msg*
     - src/mongo/db/operation_id*
     - src/mongo/db/operation_key_manager*
+    - src/mongo/db/session_manager_mongod.h
     - src/mongo/db/shutdown_in_progress_quiesce_info*
     - src/mongo/db/wire_version*
     - src/mongo/rpc/
@@ -949,6 +997,7 @@ networking.commands:
     - src/mongo/db/commands/drop_connections_command.cpp
     - src/mongo/db/commands/http_client.cpp
     - src/mongo/db/commands/http_client.idl
+    - src/mongo/db/commands/isself.cpp
     - src/mongo/db/commands/traffic_recording_cmds.cpp
     - src/mongo/db/commands/whats_my_sni_command.cpp
     - src/mongo/db/commands/whats_my_uri_cmd.cpp
@@ -973,6 +1022,7 @@ networking.execution:
     - src/mongo/s/async_requests_sender*
     - src/mongo/s/async_rpc_shard_retry_policy.h
     - src/mongo/s/async_rpc_shard_targeter*
+    - src/mongo/s/sharding_task_executor*
 
 networking.mirrored_reads:
   meta:
@@ -1092,6 +1142,7 @@ validate:
     - src/mongo/db/commands/validate.cpp
     - src/mongo/db/validate
     - src/mongo/dbtests/validate_tests.cpp
+    - src/mongo/s/commands/cluster_validate_cmd.cpp
 
 dbhash:
   meta:
@@ -1109,6 +1160,7 @@ compact:
     - src/mongo/db/commands/auto_compact*
     - src/mongo/db/commands/compact*
     - src/mongo/db/storage/compact_options*
+    - src/mongo/s/commands/cluster_compact_cmd.cpp
 
 dbcheck:
   meta:
@@ -1181,11 +1233,13 @@ replication:
     jira: Server Replication
   files:
     - src/mongo/db/repl/ # excluding ./dbcheck*
+    - src/mongo/db/command_can_run_here*
     - src/mongo/db/commands/snapshot_management.cpp
     - src/mongo/db/commands/test_api_version_2_commands.cpp
     - src/mongo/db/op_observer/find_and_modify_images_op_observer* # specific files
     - src/mongo/db/mongod_options_replication*
     - src/mongo/db/concurrency/replication_state_transition_lock_guard*
+    - src/mongo/db/incremental_rollout_metrics.cpp
     - src/mongo/dbtests/mock_replica_set_test.cpp
     - src/mongo/dbtests/replica_set_tests.cpp
     - src/mongo/dbtests/repltests.cpp
@@ -1213,6 +1267,8 @@ replication.oplog:
     - src/mongo/db/repl/*noop_writer*
     - src/mongo/db/repl/*bgsync*
     - src/mongo/db/repl/*sync_source*
+    - src/mongo/s/commands/cluster_oplog_note_cmd.cpp
+    - src/mongo/s/commands/cluster_repl_set_get_status_cmd.cpp
 
 replication.server_rw_concerns:
   meta:
@@ -1235,6 +1291,7 @@ replication.rs_aware_service:
   files:
     - src/mongo/db/repl/*primary_only_service*
     - src/mongo/db/repl/*replica_set_aware_service*
+    - src/mongo/db/s/primary_only_service_helpers
 
 replication.replication_coordinator:
   meta:

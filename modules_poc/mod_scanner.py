@@ -922,8 +922,6 @@ def validate_modules() -> bool:
 
         if not matches:
             teams = " and ".join(teams_for_file(path))
-            if teams == "__NO_OWNER__" or teams == "server_catalog_and_routing":
-                continue  # Only error for files owned by teams that have finished assignment.
             perr(f"Error: {path} owned by {teams} doesn't match any globs in modules.yaml")
             failed = True
 
