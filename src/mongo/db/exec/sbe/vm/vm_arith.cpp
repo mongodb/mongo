@@ -955,7 +955,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericExp(value::TypeT
             return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
         }
         case value::TypeTags::NumberDecimal: {
-            auto result = value::bitcastTo<Decimal128>(operandValue).exponential();
+            auto result = value::bitcastTo<Decimal128>(operandValue).exp();
             auto [tag, value] = value::makeCopyDecimal(result);
             return {true, tag, value};
         }
@@ -991,7 +991,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericLn(value::TypeTa
             if (!operand.isGreater(Decimal128::kNormalizedZero) && !operand.isNaN()) {
                 return {false, value::TypeTags::Nothing, 0};
             }
-            auto operandLn = operand.naturalLogarithm();
+            auto operandLn = operand.log();
 
             auto [tag, value] = value::makeCopyDecimal(operandLn);
             return {true, tag, value};
@@ -1032,7 +1032,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericLog10(value::Typ
             if (!operand.isGreater(Decimal128::kNormalizedZero) && !operand.isNaN()) {
                 return {false, value::TypeTags::Nothing, 0};
             }
-            auto operandLog10 = operand.logarithm(Decimal128(10));
+            auto operandLog10 = operand.log10();
 
             auto [tag, value] = value::makeCopyDecimal(operandLog10);
             return {true, tag, value};
@@ -1073,7 +1073,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericSqrt(value::Type
             if (operand.isLess(Decimal128::kNormalizedZero) && !operand.isNaN()) {
                 return {false, value::TypeTags::Nothing, 0};
             }
-            auto [tag, value] = value::makeCopyDecimal(operand.squareRoot());
+            auto [tag, value] = value::makeCopyDecimal(operand.sqrt());
             return {true, tag, value};
         }
         case value::TypeTags::NumberInt32:

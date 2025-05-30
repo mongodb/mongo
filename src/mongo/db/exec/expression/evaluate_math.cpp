@@ -448,7 +448,8 @@ Value evaluate(const ExpressionLog& expr, const Document& root, Variables* varia
         if (argDecimal.isGreater(Decimal128::kNormalizedZero) &&
             baseDecimal.isNotEqual(Decimal128(1)) &&
             baseDecimal.isGreater(Decimal128::kNormalizedZero)) {
-            return Value(argDecimal.logarithm(baseDecimal));
+            // Change of logarithm base: log_B(A) == log(A) / log(B)
+            return Value(argDecimal.log().divide(baseDecimal.log()));
         }
         // Fall through for error cases.
     }
@@ -1697,7 +1698,7 @@ Value evaluate(const ExpressionExp& expr, const Document& root, Variables* varia
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
         // $exp always returns either a double or a decimal number, as e is irrational.
         if (numericArg.getType() == NumberDecimal) {
-            return Value(numericArg.coerceToDecimal().exponential());
+            return Value(numericArg.coerceToDecimal().exp());
         }
 
         return Value(exp(numericArg.coerceToDouble()));
@@ -1933,7 +1934,7 @@ Value evaluate(const ExpressionLn& expr, const Document& root, Variables* variab
         if (numericArg.getType() == NumberDecimal) {
             Decimal128 argDecimal = numericArg.getDecimal();
             if (argDecimal.isGreater(Decimal128::kNormalizedZero))
-                return Value(argDecimal.naturalLogarithm());
+                return Value(argDecimal.log());
             // Fall through for error case.
         }
         double argDouble = numericArg.coerceToDouble();
@@ -1949,7 +1950,7 @@ Value evaluate(const ExpressionLog10& expr, const Document& root, Variables* var
         if (numericArg.getType() == NumberDecimal) {
             Decimal128 argDecimal = numericArg.getDecimal();
             if (argDecimal.isGreater(Decimal128::kNormalizedZero))
-                return Value(argDecimal.logarithm(Decimal128(10)));
+                return Value(argDecimal.log10());
             // Fall through for error case.
         }
 
@@ -1971,7 +1972,7 @@ Value evaluate(const ExpressionSqrt& expr, const Document& root, Variables* vari
         if (numericArg.getType() == NumberDecimal) {
             Decimal128 argDec = numericArg.getDecimal();
             checkArg(!argDec.isLess(Decimal128::kNormalizedZero));  // NaN returns Nan without error
-            return Value(argDec.squareRoot());
+            return Value(argDec.sqrt());
         }
         double argDouble = numericArg.coerceToDouble();
         checkArg(!(argDouble < 0));  // NaN returns Nan without error

@@ -582,10 +582,7 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
 
     auto a = first.numberDecimal();
     auto b = second.numberDecimal();
-
-    // 10.0 is used frequently in the rest of the function, so save it to a variable.
-    auto ten = Decimal128(10);
-    auto exponent = a.toAbs().logarithm(ten).round();
+    auto exponent = a.toAbs().log10().round();
 
     // Early exit for zero, infinity and NaN cases.
     if ((a.isZero() && b.isZero()) || (a.isNaN() && b.isNaN()) ||
@@ -593,21 +590,21 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
         return BSON("" << true /* isErrorAcceptable */);
     } else if (!a.isZero() && !b.isZero()) {
         // Return early if arguments are not the same order of magnitude.
-        if (exponent != b.toAbs().logarithm(ten).round()) {
+        if (exponent != b.toAbs().log10().round()) {
             return BSON("" << false);
         }
 
         // Put the whole number behind the decimal point.
         if (!exponent.isZero()) {
-            a = a.divide(ten.power(exponent));
-            b = b.divide(ten.power(exponent));
+            a = a.divide(exponent.exp10());
+            b = b.divide(exponent.exp10());
         }
     }
 
     auto places = third.numberDecimal();
     auto isErrorAcceptable = a.subtract(b)
                                  .toAbs()
-                                 .multiply(ten.power(places, Decimal128::kRoundTowardZero))
+                                 .multiply(places.exp10(Decimal128::kRoundTowardZero))
                                  .round(Decimal128::kRoundTowardZero) == Decimal128(0);
 
     return BSON("" << isErrorAcceptable);
