@@ -131,6 +131,11 @@ public:
     void onOplogEntriesFetched(int64_t numEntries);
     void onOplogEntriesApplied(int64_t numEntries);
 
+    void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
+    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
+    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
+
 protected:
     const ShardingDataTransformCumulativeMetricsFieldNameProvider* getFieldNames() const;
 
@@ -145,6 +150,15 @@ protected:
     int64_t getOplogEntriesFetched() const;
     int64_t getOplogEntriesApplied() const;
 
+    int64_t getOplogFetchingTotalRemoteBatchesRetrieved() const;
+    int64_t getOplogFetchingTotalRemoteBatchesRetrievalTimeMillis() const;
+    int64_t getOplogFetchingTotalLocalInserts() const;
+    int64_t getOplogFetchingTotalLocalInsertTimeMillis() const;
+    int64_t getOplogApplyingTotalBatchesRetrieved() const;
+    int64_t getOplogApplyingTotalBatchesRetrievalTimeMillis() const;
+    int64_t getOplogBatchApplied() const;
+    int64_t getOplogBatchAppliedMillis() const;
+
     template <typename FieldNameProvider>
     void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
                                             BSONObjBuilder* bob) const {
@@ -154,6 +168,26 @@ protected:
         bob->append(names->getForInsertsApplied(), getInsertsApplied());
         bob->append(names->getForUpdatesApplied(), getUpdatesApplied());
         bob->append(names->getForDeletesApplied(), getDeletesApplied());
+    }
+
+    template <typename FieldNameProvider>
+    void reportOplogApplicationLatencyMetrics(const FieldNameProvider* names,
+                                              BSONObjBuilder* bob) const {
+        bob->append(names->getForOplogFetchingTotalRemoteBatchRetrievalTimeMillis(),
+                    getOplogFetchingTotalRemoteBatchesRetrievalTimeMillis());
+        bob->append(names->getForOplogFetchingTotalRemoteBatchesRetrieved(),
+                    getOplogFetchingTotalRemoteBatchesRetrieved());
+        bob->append(names->getForOplogFetchingTotalLocalInsertTimeMillis(),
+                    getOplogFetchingTotalLocalInsertTimeMillis());
+        bob->append(names->getForOplogFetchingTotalLocalInserts(),
+                    getOplogFetchingTotalLocalInserts());
+        bob->append(names->getForOplogApplyingTotalLocalBatchRetrievalTimeMillis(),
+                    getOplogApplyingTotalBatchesRetrievalTimeMillis());
+        bob->append(names->getForOplogApplyingTotalLocalBatchesRetrieved(),
+                    getOplogApplyingTotalBatchesRetrieved());
+        bob->append(names->getForOplogApplyingTotalLocalBatchApplyTimeMillis(),
+                    getOplogBatchAppliedMillis());
+        bob->append(names->getForOplogApplyingTotalLocalBatchesApplied(), getOplogBatchApplied());
     }
 
     const std::string _rootSectionName;
@@ -198,6 +232,15 @@ private:
     AtomicWord<int64_t> _deletesApplied{0};
     AtomicWord<int64_t> _oplogEntriesApplied{0};
     AtomicWord<int64_t> _oplogEntriesFetched{0};
+
+    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
+    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
+    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
+    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
+    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
+    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
+    AtomicWord<int64_t> _oplogBatchApplied{0};
+    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
 };
 
 }  // namespace mongo
