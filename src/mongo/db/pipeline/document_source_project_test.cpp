@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -76,10 +77,11 @@ using UnsetTest = AggregationContextFixture;
 TEST_F(ProjectStageTest, InclusionProjectionShouldRemoveUnspecifiedFields) {
     auto project = DocumentSourceProject::create(
         BSON("a" << true << "c" << BSON("d" << true)), getExpCtx(), "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto source = DocumentSourceMock::createForTest("{_id: 0, a: 1, b: 1, c: {d: 1}}", getExpCtx());
-    project->setSource(source.get());
+    projectStage->setSource(source.get());
     // The first result exists and is as expected.
-    auto next = project->getNext();
+    auto next = projectStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     ASSERT_EQUALS(1, next.getDocument().getField("a").getInt());
     ASSERT(next.getDocument().getField("b").missing());
@@ -115,21 +117,22 @@ TEST_F(ProjectStageTest, ShouldErrorOnNonObjectSpec) {
  */
 TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << true), getExpCtx(), "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    project->setSource(source.get());
-    auto next = project->getNext();
+    projectStage->setSource(source.get());
+    auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(1, next.getDocument().getField("a").getInt());
     ASSERT(next.getDocument().getField("b").missing());
 
-    next = project->getNext();
+    next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQUALS(3, next.getDocument().getField("a").getInt());
     ASSERT(next.getDocument().getField("b").missing());
 
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
 }
 
 /**
@@ -138,25 +141,27 @@ TEST_F(ProjectStageTest, InclusionShouldBeAbleToProcessMultipleDocuments) {
  */
 TEST_F(ProjectStageTest, ExclusionShouldBeAbleToProcessMultipleDocuments) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx(), "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    project->setSource(source.get());
-    auto next = project->getNext();
+    projectStage->setSource(source.get());
+    auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT(next.getDocument().getField("a").missing());
     ASSERT_EQUALS(2, next.getDocument().getField("b").getInt());
 
-    next = project->getNext();
+    next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT(next.getDocument().getField("a").missing());
     ASSERT_EQUALS(4, next.getDocument().getField("b").getInt());
 
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
 }
 
 TEST_F(ProjectStageTest, ShouldPropagatePauses) {
     auto project = DocumentSourceProject::create(BSON("a" << false), getExpCtx(), "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto source =
         DocumentSourceMock::createForTest({Document(),
                                            DocumentSource::GetNextResult::makePauseExecution(),
@@ -165,18 +170,18 @@ TEST_F(ProjectStageTest, ShouldPropagatePauses) {
                                            Document(),
                                            DocumentSource::GetNextResult::makePauseExecution()},
                                           getExpCtx());
-    project->setSource(source.get());
+    projectStage->setSource(source.get());
 
-    ASSERT_TRUE(project->getNext().isAdvanced());
-    ASSERT_TRUE(project->getNext().isPaused());
-    ASSERT_TRUE(project->getNext().isAdvanced());
-    ASSERT_TRUE(project->getNext().isPaused());
-    ASSERT_TRUE(project->getNext().isAdvanced());
-    ASSERT_TRUE(project->getNext().isPaused());
+    ASSERT_TRUE(projectStage->getNext().isAdvanced());
+    ASSERT_TRUE(projectStage->getNext().isPaused());
+    ASSERT_TRUE(projectStage->getNext().isAdvanced());
+    ASSERT_TRUE(projectStage->getNext().isPaused());
+    ASSERT_TRUE(projectStage->getNext().isAdvanced());
+    ASSERT_TRUE(projectStage->getNext().isPaused());
 
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
-    ASSERT(project->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
 }
 
 TEST_F(ProjectStageTest, InclusionShouldAddDependenciesOfIncludedAndComputedFields) {
@@ -275,19 +280,20 @@ TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProject
         fromjson("{a: 1, b: {$cond: [{$eq: ['$b', 4]}, '$$REMOVE', '$b']}}"),
         getExpCtx(),
         "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto source = DocumentSourceMock::createForTest({"{a: 2, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
-    project->setSource(source.get());
-    auto next = project->getNext();
+    projectStage->setSource(source.get());
+    auto next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     Document expected{{"a", 2}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
-    next = project->getNext();
+    next = projectStage->getNext();
     ASSERT(next.isAdvanced());
     expected = Document{{"a", 3}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
-    ASSERT(project->getNext().isEOF());
+    ASSERT(projectStage->getNext().isEOF());
 }
 
 TEST_F(ProjectStageTest, ProjectionCorrectlyReportsRenamesForwards) {
@@ -364,10 +370,11 @@ TEST_F(ProjectStageTest, CanAddNestedDocumentExactlyAtDepthLimit) {
         makeProjectForNestedDocument(BSONDepth::getMaxAllowableDepth()),
         getExpCtx(),
         "$project"_sd);
+    auto projectStage = exec::agg::buildStage(project);
     auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}}, getExpCtx());
-    project->setSource(mock.get());
+    projectStage->setSource(mock.get());
 
-    auto next = project->getNext();
+    auto next = projectStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 }
 
@@ -458,7 +465,8 @@ TEST_F(UnsetTest, RejectsUnsetSpecWithArrayContainingAnyNonStringValue) {
 
 TEST_F(UnsetTest, UnsetSingleField) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a"));
-    auto unsetStage = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto source = DocumentSourceMock::createForTest({"{a: 10, b: 20}"}, getExpCtx());
     unsetStage->setSource(source.get());
     auto next = unsetStage->getNext();
@@ -472,7 +480,8 @@ TEST_F(UnsetTest, UnsetSingleField) {
 TEST_F(UnsetTest, UnsetMultipleFields) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a" << "b.c"
                                                      << "d.e"));
-    auto unsetStage = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto source = DocumentSourceMock::createForTest({"{a: 10, b: {c: 20}, d: [{e: 30, f: 40}]}"},
                                                     getExpCtx());
     unsetStage->setSource(source.get());
@@ -486,7 +495,8 @@ TEST_F(UnsetTest, UnsetMultipleFields) {
 
 TEST_F(UnsetTest, UnsetShouldBeAbleToProcessMultipleDocuments) {
     auto updateDoc = BSON("$unset" << BSON_ARRAY("a"));
-    auto unsetStage = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetSource = DocumentSourceProject::createFromBson(updateDoc.firstElement(), getExpCtx());
+    auto unsetStage = exec::agg::buildStage(unsetSource);
     auto source = DocumentSourceMock::createForTest({"{a: 1, b: 2}", "{a: 3, b: 4}"}, getExpCtx());
     unsetStage->setSource(source.get());
     auto next = unsetStage->getNext();

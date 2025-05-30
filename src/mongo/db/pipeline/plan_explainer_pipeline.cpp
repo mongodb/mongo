@@ -68,8 +68,10 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
 
     PlanSummaryStatsVisitor visitor(*statsOut);
     std::for_each(source_it, _pipeline->getSources().cend(), [&](const auto& source) {
-        statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
-        if (auto specificStats = source->getSpecificStats()) {
+        // TODO SERVER-104226: Temporary cast to Stage until explain is handled by agg::Pipeline.
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*source);
+        statsOut->usedDisk = statsOut->usedDisk || stage.usedDisk();
+        if (auto specificStats = stage.getSpecificStats()) {
             specificStats->acceptVisitor(&visitor);
         }
     });

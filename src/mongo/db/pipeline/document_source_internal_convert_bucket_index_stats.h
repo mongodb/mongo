@@ -66,7 +66,8 @@ struct TimeseriesConversionOptions {
 /**
  * Aggregation stage that converts buckets schema index stats to time-series schema index stats.
  */
-class DocumentSourceInternalConvertBucketIndexStats : public DocumentSource {
+class DocumentSourceInternalConvertBucketIndexStats : public DocumentSource,
+                                                      public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalConvertBucketIndexStats"_sd;
 

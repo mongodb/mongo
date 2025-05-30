@@ -64,7 +64,7 @@
 
 namespace mongo {
 
-class DocumentSourceCurrentOp final : public DocumentSource {
+class DocumentSourceCurrentOp final : public DocumentSource, public exec::agg::Stage {
 public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
     using ConnMode = MongoProcessInterface::CurrentOpConnectionsMode;
@@ -203,6 +203,7 @@ private:
                             boost::optional<CursorMode> idleCursors,
                             boost::optional<bool> targetAllNodes)
         : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),

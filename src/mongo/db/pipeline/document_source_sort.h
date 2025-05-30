@@ -74,7 +74,7 @@
 
 namespace mongo {
 
-class DocumentSourceSort final : public DocumentSource {
+class DocumentSourceSort final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kMin = "min"_sd;
     static constexpr StringData kMax = "max"_sd;

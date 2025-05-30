@@ -54,7 +54,7 @@
 
 namespace mongo {
 
-class DocumentSourceChangeStreamSplitLargeEvent : public DocumentSource {
+class DocumentSourceChangeStreamSplitLargeEvent : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$changeStreamSplitLargeEvent"_sd;
     static constexpr size_t kBSONObjMaxChangeEventSize = BSONObjMaxInternalSize - (8 * 1024);

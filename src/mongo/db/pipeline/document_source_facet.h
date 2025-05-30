@@ -85,7 +85,7 @@ class NamespaceString;
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class DocumentSourceFacet final : public DocumentSource {
+class DocumentSourceFacet final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$facet"_sd;
     static constexpr StringData kTeeConsumerStageName = "$internalFacetTeeConsumer"_sd;

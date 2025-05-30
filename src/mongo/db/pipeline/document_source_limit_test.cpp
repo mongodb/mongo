@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -124,11 +125,12 @@ TEST_F(DocumentSourceLimitTest, DisposeShouldCascadeAllTheWayToSource) {
     BSONObj spec = BSON("$match" << BSON("a" << 1));
     BSONElement specElement = spec.firstElement();
     auto match = DocumentSourceMatch::createFromBson(specElement, getExpCtx());
-    match->setSource(source.get());
+    auto matchStage = exec::agg::buildStage(match);
+    matchStage->setSource(source.get());
 
     auto limit = DocumentSourceLimit::create(getExpCtx(), 1);
-    limit->setSource(match.get());
-    // The limit is not exhauted.
+    limit->setSource(matchStage.get());
+    // The limit is not exhausted.
     auto next = limit->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_VALUE_EQ(Value(1), next.getDocument().getField("a"));

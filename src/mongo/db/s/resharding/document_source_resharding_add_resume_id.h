@@ -54,7 +54,7 @@ namespace mongo {
  * transaction, this will be {clusterTime: <transaction commit timestamp>, ts: <applyOps
  * optime.ts>}. For all other documents, this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingAddResumeId : public DocumentSource {
+class DocumentSourceReshardingAddResumeId : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_addReshardingResumeId"_sd;
 

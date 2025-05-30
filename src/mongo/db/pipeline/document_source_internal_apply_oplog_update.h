@@ -54,7 +54,8 @@ namespace mongo {
  * This is an internal stage that takes an oplog update description and applies the update to the
  * input Document.
  */
-class DocumentSourceInternalApplyOplogUpdate final : public DocumentSource {
+class DocumentSourceInternalApplyOplogUpdate final : public DocumentSource,
+                                                     public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalApplyOplogUpdate"_sd;
     static constexpr StringData kOplogUpdateFieldName = "oplogUpdate"_sd;

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -74,16 +75,17 @@ TEST_F(AddFieldsTest, ShouldKeepUnspecifiedFieldsReplaceExistingFieldsAndAddNewF
         DocumentSourceAddFields::create(BSON("e" << 2 << "b" << BSON("c" << 3)), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(
         Document{{"a", 1}, {"b", Document{{"c", 1}}}, {"d", 1}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     Document expected = Document{{"a", 1}, {"b", Document{{"c", 3}}}, {"d", 1}, {"e", 2}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 TEST_F(AddFieldsTest, ShouldSerializeAndParse) {
@@ -135,21 +137,22 @@ TEST_F(AddFieldsTest, ShouldBeAbleToProcessMultipleDocuments) {
     auto addFields = DocumentSourceAddFields::create(BSON("a" << 10), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(
         {Document{{"a", 1}, {"b", 2}}, Document{{"c", 3}, {"d", 4}}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     Document expected = Document{{"a", 10}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
-    next = addFields->getNext();
+    next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     expected = Document{{"c", 3}, {"d", 4}, {"a", 10}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
 
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 TEST_F(AddFieldsTest, ShouldAddReferencedFieldsToDependencies) {
@@ -184,52 +187,56 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
                                            Document(),
                                            DocumentSource::GetNextResult::makePauseExecution()},
                                           getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    ASSERT_TRUE(addFields->getNext().isAdvanced());
-    ASSERT_TRUE(addFields->getNext().isPaused());
-    ASSERT_TRUE(addFields->getNext().isAdvanced());
-    ASSERT_TRUE(addFields->getNext().isPaused());
+    ASSERT_TRUE(addFieldsStage->getNext().isAdvanced());
+    ASSERT_TRUE(addFieldsStage->getNext().isPaused());
+    ASSERT_TRUE(addFieldsStage->getNext().isAdvanced());
+    ASSERT_TRUE(addFieldsStage->getNext().isPaused());
 
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
     auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd" << "$$REMOVE"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"existingField", 1}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     Document expected{{"existingField", 1}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$ROOT"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
     auto addFields = DocumentSourceAddFields::create(BSON("b" << "$$CURRENT"), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"a", 1}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
-    ASSERT_TRUE(addFields->getNext().isEOF());
+    ASSERT_TRUE(addFieldsStage->getNext().isEOF());
 }
 
 /**
@@ -250,9 +257,10 @@ TEST_F(AddFieldsTest, CanAddNestedDocumentExactlyAtDepthLimit) {
     auto addFields = DocumentSourceAddFields::create(
         makeAddFieldsForNestedDocument(BSONDepth::getMaxAllowableDepth()), getExpCtx());
     auto mock = DocumentSourceMock::createForTest(Document{{"_id", 1}}, getExpCtx());
-    addFields->setSource(mock.get());
+    auto addFieldsStage = exec::agg::buildStage(addFields);
+    addFieldsStage->setSource(mock.get());
 
-    auto next = addFields->getNext();
+    auto next = addFieldsStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
 }
 

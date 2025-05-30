@@ -70,7 +70,7 @@
 
 namespace mongo {
 
-class DocumentSourceUnionWith final : public DocumentSource {
+class DocumentSourceUnionWith final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$unionWith"_sd;
 

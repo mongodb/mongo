@@ -67,7 +67,8 @@ namespace mongo {
  * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
  * created from BSON.
  */
-class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
+class DocumentSourceSingleDocumentTransformation final : public DocumentSource,
+                                                         public exec::agg::Stage {
 public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

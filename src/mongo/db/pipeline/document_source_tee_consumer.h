@@ -62,7 +62,7 @@ class Value;
  * documents held in a TeeBuffer stage. It will simply open an iterator on the TeeBuffer stage, and
  * answer calls to getNext() by advancing said iterator.
  */
-class DocumentSourceTeeConsumer : public DocumentSource {
+class DocumentSourceTeeConsumer : public DocumentSource, public exec::agg::Stage {
 public:
     static boost::intrusive_ptr<DocumentSourceTeeConsumer> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

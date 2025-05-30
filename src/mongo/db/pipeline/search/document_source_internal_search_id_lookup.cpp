@@ -51,6 +51,7 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     ExecShardFilterPolicy shardFilterPolicy,
     boost::optional<std::vector<BSONObj>> viewPipeline)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _limit(limit),
       _shardFilterPolicy(shardFilterPolicy),
       _viewPipeline(viewPipeline ? Pipeline::parse(*viewPipeline, pExpCtx) : nullptr) {

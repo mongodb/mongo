@@ -422,7 +422,7 @@ void Pipeline::detachFromOperationContext() {
     pCtx->setOperationContext(nullptr);
 
     for (auto&& source : _sources) {
-        source->detachFromOperationContext();
+        dynamic_cast<exec::agg::Stage&>(*source).detachFromOperationContext();
     }
 
     // Check for a null operation context to make sure that all children detached correctly.
@@ -433,7 +433,7 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     pCtx->setOperationContext(opCtx);
 
     for (auto&& source : _sources) {
-        source->reattachToOperationContext(opCtx);
+        dynamic_cast<exec::agg::Stage&>(*source).reattachToOperationContext(opCtx);
     }
 
     checkValidOperationContext();
@@ -444,7 +444,8 @@ bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
         // All sources in a pipeline must share its expression context. Subpipelines may have a
         // different expression context, but must point to the same operation context. Let the
         // sources validate this themselves since they don't all have the same subpipelines, etc.
-        return s->getContext() == getContext() && s->validateOperationContext(opCtx);
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*s);
+        return stage.getContext() == getContext() && stage.validateOperationContext(opCtx);
     });
 }
 
@@ -464,7 +465,8 @@ void Pipeline::dispose(OperationContext* opCtx) {
         stitch();
 
         if (!_sources.empty()) {
-            _sources.back()->dispose();
+            auto& stage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
+            stage.dispose();
         }
         _disposed = true;
     } catch (...) {
@@ -474,13 +476,16 @@ void Pipeline::dispose(OperationContext* opCtx) {
 
 void Pipeline::forceSpill() {
     if (!_sources.empty()) {
-        _sources.back()->forceSpill();
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
+        stage.forceSpill();
     }
 }
 
 bool Pipeline::usedDisk() const {
-    return std::any_of(
-        _sources.begin(), _sources.end(), [](const auto& stage) { return stage->usedDisk(); });
+    return std::any_of(_sources.begin(), _sources.end(), [](const auto& source) {
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*source);
+        return stage.usedDisk();
+    });
 }
 
 BSONObj Pipeline::getInitialQuery() const {
@@ -650,14 +655,16 @@ void Pipeline::stitch(SourceContainer* container) {
     }
 
     // Chain together all the stages.
-    DocumentSource* prevSource = container->front().get();
+    // TODO SERVER-105371: Temporary cast to Stage until method is moved to agg::Pipeline.
+    auto prevSource = dynamic_cast<exec::agg::Stage*>(container->front().get());
     prevSource->setSource(nullptr);
     for (Pipeline::SourceContainer::iterator iter(++container->begin()), listEnd(container->end());
          iter != listEnd;
          ++iter) {
         intrusive_ptr<DocumentSource> pTemp(*iter);
-        pTemp->setSource(prevSource);
-        prevSource = pTemp.get();
+        auto stage = dynamic_cast<exec::agg::Stage*>(pTemp.get());
+        stage->setSource(prevSource);
+        prevSource = stage;
     }
 }
 
@@ -672,7 +679,10 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
         invariant(afterSize - beforeSize == 1u);
         if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
             auto serializedStage = array.back();
-            array.back() = appendCommonExecStats(serializedStage, stage->getCommonStats());
+            // TODO SERVER-104226: Temporary cast to Stage until explain is handled by
+            // agg::Pipeline.
+            array.back() = appendCommonExecStats(
+                serializedStage, dynamic_cast<exec::agg::Stage&>(*stage).getCommonStats());
         }
     }
     return array;
@@ -680,14 +690,16 @@ std::vector<Value> Pipeline::writeExplainOps(const SerializationOptions& opts) c
 
 void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
     if (!_sources.empty()) {
-        _sources.front()->setSource(source.get());
+        auto& initialStage = dynamic_cast<exec::agg::Stage&>(*_sources.front());
+        initialStage.setSource(dynamic_cast<exec::agg::Stage*>(source.get()));
     }
     _sources.push_front(source);
 }
 
 void Pipeline::addFinalSource(intrusive_ptr<DocumentSource> source) {
     if (!_sources.empty()) {
-        source->setSource(_sources.back().get());
+        auto& finalStage = dynamic_cast<exec::agg::Stage&>(*_sources.back());
+        finalStage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
     }
     _sources.push_back(source);
 }
@@ -868,7 +880,8 @@ Status Pipeline::canRunOnRouter() const {
 
 void Pipeline::pushBack(boost::intrusive_ptr<DocumentSource> newStage) {
     if (!_sources.empty()) {
-        newStage->setSource(_sources.back().get());
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*newStage);
+        stage.setSource(dynamic_cast<exec::agg::Stage*>(_sources.back().get()));
     }
     _sources.push_back(std::move(newStage));
 }

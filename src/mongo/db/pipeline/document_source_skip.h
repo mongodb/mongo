@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceSkip final : public DocumentSource {
+class DocumentSourceSkip final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$skip"_sd;
 

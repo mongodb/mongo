@@ -406,6 +406,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType)
     : DocumentSource(kStageName, pCtx),
+      exec::agg::Stage(kStageName, pCtx),
       _currentBatch(cursorType),
       _catalogResourceHandle(catalogResourceHandle),
       _exec(std::move(exec)),

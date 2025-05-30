@@ -122,7 +122,9 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalConvertBucketIndexStats,
 DocumentSourceInternalConvertBucketIndexStats::DocumentSourceInternalConvertBucketIndexStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     TimeseriesConversionOptions timeseriesOptions)
-    : DocumentSource(kStageName, expCtx), _timeseriesOptions(std::move(timeseriesOptions)) {}
+    : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
+      _timeseriesOptions(std::move(timeseriesOptions)) {}
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexStats::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

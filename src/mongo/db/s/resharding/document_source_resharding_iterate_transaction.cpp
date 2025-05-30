@@ -115,6 +115,7 @@ DocumentSourceReshardingIterateTransaction::createFromBson(
 DocumentSourceReshardingIterateTransaction::DocumentSourceReshardingIterateTransaction(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTransactionTimestamp)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _includeCommitTransactionTimestamp(includeCommitTransactionTimestamp) {}
 
 StageConstraints DocumentSourceReshardingIterateTransaction::constraints(

@@ -52,7 +52,7 @@
 
 namespace mongo {
 
-class DocumentSourceRedact final : public DocumentSource {
+class DocumentSourceRedact final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$redact"_sd;
     const char* getSourceName() const final;

@@ -58,7 +58,7 @@ namespace mongo {
  * A mock DocumentSource which is useful for testing. In addition to re-spooling documents like
  * DocumentSourceQueue, it tracks some state about which methods have been called.
  */
-class DocumentSourceMock : public DocumentSource {
+class DocumentSourceMock : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$mock"_sd;
 

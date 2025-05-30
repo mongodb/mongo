@@ -63,7 +63,7 @@ namespace mongo {
  * - a single collection with its indexes; or
  * - a view instance.
  */
-class DocumentSourceListCatalog final : public DocumentSource {
+class DocumentSourceListCatalog final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$listCatalog"_sd;
 

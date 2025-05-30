@@ -49,7 +49,7 @@
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource {
+class DocumentSourceSample final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$sample"_sd;
 

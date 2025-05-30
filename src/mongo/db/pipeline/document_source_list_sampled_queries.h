@@ -75,7 +75,7 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-class DocumentSourceListSampledQueries final : public DocumentSource {
+class DocumentSourceListSampledQueries final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$listSampledQueries"_sd;
 
@@ -117,7 +117,9 @@ public:
 
     DocumentSourceListSampledQueries(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                      DocumentSourceListSampledQueriesSpec spec)
-        : DocumentSource(kStageName, pExpCtx), _spec(std::move(spec)) {}
+        : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
+          _spec(std::move(spec)) {}
 
     ~DocumentSourceListSampledQueries() override = default;
 
@@ -163,7 +165,7 @@ public:
 
 private:
     DocumentSourceListSampledQueries(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {}
+        : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;
 

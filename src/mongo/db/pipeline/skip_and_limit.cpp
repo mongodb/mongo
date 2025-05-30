@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -87,7 +88,10 @@ Pipeline::SourceContainer::iterator eraseAndStich(Pipeline::SourceContainer::ite
     // If the removed stage wasn't the last in the pipeline, make sure that the stage followed the
     // erased stage has a valid pointer to the previous document source.
     if (itr != container->end()) {
-        (*itr)->setSource(itr != container->begin() ? std::prev(itr)->get() : nullptr);
+        auto source = itr != container->begin()
+            ? dynamic_cast<exec::agg::Stage*>(std::prev(itr)->get())
+            : nullptr;
+        dynamic_cast<exec::agg::Stage*>(itr->get())->setSource(source);
     }
     return itr;
 }

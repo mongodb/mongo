@@ -60,6 +60,7 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     AsyncResultsMergerParams armParams,
     boost::optional<BSONObj> ownedParamsSpec)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
       _armParams(std::move(armParams)) {
 

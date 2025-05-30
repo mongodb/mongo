@@ -86,7 +86,7 @@ namespace mongo {
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource {
+class DocumentSourceLookUp final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$lookup"_sd;
     static constexpr StringData kFromField = "from"_sd;

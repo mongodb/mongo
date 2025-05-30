@@ -51,7 +51,9 @@ using boost::intrusive_ptr;
 
 DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                        long long nToSkip)
-    : DocumentSource(kStageName, pExpCtx), _nToSkip(nToSkip) {}
+    : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
+      _nToSkip(nToSkip) {}
 
 REGISTER_DOCUMENT_SOURCE(skip,
                          LiteParsedDocumentSourceDefault::parse,

@@ -59,7 +59,7 @@ namespace mongo {
  * be executed on router if all other stages are eligible, and will be sent to a random
  * participating shard otherwise.
  */
-class DocumentSourceInternalSplitPipeline final : public DocumentSource {
+class DocumentSourceInternalSplitPipeline final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalSplitPipeline"_sd;
 
@@ -115,7 +115,10 @@ private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         HostTypeRequirement mergeType,
                                         boost::optional<ShardId> mergeShardId)
-        : DocumentSource(kStageName, expCtx), _mergeType(mergeType), _mergeShardId(mergeShardId) {}
+        : DocumentSource(kStageName, expCtx),
+          exec::agg::Stage(kStageName, expCtx),
+          _mergeType(mergeType),
+          _mergeShardId(mergeShardId) {}
 
     GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

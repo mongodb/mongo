@@ -141,7 +141,8 @@ private:
     Document _result;
 };
 
-class Stage : public RefCountable {
+// TODO SPM-4106: Remove inheritance once the refactoring is done.
+class Stage : public virtual RefCountable {
 public:
     Stage(StringData stageName, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
     ~Stage() override {}
@@ -215,11 +216,6 @@ public:
     }
 
     /**
-     * Get the stage's name.
-     */
-    virtual const char* getSourceName() const = 0;
-
-    /**
      * Returns the expression context from the stage's context.
      */
     const boost::intrusive_ptr<ExpressionContext>& getContext() const {
@@ -272,11 +268,11 @@ protected:
 
     /**
      * Most Stages have an underlying source they get their data
-     * from.  This is a convenience for them.
+     * from. This is a convenience for them.
      *
      * The default implementation of setSourceStage() sets this; if you don't
-     * need a source, override that to verify().  The default is to
-     * verify() if this has already been set.
+     * need a source, override that to verify(). The default is to verify()
+     * if this has already been set.
      */
     Stage* pSource;
 

@@ -76,7 +76,8 @@ namespace mongo {
  * Then, for each collection, we will call `makeStatsForNs` method from DocumentSourceCollStats that
  * will retrieve all storage stats for that particular collection.
  */
-class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
+class DocumentSourceInternalAllCollectionStats final : public DocumentSource,
+                                                       public exec::agg::Stage {
 public:
     static constexpr StringData kStageNameInternal = "$_internalAllCollectionStats"_sd;
 

@@ -47,6 +47,7 @@ boost::intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
 DocumentSourceMock::DocumentSourceMock(std::deque<GetNextResult> results,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       mockConstraints(StreamType::kStreaming,
                       PositionRequirement::kNone,
                       HostTypeRequirement::kNone,

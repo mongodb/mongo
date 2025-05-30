@@ -66,6 +66,7 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
                                            const boost::optional<FieldPath>& indexPath,
                                            bool strict)
     : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
       _unwindProcessor(boost::in_place(fieldPath, preserveNullAndEmptyArrays, indexPath, strict)) {}
 
 REGISTER_DOCUMENT_SOURCE(unwind,

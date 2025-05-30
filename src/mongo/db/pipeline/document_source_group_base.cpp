@@ -264,6 +264,7 @@ DocumentSourceGroupBase::DocumentSourceGroupBase(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSource(stageName, expCtx),
+      exec::agg::Stage(stageName, expCtx),
       _groupProcessor(expCtx,
                       maxMemoryUsageBytes ? *maxMemoryUsageBytes
                                           : internalDocumentSourceGroupMaxMemoryBytes.load()),

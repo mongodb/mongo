@@ -54,7 +54,9 @@ ALLOCATE_DOCUMENT_SOURCE_ID(querySettings, DocumentSourceQuerySettings::id)
 
 DocumentSourceQuerySettings::DocumentSourceQuerySettings(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, bool showDebugQueryShape)
-    : DocumentSource(kStageName, expCtx), _showDebugQueryShape(showDebugQueryShape) {}
+    : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
+      _showDebugQueryShape(showDebugQueryShape) {}
 
 namespace {
 BSONObj createDebugQueryShape(const BSONObj& representativeQuery,

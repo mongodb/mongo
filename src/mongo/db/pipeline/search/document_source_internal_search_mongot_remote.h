@@ -49,7 +49,7 @@ namespace mongo {
 /**
  * A class to retrieve $search results from a mongot process.
  */
-class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
+class DocumentSourceInternalSearchMongotRemote : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalSearchMongotRemote"_sd;
 

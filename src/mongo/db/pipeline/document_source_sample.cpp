@@ -58,7 +58,7 @@ using boost::intrusive_ptr;
 constexpr StringData DocumentSourceSample::kStageName;
 
 DocumentSourceSample::DocumentSourceSample(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx), _size(0) {}
+    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx), _size(0) {}
 
 REGISTER_DOCUMENT_SOURCE(sample,
                          LiteParsedDocumentSourceDefault::parse,

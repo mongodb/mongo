@@ -72,7 +72,7 @@ namespace mongo {
 /**
  * Constructs and returns Documents from the BSONObj objects produced by a supplied PlanExecutor.
  */
-class DocumentSourceCursor : public DocumentSource {
+class DocumentSourceCursor : public DocumentSource, public exec::agg::Stage {
 public:
     /**
      * Interface for acquiring and releasing catalog resources needed for DS Cursor.

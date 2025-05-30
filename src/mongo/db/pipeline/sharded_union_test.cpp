@@ -43,6 +43,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -458,22 +459,23 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
         ResolvedNamespaceMap{{nsToUnionWith, {nsToUnionWith, std::vector<BSONObj>{}}}});
     auto bson = BSON("$unionWith" << nsToUnionWith.coll());
     auto unionWith = DocumentSourceUnionWith::createFromBson(bson.firstElement(), expCtx());
+    auto unionWithStage = exec::agg::buildStage(unionWith);
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    unionWith->setSource(queue.get());
+    unionWithStage->setSource(queue.get());
 
     NamespaceString expectedBackingNs(kTestAggregateNss);
     auto expectedResult = Document{{"_id"_sd, "unionResult"_sd}};
     auto expectToBeFiltered = Document{{"_id"_sd, "notTheUnionResult"_sd}};
 
     auto future = launchAsync([&] {
-        auto next = unionWith->getNext();
+        auto next = unionWithStage->getNext();
         ASSERT_TRUE(next.isAdvanced());
         auto result = next.releaseDocument();
         ASSERT_DOCUMENT_EQ(result, expectedResult);
-        ASSERT(unionWith->getNext().isEOF());
-        ASSERT(unionWith->getNext().isEOF());
-        ASSERT(unionWith->getNext().isEOF());
+        ASSERT(unionWithStage->getNext().isEOF());
+        ASSERT(unionWithStage->getNext().isEOF());
+        ASSERT(unionWithStage->getNext().isEOF());
     });
 
     // Mock the expected config server queries.
@@ -534,7 +536,7 @@ TEST_F(ShardedUnionTest, IncorporatesViewDefinitionAndRetriesWhenViewErrorReceiv
 
     future.default_timed_get();
 
-    unionWith->dispose();
+    unionWithStage->dispose();
 }
 
 TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {

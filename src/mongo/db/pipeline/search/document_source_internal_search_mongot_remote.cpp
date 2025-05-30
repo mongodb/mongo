@@ -91,6 +91,7 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _mergingPipeline(spec.getMergingPipeline().has_value()
                            ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
                            : nullptr),

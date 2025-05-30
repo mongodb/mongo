@@ -97,7 +97,7 @@ DocumentSourceReshardingAddResumeId::createFromBson(
 
 DocumentSourceReshardingAddResumeId::DocumentSourceReshardingAddResumeId(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {}
+    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
 
 StageConstraints DocumentSourceReshardingAddResumeId::constraints(
     Pipeline::SplitState pipeState) const {

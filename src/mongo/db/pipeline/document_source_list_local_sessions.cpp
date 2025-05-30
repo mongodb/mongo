@@ -90,7 +90,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFrom
 
 DocumentSourceListLocalSessions::DocumentSourceListLocalSessions(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx, const ListSessionsSpec& spec)
-    : DocumentSource(kStageName, pExpCtx), _spec(spec) {
+    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx), _spec(spec) {
     const auto& opCtx = pExpCtx->getOperationContext();
     _cache = LogicalSessionCache::get(opCtx);
     if (_spec.getAllUsers()) {

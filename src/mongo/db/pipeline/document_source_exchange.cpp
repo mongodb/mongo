@@ -118,6 +118,7 @@ DocumentSourceExchange::DocumentSourceExchange(
     size_t consumerId,
     std::unique_ptr<ResourceYielder> yielder)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _exchange(exchange),
       _consumerId(consumerId),
       _resourceYielder(std::move(yielder)) {}

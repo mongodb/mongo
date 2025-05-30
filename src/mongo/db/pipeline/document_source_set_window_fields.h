@@ -92,7 +92,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
 
 }  // namespace document_source_set_window_fields
 
-class DocumentSourceInternalSetWindowFields final : public DocumentSource {
+class DocumentSourceInternalSetWindowFields final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalSetWindowFields"_sd;
 
@@ -111,6 +111,7 @@ public:
         int64_t maxMemoryBytes,
         SbeCompatibility sbeCompatibility)
         : DocumentSource(kStageName, expCtx),
+          exec::agg::Stage(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),

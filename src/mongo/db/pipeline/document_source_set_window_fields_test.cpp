@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -147,10 +148,11 @@ TEST_F(DocumentSourceSetWindowFieldsTest, HandlesEmptyInputCorrectly) {
         {$sum: '$pop', window: {documents: ["unbounded", 0]}}}}})");
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(parsedStage);
     const auto mock = DocumentSourceMock::createForTest(getExpCtx());
-    parsedStage->setSource(mock.get());
+    stage->setSource(mock.get());
     ASSERT_EQ((int)DocumentSource::GetNextResult::ReturnStatus::kEOF,
-              (int)parsedStage->getNext().getStatus());
+              (int)stage->getNext().getStatus());
 }
 
 TEST_F(DocumentSourceSetWindowFieldsTest, HandlesDependencyWithArrayExpression) {
@@ -294,27 +296,28 @@ TEST_F(DocumentSourceSetWindowFieldsTest, PartitionOutputIsCorrect) {
 
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(parsedStage);
     std::vector<Document> docs;
     docs.push_back(DOC("num" << 3 << "val" << 25 << "part" << 1));
     docs.push_back(DOC("num" << 15 << "val" << 12 << "part" << 1));
     docs.push_back(DOC("num" << 2 << "val" << 1 << "part" << 2));
     docs.push_back(DOC("num" << 4 << "val" << 3 << "part" << 2));
     auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
-    parsedStage->setSource(source.get());
+    stage->setSource(source.get());
 
-    auto next = parsedStage->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(), "{num: 3, val: 25, part: 1, sum: 37}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(), "{num: 15, val: 12, part: 1, sum: 37}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(), "{num: 2, val: 1, part: 2, sum: 4}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(), "{num: 4, val: 3, part: 2, sum: 4}");
 }
@@ -327,7 +330,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, OptimizationRemovesRedundantSortStage)
         DocumentSourceInternalSetWindowFields::createFromBson(swfSpec.firstElement(), getExpCtx());
     auto sortSpec = fromjson(R"({$sort: {y: 1}})");
     auto sortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
-    swfStage->setSource(sortStage.get());
+    exec::agg::buildStage(swfStage)->setSource(exec::agg::buildStage(sortStage.get()).get());
     auto prevSortStage = DocumentSourceSort::createFromBson(sortSpec.firstElement(), getExpCtx());
     Pipeline::SourceContainer pipeline = {prevSortStage, swfStage, sortStage};
 
@@ -349,7 +352,7 @@ PlanSummaryStats collectPipelineStats(
     PlanSummaryStats stats;
     PlanSummaryStatsVisitor visitor{stats};
     for (const auto& stage : pipelineStages) {
-        const auto* stageStats = stage->getSpecificStats();
+        const auto* stageStats = exec::agg::buildStage(stage)->getSpecificStats();
         if (stageStats != nullptr) {
             stageStats->acceptVisitor(&visitor);
         }
@@ -499,32 +502,33 @@ TEST_F(DocumentSourceSetWindowFieldsTest, outputFieldsIsDeterministic) {
         })");
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(parsedStage);
     const auto mock = DocumentSourceMock::createForTest(getExpCtx());
     auto source = DocumentSourceMock::createForTest(
         {"{b: 6}", "{b: 5000}", "{b: 50}", "{b: 88}", "{b: 100}"}, getExpCtx());
-    parsedStage->setSource(source.get());
+    stage->setSource(source.get());
 
-    auto next = parsedStage->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(),
               "{b: 6, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(),
               "{b: 5000, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(),
               "{b: 50, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(),
               "{b: 88, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");
 
-    next = parsedStage->getNext();
+    next = stage->getNext();
     ASSERT(next.isAdvanced());
     ASSERT_EQ(next.getDocument().toString(),
               "{b: 100, obj: {str: \"\", obj: {date: 2012-10-17T20:46:22.000Z}, totalB: 5244}}");

@@ -43,7 +43,7 @@ using QueryShapeConfigurationMap = stdx::unordered_map<query_shape::QueryShapeHa
 /**
  * The $querySettings stage returns all QueryShapeConfigurations stored in the cluster.
  */
-class DocumentSourceQuerySettings final : public DocumentSource {
+class DocumentSourceQuerySettings final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$querySettings"_sd;
     static constexpr StringData kDebugQueryShapeFieldName = "debugQueryShape"_sd;
@@ -177,9 +177,10 @@ private:
     }};
     QueryShapeConfigurationMap::const_iterator _iterator;
 
-    DeferredFn<boost::intrusive_ptr<DocumentSource>> _queryShapeRepresentativeQueriesCursor{
+    DeferredFn<boost::intrusive_ptr<exec::agg::Stage>> _queryShapeRepresentativeQueriesCursor{
         [this]() {
-            return createQueryShapeRepresentativeQueriesCursor(getContext()->getOperationContext());
+            return boost::dynamic_pointer_cast<exec::agg::Stage>(
+                createQueryShapeRepresentativeQueriesCursor(getContext()->getOperationContext()));
         }};
 
     bool _showDebugQueryShape;

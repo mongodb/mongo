@@ -54,6 +54,7 @@ DocumentSourceInternalProjection::DocumentSourceInternalProjection(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalProjectionSpec spec)
     : DocumentSource(kStageNameInternal, pExpCtx),
+      exec::agg::Stage(kStageNameInternal, pExpCtx),
       _stageSpec(std::move(spec)),
       _projection(projection_ast::parseAndAnalyze(
           pExpCtx, _stageSpec.getSpec(), lookUpPolicies(_stageSpec.getPolicies()))) {}

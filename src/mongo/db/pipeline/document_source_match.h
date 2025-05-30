@@ -62,7 +62,7 @@
 
 namespace mongo {
 
-class DocumentSourceMatch : public DocumentSource {
+class DocumentSourceMatch : public DocumentSource, public exec::agg::Stage {
 public:
     DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);

@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -255,7 +256,8 @@ public:
                              const std::vector<repl::OplogEntry> transactionEntries = {},
                              std::vector<Document> documentsForLookup = {},
                              const boost::optional<std::int32_t> expectedErrorCode = {}) {
-        vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
+        vector<intrusive_ptr<exec::agg::Stage>> stages =
+            makeStages(entry.getEntry().toBSON(), spec);
         auto lastStage = stages.back();
 
         getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
@@ -292,7 +294,7 @@ public:
      * Stages such as DSEnsureResumeTokenPresent which can swallow results are removed from the
      * returned list.
      */
-    std::vector<intrusive_ptr<DocumentSource>> makeStages(BSONObj entry, const BSONObj& spec) {
+    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(BSONObj entry, const BSONObj& spec) {
         return makeStages({entry}, spec, true /* removeEnsureResumeTokenStage */);
     }
 
@@ -300,13 +302,16 @@ public:
      * Returns a list of the stages expanded from a $changStream specification, starting with a
      * DocumentSourceMock which contains a list of document representing 'entries'.
      */
-    std::vector<intrusive_ptr<DocumentSource>> makeStages(
+    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(
         std::vector<BSONObj> entries,
         const BSONObj& spec,
         bool removeEnsureResumeTokenStage = false) {
         std::list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-        std::vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
+        std::vector<intrusive_ptr<exec::agg::Stage>> stages;
+        for (auto& source : result) {
+            stages.push_back(exec::agg::buildStage(source));
+        }
         getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
         // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
@@ -349,8 +354,8 @@ public:
         return stages;
     }
 
-    std::vector<intrusive_ptr<DocumentSource>> makeStages(const OplogEntry& entry,
-                                                          const BSONObj& spec = kDefaultSpec) {
+    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(const OplogEntry& entry,
+                                                            const BSONObj& spec = kDefaultSpec) {
         return makeStages(entry.getEntry().toBSON(), spec);
     }
 
@@ -392,7 +397,7 @@ public:
         BSONObj oplogEntry = builder.done();
 
         // Create the stages and check that the documents produced matched those in the applyOps.
-        vector<intrusive_ptr<DocumentSource>> stages = makeStages(oplogEntry, spec);
+        vector<intrusive_ptr<exec::agg::Stage>> stages = makeStages(oplogEntry, spec);
         auto transform = stages[3].get();
         invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 

@@ -63,7 +63,7 @@ using boost::intrusive_ptr;
 
 DocumentSourceInternalListCollections::DocumentSourceInternalListCollections(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageNameInternal, pExpCtx) {}
+    : DocumentSource(kStageNameInternal, pExpCtx), exec::agg::Stage(kStageNameInternal, pExpCtx) {}
 
 REGISTER_DOCUMENT_SOURCE(_internalListCollections,
                          DocumentSourceInternalListCollections::LiteParsed::parse,

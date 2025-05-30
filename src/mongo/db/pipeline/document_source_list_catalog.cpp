@@ -113,7 +113,7 @@ DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
 
 DocumentSourceListCatalog::DocumentSourceListCatalog(
     const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageName, pExpCtx) {}
+    : DocumentSource(kStageName, pExpCtx), exec::agg::Stage(kStageName, pExpCtx) {}
 
 intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

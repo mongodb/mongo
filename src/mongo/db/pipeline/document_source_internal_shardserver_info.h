@@ -59,7 +59,7 @@ namespace mongo {
  * An internal stage available for testing. Gets the host and shard name for every shard server in
  * the cluster.
  */
-class DocumentSourceInternalShardServerInfo final : public DocumentSource {
+class DocumentSourceInternalShardServerInfo final : public DocumentSource, public exec::agg::Stage {
 public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:
@@ -125,7 +125,7 @@ public:
 
 private:
     DocumentSourceInternalShardServerInfo(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {}
+        : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;
 

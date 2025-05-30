@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -89,9 +90,10 @@ protected:
 
     /** Assert that iterator state accessors consistently report the source is exhausted. */
     void assertEOF() const {
-        ASSERT(_sort->getNext().isEOF());
-        ASSERT(_sort->getNext().isEOF());
-        ASSERT(_sort->getNext().isEOF());
+        auto stage = exec::agg::buildStage(_sort);
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
     }
 
     DocumentSourceSort* sort() {
@@ -834,14 +836,15 @@ TEST_F(DocumentSourceSortTest, Redaction) {
 void assertProducesSortKeyMetadata(auto expCtx, auto sortStage) {
     const auto mock =
         DocumentSourceMock::createForTest({Document{{"_id", 0}}, Document{{"_id", 1}}}, expCtx);
-    sortStage->setSource(mock.get());
-    const auto output1 = sortStage->getNext();
+    auto stage = exec::agg::buildStage(sortStage);
+    stage->setSource(mock.get());
+    const auto output1 = stage->getNext();
     ASSERT(output1.isAdvanced());
     ASSERT(output1.getDocument().metadata().hasSortKey());
-    const auto output2 = sortStage->getNext();
+    const auto output2 = stage->getNext();
     ASSERT(output2.isAdvanced());
     ASSERT(output2.getDocument().metadata().hasSortKey());
-    ASSERT(sortStage->getNext().isEOF());
+    ASSERT(stage->getNext().isEOF());
 }
 
 TEST_F(DocumentSourceSortExecutionTest, ShouldOutputSortKeyMetadataIfRequested) {

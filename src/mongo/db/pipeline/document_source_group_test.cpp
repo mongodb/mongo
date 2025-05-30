@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -364,15 +365,16 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     }
 })");
     auto group = DocumentSourceStreamingGroup::createFromBson(spec.firstElement(), expCtx);
+    auto stage = exec::agg::buildStage(group);
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
     doc.metadata().setChangeStreamControlEvent();
 
     auto mock = DocumentSourceMock::createForTest({doc.freeze()}, expCtx);
-    group->setSource(mock.get());
+    stage->setSource(mock.get());
 
-    ASSERT_THROWS_CODE(group->getNext(), AssertionException, 10358903);
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, 10358903);
 }
 
 TEST_F(DocumentSourceGroupTest, ShouldReportSingleFieldGroupKeyAsARename) {
@@ -690,8 +692,9 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateMemoryUsageTrackerDuringGroup) {
                 }
             })");
             auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
-            src->setSource(mock.get());
-            return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+            auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+            group->setSource(mock.get());
+            return group;
         }();
 
         GroupProcessor* groupProcessor = group->getGroupProcessor();
@@ -776,8 +779,9 @@ TEST_F(DocumentSourceGroupTest, ShouldUpdateCurOpStatsDuringGroup) {
                 }
             })");
         auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
-        src->setSource(mock.get());
-        return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+        auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+        group->setSource(mock.get());
+        return group;
     }();
 
     int64_t inUseMemoryBytes, maxUsedMemoryBytes;
@@ -875,8 +879,9 @@ TEST_F(DocumentSourceGroupTest, CurOpStatsAreNotUpdatedIfFeatureFlagOff) {
                 }
             })");
         auto src = DocumentSourceGroup::createFromBson(spec.firstElement(), expCtx.get());
-        src->setSource(mock.get());
-        return boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+        auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(src);
+        group->setSource(mock.get());
+        return group;
     }();
 
     int64_t inUseMemoryBytes, maxUsedMemoryBytes;
@@ -1004,11 +1009,11 @@ protected:
         return static_cast<DocumentSourceGroupBase*>(_group.get());
     }
     /** Assert that iterator state accessors consistently report the source is exhausted. */
-    void assertEOF(const boost::intrusive_ptr<DocumentSource>& source) const {
+    void assertEOF(const boost::intrusive_ptr<exec::agg::Stage>& stage) const {
         // It should be safe to check doneness multiple times
-        ASSERT(source->getNext().isEOF());
-        ASSERT(source->getNext().isEOF());
-        ASSERT(source->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
     }
 
     boost::intrusive_ptr<ExpressionContextForTest> ctx() const {
@@ -1303,7 +1308,7 @@ public:
         auto source = DocumentSourceMock::createForTest(inputData(), ctx());
         group()->setSource(source.get());
 
-        boost::intrusive_ptr<DocumentSource> sink = group();
+        boost::intrusive_ptr<exec::agg::Stage> sink = group();
         if (sharded) {
             sink = createMerger();
             // Serialize and re-parse the shard stage.
@@ -1333,7 +1338,7 @@ protected:
     virtual std::string expectedResultSetString() {
         return "[]";
     }
-    boost::intrusive_ptr<DocumentSource> createMerger() {
+    boost::intrusive_ptr<exec::agg::Stage> createMerger() {
         // Set up a group merger to simulate merging results in the router.  In this
         // case only one shard is in use.
         auto distributedPlanLogic = group()->distributedPlanLogic();
@@ -1343,9 +1348,9 @@ protected:
         auto mergingStage = *distributedPlanLogic->mergingStages.begin();
         ASSERT_NOT_EQUALS(group(), mergingStage);
         ASSERT_FALSE(static_cast<bool>(distributedPlanLogic->mergeSortPattern));
-        return mergingStage;
+        return exec::agg::buildStage(mergingStage);
     }
-    void checkResultSet(const boost::intrusive_ptr<DocumentSource>& sink) {
+    void checkResultSet(const boost::intrusive_ptr<exec::agg::Stage>& sink) {
         // Load the results from the DocumentSourceGroup and sort them by _id.
         IdMap resultSet;
         for (auto output = sink->getNext(); output.isAdvanced(); output = sink->getNext()) {
@@ -1514,7 +1519,7 @@ public:
         createGroup(BSON("_id" << "$x"
                                << "list" << BSON("$push" << "$y")));
         // Create a merger version of the source.
-        boost::intrusive_ptr<DocumentSource> group = createMerger();
+        boost::intrusive_ptr<exec::agg::Stage> group = createMerger();
         // Attach the merger to the synthetic shard results.
         group->setSource(source.get());
         // Check the merger's output.

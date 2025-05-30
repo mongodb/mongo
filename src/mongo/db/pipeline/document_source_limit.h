@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-class DocumentSourceLimit final : public DocumentSource {
+class DocumentSourceLimit final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$limit"_sd;
 

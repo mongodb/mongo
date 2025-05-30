@@ -102,7 +102,7 @@ public:
  * has been read, respectively.
  */
 template <typename B>
-class DocumentSourceWriter : public DocumentSource {
+class DocumentSourceWriter : public DocumentSource, public exec::agg::Stage {
 public:
     using BatchObject = B;
     using BatchedObjects = std::vector<BatchObject>;
@@ -111,6 +111,7 @@ public:
                          NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
+          exec::agg::Stage(stageName, expCtx),
           _writeSizeEstimator(expCtx->getMongoProcessInterface()->getWriteSizeEstimator(
               expCtx->getOperationContext(), outputNs)),
           _outputNs(std::move(outputNs)) {}

@@ -46,6 +46,7 @@ DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<Express
                                                      const intrusive_ptr<TeeBuffer>& bufferSource,
                                                      StringData stageName)
     : DocumentSource(stageName, expCtx),
+      exec::agg::Stage(stageName, expCtx),
       _facetId(facetId),
       _bufferSource(bufferSource),
       _stageName(stageName.toString()) {}

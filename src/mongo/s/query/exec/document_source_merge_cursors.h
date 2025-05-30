@@ -74,7 +74,7 @@ namespace mongo {
  * Then this stage is forwarded to the merging shard, and it should not kill the cursors when it
  * goes out of scope on mongos.
  */
-class DocumentSourceMergeCursors : public DocumentSource {
+class DocumentSourceMergeCursors : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$mergeCursors"_sd;
 

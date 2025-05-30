@@ -73,7 +73,7 @@ namespace mongo {
  * {clusterTime: <transaction commit timestamp>, ts: <applyOps optime.ts>}. For all other documents,
  * this will be {clusterTime: <optime.ts>, ts: <optime.ts>}.
  */
-class DocumentSourceReshardingIterateTransaction : public DocumentSource {
+class DocumentSourceReshardingIterateTransaction : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalReshardingIterateTransaction"_sd;
     static constexpr StringData kIncludeCommitTransactionTimestampFieldName =

@@ -57,7 +57,7 @@
 
 namespace mongo {
 
-class DocumentSourceGeoNear : public DocumentSource {
+class DocumentSourceGeoNear : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;
     static constexpr StringData kStageName = "$geoNear"_sd;

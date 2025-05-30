@@ -40,7 +40,7 @@
 namespace mongo {
 class DocumentSourceListSearchIndexesSpec;
 
-class DocumentSourceListSearchIndexes final : public DocumentSource {
+class DocumentSourceListSearchIndexes final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$listSearchIndexes"_sd;
     static constexpr StringData kCursorFieldName = "cursor"_sd;
@@ -97,7 +97,9 @@ public:
 
     DocumentSourceListSearchIndexes(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                     BSONObj cmdObj)
-        : DocumentSource(kStageName, pExpCtx), _cmdObj(cmdObj.getOwned()) {}
+        : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
+          _cmdObj(cmdObj.getOwned()) {}
 
     const char* getSourceName() const override {
         return kStageName.data();

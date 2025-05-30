@@ -138,6 +138,7 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
                                        const SortPattern& sortOrder,
                                        DocumentSourceSort::SortStageOptions options)
     : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
       _sortExecutor({sortOrder,
                      options.limit,
                      options.maxMemoryUsageBytes.value_or(

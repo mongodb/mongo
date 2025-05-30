@@ -42,7 +42,7 @@ namespace mongo {
  * which we create during desugaring or optimization. The order of results is guarenteed to be
  * sorted by name.
  */
-class DocumentSourceListMqlEntities final : public DocumentSource {
+class DocumentSourceListMqlEntities final : public DocumentSource, public exec::agg::Stage {
 public:
     class LiteParsed : public LiteParsedDocumentSource {
     public:

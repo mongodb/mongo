@@ -43,6 +43,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
@@ -240,6 +241,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
                                            const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
       _variables(expCtx->variables),
@@ -407,6 +409,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 DocumentSourceLookUp::DocumentSourceLookUp(const DocumentSourceLookUp& original,
                                            const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
     : DocumentSource(kStageName, newExpCtx),
+      exec::agg::Stage(kStageName, newExpCtx),
       _fromNs(original._fromNs),
       _resolvedNs(original._resolvedNs),
       _as(original._as),
@@ -1467,8 +1470,10 @@ bool DocumentSourceLookUp::validateOperationContext(const OperationContext* opCt
         return false;
     }
 
-    if (_pipeline) {
-        const auto& sources = _pipeline->getSources();
+    if (_execPipeline) {
+        // TODO SERVER-105371: Use _execPipeline->validateOperationContext() once
+        // validateOperationContext() is moved to agg::Pipeline.
+        const auto& sources = _execPipeline->getStages();
         return std::all_of(sources.cbegin(), sources.cend(), [opCtx](const auto& s) {
             return s->validateOperationContext(opCtx);
         });

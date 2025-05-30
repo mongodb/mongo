@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -86,16 +87,17 @@ void DocumentSourceGroupBMFixture::runDocumentSourceGroup(int numGroups,
         state.PauseTiming();
         auto group = DocumentSourceGroup::createFromBsonWithMaxMemoryUsage(
             _groupObj.firstElement(), expCtx, std::numeric_limits<int64_t>::max());
+        auto groupStage = exec::agg::buildStage(group);
         auto mock = DocumentSourceMock::createForTest(expCtx);
         for (int i = 1; i <= numGroups; ++i) {
             BSONObj obj = BSON("a" << i << "b" << i + 1 << "c" << 10 << "x" << i << "y" << i * 10);
             mock->push_back(Document{obj}, countPerGroup);
         }
-        group->setSource(mock.get());
+        groupStage->setSource(mock.get());
         state.ResumeTiming();
         // Call getNext() only once to ready all the groups. We do not read all the output documents
         // since we only want to benchmark the code that prepares all the groups.
-        ASSERT_TRUE(group->getNext().isAdvanced());
+        ASSERT_TRUE(groupStage->getNext().isAdvanced());
     }
 }
 

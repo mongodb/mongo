@@ -53,7 +53,7 @@ namespace mongo {
  * This class is not a registered stage, it is only used as an optimized replacement for $sample
  * when the storage engine allows us to use a random cursor.
  */
-class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
+class DocumentSourceSampleFromRandomCursor final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     const char* getSourceName() const final;

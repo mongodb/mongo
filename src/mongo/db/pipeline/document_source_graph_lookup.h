@@ -79,7 +79,7 @@
 
 namespace mongo {
 
-class DocumentSourceGraphLookUp final : public DocumentSource {
+class DocumentSourceGraphLookUp final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
 

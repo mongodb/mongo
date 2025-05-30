@@ -88,14 +88,14 @@ ALLOCATE_DOCUMENT_SOURCE_ID(match, DocumentSourceMatch::id)
 
 DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {
+    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {
     auto bsonObj = expr->serialize();
     rebuild(std::move(bsonObj), std::move(expr));
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {
+    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {
     rebuild(query);
 }
 

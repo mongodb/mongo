@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/matcher/matcher.h"
@@ -249,8 +250,9 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsImmediateEOFWithEmptyPlanCache) {
     getExpCtx()->setMongoProcessInterface(
         std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{}));
-    auto stage =
+    auto source =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
+    auto stage = exec::agg::buildStage(source);
     ASSERT(stage->getNext().isEOF());
     ASSERT(stage->getNext().isEOF());
 }

@@ -58,7 +58,7 @@ namespace mongo {
  * return results directly from the cache rather than from a preceding stage. It does not have a
  * registered parser and cannot be created from BSON.
  */
-class DocumentSourceSequentialDocumentCache final : public DocumentSource {
+class DocumentSourceSequentialDocumentCache final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$sequentialCache"_sd;
 

@@ -60,7 +60,7 @@ namespace mongo {
  * This is an internal stage that computes the distance between the given centroid and the value of
  * '_field' of the input Document.
  */
-class DocumentSourceInternalGeoNearDistance final : public DocumentSource {
+class DocumentSourceInternalGeoNearDistance final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalComputeGeoNearDistance"_sd;
     static constexpr StringData kNearFieldName = "near"_sd;

@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -91,7 +92,8 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteAllowsUnknownFields) {
     // Because internalSearchMongotRemoteSpec is {strict: false}, the superfluous fields on the
     // request should be ignored and the DocumentSourceInternalSearchMongotRemote stage should be
     // serialized successfully.
-    auto mongotRemoteStage = createFromBson(spec, expCtx);
+    auto mongotRemote = createFromBson(spec, expCtx);
+    auto mongotRemoteStage = exec::agg::buildStage(mongotRemote);
     ASSERT_TRUE(mongotRemoteStage->getNext().isEOF());
 }
 
@@ -105,7 +107,8 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteReturnsEOFWhenCollDoesN
     auto spec = specObj.firstElement();
 
     // Set up the mongotRemote stage.
-    auto mongotRemoteStage = createFromBson(spec, expCtx);
+    auto mongotRemote = createFromBson(spec, expCtx);
+    auto mongotRemoteStage = exec::agg::buildStage(mongotRemote);
     ASSERT_TRUE(mongotRemoteStage->getNext().isEOF());
 }
 

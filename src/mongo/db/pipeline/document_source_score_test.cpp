@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -86,7 +87,8 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
     // list.
     ASSERT_EQ(desugaredList.size(), 2);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
-    ASSERT_DOES_NOT_THROW(ds->setSource(mock.get()));
+    auto stage = exec::agg::buildStage(ds);
+    ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
 }
 
 TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
@@ -129,7 +131,8 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     // list.
     ASSERT_EQ(desugaredList.size(), 2);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
-    ASSERT_DOES_NOT_THROW(ds->setSource(mock.get()));
+    auto stage = exec::agg::buildStage(ds);
+    ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfWrongNormalizeFunctionType) {
@@ -172,10 +175,11 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
-    auto next = docSourceScore->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
 
     // Assert inputDoc's metadata equals 5.1
@@ -196,10 +200,11 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
-    auto next = docSourceScore->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
 
     // Assert inputDoc's metadata equals 5.1
@@ -220,10 +225,11 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
-    auto next = docSourceScore->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
 
     // Assert inputDoc's metadata equals 5.1
@@ -244,11 +250,12 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
     // Assert cannot evaluate expression into double
-    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
@@ -264,11 +271,12 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
     // Assert cannot evaluate expression into double
-    ASSERT_THROWS_CODE(docSourceScore->getNext(), AssertionException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(stage->getNext(), AssertionException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
@@ -301,10 +309,11 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> docSourceScore = *desugaredList.begin();
+    auto stage = exec::agg::buildStage(docSourceScore);
     auto mock = DocumentSourceMock::createForTest(inputDoc, getExpCtx());
-    docSourceScore->setSource(mock.get());
+    stage->setSource(mock.get());
 
-    auto next = docSourceScore->getNext();
+    auto next = stage->getNext();
     ASSERT(next.isAdvanced());
 
     // Assert inputDoc's metadata equals 15.3

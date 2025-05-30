@@ -68,7 +68,7 @@ namespace mongo {
  * Provides a document source interface to retrieve collection-level statistics for a given
  * collection.
  */
-class DocumentSourceCollStats : public DocumentSource {
+class DocumentSourceCollStats : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$collStats"_sd;
 
@@ -124,6 +124,7 @@ public:
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             DocumentSourceCollStatsSpec spec)
         : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
           _collStatsSpec(std::move(spec)),
           _targetAllNodes(_collStatsSpec.getTargetAllNodes().value_or(false)) {}
 

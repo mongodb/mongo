@@ -68,6 +68,7 @@ DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelin
                                          size_t bufferSizeBytes,
                                          size_t maxOutputDocBytes)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _teeBuffer(TeeBuffer::create(facetPipelines.size(), bufferSizeBytes)),
       _facets(std::move(facetPipelines)),
       _maxOutputDocSizeBytes(maxOutputDocBytes) {

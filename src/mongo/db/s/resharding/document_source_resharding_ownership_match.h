@@ -58,7 +58,8 @@ namespace mongo {
  * resharding pipelines which need to be able to answer this question very quickly. To do so, it
  * re-uses pieces of sharding infrastructure rather than applying a MatchExpression.
  */
-class DocumentSourceReshardingOwnershipMatch final : public DocumentSource {
+class DocumentSourceReshardingOwnershipMatch final : public DocumentSource,
+                                                     public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalReshardingOwnershipMatch"_sd;
 

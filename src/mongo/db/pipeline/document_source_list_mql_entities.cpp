@@ -63,7 +63,7 @@ DocumentSourceListMqlEntities::DocumentSourceListMqlEntities(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     MqlEntityTypeEnum type,
     const StringMap<ParserRegistration>& docSourceParserMap)
-    : DocumentSource(kStageName, expCtx), _type(type) {
+    : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx), _type(type) {
     if (_type != MqlEntityTypeEnum::aggregationStages) {
         MONGO_UNIMPLEMENTED;
     }

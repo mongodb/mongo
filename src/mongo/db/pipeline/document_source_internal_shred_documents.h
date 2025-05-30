@@ -37,7 +37,7 @@ namespace mongo {
  * Converts documents into a shredded format to avoid performance regressions from the switch to
  * having a field cache in 4.4.
  */
-class DocumentSourceInternalShredDocuments final : public DocumentSource {
+class DocumentSourceInternalShredDocuments final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalShredDocuments"_sd;
 

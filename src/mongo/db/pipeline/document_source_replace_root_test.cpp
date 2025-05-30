@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
@@ -58,19 +59,20 @@ using boost::intrusive_ptr;
 
 class ReplaceRootBasics : public AggregationContextFixture {
 protected:
-    intrusive_ptr<DocumentSource> createReplaceRoot(const BSONObj& replaceRoot) {
+    intrusive_ptr<exec::agg::Stage> createReplaceRoot(const BSONObj& replaceRoot) {
         BSONObj spec = BSON(DocumentSourceReplaceRoot::kStageName << replaceRoot);
         BSONElement specElement = spec.firstElement();
-        return DocumentSourceReplaceRoot::createFromBson(specElement, getExpCtx());
+        return exec::agg::buildStage(
+            DocumentSourceReplaceRoot::createFromBson(specElement, getExpCtx()));
     }
 
     /**
      * Assert 'source' consistently reports it is exhausted.
      */
-    void assertExhausted(const boost::intrusive_ptr<DocumentSource>& source) const {
-        ASSERT(source->getNext().isEOF());
-        ASSERT(source->getNext().isEOF());
-        ASSERT(source->getNext().isEOF());
+    void assertExhausted(const boost::intrusive_ptr<exec::agg::Stage>& stage) const {
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
+        ASSERT(stage->getNext().isEOF());
     }
 };
 
@@ -263,9 +265,10 @@ TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
 // Verify that the only dependent field is the root we are replacing with.
 TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a.b"));
+    auto replaceRootSource = boost::dynamic_pointer_cast<DocumentSource>(replaceRoot);
     DepsTracker dependencies;
     ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_FIELDS,
-                  replaceRoot->getDependencies(&dependencies));
+                  replaceRootSource->getDependencies(&dependencies));
 
     // Should only depend on field a.b
     ASSERT_EQUALS(1U, dependencies.fields.size());
@@ -280,7 +283,8 @@ TEST_F(ReplaceRootBasics, OnlyDependentFieldIsNewRoot) {
 
 TEST_F(ReplaceRootBasics, ReplaceRootModifiesAllFields) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$a"));
-    auto modifiedPaths = replaceRoot->getModifiedPaths();
+    auto replaceRootSource = boost::dynamic_pointer_cast<DocumentSource>(replaceRoot);
+    auto modifiedPaths = replaceRootSource->getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kAllPaths);
     ASSERT_EQUALS(0U, modifiedPaths.paths.size());
 }
@@ -300,7 +304,7 @@ TEST_F(ReplaceRootBasics, ReplaceRootSwapsWithMatchStage) {
     auto replaceRoot = createReplaceRoot(BSON("newRoot" << "$subDocument"));
     auto match = DocumentSourceMatch::create(BSON("x" << 2), getExpCtx());
 
-    container.push_back(replaceRoot);
+    container.push_back(boost::dynamic_pointer_cast<DocumentSource>(replaceRoot));
     container.push_back(match);
 
     auto singleDocTransform =

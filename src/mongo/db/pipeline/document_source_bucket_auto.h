@@ -68,7 +68,7 @@ namespace mongo {
  * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
  * boundaries such that the values are approximately equally distributed between those buckets.
  */
-class DocumentSourceBucketAuto final : public DocumentSource {
+class DocumentSourceBucketAuto final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$bucketAuto"_sd;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

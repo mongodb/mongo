@@ -644,6 +644,7 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     bool fixedBuckets,
     boost::optional<bool> sbeCompatible)
     : DocumentSource(kStageNameInternal, expCtx),
+      exec::agg::Stage(kStageNameInternal, expCtx),
       _assumeNoMixedSchemaData(assumeNoMixedSchemaData),
       _fixedBuckets(fixedBuckets),
       _bucketUnpacker(std::move(bucketUnpacker)),

@@ -76,7 +76,9 @@ DocumentSourceInternalShardFilter::buildIfNecessary(
 DocumentSourceInternalShardFilter::DocumentSourceInternalShardFilter(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<ShardFilterer> shardFilterer)
-    : DocumentSource(kStageName, pExpCtx), _shardFilterer(std::move(shardFilterer)) {}
+    : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
+      _shardFilterer(std::move(shardFilterer)) {}
 
 DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
     auto next = pSource->getNext();

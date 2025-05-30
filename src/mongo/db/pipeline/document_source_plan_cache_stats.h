@@ -63,7 +63,7 @@
 
 namespace mongo {
 
-class DocumentSourcePlanCacheStats final : public DocumentSource {
+class DocumentSourcePlanCacheStats final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$planCacheStats"_sd;
 

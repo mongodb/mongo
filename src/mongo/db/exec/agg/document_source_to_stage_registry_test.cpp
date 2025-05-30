@@ -76,7 +76,7 @@ TEST(DocumentSourceToStageRegistryTest, DefaultMapper) {
 
     auto fakeStage = buildStage(fakeDS);
 
-    ASSERT_EQ(fakeDS.get(), fakeStage.get());
+    ASSERT_EQ(fakeDS.get(), dynamic_cast<DocumentSourceTestOptimizations*>(fakeStage.get()));
     ASSERT_EQ(mappingFnCallCount, 0);
 }
 

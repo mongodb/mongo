@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -89,7 +90,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldSkipResultsWhenIdNotFound) {
     auto spec = specObj.firstElement();
 
     // Set up the idLookup stage.
-    auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookup = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
     auto mockLocalSource =
@@ -125,7 +127,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotRemoveMetadata) {
     auto specObj = BSON("$_internalSearchIdLookup" << BSONObj());
     auto spec = specObj.firstElement();
 
-    auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookup = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
     idLookupStage->setSource(&mockLocalSource);
 
     // Set up a project stage that asks for metadata.
@@ -133,7 +136,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotRemoveMetadata) {
         "{$project: {score: {$meta: \"searchScore\"}, "
         "scoreInfo: {$meta: \"searchScoreDetails\"},"
         " _id: 1, color: 1}}");
-    auto projectStage = DocumentSourceProject::createFromBson(projectSpec.firstElement(), expCtx);
+    auto project = DocumentSourceProject::createFromBson(projectSpec.firstElement(), expCtx);
+    auto projectStage = exec::agg::buildStage(project);
     projectStage->setSource(idLookupStage.get());
 
     // Mock documents for this namespace.
@@ -203,7 +207,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldAllowStringOrObjectIdValues) {
     auto spec = specObj.firstElement();
 
     // Set up the idLookup stage.
-    auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookup = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
     auto mockLocalSource = DocumentSourceMock::createForTest(
@@ -241,7 +246,8 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotErrorOnEmptyResult) {
     auto spec = specObj.firstElement();
 
     // Set up the idLookup stage.
-    auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookup = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
+    auto idLookupStage = exec::agg::buildStage(idLookup);
 
     // Mock its input.
     auto mockLocalSource = DocumentSourceMock::createForTest({}, expCtx);

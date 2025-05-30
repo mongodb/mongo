@@ -98,6 +98,7 @@ DocumentSourceReshardingOwnershipMatch::DocumentSourceReshardingOwnershipMatch(
     boost::optional<NamespaceString> temporaryReshardingNamespace,
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _recipientShardId{std::move(recipientShardId)},
       _reshardingKey{std::move(reshardingKey)},
       _temporaryReshardingNamespace{std::move(temporaryReshardingNamespace)} {}

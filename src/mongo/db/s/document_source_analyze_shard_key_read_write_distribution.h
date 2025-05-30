@@ -70,7 +70,8 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource {
+class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public DocumentSource,
+                                                                 public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_analyzeShardKeyReadWriteDistribution"_sd;
 
@@ -110,7 +111,9 @@ public:
     DocumentSourceAnalyzeShardKeyReadWriteDistribution(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec)
-        : DocumentSource(kStageName, pExpCtx), _spec(std::move(spec)) {}
+        : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
+          _spec(std::move(spec)) {}
 
     ~DocumentSourceAnalyzeShardKeyReadWriteDistribution() override = default;
 
@@ -153,7 +156,7 @@ public:
 private:
     DocumentSourceAnalyzeShardKeyReadWriteDistribution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {}
+        : DocumentSource(kStageName, expCtx), exec::agg::Stage(kStageName, expCtx) {}
 
     GetNextResult doGetNext() final;
 

@@ -96,7 +96,9 @@ DocumentSourceChangeStreamSplitLargeEvent::createFromBson(
 DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeEvent(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<ResumeTokenData> resumeAfterSplit)
-    : DocumentSource(getSourceName(), expCtx), _resumeAfterSplit(std::move(resumeAfterSplit)) {
+    : DocumentSource(getSourceName(), expCtx),
+      exec::agg::Stage(getSourceName(), expCtx),
+      _resumeAfterSplit(std::move(resumeAfterSplit)) {
     tassert(7182801,
             "Expected a split event resume token, but found a non-split token",
             !_resumeAfterSplit || _resumeAfterSplit->fragmentNum);

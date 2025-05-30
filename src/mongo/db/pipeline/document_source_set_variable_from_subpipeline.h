@@ -59,7 +59,8 @@
 namespace mongo {
 
 
-class DocumentSourceSetVariableFromSubPipeline final : public DocumentSource {
+class DocumentSourceSetVariableFromSubPipeline final : public DocumentSource,
+                                                       public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$setVariableFromSubPipeline"_sd;
 
@@ -139,6 +140,7 @@ protected:
                                              std::unique_ptr<Pipeline, PipelineDeleter> subpipeline,
                                              Variables::Id varID)
         : DocumentSource(kStageName, expCtx),
+          exec::agg::Stage(kStageName, expCtx),
           _subPipeline(std::move(subpipeline)),
           _subExecPipeline(exec::agg::buildPipeline(_subPipeline->getSources())),
           _variableID(varID) {}

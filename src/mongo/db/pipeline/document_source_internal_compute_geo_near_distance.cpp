@@ -116,6 +116,7 @@ DocumentSourceInternalGeoNearDistance::DocumentSourceInternalGeoNearDistance(
     std::string distanceField,
     double distanceMultiplier)
     : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
       _key(std::move(key)),
       _centroid(std::move(centroid)),
       _coords(coords),

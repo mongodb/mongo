@@ -60,7 +60,7 @@ namespace mongo {
  * the forged pre- or post-image oplog entry document for each 'applyOps' oplog entry document that
  * comes with a transaction commit timestamp will have the commit timestamp attached to it.
  */
-class DocumentSourceFindAndModifyImageLookup : public DocumentSource {
+class DocumentSourceFindAndModifyImageLookup : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalFindAndModifyImageLookup"_sd;
     static constexpr StringData kIncludeCommitTransactionTimestampFieldName =

@@ -59,7 +59,7 @@
 
 namespace mongo {
 
-class DocumentSourceUnwind final : public DocumentSource {
+class DocumentSourceUnwind final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$unwind"_sd;
 

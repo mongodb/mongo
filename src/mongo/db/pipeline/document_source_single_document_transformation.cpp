@@ -54,6 +54,7 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     const StringData name,
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
+      exec::agg::Stage(name, pExpCtx),
       _name(name.toString()),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
     if (parsedTransform) {

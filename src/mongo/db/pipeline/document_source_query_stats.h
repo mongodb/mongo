@@ -66,7 +66,7 @@ namespace mongo {
 
 using namespace query_stats;
 
-class DocumentSourceQueryStats final : public DocumentSource {
+class DocumentSourceQueryStats final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$queryStats"_sd;
 
@@ -194,6 +194,7 @@ private:
                              TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone,
                              std::string hmacKey = {})
         : DocumentSource(kStageName, expCtx),
+          exec::agg::Stage(kStageName, expCtx),
           _currentCopiedPartition(0),
           _transformIdentifiers(algorithm != TransformAlgorithmEnum::kNone),
           _algorithm(algorithm),

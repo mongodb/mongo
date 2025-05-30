@@ -37,11 +37,12 @@ namespace mongo {
  * A dummy class for other tests to inherit from to customize the behavior of any of the virtual
  * methods from DocumentSource without having to implement all of them.
  */
-class DocumentSourceTestOptimizations : public DocumentSource {
+class DocumentSourceTestOptimizations : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalTestOptimizations"_sd;
     DocumentSourceTestOptimizations(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx) {}
+        : DocumentSource(DocumentSourceTestOptimizations::kStageName, expCtx),
+          exec::agg::Stage(DocumentSourceTestOptimizations::kStageName, expCtx) {}
     ~DocumentSourceTestOptimizations() override = default;
     const char* getSourceName() const override {
         return DocumentSourceTestOptimizations::kStageName.data();
@@ -51,9 +52,6 @@ public:
         return kUnallocatedId;
     }
 
-    GetNextResult doGetNext() override {
-        MONGO_UNREACHABLE;
-    }
     StageConstraints constraints(Pipeline::SplitState) const override {
         // Return the default constraints so that this can be used in test pipelines. Constructing a
         // pipeline needs to do some validation that depends on this.
@@ -76,6 +74,10 @@ public:
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    GetNextResult doGetNext() final {
+        return GetNextResult::makeEOF();
+    }
 
 private:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final {

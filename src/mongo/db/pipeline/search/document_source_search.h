@@ -48,7 +48,7 @@ namespace mongo {
  * We only ever make a DocumentSourceSearch for a pipeline to store it in the view catalog.
  * Desugaring must be done every time the view is called.
  */
-class DocumentSourceSearch final : public DocumentSource {
+class DocumentSourceSearch final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$search"_sd;
     static constexpr StringData kProtocolStoredFieldsName = "storedSource"_sd;
@@ -72,7 +72,10 @@ public:
     DocumentSourceSearch(const boost::intrusive_ptr<ExpressionContext> expCtx,
                          InternalSearchMongotRemoteSpec spec,
                          boost::optional<SearchQueryViewSpec> view = boost::none)
-        : DocumentSource(kStageName, expCtx), _spec(std::move(spec)), _view(view) {}
+        : DocumentSource(kStageName, expCtx),
+          exec::agg::Stage(kStageName, expCtx),
+          _spec(std::move(spec)),
+          _view(view) {}
 
     const char* getSourceName() const override;
     StageConstraints constraints(Pipeline::SplitState pipeState) const override;

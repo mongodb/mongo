@@ -61,6 +61,7 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
     BSONObj originalSpec,
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _taskExecutor(taskExecutor),
       _originalSpec(originalSpec.getOwned()),
       _view(view) {

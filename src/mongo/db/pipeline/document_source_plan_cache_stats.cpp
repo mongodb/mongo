@@ -83,7 +83,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
 
 DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, bool allHosts)
-    : DocumentSource(kStageName, expCtx), _allHosts(allHosts) {}
+    : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
+      _allHosts(allHosts) {}
 
 void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
                                                     const SerializationOptions& opts) const {

@@ -281,7 +281,8 @@ private:
 // A custom-deleter which disposes a DocumentSource when it goes out of scope.
 struct DocumentSourceDeleter {
     void operator()(DocumentSource* docSource) {
-        docSource->dispose();
+        auto& stage = dynamic_cast<exec::agg::Stage&>(*docSource);
+        stage.dispose();
         delete docSource;
     }
 };

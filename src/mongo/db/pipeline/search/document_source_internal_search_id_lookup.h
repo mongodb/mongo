@@ -44,7 +44,7 @@ namespace mongo {
  * Input documents will be ignored and skipped if no document with key specified at "_id"
  * is locally-stored.
  */
-class DocumentSourceInternalSearchIdLookUp final : public DocumentSource {
+class DocumentSourceInternalSearchIdLookUp final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalSearchIdLookup"_sd;
     /**

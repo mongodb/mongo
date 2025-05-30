@@ -57,7 +57,7 @@ namespace mongo {
  * Filters out documents which are physically present on this shard but not logically owned
  * according to this operation's shard version.
  */
-class DocumentSourceInternalShardFilter final : public DocumentSource {
+class DocumentSourceInternalShardFilter final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalShardFilter"_sd;
 

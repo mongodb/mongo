@@ -62,6 +62,7 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
                                            const intrusive_ptr<Expression>& expression,
                                            Variables::Id currentId)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _redactProcessor(boost::in_place(expCtx, expression, currentId)) {}
 
 REGISTER_DOCUMENT_SOURCE(redact,

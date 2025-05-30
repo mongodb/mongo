@@ -67,7 +67,7 @@ namespace mongo {
  * `admin`, it will return all the collections of the cluster. Otherwise, it will return all the
  * collections of the targeted database.
  */
-class DocumentSourceInternalListCollections final : public DocumentSource {
+class DocumentSourceInternalListCollections final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageNameInternal = "$_internalListCollections"_sd;
 

@@ -498,6 +498,7 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
     const boost::intrusive_ptr<GranularityRounder>& granularityRounder,
     uint64_t maxMemoryUsageBytes)
     : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
       _sorterFileStats(nullptr /*sorterTracker*/),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _groupByExpression(groupByExpression),

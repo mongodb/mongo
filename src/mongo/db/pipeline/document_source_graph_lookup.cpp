@@ -781,6 +781,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),
@@ -817,6 +818,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     const DocumentSourceGraphLookUp& original,
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
     : DocumentSource(kStageName, newExpCtx),
+      exec::agg::Stage(kStageName, newExpCtx),
       _from(original._from),
       _as(original._as),
       _connectFromField(original._connectFromField),

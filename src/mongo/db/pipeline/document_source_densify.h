@@ -321,7 +321,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> create(
     bool isInternal);
 }  // namespace document_source_densify
 
-class DocumentSourceInternalDensify final : public DocumentSource {
+class DocumentSourceInternalDensify final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalDensify"_sd;
     static constexpr StringData kPartitionByFieldsFieldName = "partitionByFields"_sd;
@@ -333,6 +333,7 @@ public:
                                   std::list<FieldPath> partitions,
                                   RangeStatement range)
         : DocumentSource(kStageName, pExpCtx),
+          exec::agg::Stage(kStageName, pExpCtx),
           _memTracker(internalDocumentSourceDensifyMaxMemoryBytes.load()),
           _field(std::move(field)),
           _partitions(std::move(partitions)),

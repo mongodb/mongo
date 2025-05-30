@@ -200,6 +200,7 @@ DocumentSourceFindAndModifyImageLookup::createFromBson(
 DocumentSourceFindAndModifyImageLookup::DocumentSourceFindAndModifyImageLookup(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, bool includeCommitTimestamp)
     : DocumentSource(kStageName, expCtx),
+      exec::agg::Stage(kStageName, expCtx),
       _includeCommitTransactionTimestamp(includeCommitTimestamp) {}
 
 StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(

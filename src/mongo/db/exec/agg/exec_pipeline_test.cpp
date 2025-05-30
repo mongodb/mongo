@@ -45,10 +45,6 @@ class FakeStage : public Stage {
 public:
     FakeStage() : Stage("$fake", make_intrusive<ExpressionContextForTest>()) {}
 
-    const char* getSourceName() const final {
-        return nullptr;
-    }
-
     GetNextResult doGetNext() final {
         return GetNextResult::makeEOF();
     }

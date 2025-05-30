@@ -73,7 +73,7 @@ namespace mongo {
  *  - Computing the group key
  *  - Accumulating values in a hash table and populating output documents.
  */
-class DocumentSourceGroupBase : public DocumentSource {
+class DocumentSourceGroupBase : public DocumentSource, public exec::agg::Stage {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;

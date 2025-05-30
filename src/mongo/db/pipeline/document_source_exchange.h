@@ -215,7 +215,7 @@ private:
     std::vector<std::unique_ptr<ExchangeBuffer>> _consumers;
 };
 
-class DocumentSourceExchange final : public DocumentSource {
+class DocumentSourceExchange final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$_internalExchange"_sd;
 

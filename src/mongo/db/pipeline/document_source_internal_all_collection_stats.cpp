@@ -62,6 +62,7 @@ DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionSta
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalAllCollectionStatsSpec spec)
     : DocumentSource(kStageNameInternal, pExpCtx),
+      exec::agg::Stage(kStageNameInternal, pExpCtx),
       _internalAllCollectionStatsSpec(std::move(spec)) {}
 
 REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,

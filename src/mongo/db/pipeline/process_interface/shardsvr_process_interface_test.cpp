@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -87,6 +88,7 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
     const NamespaceString kOutNss =
         NamespaceString::createNamespaceString_forTest("unittests-out", "sharded_agg_test");
     auto outStage = DocumentSourceOut::create(kOutNss, expCtx());
+    auto stage = exec::agg::buildStage(outStage);
 
     // Attach a write concern, and make sure it is forwarded below.
     WriteConcernOptions wco{WriteConcernOptions::kMajority,
@@ -96,9 +98,9 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
 
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
     auto queue = DocumentSourceQueue::create(expCtx());
-    outStage->setSource(queue.get());
+    stage->setSource(queue.get());
 
-    auto future = launchAsync([&] { ASSERT_TRUE(outStage->getNext().isEOF()); });
+    auto future = launchAsync([&] { ASSERT_TRUE(stage->getNext().isEOF()); });
 
     expectGetDatabase(kOutNss);
 

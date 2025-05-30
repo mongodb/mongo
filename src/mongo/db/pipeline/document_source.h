@@ -197,7 +197,8 @@ namespace mongo {
     }                                                                 \
     const DocumentSource::Id& constName = _dsid_##name;
 
-class DocumentSource : public exec::agg::Stage {
+// TODO SPM-4106: Remove virtual keyword once the refactoring is done.
+class DocumentSource : public virtual RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
@@ -343,6 +344,10 @@ public:
         MONGO_UNIMPLEMENTED_TASSERT(7183905);
     };
 
+    /**
+     * Get the stage's name.
+     */
+    virtual const char* getSourceName() const = 0;
 
     /**
      * Returns the DocumentSource::Id value of a given stage object.
@@ -622,6 +627,14 @@ public:
     }
 
     /**
+     * Returns the expression context from the stage's context.
+     * TODO SPM-4106: Consider renaming to getContext() once the refactoring is done.
+     */
+    const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const {
+        return _expCtx;
+    }
+
+    /**
      * Get the dependencies this operation needs to do its job. If overridden, subclasses must add
      * all paths needed to apply their transformation to 'deps->fields', and call
      * 'deps->setNeedsMetadata()' to indicate what metadata (e.g. text score), if any, is required.
@@ -743,6 +756,8 @@ private:
      * being added to the array for this stage (DocumentSource).
      */
     virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 }  // namespace mongo

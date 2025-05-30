@@ -60,7 +60,7 @@ namespace mongo {
  * This stage can also be useful to adapt the usual pull-based model of a pipeline to more of a
  * push-based model by pushing documents to feed through the pipeline into this queue stage.
  */
-class DocumentSourceQueue : public DocumentSource {
+class DocumentSourceQueue : public DocumentSource, public exec::agg::Stage {
 public:
     using DeferredQueue = DeferredFn<std::deque<GetNextResult>>;
 

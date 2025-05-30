@@ -68,6 +68,7 @@ DocumentSourceSampleFromRandomCursor::DocumentSourceSampleFromRandomCursor(
     std::string idField,
     long long nDocsInCollection)
     : DocumentSource(kStageName, pExpCtx),
+      exec::agg::Stage(kStageName, pExpCtx),
       _size(size),
       _idField(std::move(idField)),
       _seenDocs(pExpCtx->getValueComparator().makeFlatUnorderedValueSet()),

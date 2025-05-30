@@ -49,6 +49,7 @@ TEST(PipelineBuilderTest, OneStagePipeline) {
     // The next assertion is only true for trivial (same object instance) mapping of not-yet
     // refactored document sources during SPM-4106. After all stages are refactored, we must use
     // more specific assertions.
-    ASSERT_EQ(dsFake.get(), pl->getStages().back().get());
+    ASSERT_EQ(dsFake.get(),
+              dynamic_cast<DocumentSourceTestOptimizations*>(pl->getStages().back().get()));
 }
 }  // namespace mongo::test

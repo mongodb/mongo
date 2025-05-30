@@ -75,7 +75,7 @@ std::vector<SHA256Block> listSessionsUsersToDigests(const std::vector<ListSessio
  * as true, and returns just sessions for the currently logged in user if
  * 'allUsers' is specified as false, or not specified at all.
  */
-class DocumentSourceListLocalSessions final : public DocumentSource {
+class DocumentSourceListLocalSessions final : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageName = "$listLocalSessions"_sd;
 

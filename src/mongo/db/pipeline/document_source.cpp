@@ -61,7 +61,7 @@ using boost::intrusive_ptr;
 StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
 
 DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
-    : Stage(stageName, pCtx) {}
+    : _expCtx(pCtx) {}
 
 void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
     auto it = parserMap.find(name);

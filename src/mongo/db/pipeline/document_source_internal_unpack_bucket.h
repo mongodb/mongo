@@ -60,7 +60,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
-class DocumentSourceInternalUnpackBucket : public DocumentSource {
+class DocumentSourceInternalUnpackBucket : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kStageNameInternal = "$_internalUnpackBucket"_sd;
     static constexpr StringData kStageNameExternal = "$_unpackBucket"_sd;
