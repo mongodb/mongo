@@ -7,4 +7,4 @@
  */
 import {MongosAPIParametersUtil} from "jstests/sharding/libs/mongos_api_params_util.js";
 
-MongosAPIParametersUtil.runTests({inTransaction: false, shardedCollection: true});
+MongosAPIParametersUtil.runTestsFirstHalf({inTransaction: false, shardedCollection: true});

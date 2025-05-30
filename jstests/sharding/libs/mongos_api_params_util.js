@@ -100,7 +100,7 @@ export let MongosAPIParametersUtil = (function() {
     // sharded/unsharded collection, inside or outside of a multi-document transaction. The "db"
     // database is dropped and recreated between test cases, so most tests don't need custom setUp
     // or cleanUp. Test cases are not 1-1 with commands, e.g. "count" has two cases.
-    let testCases = [
+    let testCasesFirstHalf = [
         {
             commandName: "_hashBSONElement",
             skip: "executes locally on mongos (not sent to any remote node)"
@@ -731,31 +731,33 @@ export let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {commandName: "isdbgrid", skip: "executes locally on mongos (not sent to any remote node)"},
+    ];
+
+    let testCasesSecondHalf = [
         {commandName: "isMaster", skip: "executes locally on mongos (not sent to any remote node)"},
         {
             commandName: "killCursors",
-            run:
-                {
-                    inAPIVersion1: true,
-                    shardCommandName: "killCursors",
-                    permittedInTxn: false,
-                    // Global setup puts one doc on shard 0, we need several.
-                    setUp: () => assert.commandWorked(st.s0.getDB("db").runCommand(
-                        {insert: "collection", documents: [{_id: 1}, {_id: 2}, {_id: 3}]})),
-                    command:
-                        () => {
-                            // Some extra logging should this test case ever fail.
-                            setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
-                                            {"command": {"verbosity": 2}});
-                            const res = assert.commandWorked(
-                                st.s0.getDB("db").runCommand({find: "collection", batchSize: 1}));
-                            setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
-                                            {"command": {"verbosity": 0}});
-                            jsTestLog(`"find" reply: ${tojson(res)}`);
-                            const cursorId = res.cursor.id;
-                            return {killCursors: "collection", cursors: [cursorId]};
-                        }
-                }
+            run: {
+                inAPIVersion1: true,
+                shardCommandName: "killCursors",
+                permittedInTxn: false,
+                // Global setup puts one doc on shard 0, we need several.
+                setUp: () => assert.commandWorked(st.s0.getDB("db").runCommand(
+                    {insert: "collection", documents: [{_id: 1}, {_id: 2}, {_id: 3}]})),
+                command:
+                    () => {
+                        // Some extra logging should this test case ever fail.
+                        setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                        {"command": {"verbosity": 2}});
+                        const res = assert.commandWorked(
+                            st.s0.getDB("db").runCommand({find: "collection", batchSize: 1}));
+                        setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                        {"command": {"verbosity": 0}});
+                        jsTestLog(`"find" reply: ${tojson(res)}`);
+                        const cursorId = res.cursor.id;
+                        return {killCursors: "collection", cursors: [cursorId]};
+                    }
+            }
         },
         {
             commandName: "killAllSessions",
@@ -1453,9 +1455,12 @@ export let MongosAPIParametersUtil = (function() {
     ];
 
     commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
-        testCases[cmd] = {
+        // Since we will skip this test later, arbitrarily add it to the first half of
+        // the test cases.
+        testCasesFirstHalf.push({
+            commandName: cmd,
             skip: "must define test coverage for latest version backwards compatibility"
-        };
+        });
     });
 
     const st = new ShardingTest({mongos: 1, shards: 2, config: 1, rs: {nodes: 1}});
@@ -1472,7 +1477,10 @@ export let MongosAPIParametersUtil = (function() {
         // Validate test cases for all commands. Ensure there is at least one test case for every
         // mongos command, and that the test cases are well formed.
         for (const command of Object.keys(listCommandsRes.commands)) {
-            const matchingCases = testCases.filter(elem => elem.commandName === command);
+            const matchingCases = [
+                ...testCasesFirstHalf.filter(elem => elem.commandName === command),
+                ...testCasesSecondHalf.filter(elem => elem.commandName === command)
+            ];
             // TODO(SERVER-100573): Fix invariant, this currently is never going to be hit even if
             // length is zero.
             // eslint-disable-next-line
@@ -1486,7 +1494,7 @@ export let MongosAPIParametersUtil = (function() {
 
         // After iterating through all the existing commands, ensure there were no additional test
         // cases that did not correspond to any mongos command.
-        for (const testCase of testCases) {
+        for (const testCase of [...testCasesFirstHalf, ...testCasesSecondHalf]) {
             // We have defined real test cases for commands added since the last LTS version so that
             // the test cases are exercised in the regular suites, but because these test cases
             // can't run in the last stable suite, we skip processing them here to avoid failing the
@@ -1547,7 +1555,27 @@ export let MongosAPIParametersUtil = (function() {
             });
     }
 
-    function runTests({inTransaction, shardedCollection}) {
+    // We split up the test cases into two halves in order to decrease the runtime of a single JS
+    // test - each JS test file should either call runTestsFirstHalf or runTestsSecondHalf.
+    function runTestsFirstHalf({inTransaction, shardedCollection}) {
+        runTests({
+            inTransaction: inTransaction,
+            shardedCollection: shardedCollection,
+            cases: testCasesFirstHalf
+        });
+    }
+
+    // We split up the test cases into two halves in order to decrease the runtime of a single JS
+    // test - each JS test file should either call runTestsFirstHalf or runTestsSecondHalf.
+    function runTestsSecondHalf({inTransaction, shardedCollection}) {
+        runTests({
+            inTransaction: inTransaction,
+            shardedCollection: shardedCollection,
+            cases: testCasesSecondHalf
+        });
+    }
+
+    function runTests({inTransaction, shardedCollection, cases}) {
         // For each combination of config parameters and test case, create a test instance. Do this
         // before executing the test instances so we can count the number of instances and log
         // progress.
@@ -1565,7 +1593,7 @@ export let MongosAPIParametersUtil = (function() {
                      {apiVersion: "1", apiStrict: true, apiDeprecationErrors: false},
                      {apiVersion: "1", apiStrict: true, apiDeprecationErrors: true},
         ]) {
-            for (const testCase of testCases) {
+            for (const testCase of cases) {
                 if (testCase.skip)
                     continue;
 
@@ -1720,5 +1748,5 @@ export let MongosAPIParametersUtil = (function() {
         st.stop();
     }
 
-    return {runTests: runTests};
+    return {runTestsFirstHalf: runTestsFirstHalf, runTestsSecondHalf: runTestsSecondHalf};
 })();

@@ -206,10 +206,14 @@ selector:
     - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
 
     # Expects same CSRS primary and shard primary throughout the test
-    - jstests/sharding/query/api_version/api_params_nontransaction_sharded.js
-    - jstests/sharding/query/api_version/api_params_nontransaction_unsharded.js
-    - jstests/sharding/query/api_version/api_params_transaction_sharded.js
-    - jstests/sharding/query/api_version/api_params_transaction_unsharded.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_sharded_first_half.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_sharded_second_half.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_unsharded_first_half.js
+    - jstests/sharding/query/api_version/api_params_nontransaction_unsharded_second_half.js
+    - jstests/sharding/query/api_version/api_params_transaction_sharded_first_half.js
+    - jstests/sharding/query/api_version/api_params_transaction_sharded_second_half.js
+    - jstests/sharding/query/api_version/api_params_transaction_unsharded_first_half.js
+    - jstests/sharding/query/api_version/api_params_transaction_unsharded_second_half.js
 
     # These tests use the resharding test fixture, which performs its own addShard. Config server stepdowns can
     # interrupt the addShard operation resulting in the test cluster not being initalized properly.
