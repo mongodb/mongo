@@ -37,8 +37,8 @@ from typing import Sequence
 import pymongo
 from config import DataGeneratorConfig, WriteMode
 from database_instance import DatabaseInstance
-from motor.motor_asyncio import AsyncIOMotorCollection
 from pymongo import IndexModel
+from pymongo.asynchronous.collection import AsyncCollection
 from random_generator import DataType, RandomDistribution
 
 __all__ = ["DataGenerator"]
@@ -106,7 +106,7 @@ class DataGenerator:
             await task
 
         t1 = time.time()
-        print(f"\npopulate Collections took {t1-t0} s.")
+        print(f"\npopulate Collections took {t1 - t0} s.")
 
     def _generate_collection_infos(self):
         for coll_template in self.config.collection_templates:
@@ -130,9 +130,7 @@ class DataGenerator:
                     compound_indexes=coll_template.compound_indexes,
                 )
 
-    async def _populate_collection(
-        self, coll: AsyncIOMotorCollection, coll_info: CollectionInfo
-    ) -> None:
+    async def _populate_collection(self, coll: AsyncCollection, coll_info: CollectionInfo) -> None:
         print(f"\nGenerating ${coll_info.name} ...")
         batch_size = self.config.batch_size
         tasks = []
@@ -150,7 +148,7 @@ class DataGenerator:
 
 
 async def populate_batch(
-    coll: AsyncIOMotorCollection, documents_count: int, fields: Sequence[FieldInfo]
+    coll: AsyncCollection, documents_count: int, fields: Sequence[FieldInfo]
 ) -> None:
     """Generate collection data and write it to the collection."""
 
@@ -167,9 +165,7 @@ def generate_collection_data(documents_count: int, fields: Sequence[FieldInfo]):
     return documents
 
 
-async def create_single_field_indexes(
-    coll: AsyncIOMotorCollection, fields: Sequence[FieldInfo]
-) -> None:
+async def create_single_field_indexes(coll: AsyncCollection, fields: Sequence[FieldInfo]) -> None:
     """Create single-fields indexes on the given collection."""
 
     indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields if field.indexed]
@@ -178,7 +174,7 @@ async def create_single_field_indexes(
         print(f"create_single_field_indexes done. {[index.document for index in indexes]}")
 
 
-async def create_compound_indexes(coll: AsyncIOMotorCollection, coll_info: CollectionInfo) -> None:
+async def create_compound_indexes(coll: AsyncCollection, coll_info: CollectionInfo) -> None:
     """Create a coumpound indexes on the given collection."""
 
     indexes_spec = []

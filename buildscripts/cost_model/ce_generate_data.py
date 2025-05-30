@@ -140,7 +140,7 @@ async def dump_collections_to_json(db, dump_path, database_name, collections):
     load_file = open(Path(dump_path) / f"{database_name}.data", "w")
     load_file.write("// This is a generated file.\n")
     # Create an array named 'chunkNames' with all chunk file names to be loaded.
-    load_file.write(f'const chunkNames = [{",".join(all_chunk_names)}];')
+    load_file.write(f"const chunkNames = [{','.join(all_chunk_names)}];")
 
 
 async def generate_histograms(coll_template, coll, dump_path):
@@ -184,7 +184,7 @@ async def main():
         old_db_collections = await database_instance.database.list_collection_names()
         for coll_name in old_db_collections:
             collection = database_instance.database[coll_name]
-            collection.drop()
+            await collection.drop()
 
         generator = DataGenerator(database_instance, data_generator_config)
         await generator.populate_collections()

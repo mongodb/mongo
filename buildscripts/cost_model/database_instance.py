@@ -34,7 +34,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Mapping, NewType, Sequence
 
 from config import DatabaseConfig, RestoreMode
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
 __all__ = ["DatabaseInstance", "Pipeline"]
 """MongoDB Aggregate's Pipeline"""
@@ -47,7 +47,7 @@ class DatabaseInstance:
     def __init__(self, config: DatabaseConfig) -> None:
         """Initialize wrapper."""
         self.config = config
-        self.client = AsyncIOMotorClient(config.connection_string)
+        self.client = AsyncMongoClient(config.connection_string)
         self.database = self.client[config.database_name]
 
     def __enter__(self):
