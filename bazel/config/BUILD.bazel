@@ -26,6 +26,7 @@ load(
     "libunwind",
     "linker",
     "linkstatic",
+    "local_clang_compiler",
     "lsan",
     "mongo_toolchain_version",
     "msan",
@@ -88,6 +89,18 @@ config_setting(
     name = "compiler_type_msvc",
     flag_values = {
         "//bazel/config:compiler_type": "msvc",
+    },
+)
+
+local_clang_compiler(
+    name = "local_clang_compiler",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_local_clang_compiler",
+    flag_values = {
+        "//bazel/config:local_clang_compiler": "True",
     },
 )
 

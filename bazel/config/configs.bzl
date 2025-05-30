@@ -15,11 +15,26 @@ def compiler_type_impl(ctx):
     compiler_type_value = ctx.build_setting_value
     if compiler_type_value not in compiler_type_values:
         fail(str(ctx.label) + " compiler_type allowed to take values {" + ", ".join(compiler_type_values) + "} but was set to unallowed value " + compiler_type_value)
+
     return compiler_type_provider(compiler_type = compiler_type_value)
 
 compiler_type = rule(
     implementation = compiler_type_impl,
     build_setting = config.string(flag = True),
+)
+
+# =============
+# compiler_type
+# =============
+
+local_clang_compiler_provider = provider(
+    doc = "use the local clang compiler",
+    fields = ["enabled"],
+)
+
+local_clang_compiler = rule(
+    implementation = lambda ctx: local_clang_compiler_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
 )
 
 # =========

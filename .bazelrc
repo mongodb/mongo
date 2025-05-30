@@ -62,6 +62,9 @@ test --build_tests_only
 
 common:macos --repo_env=BAZEL_NO_APPLE_CPP_TOOLCHAIN=1
 
+# Pin down the OSS LLVM Clang version for MacOS builds.
+common:macos --repo_env=LLVM_VERSION=19
+
 common:windows --features=-compiler_param_file
 
 
@@ -135,6 +138,7 @@ common --flag_alias=dbg_level=//bazel/config:dbg_level
 common --flag_alias=mongo_toolchain_version=//bazel/config:mongo_toolchain_version
 common --flag_alias=simple_build_id=//bazel/config:simple_build_id
 common --flag_alias=create_dwp=//bazel/config:create_dwp
+common --flag_alias=local_clang_compiler=//bazel/config:local_clang_compiler
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.

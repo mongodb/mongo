@@ -275,7 +275,135 @@ exit $?
 
 ######
 # mongodb customization
-# everything below is modifications for mongodb build
+# Everything below is modifications for mongodb build.
+# We are going through a transition of using the LLVM
+# clang while the Apple Clang is still the default. Once
+# the transition is completed, we will remove the Apple
+# Clang toolchain.
+
+def _get_llvm_info(repository_ctx, build_file):
+    llvm_version = repository_ctx.os.environ.get("LLVM_VERSION") or ""
+
+    if llvm_version == "":
+        error_message = """
+The Apple LLVM Clang toolchain has not been defined. Please make sure
+that LLVM_VERSION has been defined in //.bazelrc.local or //.bazelrc file."""
+        return False, "", "", error_message
+
+    brew_command = [
+        "/bin/bash",
+        "-c",
+        "brew --prefix llvm@{}".format(llvm_version),
+    ]
+    result = repository_ctx.execute(brew_command)
+    if result.return_code != 0:
+        error_message = """
+Unable to find the prefix LLVM path using brew command: {}. Please make
+sure that you have installed the LLVM toolchain using Homebrew:
+    `brew install llvm@<version>`
+or update the LLVM_VERSION in the //.bazelrc file or //.bazelrc.local.""".format(" ".join(brew_command))
+        return False, "", "", error_message
+    llvm_path = result.stdout.strip()
+
+    # The path needs to be validated to ensure that it exists.
+    # The error message is injected in the build file as users may not
+    # have installed the LLVM toolchain yet. If the user attempt to use
+    # it, a build error will be raised with the message.
+    if not repository_ctx.path(llvm_path).exists:
+        error_message = """
+You have specified to use the local clang --local_clang_compiler but unable to find the LLVM path:
+    {}.
+Please make sure that you have installed the LLVM toolchain using Homebrew: 
+    `brew install llvm@<version>`.""".format(llvm_path)
+        return False, "", "", error_message
+
+    # Find the real path to the LLVM installation as we need to include the LLVM
+    # lib and headers directories as part of built-in directories.
+    command = [
+        "/bin/bash",
+        "-c",
+        "readlink -f {}".format(llvm_path),
+    ]
+    result = repository_ctx.execute(command)
+    if result.return_code != 0:
+        return False, "", "", "Failed to find the true LLVM path using command: {}".format(" ".join(command))
+    llvm_path = result.stdout.strip()
+
+    return True, llvm_path, llvm_version, ""
+
+def _get_lld_info(repository_ctx, llvm_version):
+    brew_command = [
+        "/bin/bash",
+        "-c",
+        "brew --prefix lld@{}".format(llvm_version),
+    ]
+    result = repository_ctx.execute(brew_command)
+    if result.return_code != 0:
+        return False, "", "Failed to find the prefix of LLD path using brew command: {}".format(" ".join(brew_command))
+    lld_path = result.stdout.strip()
+
+    if not repository_ctx.path(lld_path).exists:
+        return False, "", "The LLD_PATH does not exist: {}".format(lld_path)
+
+    return True, lld_path, ""
+
+def _get_llvm_clang_include_dirs(repository_ctx, llvm_path):
+    include_dirs = [
+        "/Applications/",
+        "/Library",
+    ]
+
+    user = repository_ctx.os.environ.get("USER")
+    if user:
+        include_dirs.extend([
+            "/Users/{}/Applications/".format(user),
+            "/Users/{}/Library/".format(user),
+        ])
+
+    for include_dir in ["include", "lib"]:
+        include_dirs.append(llvm_path + "/" + include_dir)
+
+    ret_include_dirs = []
+    for path in include_dirs:
+        ret_include_dirs.append(("            \"%s\"," % path))
+
+    return ret_include_dirs
+
+def _configure_oss_clang_toolchain(repository_ctx):
+    build_file = "BUILD.bazel"
+
+    success, llvm_path, llvm_version, error = _get_llvm_info(repository_ctx, build_file)
+    if not success:
+        repository_ctx.file(
+            build_file,
+            "fail(\"\"\"%s\"\"\")" % error,
+        )
+        return False
+
+    success, lld_path, error = _get_lld_info(repository_ctx, llvm_version)
+    if not success:
+        repository_ctx.file(
+            build_file,
+            "fail(\"\"\"%s\"\"\")" % error,
+        )
+        return False
+
+    include_dirs = _get_llvm_clang_include_dirs(repository_ctx, llvm_path)
+
+    repository_ctx.report_progress("Generating Apple OSS LLVM Clang Toolchain build file")
+    build_template = Label("@//bazel/toolchains/cc/mongo_apple:BUILD_llvm.tpl")
+    repository_ctx.template(
+        build_file,
+        build_template,
+        {
+            "%{llvm_path}": llvm_path,
+            "%{lld_path}": lld_path,
+            "%{cxx_builtin_include_directories}": "\n".join(include_dirs),
+        },
+    )
+
+    return True, ""
+
 def _apple_cc_autoconf_impl(repository_ctx):
     if repository_ctx.os.name.startswith("mac os"):
         success, error = configure_osx_toolchain(repository_ctx)
@@ -295,9 +423,29 @@ mongo_apple_toolchain_config = repository_rule(
         "USE_CLANG_CL",  # Kept as a hack for those who rely on this invaliding the toolchain
         "USER",  # Used to allow paths for custom toolchains to be used by C* compiles
         "XCODE_VERSION",  # Force re-computing the toolchain by including the current Xcode version info in an env var
+        "LLVM_PATH",  # Force re-compute if the user changed the location of the LLVM toolchain
+        "LLVM_VERSION",  # Force re-compute if the user changed the version of the LLVM toolchain
     ],
     implementation = _apple_cc_autoconf_impl,
     configure = True,
+)
+
+def _apple_llvm_clang_cc_autoconf_impl(repository_ctx):
+    """Configures the Apple LLVM Clang toolchain."""
+    if repository_ctx.os.name.startswith("mac os"):
+        # No failure is shown to the user as the toolchain is still being worked on it.
+        _configure_oss_clang_toolchain(repository_ctx)
+    else:
+        repository_ctx.file("BUILD", "# Apple OSS LLVM Clang autoconfiguration was disabled because you're not on macOS")
+
+mongo_apple_brew_llvm_toolchain_config = repository_rule(
+    environ = [
+        "LLVM_PATH",  # Force re-compute if the user changed the location of the LLVM toolchain
+        "LLVM_VERSION",  # Force re-compute if the user changed the version of the LLVM toolchain
+    ],
+    implementation = _apple_llvm_clang_cc_autoconf_impl,
+    configure = True,
+    local = True,
 )
 
 _ARCH_MAP = {

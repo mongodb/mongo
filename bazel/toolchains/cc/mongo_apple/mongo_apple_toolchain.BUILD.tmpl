@@ -13,7 +13,10 @@ package(default_visibility = ["//visibility:public"])
             "@platforms//os:macos",
             "@platforms//cpu:" + cpu,
         ],
-        toolchain = "@mongo_apple_toolchain_config//:cc-compiler-" + apple_arch,
+        toolchain = select({
+            "@//bazel/config:use_local_clang_compiler": "@mongo_apple_brew_llvm_toolchain_config//:cc-compiler-" + apple_arch,
+            "@//conditions:default": "@mongo_apple_toolchain_config//:cc-compiler-" + apple_arch,
+        }),
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     )
     for apple_arch, cpu in get_supported_apple_archs().items()
