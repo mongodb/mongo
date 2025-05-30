@@ -530,14 +530,13 @@ class _AddRemoveShardThread(threading.Thread):
                     untracked_collections.append(collection)
         return untracked_collections
 
-    def _get_collection_uuid(self, db_name, coll_name):
-        collections = self._client[db_name].list_collections(filter={"name": coll_name})
-        collection_info = next(collections, None)
-        if collection_info and "info" in collection_info and "uuid" in collection_info["info"]:
-            return collection_info["info"]["uuid"]
-        msg = "Could not find the collection uuid for " + db_name + "." + coll_name
-        self.logger.error(msg)
-        raise errors.ServerFailure(msg)
+    def _get_collection_uuid(self, namespace):
+        collection_entry = self._client.config.collections.find_one({"_id": namespace})
+        if collection_entry and "uuid" in collection_entry:
+            return collection_entry["uuid"]
+        msg = "Could not find the collection uuid for " + namespace
+        self.logger.warning(msg)
+        return None
 
     def _move_all_unsharded_collections_from_shard(self, collections, source):
         for collection in collections:
@@ -561,9 +560,9 @@ class _AddRemoveShardThread(threading.Thread):
 
     def _move_sessions_collection_from_shard(self, source):
         namespace = self._LOGICAL_SESSIONS_NAMESPACE
-        collection_uuid = self._get_collection_uuid(
-            self._CONFIG_DATABASE_NAME, self._LOGICAL_SESSIONS_COLLECTION_NAME
-        )
+        collection_uuid = self._get_collection_uuid(namespace)
+        if collection_uuid is None:
+            return
         chunks_on_source = [
             doc
             for doc in self._client["config"]["chunks"].find(
