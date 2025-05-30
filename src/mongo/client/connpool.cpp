@@ -638,7 +638,9 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
                                                    0,
                                                    0,
                                                    0,
-                                                   Milliseconds{0}};
+                                                   Milliseconds{0},
+                                                   0,
+                                                   0};
             hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
             stats->updateStatsForHost("global", host, hostStats);
         }

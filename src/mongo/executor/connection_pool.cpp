@@ -79,6 +79,7 @@ MONGO_FAIL_POINT_DEFINE(forceExecutorConnectionPoolTimeout);
 MONGO_FAIL_POINT_DEFINE(connectionPoolReturnsErrorOnGet);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDropConnectionsBeforeGetConnection);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDoesNotFulfillRequests);
+MONGO_FAIL_POINT_DEFINE(connectionPoolRejectsConnectionRequests);
 
 static const Status kCancelledStatus{ErrorCodes::CallbackCanceled,
                                      "Cancelled acquiring connection"};
@@ -225,6 +226,10 @@ public:
     }
     Milliseconds toRefreshTimeout() const override {
         return getPool()->_options.refreshRequirement;
+    }
+
+    size_t connectionRequestsMaxQueueDepth() const override {
+        return getPool()->_options.connectionRequestsMaxQueueDepth;
     }
 
     StringData name() const override {
@@ -388,6 +393,11 @@ public:
     size_t requestsPending(WithLock) const;
 
     /**
+     * Returns the number of rejected requests.
+     */
+    size_t rejectedConnectionsRequests(WithLock) const;
+
+    /**
      * Updates the ConnectionPool's _cachedCreatedConnections map with the number of created
      * connections that this SpecificPool made. This should be called before removing a SpecificPool
      * from the ConnectionPool.
@@ -456,6 +466,7 @@ private:
 
     // Enqueues a request, returning an iterator into _requests pointing to the request.
     Requests::iterator pushRequest(WithLock, Date_t expiration, Request request) {
+
         auto it = _requests.emplace(std::pair(expiration, std::move(request)));
         _requestsById[it->second.id] = it;
         return it;
@@ -533,6 +544,8 @@ private:
     void updateController(stdx::unique_lock<stdx::mutex>& lk);
 
 private:
+    bool _shouldRejectRequest(WithLock);
+
     const std::shared_ptr<ConnectionPool> _parent;
 
     const transport::ConnectSSLMode _sslMode;
@@ -583,6 +596,11 @@ private:
     HostHealth _health;
 
     std::uint64_t _nextRequestId{0};
+
+    logv2::SeveritySuppressor _rejectedConnectionsLogSeverity{
+        Seconds{5}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+    // The overall number of rejected connections used for stats.
+    size_t _numberRejectedConnections{0};
 };
 
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
@@ -819,7 +837,9 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
                                      pool->refreshedConnections(lk),
                                      pool->neverUsedConnections(lk),
                                      pool->getOnceUsedConnections(lk),
-                                     pool->getTotalConnUsageTime(lk)};
+                                     pool->getTotalConnUsageTime(lk),
+                                     pool->rejectedConnectionsRequests(lk),
+                                     pool->requestsPending(lk)};
 
         hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats(lk);
         stats->updateStatsForHost(_name, host, hostStats);
@@ -913,6 +933,27 @@ size_t ConnectionPool::SpecificPool::requestsPending(WithLock) const {
     return _requests.size();
 }
 
+size_t ConnectionPool::SpecificPool::rejectedConnectionsRequests(WithLock) const {
+    return _numberRejectedConnections;
+}
+
+bool ConnectionPool::SpecificPool::_shouldRejectRequest(WithLock) {
+    if (MONGO_unlikely(connectionPoolRejectsConnectionRequests.shouldFail())) {
+        return true;
+    }
+
+    const size_t connectionRequestsMaxQueueDepth =
+        _parent->_controller->connectionRequestsMaxQueueDepth();
+
+    // If the value of connectionRequestsMaxQueueDepth is 0, then the feature is disabled and no
+    // further checks should be performed here: the request should NOT be rejected.
+    if (connectionRequestsMaxQueueDepth == 0) {
+        return false;
+    }
+
+    return (_requests.size() >= connectionRequestsMaxQueueDepth);
+}
+
 void ConnectionPool::SpecificPool::updateCachedCreatedConnections(WithLock lk) {
     auto totalCreated = createdConnections(lk) + getCachedCreatedConnections(lk);
     _parent->_cachedCreatedConnections[_hostAndPort] = totalCreated;
@@ -972,7 +1013,31 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     // If we've already been cancelled or we do not have requests, then we can fulfill immediately.
     if (token.isCanceled()) {
         return Future<ConnectionPool::ConnectionHandle>::makeReady(kCancelledStatus);
-    } else if (_requests.size() == 0) {
+    }
+
+    // If a queue of requests for connections exceeds a certain size, do not accept
+    // new requests and reject them.
+    if (MONGO_unlikely(_shouldRejectRequest(lk))) {
+        _numberRejectedConnections++;
+
+        LOGV2_DEBUG(9147901,
+                    _rejectedConnectionsLogSeverity().toInt(),
+                    "Connection acquisition attempt was rejected because the pool is overloaded.",
+                    "name"_attr = _parent->getName(),
+                    "hostAndPort"_attr = _hostAndPort,
+                    "totalRejectedRequests"_attr = _numberRejectedConnections);
+
+        const Status rejectedStatus{
+            ErrorCodes::TemporarilyUnavailable,
+            fmt::format(
+                "Connection acquisition attempt was rejected because the pool is overloaded."
+                " ConnectionPool: {}, HostAndPort: {}",
+                _parent->getName(),
+                _hostAndPort)};
+        return Future<ConnectionPool::ConnectionHandle>::makeReady(rejectedStatus);
+    }
+
+    if (_requests.size() == 0) {
         auto conn = tryGetConnection(lk, lease);
 
         if (conn) {
@@ -1339,7 +1404,7 @@ void ConnectionPool::SpecificPool::processFailure(stdx::unique_lock<stdx::mutex>
 
 // fulfills as many outstanding requests as possible
 void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex>& lk) {
-    if (auto sfp = connectionPoolDoesNotFulfillRequests.scoped(); MONGO_unlikely(sfp.isActive())) {
+    if (MONGO_unlikely(connectionPoolDoesNotFulfillRequests.shouldFail())) {
         return;
     }
 

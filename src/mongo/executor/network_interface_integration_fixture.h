@@ -55,6 +55,8 @@
 #include <memory>
 #include <mutex>
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 class PseudoRandom;
@@ -173,6 +175,10 @@ public:
         return future.get(&interruptible);
     }
 
+    void setConnectionPoolOptions(const ConnectionPool::Options& opts) {
+        _opts = opts;
+    }
+
 protected:
     virtual std::unique_ptr<NetworkInterface> _makeNet(std::string instanceName,
                                                        transport::TransportProtocol protocol);
@@ -188,6 +194,8 @@ private:
     size_t _workInProgress = 0;
     stdx::condition_variable _fixtureIsIdle;
     mutable stdx::mutex _mutex;
+
+    boost::optional<ConnectionPool::Options> _opts;
 };
 
 }  // namespace executor

@@ -162,6 +162,32 @@ private:
     std::shared_ptr<ConnectionPool> _pool;
 };
 
+TEST_F(ConnectionPoolTest, CheckRejectedConnectionRequest) {
+    ConnectionPool::Options opts;
+    opts.connectionRequestsMaxQueueDepth = 1;
+    auto pool = makePool(opts);
+
+    FailPointEnableBlock fpb("connectionPoolDoesNotFulfillRequests");
+    auto conn1Fut = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+    ASSERT_FALSE(conn1Fut.isReady());
+
+    auto fut = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+    ASSERT_TRUE(fut.isReady());
+    ASSERT_THROWS_CODE(std::move(fut).get(), DBException, ErrorCodes::TemporarilyUnavailable);
+}
+
+/**
+ * Verify that the limit on the size of connection requests queue
+ * is enforced properly.
+ */
+TEST_F(ConnectionPoolTest, CheckRejectedConnectionRequestBasic) {
+    auto pool = makePool();
+    FailPointEnableBlock fpb("connectionPoolRejectsConnectionRequests");
+    auto fut = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+    ASSERT_TRUE(fut.isReady());
+    ASSERT_THROWS_CODE(std::move(fut).get(), DBException, ErrorCodes::TemporarilyUnavailable);
+}
+
 TEST_F(ConnectionPoolTest, StatsTest) {
     constexpr auto numConnections = 3;
     auto hosts = std::vector<HostAndPort>(

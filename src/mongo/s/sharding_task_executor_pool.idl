@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/sharding_task_executor_pool_controller.h"
+        - "mongo/executor/connection_pool.h"
 
 server_parameters:
     ShardingTaskExecutorPoolMinSize:
@@ -125,4 +126,18 @@ server_parameters:
         validator:
             gte: -1
         default: -1
+        redact: false
+
+    ShardingTaskExecutorPoolMaxQueueDepth:
+        description: <-
+            The maximum number of connection acquisition requests that an executor will queue before it begins
+            rejecting further requests. A value of 0 indicates there is no limit to the size of the queue.
+        set_at: [startup, runtime]
+        cpp_varname: "ShardingTaskExecutorPoolController::gParameters.connectionRequestsMaxQueueDepth"
+        validator:
+            gte: 0
+        default:
+            {
+                expr: "mongo::executor::ConnectionPool::kDefaultConnectionRequestsMaxQueueDepth",
+            }
         redact: false

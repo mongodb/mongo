@@ -69,10 +69,12 @@ MONGO_FAIL_POINT_DEFINE(networkInterfaceFixtureHangOnCompletion);
 
 std::unique_ptr<NetworkInterface> NetworkInterfaceIntegrationFixture::_makeNet(
     std::string instanceName, transport::TransportProtocol protocol) {
+
+    auto opts = _opts ? *_opts : makeDefaultConnectionPoolOptions();
+
     switch (protocol) {
         case transport::TransportProtocol::MongoRPC:
-            return makeNetworkInterface(
-                instanceName, nullptr, nullptr, makeDefaultConnectionPoolOptions());
+            return makeNetworkInterface(instanceName, nullptr, nullptr, opts);
         case transport::TransportProtocol::GRPC:
 #ifdef MONGO_CONFIG_GRPC
             return makeNetworkInterfaceGRPC(instanceName);
@@ -127,8 +129,13 @@ void NetworkInterfaceIntegrationFixture::startNet() {
 
 void NetworkInterfaceIntegrationFixture::tearDown() {
     // Network interface will only shutdown once because of an internal shutdown guard
-    _net->shutdown();
-    _fixtureNet->shutdown();
+    if (_net) {
+        _net->shutdown();
+    }
+
+    if (_fixtureNet) {
+        _fixtureNet->shutdown();
+    }
 
     auto lk = stdx::unique_lock(_mutex);
     auto checkIdle = [&]() {

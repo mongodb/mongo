@@ -111,6 +111,11 @@ public:
     static constexpr Milliseconds kDefaultRefreshTimeout = Seconds(20);
     static constexpr Milliseconds kHostRetryTimeout = Seconds(1);
 
+    /**
+     * Default value for limiting the size of a connection requests queue.
+     */
+    static constexpr size_t kDefaultConnectionRequestsMaxQueueDepth = 0;
+
     static const Status kConnectionStateUnknown;
 
     /**
@@ -182,6 +187,12 @@ public:
 
         std::function<std::shared_ptr<ControllerInterface>(void)> controllerFactory =
             &ConnectionPool::makeLimitController;
+
+        /**
+         * This parameter represents the limit on the size of connection requests queue. If this
+         * parameter is 0 then no checks and no rejections will be performed.
+         */
+        size_t connectionRequestsMaxQueueDepth = kDefaultConnectionRequestsMaxQueueDepth;
     };
 
     /**
@@ -557,6 +568,8 @@ public:
     virtual Milliseconds hostTimeout() const = 0;
     virtual Milliseconds pendingTimeout() const = 0;
     virtual Milliseconds toRefreshTimeout() const = 0;
+
+    virtual size_t connectionRequestsMaxQueueDepth() const = 0;
 
     /**
      * Get the name for this controller

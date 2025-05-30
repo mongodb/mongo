@@ -1433,6 +1433,57 @@ TEST_F(NetworkInterfaceTestWithHangingHook, HookHangs) {
     ASSERT(ErrorCodes::isExceededTimeLimitError(res.status.code()));
 }
 
+TEST_F(NetworkInterfaceIntegrationFixture, BasicRejectConnection) {
+    SKIP_ON_GRPC("gRPC doesn't use ConnectionPool");
+
+    FailPointEnableBlock fpb2("connectionPoolRejectsConnectionRequests");
+
+    startNet();
+
+    RemoteCommandRequest request{fixture().getServers()[0],
+                                 DatabaseName::kAdmin,
+                                 BSON("ping" << 1),
+                                 BSONObj(),
+                                 nullptr,
+                                 Minutes(5)};
+
+    auto fut2 = runCommand(makeCallbackHandle(), request);
+    ASSERT_FALSE(fut2.get(interruptible()).isOK());
+
+    auto result = fut2.get(interruptible());
+    ASSERT_NOT_OK(result.status);
+    ASSERT_EQ(ErrorCodes::TemporarilyUnavailable, result.status);
+}
+
+TEST_F(NetworkInterfaceIntegrationFixture, RejectConnection) {
+    SKIP_ON_GRPC("gRPC doesn't use ConnectionPool");
+
+    FailPointEnableBlock fpb("connectionPoolDoesNotFulfillRequests");
+
+    ConnectionPool::Options opts;
+    opts.connectionRequestsMaxQueueDepth = 1;
+    setConnectionPoolOptions(opts);
+
+    startNet();
+
+    RemoteCommandRequest request{fixture().getServers()[0],
+                                 DatabaseName::kAdmin,
+                                 BSON("ping" << 1),
+                                 BSONObj(),
+                                 nullptr,
+                                 Minutes(5)};
+
+    auto fut = runCommand(makeCallbackHandle(), request);
+
+    auto fut2 = runCommand(makeCallbackHandle(), request);
+    ASSERT_FALSE(fut2.get(interruptible()).isOK());
+
+    auto result = fut2.get(interruptible());
+    ASSERT_NOT_OK(result.status);
+    ASSERT_EQ(ErrorCodes::TemporarilyUnavailable, result.status);
+}
+
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

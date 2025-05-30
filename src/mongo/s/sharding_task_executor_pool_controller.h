@@ -117,6 +117,8 @@ public:
         AtomicWord<int> pendingTimeoutMS;
         AtomicWord<int> toRefreshTimeoutMS;
 
+        AtomicWord<int> connectionRequestsMaxQueueDepth;
+
         synchronized_value<std::string> matchingStrategyString;
         AtomicWord<MatchingStrategy> matchingStrategy;
 
@@ -159,6 +161,8 @@ public:
     Milliseconds hostTimeout() const override;
     Milliseconds pendingTimeout() const override;
     Milliseconds toRefreshTimeout() const override;
+
+    size_t connectionRequestsMaxQueueDepth() const override;
 
     StringData name() const override {
         return "ShardingTaskExecutorPoolController"_sd;

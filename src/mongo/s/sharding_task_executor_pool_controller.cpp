@@ -357,6 +357,10 @@ Milliseconds ShardingTaskExecutorPoolController::toRefreshTimeout() const {
     return Milliseconds{gParameters.toRefreshTimeoutMS.load()};
 }
 
+size_t ShardingTaskExecutorPoolController::connectionRequestsMaxQueueDepth() const {
+    return gParameters.connectionRequestsMaxQueueDepth.load();
+}
+
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
     cps->matchingStrategy =

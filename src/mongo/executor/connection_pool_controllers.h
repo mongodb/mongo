@@ -89,6 +89,10 @@ public:
         return getPoolOptions().refreshRequirement;
     }
 
+    size_t connectionRequestsMaxQueueDepth() const override {
+        return getPoolOptions().connectionRequestsMaxQueueDepth;
+    }
+
     StringData name() const override {
         return _name;
     }
