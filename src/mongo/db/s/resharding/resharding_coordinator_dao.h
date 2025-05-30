@@ -67,6 +67,12 @@ public:
     ReshardingCoordinatorDao() = default;
     ~ReshardingCoordinatorDao() = default;
 
+    CoordinatorStateEnum getPhase(OperationContext* opCtx,
+                                  DaoStorageClient* client,
+                                  const UUID& reshardingUUID) {
+        return client->readState(opCtx, reshardingUUID).getState();
+    }
+
     ReshardingCoordinatorDocument transitionToCloningPhase(OperationContext* opCtx,
                                                            DaoStorageClient* client,
                                                            Date_t now,

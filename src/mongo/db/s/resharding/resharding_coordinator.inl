@@ -33,6 +33,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_commit_monitor.h"
+#include "mongo/db/s/resharding/resharding_coordinator_dao.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
@@ -1009,7 +1010,10 @@ ReshardingApproxCopySize computeApproxCopySize(OperationContext* opCtx,
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    resharding::DaoStorageClientImpl daoClient;
+    if (_coordinatorDao.getPhase(opCtx.get(), &daoClient, _coordinatorDoc.getReshardingUUID()) >
+        CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
@@ -1166,7 +1170,10 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
 
 ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kCloning) {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    resharding::DaoStorageClientImpl daoClient;
+    if (_coordinatorDao.getPhase(opCtx.get(), &daoClient, _coordinatorDoc.getReshardingUUID()) >
+        CoordinatorStateEnum::kCloning) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 

@@ -40,7 +40,7 @@
 namespace mongo {
 namespace resharding {
 
-class SpyingDocumentUpdater : public DaoStorageClient {
+class SpyingDaoStorageClient : public DaoStorageClient {
 public:
     void alterState(OperationContext* opCtx, const BatchedCommandRequest& request) override {
         _lastRequest = request.toBSON();
@@ -66,7 +66,7 @@ private:
 
 TEST(ReshardingCoordinatorDaoTest, TransitionToCloningPhase) {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kPreparingToDonate);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
@@ -101,7 +101,7 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
            TransitionToCloningPhasePreviousStateInvariant,
            "invariant") {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
@@ -120,7 +120,7 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
 
 TEST(ReshardingCoordinatorDaoTest, TransitionToApplyingPhase) {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
@@ -147,7 +147,7 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
            TransitionToApplyingPhasePreviousStateInvariant,
            "invariant") {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
@@ -157,9 +157,25 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
     dao.transitionToApplyingPhase(opCtx, &updater, applyStartTime, uuid);
 }
 
+
+TEST(ReshardingCoordinatorDaoTest, GetPhase) {
+    SpyingDaoStorageClient client;
+    client.getOnDiskStateForModification().setState(CoordinatorStateEnum::kCloning);
+    ReshardingCoordinatorDao dao;
+    OperationContext* opCtx = nullptr;
+    auto uuid = UUID::gen();
+    auto phase = dao.getPhase(opCtx, &client, uuid);
+    ASSERT_EQUALS(phase, CoordinatorStateEnum::kCloning);
+
+    // Test with a different phase.
+    client.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
+    phase = dao.getPhase(opCtx, &client, uuid);
+    ASSERT_EQUALS(phase, CoordinatorStateEnum::kApplying);
+}
+
 TEST(ReshardingCoordinatorDaoTest, TransitionToBlockingWritesPhase) {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kApplying);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
@@ -187,7 +203,7 @@ DEATH_TEST(ReshardingCoordinatorDaoTest,
            TransitionToBlockingWritesPhasePreviousStateInvariant,
            "invariant") {
     ClockSourceMock clock;
-    SpyingDocumentUpdater updater;
+    SpyingDaoStorageClient updater;
     updater.getOnDiskStateForModification().setState(CoordinatorStateEnum::kAborting);
     ReshardingCoordinatorDao dao;
     OperationContext* opCtx = nullptr;
