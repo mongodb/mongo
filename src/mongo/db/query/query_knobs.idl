@@ -1627,16 +1627,6 @@ server_parameters:
         default: false
         redact: false
 
-    internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue:
-        description: >-
-            Prevent $ne and $nin predicates on dotted field paths with null operand from being considered as
-            a subset of {$exists: true} on the same dotted path during query planning.
-        set_at: [startup, runtime]
-        cpp_varname: "internalQueryPlannerDisableDottedPathIsSubsetOfExistsTrue"
-        cpp_vartype: AtomicWord<bool>
-        default: true
-        redact: false
-
     internalQueryUnifiedWriteExecutor:
         description: "Boolean flag to use the unified write executor."
         set_at: [startup, runtime]
