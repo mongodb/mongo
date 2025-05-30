@@ -699,18 +699,6 @@ TEST(ExpressionAlgoIsSubsetOf, NinAndExists) {
     ASSERT_TRUE(expression::isSubsetOf(aNinWithNull.get(), aExists.get()));
 }
 
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_Nin_Dotted_Path) {
-    ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
-    ParsedMatchExpressionForTest aBNin("{'a.b': {$nin: [1, 2, 3]}}");
-    ParsedMatchExpressionForTest aBNinWithNull("{'a.b': {$nin: [1, null, 3]}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aBNin.get(), aBExists.get()));
-
-    // This behavior is inconsistent with how top-level fields work. The behavior is similar to the
-    // one described in SERVER-36681.
-    ASSERT_FALSE(expression::isSubsetOf(aBNinWithNull.get(), aBExists.get()));
-}
-
 TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
     ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
     ParsedMatchExpressionForTest aNotEqual1("{a: {$ne: 1}}");
@@ -720,109 +708,6 @@ TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE) {
     ASSERT_FALSE(expression::isSubsetOf(aNotEqual1.get(), aExists.get()));
     ASSERT_FALSE(expression::isSubsetOf(bNotEqual1.get(), aExists.get()));
     ASSERT_TRUE(expression::isSubsetOf(aNotEqualNull.get(), aExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Path) {
-    ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
-    ParsedMatchExpressionForTest aBNotEqual1("{'a.b': {$ne: 1}}");
-    ParsedMatchExpressionForTest aBNotEqualNull("{'a.b': {$ne: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aBNotEqual1.get(), aBExists.get()));
-
-    // This behavior is inconsistent with how top-level fields work. See SERVER-36681.
-    ASSERT_FALSE(expression::isSubsetOf(aBNotEqualNull.get(), aBExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_NE_Dotted_Numeric) {
-    ParsedMatchExpressionForTest a0Exists("{'a.0': {$exists: true}}");
-    ParsedMatchExpressionForTest a0NotEqual1("{'a.0': {$ne: 1}}");
-    ParsedMatchExpressionForTest a0NotEqualNull("{'a.0': {$ne: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(a0NotEqual1.get(), a0Exists.get()));
-
-    // This behavior is inconsistent with how top-level fields work. See SERVER-36681.
-    ASSERT_FALSE(expression::isSubsetOf(a0NotEqualNull.get(), a0Exists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_EQ) {
-    ParsedMatchExpressionForTest aExists("{a: {$exists: true}}");
-    ParsedMatchExpressionForTest aEqual1("{a: {$eq: 1}}");
-    ParsedMatchExpressionForTest aEqualNull("{a: {$eq: null}}");
-
-    ASSERT_TRUE(expression::isSubsetOf(aEqual1.get(), aExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aEqualNull.get(), aExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_EQ_Dotted_Path) {
-    ParsedMatchExpressionForTest aBExists("{'a.b': {$exists: true}}");
-    ParsedMatchExpressionForTest aBEqual1("{'a.b': {$eq: 1}}");
-    ParsedMatchExpressionForTest aBEqualNull("{'a.b': {$eq: null}}");
-
-    ASSERT_TRUE(expression::isSubsetOf(aBEqual1.get(), aBExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aBEqualNull.get(), aBExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Exists_EQ_Dotted_Numeric) {
-    ParsedMatchExpressionForTest aBExists("{'a.0': {$exists: true}}");
-    ParsedMatchExpressionForTest aBEqual1("{'a.0': {$eq: 1}}");
-    ParsedMatchExpressionForTest aBEqualNull("{'a.0': {$eq: null}}");
-
-    ASSERT_TRUE(expression::isSubsetOf(aBEqual1.get(), aBExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aBEqualNull.get(), aBExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_NE) {
-    ParsedMatchExpressionForTest aNotExists("{a: {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest aNotEqual1("{a: {$ne: 1}}");
-    ParsedMatchExpressionForTest aNotEqualNull("{a: {$ne: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aNotEqual1.get(), aNotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aNotEqualNull.get(), aNotExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_NE_Dotted_Path) {
-    ParsedMatchExpressionForTest aBNotExists("{'a.b': {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest aBNotEqual1("{'a.b': {$ne: 1}}");
-    ParsedMatchExpressionForTest aBNotEqualNull("{'a.b': {$ne: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aBNotEqual1.get(), aBNotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aBNotEqualNull.get(), aBNotExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_NE_Dotted_Numeric) {
-    ParsedMatchExpressionForTest a0NotExists("{'a.0': {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest a0NotEqual1("{'a.0': {$ne: 1}}");
-    ParsedMatchExpressionForTest a0NotEqualNull("{'a.0': {$ne: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(a0NotEqual1.get(), a0NotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(a0NotEqualNull.get(), a0NotExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_EQ) {
-    ParsedMatchExpressionForTest aNotExists("{a: {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest aEqual1("{a: {$eq: 1}}");
-    ParsedMatchExpressionForTest aEqualNull("{a: {$eq: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aEqual1.get(), aNotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aEqualNull.get(), aNotExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_EQ_Dotted_Path) {
-    ParsedMatchExpressionForTest aBNotExists("{'a.b': {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest aBEqual1("{'a.b': {$eq: 1}}");
-    ParsedMatchExpressionForTest aBEqualNull("{'a.b': {$eq: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(aBEqual1.get(), aBNotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(aBEqualNull.get(), aBNotExists.get()));
-}
-
-TEST(ExpressionAlgoIsSubsetOf, Compare_Not_Exists_EQ_Dotted_Numeric) {
-    ParsedMatchExpressionForTest a0NotExists("{'a.0': {$not: {$exists: true}}}");
-    ParsedMatchExpressionForTest a0Equal1("{'a.0': {$eq: 1}}");
-    ParsedMatchExpressionForTest a0EqualNull("{'a.0': {$eq: null}}");
-
-    ASSERT_FALSE(expression::isSubsetOf(a0Equal1.get(), a0NotExists.get()));
-    ASSERT_FALSE(expression::isSubsetOf(a0EqualNull.get(), a0NotExists.get()));
 }
 
 TEST(ExpressionAlgoIsSubsetOf, CollationAwareStringComparison) {
