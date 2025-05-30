@@ -2405,6 +2405,22 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharding_viewless_timeseries_gen
+    # TODO (SERVER-101590): Remove this temporary suite.
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "sharding",
+        "requires_all_feature_flags",
+        "viewless_timeseries",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
     # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:

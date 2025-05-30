@@ -1,3 +1,4 @@
+# featureFlagCreateViewlessTimeseriesCollections overrides
 - name: enable_viewless_timeseries_feature_flag_mongod
   value:
     executor:
@@ -12,6 +13,25 @@
         mongos_options:
           set_parameters:
             featureFlagCreateViewlessTimeseriesCollections: 1
+- name: enable_viewless_timeseries_feature_flag_testdata_parameter_mongod
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParameters:
+                featureFlagCreateViewlessTimeseriesCollections: true
+- name: enable_viewless_timeseries_feature_flag_testdata_parameter_mongos
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              setParametersMongos:
+                featureFlagCreateViewlessTimeseriesCollections: true
+# concurrency test selectors
 - name: all_concurrency_timeseries_tests_selector
   value:
     selector:
@@ -19,13 +39,14 @@
       roots:
         - jstests/concurrency/fsm_workloads/**/*timeseries*/**/*.js
         - jstests/concurrency/fsm_workloads/**/*timeseries*.js
-- name: all_timeseries_tests_selector
+# jsCore test selectors
+- name: all_jscore_timeseries_tests_selector
   value:
     selector:
       exclude_files: null
       roots:
         - jstests/core/timeseries/**/*.js
-- name: only_validated_timeseries_tests_selector
+- name: only_validated_jscore_timeseries_tests_selector
   value:
     selector:
       exclude_files: null
@@ -96,6 +117,90 @@
         - jstests/core/timeseries/write/timeseries_out_of_order.js
         - jstests/core/timeseries/write/timeseries_simple.js
         - jstests/core/timeseries/write/timeseries_sparse.js
+# sharding test selectors
+- name: all_sharding_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/sharding/*timeseries*/*.js
+        - jstests/sharding/**/*timeseries*.js
+- name: only_validated_sharding_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/sharding/libs/timeseries_update_multi_util.js
+        - jstests/sharding/timeseries/timeseries_out_conflicting_namespace_on_shard.js
+        - jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
+        - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
+# noPassthrough test selectors
+- name: all_no_passthrough_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/noPassthrough/**/timeseries/**/*.js
+        - jstests/noPassthrough/**/*timeseries*.js
+- name: only_validated_no_passthrough_timeseries_tests_selector
+  value:
+    selector:
+      exclude_files: null
+      roots:
+        - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
+        - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+        - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
+        - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
+        - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js
+        - jstests/noPassthrough/timeseries/create/timeseries_startup.js
+        - jstests/noPassthrough/timeseries/create/timeseries_writes_check_buckets_coll_is_valid.js
+        - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js
+        - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
+        - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
+        - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
+        - jstests/noPassthrough/timeseries/query/timeseries_group_block_metrics.js
+        - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js
+        - jstests/noPassthrough/timeseries/query/timeseries_group_spill_metrics.js
+        - jstests/noPassthrough/timeseries/query/timeseries_group_topN_bottomN.js
+        - jstests/noPassthrough/timeseries/query/timeseries_id_filtered_explicit_upack_bucket.js
+        - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
+        - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
+        - jstests/noPassthrough/timeseries/query/timeseries_sample_on_system_buckets.js
+        - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
+        - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
+        - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
+        - jstests/noPassthrough/timeseries/timeseries_resharding_disabled.js
+        - jstests/noPassthrough/timeseries/timeseries_write_concurrent_collection_replace.js
+        - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
+        - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
+        - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+        - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
+        - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucketing_parameters_change.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_count.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_data_indexes.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_id_timestamp.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_minmax.js
+        - jstests/noPassthrough/timeseries/validate/validate_timeseries_version.js
+        - jstests/noPassthrough/timeseries/validate/validate_v3_buckets_are_unsorted.js
+        - jstests/noPassthrough/timeseries/write/promoting_compressed_sorted_bucket_to_compressed_unsorted_bucket.js
+        - jstests/noPassthrough/timeseries/write/timeseries_bucket_limit_size.js
+        - jstests/noPassthrough/timeseries/write/timeseries_bucket_oids.js
+        - jstests/noPassthrough/timeseries/write/timeseries_closed_due_to_schema_changes.js
+        - jstests/noPassthrough/timeseries/write/timeseries_compressed_bucket_size.js
+        - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing.js
+        - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing_large.js
+        - jstests/noPassthrough/timeseries/write/timeseries_idle_buckets.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
+        - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js
+        - jstests/noPassthrough/timeseries/write/timeseries_large_measurements.js
+        - jstests/noPassthrough/timeseries/write/timeseries_large_measurements_max_size.js
+        - jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js
+        - jstests/noPassthrough/timeseries/write/timeseries_retryable_writes_restart.js
+        - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
+        - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
+# excludes
 - name: exclude_viewless_timeseries_incompabile_tag
   value:
     exclude_with_any_tags:

@@ -1,0 +1,97 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_passthrough_viewless_timeseries.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+description:
+  '"Passthrough" means running a test against different runtime Cluster
+
+  configurations, including topology, runtime flags, fault injections, and other
+
+  parameters. Most tests by default are able to run in "passthrough" suites.
+
+  NoPassthrough is an exception, where tests here only run in the exact
+
+  configuration predefined in the tests themselves.
+
+  '
+executor:
+  archive:
+    tests:
+      - jstests/noPassthrough/backup*.js
+      - jstests/noPassthrough/oplog_writes_only_permitted_on_standalone.js
+      - jstests/noPassthrough/wt_unclean_shutdown.js
+      - src/mongo/db/modules/*/jstests/live_restore/*.js
+      - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagCreateViewlessTimeseriesCollections: true
+          setParametersMongos:
+            featureFlagCreateViewlessTimeseriesCollections: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
+  roots:
+    - jstests/noPassthrough/query/timeseries/bucket_unpacking_with_sort_granularity_change.js
+    - jstests/noPassthrough/query/timeseries/timeseries_validate_mixed_schema_bucket.js
+    - jstests/noPassthrough/timeseries/create/initial_sync_recreate_timeseries_collection.js
+    - jstests/noPassthrough/timeseries/create/timeseries_block_compressor_options.js
+    - jstests/noPassthrough/timeseries/create/timeseries_server_parameters.js
+    - jstests/noPassthrough/timeseries/create/timeseries_startup.js
+    - jstests/noPassthrough/timeseries/create/timeseries_writes_check_buckets_coll_is_valid.js
+    - jstests/noPassthrough/timeseries/data_integrity/intermediate_data_consistency_checks_skips.js
+    - jstests/noPassthrough/timeseries/data_integrity/timeseries_insert_decompression_failure.js
+    - jstests/noPassthrough/timeseries/extended_range/timeseries_bucket_spanning_epoch.js
+    - jstests/noPassthrough/timeseries/index_builds/timeseries_create_index_option_defaults.js
+    - jstests/noPassthrough/timeseries/query/timeseries_group_block_metrics.js
+    - jstests/noPassthrough/timeseries/query/timeseries_group_bson_types.js
+    - jstests/noPassthrough/timeseries/query/timeseries_group_spill_metrics.js
+    - jstests/noPassthrough/timeseries/query/timeseries_group_topN_bottomN.js
+    - jstests/noPassthrough/timeseries/query/timeseries_id_filtered_explicit_upack_bucket.js
+    - jstests/noPassthrough/timeseries/query/timeseries_internal_bounded_sort_spilling.js
+    - jstests/noPassthrough/timeseries/query/timeseries_query_knob_sbe.js
+    - jstests/noPassthrough/timeseries/query/timeseries_sample_on_system_buckets.js
+    - jstests/noPassthrough/timeseries/stats/timeseries_latency_stats.js
+    - jstests/noPassthrough/timeseries/stats/timeseries_serverStatus.js
+    - jstests/noPassthrough/timeseries/timeseries_buckets_oplog_update.js
+    - jstests/noPassthrough/timeseries/timeseries_resharding_disabled.js
+    - jstests/noPassthrough/timeseries/timeseries_write_concurrent_collection_replace.js
+    - jstests/noPassthrough/timeseries/ttl/timeseries_expire.js
+    - jstests/noPassthrough/timeseries/ttl/timeseries_expires_with_partial_index.js
+    - jstests/noPassthrough/timeseries/ttl/timeseries_ttl.js
+    - jstests/noPassthrough/timeseries/updates_deletes/timeseries_updates_create_compressed_buckets.js
+    - jstests/noPassthrough/timeseries/validate/validate_compressed_bucket_with_time_out_of_order.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucket_max_span.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_bucketing_parameters_change.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_count.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_data_indexes.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_id_timestamp.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_minmax.js
+    - jstests/noPassthrough/timeseries/validate/validate_timeseries_version.js
+    - jstests/noPassthrough/timeseries/validate/validate_v3_buckets_are_unsorted.js
+    - jstests/noPassthrough/timeseries/write/promoting_compressed_sorted_bucket_to_compressed_unsorted_bucket.js
+    - jstests/noPassthrough/timeseries/write/timeseries_bucket_limit_size.js
+    - jstests/noPassthrough/timeseries/write/timeseries_bucket_oids.js
+    - jstests/noPassthrough/timeseries/write/timeseries_closed_due_to_schema_changes.js
+    - jstests/noPassthrough/timeseries/write/timeseries_compressed_bucket_size.js
+    - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing.js
+    - jstests/noPassthrough/timeseries/write/timeseries_dynamic_bucket_sizing_large.js
+    - jstests/noPassthrough/timeseries/write/timeseries_idle_buckets.js
+    - jstests/noPassthrough/timeseries/write/timeseries_insert_after_failed_insert.js
+    - jstests/noPassthrough/timeseries/write/timeseries_insert_invalid_timefield.js
+    - jstests/noPassthrough/timeseries/write/timeseries_large_measurements.js
+    - jstests/noPassthrough/timeseries/write/timeseries_large_measurements_max_size.js
+    - jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js
+    - jstests/noPassthrough/timeseries/write/timeseries_retryable_writes_restart.js
+    - jstests/noPassthrough/timeseries/write/timeseries_time_backward.js
+    - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
+test_kind: js_test

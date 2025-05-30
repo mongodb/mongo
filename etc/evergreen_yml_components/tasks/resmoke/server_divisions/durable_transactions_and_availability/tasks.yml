@@ -2131,6 +2131,27 @@ tasks:
           suite: no_passthrough
           use_large_distro: "true"
 
+  # TODO (SERVER-101590): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: noPassthrough_viewless_timeseries_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "viewless_timeseries",
+        "requires_all_feature_flags",
+        "requires_execution_on_windows_patch_build",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: no_passthrough_viewless_timeseries
+          use_large_distro: "true"
+
   - <<: *task_template
     name: read_only
     tags: ["assigned_to_jira_team_server_execution", "default", "read_only"]

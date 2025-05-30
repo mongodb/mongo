@@ -5,7 +5,7 @@
 # TODO SERVER-101590: remove this temorary suite and all its usages.
 base_suite: sharded_collections_jscore_passthrough
 overrides:
-  - "viewless_timeseries.only_validated_timeseries_tests_selector"
+  - "viewless_timeseries.only_validated_jscore_timeseries_tests_selector"
   - "viewless_timeseries.enable_viewless_timeseries_feature_flag_mongod"
   - "viewless_timeseries.enable_viewless_timeseries_feature_flag_mongos"
 

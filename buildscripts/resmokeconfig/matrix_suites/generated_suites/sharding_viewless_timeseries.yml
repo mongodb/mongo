@@ -1,0 +1,32 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_viewless_timeseries.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    tests:
+      - jstests/sharding/*reshard*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            featureFlagCreateViewlessTimeseriesCollections: true
+          setParametersMongos:
+            featureFlagCreateViewlessTimeseriesCollections: true
+      nodb: ""
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+    - viewless_timeseries_incompatible
+    - does_not_support_viewless_timeseries_yet
+  roots:
+    - jstests/sharding/libs/timeseries_update_multi_util.js
+    - jstests/sharding/timeseries/timeseries_out_conflicting_namespace_on_shard.js
+    - jstests/sharding/timeseries/timeseries_shard_collection_with_deprecation_message.js
+    - jstests/sharding/timeseries/timeseries_user_system_buckets_sharding.js
+test_kind: js_test
