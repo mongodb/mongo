@@ -39,6 +39,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/router_role.h"
 
 #include <memory>
 #include <set>
@@ -67,9 +68,14 @@ namespace mongo {
  * @param allowPartialResults: If true, unreachable hosts are ignored, and only cursors established
  *                             on reachable hosts are returned.
  *
+ * @param routingCtx: An interface that acquires cached routing tables at the start of a routing
+ *                    operation and provides accessors throughout the operation. If provided, we
+ *                    will mark that a request has successfully sent a request to the shards at the
+ *                    end of CursorEstablisher::sendRequests(), in order to validate the
+ *                    RoutingContext.
+ *
  * @param designatedHostsMap: A map of hosts to be targeted for particular shards, overriding
  *                            the read preference setting.
- *
  */
 std::vector<RemoteCursor> establishCursors(
     OperationContext* opCtx,
@@ -78,6 +84,7 @@ std::vector<RemoteCursor> establishCursors(
     ReadPreferenceSetting readPref,
     const std::vector<AsyncRequestsSender::Request>& remotes,
     bool allowPartialResults,
+    RoutingContext* routingCtx = nullptr,
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent,
     std::vector<OperationKey> providedOpKeys = {},
     AsyncRequestsSender::ShardHostMap designatedHostsMap = {});

@@ -134,15 +134,12 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
     }
 }
 
-bool RoutingContext::onStaleError(const NamespaceString& nss, const Status& status) {
+void RoutingContext::onStaleError(const NamespaceString& nss, const Status& status) {
     if (status.code() == ErrorCodes::StaleDbVersion) {
         auto si = status.extraInfo<StaleDbRoutingVersion>();
         // If the database version is stale, refresh its entry in the catalog cache.
         _catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-        return true;
-    }
-
-    if (ErrorCodes::isStaleShardVersionError(status)) {
+    } else if (ErrorCodes::isStaleShardVersionError(status)) {
         // 1. If the exception provides a shardId, add it to the set of shards requiring a refresh.
         // 2. If the cache currently considers the collection to be unsharded, this will trigger an
         //    epoch refresh.
@@ -152,11 +149,7 @@ bool RoutingContext::onStaleError(const NamespaceString& nss, const Status& stat
         } else {
             _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
         }
-        return true;
     }
-
-    uassertStatusOK(status);
-    return false;
 }
 
 void RoutingContext::skipValidation() {

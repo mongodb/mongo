@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/util/assert_util.h"
 
@@ -93,7 +94,7 @@ public:
      * Utility to trigger CatalogCache refreshes for staleness errors directly from the
      * RoutingContext.
      */
-    bool onStaleError(const NamespaceString& nss, const Status& status);
+    void onStaleError(const NamespaceString& nss, const Status& status);
 
     /**
      * By default, the RoutingContext should be validated by running validateOnContextEnd() at the
@@ -161,20 +162,24 @@ auto runAndValidate(RoutingContext& routingCtx, Fn&& fn) {
 template <class Fn>
 auto withValidatedRoutingContext(OperationContext* opCtx,
                                  const std::vector<NamespaceString>& nssList,
-                                 bool allowLocks,
                                  Fn&& fn) {
-    RoutingContext routingCtx(opCtx, nssList, allowLocks);
+    RoutingContext routingCtx(opCtx, nssList);
     return runAndValidate(routingCtx, std::forward<Fn>(fn));
 }
 
 /*
- * Same as above, but assumes allowLocks is false.
+ * Same as above, but checks whether locks are allowed if we are in a transaction.
  */
 template <class Fn>
-auto withValidatedRoutingContext(OperationContext* opCtx,
-                                 const std::vector<NamespaceString>& nssList,
-                                 Fn&& fn) {
-    RoutingContext routingCtx(opCtx, nssList);
+auto withValidatedRoutingContextForTxnCmd(OperationContext* opCtx,
+                                          const std::vector<NamespaceString>& nssList,
+                                          Fn&& fn) {
+    // When in a multi-document transaction, allow getting routing info from the
+    // CatalogCache even though locks may be held. The CatalogCache will throw
+    // CannotRefreshDueToLocksHeld if the entry is not already cached.
+    const auto allowLocks =
+        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+    RoutingContext routingCtx(opCtx, nssList, allowLocks);
     return runAndValidate(routingCtx, std::forward<Fn>(fn));
 }
 

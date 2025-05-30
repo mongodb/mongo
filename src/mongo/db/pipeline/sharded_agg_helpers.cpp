@@ -289,12 +289,15 @@ std::vector<RemoteCursor> establishShardCursors(
         return establishCursorsOnAllHosts(
             opCtx, std::move(executor), nss, shardIds, cmdObj, false, getDesiredRetryPolicy(opCtx));
     } else {
+        // TODO SERVER-102925 RoutingContext should not be nullptr here after it's incorporated into
+        // sharded agg.
         return establishCursors(opCtx,
                                 std::move(executor),
                                 nss,
                                 readPref,
                                 requests,
                                 false /* do not allow partial results */,
+                                nullptr /* RoutingContext */,
                                 getDesiredRetryPolicy(opCtx),
                                 {} /* providedOpKeys */,
                                 std::move(designatedHostsMap));
@@ -594,8 +597,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
     std::unique_ptr<Pipeline, PipelineDeleter>& pipelineToTarget,
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
-    const CollectionRoutingInfo& targetingCri,
+    RoutingContext& routingCtx,
     const ShardId& localShardId) {
+    const auto& nss = expCtx.getNamespaceString();
+    const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
+
     try {
         auto shardVersion = [&] {
             auto sv = targetingCri.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
@@ -609,10 +615,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
         }();
         ScopedSetShardRole shardRole{
             opCtx,
-            expCtx.getNamespaceString(),
+            nss,
             shardVersion,
             boost::optional<DatabaseVersion>{!targetingCri.hasRoutingTable(),
                                              targetingCri.getDbVersion()}};
+
+        // Mark routing table as validated as we have "sent" the versioned command to a shard by
+        // entering the shard role for a local read.
+        routingCtx.onRequestSentForNss(nss);
 
         // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
         // catching exceptions. attachCursorSourceToPipelineForLocalRead enters the
@@ -673,6 +683,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
                                     std::move(readPreference),
                                     requests,
                                     false /* allowPartialResults */,
+                                    nullptr /* RoutingContext */,
                                     Shard::RetryPolicy::kIdempotent);
     invariant(cursors.size() == 1);
 
@@ -710,8 +721,9 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    const auto cri =
-        uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, mergeStage->getOutputNs()));
+    // TODO SERVER-102925 Remove this once the RoutingContext is incorporated into sharded agg.
+    const auto cri = uassertStatusOK(
+        getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, mergeStage->getOutputNs()));
     if (!cri.isSharded()) {
         return boost::none;
     }
@@ -1542,24 +1554,27 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
                                               expCtx->getNamespaceString());
     aggregation_request_helper::addQuerySettingsToRequest(aggRequest, expCtx);
-    return router.route(expCtx->getOperationContext(),
-                        "collecting explain from shards"_sd,
-                        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
-                            auto shardDispatchResults = dispatchShardPipeline(
-                                Document(aggRequest.toBSON()),
-                                pipelineDataSource,
-                                expCtx->eligibleForSampling(),
-                                pipeline->clone(),
-                                expCtx->getExplain(),
-                                false /* requestQueryStatsFromRemotes */,
-                                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(
-                                    opCtx, expCtx->getNamespaceString())));
-                            BSONObjBuilder explainBuilder;
-                            auto appendStatus = appendExplainResults(
-                                std::move(shardDispatchResults), expCtx, &explainBuilder);
-                            uassertStatusOK(appendStatus);
-                            return BSON("pipeline" << explainBuilder.done());
-                        });
+    return router.routeWithRoutingContext(
+        expCtx->getOperationContext(),
+        "collecting explain from shards"_sd,
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            auto shardDispatchResults = dispatchShardPipeline(
+                Document(aggRequest.toBSON()),
+                pipelineDataSource,
+                expCtx->eligibleForSampling(),
+                pipeline->clone(),
+                expCtx->getExplain(),
+                false /* requestQueryStatsFromRemotes */,
+                routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString()));
+            BSONObjBuilder explainBuilder;
+            auto appendStatus =
+                appendExplainResults(std::move(shardDispatchResults), expCtx, &explainBuilder);
+            uassertStatusOK(appendStatus);
+
+            // TODO SERVER-102925 Remove once RoutingContext is integrated into sharded aggregation.
+            routingCtx.skipValidation();
+            return BSON("pipeline" << explainBuilder.done());
+        });
 }
 
 StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
@@ -1576,7 +1591,8 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
     }
 
     // This call to getCollectionRoutingInfoForTxnCmd will return !OK if the database does not exist
-    return getCollectionRoutingInfoForTxnCmd(opCtx, execNss);
+    // TODO SERVER-102925 Remove once RoutingContext is integrated into sharded aggregation.
+    return getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, execNss);
 }
 
 Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
@@ -1721,18 +1737,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     // to see what shard(s) the pipeline targets.
     sharding::router::CollectionRouter router(expCtx->getOperationContext()->getServiceContext(),
                                               expCtx->getNamespaceString());
-    return router.route(
+    return router.routeWithRoutingContext(
         expCtx->getOperationContext(),
         "targeting pipeline to attach cursors"_sd,
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& _) {
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
             auto pipelineToTarget = pipeline->clone();
 
-            // CollectionRoutingInfo provided by CollectionRouter, contains the latest data. We call
-            // getCollectionRoutingInfoForTxnCmd() to get CRI with historical data for transactions
-            // with snapshot isolations. We wrap the result into boost::optional, as the next
-            // function accepts only boost::optional.
-            boost::optional<CollectionRoutingInfo> targetingCri = uassertStatusOK(
-                getCollectionRoutingInfoForTxnCmd(opCtx, expCtx->getNamespaceString()));
+            // We wrap the result into boost::optional, as the next function accepts only
+            // boost::optional.
+            boost::optional<CollectionRoutingInfo> targetingCri =
+                routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
             auto pipelineTargetingInfo = targetPipeline(expCtx,
                                                         pipelineToTarget.get(),
                                                         pipelineDataSource,
@@ -1749,7 +1763,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
                                                           pipelineToTarget,
                                                           aggRequest,
                                                           useCollectionDefaultCollator,
-                                                          *targetingCri,
+                                                          routingCtx,
                                                           *localShardId)) {
                     return pipelineWithCursor;
                 }
@@ -1763,6 +1777,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
             bool requestQueryStatsFromRemotes = query_stats::shouldRequestRemoteMetrics(
                 CurOp::get(expCtx->getOperationContext())->debug());
+
+            // TODO SERVER-102925 Remove once RoutingContext is integrated into sharded aggregation.
+            routingCtx.skipValidation();
             return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
                                                               aggRequest,
                                                               std::move(pipelineToTarget),

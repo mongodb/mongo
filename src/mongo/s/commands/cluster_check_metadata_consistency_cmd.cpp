@@ -262,6 +262,7 @@ public:
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
                 requests,
                 false /*allowPartialResults*/,
+                nullptr /* RoutingContext */,
                 Shard::RetryPolicy::kIdempotent,
                 std::move(opKeys));
 

@@ -442,10 +442,23 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
  * read concern, the latest routing table is returned, otherwise a historical routing table is
  * returned at the global read timestamp, which must have been selected by this point.
  *
+ * Note that this will be deprecated (SERVER-102925, SERVER-104490) in favor of
+ * getRoutingContextForTxnCmd().
+ */
+StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
+    OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * If the command is running in a transaction, returns the RoutingContext to use for targeting
+ * shards. If there is no active transaction or the transaction is not running with snapshot level
+ * read concern, the RoutingContext acquires the latest routing table, otherwise it acquires a
+ * historical routing table at the global read timestamp, which must have been selected by this
+ * point.
+ *
  * Should be used by all router commands that can be run in a transaction when targeting shards.
  */
-StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
-                                                                    const NamespaceString& nss);
+StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(OperationContext* opCtx,
+                                                                       const NamespaceString& nss);
 
 /**
  * Force a refresh of the routing cache and fetch the routing info for the given collection.

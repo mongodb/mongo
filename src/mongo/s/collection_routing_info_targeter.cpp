@@ -254,7 +254,9 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                     waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
                 }
 
-                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+                // TODO SERVER-104490 Remove this once RoutingContext is integrated with the
+                // RoutingContext.
+                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_INFO(8314601,
                            "Failed initialization of routing info because the database has been "

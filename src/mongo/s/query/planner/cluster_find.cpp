@@ -298,10 +298,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  const boost::optional<UUID> sampleId,
-                                 const CollectionRoutingInfo& cri,
+                                 RoutingContext* routingCtx,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     const auto& findCommand = query.getFindCommandRequest();
+    const auto& nss = query.nss();
+    const auto& cri = routingCtx->getCollectionRoutingInfo(nss);
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForCanonicalQuery(query, cri);
 
@@ -311,7 +313,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
     ClusterClientCursorParams params(
-        query.nss(), APIParameters::get(opCtx), readPref, repl::ReadConcernArgs::get(opCtx), [&] {
+        nss, APIParameters::get(opCtx), readPref, repl::ReadConcernArgs::get(opCtx), [&] {
             if (!opCtx->getLogicalSessionId())
                 return OperationSessionInfoFromClient();
 
@@ -402,10 +404,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             params.remotes =
                 establishCursors(opCtx,
                                  Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                 query.nss(),
+                                 nss,
                                  readPref,
                                  std::move(requests),
                                  findCommand.getAllowPartialResults(),
+                                 routingCtx,
                                  Shard::RetryPolicy::kIdempotent,
                                  std::move(opKeys));
         });
@@ -544,7 +547,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     collectQueryStatsMongos(opCtx, ccc);
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
-        opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUser));
+        opCtx, ccc.releaseCursor(), nss, cursorType, cursorLifetime, authUser));
 
     // Record the cursorID in CurOp.
     opDebug.cursorid = cursorId;
@@ -707,11 +710,11 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             !findCommand.getRequestResumeToken() && findCommand.getResumeAfter().isEmpty() &&
                 findCommand.getStartAt().isEmpty());
 
-    auto const catalogCache = Grid::get(opCtx)->catalogCache();
+    const auto& nss = query.nss();
     // Try to generate a sample id for this query here instead of inside 'runQueryWithoutRetrying()'
     // since it is incorrect to generate multiple sample ids for a single query.
     const auto sampleId = analyze_shard_key::tryGenerateSampleId(
-        opCtx, query.nss(), analyze_shard_key::SampledCommandNameEnum::kFind);
+        opCtx, nss, analyze_shard_key::SampledCommandNameEnum::kFind);
 
     // Evaluate let params once: not per shard, and not per retry.
     if (auto letParams = findCommand.getLet()) {
@@ -735,14 +738,16 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
-        auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
-        if (swCri == ErrorCodes::NamespaceNotFound) {
+        auto swRoutingCtx = getRoutingContextForTxnCmd(opCtx, nss);
+        if (swRoutingCtx == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             return earlyExitWithNoResults(opCtx, query, findCommand);
         }
 
-        const auto cri = uassertStatusOK(std::move(swCri));
+        uassertStatusOK(swRoutingCtx.getStatus());
+        auto& routingCtx = swRoutingCtx.getValue();
+        const auto& cri = routingCtx->getCollectionRoutingInfo(nss);
 
         // Create an RAII object that prints the collection's shard key in the case of a tassert
         // or crash.
@@ -752,8 +757,16 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
 
         try {
-            return runQueryWithoutRetrying(
-                opCtx, query, readPref, sampleId, cri, results, partialResultsReturned);
+            const auto cursorId = runQueryWithoutRetrying(opCtx,
+                                                          query,
+                                                          readPref,
+                                                          sampleId,
+                                                          routingCtx.get(),
+                                                          results,
+                                                          partialResultsReturned);
+
+            routingCtx->validateOnContextEnd();
+            return cursorId;
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
@@ -772,8 +785,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                         "error"_attr = redact(ex));
 
             // Mark database entry in cache as stale.
-            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
-                                                                     ex->getVersionWanted());
+            routingCtx->onStaleError(nss, ex.toStatus());
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
@@ -816,11 +828,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                         "maxRetries"_attr = kMaxRetries,
                         "error"_attr = redact(ex));
 
-            if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                catalogCache->onStaleCollectionVersion(query.nss(), staleInfo->getVersionWanted());
-            } else {
-                catalogCache->invalidateCollectionEntry_LINEARIZABLE(query.nss());
-            }
+            routingCtx->onStaleError(nss, ex.toStatus());
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {

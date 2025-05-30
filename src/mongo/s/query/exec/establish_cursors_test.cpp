@@ -162,6 +162,44 @@ public:
         });
     }
 
+    ChunkManager createChunkManager(const UUID& uuid, const NamespaceString& nss) {
+        ShardKeyPattern sk{fromjson("{x: 1, _id: 1}")};
+        std::deque<DocumentSource::GetNextResult> configData{
+            Document(fromjson("{_id: {x: {$minKey: 1}, _id: {$minKey: 1}}, max: {x: 0.0, _id: "
+                              "0.0}, shard: 'shard1'}")),
+            Document(fromjson("{_id: {x: 0.0, _id: 0.0}, max: {x: {$maxKey: 1}, _id: {$maxKey: "
+                              "1}}, shard: 'shard2' }"))};
+        const OID epoch = OID::gen();
+        std::vector<ChunkType> chunks;
+        for (const auto& chunkData : configData) {
+            const auto bson = chunkData.getDocument().toBson();
+            ChunkRange range{bson.getField("_id").Obj().getOwned(),
+                             bson.getField("max").Obj().getOwned()};
+            ShardId shard{bson.getField("shard").valueStringDataSafe().toString()};
+            chunks.emplace_back(uuid,
+                                std::move(range),
+                                ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),
+                                std::move(shard));
+        }
+
+        auto rt = RoutingTableHistory::makeNew(nss,
+                                               uuid,
+                                               sk.getKeyPattern(),
+                                               false, /* unsplittable */
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               Timestamp(1, 1),
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               false,
+                                               chunks);
+
+        return ChunkManager(
+            ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rt)),
+            boost::none);
+    }
+
 protected:
     const NamespaceString _nss;
     std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
@@ -226,6 +264,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
+                                       nullptr /* RoutingContext */,
                                        Shard::RetryPolicy::kIdempotent,
                                        {},  // providedOpKeys
                                        designatedHosts),
@@ -247,6 +286,43 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithInvalidMessage) {
     failPoint->waitForTimesEntered(failPoint.initialTimesEntered() + 1);
 }
 
+TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) {
+    BSONObj cmdObj = fromjson("{find: 'testcoll'}");
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
+
+    auto uuid = UUID::gen();
+    stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap = {
+        {_nss,
+         CollectionRoutingInfo(
+             createChunkManager(uuid, _nss),
+             DatabaseTypeValueHandle(DatabaseType{
+                 _nss.dbName(), kTestShardIds[0], DatabaseVersion(uuid, Timestamp{1, 1})}))}};
+    auto routingCtx = RoutingContext::createForTest(criMap);
+
+    auto future = launchAsync([&] {
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false /* allowPartialResults */,
+                                        &routingCtx);
+        ASSERT_EQUALS(remotes.size(), cursors.size());
+        routingCtx.validateOnContextEnd();
+    });
+
+    // Remote responds.
+    onCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    future.default_timed_get();
+}
+
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
@@ -263,6 +339,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         remotes,
                                         false,  // allowPartialResults
+                                        nullptr /* RoutingContext */,
                                         Shard::RetryPolicy::kIdempotent,
                                         {},  // providedOpKeys
                                         designatedHosts);
@@ -606,6 +683,7 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                        remotes,
                                        false,  // allowPartialResults
+                                       nullptr /* RoutingContext */,
                                        Shard::RetryPolicy::kIdempotent,
                                        providedOpKeys),
                       ExceptionFor<ErrorCodes::FailedToParse>);

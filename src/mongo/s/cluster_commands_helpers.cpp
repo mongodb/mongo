@@ -982,8 +982,8 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);
 }
 
-StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
-                                                                    const NamespaceString& nss) {
+StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
+    OperationContext* opCtx, const NamespaceString& nss) {
     // When in a multi-document transaction, allow getting routing info from the
     // CatalogCache even though locks may be held. The CatalogCache will throw
     // CannotRefreshDueToLocksHeld if the entry is not already cached.
@@ -1014,6 +1014,28 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationCon
     }
 
     return catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks);
+}
+
+StatusWith<std::unique_ptr<RoutingContext>> getRoutingContextForTxnCmd(OperationContext* opCtx,
+                                                                       const NamespaceString& nss) {
+    // When in a multi-document transaction, allow getting routing info from the
+    // CatalogCache even though locks may be held. The CatalogCache will throw
+    // CannotRefreshDueToLocksHeld if the entry is not already cached.
+    //
+    // Note that we only do this if we indeed hold a lock. Otherwise first executions on a mongos
+    // would cause this to unnecessarily throw a transient CannotRefreshDueToLocksHeld error. This
+    // would force the client to retry the entire transaction even if it hasn't yet executed
+    // anything.
+    const auto allowLocks =
+        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+
+    try {
+        auto routingCtx =
+            std::make_unique<RoutingContext>(opCtx, std::vector<NamespaceString>{nss}, allowLocks);
+        return routingCtx;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 CollectionRoutingInfo getRefreshedCollectionRoutingInfoAssertSharded_DEPRECATED(

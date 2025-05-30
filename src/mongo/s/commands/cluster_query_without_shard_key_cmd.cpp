@@ -88,6 +88,7 @@
 #include "mongo/s/query/exec/router_stage_merge.h"
 #include "mongo/s/query/exec/router_stage_remove_metadata_fields.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -420,138 +421,150 @@ public:
 
             // Get all shard ids for shards that have chunks in the desired namespace.
             hangBeforeMetadataRefreshClusterQuery.pauseWhileSet(opCtx);
-            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
-            auto allShardsContainingChunksForNs =
-                getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
+            return routing_context_utils::withValidatedRoutingContextForTxnCmd(
+                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-            // If the request omits the collation use the collection default collation. If the
-            // collection just has the simple collation, we can leave the collation as an empty
-            // BSONObj. Note that this block assumes that we have a routing table (if we do not, we
-            // cannot know the collection default collation without contacting the primary shard).
-            tassert(8557201,
-                    "This function should not be invoked if we do not have a routing table",
-                    cri.hasRoutingTable());
-            const auto& cm = cri.getChunkManager();
-            if (parsedInfoFromRequest.collation.isEmpty()) {
-                if (const auto& defaultCollator = cm.getDefaultCollator()) {
-                    parsedInfoFromRequest.collation = defaultCollator->getSpec().toBSON();
-                }
-            }
+                    auto allShardsContainingChunksForNs =
+                        getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
 
-            const auto& collectionUUID = cm.getUUID();
-            const auto& timeseriesFields = cm.isSharded() && cm.getTimeseriesFields().has_value() &&
-                    parsedInfoFromRequest.isTimeseriesNamespace
-                ? cm.getTimeseriesFields()
-                : boost::none;
+                    // If the request omits the collation use the collection default collation. If
+                    // the collection just has the simple collation, we can leave the collation as
+                    // an empty BSONObj. Note that this block assumes that we have a routing table
+                    // (if we do not, we cannot know the collection default collation without
+                    // contacting the primary shard).
+                    tassert(8557201,
+                            "This function should not be invoked if we do not have a routing table",
+                            cri.hasRoutingTable());
+                    const auto& cm = cri.getChunkManager();
+                    if (parsedInfoFromRequest.collation.isEmpty()) {
+                        if (const auto& defaultCollator = cm.getDefaultCollator()) {
+                            parsedInfoFromRequest.collation = defaultCollator->getSpec().toBSON();
+                        }
+                    }
 
-            auto cmdObj =
-                createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
+                    const auto& collectionUUID = cm.getUUID();
+                    const auto& timeseriesFields = cm.isSharded() &&
+                            cm.getTimeseriesFields().has_value() &&
+                            parsedInfoFromRequest.isTimeseriesNamespace
+                        ? cm.getTimeseriesFields()
+                        : boost::none;
 
-            std::vector<AsyncRequestsSender::Request> requests;
-            requests.reserve(allShardsContainingChunksForNs.size());
-            for (const auto& shardId : allShardsContainingChunksForNs) {
-                requests.emplace_back(shardId,
-                                      appendShardVersion(cmdObj, cri.getShardVersion(shardId)));
-            }
+                    auto cmdObj =
+                        createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
 
-            MultiStatementTransactionRequestsSender ars(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName(),
-                requests,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kNoRetry);
+                    std::vector<AsyncRequestsSender::Request> requests;
+                    requests.reserve(allShardsContainingChunksForNs.size());
+                    for (const auto& shardId : allShardsContainingChunksForNs) {
+                        requests.emplace_back(
+                            shardId, appendShardVersion(cmdObj, cri.getShardVersion(shardId)));
+                    }
 
-            Response res;
-            bool wasStatementExecuted = false;
-            std::vector<RemoteCursor> remoteCursors;
+                    MultiStatementTransactionRequestsSender ars(
+                        opCtx,
+                        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                        request().getDbName(),
+                        requests,
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kNoRetry);
 
-            // The MultiStatementTransactionSender expects all statements executed by it to be a
-            // part of the transaction. If we break after finding a target document and then
-            // destruct the MultiStatementTransactionSender, we register the remaining responses as
-            // failed requests. This has implications when we go to commit the internal transaction,
-            // since the transaction router will notice that a request "failed" during execution and
-            // try to abort the transaction, which in turn will force the internal transaction to
-            // retry (potentially indefinitely). Thus, we need to wait for all of the responses from
-            // the MultiStatementTransactionSender.
-            while (!ars.done()) {
-                auto response = ars.next();
-                uassertStatusOK(response.swResponse);
+                    routingCtx.onRequestSentForNss(nss);
 
-                if (wasStatementExecuted) {
-                    continue;
-                }
+                    Response res;
+                    bool wasStatementExecuted = false;
+                    std::vector<RemoteCursor> remoteCursors;
 
-                auto cursor = uassertStatusOK(
-                    CursorResponse::parseFromBSON(response.swResponse.getValue().data));
+                    // The MultiStatementTransactionSender expects all statements executed by it to
+                    // be a part of the transaction. If we break after finding a target document and
+                    // then destruct the MultiStatementTransactionSender, we register the remaining
+                    // responses as failed requests. This has implications when we go to commit the
+                    // internal transaction, since the transaction router will notice that a request
+                    // "failed" during execution and try to abort the transaction, which in turn
+                    // will force the internal transaction to retry (potentially indefinitely).
+                    // Thus, we need to wait for all of the responses from the
+                    // MultiStatementTransactionSender.
+                    while (!ars.done()) {
+                        auto response = ars.next();
+                        uassertStatusOK(response.swResponse);
 
-                // Return the first target doc/shard id pair that has already applied the write
-                // for a retryable write.
-                if (cursor.getWasStatementExecuted()) {
-                    // Since the retryable write history check happens before a write is executed,
-                    // we can just use an empty BSONObj for the target doc.
-                    res.setTargetDoc(BSONObj::kEmptyObject);
-                    res.setShardId(response.shardId.toString());
-                    wasStatementExecuted = true;
-                    continue;
-                }
+                        if (wasStatementExecuted) {
+                            continue;
+                        }
 
-                remoteCursors.emplace_back(
-                    response.shardId.toString(), *response.shardHostAndPort, std::move(cursor));
-            }
+                        auto cursor = uassertStatusOK(
+                            CursorResponse::parseFromBSON(response.swResponse.getValue().data));
 
-            // For retryable writes, if the statement had already been executed successfully on a
-            // particular shard, return that response immediately.
-            if (wasStatementExecuted) {
-                return res;
-            }
+                        // Return the first target doc/shard id pair that has already applied the
+                        // write for a retryable write.
+                        if (cursor.getWasStatementExecuted()) {
+                            // Since the retryable write history check happens before a write is
+                            // executed, we can just use an empty BSONObj for the target doc.
+                            res.setTargetDoc(BSONObj::kEmptyObject);
+                            res.setShardId(response.shardId.toString());
+                            wasStatementExecuted = true;
+                            continue;
+                        }
 
-            // Return a target document. If a sort order is specified, return the first target
-            // document corresponding to the sort order for a particular sort key.
-            AsyncResultsMergerParams params(std::move(remoteCursors), nss);
-            if (auto sortPattern = parseSortPattern(opCtx, nss, parsedInfoFromRequest);
-                !sortPattern.isEmpty()) {
-                params.setSort(sortPattern);
-            } else {
-                params.setSort(boost::none);
-            }
+                        remoteCursors.emplace_back(response.shardId.toString(),
+                                                   *response.shardHostAndPort,
+                                                   std::move(cursor));
+                    }
 
-            std::unique_ptr<RouterExecStage> root = std::make_unique<RouterStageMerge>(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                std::move(params));
+                    // For retryable writes, if the statement had already been executed successfully
+                    // on a particular shard, return that response immediately.
+                    if (wasStatementExecuted) {
+                        return res;
+                    }
 
-            if (parsedInfoFromRequest.sort) {
-                root = std::make_unique<RouterStageRemoveMetadataFields>(
-                    opCtx, std::move(root), Document::allMetadataFieldNames);
-            }
+                    // Return a target document. If a sort order is specified, return the first
+                    // target document corresponding to the sort order for a particular sort key.
+                    AsyncResultsMergerParams params(std::move(remoteCursors), nss);
+                    if (auto sortPattern = parseSortPattern(opCtx, nss, parsedInfoFromRequest);
+                        !sortPattern.isEmpty()) {
+                        params.setSort(sortPattern);
+                    } else {
+                        params.setSort(boost::none);
+                    }
 
-            if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {
-                res.setTargetDoc(nextResponse.getResult());
-                res.setShardId(boost::optional<mongo::StringData>(nextResponse.getShardId()));
-            }
+                    std::unique_ptr<RouterExecStage> root = std::make_unique<RouterStageMerge>(
+                        opCtx,
+                        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                        std::move(params));
 
-            // If there are no targetable documents and {upsert: true}, create the document to
-            // upsert.
-            if (!res.getTargetDoc() && parsedInfoFromRequest.upsert) {
-                auto [upsertDoc, userUpsertDoc] = write_without_shard_key::generateUpsertDocument(
-                    opCtx,
-                    parsedInfoFromRequest.updateRequest.get(),
-                    collectionUUID,
-                    timeseriesFields
-                        ? boost::make_optional(timeseriesFields->getTimeseriesOptions())
-                        : boost::none,
-                    cri.getChunkManager().getDefaultCollator());
-                res.setTargetDoc(upsertDoc);
-                res.setUpsertRequired(true);
+                    if (parsedInfoFromRequest.sort) {
+                        root = std::make_unique<RouterStageRemoveMetadataFields>(
+                            opCtx, std::move(root), Document::allMetadataFieldNames);
+                    }
 
-                if (timeseriesFields) {
-                    res.setUserUpsertDocForTimeseries(userUpsertDoc);
-                }
-            }
+                    if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {
+                        res.setTargetDoc(nextResponse.getResult());
+                        res.setShardId(
+                            boost::optional<mongo::StringData>(nextResponse.getShardId()));
+                    }
 
-            return res;
+                    // If there are no targetable documents and {upsert: true}, create the document
+                    // to upsert.
+                    if (!res.getTargetDoc() && parsedInfoFromRequest.upsert) {
+                        auto [upsertDoc, userUpsertDoc] =
+                            write_without_shard_key::generateUpsertDocument(
+                                opCtx,
+                                parsedInfoFromRequest.updateRequest.get(),
+                                collectionUUID,
+                                timeseriesFields
+                                    ? boost::make_optional(timeseriesFields->getTimeseriesOptions())
+                                    : boost::none,
+                                cri.getChunkManager().getDefaultCollator());
+                        res.setTargetDoc(upsertDoc);
+                        res.setUpsertRequired(true);
+
+                        if (timeseriesFields) {
+                            res.setUserUpsertDocForTimeseries(userUpsertDoc);
+                        }
+                    }
+
+                    return res;
+                });
         }
 
     private:
@@ -577,52 +590,59 @@ public:
 
             // Get all shard ids for shards that have chunks in the desired namespace.
             const auto& nss = parsedInfoFromRequest.nss;
-            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            return routing_context_utils::withValidatedRoutingContextForTxnCmd(
+                opCtx, {nss}, [&](RoutingContext& routingCtx) {
+                    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-            auto allShardsContainingChunksForNs =
-                getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
-            auto cmdObj = createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, boost::none);
+                    auto allShardsContainingChunksForNs =
+                        getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
+                    auto cmdObj =
+                        createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, boost::none);
 
-            const auto aggExplainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+                    const auto aggExplainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
-            std::vector<AsyncRequestsSender::Request> requests;
-            requests.reserve(allShardsContainingChunksForNs.size());
-            for (const auto& shardId : allShardsContainingChunksForNs) {
-                requests.emplace_back(
-                    shardId, appendShardVersion(aggExplainCmdObj, cri.getShardVersion(shardId)));
-            }
+                    std::vector<AsyncRequestsSender::Request> requests;
+                    requests.reserve(allShardsContainingChunksForNs.size());
+                    for (const auto& shardId : allShardsContainingChunksForNs) {
+                        requests.emplace_back(
+                            shardId,
+                            appendShardVersion(aggExplainCmdObj, cri.getShardVersion(shardId)));
+                    }
 
-            Timer timer;
-            MultiStatementTransactionRequestsSender ars(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName(),
-                requests,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kNoRetry);
+                    Timer timer;
+                    MultiStatementTransactionRequestsSender ars(
+                        opCtx,
+                        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                        request().getDbName(),
+                        requests,
+                        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                        Shard::RetryPolicy::kNoRetry);
 
-            ShardId shardId;
-            std::vector<AsyncRequestsSender::Response> responses;
+                    routingCtx.onRequestSentForNss(nss);
 
-            while (!ars.done()) {
-                auto response = ars.next();
-                uassertStatusOK(response.swResponse);
-                shardId = response.shardId;
-                responses.push_back(std::move(response));
-            }
+                    ShardId shardId;
+                    std::vector<AsyncRequestsSender::Response> responses;
 
-            const auto millisElapsed = timer.millis();
+                    while (!ars.done()) {
+                        auto response = ars.next();
+                        uassertStatusOK(response.swResponse);
+                        shardId = response.shardId;
+                        responses.push_back(std::move(response));
+                    }
 
-            auto bodyBuilder = result->getBodyBuilder();
-            uassertStatusOK(ClusterExplain::buildExplainResult(
-                ExpressionContext::makeBlankExpressionContext(opCtx, nss),
-                responses,
-                parsedInfoFromRequest.sort ? ClusterExplain::kMergeSortFromShards
-                                           : ClusterExplain::kMergeFromShards,
-                millisElapsed,
-                writeCmdObj,
-                &bodyBuilder));
-            bodyBuilder.append("targetShardId", shardId);
+                    const auto millisElapsed = timer.millis();
+
+                    auto bodyBuilder = result->getBodyBuilder();
+                    uassertStatusOK(ClusterExplain::buildExplainResult(
+                        ExpressionContext::makeBlankExpressionContext(opCtx, nss),
+                        responses,
+                        parsedInfoFromRequest.sort ? ClusterExplain::kMergeSortFromShards
+                                                   : ClusterExplain::kMergeFromShards,
+                        millisElapsed,
+                        writeCmdObj,
+                        &bodyBuilder));
+                    bodyBuilder.append("targetShardId", shardId);
+                });
         }
 
         NamespaceString ns() const override {

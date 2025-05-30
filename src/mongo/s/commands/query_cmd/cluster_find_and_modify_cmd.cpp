@@ -518,7 +518,7 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
                                                const NamespaceString& maybeTsNss) {
     // Apparently, we should return the CollectionRoutingInfo for the original namespace if we're
     // not writing to a timeseries collection.
-    auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, maybeTsNss));
+    auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, maybeTsNss));
 
     // Note: We try to get CollectionRoutingInfo for the timeseries buckets collection only when the
     // timeseries deletes or updates feature flag is enabled.
@@ -540,7 +540,8 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
     // do this to figure out whether we need to use the two phase write protocol or not on
     // timeseries buckets collections.
     auto bucketCollNss = maybeTsNss.makeTimeseriesBucketsNamespace();
-    auto bucketCollCri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketCollNss));
+    auto bucketCollCri =
+        uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, bucketCollNss));
     if (!bucketCollCri.hasRoutingTable() ||
         !bucketCollCri.getChunkManager().getTimeseriesFields()) {
         return cri;

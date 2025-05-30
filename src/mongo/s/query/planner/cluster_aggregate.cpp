@@ -264,8 +264,10 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
             if (nss == executionNss)
                 continue;
 
+            // TODO SERVER-102925 Remove this once the RoutingContext is incorporated into sharded
+            // agg.
             const auto resolvedNsCri =
-                uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+                uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss));
             if (resolvedNsCri.isSharded()) {
                 std::set<ShardId> shardIdsForNs;
                 // Note: It is fine to use 'getAllShardIds_UNSAFE_NotPointInTime' here because the
@@ -533,7 +535,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     performValidationChecks(opCtx, request, liteParsedPipeline);
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
-        auto criSW = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
+        // TODO SERVER-102925 Remove this once the RoutingContext is incorporated into sharded agg.
+        auto criSW = getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss);
 
         // If the ns is not found we assume its unsharded. It might be implicitly created as
         // unsharded if this query does writes. An existing collection could also be concurrently
