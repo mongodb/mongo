@@ -660,8 +660,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ResolvedViewAggExState::handleViewHel
         // For timeseries, there may have been rewrites done on the raw BSON pipeline
         // during view resolution. We must parse the request's full resolved pipeline
         // which will account for those rewrites.
-        // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
-        // same pattern here as other views
+        // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
+        // timeseries collections will exist.
         return Pipeline::parse(getRequest().getPipeline(), expCtx);
     } else if (search_helpers::isMongotPipeline(pipeline.get()) &&
                expCtx->isFeatureFlagMongotIndexedViewsEnabled()) {
