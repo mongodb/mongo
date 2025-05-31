@@ -263,7 +263,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
     sessions.forEach(session => session.getDatabase('admin').runCommand({ping: 1}));
 
     for (const [key, db] of dbs) {
-        let result;
+        let result = [];
         let clusterTime;
         let previousClusterTime;
         let hasTransientError;
@@ -317,6 +317,15 @@ async function checkReplDbhashBackgroundThread(hosts) {
             return hasTransientError;
         };
 
+        const isRetriableError = (e) => {
+            // Handles tests changing the topology during the test.
+            if (e.code === ErrorCodes.ShutdownInProgress) {
+                return false;
+            }
+
+            return true;
+        };
+
         do {
             // SERVER-38928: Due to races around advancing last applied, there's technically no
             // guarantee that a primary will report a later operation time than its
@@ -348,6 +357,11 @@ async function checkReplDbhashBackgroundThread(hosts) {
 
                 result = checkCollectionHashesForDBWithToken(dbName, clusterTime, token);
             } catch (e) {
+                if (!isRetriableError(e)) {
+                    debugInfo.push({"nonRetriableError": e});
+                    break;
+                }
+
                 if (isTransientError(e)) {
                     if (performNoopWrite) {
                         // Use the session's client directly so FSM workloads that kill random

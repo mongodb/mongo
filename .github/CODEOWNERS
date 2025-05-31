@@ -723,6 +723,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/hooks/**/lag_secondary_application.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/run_check_repl_oplogs.js @10gen/server-jstest-infra @svc-auto-approve-bot
 /jstests/hooks/**/run_cleanup_hello_failures.js @10gen/server-hello @svc-auto-approve-bot
+/jstests/hooks/**/run_check_repl_dbhash*.js @10gen/server-dbhash @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/hooks/write_conflicts/OWNERS.yml
 /jstests/hooks/write_conflicts/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

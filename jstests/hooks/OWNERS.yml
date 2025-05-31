@@ -30,3 +30,6 @@ filters:
   - "run_cleanup_hello_failures.js":
     approvers:
       - 10gen/server-hello
+  - "run_check_repl_dbhash*.js":
+    approvers:
+      - 10gen/server-dbhash
