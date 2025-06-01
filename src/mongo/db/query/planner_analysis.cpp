@@ -1077,6 +1077,11 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
             if (!isOilExplodable(oil, iet)) {
                 break;
             }
+            // We need not explode the fields in the desired sort order
+            auto elem = *kpIt;
+            if (elem.fieldNameStringData() == desiredSort.begin()->fieldNameStringData()) {
+                break;
+            }
             numScans *= oil.intervals.size();
             kpIt.next();
             ++boundsIdx;
