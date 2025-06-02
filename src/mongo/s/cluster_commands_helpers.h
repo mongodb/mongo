@@ -369,7 +369,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingD
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy);
@@ -442,8 +442,7 @@ std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
  * read concern, the latest routing table is returned, otherwise a historical routing table is
  * returned at the global read timestamp, which must have been selected by this point.
  *
- * Note that this will be deprecated (SERVER-102925, SERVER-104490) in favor of
- * getRoutingContextForTxnCmd().
+ * Note that this will be deprecated (SERVER-102925) in favor of getRoutingContextForTxnCmd().
  */
 StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd_DEPRECATED(
     OperationContext* opCtx, const NamespaceString& nss);

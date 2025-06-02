@@ -219,24 +219,28 @@ const size_t CollectionRoutingInfoTargeter::kMaxDatabaseCreationAttempts = 3;
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              boost::optional<OID> targetEpoch)
-    : _nss(nss), _targetEpoch(std::move(targetEpoch)), _cri(_init(opCtx, false)) {}
+    : _nss(nss),
+      _targetEpoch(std::move(targetEpoch)),
+      _routingCtx(_init(opCtx, false)),
+      _cri(_routingCtx->getCollectionRoutingInfo(_nss)) {}
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceString& nss,
                                                              const CollectionRoutingInfo& cri)
-    : _nss(nss), _cri(cri) {
+    : _nss(nss), _routingCtx(RoutingContext::createSynthetic({{nss, cri}})), _cri(cri) {
     invariant(!cri.hasRoutingTable() || cri.getChunkManager().getNss() == nss);
 }
 
 /**
- * Initializes and returns the CollectionRoutingInfo which needs to be used for targeting.
+ * Initializes and returns the RoutingContext which needs to be used for targeting.
  * If 'refresh' is true, additionally fetches the latest routing info from the config servers.
  *
  * Note: For tracked time-series collections, we use the buckets collection for targeting. If the
  * user request is on the view namespace, we implicitly transform the request to the buckets
  * namespace.
  */
-CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opCtx, bool refresh) {
-    const auto createDatabaseAndGetRoutingInfo = [&opCtx, &refresh](const NamespaceString& nss) {
+std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationContext* opCtx,
+                                                                     bool refresh) {
+    const auto createDatabaseAndGetRoutingCtx = [&opCtx, &refresh](const NamespaceString& nss) {
         size_t attempts = 1;
         while (true) {
             try {
@@ -252,9 +256,7 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
                     waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
                 }
 
-                // TODO SERVER-104490 Remove this once RoutingContext is integrated with the
-                // RoutingContext.
-                return uassertStatusOK(getCollectionRoutingInfoForTxnCmd_DEPRECATED(opCtx, nss));
+                return uassertStatusOK(getRoutingContextForTxnCmd(opCtx, nss));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_INFO(8314601,
                            "Failed initialization of routing info because the database has been "
@@ -273,10 +275,18 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         }
     };
 
-    auto [cm, dbInfo] = [&]() {
-        auto cri = createDatabaseAndGetRoutingInfo(_nss);
-        return std::make_tuple(std::move(cri.getChunkManager()), std::move(cri.getDatabaseInfo()));
-    }();
+    auto routingCtx = createDatabaseAndGetRoutingCtx(_nss);
+    const auto& cri = routingCtx->getCollectionRoutingInfo(_nss);
+    auto cm = std::move(cri.getChunkManager());
+
+    const auto checkStaleEpoch = [&](ChunkManager& cm) {
+        if (_targetEpoch) {
+            uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", cm.hasRoutingTable());
+            uassert(ErrorCodes::StaleEpoch,
+                    "Collection epoch has changed",
+                    cm.getVersion().epoch() == *_targetEpoch);
+        }
+    };
 
     // For a tracked time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
@@ -293,30 +303,30 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
     //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
     if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        auto bucketsCri = createDatabaseAndGetRoutingInfo(bucketsNs);
+        auto bucketsRoutingCtx = createDatabaseAndGetRoutingCtx(bucketsNs);
+        const auto& bucketsCri = bucketsRoutingCtx->getCollectionRoutingInfo(bucketsNs);
         if (bucketsCri.hasRoutingTable()) {
             _nss = bucketsNs;
             cm = std::move(bucketsCri.getChunkManager());
             if (!isRawDataOperation(opCtx)) {
                 _isRequestOnTimeseriesViewNamespace = true;
             }
+            checkStaleEpoch(cm);
+            return bucketsRoutingCtx;
         }
     } else if (!cm.hasRoutingTable() && _isRequestOnTimeseriesViewNamespace) {
         // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
-        auto newCri = createDatabaseAndGetRoutingInfo(_nss);
-        cm = std::move(newCri.getChunkManager());
+        auto newRoutingCtx = createDatabaseAndGetRoutingCtx(_nss);
+        cm = std::move(newRoutingCtx->getCollectionRoutingInfo(_nss).getChunkManager());
         _isRequestOnTimeseriesViewNamespace = false;
+        checkStaleEpoch(cm);
+        return newRoutingCtx;
     }
 
-    if (_targetEpoch) {
-        uassert(ErrorCodes::StaleEpoch, "Collection has been dropped", cm.hasRoutingTable());
-        uassert(ErrorCodes::StaleEpoch,
-                "Collection epoch has changed",
-                cm.getVersion().epoch() == *_targetEpoch);
-    }
-    return CollectionRoutingInfo(std::move(cm), std::move(dbInfo));
+    checkStaleEpoch(cm);
+    return routingCtx;
 }
 
 const NamespaceString& CollectionRoutingInfoTargeter::getNS() const {
@@ -853,12 +863,14 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cri;
-    _cri = _init(opCtx, false);
+    _routingCtx = _init(opCtx, false);
+    _cri = _routingCtx->getCollectionRoutingInfo(_nss);
     auto metadataChanged = isMetadataDifferent(lastManager, _cri);
 
     if (_lastError.value() == LastErrorType::kCouldNotTarget && !metadataChanged) {
         // If we couldn't target, and we didn't already update the metadata we must force a refresh
-        _cri = _init(opCtx, true);
+        _routingCtx = _init(opCtx, true);
+        _cri = _routingCtx->getCollectionRoutingInfo(_nss);
         metadataChanged = isMetadataDifferent(lastManager, _cri);
     }
 
@@ -907,6 +919,10 @@ bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(
     const NamespaceString& nss) const {
     return isTrackedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
+}
+
+RoutingContext& CollectionRoutingInfoTargeter::getRoutingCtx() const {
+    return *_routingCtx;
 }
 
 const CollectionRoutingInfo& CollectionRoutingInfoTargeter::getRoutingInfo() const {

@@ -1984,7 +1984,7 @@ public:
     OperationContext* getOpCtx() {
         return operationContext();
     }
-    CollectionRoutingInfoTargeter getCollectionRoutingInfoTargeter() const {
+    CollectionRoutingInfoTargeter& getCollectionRoutingInfoTargeter() {
         return *_criTargeter;
     }
 
@@ -2237,7 +2237,7 @@ public:
         return operationContext();
     }
 
-    CollectionRoutingInfoTargeter getCollectionRoutingInfoTargeter() const {
+    CollectionRoutingInfoTargeter& getCollectionRoutingInfoTargeter() {
         return *_criTargeter;
     }
 
@@ -2399,7 +2399,7 @@ public:
     OperationContext* getOpCtx() {
         return operationContext();
     }
-    CollectionRoutingInfoTargeter getCollectionRoutingInfoTargeter() const {
+    CollectionRoutingInfoTargeter& getCollectionRoutingInfoTargeter() {
         return *_criTargeter;
     }
 

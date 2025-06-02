@@ -73,9 +73,10 @@ public:
     RoutingContext& operator=(const RoutingContext&) = delete;
 
     /**
-     * Create a RoutingContext without using a CatalogCache, for testing
+     * Create a RoutingContext with a synthetic routing table (without using a CatalogCache). Use
+     * this for testing or specific cases where fetching from the cache is not required.
      */
-    static RoutingContext createForTest(
+    static std::unique_ptr<RoutingContext> createSynthetic(
         stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap);
 
     /**
@@ -117,6 +118,7 @@ public:
 
 private:
     RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap);
+
     /**
      * Obtain the routing table associated with a namespace from the CatalogCache. This returns the
      * latest routing table unless the read concern is snapshot with "atClusterTime" set. If an

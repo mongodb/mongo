@@ -297,7 +297,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) 
              createChunkManager(uuid, _nss),
              DatabaseTypeValueHandle(DatabaseType{
                  _nss.dbName(), kTestShardIds[0], DatabaseVersion(uuid, Timestamp{1, 1})}))}};
-    auto routingCtx = RoutingContext::createForTest(criMap);
+    auto routingCtx = RoutingContext::createSynthetic(criMap);
 
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -306,9 +306,9 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccessWithRoutingContext) 
                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                         remotes,
                                         false /* allowPartialResults */,
-                                        &routingCtx);
+                                        routingCtx.get());
         ASSERT_EQUALS(remotes.size(), cursors.size());
-        routingCtx.validateOnContextEnd();
+        routingCtx->validateOnContextEnd();
     });
 
     // Remote responds.

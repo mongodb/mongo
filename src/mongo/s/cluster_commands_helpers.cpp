@@ -705,10 +705,11 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingD
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
+    RoutingContext& routingCtx,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
                                                                cri,
@@ -728,7 +729,8 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
-            expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */));
+            expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */),
+        &routingCtx);
     return std::move(responses.front());
 }
 

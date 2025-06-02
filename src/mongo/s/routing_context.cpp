@@ -95,9 +95,9 @@ RoutingContext::RoutingContext(
     }
 }
 
-RoutingContext RoutingContext::createForTest(
+std::unique_ptr<RoutingContext> RoutingContext::createSynthetic(
     stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap) {
-    return RoutingContext(nssMap);
+    return std::unique_ptr<RoutingContext>(new RoutingContext(std::move(nssMap)));
 }
 RoutingContext::RoutingContext(stdx::unordered_map<NamespaceString, CollectionRoutingInfo> nssMap)
     : _nssRoutingInfoMap([nssMap = std::move(nssMap)]() {

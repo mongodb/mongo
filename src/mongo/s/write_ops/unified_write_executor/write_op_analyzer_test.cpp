@@ -89,7 +89,7 @@ struct WriteOpAnalyzerTest : public ShardingTestFixture {
             boost::none);
     }
 
-    RoutingContext createRoutingContextSharded(
+    std::unique_ptr<RoutingContext> createRoutingContextSharded(
         std::vector<std::pair<UUID, NamespaceString>> uuidNssList) {
         stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
         for (auto [uuid, nss] : uuidNssList) {
@@ -100,16 +100,16 @@ struct WriteOpAnalyzerTest : public ShardingTestFixture {
                     DatabaseTypeValueHandle(DatabaseType{
                         nss.dbName(), kShard1Name, DatabaseVersion(uuid, Timestamp{1, 1})})));
         }
-        return RoutingContext::createForTest(criMap);
+        return RoutingContext::createSynthetic(criMap);
     }
 
     /**
      * Set up a routing context for testing analyze() with unsharded collections.
      */
-    RoutingContext createRoutingContextUnsharded() {
+    std::unique_ptr<RoutingContext> createRoutingContextUnsharded() {
         auto uuid = UUID::gen();
         auto dbVersion = DatabaseVersion(uuid, Timestamp{1, 1});
-        return RoutingContext::createForTest(
+        return RoutingContext::createSynthetic(
             {{kUntrackedNss,
               CatalogCacheMock::makeCollectionRoutingInfoUntracked(
                   kUntrackedNss, kShard1Name, dbVersion)},
@@ -133,18 +133,18 @@ TEST_F(WriteOpAnalyzerTest, SingleInserts) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
@@ -163,20 +163,20 @@ TEST_F(WriteOpAnalyzerTest, MultiNSSingleInserts) {
 
     WriteOp op1(request, 0);
     ASSERT_EQ(nss, op1.getNss());
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
     ASSERT_EQ(nss2, op2.getNss());
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
-    rtx.onRequestSentForNss(nss2);
+    rtx->onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss2);
 }
 
 TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
@@ -196,18 +196,18 @@ TEST_F(WriteOpAnalyzerTest, EqUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
@@ -227,16 +227,16 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
@@ -266,16 +266,16 @@ TEST_F(WriteOpAnalyzerTest, RangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
@@ -295,20 +295,20 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
@@ -338,18 +338,18 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeUpdateManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, EqDeletes) {
@@ -365,18 +365,18 @@ TEST_F(WriteOpAnalyzerTest, EqDeletes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kSingleShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 
@@ -393,16 +393,16 @@ TEST_F(WriteOpAnalyzerTest, RangeDeleteOnes) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
@@ -428,19 +428,19 @@ TEST_F(WriteOpAnalyzerTest, SingleShardRangeDeleteManys) {
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
-    auto analysis = analyzer.analyze(operationContext(), rtx, op1);
+    auto analysis = analyzer.analyze(operationContext(), *rtx, op1);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
     WriteOp op2(request, 1);
-    analysis = analyzer.analyze(operationContext(), rtx, op2);
+    analysis = analyzer.analyze(operationContext(), *rtx, op2);
     ASSERT_EQ(1, analysis.shardsAffected.size());
     ASSERT_EQ(kShard2Name, analysis.shardsAffected[0].shardName);
     // TODO SERVER-103780 this should be changed with 2 phase write support.
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
 
-    rtx.onRequestSentForNss(nss);
+    rtx->onRequestSentForNss(nss);
 }
 
 TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
@@ -473,13 +473,13 @@ TEST_F(WriteOpAnalyzerTest, UnshardedUntracked) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346501, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyzer.analyze(operationContext(), rtx, op);
+        auto analysis = analyzer.analyze(operationContext(), *rtx, op);
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
 
-    rtx.onRequestSentForNss(kUntrackedNss);
-    rtx.onRequestSentForNss(kUnsplittableNss);
+    rtx->onRequestSentForNss(kUntrackedNss);
+    rtx->onRequestSentForNss(kUnsplittableNss);
 }
 
 TEST_F(WriteOpAnalyzerTest, Unsplittable) {
@@ -512,13 +512,13 @@ TEST_F(WriteOpAnalyzerTest, Unsplittable) {
     for (size_t i = 0; i < request.getOps().size(); i++) {
         LOGV2(10346502, "request index", "i"_attr = i);
         WriteOp op(request, i);
-        auto analysis = analyzer.analyze(operationContext(), rtx, op);
+        auto analysis = analyzer.analyze(operationContext(), *rtx, op);
         ASSERT_EQ(1, analysis.shardsAffected.size());
         ASSERT_EQ(kShard1Name, analysis.shardsAffected[0].shardName);
     }
 
-    rtx.onRequestSentForNss(kUntrackedNss);
-    rtx.onRequestSentForNss(kUnsplittableNss);
+    rtx->onRequestSentForNss(kUntrackedNss);
+    rtx->onRequestSentForNss(kUnsplittableNss);
 }
 
 }  // namespace

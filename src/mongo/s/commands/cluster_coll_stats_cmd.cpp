@@ -275,8 +275,8 @@ public:
                 timeseries::makeTimeseriesCommand(cmdObjToSend, nss, getName(), boost::none);
         }
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {{targeter.getNS(), cri}}, [&](RoutingContext& routingCtx) {
+        return routing_context_utils::runAndValidate(
+            targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
                 // Unscaled individual shard results. This is required to apply scaling after
                 // summing the statistics from individual shards as opposed to adding the summation
                 // of the scaled statistics.

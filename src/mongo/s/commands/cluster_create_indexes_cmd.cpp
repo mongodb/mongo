@@ -148,8 +148,8 @@ public:
                 cmdToBeSent, nss, getName(), CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
         }
 
-        return routing_context_utils::withValidatedRoutingContext(
-            opCtx, {{targeter.getNS(), routingInfo}}, [&](RoutingContext& routingCtx) {
+        return routing_context_utils::runAndValidate(
+            targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
                 auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     targeter.getNS(),

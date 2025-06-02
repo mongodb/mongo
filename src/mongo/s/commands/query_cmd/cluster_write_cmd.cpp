@@ -435,11 +435,10 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
                                      const BSONObj& command,
                                      BatchItemRef targetingBatchItem,
                                      std::vector<AsyncRequestsSender::Response>* results) {
+    CollectionRoutingInfoTargeter targeter(opCtx, nss);
     auto endpoints = [&] {
         // Note that this implementation will not handle targeting retries and does not
         // completely emulate write behavior
-        CollectionRoutingInfoTargeter targeter(opCtx, nss);
-
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, targetingBatchItem.getDocument())};
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
@@ -450,41 +449,49 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }();
 
-    // Assemble requests
-    std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(endpoints.size());
-    for (const auto& endpoint : endpoints) {
-        BSONObj cmdObjWithVersions = BSONObj(command);
-        if (endpoint.databaseVersion) {
-            cmdObjWithVersions =
-                appendDbVersionIfPresent(cmdObjWithVersions, *endpoint.databaseVersion);
-        }
-        if (endpoint.shardVersion) {
-            cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *endpoint.shardVersion);
-        }
-        requests.emplace_back(endpoint.shardName, std::move(cmdObjWithVersions));
-    }
+    routing_context_utils::runAndValidate(
+        targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+            // Assemble requests
+            std::vector<AsyncRequestsSender::Request> requests;
+            requests.reserve(endpoints.size());
+            for (const auto& endpoint : endpoints) {
+                BSONObj cmdObjWithVersions = BSONObj(command);
+                if (endpoint.databaseVersion) {
+                    cmdObjWithVersions =
+                        appendDbVersionIfPresent(cmdObjWithVersions, *endpoint.databaseVersion);
+                }
+                if (endpoint.shardVersion) {
+                    cmdObjWithVersions =
+                        appendShardVersion(cmdObjWithVersions, *endpoint.shardVersion);
+                }
+                requests.emplace_back(endpoint.shardName, std::move(cmdObjWithVersions));
+            }
 
-    // Send the requests.
+            // Send the requests.
 
-    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-    MultiStatementTransactionRequestsSender ars(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        nss.dbName(),
-        requests,
-        readPref,
-        Shard::RetryPolicy::kNoRetry);
+            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
+            MultiStatementTransactionRequestsSender ars(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                nss.dbName(),
+                requests,
+                readPref,
+                Shard::RetryPolicy::kNoRetry);
 
-    while (!ars.done()) {
-        // Block until a response is available.
-        auto response = ars.next();
-        uassertStatusOK(response.swResponse);
+            // Validate the RoutingContext once a request has been scheduled and sent to the shards
+            // via the ARS.
+            routingCtx.onRequestSentForNss(targeter.getNS());
 
-        // If the response status was OK, the response must contain which host was targeted.
-        invariant(response.shardHostAndPort);
-        results->push_back(std::move(response));
-    }
+            while (!ars.done()) {
+                // Block until a response is available.
+                auto response = ars.next();
+                uassertStatusOK(response.swResponse);
+
+                // If the response status was OK, the response must contain which host was targeted.
+                invariant(response.shardHostAndPort);
+                results->push_back(std::move(response));
+            }
+        });
 }
 
 bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,

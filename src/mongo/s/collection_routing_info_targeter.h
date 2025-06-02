@@ -46,6 +46,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/ns_targeter.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -179,6 +180,8 @@ public:
 
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
 
+    RoutingContext& getRoutingCtx() const;
+
     const CollectionRoutingInfo& getRoutingInfo() const;
 
     static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
@@ -208,7 +211,7 @@ private:
     // Maximum number of database creation attempts, which may fail due to a concurrent drop.
     static const size_t kMaxDatabaseCreationAttempts;
 
-    CollectionRoutingInfo _init(OperationContext* opCtx, bool refresh);
+    std::unique_ptr<RoutingContext> _init(OperationContext* opCtx, bool refresh);
 
     /**
      * Returns a CanonicalQuery if parsing succeeds.
@@ -261,6 +264,8 @@ private:
     // Set to the epoch of the namespace we are targeting. If we ever refresh the catalog cache
     // and find a new epoch, we immediately throw a StaleEpoch exception.
     boost::optional<OID> _targetEpoch;
+
+    std::unique_ptr<RoutingContext> _routingCtx;
 
     // The latest loaded routing cache entry
     CollectionRoutingInfo _cri;
