@@ -45,7 +45,6 @@ class TestGenerateExcludeYaml(unittest.TestCase):
                 under_test.generate_exclude_yaml(
                     old_bin_version=old_bin_version,
                     output=output,
-                    expansions_file=EXPANSIONS_FILE,
                     logger=MagicMock(),
                 )
 

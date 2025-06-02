@@ -163,7 +163,6 @@ class TestRunner(Subcommand):
         generate_multiversion_exclude_tags.generate_exclude_yaml(
             config.MULTIVERSION_BIN_VERSION,
             config.EXCLUDE_TAGS_FILE_PATH,
-            config.EXPANSIONS_FILE,
             self._resmoke_logger,
         )
 
