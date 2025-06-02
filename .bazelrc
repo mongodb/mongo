@@ -67,6 +67,13 @@ common:macos --repo_env=LLVM_VERSION=19
 
 common:windows --features=-compiler_param_file
 
+# Pin down the Microsoft Visual compiler. If you would like to use
+# the default compiler version installed in this host, comment the line.
+common:windows --repo_env=BAZEL_VC_FULL_VERSION=14.31.31103
+
+# Default the Visual C Redistribution to v14.3 for Windows installer.
+common:windows --repo_env=MONGO_VC_REDIST_FULL_VERSION=v143
+
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
@@ -491,13 +498,6 @@ common --define=MONGO_VERSION=8.2.0-alpha
 
 # Default distmod if not specified.
 common --define=MONGO_DISTMOD=""
-
-# Pin down the Microsoft Visual compiler. If you would like to use
-# the default compiler version installed in this host, comment the line.
-common --action_env=BAZEL_VC_FULL_VERSION=14.31.31103
-
-# Default the Visual C Redistribution to v14.3 for Windows installer.
-common --action_env=MONGO_VC_REDIST_FULL_VERSION=v143
 
 # Default if .git directory is not present
 common --define=GIT_COMMIT_HASH="nogitversion"

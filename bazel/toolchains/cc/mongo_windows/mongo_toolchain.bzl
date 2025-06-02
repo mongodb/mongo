@@ -85,6 +85,9 @@ def _impl_gen_windows_toolchain_build_file(ctx):
     return None
 
 generate_windows_toolchain_build_file = repository_rule(
+    environ = [
+        "BAZEL_VC_FULL_VERSION",  # Force re-compute if the user changed the version of MS compiler.
+    ],
     implementation = _impl_gen_windows_toolchain_build_file,
     attrs = {
         "build_tpl": attr.label(
@@ -92,6 +95,8 @@ generate_windows_toolchain_build_file = repository_rule(
             doc = "Label denoting the BUILD file template that gets installed in the repo.",
         ),
     },
+    configure = True,
+    local = True,
 )
 
 def setup_mongo_windows_toolchain():

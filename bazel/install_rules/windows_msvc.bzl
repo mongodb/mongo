@@ -39,5 +39,11 @@ filegroup(
     return None
 
 windows_msvc = repository_rule(
+    environ = [
+        "BAZEL_VC_FULL_VERSION",  # Force re-compute if the user changed the version of MS compiler.
+        "MONGO_VC_REDIST_FULL_VERSION",  # Force re-compute if the user changed the VC Redistribution version.
+    ],
     implementation = find_windows_msvc,
+    configure = True,
+    local = True,
 )
