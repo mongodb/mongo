@@ -36,6 +36,7 @@ selector:
     # mongos has no system.profile collection.
     - requires_profiling
     - assumes_unsharded_collection
+    - config_shard_incompatible
 
 executor:
   archive:

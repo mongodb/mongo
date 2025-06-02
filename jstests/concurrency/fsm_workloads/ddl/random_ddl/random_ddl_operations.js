@@ -10,25 +10,23 @@ import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
-const dbPrefix = jsTestName() + '_DB_';
-const dbCount = 2;
-const collPrefix = 'sharded_coll_';
-const collCount = 2;
-
-function getRandomShard(connCache) {
-    const shards = Object.keys(connCache.shards);
-    return shards[Random.randInt(shards.length)];
-}
-
 export const $config = (function() {
     let data = {
+        dbPrefix: jsTestName() + '_DB_',
+        dbCount: 2,
+        collPrefix: 'sharded_coll_',
+        collCount: 2,
         getRandomDb: function(db) {
-            return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
+            return db.getSiblingDB(data.dbPrefix + Random.randInt(data.dbCount));
         },
         getRandomCollection: function(db) {
-            return db[collPrefix + Random.randInt(collCount)];
+            return db[data.collPrefix + Random.randInt(data.collCount)];
         },
-        movePrimaryAllowedErrorCodes: [
+        getRandomShard: function(connCache) {
+            const shards = Object.keys(connCache.shards);
+            return shards[Random.randInt(shards.length)];
+        },
+        kMovePrimaryAllowedErrorCodes: [
             ErrorCodes.ConflictingOperationInProgress,
             // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
             // occurs at this phase, the movePrimary operation does not recover.
@@ -37,13 +35,13 @@ export const $config = (function() {
             // left to clone. This occurs when a MovePrimary joins an already existing MovePrimary
             // command that has purposefully triggered a failpoint.
             9046501,
-        ]
+        ],
     };
 
     let states = {
         create: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
             const fullNs = coll.getFullName();
 
             jsTestLog('Executing create state: ' + fullNs);
@@ -51,18 +49,18 @@ export const $config = (function() {
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
         drop: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
 
             assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: coll.getName()}));
         },
         rename: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const srcColl = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const srcColl = data.getRandomCollection(db);
             const srcCollName = srcColl.getFullName();
-            const destCollNS = this.getRandomCollection(db).getFullName();
+            const destCollNS = data.getRandomCollection(db).getFullName();
             const destCollName = destCollNS.split('.')[1];
 
             jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
@@ -79,9 +77,10 @@ export const $config = (function() {
                 if (count === 5) {
                     jsTestLog(`movePrimary failed ${
                         count} times because the target was not found, giving up`);
+                    return true;
                 }
-                db = this.getRandomDb(db);
-                const shardId = getRandomShard(connCache);
+                db = data.getRandomDb(db);
+                const shardId = data.getRandomShard(connCache);
 
                 jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
                 const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
@@ -91,13 +90,13 @@ export const $config = (function() {
                         shardId} was not found, retrying...`);
                     return false;
                 }
-                assert.commandWorkedOrFailedWithCode(res, this.movePrimaryAllowedErrorCodes);
+                assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
                 return true;
             });
         },
         collMod: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
 
             jsTestLog('Executing collMod state: ' + coll.getFullName());
             assert.commandWorkedOrFailedWithCode(
@@ -105,14 +104,14 @@ export const $config = (function() {
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
+            db = data.getRandomDb(db);
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
             jsTestLog('Executing checkMetadataConsistency state for collection: ' +
                       coll.getFullName());
             const inconsistencies = coll.checkMetadataConsistency().toArray();
@@ -120,8 +119,8 @@ export const $config = (function() {
         },
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             // Note this command will behave as no-op in case the collection is not tracked.
-            db = this.getRandomDb(db);
-            collName = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            collName = data.getRandomCollection(db);
             const namespace = `${db}.${collName}`;
             jsTestLog(`Started to untrack collection ${namespace}`);
             // Attempt to unshard the collection first
@@ -150,8 +149,8 @@ export const $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        for (var i = 0; i < dbCount; i++) {
-            const dbName = dbPrefix + i;
+        for (var i = 0; i < data.dbCount; i++) {
+            const dbName = data.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
             newDb.adminCommand({enablesharding: dbName});
         }

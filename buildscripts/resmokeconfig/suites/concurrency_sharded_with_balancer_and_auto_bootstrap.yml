@@ -48,6 +48,7 @@ selector:
     # implicitly_retry_on_migration_in_progress.js alters find/aggregate commands
     # so that the whole result set is returned through a single batch
     - assumes_no_implicit_cursor_exhaustion
+    - config_shard_incompatible
 
 executor:
   archive:
