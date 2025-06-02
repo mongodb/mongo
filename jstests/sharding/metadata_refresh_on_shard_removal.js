@@ -3,6 +3,9 @@
  * to target shards that have been removed.
  * @tags: [
  *   temp_disabled_embedded_router_uncategorized,
+ *   # Incremental metadata refresh following shard removal is protected by a server parameter in
+ *   # the 7.0 branch.
+ *   multiversion_incompatible,
  * ]
  */
 import {
