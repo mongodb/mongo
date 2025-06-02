@@ -1747,7 +1747,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     }
 
     if (sizeRecoveryState(opCtx->getServiceContext()).shouldRecordStoresAlwaysCheckSize()) {
-        ret->checkSize(opCtx);
+        ret->checkSize(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
     }
 
     return std::move(ret);

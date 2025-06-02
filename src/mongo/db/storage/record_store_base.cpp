@@ -30,6 +30,7 @@
 #include "mongo/db/storage/record_store_base.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 namespace {
@@ -66,8 +67,13 @@ void RecordStoreBase::setIdent(std::shared_ptr<Ident> ident) {
 }
 
 RecordData RecordStoreBase::dataFor(OperationContext* opCtx, const RecordId& loc) const {
+    return dataFor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc);
+}
+RecordData RecordStoreBase::dataFor(OperationContext* opCtx,
+                                    RecoveryUnit& ru,
+                                    const RecordId& loc) const {
     RecordData data;
-    invariant(findRecord(opCtx, loc, &data),
+    invariant(findRecord(opCtx, ru, loc, &data),
               str::stream() << "Didn't find RecordId " << loc << " in record store "
                             << (_uuid ? _uuid->toString() : std::string{}));
     return data;
@@ -76,7 +82,13 @@ RecordData RecordStoreBase::dataFor(OperationContext* opCtx, const RecordId& loc
 bool RecordStoreBase::findRecord(OperationContext* opCtx,
                                  const RecordId& loc,
                                  RecordData* out) const {
-    auto cursor = getCursor(opCtx);
+    return findRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), loc, out);
+}
+bool RecordStoreBase::findRecord(OperationContext* opCtx,
+                                 RecoveryUnit& ru,
+                                 const RecordId& loc,
+                                 RecordData* out) const {
+    auto cursor = getCursor(opCtx, ru);
     auto record = cursor->seekExact(loc);
     if (!record)
         return false;
@@ -87,21 +99,34 @@ bool RecordStoreBase::findRecord(OperationContext* opCtx,
 }
 
 void RecordStoreBase::deleteRecord(OperationContext* opCtx, const RecordId& id) {
+    deleteRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id);
+}
+void RecordStoreBase::deleteRecord(OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id) {
     validateWriteAllowed(opCtx);
-    _deleteRecord(opCtx, id);
+    _deleteRecord(opCtx, ru, id);
 }
 
 Status RecordStoreBase::insertRecords(OperationContext* opCtx,
                                       std::vector<Record>* records,
                                       const std::vector<Timestamp>& timestamps) {
+    return insertRecords(opCtx, *shard_role_details::getRecoveryUnit(opCtx), records, timestamps);
+}
+Status RecordStoreBase::insertRecords(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
+                                      std::vector<Record>* records,
+                                      const std::vector<Timestamp>& timestamps) {
     validateWriteAllowed(opCtx);
-    return _insertRecords(opCtx, records, timestamps);
+    return _insertRecords(opCtx, ru, records, timestamps);
 }
 
 StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
                                                    const char* data,
                                                    int len,
                                                    Timestamp timestamp) {
+    return insertRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), data, len, timestamp);
+}
+StatusWith<RecordId> RecordStoreBase::insertRecord(
+    OperationContext* opCtx, RecoveryUnit& ru, const char* data, int len, Timestamp timestamp) {
     // Record stores with the Long key format accept a null RecordId, as the storage engine will
     // generate one.
     invariant(keyFormat() == KeyFormat::Long);
@@ -110,8 +135,17 @@ StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
 
 StatusWith<RecordId> RecordStoreBase::insertRecord(
     OperationContext* opCtx, const RecordId& id, const char* data, int len, Timestamp timestamp) {
+    return insertRecord(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, len, timestamp);
+}
+StatusWith<RecordId> RecordStoreBase::insertRecord(OperationContext* opCtx,
+                                                   RecoveryUnit& ru,
+                                                   const RecordId& id,
+                                                   const char* data,
+                                                   int len,
+                                                   Timestamp timestamp) {
     std::vector<Record> inOutRecords{Record{id, RecordData(data, len)}};
-    Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
+    Status status = insertRecords(opCtx, ru, &inOutRecords, std::vector<Timestamp>{timestamp});
     if (!status.isOK())
         return status;
     return std::move(inOutRecords.front().id);
@@ -121,8 +155,12 @@ Status RecordStoreBase::updateRecord(OperationContext* opCtx,
                                      const RecordId& id,
                                      const char* data,
                                      int len) {
+    return updateRecord(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, len);
+}
+Status RecordStoreBase::updateRecord(
+    OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id, const char* data, int len) {
     validateWriteAllowed(opCtx);
-    return _updateRecord(opCtx, id, data, len);
+    return _updateRecord(opCtx, ru, id, data, len);
 }
 
 StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCtx,
@@ -130,16 +168,50 @@ StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCt
                                                           const RecordData& data,
                                                           const char* damageSource,
                                                           const DamageVector& damages) {
+    return updateWithDamages(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, data, damageSource, damages);
+}
+StatusWith<RecordData> RecordStoreBase::updateWithDamages(OperationContext* opCtx,
+                                                          RecoveryUnit& ru,
+                                                          const RecordId& id,
+                                                          const RecordData& data,
+                                                          const char* damageSource,
+                                                          const DamageVector& damages) {
     validateWriteAllowed(opCtx);
-    return _updateWithDamages(opCtx, id, data, damageSource, damages);
+    return _updateWithDamages(opCtx, ru, id, data, damageSource, damages);
+}
+
+std::unique_ptr<SeekableRecordCursor> RecordStoreBase::getCursor(OperationContext* opCtx,
+                                                                 bool forward) const {
+    return getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
+}
+
+std::unique_ptr<RecordCursor> RecordStoreBase::getRandomCursor(OperationContext* opCtx) const {
+    return getRandomCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
 }
 
 Status RecordStoreBase::truncate(OperationContext* opCtx) {
+    return truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+}
+Status RecordStoreBase::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
     validateWriteAllowed(opCtx);
-    return _truncate(opCtx);
+    return _truncate(opCtx, ru);
 }
 
 Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
+                                      const RecordId& minRecordId,
+                                      const RecordId& maxRecordId,
+                                      int64_t hintDataSizeIncrement,
+                                      int64_t hintNumRecordsIncrement) {
+    return rangeTruncate(opCtx,
+                         *shard_role_details::getRecoveryUnit(opCtx),
+                         minRecordId,
+                         maxRecordId,
+                         hintDataSizeIncrement,
+                         hintNumRecordsIncrement);
+}
+Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
+                                      RecoveryUnit& ru,
                                       const RecordId& minRecordId,
                                       const RecordId& maxRecordId,
                                       int64_t hintDataSizeIncrement,
@@ -149,13 +221,28 @@ Status RecordStoreBase::rangeTruncate(OperationContext* opCtx,
               "Ranged truncate must have one bound defined");
     invariant(minRecordId <= maxRecordId, "Start position cannot be after end position");
     return _rangeTruncate(
-        opCtx, minRecordId, maxRecordId, hintDataSizeIncrement, hintNumRecordsIncrement);
+        opCtx, ru, minRecordId, maxRecordId, hintDataSizeIncrement, hintNumRecordsIncrement);
 }
 
 StatusWith<int64_t> RecordStoreBase::compact(OperationContext* opCtx,
                                              const CompactOptions& options) {
+    return compact(opCtx, *shard_role_details::getRecoveryUnit(opCtx), options);
+}
+StatusWith<int64_t> RecordStoreBase::compact(OperationContext* opCtx,
+                                             RecoveryUnit& ru,
+                                             const CompactOptions& options) {
     validateWriteAllowed(opCtx);
-    return _compact(opCtx, options);
+    return _compact(opCtx, ru, options);
+}
+
+RecordId RecordStoreBase::getLargestKey(OperationContext* opCtx) const {
+    return getLargestKey(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+}
+
+void RecordStoreBase::reserveRecordIds(OperationContext* opCtx,
+                                       std::vector<RecordId>* rids,
+                                       size_t numRecords) {
+    reserveRecordIds(opCtx, *shard_role_details::getRecoveryUnit(opCtx), rids, numRecords);
 }
 
 RecordStoreBase::Capped::Capped()
@@ -177,8 +264,17 @@ void RecordStoreBase::Capped::notifyWaitersIfNeeded() {
 
 RecordStoreBase::Capped::TruncateAfterResult RecordStoreBase::Capped::truncateAfter(
     OperationContext* opCtx, const RecordId& id, bool inclusive) {
+    return truncateAfter(opCtx, *shard_role_details::getRecoveryUnit(opCtx), id, inclusive);
+}
+RecordStoreBase::Capped::TruncateAfterResult RecordStoreBase::Capped::truncateAfter(
+    OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id, bool inclusive) {
     validateWriteAllowed(opCtx);
-    return _truncateAfter(opCtx, id, inclusive);
+    return _truncateAfter(opCtx, ru, id, inclusive);
+}
+
+std::unique_ptr<SeekableRecordCursor> RecordStoreBase::Oplog::getRawCursor(OperationContext* opCtx,
+                                                                           bool forward) const {
+    return getRawCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx), forward);
 }
 
 }  // namespace mongo

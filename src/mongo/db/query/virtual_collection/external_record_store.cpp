@@ -55,5 +55,10 @@ std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationCo
     tasserted(6968302, "MultiBsonStreamCursor does not support reverse scans");
     return nullptr;
 }
+std::unique_ptr<SeekableRecordCursor> ExternalRecordStore::getCursor(OperationContext* opCtx,
+                                                                     RecoveryUnit& ru,
+                                                                     bool forward) const {
+    return getCursor(opCtx, forward);
+}
 
 }  // namespace mongo

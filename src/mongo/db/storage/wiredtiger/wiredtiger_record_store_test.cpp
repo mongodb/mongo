@@ -477,7 +477,7 @@ void testTruncateRange(int64_t numRecordsToInsert,
 
     std::set<RecordId> actualRemainingRecordIds;
 
-    auto cursor = wtRS->getCursor(opCtx.get(), true);
+    auto cursor = wtRS->getCursor(opCtx.get(), ru, true);
     while (auto record = cursor->next()) {
         actualRemainingRecordIds.emplace(record->id);
     }

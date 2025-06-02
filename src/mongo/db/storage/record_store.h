@@ -433,8 +433,11 @@ public:
      *
      * In general, prefer findRecord or RecordCursor::seekExact since they can tell you if a record
      * has been removed.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual RecordData dataFor(OperationContext*, const RecordId&) const = 0;
+    virtual RecordData dataFor(OperationContext*, RecoveryUnit&, const RecordId&) const = 0;
 
     /**
      * @param out - If the record exists, the contents of this are set.
@@ -445,39 +448,71 @@ public:
      *
      * In general prefer RecordCursor::seekExact since it can avoid copying data in more
      * storageEngines.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual bool findRecord(OperationContext*, const RecordId&, RecordData*) const = 0;
+    virtual bool findRecord(OperationContext*,
+                            RecoveryUnit&,
+                            const RecordId&,
+                            RecordData*) const = 0;
 
+    /**
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
+     */
     virtual void deleteRecord(OperationContext* opCtx, const RecordId& dl) = 0;
+    virtual void deleteRecord(OperationContext* opCtx, RecoveryUnit&, const RecordId& dl) = 0;
 
     /**
      * Inserts the specified records into this RecordStore by copying the passed-in record data and
      * updates 'inOutRecords' to contain the ids of the inserted records.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual Status insertRecords(OperationContext*,
+                                 std::vector<Record>*,
+                                 const std::vector<Timestamp>&) = 0;
+    virtual Status insertRecords(OperationContext*,
+                                 RecoveryUnit&,
                                  std::vector<Record>*,
                                  const std::vector<Timestamp>&) = 0;
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual StatusWith<RecordId> insertRecord(OperationContext*,
                                               const char* data,
                                               int len,
                                               Timestamp) = 0;
+    virtual StatusWith<RecordId> insertRecord(
+        OperationContext*, RecoveryUnit&, const char* data, int len, Timestamp) = 0;
 
     /**
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
      * If RecordId is null, the storage engine will generate one and return it.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual StatusWith<RecordId> insertRecord(
         OperationContext*, const RecordId&, const char* data, int len, Timestamp) = 0;
+    virtual StatusWith<RecordId> insertRecord(OperationContext*,
+                                              RecoveryUnit&,
+                                              const RecordId&,
+                                              const char* data,
+                                              int len,
+                                              Timestamp) = 0;
 
     /**
      * Updates the record with id 'recordId', replacing its contents with those described by
      * 'data' and 'len'.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) = 0;
+    virtual Status updateRecord(
+        OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) = 0;
 
     /**
      * @return Returns 'false' if this record store does not implement
@@ -496,8 +531,16 @@ public:
      *
      * @return the updated version of the record. If unowned data is returned, then it is valid
      * until the next modification of this Record or the lock on the collection has been released.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual StatusWith<RecordData> updateWithDamages(OperationContext*,
+                                                     const RecordId&,
+                                                     const RecordData&,
+                                                     const char* damageSource,
+                                                     const DamageVector&) = 0;
+    virtual StatusWith<RecordData> updateWithDamages(OperationContext*,
+                                                     RecoveryUnit&,
                                                      const RecordId&,
                                                      const RecordData&,
                                                      const char* damageSource,
@@ -518,8 +561,13 @@ public:
      * collection so that Record will be returned on the first call to next(). Implementations
      * are allowed to lazily seek to the first Record when next() is called rather than doing
      * it on construction.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
+                                                            bool forward = true) const = 0;
+    virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*,
+                                                            RecoveryUnit&,
                                                             bool forward = true) const = 0;
 
     /**
@@ -532,13 +580,20 @@ public:
      * the same document more than once and, as a result, may return more documents than exist in
      * the record store. Implementations should avoid obvious biases toward older, newer, larger
      * smaller or other specific classes of documents.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const = 0;
+    virtual std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*,
+                                                          RecoveryUnit&) const = 0;
 
     /**
      * Removes all Records.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual Status truncate(OperationContext*) = 0;
+    virtual Status truncate(OperationContext*, RecoveryUnit&) = 0;
 
     /**
      * Removes all Records in the range [minRecordId, maxRecordId] inclusive of both. The hint*
@@ -547,8 +602,16 @@ public:
      * order to update numRecords and dataSize correctly. Implementations are free to ignore the
      * hints if they have a way of obtaining the correct values without the help of external
      * callers.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual Status rangeTruncate(OperationContext*,
+                                 const RecordId& minRecordId = RecordId(),
+                                 const RecordId& maxRecordId = RecordId(),
+                                 int64_t hintDataSizeIncrement = 0,
+                                 int64_t hintNumRecordsIncrement = 0) = 0;
+    virtual Status rangeTruncate(OperationContext*,
+                                 RecoveryUnit&,
                                  const RecordId& minRecordId = RecordId(),
                                  const RecordId& maxRecordId = RecordId(),
                                  int64_t hintDataSizeIncrement = 0,
@@ -565,8 +628,13 @@ public:
      * Attempt to reduce the storage space used by this RecordStore.
      * Only called if compactSupported() returns true.
      * Returns an estimated number of bytes when doing a dry run.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) = 0;
+    virtual StatusWith<int64_t> compact(OperationContext*,
+                                        RecoveryUnit&,
+                                        const CompactOptions&) = 0;
 
     /**
      * Performs record store specific validation to ensure consistency of underlying data
@@ -597,14 +665,23 @@ public:
      *
      * May throw WriteConflictException in certain cache-stuck scenarios even if the operation isn't
      * part of a WriteUnitOfWork.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual RecordId getLargestKey(OperationContext*) const = 0;
+    virtual RecordId getLargestKey(OperationContext*, RecoveryUnit&) const = 0;
 
     /**
      * Reserve a range of contiguous RecordIds. Returns the first valid RecordId in the range. Must
      * only be called on a RecordStore with KeyFormat::Long.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual void reserveRecordIds(OperationContext*, std::vector<RecordId>*, size_t numRecords) = 0;
+    virtual void reserveRecordIds(OperationContext*,
+                                  RecoveryUnit&,
+                                  std::vector<RecordId>*,
+                                  size_t numRecords) = 0;
 
     /**
      * Called after a repair operation is run with the recomputed numRecords and dataSize.
@@ -657,8 +734,14 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual TruncateAfterResult truncateAfter(OperationContext*,
+                                              const RecordId&,
+                                              bool inclusive) = 0;
+    virtual TruncateAfterResult truncateAfter(OperationContext*,
+                                              RecoveryUnit&,
                                               const RecordId&,
                                               bool inclusive) = 0;
 };
@@ -675,8 +758,13 @@ public:
     /**
      * Returns a new cursor on the oplog, ignoring any visibility semantics specific to forward
      * cursors.
+     *
+     * TODO (SERVER-105771): Remove the overload without RecoveryUnit.
      */
     virtual std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                               bool forward = true) const = 0;
+    virtual std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                               RecoveryUnit&,
                                                                bool forward = true) const = 0;
     /**
      * If supported, this method returns the timestamp value for the latest storage engine committed

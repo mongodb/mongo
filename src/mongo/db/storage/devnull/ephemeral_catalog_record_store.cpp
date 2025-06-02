@@ -35,7 +35,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -280,7 +279,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecordStore(boost::optional<UUID> u
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped,
                                                          bool isOplog)
-    : _uuid(uuid),
+    : RecordStoreBase(uuid, identName),
       _isCapped(isCapped),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get()) : new Data(isOplog)) {
     // NOTE : The static_cast here assumes that `dataInOut`, which is a void pointer. As of now,
@@ -295,39 +294,13 @@ const char* EphemeralForTestRecordStore::name() const {
     return "EphemeralForTest";
 }
 
-boost::optional<UUID> EphemeralForTestRecordStore::uuid() const {
-    return _uuid;
-}
-
-bool EphemeralForTestRecordStore::isTemp() const {
-    return !_uuid.has_value();
-}
-
-std::shared_ptr<Ident> EphemeralForTestRecordStore::getSharedIdent() const {
-    return _ident;
-}
-
-const std::string& EphemeralForTestRecordStore::getIdent() const {
-    return _ident->getIdent();
-}
-
-void EphemeralForTestRecordStore::setIdent(std::shared_ptr<Ident> ident) {
-    _ident = std::move(ident);
-}
-
-RecordData EphemeralForTestRecordStore::dataFor(OperationContext* opCtx,
-                                                const RecordId& loc) const {
-    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-    return recordFor(lock, loc)->toRecordData();
-}
-
 const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore::recordFor(
     WithLock, const RecordId& loc) const {
     Records::const_iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
         LOGV2_ERROR(23720,
                     "EphemeralForTestRecordStore::recordFor cannot find record",
-                    "uuid"_attr = _uuid,
+                    "uuid"_attr = uuid(),
                     "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
@@ -340,31 +313,20 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
     if (it == _data->records.end()) {
         LOGV2_ERROR(23721,
                     "EphemeralForTestRecordStore::recordFor cannot find record",
-                    "uuid"_attr = _uuid,
+                    "uuid"_attr = uuid(),
                     "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
     return &it->second;
 }
 
-bool EphemeralForTestRecordStore::findRecord(OperationContext* opCtx,
-                                             const RecordId& loc,
-                                             RecordData* rd) const {
-    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
-    Records::const_iterator it = _data->records.find(loc);
-    if (it == _data->records.end()) {
-        return false;
-    }
-    *rd = it->second.toRecordData();
-    return true;
-}
-
-void EphemeralForTestRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& loc) {
+void EphemeralForTestRecordStore::_deleteRecord(OperationContext* opCtx,
+                                                RecoveryUnit& ru,
+                                                const RecordId& loc) {
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     EphemeralForTestRecord* rec = recordFor(lock, loc);
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<RemoveChange>(_data, loc, *rec));
+    ru.registerChange(std::make_unique<RemoveChange>(_data, loc, *rec));
     _data->dataSize -= rec->size;
     invariant(_data->records.erase(loc) == 1);
 }
@@ -386,10 +348,11 @@ StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(Wit
     return status;
 }
 
-Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
-                                                  std::vector<Record>* inOutRecords,
-                                                  const std::vector<Timestamp>& timestamps) {
-    const auto insertSingleFn = [this, opCtx](Record* record) {
+Status EphemeralForTestRecordStore::_insertRecords(OperationContext* opCtx,
+                                                   RecoveryUnit& ru,
+                                                   std::vector<Record>* inOutRecords,
+                                                   const std::vector<Timestamp>& timestamps) {
+    const auto insertSingleFn = [this, opCtx, &ru](Record* record) {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         EphemeralForTestRecord rec(record->data.size());
         memcpy(rec.data.get(), record->data.data(), record->data.size());
@@ -409,16 +372,15 @@ Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
         _data->records[loc] = rec;
         record->id = loc;
 
-        shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-            [this, loc = std::move(loc)](OperationContext*) {
-                stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
+        ru.onRollback([this, loc = std::move(loc)](OperationContext*) {
+            stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
-                Records::iterator it = _data->records.find(loc);
-                if (it != _data->records.end()) {
-                    _data->dataSize -= it->second.size;
-                    _data->records.erase(it);
-                }
-            });
+            Records::iterator it = _data->records.find(loc);
+            if (it != _data->records.end()) {
+                _data->dataSize -= it->second.size;
+                _data->records.erase(it);
+            }
+        });
         return Status::OK();
     };
 
@@ -431,26 +393,8 @@ Status EphemeralForTestRecordStore::insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(OperationContext* opCtx,
-                                                               const char* data,
-                                                               int len,
-                                                               Timestamp timestamp) {
-    return insertRecord(opCtx, RecordId(), data, len, timestamp);
-}
-
-StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(
-    OperationContext* opCtx, const RecordId& id, const char* data, int len, Timestamp timestamp) {
-    std::vector<Record> inOutRecords{Record{id, RecordData(data, len)}};
-    Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
-    if (!status.isOK())
-        return status;
-    return std::move(inOutRecords.front().id);
-}
-
-Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
-                                                 const RecordId& loc,
-                                                 const char* data,
-                                                 int len) {
+Status EphemeralForTestRecordStore::_updateRecord(
+    OperationContext* opCtx, RecoveryUnit& ru, const RecordId& loc, const char* data, int len) {
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord* oldRecord = recordFor(lock, loc);
     int oldLen = oldRecord->size;
@@ -458,8 +402,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
     EphemeralForTestRecord newRecord(len);
     memcpy(newRecord.data.get(), data, len);
 
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<RemoveChange>(_data, loc, *oldRecord));
+    ru.registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
     _data->dataSize += len - oldLen;
     *oldRecord = newRecord;
     return Status::OK();
@@ -469,11 +412,13 @@ bool EphemeralForTestRecordStore::updateWithDamagesSupported() const {
     return true;
 }
 
-StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(OperationContext* opCtx,
-                                                                      const RecordId& loc,
-                                                                      const RecordData& oldRec,
-                                                                      const char* damageSource,
-                                                                      const DamageVector& damages) {
+StatusWith<RecordData> EphemeralForTestRecordStore::_updateWithDamages(
+    OperationContext* opCtx,
+    RecoveryUnit& ru,
+    const RecordId& loc,
+    const RecordData& oldRec,
+    const char* damageSource,
+    const DamageVector& damages) {
 
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
@@ -485,8 +430,7 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(OperationC
 
     EphemeralForTestRecord newRecord(len);
 
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<RemoveChange>(_data, loc, *oldRecord));
+    ru.registerChange(std::make_unique<RemoveChange>(_data, loc, *oldRecord));
 
     char* root = newRecord.data.get();
     char* old = oldRecord->data.get();
@@ -523,34 +467,34 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(OperationC
 }
 
 std::unique_ptr<SeekableRecordCursor> EphemeralForTestRecordStore::getCursor(
-    OperationContext* opCtx, bool forward) const {
+    OperationContext* opCtx, RecoveryUnit& ru, bool forward) const {
     if (forward)
         return std::make_unique<Cursor>(opCtx, *this);
     return std::make_unique<ReverseCursor>(opCtx, *this);
 }
 
-std::unique_ptr<RecordCursor> EphemeralForTestRecordStore::getRandomCursor(
-    OperationContext*) const {
+std::unique_ptr<RecordCursor> EphemeralForTestRecordStore::getRandomCursor(OperationContext*,
+                                                                           RecoveryUnit&) const {
     return {};
 }
 
-Status EphemeralForTestRecordStore::truncate(OperationContext* opCtx) {
+Status EphemeralForTestRecordStore::_truncate(OperationContext* opCtx, RecoveryUnit& ru) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+    ru.registerChange(
         std::make_unique<TruncateChange>(opCtx, _data, RecordId::minLong(), RecordId::maxLong()));
     return Status::OK();
 }
 
-Status EphemeralForTestRecordStore::rangeTruncate(OperationContext* opCtx,
-                                                  const RecordId& minRecordId,
-                                                  const RecordId& maxRecordId,
-                                                  int64_t hintDataSizeDiff,
-                                                  int64_t hintNumRecordsDiff) {
+Status EphemeralForTestRecordStore::_rangeTruncate(OperationContext* opCtx,
+                                                   RecoveryUnit& ru,
+                                                   const RecordId& minRecordId,
+                                                   const RecordId& maxRecordId,
+                                                   int64_t hintDataSizeDiff,
+                                                   int64_t hintNumRecordsDiff) {
     // Unlike other changes, TruncateChange mutates _data on construction to perform the
     // truncate.
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<TruncateChange>(opCtx, _data, minRecordId, maxRecordId));
+    ru.registerChange(std::make_unique<TruncateChange>(opCtx, _data, minRecordId, maxRecordId));
     return Status::OK();
 }
 
@@ -558,7 +502,9 @@ bool EphemeralForTestRecordStore::compactSupported() const {
     return false;
 }
 
-StatusWith<int64_t> EphemeralForTestRecordStore::compact(OperationContext*, const CompactOptions&) {
+StatusWith<int64_t> EphemeralForTestRecordStore::_compact(OperationContext*,
+                                                          RecoveryUnit&,
+                                                          const CompactOptions&) {
     return Status::OK();
 }
 

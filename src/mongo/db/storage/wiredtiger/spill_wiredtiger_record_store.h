@@ -64,36 +64,42 @@ public:
                         BSONObjBuilder* extraInfo = nullptr,
                         int infoLevel = 0) const override;
 
+    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    RecoveryUnit& ru,
                                                     bool forward = true) const override;
 
     /**
      * The 'opCtx' param is not used and is allowed to be nullptr.
      */
-    RecoveryUnit& getRecoveryUnit(OperationContext* opCtx) const override;
+    RecoveryUnit& getRecoveryUnit(RecoveryUnit&) const override;
 
 private:
-    void _deleteRecord(OperationContext* opCtx, const RecordId&) override;
+    void _deleteRecord(OperationContext* opCtx, RecoveryUnit&, const RecordId&) override;
 
     // TODO(SERVER-103259): Remove the timestamp param.
     Status _insertRecords(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           std::vector<Record>*,
                           const std::vector<Timestamp>&) override;
 
     Status _updateRecord(OperationContext* opCtx,
+                         RecoveryUnit& ru,
                          const RecordId&,
                          const char* data,
                          int len) override;
 
-    Status _truncate(OperationContext* opCtx) override;
+    Status _truncate(OperationContext* opCtx, RecoveryUnit& ru) override;
 
     Status _rangeTruncate(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           const RecordId& minRecordId = RecordId(),
                           const RecordId& maxRecordId = RecordId(),
                           int64_t hintDataSizeIncrement = 0,
                           int64_t hintNumRecordsIncrement = 0) override;
 
     StatusWith<RecordData> _updateWithDamages(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               const RecordId& loc,
                                               const RecordData& oldRec,
                                               const char* damageSource,
@@ -101,7 +107,9 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<int64_t> _compact(OperationContext* opCtx, const CompactOptions&) override {
+    StatusWith<int64_t> _compact(OperationContext* opCtx,
+                                 RecoveryUnit& ru,
+                                 const CompactOptions&) override {
         MONGO_UNREACHABLE;
     }
 
@@ -121,7 +129,9 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx) const override {
+    using RecordStoreBase::getRandomCursor;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext* opCtx,
+                                                  RecoveryUnit& ru) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -139,11 +149,14 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    RecordId getLargestKey(OperationContext* opCtx) const override {
+    using RecordStoreBase::getLargestKey;
+    RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const override {
         MONGO_UNREACHABLE;
     }
 
+    using RecordStoreBase::reserveRecordIds;
     void reserveRecordIds(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           std::vector<RecordId>*,
                           size_t numRecords) override {
         MONGO_UNREACHABLE;
@@ -178,15 +191,15 @@ private:
 class SpillWiredTigerRecordStoreCursor final : public WiredTigerRecordStoreCursorBase {
 public:
     SpillWiredTigerRecordStoreCursor(OperationContext* opCtx,
+                                     SpillRecoveryUnit& ru,
                                      const SpillWiredTigerRecordStore& rs,
-                                     bool forward,
-                                     SpillRecoveryUnit* wtRu);
+                                     bool forward);
 
 protected:
     RecoveryUnit& getRecoveryUnit() const override;
 
 private:
-    SpillRecoveryUnit* _wtRu{nullptr};
+    SpillRecoveryUnit& _wtRu;
 };
 
 }  // namespace mongo

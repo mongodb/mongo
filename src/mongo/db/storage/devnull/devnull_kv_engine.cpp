@@ -131,12 +131,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    RecoveryUnit& ru,
                                                     bool forward) const final {
         return std::make_unique<EmptyRecordCursor>();
     }
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const override {
+    using RecordStoreBase::getRandomCursor;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*, RecoveryUnit&) const override {
         return {};
     }
 
@@ -170,11 +173,14 @@ public:
         return nullptr;
     }
 
-    RecordId getLargestKey(OperationContext* opCtx) const final {
+    using RecordStoreBase::getLargestKey;
+    RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
         return RecordId();
     }
 
+    using RecordStoreBase::reserveRecordIds;
     void reserveRecordIds(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           std::vector<RecordId>* out,
                           size_t nRecords) final {
         for (size_t i = 0; i < nRecords; i++) {
@@ -183,9 +189,10 @@ public:
     };
 
 private:
-    void _deleteRecord(OperationContext* opCtx, const RecordId& dl) override {}
+    void _deleteRecord(OperationContext* opCtx, RecoveryUnit& ru, const RecordId& dl) override {}
 
     Status _insertRecords(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           std::vector<Record>* inOutRecords,
                           const std::vector<Timestamp>& timestamps) override {
         _numInserts += inOutRecords->size();
@@ -196,6 +203,7 @@ private:
     }
 
     Status _updateRecord(OperationContext* opCtx,
+                         RecoveryUnit& ru,
                          const RecordId& oldLocation,
                          const char* data,
                          int len) override {
@@ -203,6 +211,7 @@ private:
     }
 
     StatusWith<RecordData> _updateWithDamages(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
                                               const RecordId& loc,
                                               const RecordData& oldRec,
                                               const char* damageSource,
@@ -210,11 +219,12 @@ private:
         MONGO_UNREACHABLE;
     }
 
-    Status _truncate(OperationContext* opCtx) override {
+    Status _truncate(OperationContext* opCtx, RecoveryUnit& ru) override {
         return Status::OK();
     }
 
     Status _rangeTruncate(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           const RecordId& minRecordId,
                           const RecordId& maxRecordId,
                           int64_t hintDataSizeDiff,
@@ -222,7 +232,7 @@ private:
         return Status::OK();
     }
 
-    StatusWith<int64_t> _compact(OperationContext*, const CompactOptions&) override {
+    StatusWith<int64_t> _compact(OperationContext*, RecoveryUnit&, const CompactOptions&) override {
         return Status::OK();
     }
 
@@ -246,6 +256,7 @@ public:
 
 private:
     TruncateAfterResult _truncateAfter(OperationContext*,
+                                       RecoveryUnit& ru,
                                        const RecordId&,
                                        bool inclusive) override {
         return {};
@@ -253,7 +264,7 @@ private:
 };
 
 class DevNullRecordStore::Oplog final : public DevNullRecordStore::Capped,
-                                        public RecordStore::Oplog {
+                                        public RecordStoreBase::Oplog {
 public:
     Oplog(UUID uuid, StringData ident, int64_t maxSize)
         : DevNullRecordStore::Capped(uuid, ident, KeyFormat::Long), _maxSize(maxSize) {}
@@ -275,7 +286,9 @@ public:
         return _maxSize;
     }
 
+    using RecordStoreBase::Oplog::getRawCursor;
     std::unique_ptr<SeekableRecordCursor> getRawCursor(OperationContext* opCtx,
+                                                       RecoveryUnit& ru,
                                                        bool forward) const override {
         return std::make_unique<EmptyRecordCursor>();
     }

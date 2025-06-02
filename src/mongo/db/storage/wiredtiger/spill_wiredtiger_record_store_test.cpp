@@ -56,7 +56,9 @@ protected:
             std::string{kWiredTigerEngineName}, _dbpath.path(), &_clockSource, std::move(wtConfig));
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
-        ASSERT_TRUE(_kvEngine->hasIdent(_recordStore->getRecoveryUnit(nullptr), "a.b"));
+        ASSERT_TRUE(_kvEngine->hasIdent(
+            _recordStore->getRecoveryUnit(*shard_role_details::getRecoveryUnit(_opCtx.get())),
+            "a.b"));
     }
 
     std::unique_ptr<SpillWiredTigerRecordStore> makeTemporaryRecordStore(const std::string& ns,
@@ -260,6 +262,8 @@ TEST_F(SpillWiredTigerRecordStoreTest, RangeTruncate) {
 
 // Test that RecordCursor works as expected.
 TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
+    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {
         RecordId recordId(i);
@@ -277,7 +281,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
         ASSERT_EQ(i * 5, _recordStore->dataSize());
     }
 
-    auto cursor = _recordStore->getCursor(_opCtx.get(), true /* forward */);
+    auto cursor = _recordStore->getCursor(_opCtx.get(), ru, true /* forward */);
     for (int32_t i = 1; i <= 10; ++i) {
         auto record = cursor->next();
         ASSERT_TRUE(record);
@@ -287,7 +291,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     ASSERT_FALSE(cursor->next());
 
     // Test seek() in {forward, kInclude} mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), true /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, true /* forward */);
     auto record = cursor->seek(RecordId(5), SeekableRecordCursor::BoundInclusion::kInclude);
     for (int32_t i = 5; i <= 10; ++i) {
         ASSERT_TRUE(record);
@@ -298,7 +302,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     ASSERT_FALSE(cursor->next());
 
     // Test seekExact() in forward mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), true /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, true /* forward */);
     record = cursor->seekExact(RecordId(5));
     for (int32_t i = 5; i <= 10; ++i) {
         ASSERT_TRUE(record);
@@ -309,7 +313,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     ASSERT_FALSE(cursor->next());
 
     // Test seek() in {forward, kExclude} mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), true /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, true /* forward */);
     record = cursor->seek(RecordId(5), SeekableRecordCursor::BoundInclusion::kExclude);
     for (int32_t i = 6; i <= 10; ++i) {
         ASSERT_TRUE(record);
@@ -321,7 +325,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
 
 
     // Test seek() in {backward, kInclude} mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), false /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, false /* forward */);
     record = cursor->seek(RecordId(5), SeekableRecordCursor::BoundInclusion::kInclude);
     for (int32_t i = 5; i >= 1; --i) {
         ASSERT_TRUE(record);
@@ -332,7 +336,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     ASSERT_FALSE(cursor->next());
 
     // Test seekExact() in backward mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), false /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, false /* forward */);
     record = cursor->seekExact(RecordId(5));
     for (int32_t i = 5; i >= 1; --i) {
         ASSERT_TRUE(record);
@@ -343,7 +347,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
     ASSERT_FALSE(cursor->next());
 
     // Test seek() in {backward, kExclude} mode.
-    cursor = _recordStore->getCursor(_opCtx.get(), false /* forward */);
+    cursor = _recordStore->getCursor(_opCtx.get(), ru, false /* forward */);
     record = cursor->seek(RecordId(5), SeekableRecordCursor::BoundInclusion::kExclude);
     for (int32_t i = 4; i >= 1; --i) {
         ASSERT_TRUE(record);

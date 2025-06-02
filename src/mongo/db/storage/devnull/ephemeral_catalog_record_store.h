@@ -38,7 +38,7 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
-#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/record_store_base.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -62,7 +62,7 @@ namespace mongo {
  *
  * @param cappedMaxSize - required if isCapped. limit uses dataSize() in this impl.
  */
-class EphemeralForTestRecordStore : public RecordStore {
+class EphemeralForTestRecordStore : public RecordStoreBase {
 public:
     explicit EphemeralForTestRecordStore(boost::optional<UUID> uuid,
                                          StringData identName,
@@ -72,66 +72,51 @@ public:
 
     const char* name() const override;
 
-    boost::optional<UUID> uuid() const override;
-
-    bool isTemp() const override;
-
-    std::shared_ptr<Ident> getSharedIdent() const override;
-
-    const std::string& getIdent() const override;
-
-    void setIdent(std::shared_ptr<Ident>) override;
-
     KeyFormat keyFormat() const override {
         return KeyFormat::Long;
     }
 
-    RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const override;
+    void _deleteRecord(OperationContext*, RecoveryUnit&, const RecordId&) override;
 
-    bool findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* rd) const override;
+    Status _insertRecords(OperationContext*,
+                          RecoveryUnit&,
+                          std::vector<Record>*,
+                          const std::vector<Timestamp>&) override;
 
-    void deleteRecord(OperationContext*, const RecordId&) override;
-
-    Status insertRecords(OperationContext*,
-                         std::vector<Record>*,
-                         const std::vector<Timestamp>&) override;
-
-    StatusWith<RecordId> insertRecord(OperationContext*,
-                                      const char* data,
-                                      int len,
-                                      Timestamp) override;
-
-    StatusWith<RecordId> insertRecord(
-        OperationContext*, const RecordId&, const char* data, int len, Timestamp) override;
-
-    Status updateRecord(OperationContext*, const RecordId&, const char* data, int len) override;
+    Status _updateRecord(
+        OperationContext*, RecoveryUnit&, const RecordId&, const char* data, int len) override;
 
     bool updateWithDamagesSupported() const override;
 
-    StatusWith<RecordData> updateWithDamages(OperationContext*,
-                                             const RecordId& loc,
-                                             const RecordData& oldRec,
-                                             const char* damageSource,
-                                             const DamageVector& damages) override;
+    StatusWith<RecordData> _updateWithDamages(OperationContext*,
+                                              RecoveryUnit&,
+                                              const RecordId& loc,
+                                              const RecordData& oldRec,
+                                              const char* damageSource,
+                                              const DamageVector& damages) override;
 
     void printRecordMetadata(const RecordId& recordId,
                              std::set<Timestamp>* recordTimestamps) const override {}
 
+    using RecordStoreBase::getCursor;
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
+                                                    RecoveryUnit& ru,
                                                     bool forward) const final;
 
-    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*) const override;
+    using RecordStoreBase::getRandomCursor;
+    std::unique_ptr<RecordCursor> getRandomCursor(OperationContext*, RecoveryUnit&) const override;
 
-    Status truncate(OperationContext*) override;
-    Status rangeTruncate(OperationContext*,
-                         const RecordId& minRecordId,
-                         const RecordId& maxRecordId,
-                         int64_t hintDataSizeDiff,
-                         int64_t hintNumRecordsDiff) override;
+    Status _truncate(OperationContext*, RecoveryUnit& ru) override;
+    Status _rangeTruncate(OperationContext*,
+                          RecoveryUnit&,
+                          const RecordId& minRecordId,
+                          const RecordId& maxRecordId,
+                          int64_t hintDataSizeDiff,
+                          int64_t hintNumRecordsDiff) override;
 
     bool compactSupported() const override;
 
-    StatusWith<int64_t> compact(OperationContext*, const CompactOptions&) override;
+    StatusWith<int64_t> _compact(OperationContext*, RecoveryUnit&, const CompactOptions&) override;
 
     void validate(RecoveryUnit&,
                   const CollectionValidation::ValidationOptions&,
@@ -163,12 +148,15 @@ public:
         _data->dataSize = dataSize;
     }
 
-    RecordId getLargestKey(OperationContext* opCtx) const final {
+    using RecordStoreBase::getLargestKey;
+    RecordId getLargestKey(OperationContext* opCtx, RecoveryUnit& ru) const final {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         return RecordId(_data->nextId - 1);
     }
 
+    using RecordStoreBase::reserveRecordIds;
     void reserveRecordIds(OperationContext* opCtx,
+                          RecoveryUnit& ru,
                           std::vector<RecordId>* out,
                           size_t nRecords) final {};
 
@@ -218,8 +206,6 @@ private:
 
     RecordId allocateLoc(WithLock);
 
-    boost::optional<UUID> _uuid;
-    std::shared_ptr<Ident> _ident;
     const bool _isCapped;
 
     // This is the "persistent" data.
