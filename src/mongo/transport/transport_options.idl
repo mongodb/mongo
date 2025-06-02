@@ -68,17 +68,25 @@ server_parameters:
     cpp_vartype: bool
     default: true
 
-  maxEstablishingConnectionsOverride:
-    description: "A list of CIDRs to be exempted from the max establishing limits"
+  ingressConnectionEstablishmentRateLimiterBypass:
+    description: "A list of CIDRs to be exempted from the ingress connection establishment rate limit"
     set_at: [startup, runtime]
     cpp_class:
         name: "MaxEstablishingConnectionsOverrideServerParameter"
         # Expects the payload to be an instance of `ConnectionListParameters`.
         override_set: true
     redact: false
-  
+
+  ingressConnectionEstablishmentRateLimiterEnabled:
+    description: "Whether the ingress connection establishment rate limiter is enabled or not"
+    set_at: [startup, runtime]
+    cpp_varname: gIngressConnectionEstablishmentRateLimiterEnabled
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    redact: false
+
   ingressConnectionEstablishmentRatePerSec:
-    description: "The number of new connections that will be allowed to establish per second"
+    description: "The number of new ingress connections that will be allowed to establish per second"
     set_at: [startup, runtime]
     cpp_varname: gIngressConnectionEstablishmentRatePerSec
     cpp_vartype: AtomicWord<int32_t>
@@ -90,7 +98,7 @@ server_parameters:
 
   ingressConnectionEstablishmentBurstSize:
     description: >-
-        The maximum number of connection establishments that will be admitted before rate-limiting 
+        The maximum number of ingress connection establishments that will be admitted before rate-limiting 
         kicks in (ie, the burst size of the bucket)
     set_at: [startup, runtime]
     cpp_varname: gIngressConnectionEstablishmentBurstSize
@@ -104,8 +112,8 @@ server_parameters:
   ingressConnectionEstablishmentMaxQueueDepth:
     description: >-
         The maximum size of the connection establishment queue, after which the server will begin 
-        rejecting new connections. A queue size of 0 indicates that connections will be rejected if 
-        they cannot immediately be admitted.
+        rejecting new ingress connections. A queue size of 0 indicates that connections will be 
+        rejected if they cannot immediately be admitted.
     set_at: [startup, runtime]
     cpp_varname: gIngressConnectionEstablishmentMaxQueueDepth
     cpp_vartype: AtomicWord<int32_t>

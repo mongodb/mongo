@@ -59,6 +59,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
@@ -794,7 +795,8 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                 const auto fcvSnapshot =
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                 if (gFeatureFlagRateLimitIngressConnectionEstablishment
-                        .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
+                        .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot) &&
+                    gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
                     uassertStatusOK(SessionEstablishmentRateLimiter::get(*_serviceContext)
                                         ->throttleIfNeeded(client()));
                 }

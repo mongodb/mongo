@@ -1,11 +1,12 @@
-// Tests using a server parameter to set `maxEstablishingConnectionsOverride` at runtime.
+// Tests using a server parameter to set `ingressConnectionEstablishmentRateLimiterBypass` at
+// runtime.
 
 // TODO (SERVER-96103): Allow test to run on Windows.
 if (_isWindows()) {
     quit();
 }
 
-const maxEstablishing = "maxEstablishingConnectionsOverride";
+const maxEstablishing = "ingressConnectionEstablishmentRateLimiterBypass";
 
 function runTest(args, testFunc) {
     // Run tests in isolation to make sure we always start with a clean slate.
