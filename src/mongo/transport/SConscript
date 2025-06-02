@@ -24,6 +24,7 @@ env.Library(
     source=[
         'hello_metrics.cpp',
         'session.cpp',
+        "session_establishment_rate_limiter.cpp",
         'transport_layer.cpp',
         'transport_options.cpp',
         'transport_options.idl',
@@ -134,6 +135,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_asio',
+        'ingress_handshake_metrics',
         'service_executor',
         'session_manager',
     ],

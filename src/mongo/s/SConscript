@@ -526,6 +526,7 @@ env.Library(
         # please add that library as a private libdep of
         # mongos_initializers.
         '$BUILD_DIR/mongo/client/remote_command_targeter',
+        '$BUILD_DIR/mongo/db/admission/queues_server_status_section',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authserver',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
