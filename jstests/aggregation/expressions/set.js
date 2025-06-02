@@ -278,7 +278,7 @@ const operators = [
     ["$setUnion", 17043],
     ["$setIntersection", 17047],
     ["$setDifference", [17048, 17049]],
-    ["$setEquals", 17044],
+    ["$setEquals", [17044, 7158100]],
     ["$setIsSubset", [17042, 17046]]
 ];
 const badDocuments = [
