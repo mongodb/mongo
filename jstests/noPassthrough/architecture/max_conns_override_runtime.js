@@ -1,8 +1,8 @@
 // Tests using a server parameter to set `maxIncomingConnectionsOverride` and
-// `maxEstablishingConnectionsOverride` at runtime.
+// `ingressConnectionEstablishmentRateLimiterBypass` at runtime.
 
 const maxIncoming = "maxIncomingConnectionsOverride";
-const maxEstablishing = "maxEstablishingConnectionsOverride";
+const maxEstablishing = "ingressConnectionEstablishmentRateLimiterBypass";
 
 function runTest(args, testFunc) {
     // Run tests in isolation to make sure we always start with a clean slate.

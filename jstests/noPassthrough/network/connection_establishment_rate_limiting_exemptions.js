@@ -48,10 +48,11 @@ const testExemptIPsFromRateLimit = (conn) => {
 };
 
 const testExemptIPsFromRateLimitOpts = {
+    ingressConnectionEstablishmentRateLimiterEnabled: true,
     ingressConnectionEstablishmentRatePerSec: 1,
     ingressConnectionEstablishmentBurstSize: 1,
     ingressConnectionEstablishmentMaxQueueDepth: 0,
-    maxEstablishingConnectionsOverride: {ranges: [exemptIP]},
+    ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
 };
 runTestStandaloneParamsSetAtStartup(testExemptIPsFromRateLimitOpts, testExemptIPsFromRateLimit);
 runTestStandaloneParamsSetAtRuntime(testExemptIPsFromRateLimitOpts, testExemptIPsFromRateLimit);

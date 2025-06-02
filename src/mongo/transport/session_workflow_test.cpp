@@ -605,6 +605,8 @@ private:
 
     RAIIServerParameterControllerForTest featureFlagController{
         "featureFlagRateLimitIngressConnectionEstablishment", true};
+    RAIIServerParameterControllerForTest featureEnabled{
+        "ingressConnectionEstablishmentRateLimiterEnabled", true};
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
                                                           logv2::LogSeverity::Debug(4)};
 };
@@ -679,7 +681,8 @@ TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
 TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     std::string ip = "127.0.0.1";
     RAIIServerParameterControllerForTest exemptionsGuard(
-        "maxEstablishingConnectionsOverride", BSON("ranges" << BSONArray(BSON("0" << ip))));
+        "ingressConnectionEstablishmentRateLimiterBypass",
+        BSON("ranges" << BSONArray(BSON("0" << ip))));
     RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
                                                      1.0};
     RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
