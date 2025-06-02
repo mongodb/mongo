@@ -396,6 +396,16 @@ const internalCommandsMap = {
         command:
             {_refreshQueryAnalyzerConfiguration: 1, name: "test", numQueriesExecutedPerSecond: 1},
     },
+    internalRenameIfOptionsAndIndexesMatch: {
+        testname: "internalRenameIfOptionsAndIndexesMatch",
+        command: {
+            internalRenameIfOptionsAndIndexesMatch: 1,
+            from: "test.collection",
+            to: "db.collection_renamed",
+            collectionOptions: {},
+            indexes: [],
+        },
+    },
     _shardsvrAbortReshardCollection: {
         testname: "_shardsvrAbortReshardCollection",
         command: {_shardsvrAbortReshardCollection: UUID(), userCanceled: true},
@@ -849,6 +859,11 @@ function runAuthorizationTestsOnAllInternalCommands(conn, firstDb, secondDb, col
     let fails = [];
     const availableCommandsList =
         AllCommandsTest.checkCommandCoverage(conn, internalCommandsMap, function(cmdName) {
+            // TODO(SERVER-104891): Remove this once this command is _renameIfOptionsAndIndexesMatch
+            if (cmdName == "internalRenameIfOptionsAndIndexesMatch") {
+                return false;
+            }
+
             return !cmdName.startsWith('_') || testOnlyCommandsSet.hasOwnProperty(cmdName);
         });
     for (const commandName of availableCommandsList) {

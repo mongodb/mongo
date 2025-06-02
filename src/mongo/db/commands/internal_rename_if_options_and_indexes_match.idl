@@ -38,6 +38,8 @@ commands:
             indexes and collection options on the destination match those given in the
             command."
         command_name: internalRenameIfOptionsAndIndexesMatch
+        # TODO (SERVER-104891): make this alias the command_name when 9.0 becomes last LTS
+        command_alias: _renameIfOptionsAndIndexesMatch
         namespace: ignored
         api_version: ""
         fields:

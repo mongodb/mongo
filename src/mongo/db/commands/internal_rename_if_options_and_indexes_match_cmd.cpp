@@ -141,24 +141,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            auto thisRequest = request();
-            auto from = thisRequest.getFrom();
-            auto to = thisRequest.getTo();
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to rename " << from.toStringForErrorMsg(),
+                    "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(from),
-                                                           ActionType::renameCollection));
-            uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to drop " << to.toStringForErrorMsg(),
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(to),
-                                                           ActionType::dropCollection));
-            uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to insert into " << to.toStringForErrorMsg(),
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(to),
-                                                           ActionType::insert));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
