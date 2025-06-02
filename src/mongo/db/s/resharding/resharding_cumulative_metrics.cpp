@@ -47,7 +47,7 @@ namespace {
 constexpr auto kResharding = "resharding";
 
 const auto kReportedStateFieldNamesMap = [] {
-    return ReshardingCumulativeMetrics::StateFieldNameMap{
+    return ReshardingCumulativeMetrics::StateTracker::StateFieldNameMap{
         {CoordinatorStateEnum::kInitializing, "countInstancesInCoordinatorState1Initializing"},
         {CoordinatorStateEnum::kPreparingToDonate,
          "countInstancesInCoordinatorState2PreparingToDonate"},
@@ -81,15 +81,14 @@ const auto kReportedStateFieldNamesMap = [] {
 }  // namespace
 
 boost::optional<StringData> ReshardingCumulativeMetrics::fieldNameFor(AnyState state) {
-    return getNameFor(state, kReportedStateFieldNamesMap);
+    return StateTracker::getNameFor(state, kReportedStateFieldNamesMap);
 }
 
 ReshardingCumulativeMetrics::ReshardingCumulativeMetrics()
     : ReshardingCumulativeMetrics(kResharding) {}
 
 ReshardingCumulativeMetrics::ReshardingCumulativeMetrics(const std::string& rootName)
-    : resharding_cumulative_metrics::Base(
-          rootName, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
+    : Base(rootName, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
       _fieldNames(
           static_cast<const ReshardingCumulativeMetricsFieldNameProvider*>(getFieldNames())) {}
 

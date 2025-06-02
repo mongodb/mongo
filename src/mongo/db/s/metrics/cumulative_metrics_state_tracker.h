@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -35,20 +35,17 @@
 
 namespace mongo {
 
-template <typename Base, typename... StateEnums>
-class WithStateManagementForCumulativeMetrics : public Base {
+template <typename... StateEnums>
+class CumulativeMetricsStateTracker {
 public:
     using AnyState = std::variant<StateEnums...>;
     using StateFieldNameMap = stdx::unordered_map<AnyState, StringData>;
-
-    using Base::Base;
 
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
         getHolderFor<T>().onStateTransition(before, after);
     }
 
-protected:
     template <typename T>
     int64_t getCountInState(T state) const {
         return getHolderFor<T>().getStateCounter(state)->load();

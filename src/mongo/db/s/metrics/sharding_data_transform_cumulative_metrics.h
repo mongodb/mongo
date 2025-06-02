@@ -30,11 +30,13 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/s/metrics/cumulative_metrics_state_tracker.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -59,6 +61,9 @@ public:
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
+    using StateTracker =
+        CumulativeMetricsStateTracker<CoordinatorStateEnum, DonorStateEnum, RecipientStateEnum>;
+    using AnyState = StateTracker::AnyState;
 
     struct MetricsComparer {
         inline bool operator()(const InstanceObserver* a, const InstanceObserver* b) const {
@@ -136,6 +141,11 @@ public:
     void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
 
+    template <typename T>
+    void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
+        _stateTracker.onStateTransition(before, after);
+    }
+
 protected:
     const ShardingDataTransformCumulativeMetricsFieldNameProvider* getFieldNames() const;
 
@@ -158,6 +168,9 @@ protected:
     int64_t getOplogApplyingTotalBatchesRetrievalTimeMillis() const;
     int64_t getOplogBatchApplied() const;
     int64_t getOplogBatchAppliedMillis() const;
+
+    void reportCountsForAllStates(const StateTracker::StateFieldNameMap& names,
+                                  BSONObjBuilder* bob) const;
 
     template <typename FieldNameProvider>
     void reportOplogApplicationCountMetrics(const FieldNameProvider* names,
@@ -190,6 +203,11 @@ protected:
         bob->append(names->getForOplogApplyingTotalLocalBatchesApplied(), getOplogBatchApplied());
     }
 
+    template <typename T>
+    int64_t getCountInState(T state) const {
+        return _stateTracker.getCountInState(state);
+    }
+
     const std::string _rootSectionName;
     AtomicWord<bool> _operationWasAttempted;
 
@@ -208,6 +226,8 @@ private:
     mutable stdx::mutex _mutex;
     std::unique_ptr<NameProvider> _fieldNames;
     std::vector<MetricsSet> _instanceMetricsForAllRoles;
+
+    StateTracker _stateTracker;
 
     AtomicWord<int64_t> _countStarted{0};
     AtomicWord<int64_t> _countSucceeded{0};

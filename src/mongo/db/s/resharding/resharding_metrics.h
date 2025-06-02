@@ -36,7 +36,6 @@
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
-#include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"

@@ -278,6 +278,11 @@ int64_t ShardingDataTransformCumulativeMetrics::getOplogBatchAppliedMillis() con
     return _oplogBatchAppliedMillis.load();
 }
 
+void ShardingDataTransformCumulativeMetrics::reportCountsForAllStates(
+    const StateTracker::StateFieldNameMap& names, BSONObjBuilder* bob) const {
+    _stateTracker.reportCountsForAllStates(names, bob);
+}
+
 const ShardingDataTransformCumulativeMetrics::InstanceObserver*
 ShardingDataTransformCumulativeMetrics::getOldestOperation(WithLock, Role role) const {
     auto set = getMetricsSetForRole(role);
