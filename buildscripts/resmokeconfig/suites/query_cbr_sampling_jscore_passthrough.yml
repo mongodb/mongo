@@ -43,6 +43,9 @@ selector:
     - jstests/core/query/explain/explain_all_plans_execution_stats.js
     - jstests/core/query/explain/explain_multi_plan.js
 
+    # TODO SERVER-99091 re-enable this test to get coverage of switching between plan ranker modes.
+    - jstests/core/query/query_knob_correctness_pbt.js
+
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling

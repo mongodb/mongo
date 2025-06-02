@@ -82,6 +82,7 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/run_all_plans_pbt.js
     - jstests/core/query/partial_index_pbt.js
+    - jstests/core/query/query_knob_correctness_pbt.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show

@@ -85,8 +85,12 @@ const okIndexCreationErrorCodes = [
  * there are.
  */
 function runProperty(propertyFn, namespaces, workload) {
-    const {collSpec, queries} = workload;
+    let {collSpec, queries, extraParams} = workload;
     const {controlColl, experimentColl} = namespaces;
+    // `extraParams` is an optional field in a workload model.
+    if (!extraParams) {
+        extraParams = [];
+    }
 
     // Setup the control/experiment collections, define the helper functions, then run the property.
     if (controlColl) {
@@ -101,7 +105,7 @@ function runProperty(propertyFn, namespaces, workload) {
     collSpec.indexes.forEach((indexSpec, num) => {
         const name = "index_" + num;
         assert.commandWorkedOrFailedWithCode(
-            experimentColl.createIndex(indexSpec.def, Object.extend(indexSpec.options, {name})),
+            experimentColl.createIndex(indexSpec.def, Object.assign({}, indexSpec.options, {name})),
             okIndexCreationErrorCodes);
     });
 
@@ -117,7 +121,7 @@ function runProperty(propertyFn, namespaces, workload) {
         return concreteQueryFromFamily(query, paramIx);
     }
 
-    return propertyFn(getQuery, testHelpers);
+    return propertyFn(getQuery, testHelpers, ...extraParams);
 }
 
 /*

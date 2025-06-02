@@ -14,7 +14,5 @@ export function getCollectionModel({isTS = false, allowPartialIndexes = false} =
                             : getIndexModel({allowPartialIndexes});
     const indexesModel = fc.array(indexModel, {minLength: 0, maxLength: 15, size: '+2'});
 
-    // TODO SERVER-93783 as part of the collection model, we'll generate different query knobs that
-    // can be set on a collection.
     return fc.record({isTS: fc.constant(isTS), docs: getDocsModel(isTS), indexes: indexesModel});
 }
