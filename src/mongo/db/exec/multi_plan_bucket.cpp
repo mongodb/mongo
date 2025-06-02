@@ -37,23 +37,56 @@
 namespace mongo {
 namespace {
 /**
+ * The total number of multiplannings allowed to proceed by the rate limiter.
+ */
+auto& rateLimiterAllowedCount = *MetricBuilder<Counter64>{"query.multiPlanner.rateLimiter.allowed"};
+
+/**
+ * The total number of multiplannings delayed but allowed to proceed by the rate limiter.
+ */
+auto& rateLimiterDelayedCount = *MetricBuilder<Counter64>{"query.multiPlanner.rateLimiter.delayed"};
+
+
+/**
+ * The total number of multiplannings refused by the rate limiter.
+ */
+auto& rateLimiterRefusedCount = *MetricBuilder<Counter64>{"query.multiPlanner.rateLimiter.refused"};
+
+/**
  * This class defines a table containing the buckets used in the MultiPlan rate limiting algorithm.
  * It maintains a bucket for each plan cache key.
  */
-class BucketTable : public RefCountable {
+class BucketTable {
 public:
-    boost::intrusive_ptr<MultiPlanBucket> get(const std::string& key) {
+    std::shared_ptr<MultiPlanBucket> get(const std::string& key) {
         stdx::lock_guard guard{_mutex};
         auto [pos, inserted] = _table.try_emplace(key);
         if (inserted) {
-            pos->second = make_intrusive<MultiPlanBucket>(
+            pos->second = std::make_shared<MultiPlanBucket>(
                 internalQueryMaxConcurrentMultiPlanJobsPerCacheKey.load());
         }
         return pos->second;
     }
 
+    /**
+     * Gets a shared pointer to the requested bucket and erases it from the bucket table. Both
+     * operations are performed under a single mutex lock for efficiency.
+     */
+    std::shared_ptr<MultiPlanBucket> getAndErase(const std::string& key) {
+        stdx::lock_guard guard{_mutex};
+        std::shared_ptr<MultiPlanBucket> result{};
+        auto it = _table.find(key);
+
+        if (it != _table.end()) {
+            result = it->second;
+            _table.erase(it);
+        }
+
+        return result;
+    }
+
 private:
-    stdx::unordered_map<std::string, boost::intrusive_ptr<MultiPlanBucket>> _table;
+    stdx::unordered_map<std::string, std::shared_ptr<MultiPlanBucket>> _table;
     stdx::mutex _mutex;
 };
 
@@ -63,27 +96,59 @@ private:
  */
 class BucketTablePointer {
 public:
-    BucketTablePointer() : _table{make_intrusive<BucketTable>()} {}
+    BucketTablePointer() : _table{std::make_shared<BucketTable>()} {}
 
-    boost::intrusive_ptr<MultiPlanBucket> get(const std::string& key) const {
+    std::shared_ptr<MultiPlanBucket> get(const std::string& key) const {
         return _table->get(key);
     }
 
+    std::shared_ptr<MultiPlanBucket> getAndErase(const std::string& key) {
+        return _table->getAndErase(key);
+    }
+
 private:
-    boost::intrusive_ptr<BucketTable> _table;
+    std::shared_ptr<BucketTable> _table;
 };
 
 // All buckets stored a collection decoration.
 const auto bucketTableDecoration = Collection::declareDecoration<BucketTablePointer>();
 }  // namespace
 
-MultiPlanTokens::~MultiPlanTokens() {
-    _bucket->releaseTokens(_tokensCount);
+MultiPlanTokens::MultiPlanTokens(MultiPlanTokens&& other) {
+    _tokensCount = other._tokensCount;
+    other._tokensCount = 0;
+    _bucket = std::move(other._bucket);
 }
 
-boost::intrusive_ptr<MultiPlanBucket> MultiPlanBucket::get(const std::string& planCacheKey,
-                                                           const CollectionPtr& collection) {
+MultiPlanTokens& MultiPlanTokens::operator=(MultiPlanTokens&& other) {
+    _tokensCount = other._tokensCount;
+    other._tokensCount = 0;
+    _bucket = std::move(other._bucket);
+    return *this;
+}
+
+MultiPlanTokens::~MultiPlanTokens() {
+    if (_tokensCount == 0) {
+        return;
+    }
+
+    auto bucket = _bucket.lock();
+    if (bucket) {
+        bucket->releaseTokens(_tokensCount);
+    }
+}
+
+std::shared_ptr<MultiPlanBucket> MultiPlanBucket::get(const std::string& planCacheKey,
+                                                      const CollectionPtr& collection) {
     return bucketTableDecoration(collection.get()).get(planCacheKey);
+}
+
+void MultiPlanBucket::release(const std::string& planCacheKey, const CollectionPtr& collection) {
+    auto table = bucketTableDecoration(collection.get());
+    auto bucket = table.getAndErase(planCacheKey);
+    if (bucket) {
+        bucket->unlockAll();
+    }
 }
 
 boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedTokens,
@@ -91,14 +156,18 @@ boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedToke
                                                             OperationContext* opCtx) {
     const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
+    boost::optional<MultiPlanTokens> tokens{};
+
     stdx::unique_lock guard(_mutex);
-    if (_tokens >= requestedTokens) {
+    if (_active && _tokens >= requestedTokens) {
         _tokens -= requestedTokens;
         guard.unlock();
-        return MultiPlanTokens{requestedTokens, boost::intrusive_ptr<MultiPlanBucket>(this)};
+        tokens.emplace(requestedTokens, weak_from_this());
+        rateLimiterAllowedCount.increment();
+        return tokens;
     }
 
-    while (_tokens < requestedTokens &&
+    while (_active && _tokens < requestedTokens &&
            _cv.wait_for(
                guard,
                _yieldingTimeout,
@@ -114,7 +183,17 @@ boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedToke
         }
     }
 
-    return boost::none;
+    // If the bucket is still active (the plan is not cached yet) we can try to get tokens.
+    if (_active && _tokens >= requestedTokens) {
+        _tokens -= requestedTokens;
+        guard.unlock();
+        tokens.emplace(requestedTokens, weak_from_this());
+        rateLimiterDelayedCount.increment();
+    } else {
+        rateLimiterRefusedCount.increment();
+    }
+
+    return tokens;
 }
 
 void MultiPlanBucket::releaseTokens(size_t tokens) {
@@ -126,6 +205,10 @@ void MultiPlanBucket::releaseTokens(size_t tokens) {
 }
 
 void MultiPlanBucket::unlockAll() {
+    {
+        stdx::unique_lock guard(_mutex);
+        _active = false;
+    }
     LOGV2_DEBUG(8712810, 5, "Threads waiting for the cache entry are about to be woken up");
     _cv.notify_all();
 }

@@ -244,6 +244,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             return Status(ErrorCodes::RetryMultiPlanning,
                           "Too many multi plans running for the same shape");
         }
+
         LOGV2_DEBUG(8712803,
                     1,
                     "Multiplanning rate limiter tokens are available, continue multiplanning...");

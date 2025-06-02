@@ -114,7 +114,7 @@ public:
         auto&& [planCacheShapeHash, planCacheKey] = hashes(key, oldEntry);
 
         if (_collection) {
-            MultiPlanBucket::get(key.toString(), _collection)->unlockAll();
+            MultiPlanBucket::release(key.toString(), _collection);
         }
 
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),

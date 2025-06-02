@@ -50,23 +50,29 @@ class MultiPlanTokens;
  * This class defines a bucket in the Multi Plan rate limiting algorithm. It controls number of
  * concurrent multi plannings for the same query shape.
  */
-class MultiPlanBucket : public RefCountable {
+class MultiPlanBucket : public std::enable_shared_from_this<MultiPlanBucket> {
     static constexpr stdx::chrono::milliseconds _yieldingTimeout{20};
 
 public:
     /**
      * Tokens specify the maximum number of concurrent multiplannings for the same plan cache key.
      */
-    explicit MultiPlanBucket(size_t tokens) : _tokens(tokens) {}
+    explicit MultiPlanBucket(size_t tokens) : _active(true), _tokens(tokens) {}
 
     template <typename PlanCacheKeyType>
-    static boost::intrusive_ptr<MultiPlanBucket> get(const PlanCacheKeyType& planCacheKey,
-                                                     const CollectionPtr& coll) {
+    static std::shared_ptr<MultiPlanBucket> get(const PlanCacheKeyType& planCacheKey,
+                                                const CollectionPtr& coll) {
         return get(planCacheKey.toString(), coll);
     }
 
-    static boost::intrusive_ptr<MultiPlanBucket> get(const std::string& planCacheKey,
-                                                     const CollectionPtr& collection);
+    static std::shared_ptr<MultiPlanBucket> get(const std::string& planCacheKey,
+                                                const CollectionPtr& collection);
+    /**
+     * Releases the bucket for the given plan cache key: erases it from the bucket table and
+     * wakes up all threads that are waiting for this plan cache key. The function should be called
+     * when a plan for the plan cache key has been cached.
+     */
+    static void release(const std::string& planCacheKey, const CollectionPtr& collection);
 
     /**
      * If enough tokens are available the function returns with it immediately, otherwise it sleeps
@@ -76,6 +82,7 @@ public:
     boost::optional<MultiPlanTokens> getTokens(size_t tokens,
                                                PlanYieldPolicy* yieldPolicy,
                                                OperationContext* opCtx);
+
 
     /**
      * This function is called when another thread completes multiplanning and frees tokens.
@@ -89,6 +96,7 @@ public:
     void unlockAll();
 
 private:
+    bool _active;  // false when the plan is cached
     size_t _tokens;
     stdx::mutex _mutex;
     stdx::condition_variable_any _cv;
@@ -101,12 +109,20 @@ private:
  */
 class MultiPlanTokens {
 public:
-    MultiPlanTokens(size_t tokensCount, boost::intrusive_ptr<MultiPlanBucket> bucket)
-        : _tokensCount(tokensCount), _bucket(std::move(bucket)) {}
+    MultiPlanTokens(size_t tokensCount, std::weak_ptr<MultiPlanBucket> bucket)
+        : _tokensCount(tokensCount), _bucket(bucket) {}
+
+    MultiPlanTokens(const MultiPlanTokens&) = delete;
+    MultiPlanTokens(MultiPlanTokens&& other);
+
+
+    MultiPlanTokens& operator=(const MultiPlanTokens&) = delete;
+    MultiPlanTokens& operator=(MultiPlanTokens&& other);
+
     ~MultiPlanTokens();
 
 private:
     size_t _tokensCount;
-    boost::intrusive_ptr<MultiPlanBucket> _bucket;
+    std::weak_ptr<MultiPlanBucket> _bucket;
 };
 }  // namespace mongo
