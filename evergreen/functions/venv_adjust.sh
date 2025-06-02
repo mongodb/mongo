@@ -23,6 +23,7 @@ fi
 # TODO SERVER-105520
 # try using downloaded venv once more reliability has been built into venv upload/download
 if [[ "$ARCH" == "ppc64le" ]]; then
+  rm -rf $venv_dir
   source "$DIR/venv_setup.sh"
 else
   # Update virtual env directory in activate script
