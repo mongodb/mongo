@@ -42,46 +42,28 @@
 ########################################################################################################
 
 tests:
-  # The current suggested method for raising these values is to run the
-  # benchmark a few times in patches, and comparing to the recent history.
-  # From the benchmark's history page, obtain a "stable region mean"
-  # and "CV of stable region". These are available in the "Trend Charts" tab on
-  # Evergreen for the `benchmarks_sep` task.
-  #
-  # The deviations of these metrics are extremely tight.
-  # We can easily accept 2 standard deviations up from the stable mean.
-  #
-  #     threshold = mean * (1 + 2 * (100 * cv))
-  #
-  # 2025-02-16:
-  #     Router/1:  mean=20077, cv=.0228 => threshold=20993
-  #     Router/32: mean=20111, cv=.0227 => threshold=21024
-  #     Shard/1:   mean=21619, cv=.0008 => threshold=25078
-  #     Shard/32:  mean=21695, cv=.0006 => threshold=24298
-  # 2025-03-19:
-  #     Shard/1:   mean=20914, cv=.00073 => threshold=23968
-  #     Shard/32:  mean=20979, cv=.00075 => threshold=24125
+  # threshholds are 0.4% above current stable region
   ServiceEntryPointRouterRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 21143
+            value: 19281
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 21174
+            value: 19291
             bound_direction: upper
   ServiceEntryPointShardRoleBenchmarkFixture/BM_SEP_PING:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
         metrics:
           - name: instructions_per_iteration_mean
-            value: 24168
+            value: 20778
             bound_direction: upper
       - thread_level: 32
         metrics:
           - name: instructions_per_iteration_mean
-            value: 24325
+            value: 20845
             bound_direction: upper
