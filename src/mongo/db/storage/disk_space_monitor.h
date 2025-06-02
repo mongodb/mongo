@@ -54,29 +54,14 @@ public:
     static DiskSpaceMonitor* get(ServiceContext* svcCtx);
 
     /**
-     * An Action defines a function that should be called when the available disk space falls below
-     * a specified threshold.
-     */
-    struct Action {
-        virtual ~Action() {}
-
-        /**
-         * If the disk space in bytes falls below this threshold, the act() function should be
-         * called.
-         */
-        virtual int64_t getThresholdBytes() = 0;
-
-        /**
-         * Takes action when the defined threshold is reached. This function may be called an
-         * indefinite number of times when the disk falls below its threshold.
-         */
-        virtual void act(OperationContext* opCtx, int64_t availableBytes) = 0;
-    };
-
-    /**
      * Registers an action that responds to changes in disk space and returns its id.
+     * If the disk space in bytes falls below the value returned from getThresholdBytes(), the act()
+     * function will be called.
+     * act() may be called an indefinite number of times when the disk falls below its threshold.
      */
-    int64_t registerAction(std::unique_ptr<Action> action);
+    int64_t registerAction(
+        std::function<int64_t()> getThresholdBytes,
+        std::function<void(OperationContext*, int64_t availableBytes, int64_t thresholdBytes)> act);
 
     /**
      * Deregisters the action corresponding to the given id.
@@ -89,6 +74,11 @@ public:
     void takeAction(OperationContext* opCtx, int64_t availableBytes);
 
 private:
+    struct Action {
+        std::function<int64_t()> getThresholdBytes;
+        std::function<void(OperationContext*, int64_t, int64_t)> act;
+    };
+
     void _start(ServiceContext* svcCtx);
     void _stop();
 
@@ -101,7 +91,7 @@ private:
     // This mutex protects _actions and the entire run loop of the disk space monitor.
     // The mutex also enables us to increment the _actionId for each new action added to _actions.
     stdx::mutex _mutex;
-    stdx::unordered_map<int64_t, std::unique_ptr<Action>> _actions;
+    stdx::unordered_map<int64_t, Action> _actions;
 
     int64_t _actionId = 0;
 };

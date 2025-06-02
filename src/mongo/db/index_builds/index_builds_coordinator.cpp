@@ -587,19 +587,13 @@ Status IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(Operati
     return Status::OK();
 }
 
-std::unique_ptr<DiskSpaceMonitor::Action>
-IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
-    class KillIndexBuildsAction : public DiskSpaceMonitor::Action {
-    public:
-        KillIndexBuildsAction(IndexBuildsCoordinator* coordinator) : _coord(coordinator) {}
-
-        int64_t getThresholdBytes() final {
-            // This parameter's validator ensures that this multiplication will not overflow.
-            return gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
-        }
-
-        void act(OperationContext* opCtx, int64_t availableBytes) final {
-            if (_coord->noIndexBuildInProgress()) {
+void IndexBuildsCoordinator::registerKillIndexBuildAction(DiskSpaceMonitor& diskMonitor) {
+    std::function<int64_t()> getThresholdBytes = []() {
+        return gIndexBuildMinAvailableDiskSpaceMB.load() * 1024 * 1024;
+    };
+    std::function<void(OperationContext*, int64_t, int64_t)> act =
+        [this](OperationContext* opCtx, int64_t availableBytes, int64_t thresholdBytes) {
+            if (this->noIndexBuildInProgress()) {
                 // Avoid excessive logging when no index builds are in progress. Nothing prevents an
                 // index build from starting after this check.  Subsequent calls will see any
                 // newly-registered builds.
@@ -609,20 +603,15 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
                   "Attempting to kill index builds because remaining disk space is less than "
                   "required minimum",
                   "availableBytes"_attr = availableBytes,
-                  "requiredBytes"_attr = getThresholdBytes());
+                  "requiredBytes"_attr = thresholdBytes);
             try {
-                _coord->abortAllIndexBuildsDueToDiskSpace(
-                    opCtx, availableBytes, getThresholdBytes());
+                this->abortAllIndexBuildsDueToDiskSpace(opCtx, availableBytes, thresholdBytes);
             } catch (...) {
                 LOGV2(7333503, "Failed to kill index builds", "reason"_attr = exceptionToStatus());
             }
-        }
-
-    private:
-        IndexBuildsCoordinator* _coord;
-    };
-    return std::make_unique<KillIndexBuildsAction>(this);
-};
+        };
+    diskMonitor.registerAction(std::move(getThresholdBytes), std::move(act));
+}
 
 std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     const std::vector<BSONObj>& specs) {

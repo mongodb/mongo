@@ -96,9 +96,11 @@ void DiskSpaceMonitor::_stop() {
     }
 }
 
-int64_t DiskSpaceMonitor::registerAction(std::unique_ptr<Action> action) {
+int64_t DiskSpaceMonitor::registerAction(
+    std::function<int64_t()> getThresholdBytes,
+    std::function<void(OperationContext*, int64_t, int64_t)> act) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_actions.try_emplace(_actionId, std::move(action)).second);
+    invariant(_actions.try_emplace(_actionId, Action{getThresholdBytes, act}).second);
     return _actionId++;
 }
 
@@ -110,10 +112,10 @@ void DiskSpaceMonitor::deregisterAction(int64_t actionId) {
 
 void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableBytes) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    for (auto&& [id, action] : _actions) {
-        if (availableBytes <= action->getThresholdBytes()) {
-            action->act(opCtx, availableBytes);
+    for (auto&& [_, action] : _actions) {
+        auto thresholdBytes = action.getThresholdBytes();
+        if (availableBytes <= thresholdBytes) {
+            action.act(opCtx, availableBytes, thresholdBytes);
             tookAction.increment();
         }
     }

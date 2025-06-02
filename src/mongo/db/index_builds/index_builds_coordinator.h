@@ -474,10 +474,9 @@ public:
     void appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const;
 
     /**
-     * Returns an Action for the DiskSpaceMonitor that kills all index builds when the disk space
-     * drops below a certain threshold.
+     * Registers kill index build action with the input DiskSpaceMonitor.
      */
-    std::unique_ptr<DiskSpaceMonitor::Action> makeKillIndexBuildOnLowDiskSpaceAction();
+    void registerKillIndexBuildAction(DiskSpaceMonitor& diskMonitor);
 
     //
     // Helper functions for creating indexes that do not have to be managed by the

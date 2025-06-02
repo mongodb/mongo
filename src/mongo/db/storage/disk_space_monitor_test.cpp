@@ -43,15 +43,18 @@ protected:
     DiskSpaceMonitor monitor;
 };
 
-class SimpleAction : public DiskSpaceMonitor::Action {
+class SimpleAction {
 public:
     explicit SimpleAction(int& hits) : hits(hits) {}
-    int64_t getThresholdBytes() override {
-        return 1024;
-    }
-
-    void act(OperationContext* opCtx, int64_t availableBytes) override {
-        hits += 1;
+    int64_t registerSimpleAction(DiskSpaceMonitor& diskMonitor) {
+        std::function<int64_t()> getThresholdBytes = []() {
+            return 1024;
+        };
+        std::function<void(OperationContext*, int64_t, int64_t)> act =
+            [this](OperationContext* opCtx, int64_t availableBytes, int64_t thresholdBytes) {
+                hits += 1;
+            };
+        return diskMonitor.registerAction(getThresholdBytes, act);
     }
 
     int& hits;
@@ -61,7 +64,7 @@ TEST_F(DiskSpaceMonitorTest, Threshold) {
     OperationContext* opCtx = nullptr;
     auto hitsCounter = 0;
     auto action = std::make_unique<SimpleAction>(hitsCounter);
-    int64_t actionId = monitor.registerAction(std::move(action));
+    int64_t actionId = action->registerSimpleAction(monitor);
 
     monitor.takeAction(opCtx, 2000);
     ASSERT_EQ(0, hitsCounter);
@@ -84,8 +87,8 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
     auto hitsCounter2 = 0;
     auto action1 = std::make_unique<SimpleAction>(hitsCounter1);
     auto action2 = std::make_unique<SimpleAction>(hitsCounter2);
-    int64_t action1Id = monitor.registerAction(std::move(action1));
-    int64_t action2Id = monitor.registerAction(std::move(action2));
+    int64_t action1Id = action1->registerSimpleAction(monitor);
+    int64_t action2Id = action2->registerSimpleAction(monitor);
 
     // Check both actions don't get incremented.
     monitor.takeAction(opCtx, 2000);
