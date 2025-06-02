@@ -78,6 +78,7 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -806,7 +807,8 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
             // If this is the first iteration of the session workflow, we must call into
             // "throttleIfNeeded" to respect connection establishment rate limits.
             if (MONGO_unlikely(_inFirstIteration)) {
-                if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled()) {
+                if (gFeatureFlagRateLimitIngressConnectionEstablishment.isEnabled() &&
+                    gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
                     uassertStatusOK(session()
                                         ->getTransportLayer()
                                         ->getSessionManager()

@@ -59,14 +59,6 @@ SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceCon
 
 
 Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
-    // We can short-circuit if the rate limit is unlimited, which probably means the feature
-    // is off.
-    if (gIngressConnectionEstablishmentRatePerSec.loadRelaxed() ==
-        std::numeric_limits<int>::max()) {
-        // Note that in this case, no metrics are maintained.
-        return Status::OK();
-    }
-
     // Check if the session is exempt from rate limiting based on its IP.
     serverGlobalParams.maxEstablishingConnsOverride.refreshSnapshot(_maxEstablishingConnsOverride);
     if (_maxEstablishingConnsOverride &&

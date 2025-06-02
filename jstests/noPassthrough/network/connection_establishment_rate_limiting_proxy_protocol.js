@@ -33,10 +33,11 @@ let rs = new ReplSetTest({
         "proxyPort": egressPort,
         config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
         setParameter: {
+            ingressConnectionEstablishmentRateLimiterEnabled: true,
             ingressConnectionEstablishmentRatePerSec: 1,
             ingressConnectionEstablishmentBurstSize: 1,
             ingressConnectionEstablishmentMaxQueueDepth: 0,
-            maxEstablishingConnectionsOverride: {ranges: [exemptIP]},
+            ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
             featureFlagRateLimitIngressConnectionEstablishment: true
         }
     }
@@ -68,8 +69,7 @@ rs.initiate();
 // Let connections through again.
 rs.getPrimary().adminCommand({
     setParameter: 1,
-    ingressConnectionEstablishmentRatePerSec: 10,
-    ingressConnectionEstablishmentBurstSize: 500,
+    ingressConnectionEstablishmentRateLimiterEnabled: false,
 });
 
 // Start up a proxy protocol server with an exempt IP as its egress address. Ensure that non-exempt
@@ -82,8 +82,7 @@ rs.getPrimary().adminCommand({
     // Reset the rate limiter to use lower values again.
     rs.getPrimary().adminCommand({
         setParameter: 1,
-        ingressConnectionEstablishmentRatePerSec: 1,
-        ingressConnectionEstablishmentBurstSize: 1,
+        ingressConnectionEstablishmentRateLimiterEnabled: true,
     });
 
     // One token will be consumed by a non-exempt IP.
