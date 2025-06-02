@@ -820,6 +820,7 @@ mongo_cc_library(
     deps = [
         # NOTE: If you need to add a static or mongo initializer to mongos startup,
         # please add that library here, as a private library dependency.
+        "//src/mongo/db/admission:queues_server_status_section",
         "//src/mongo/db:audit",
         "//src/mongo/db/auth:authserver",
         "//src/mongo/db/commands:server_status_core",

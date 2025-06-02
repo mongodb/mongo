@@ -60,6 +60,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:transport_layer_common",
     ],
 )
 

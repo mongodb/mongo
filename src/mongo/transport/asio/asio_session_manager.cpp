@@ -96,7 +96,7 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
 
     appendInt("active", getActiveOperations() - _sessionEstablishmentRateLimiter.queued());
 
-    _sessionEstablishmentRateLimiter.appendStats(bob);
+    _sessionEstablishmentRateLimiter.appendStatsConnections(bob);
 
     // Historically, this number may have differed from "current" since
     // some sessions would have used the non-threaded ServiceExecutorFixed.

@@ -29,31 +29,67 @@
 
 #pragma once
 
+#include "mongo/base/counter.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
-
-#include <limits>
+#include "mongo/util/moving_average.h"
 
 namespace mongo::admission {
 
 /**
  * The RateLimiter offers a thin wrapper around the folly::TokenBucket augmented with
- * interruptibility, maximum queue depth, and metrics tracking.
+ * interruptibility, maximum queue depth, and metrics.
  */
 class RateLimiter {
 public:
-    class Stats {
-    public:
-        void appendStats(BSONObjBuilder&) {
-            // TODO: SERVER-104413
-        }
+    struct Stats {
+        /**
+         * addedToQueue is the count of acquireToken calls that involved entering a sleep.
+         */
+        Counter64 addedToQueue;
+        /**
+         * removedFromQueue is the count of acquireToken calls that involved waking from a
+         * sleep.
+         */
+        Counter64 removedFromQueue;
+        /**
+         * interruptedInQueue is the count of acquireToken calls that involved waking from a
+         * sleep early due to some interrupt condition.
+         */
+        Counter64 interruptedInQueue;
+        /**
+         * rejectedAdmissions is the count of acquireToken calls that would have been
+         * queued (due to an unavailability of tokens), but were instead rejected due to there
+         * already being too many callers in the queue (threads sleeping in acquireToken).
+         */
+        Counter64 rejectedAdmissions;
+        /**
+         * successfulAdmissions is the count of non-error-returning calls to acquireToken. It
+         * excludes interrupted and rejected calls.
+         */
+        Counter64 successfulAdmissions;
+        /**
+         * exemptedAdmissions is the count of calls to recordExemption. It indicates how often
+         * the rate limiter was told to admit immediately.
+         */
+        Counter64 exemptedAdmissions;
+        /**
+         * attemptedAdmissions is the count of all calls to acquireToken, regardless of the
+         * result.
+         */
+        Counter64 attemptedAdmissions;
+        /**
+         * averageTimeQueuedMicros is an exponential moving average of the amount of
+         * microseconds that callers spent sleeping in acquireToken, excluding rejected calls
+         * and excluding interrupted calls.
+         */
+        MovingAverage averageTimeQueuedMicros{0.2};
     };
 
     RateLimiter(double refreshRatePerSec,
                 double burstSize,
                 int64_t maxQueueDepth,
-                std::string name = "",
-                std::unique_ptr<Stats> stats = std::make_unique<Stats>());
+                std::string name = "");
 
     ~RateLimiter();
 
@@ -63,9 +99,12 @@ public:
      */
     Status acquireToken(OperationContext*);
 
-    Stats* getRateLimiterStats();
-
-    int64_t getNumWaiters();
+    /**
+     * Updates metrics for admission granted without having called acquireToken.
+     * Use this function in place of acquireToken when admission must be granted immediately.
+     * Admission granted in this way does not consume any tokens.
+     */
+    void recordExemption();
 
     /**
      * The number of tokens issued per second when rate-limiting has kicked in. Tokens will be
@@ -84,6 +123,18 @@ public:
      * will queue past the maxQueueDepth will be rejected with a TemporarilyUnavailable error.
      */
     void setMaxQueueDepth(int64_t maxQueueDepth);
+
+    /** Returns a read-only view of the statistics collected by this rate limiter instance. */
+    const Stats& stats() const;
+
+    /** Adds named entries to bob based on this object's stats(). **/
+    void appendStats(BSONObjBuilder* bob) const;
+
+    /** Returns the number of tokens available in the underlying token bucket. **/
+    double tokensAvailable() const;
+
+    /** Returns the number of sessions that are sleeping in acquireToken(...). **/
+    int64_t queued() const;
 
 private:
     struct RateLimiterPrivate;

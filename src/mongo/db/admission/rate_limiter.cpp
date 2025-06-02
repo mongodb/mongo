@@ -30,6 +30,8 @@
 #include "mongo/db/admission/rate_limiter.h"
 
 #include "mongo/logv2/log.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 
 #include <folly/TokenBucket.h>
 
@@ -46,37 +48,42 @@ Milliseconds doubleToMillis(double t) {
 }  // namespace
 
 struct RateLimiter::RateLimiterPrivate {
-    RateLimiterPrivate(
-        double r, double b, int64_t m, std::string n, std::unique_ptr<RateLimiter::Stats> s)
-        : tokenBucket{r, b}, maxQueueDepth(m), name(std::move(n)), stats(std::move(s)) {}
+    RateLimiterPrivate(double r, double b, int64_t m, std::string n)
+        // Initialize the token bucket with one "burst" of tokens. The third parameter to
+        // tokenBucket's constructor ("zeroTime") is interpreted as a number of seconds from the
+        // epoch of the clock used by the token bucket. The clock is
+        // `std::chrono::steady_clock`, whose epoch is unspecified but is usually the boot time
+        // of the machine. Rather than have an initial accumulation of tokens based on some
+        // unknown point in the past, set the zero time to a known time in the past: enough time
+        // for burst size (b) tokens to have accumulated.
+        : tokenBucket{r, b, folly::TokenBucket::defaultClockNow() - b / r},
+          maxQueueDepth(m),
+          queued(0),
+          name(std::move(n)) {}
 
     WriteRarelyRWMutex rwMutex;
     folly::TokenBucket tokenBucket;
 
+    Stats stats;
+
     Atomic<int64_t> maxQueueDepth;
-    Atomic<int64_t> numWaiters;
+    Atomic<int64_t> queued;
 
     std::string name;
 
-    /**
-     * Users may inherit from the RateLimiter::Stats class and define their own stats to track.
-     */
-    std::unique_ptr<Stats> stats;
-
-    Status rejectIfOverQueueLimit(double nWaiters) {
-        auto maxDepth = maxQueueDepth.loadRelaxed();
-        if (MONGO_unlikely(nWaiters >= maxDepth)) {
-            {
-                auto lk = rwMutex.readLock();
-                tokenBucket.returnTokens(1.0);
+    Status enqueue() {
+        const auto maxDepth = maxQueueDepth.loadRelaxed();
+        int64_t expected = queued.load();
+        do {
+            if (expected >= maxDepth) {
+                return Status(ErrorCodes::TemporarilyUnavailable,
+                              fmt::format("RateLimiter queue depth has exceeded the maxQueueDepth. "
+                                          "numWaiters={}; maxQueueDepth={}; rateLimiterName={}",
+                                          expected,
+                                          maxDepth,
+                                          name));
             }
-            return Status(ErrorCodes::TemporarilyUnavailable,
-                          fmt::format("RateLimiter queue depth has exceeded the maxQueueDepth. "
-                                      "numWaiters={}; maxQueueDepth={}; rateLimiterName={}",
-                                      nWaiters,
-                                      maxDepth,
-                                      name));
-        }
+        } while (!queued.compareAndSwap(&expected, expected + 1));
 
         return Status::OK();
     }
@@ -85,20 +92,21 @@ struct RateLimiter::RateLimiterPrivate {
 RateLimiter::RateLimiter(double refreshRatePerSec,
                          double burstSize,
                          int64_t maxQueueDepth,
-                         std::string name,
-                         std::unique_ptr<Stats> stats) {
+                         std::string name) {
     uassert(ErrorCodes::InvalidOptions,
             fmt::format("burstSize cannot be less than 1.0. burstSize={}; rateLimiterName={}",
                         burstSize,
                         name),
             burstSize >= 1.0);
     _impl = std::make_unique<RateLimiterPrivate>(
-        refreshRatePerSec, burstSize, maxQueueDepth, std::move(name), std::move(stats));
+        refreshRatePerSec, burstSize, maxQueueDepth, std::move(name));
 }
 
 RateLimiter::~RateLimiter() = default;
 
 Status RateLimiter::acquireToken(OperationContext* opCtx) {
+    _impl->stats.attemptedAdmissions.incrementRelaxed();
+
     // The consumeWithBorrowNonBlocking API consumes a token (possibly leading to a negative
     // bucket balance), and returns how long the consumer should nap until their token
     // reservation becomes valid.
@@ -111,12 +119,15 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     }
 
     if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
-        auto nWaiters = _impl->numWaiters.fetchAndAdd(1);
-        ON_BLOCK_EXIT([&] { _impl->numWaiters.fetchAndSubtract(1); });
-        if (auto s = _impl->rejectIfOverQueueLimit(nWaiters); !s.isOK()) {
-            return s;
+        if (auto status = _impl->enqueue(); !status.isOK()) {
+            _impl->stats.rejectedAdmissions.incrementRelaxed();
+            return status;
         }
-
+        _impl->stats.addedToQueue.incrementRelaxed();
+        ON_BLOCK_EXIT([&] {
+            _impl->stats.removedFromQueue.incrementRelaxed();
+            _impl->queued.fetchAndSubtract(1);
+        });
         try {
             LOGV2_DEBUG(10550200,
                         4,
@@ -125,6 +136,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
                         "napTimeMillis"_attr = napTime.toString());
             opCtx->sleepFor(napTime);
         } catch (const DBException& e) {
+            _impl->stats.interruptedInQueue.incrementRelaxed();
             LOGV2_DEBUG(10440800,
                         4,
                         "Interrupted while waiting in rate limiter queue",
@@ -139,15 +151,14 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
                             _impl->name));
         }
     }
+
+    _impl->stats.successfulAdmissions.incrementRelaxed();
+    _impl->stats.averageTimeQueuedMicros.addSample(waitForTokenSecs * 1'000'000);
     return Status::OK();
 }
 
-RateLimiter::Stats* RateLimiter::getRateLimiterStats() {
-    return _impl->stats.get();
-}
-
-int64_t RateLimiter::getNumWaiters() {
-    return _impl->numWaiters.load();
+void RateLimiter::recordExemption() {
+    _impl->stats.exemptedAdmissions.incrementRelaxed();
 }
 
 void RateLimiter::setRefreshRatePerSec(double refreshRatePerSec) {
@@ -169,4 +180,33 @@ void RateLimiter::setBurstSize(double burstSize) {
 void RateLimiter::setMaxQueueDepth(int64_t maxQueueDepth) {
     _impl->maxQueueDepth.storeRelaxed(maxQueueDepth);
 }
+
+const RateLimiter::Stats& RateLimiter::stats() const {
+    return _impl->stats;
+}
+
+void RateLimiter::appendStats(BSONObjBuilder* bob) const {
+    invariant(bob);
+    bob->append("addedToQueue", stats().addedToQueue.get());
+    bob->append("removedFromQueue", stats().removedFromQueue.get());
+    bob->append("interruptedInQueue", stats().interruptedInQueue.get());
+    bob->append("rejectedAdmissions", stats().rejectedAdmissions.get());
+    bob->append("exemptedAdmissions", stats().exemptedAdmissions.get());
+    bob->append("successfulAdmissions", stats().successfulAdmissions.get());
+    bob->append("attemptedAdmissions", stats().attemptedAdmissions.get());
+    if (const auto avg = stats().averageTimeQueuedMicros.get()) {
+        bob->append("averageTimeQueuedMicros", *avg);
+    }
+    bob->append("totalAvailableTokens", tokensAvailable());
+}
+
+double RateLimiter::tokensAvailable() const {
+    auto lk = _impl->rwMutex.readLock();
+    return _impl->tokenBucket.available();
+}
+
+int64_t RateLimiter::queued() const {
+    return _impl->queued.load();
+}
+
 }  // namespace mongo::admission
