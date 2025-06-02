@@ -6,8 +6,10 @@
  *
  * @tags: [
  *   requires_timeseries,
- *   does_not_support_transactions,
  *   does_not_support_stepdowns,
+ *   does_not_support_transactions,
+ *   # TODO SERVER-102039
+ *   does_not_support_viewless_timeseries_yet,
  *   uses_curop_agg_stage,
  *   # TODO Undenylist (SERVER-38852).
  *   assumes_against_mongod_not_mongos,
@@ -84,12 +86,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
 
         const collNames = db.getCollectionNames();
-        // Ensure that a temporary collection is not left behind.
-        assert.eq(collNames.filter(coll => coll.includes('system.buckets.tmp.agg_out')).length, 0);
+        const temporaryAggCollections = collNames.filter(coll => coll.includes('tmp.agg_out'));
+        assert.eq(temporaryAggCollections.length,
+                  0,
+                  "Temporary agg collection left behind: " + tojson(temporaryAggCollections));
 
-        // Ensure that for the buckets collection there is a corresponding view.
-        assert(!(collNames.includes('system.buckets.interrupt_temp_out') &&
-                 !collNames.includes('interrupt_temp_out')));
+        const bucketCollectionPresent = collNames.includes('system.buckets.interrupt_temp_out');
+        const viewPresent = collNames.includes('interrupt_temp_out');
+        assert(!bucketCollectionPresent || viewPresent,
+               "View must be present if bucket collection is present: " + tojson(collNames));
     };
 
     /**
