@@ -20,6 +20,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode
@@ -58,6 +59,13 @@ const pipeline = [{
         output: {runningTotal: {$sum: "$amount", window: {documents: ["unbounded", "current"]}}}
     }
 }];
+
+// TODO Remove the mergeCursors on SERVER-104522
+const explain = coll.explain().aggregate(pipeline);
+if (hasMergeCursors(explain)) {
+    jsTest.log(`Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
+    quit();
+}
 
 // Get all the results to use as a reference.
 const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();

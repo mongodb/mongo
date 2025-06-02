@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -115,7 +115,8 @@ public:
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _memoryTracker{expCtx->getAllowDiskUse(), maxMemoryBytes},
+          _memoryTracker{OperationMemoryUsageTracker::createMemoryUsageTrackerForStage(
+              *expCtx, expCtx->getAllowDiskUse() && !expCtx->getInRouter(), maxMemoryBytes)},
           // TODO SERVER-98563 I think we can remove the sortBy here in favor of {$meta: "sortKey"}
           // also.
           _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy),

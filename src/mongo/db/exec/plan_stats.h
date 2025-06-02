@@ -1419,6 +1419,8 @@ struct DocumentSourceSetWindowFieldsStats : public SpecificStats {
     }
 
     SpillingStats spillingStats;
+
+    int64_t maxUsedMemoryBytes = 0;
 };
 
 }  // namespace mongo

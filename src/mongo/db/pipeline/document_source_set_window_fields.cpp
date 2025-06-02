@@ -386,6 +386,10 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            out["maxUsedMemBytes"] =
+                opts.serializeLiteral(static_cast<long long>(_stats.maxUsedMemoryBytes));
+        }
     }
 
     return Value(out.freezeToValue());
@@ -605,6 +609,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
 }
 
 void DocumentSourceInternalSetWindowFields::doDispose() {
+    // Before we clear the memory tracker, update SetWindowFieldStats so explain has
+    // $_internalSetWindowFields-level statistics.
+    _stats.maxUsedMemoryBytes = _memoryTracker.maxMemoryBytes();
+
     _iterator.finalize();
     _stats.spillingStats = _iterator.getSpillingStats();
 }
