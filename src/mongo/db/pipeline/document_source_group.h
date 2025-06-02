@@ -70,6 +70,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<AccumulationStatement> accumulationStatements,
+        bool willBeMerged,
         boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     /**

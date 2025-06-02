@@ -73,10 +73,12 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
+    bool willBeMerged,
     boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceGroup> groupStage =
         new DocumentSourceGroup(expCtx, maxMemoryUsageBytes);
     groupStage->_groupProcessor.setIdExpression(groupByExpression);
+    groupStage->_groupProcessor.setWillBeMerged(willBeMerged);
     for (auto&& statement : accumulationStatements) {
         groupStage->_groupProcessor.addAccumulationStatement(statement);
     }

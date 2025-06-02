@@ -145,7 +145,7 @@ protected:
         auto expCtx = getExpCtx();
         VariablesParseState vps = expCtx->variablesParseState;
         auto x = ExpressionFieldPath::parse(expCtx.get(), "$x", vps);
-        return DocumentSourceGroup::create(expCtx, x, {});
+        return DocumentSourceGroup::create(expCtx, x, {}, false);
     }
 
     auto bucketAuto() {

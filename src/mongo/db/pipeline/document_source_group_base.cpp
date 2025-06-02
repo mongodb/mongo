@@ -713,7 +713,7 @@ DocumentSourceGroupBase::distributedPlanLogic() {
 
     // When merging, we always use generic hash based algorithm.
     boost::intrusive_ptr<DocumentSourceGroup> mergingGroup = DocumentSourceGroup::create(
-        pExpCtx, std::move(mergerGroupByExpression), std::move(mergerAccumulators));
+        pExpCtx, std::move(mergerGroupByExpression), std::move(mergerAccumulators), false);
     mergingGroup->_groupProcessor.setDoingMerge(true);
 
     static_cast<DocumentSourceGroup*>(clone.get())->_groupProcessor.setWillBeMerged(true);

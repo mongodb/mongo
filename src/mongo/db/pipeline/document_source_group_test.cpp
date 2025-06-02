@@ -150,7 +150,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement countStatement{"count", accExpr};
     auto group = DocumentSourceGroup::create(
-        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement}, false);
     auto mock =
         DocumentSourceMock::createForTest({DocumentSource::GetNextResult::makePauseExecution(),
                                            Document(),
@@ -231,7 +231,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
+        expCtx, groupByExpression, {pushStatement}, false, maxMemoryUsageBytes);
 
     std::string largeStr(maxMemoryUsageBytes, 'x');
     auto mock = DocumentSourceMock::createForTest({Document{{"_id", 0}, {"largeStr", largeStr}},
@@ -304,7 +304,7 @@ TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto groupByExpression =
         ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState);
     auto group = DocumentSourceGroup::create(
-        expCtx, groupByExpression, {pushStatement}, maxMemoryUsageBytes);
+        expCtx, groupByExpression, {pushStatement}, false, maxMemoryUsageBytes);
 
     std::string largeStr(maxMemoryUsageBytes / 2, 'x');
     auto mock =
@@ -334,7 +334,7 @@ DEATH_TEST_REGEX_F(DocumentSourceGroupTest,
     auto accExpr = parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
     AccumulationStatement countStatement{"count", accExpr};
     auto group = DocumentSourceGroup::create(
-        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+        expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement}, false);
 
     // Create a control event.
     MutableDocument doc(Document{{"_id", 0}});
@@ -381,7 +381,7 @@ TEST_F(DocumentSourceGroupTest, ShouldReportSingleFieldGroupKeyAsARename) {
     auto expCtx = getExpCtx();
     VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$x", vps);
-    auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {});
+    auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {}, false);
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
     ASSERT_EQ(modifiedPathsRet.paths.size(), 0UL);
@@ -395,7 +395,7 @@ TEST_F(DocumentSourceGroupTest, ShouldReportMultipleFieldGroupKeysAsARename) {
     auto x = ExpressionFieldPath::parse(expCtx.get(), "$x", vps);
     auto y = ExpressionFieldPath::parse(expCtx.get(), "$y", vps);
     auto groupByExpression = ExpressionObject::create(expCtx.get(), {{"x", x}, {"y", y}});
-    auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {});
+    auto group = DocumentSourceGroup::create(expCtx, groupByExpression, {}, false);
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
     ASSERT_EQ(modifiedPathsRet.paths.size(), 0UL);
@@ -408,7 +408,7 @@ TEST_F(DocumentSourceGroupTest, ShouldNotReportDottedGroupKeyAsARename) {
     auto expCtx = getExpCtx();
     VariablesParseState vps = expCtx->variablesParseState;
     auto xDotY = ExpressionFieldPath::parse(expCtx.get(), "$x.y", vps);
-    auto group = DocumentSourceGroup::create(expCtx, xDotY, {});
+    auto group = DocumentSourceGroup::create(expCtx, xDotY, {}, false);
     auto modifiedPathsRet = group->getModifiedPaths();
     ASSERT(modifiedPathsRet.type == DocumentSource::GetModPathsReturn::Type::kAllExcept);
     ASSERT_EQ(modifiedPathsRet.paths.size(), 0UL);
@@ -521,7 +521,8 @@ TEST_F(DocumentSourceGroupTest, CanHandleEmptyExpressionObject) {
     // ExpressionObject here.
     auto idExpression = ExpressionObject::create(getExpCtx().get(), {});
     std::vector<AccumulationStatement> accumulationStatements;
-    auto group = DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements);
+    auto group =
+        DocumentSourceGroup::create(getExpCtx(), idExpression, accumulationStatements, false);
     auto mock = DocumentSourceMock::createForTest({Document{{"_id"_sd, 0}}}, getExpCtx());
     group->setSource(mock.get());
     auto next = group->getNext();
@@ -544,8 +545,11 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
             parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
         AccumulationStatement countStatement{"count", accExpr};
 
-        auto group = DocumentSourceGroup::create(
-            expCtx, ExpressionConstant::create(expCtx.get(), Value(BSONNULL)), {countStatement});
+        auto group =
+            DocumentSourceGroup::create(expCtx,
+                                        ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
+                                        {countStatement},
+                                        false);
         group->dispose();
 
         SerializationOptions explainOpts;
@@ -572,6 +576,30 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
         }
 
         ASSERT_DOCUMENT_EQ(Document(bob.obj()), group->serialize(explainOpts).getDocument());
+    }
+}
+
+TEST_F(DocumentSourceGroupTest, CreateCorrectlyInheritsNeedsMergeValueFromExpCtx) {
+    for (auto needsMerge : {true, false}) {
+        auto expCtx = getExpCtx();
+
+        auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
+        auto accumulatorArg = BSON("" << 1);
+        auto accExpr =
+            parser(expCtx.get(), accumulatorArg.firstElement(), expCtx->variablesParseState);
+        AccumulationStatement countStatement{"count", accExpr};
+
+        auto group =
+            DocumentSourceGroup::create(expCtx,
+                                        ExpressionConstant::create(expCtx.get(), Value(BSONNULL)),
+                                        {countStatement},
+                                        needsMerge);
+
+        if (needsMerge) {
+            ASSERT_TRUE(group->getGroupProcessor()->willBeMerged());
+        } else {
+            ASSERT_FALSE(group->getGroupProcessor()->willBeMerged());
+        }
     }
 }
 

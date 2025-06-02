@@ -285,8 +285,8 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
             expCtx.get(), field.firstElement(), expCtx->variablesParseState));
     };
 
-    auto newGroup = DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
-
+    auto newGroup =
+        DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators), false);
     // The $first accumulator is compatible with SBE.
     newGroup->setSbeCompatibility(SbeCompatibility::noRequirements);
 
@@ -1334,6 +1334,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
         DocumentSourceGroup::create(pExpCtx,
                                     rewrittenIdExpression,
                                     std::move(accumulationStatementsBucket),
+                                    groupPtr->willBeMerged(),
                                     groupPtr->getMaxMemoryUsageBytes());
 
     // The exprs used in the rewritten group might or might not be supported by SBE, so we have to
@@ -1531,8 +1532,8 @@ tryCreateBucketLevelSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
     auto newSortStage = DocumentSourceSort::create(expCtx, SortPattern(*maybeSortPattern, expCtx));
     auto newAccState = AccumulationStatement::parseAccumulationStatement(
         expCtx.get(), maybeAcc->firstElement(), expCtx->variablesParseState);
-    auto newGroupStage =
-        DocumentSourceGroup::create(expCtx, groupStage->getIdExpression(), {newAccState});
+    auto newGroupStage = DocumentSourceGroup::create(
+        expCtx, groupStage->getIdExpression(), {newAccState}, groupStage->willBeMerged());
 
     // The bucket-level group uses $first/$last accumulators that are supported by SBE.
     newGroupStage->setSbeCompatibility(SbeCompatibility::noRequirements);

@@ -173,6 +173,7 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
     return DocumentSourceGroup::create(expCtx,
                                        std::move(groupKeyExpression),
                                        makeVector<AccumulationStatement>(std::move(jsReduce)),
+                                       false,
                                        boost::none);
 }
 

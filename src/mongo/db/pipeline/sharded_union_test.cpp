@@ -275,7 +275,8 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
         {DocumentSourceMatch::create(fromjson("{_id: {$gte: 0}}"), expCtx()),
          DocumentSourceGroup::create(expCtx(),
                                      ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
-                                     {countStatement})},
+                                     {countStatement},
+                                     false)},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
@@ -374,7 +375,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     auto pipeline = Pipeline::create(
         {DocumentSourceGroup::create(expCtx(),
                                      ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
-                                     {countStatement})},
+                                     {countStatement},
+                                     false)},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
@@ -552,7 +554,8 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
     auto pipeline = Pipeline::create(
         {DocumentSourceGroup::create(expCtx(),
                                      ExpressionConstant::create(expCtx().get(), Value(BSONNULL)),
-                                     {countStatement})},
+                                     {countStatement},
+                                     false)},
         expCtx().get());
     auto unionWith = DocumentSourceUnionWith(expCtx(), std::move(pipeline));
     expCtx()->setMongoProcessInterface(std::make_shared<ShardServerProcessInterface>(executor()));
