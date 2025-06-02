@@ -30,7 +30,10 @@
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
 #include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
+#include "mongo/transport/transport_layer.h"
 
 #include "mongo/db/commands/server_status.h"
 
@@ -48,19 +51,29 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
+        const ClusterRole role = opCtx->getService()->role();
+
         BSONObjBuilder admissionBuilder;
         auto ticketHolderManager = TicketHolderManager::get(opCtx->getServiceContext());
-        if (ticketHolderManager) {
+        if (ticketHolderManager && role.has(ClusterRole::ShardServer)) {
             BSONObjBuilder executionBuilder(admissionBuilder.subobjStart("execution"));
             ticketHolderManager->appendStats(executionBuilder);
             executionBuilder.done();
         }
 
-        if (gIngressAdmissionControlEnabled.load()) {
+        if (gIngressAdmissionControlEnabled.load() && role.has(ClusterRole::ShardServer)) {
             BSONObjBuilder ingressBuilder(admissionBuilder.subobjStart("ingress"));
             auto& controller = IngressAdmissionController::get(opCtx);
             controller.appendStats(ingressBuilder);
             ingressBuilder.done();
+        }
+
+        if (auto* limiter = transport::SessionEstablishmentRateLimiter::get(
+                *opCtx->getServiceContext(), transport::TransportProtocol::MongoRPC)) {
+            BSONObjBuilder ingressSessionEstablishmentBuilder(
+                admissionBuilder.subobjStart("ingressSessionEstablishment"));
+            limiter->appendStatsQueues(&ingressSessionEstablishmentBuilder);
+            ingressSessionEstablishmentBuilder.done();
         }
 
         return admissionBuilder.obj();
@@ -68,7 +81,7 @@ public:
 };
 
 auto& admissionSection =
-    *ServerStatusSectionBuilder<AdmissionServerStatusSection>("queues").forShard();
+    *ServerStatusSectionBuilder<AdmissionServerStatusSection>("queues").forShard().forRouter();
 
 }  // namespace
 }  // namespace admission

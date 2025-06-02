@@ -35,86 +35,62 @@
 #include "mongo/db/admission/rate_limiter.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_options_gen.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/versioned_value.h"
+
+#include <cstdint>
 
 namespace mongo::transport {
 /**
  * The SessionEstablishmentRateLimiter encapsulates the logic and metrics for rate-limiting new
  * session establishment in order to avoid overloading the server.
+ *
+ * The behavior of SessionEstablishmentRateLimiter is influenced by the following server
+ * parameters:
+ *
+ * - ingressConnectionEstablishmentRatePerSec
+ * - ingressConnectionEstablishmentBurstSize
+ * - ingressConnectionEstablishmentMaxQueueDepth
+ *
+ * SessionEstablishmentRateLimiter is used in SessionWorkflow if the following feature flag
+ * server parameter is true:
+ *
+ * - featureFlagRateLimitIngressConnectionEstablishment
  */
 class SessionEstablishmentRateLimiter {
 public:
-    SessionEstablishmentRateLimiter()
-        : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
-                       gIngressConnectionEstablishmentBurstSize.load(),
-                       gIngressConnectionEstablishmentMaxQueueDepth.load()) {}
+    SessionEstablishmentRateLimiter();
+
+    /**
+     * Returns the rate limiter for ingress connections associated with the specified service
+     * context for the specified protocol. Returns nullptr if the service context does not have
+     * a matching ingress transport layer.
+     */
+    static SessionEstablishmentRateLimiter* get(ServiceContext&, TransportProtocol);
 
     /**
      * New Sessions should call into this function to respect the configured establishment rate
      * limit. If the session's IP is not exempt from rate-limiting, it will block until it is let
      * through by the underlying rate limiter.
      */
-    Status throttleIfNeeded(Client* client) {
-        // We can short-circuit if the rate limit is unlimited (aka the feature is off).
-        if (gIngressConnectionEstablishmentRatePerSec.loadRelaxed() ==
-            std::numeric_limits<int>::max()) {
-            return Status::OK();
-        }
-
-        // Check if the session is exempt from rate limiting based on its IP.
-        serverGlobalParams.maxEstablishingConnsOverride.refreshSnapshot(
-            _maxEstablishingConnsOverride);
-        if (_maxEstablishingConnsOverride &&
-            client->session()->isExemptedByCIDRList(*_maxEstablishingConnsOverride)) {
-            _exempted.incrementRelaxed();
-            return Status::OK();
-        }
-
-        _added.incrementRelaxed();  // TODO SERVER-104413: Move this logic inside the rate limiter.
-        ON_BLOCK_EXIT([&] { _removed.incrementRelaxed(); });
-
-        // Create an opCtx for interruptibility and to make queued waiters return tokens
-        // when the client has disconnected.
-        auto establishmentOpCtx = client->makeOperationContext();
-        establishmentOpCtx->markKillOnClientDisconnect();
-
-        // Acquire a token or block until one becomes available.
-        Status s = _rateLimiter.acquireToken(establishmentOpCtx.get());
-        if (MONGO_unlikely(!s.isOK())) {
-            if (s.code() == ErrorCodes::ClientDisconnect) {
-                _interuptedDueToClientDisconnect.incrementRelaxed();
-            } else if (s.code() == ErrorCodes::TemporarilyUnavailable) {
-                // TODO SERVER-104413: Move this logic inside the rate limiter.
-                _rejected.incrementRelaxed();
-            }
-        }
-
-        return s;
-    }
+    Status throttleIfNeeded(Client* client);
 
     // Stats
 
-    size_t queued() const {
-        return _added.get() - _removed.get();
+    int64_t queued() const {
+        return _rateLimiter.queued();
     }
 
-    size_t rejected() const {
-        return _rejected.get();
+    int64_t rejected() const {
+        return _rateLimiter.stats().rejectedAdmissions.get();
     }
 
-    void appendStats(BSONObjBuilder* bob) const {
-        // TODO SERVER-104413: Replace rejected and queued metrics with calculations from underlying
-        // RateLimiter.
-        bob->append("queued", _added.get() - _removed.get());
+    /** These stats go in the "connections" section of the server status. **/
+    void appendStatsConnections(BSONObjBuilder* bob) const;
 
-        BSONObjBuilder subBuilder = bob->subobjStart("establishmentRateLimit");
-        subBuilder.append("totalRejected", _rejected.get());
-        subBuilder.append("totalExempted", _exempted.get());
-        subBuilder.append("totalInterruptedDueToClientDisconnect",
-                          _interuptedDueToClientDisconnect.get());
-        subBuilder.done();
+    /** These stats go in the "queues" section of the server status. **/
+    void appendStatsQueues(BSONObjBuilder* bob) const {
+        _rateLimiter.appendStats(bob);
     }
 
     // Configuration Options
@@ -137,10 +113,7 @@ private:
         _maxEstablishingConnsOverride;
 
     // Stats
-    Counter64 _added;
-    Counter64 _removed;
-    Counter64 _rejected;
     Counter64 _exempted;
-    Counter64 _interuptedDueToClientDisconnect;
+    Counter64 _interruptedDueToClientDisconnect;
 };
 }  // namespace mongo::transport

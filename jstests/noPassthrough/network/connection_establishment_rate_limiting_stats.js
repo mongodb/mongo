@@ -10,20 +10,28 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {
-    getConnectionStats,
+    getLimiterStats,
     runTestReplSet,
     runTestShardedCluster,
     runTestStandaloneParamsSetAtRuntime,
     runTestStandaloneParamsSetAtStartup
 } from "jstests/noPassthrough/network/libs/conn_establishment_rate_limiter_helpers.js";
 
+// Return whether the left Number or NumberLong is equal to the right Number or NumberLong.
+const equal = (left, right) => {
+    if (left instanceof NumberLong && right instanceof NumberLong) {
+        return left.compare(right) === 0;
+    }
+    return left == right;
+};
+
 const maxQueueSize = 3;
 // Hardcoded so that we can assert on "available" connections in serverStatus.
 const maxIncomingConnections = 1000;
 
 const testRateLimiterStats = (conn) => {
-    // Start maxQueueDepth + 3 threads that will all try to connect to the server. The rate limiter
-    // should allow maxQueueDepth connections to be queued, and the rest should be rejected.
+    // Start maxQueueSize + 3 threads that will all try to connect to the server. The rate limiter
+    // should allow maxQueueSize connections to be queued, and the rest should be rejected.
     let connDelayFailPoint = configureFailPoint(conn, 'hangInRateLimiter');
     const extraConns = 3;
     const threads = [];
@@ -41,15 +49,39 @@ const testRateLimiterStats = (conn) => {
     }
 
     assert.soon(() => {
-        const stats = getConnectionStats(conn);
-        // Queued connections should be counted in "queued", "totalCreated", and "available" stats.
-        return (stats["queued"] == maxQueueSize && stats["totalCreated"] >= maxQueueSize &&
-                stats["available"] <= maxIncomingConnections - maxQueueSize) &&
+        const {connections: cstats, ingressSessionEstablishmentQueues: qstats} =
+            getLimiterStats(conn, {log: false});
+
+        jsTestLog("stats: " + tojson({cstats, qstats}));
+
+        const checks = [
+            // Queued connections should be counted in "queuedForEstablishment", "totalCreated", and
+            // "available" stats.
+            () => equal(cstats["queuedForEstablishment"], maxQueueSize),
+            () => cstats["totalCreated"] >= maxQueueSize,
+            () => cstats["available"] <= maxIncomingConnections - maxQueueSize,
             // "extraConns" connections should be rejected because we create more than the rate
             // limit can handle-- they should be counted as rejected in the establishmentRateLimit
             // subsection and the overall "rejected" count.
-            (stats["rejected"] == extraConns &&
-             stats["establishmentRateLimit"]["totalRejected"] == extraConns);
+            () => equal(cstats["rejected"], extraConns),
+            () => equal(cstats["establishmentRateLimit"]["rejected"], extraConns),
+            // There is a correspondence between the connections stats and the session
+            // establishment queue stats, because they use the same underlying rate limiter.
+            () => equal(cstats["establishmentRateLimit"]["rejected"], qstats["rejectedAdmissions"]),
+            () => equal(cstats["queuedForEstablishment"],
+                        qstats["addedToQueue"] - qstats["removedFromQueue"]),
+            // Somebody either waited or was admitted immediately, so there is an average wait
+            // time.
+            () => qstats["averageTimeQueuedMicros"] >= 0
+        ];
+
+        // results :: {<body of check>: <boolean result of check>}
+        const results = Object.fromEntries(checks.map(check => [check.toString(), check()]));
+
+        jsTestLog("checks: " + tojson(results));
+
+        // "all of the checks passed"
+        return Object.values(results).every(result => result);
     });
 
     connDelayFailPoint.off();

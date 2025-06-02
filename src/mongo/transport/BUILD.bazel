@@ -14,6 +14,7 @@ mongo_cc_library(
     srcs = [
         "hello_metrics.cpp",
         "session.cpp",
+        "session_establishment_rate_limiter.cpp",
         "transport_layer.cpp",
         "transport_options.cpp",
         "transport_options_gen",
