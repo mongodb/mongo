@@ -64,6 +64,7 @@ TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         contexts;
 
+    std::vector<size_t> expectedIntentCounts((size_t)IntentRegistry::Intent::_NumDistinctIntents_);
     auto createTokens = [&](IntentRegistry::Intent intent) {
         contexts.emplace_back();
         contexts.back().first =
@@ -73,11 +74,17 @@ TEST_F(IntentRegistryTest, RegisterDeregisterIntent) {
         auto registerResult = _intentRegistry.registerIntent(intent, opCtx);
         tokens.push_back(registerResult);
         ASSERT_TRUE(containsToken(registerResult));
+
+        expectedIntentCounts[(size_t)intent] += 1;
+        ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
     };
     executePerIntent(createTokens, 10);
     for (auto token : tokens) {
         _intentRegistry.deregisterIntent(token);
         ASSERT_FALSE(containsToken(token));
+
+        expectedIntentCounts[(size_t)token.intent()] -= 1;
+        ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
     }
 }
 
@@ -88,6 +95,7 @@ TEST_F(IntentRegistryTest, DestroyingGuardDeregistersIntent) {
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         contexts;
     std::vector<std::unique_ptr<IntentGuard>> guards;
+    std::vector<size_t> expectedIntentCounts((size_t)IntentRegistry::Intent::_NumDistinctIntents_);
 
     // Create and register 10 IntentGuards of each Intent type.
     auto createIntentGuards = [&](IntentRegistry::Intent intent) {
@@ -98,6 +106,9 @@ TEST_F(IntentRegistryTest, DestroyingGuardDeregistersIntent) {
         auto opCtx = contexts.back().second.get();
         guards.emplace_back(std::make_unique<IntentGuard>(intent, opCtx));
         ASSERT_TRUE(guards.back()->intent() != boost::none);
+
+        expectedIntentCounts[(size_t)intent] += 1;
+        ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
     };
     executePerIntent(createIntentGuards, 10);
 
@@ -108,6 +119,9 @@ TEST_F(IntentRegistryTest, DestroyingGuardDeregistersIntent) {
         ASSERT_EQUALS(0, getMapSize(intent));
     };
     executePerIntent(assertRegistryEmpty);
+
+    std::fill(expectedIntentCounts.begin(), expectedIntentCounts.end(), 0);
+    ASSERT_EQUALS(expectedIntentCounts, _intentRegistry.getTotalIntentsDeclared());
 }
 
 TEST_F(IntentRegistryTest, KillConflictingOperationsStepUp) {

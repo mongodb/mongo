@@ -1432,6 +1432,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "intent_registration_server_status",
+    srcs = ["intent_registration_server_status.cpp"],
+    deps = [
+        ":intent_registry",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_library(
     name = "serveronly_repl",
     srcs = [
         "noop_writer.cpp",
@@ -1447,6 +1458,7 @@ mongo_cc_library(
     ],
     deps = [
         ":bgsync",
+        ":intent_registration_server_status",
         ":oplog_application",
         ":oplog_buffer_batched_queue",
         ":oplog_buffer_collection",

@@ -70,8 +70,12 @@ const expectedReplSection = {
         "replSetUpdatePosition": {"num": 0}
     },
     "reconfig": {"numAutoReconfigsForRemovalOfNewlyAddedFields": 0},
-    "stateTransition":
-        {"lastStateTransition": "stepUp", "totalOperationsKilled": 0, "totalOperationsRunning": 3},
+    "stateTransition": {
+        "lastStateTransition": "stepUp",
+        "totalOperationsKilled": 0,
+        "totalOperationsRunning": 3,
+        "totalOperationsKilledByIntentRegistry": 0
+    },
     "syncSource": {
         "numSelections": 1,
         "numSyncSourceChangesDueToSignificantlyCloserNode": 0,
@@ -87,9 +91,21 @@ const expectedReplSection = {
         "numReplCoordMutexAcquisitionsInOplogServerStatus": 0
     }
 };
+const expectedIntentRegistrySection = {
+    "intentsDeclaredForREAD": 0,
+    "intentsDeclaredForWRITE": 0,
+    "intentsDeclaredForLOCAL_WRITE": 0,
+    "intentsDeclaredForPREPARED_TRANSACTION": 0
+};
 assert(serverStatusResponse.metrics.hasOwnProperty("repl"),
        () => (`The serverStatus response did not have the repl \
 section: \n${tojson(serverStatusResponse)}`));
+jsTestLog("printing server status response");
+assert(serverStatusResponse.hasOwnProperty("intentRegistry"),
+       () => (`The serverStatus response did not have the intentRegistry \
+section: \n${tojson(serverStatusResponse)}`));
+jsTestLog(serverStatusResponse);
 verifySameProperties(serverStatusResponse.metrics.repl, expectedReplSection);
+verifySameProperties(serverStatusResponse.intentRegistry, expectedIntentRegistrySection);
 // Stop the replica set.
 rst.stopSet();

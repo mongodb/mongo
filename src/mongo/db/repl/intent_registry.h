@@ -152,6 +152,13 @@ public:
         InterruptionType interruption, boost::optional<uint32_t> timeout_sec = boost::none);
 
     /**
+     * Updates metrics around user ops when a state transition that kills operations occurs (i.e.
+     * step up, step down, rollback, or shutdown). Also logs the metrics.
+     */
+    void updateAndLogStateTransitionMetrics(IntentRegistry::InterruptionType interrupt,
+                                            size_t numOpsKilled) const;
+
+    /**
      * Marks the IntentRegistry enabled and resets the active and last interruption.
      */
     void enable();
@@ -171,6 +178,13 @@ public:
      */
     bool isIntentHeld(OperationContext* opCtx) const;
 
+    static std::string intentToString(Intent intent);
+
+    static std::string interruptionToString(InterruptionType interrupt);
+
+    size_t getTotalOpsKilled() const;
+
+    std::vector<size_t> getTotalIntentsDeclared() const;
 
 private:
     struct tokenMap {
@@ -186,7 +200,6 @@ private:
     bool _validIntent(Intent intent) const;
     void _killOperationsByIntent(Intent intent);
     void _waitForDrain(Intent intent, stdx::chrono::milliseconds timeout);
-    static std::string _intentToString(Intent intent);
 
     bool _enabled = true;
     stdx::mutex _stateMutex;
@@ -195,6 +208,12 @@ private:
     InterruptionType _lastInterruption = InterruptionType::None;
     std::vector<tokenMap> _tokenMaps;
     mutable opCtxIntentMap _opCtxIntentMap;
+
+    // Tracks total number of intents declared per type of intent.
+    std::vector<size_t> _totalIntentsDeclared;
+
+    // Tracks number of operations killed on state transition.
+    size_t _totalOpsKilled = 0;
 };
 }  // namespace consensus
 }  // namespace rss

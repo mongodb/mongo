@@ -52,6 +52,9 @@ auto registryDecoration = ServiceContext::declareDecoration<IntentRegistry>();
 
 using namespace std::chrono_literals;
 
+// Tracks the number of operations killed by intent registry on state transition.
+auto& totalOpsKilledByIntentRegistry =
+    *MetricBuilder<Counter64>("repl.stateTransition.totalOperationsKilledByIntentRegistry");
 
 IntentRegistry::IntentToken::IntentToken(Intent intent) : _intent(intent) {
     _id = _currentTokenId.fetchAndAdd(1);
@@ -65,7 +68,8 @@ IntentRegistry::Intent IntentRegistry::IntentToken::intent() const {
 }
 
 IntentRegistry::IntentRegistry()
-    : _tokenMaps((size_t)IntentRegistry::Intent::_NumDistinctIntents_) {}
+    : _tokenMaps((size_t)IntentRegistry::Intent::_NumDistinctIntents_),
+      _totalIntentsDeclared((size_t)IntentRegistry::Intent::_NumDistinctIntents_) {}
 
 IntentRegistry& IntentRegistry::get(ServiceContext* serviceContext) {
     return registryDecoration(serviceContext);
@@ -109,6 +113,9 @@ IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Inten
         auto ins = _opCtxIntentMap.map.insert({opCtx, token.intent()});
         uassert(1026190, "Operation context already has a registered intent.", ins.second);
     }
+
+    _totalIntentsDeclared[(size_t)intent] += 1;
+
     return token;
 }
 void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
@@ -128,6 +135,8 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     if (tokenMap.map.empty()) {
         tokenMap.cv.notify_all();
     }
+
+    _totalIntentsDeclared[(size_t)token.intent()] -= 1;
 }
 
 stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
@@ -144,7 +153,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 return !_activeInterruption;
             })) {
             LOGV2(9945005,
-                  "Timeout while wating on a previous interrupt to drain.",
+                  "Timeout while waiting on a previous interrupt to drain.",
                   "last"_attr = _lastInterruption,
                   "new"_attr = interrupt);
             fasserted(9945002);
@@ -154,6 +163,7 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
         _activeInterruption = true;
         _lastInterruption = interrupt;
     }
+
     return stdx::async(stdx::launch::async, [&, interrupt, timeOutSec] {
         const std::vector<Intent>* intents = nullptr;
         switch (interrupt) {
@@ -193,6 +203,10 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                 }
             }
         }
+
+        updateAndLogStateTransitionMetrics(interrupt, _totalOpsKilled);
+        _totalOpsKilled = 0;
+
         return ReplicationStateTransitionGuard([&]() {
             stdx::lock_guard<stdx::mutex> lock(_stateMutex);
             _lastInterruption = InterruptionType::None;
@@ -200,6 +214,20 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
             _activeInterruptionCV.notify_one();
         });
     });
+}
+
+void IntentRegistry::updateAndLogStateTransitionMetrics(IntentRegistry::InterruptionType interrupt,
+                                                        size_t numOpsKilled) const {
+    // Clear the current metrics before setting.
+    totalOpsKilledByIntentRegistry.decrement(totalOpsKilledByIntentRegistry.get());
+
+    totalOpsKilledByIntentRegistry.increment(numOpsKilled);
+
+    BSONObjBuilder bob;
+    bob.append("lastStateTransition", interruptionToString(interrupt));
+    bob.appendNumber("totalOpsKilledByIntentRegistry", totalOpsKilledByIntentRegistry.get());
+
+    LOGV2(10286300, "State transition ops metrics for intent registry", "metrics"_attr = bob.obj());
 }
 
 void IntentRegistry::enable() {
@@ -254,6 +282,9 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent) {
         auto client = toKill->getClient();
         ClientLock lock(client);
         serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedDueToReplStateChange);
+
+        _totalOpsKilled += 1;
+
         LOGV2(9795400,
               "Repl state change interrupted a thread.",
               "name"_attr = client->desc(),
@@ -269,18 +300,26 @@ void IntentRegistry::_waitForDrain(IntentRegistry::Intent intent,
     if (timeout.count() &&
         !tokenMap.cv.wait_for(lock, timeout, [&tokenMap] { return tokenMap.map.empty(); })) {
         LOGV2(
-            9795403, "There are still registered intents", "Intent"_attr = _intentToString(intent));
+            9795403, "There are still registered intents", "Intent"_attr = intentToString(intent));
         for (auto& [token, opCtx] : tokenMap.map) {
             LOGV2(9795402, "Registered token:", "token_id"_attr = token);
         }
-        LOGV2(9795404, "Timeout while wating on intent queue to drain");
+        LOGV2(9795404, "Timeout while waiting on intent queue to drain");
         fasserted(9795401);
     } else if (!timeout.count()) {
         tokenMap.cv.wait(lock, [&tokenMap] { return tokenMap.map.empty(); });
     }
 }
 
-std::string IntentRegistry::_intentToString(IntentRegistry::Intent intent) {
+size_t IntentRegistry::getTotalOpsKilled() const {
+    return _totalOpsKilled;
+}
+
+std::vector<size_t> IntentRegistry::getTotalIntentsDeclared() const {
+    return _totalIntentsDeclared;
+}
+
+std::string IntentRegistry::intentToString(IntentRegistry::Intent intent) {
     switch (intent) {
         case Intent::LocalWrite:
             return "LOCAL_WRITE";
@@ -290,6 +329,21 @@ std::string IntentRegistry::_intentToString(IntentRegistry::Intent intent) {
             return "WRITE";
         case Intent::PreparedTransaction:
             return "PREPARED_TRANSACTION";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+std::string IntentRegistry::interruptionToString(InterruptionType interrupt) {
+    switch (interrupt) {
+        case IntentRegistry::InterruptionType::Rollback:
+            return "ROLLBACK";
+        case IntentRegistry::InterruptionType::Shutdown:
+            return "SHUTDOWN";
+        case IntentRegistry::InterruptionType::StepUp:
+            return "STEPUP";
+        case IntentRegistry::InterruptionType::StepDown:
+            return "STEPDOWN";
         default:
             return "UNKNOWN";
     }
