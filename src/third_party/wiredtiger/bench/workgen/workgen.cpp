@@ -3406,7 +3406,7 @@ WorkloadRunner::report(time_t interval, time_t totalsecs, Stats *prev_totals)
 }
 
 void
-WorkloadRunner::final_report(timespec &totalsecs)
+WorkloadRunner::final_report(timespec &runsecs, timespec &totalsecs)
 {
     std::ostream &out = *_report_out;
     Stats *stats = &_workload->stats;
@@ -3415,8 +3415,9 @@ WorkloadRunner::final_report(timespec &totalsecs)
     stats->track_latency(_workload->options.sample_interval_ms > 0);
 
     get_stats(stats);
-    stats->final_report(out, totalsecs);
-    out << "Run completed: " << totalsecs << " seconds" << std::endl;
+    stats->final_report(out, runsecs);
+    out << "Run for " << runsecs << " seconds";
+    out << " completed in " << totalsecs << " seconds" << std::endl;
 }
 
 int
@@ -3596,7 +3597,7 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
             THROW_ERRNO(ret, "Session close failed.");
     }
 
-    timespec now;
+    timespec end, now;
 
     /* Don't run the test if any of the above pthread_create fails. */
     if (!stopping && ret == 0) {
@@ -3612,7 +3613,7 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
         }
 
         workgen_epoch(&_start);
-        timespec end = _start + options->run_time;
+        end = _start + options->run_time;
         timespec next_report = _start + options->report_interval;
 
         // Let the test run, reporting as needed. Exit when we exceed the run time or
@@ -3702,9 +3703,11 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     }
 
     // Issue the final report.
+    std::ostream &out = *_report_out;
     if (options->report_enabled) {
-        timespec finalsecs = now - _start;
-        final_report(finalsecs);
+        timespec runsecs = end - _start;
+        timespec totalsecs = now - _start;
+        final_report(runsecs, totalsecs);
     }
 
     if (ret != 0)

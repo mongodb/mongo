@@ -357,7 +357,7 @@ private:
     int create_all(WT_CONNECTION *conn, Context *context);
     int create_table(
       WT_SESSION *session, const std::string &config, const std::string &uri, bool mirror_enabled);
-    void final_report(timespec &);
+    void final_report(timespec &runsecs, timespec &totalsecs);
     void schedule_table_for_drop(const std::map<std::string, tint_t>::iterator &itr,
       std::vector<std::string> &pending_delete);
     void get_stats(Stats *stats);
