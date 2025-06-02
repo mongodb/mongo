@@ -54,7 +54,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_mongos_test_fixture.h"
@@ -240,8 +239,7 @@ protected:
             Timestamp timestamp{1, 0};
             return StaleConfigInfo(
                 NamespaceString::createNamespaceString_forTest("Foo.Bar"),
-                ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                          boost::optional<CollectionIndexes>(boost::none)),
+                ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
                 boost::none,
                 ShardId{"dummy"});
         }(),

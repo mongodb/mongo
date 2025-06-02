@@ -347,61 +347,6 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
-AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* opCtx,
-                                                            const NamespaceString& nss) {
-    auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(CollectionType::ConfigNS).build();
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces[CollectionType::ConfigNS] = {CollectionType::ConfigNS,
-                                                    std::vector<BSONObj>()};
-    resolvedNamespaces[NamespaceString::kConfigsvrIndexCatalogNamespace] = {
-        NamespaceString::kConfigsvrIndexCatalogNamespace, std::vector<BSONObj>()};
-    expCtx->setResolvedNamespaces(resolvedNamespaces);
-
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-
-    Pipeline::SourceContainer stages;
-
-    // 1. Match config.collections entries with {_id: nss}. This stage will produce, at most, one
-    // config.collections document.
-    // {
-    //     $match: {
-    //         _id: <nss>
-    //     }
-    // }
-    stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kNssFieldName,
-             NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}
-            .toBson(),
-        expCtx));
-
-    // 2. Retrieve config.csrs.indexes entries with the same uuid as the one from the
-    // config.collections document.
-    //
-    // The $lookup stage gets the config.csrs.indexes documents and puts them in a field called
-    // "indexes" in the document produced during stage 1.
-    //
-    // {
-    //      $lookup: {
-    //          from: "csrs.indexes",
-    //          as: "indexes",
-    //          localField: "uuid",
-    //          foreignField: "collectionUUID"
-    //      }
-    // }
-    const Doc lookupPipeline{{"from", NamespaceString::kConfigsvrIndexCatalogNamespace.coll()},
-                             {"as", "indexes"_sd},
-                             {"localField", CollectionType::kUuidFieldName},
-                             {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
-
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(
-        Doc{{"$lookup", lookupPipeline}}.toBson().firstElement(), expCtx));
-
-    auto pipeline = Pipeline::create(std::move(stages), expCtx);
-    auto serializedPipeline = pipeline->serializeToBson();
-    return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
-}
-
 AggregateCommandRequest makeUnsplittableCollectionsDataShardAggregation(
     OperationContext* opCtx,
     const DatabaseName& dbName,
@@ -1079,36 +1024,6 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
 
     return {std::move(*coll), std::move(chunks)};
 };
-
-std::pair<CollectionType, std::vector<IndexCatalogType>>
-ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
-    OperationContext* opCtx, const NamespaceString& nss, const repl::ReadConcernArgs& readConcern) {
-    auto aggRequest = makeCollectionAndIndexesAggregation(opCtx, nss);
-
-    std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
-
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection " << nss.toStringForErrorMsg() << " not found",
-            !aggResult.empty());
-
-    uassert(6958800,
-            str::stream() << "More than one collection for ns " << nss.toStringForErrorMsg()
-                          << " found",
-            aggResult.size() == 1);
-
-    boost::optional<CollectionType> coll;
-    std::vector<IndexCatalogType> indexes;
-
-    auto elem = aggResult[0];
-    coll.emplace(elem);
-    const auto indexList = elem.getField("indexes");
-    for (const auto index : indexList.Array()) {
-        indexes.emplace_back(
-            IndexCatalogType::parse(IDLParserContext("IndexCatalogType"), index.Obj()));
-    }
-
-    return {std::move(*coll), std::move(indexes)};
-}
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
     OperationContext* opCtx, const NamespaceString& nss, boost::optional<long long> limit) {

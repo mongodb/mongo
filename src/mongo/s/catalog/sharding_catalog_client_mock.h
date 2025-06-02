@@ -50,7 +50,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -145,11 +144,6 @@ public:
         const NamespaceString& nss,
         const ChunkVersion& sinceVersion,
         const repl::ReadConcernArgs& readConcern) override;
-
-    std::pair<CollectionType, std::vector<IndexCatalogType>>
-    getCollectionAndShardingIndexCatalogEntries(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const repl::ReadConcernArgs& readConcern) override;
 
     StatusWith<std::vector<TagsType>> getTagsForCollection(
         OperationContext* opCtx,

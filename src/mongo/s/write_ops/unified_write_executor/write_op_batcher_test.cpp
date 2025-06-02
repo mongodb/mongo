@@ -66,17 +66,13 @@ public:
     const ShardId shardId0 = ShardId("shard0");
     const ShardId shardId1 = ShardId("shard1");
     const ShardVersion shardVersionNss0Shard0 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)));
     const ShardVersion shardVersionNss0Shard1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(2, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(2, 0)));
     const ShardVersion shardVersionNss1Shard0 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)));
     const ShardVersion shardVersionNss1Shard1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(2, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(2, 0)));
     const ShardEndpoint nss0Shard0 = ShardEndpoint(shardId0, shardVersionNss0Shard0, boost::none);
     const ShardEndpoint nss0Shard1 = ShardEndpoint(shardId1, shardVersionNss0Shard1, boost::none);
     const ShardEndpoint nss1Shard0 = ShardEndpoint(shardId0, shardVersionNss1Shard0, boost::none);
@@ -137,8 +133,8 @@ public:
 };
 class UnorderedUnifiedWriteExecutorBatcherTest : public UnifiedWriteExecutorBatcherTest {
 public:
-    const ShardVersion shardVersionNss0Shard0VersionIgnored = ShardVersionFactory::make(
-        ChunkVersion::IGNORED(), boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersionNss0Shard0VersionIgnored =
+        ShardVersionFactory::make(ChunkVersion::IGNORED());
     const ShardEndpoint nss0Shard0VersionIgnored =
         ShardEndpoint(shardId0, shardVersionNss0Shard0VersionIgnored, boost::none);
 

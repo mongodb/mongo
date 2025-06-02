@@ -34,7 +34,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -65,8 +64,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleShardVersion) {
     CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
-    ShardVersion shardVersion =
-        ShardVersionFactory::make({gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+    ShardVersion shardVersion = ShardVersionFactory::make({gen, {1, 0}});
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, shardVersion, boost::none);
 
     auto& oss = OperationShardingState::get(operationContext());
@@ -78,16 +76,14 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
 
     {
         CollectionGeneration gen1(OID::gen(), Timestamp(10, 0));
-        ShardVersion shardVersion1 = ShardVersionFactory::make(
-            {gen1, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+        ShardVersion shardVersion1 = ShardVersionFactory::make({gen1, {1, 0}});
         ScopedSetShardRole scopedSetShardRole1(
             operationContext(), kNss, shardVersion1, boost::none);
         ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));
     }
     {
         CollectionGeneration gen2(OID::gen(), Timestamp(20, 0));
-        ShardVersion shardVersion2 = ShardVersionFactory::make(
-            {gen2, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+        ShardVersion shardVersion2 = ShardVersionFactory::make({gen2, {1, 0}});
         ScopedSetShardRole scopedSetShardRole2(
             operationContext(), kNss, shardVersion2, boost::none);
         ASSERT_EQ(shardVersion2, *oss.getShardVersion(kNss));
@@ -97,10 +93,8 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleRecursiveShardVersionDifferentNamespaces) {
     CollectionGeneration gen1(OID::gen(), Timestamp(10, 0));
     CollectionGeneration gen2(OID::gen(), Timestamp(20, 0));
-    ShardVersion shardVersion1 =
-        ShardVersionFactory::make({gen1, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
-    ShardVersion shardVersion2 =
-        ShardVersionFactory::make({gen2, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+    ShardVersion shardVersion1 = ShardVersionFactory::make({gen1, {1, 0}});
+    ShardVersion shardVersion2 = ShardVersionFactory::make({gen2, {1, 0}});
 
     ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, shardVersion1, boost::none);
     ScopedSetShardRole scopedSetShardRole2(
@@ -137,8 +131,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFix
         // Any other shard version cannot be passed with a fixed dbVersion.
         DatabaseVersion dbv{DatabaseVersion::makeFixed()};
         CollectionGeneration gen(OID::gen(), Timestamp(1, 0));
-        ShardVersion sv = ShardVersionFactory::make(
-            {gen, {1, 0}}, boost::optional<CollectionIndexes>(boost::none));
+        ShardVersion sv = ShardVersionFactory::make({gen, {1, 0}});
         ASSERT_THROWS_CODE(
             [&] {
                 ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, sv, dbv);

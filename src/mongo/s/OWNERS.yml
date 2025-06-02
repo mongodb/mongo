@@ -60,9 +60,6 @@ filters:
   - "database_version*":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "index_version*":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "resource_yielders*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -91,9 +88,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "shard_version*":
-    approvers:
-      - 10gen/server-catalog-and-routing
-  - "sharding_index_catalog_cache*":
     approvers:
       - 10gen/server-catalog-and-routing
   - "sharding_types.idl":

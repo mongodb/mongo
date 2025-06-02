@@ -57,7 +57,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
@@ -121,23 +120,19 @@ protected:
 
     const NamespaceString nssShardedCollection1 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb1, "sharded.porcupine.tree");
-    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
 
     const NamespaceString nssShardedCollection2 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb2, "sharded.oasis");
-    const ShardVersion shardVersionShardedCollection2 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(6, 0)}, CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersionShardedCollection2 = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(6, 0)}, CollectionPlacement(10, 1)));
 
     // Used to cause a database version mismatch.
     const DatabaseVersion incorrectDatabaseVersion{UUID::gen(), Timestamp(3, 0)};
     // Used to cause a shard version mismatch.
-    const ShardVersion incorrectShardVersion =
-        ShardVersionFactory::make(ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(12, 0)},
-                                               CollectionPlacement(10, 1)),
-                                  boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion incorrectShardVersion = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(12, 0)}, CollectionPlacement(10, 1)));
 };
 
 void createTestCollection(OperationContext* opCtx, const NamespaceString& nss) {

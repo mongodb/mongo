@@ -61,7 +61,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -87,9 +86,8 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOn
 
 // This shard version is used as the received version in StaleConfigInfo since we do not have
 // information about the received version of the operation.
-ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
-    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                     boost::optional<CollectionIndexes>(boost::none));
+ShardVersion ShardVersionPlacementIgnored() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED());
 }
 
 bool checkIfSingleDoc(OperationContext* opCtx,
@@ -139,29 +137,27 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     ShardId shardId = ShardingState::get(opCtx)->shardId();
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadataAfterSplit->isSharded());
     const auto placementVersion = metadataAfterSplit->getShardPlacementVersion();
     const auto epoch = placementVersion.epoch();
-    uassert(
-        StaleConfigInfo(
-            nss,
-            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
-            ShardVersionFactory::make(*metadataAfterSplit,
-                                      scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
-            shardId),
-        str::stream() << "Collection " << nss.toStringForErrorMsg() << " changed since split start",
-        epoch == expectedEpoch &&
-            (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
+    uassert(StaleConfigInfo(nss,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
+                            ShardVersionFactory::make(*metadataAfterSplit) /* wantedVersion */,
+                            shardId),
+            str::stream() << "Collection " << nss.toStringForErrorMsg()
+                          << " changed since split start",
+            epoch == expectedEpoch &&
+                (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {

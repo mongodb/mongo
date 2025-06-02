@@ -1845,8 +1845,6 @@ mongo_cc_library(
         "//src/mongo/s:database_version_base_gen",
         "//src/mongo/s:database_version_gen",
         "//src/mongo/s:gossiped_routing_cache_gen",
-        "//src/mongo/s:index_version.cpp",
-        "//src/mongo/s:index_version_gen",
         "//src/mongo/s:shard_version.cpp",
         "//src/mongo/s:shard_version_gen",
         "//src/mongo/s:sharding_types_gen",

@@ -55,14 +55,12 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -136,8 +134,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto receivedVersion = [&] {
         // Mark the cache entry routingInfo for the 'nss' if the entry is staler than
         // 'targetCollectionPlacementVersion'.
-        auto ignoreIndexVersion =
-            ShardVersionFactory::make(targetCollectionPlacementVersion, boost::none);
+        auto ignoreIndexVersion = ShardVersionFactory::make(targetCollectionPlacementVersion);
 
         catalogCache->onStaleCollectionVersion(nss, ignoreIndexVersion);
         return ignoreIndexVersion;
@@ -150,7 +147,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
             ? routingInfo.getCollectionVersion().placementVersion()
             : ChunkVersion::UNSHARDED();
 
-        auto ignoreIndexVersion = ShardVersionFactory::make(foundVersion, boost::none);
+        auto ignoreIndexVersion = ShardVersionFactory::make(foundVersion);
         return ignoreIndexVersion;
     }();
 

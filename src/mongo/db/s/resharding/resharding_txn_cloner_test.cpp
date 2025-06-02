@@ -97,7 +97,6 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -218,16 +217,6 @@ class ReshardingTxnClonerTest : service_context_test::WithSetupTransportLayer,
                     shardTypes.push_back(std::move(sType));
                 };
                 return repl::OpTimeWith<std::vector<ShardType>>(shardTypes);
-            }
-
-            std::pair<CollectionType, std::vector<IndexCatalogType>>
-            getCollectionAndShardingIndexCatalogEntries(
-                OperationContext* opCtx,
-                const NamespaceString& nss,
-                const repl::ReadConcernArgs& readConcern) override {
-                uasserted(ErrorCodes::NamespaceNotFound,
-                          str::stream()
-                              << "Collection " << nss.toStringForErrorMsg() << " not found");
             }
 
         private:

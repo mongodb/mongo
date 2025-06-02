@@ -37,7 +37,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -110,13 +109,10 @@ TEST_F(SyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
         if (++tries < 5) {
             const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
             const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
-            uassert(StaleConfigInfo(
-                        nss(),
-                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardId("sB")),
+            uassert(StaleConfigInfo(nss(),
+                                    ShardVersionFactory::make(ChunkVersion(gen1, {5, 23})),
+                                    ShardVersionFactory::make(ChunkVersion(gen2, {6, 99})),
+                                    ShardId("sB")),
                     "testX",
                     false);
         }
@@ -137,16 +133,12 @@ TEST_F(SyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
             if (++tries < altMaxNumRetries / 2) {
                 const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
                 const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
-                uassert(
-                    StaleConfigInfo(
-                        nss(),
-                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardId("sB")),
-                    "testX",
-                    false);
+                uassert(StaleConfigInfo(nss(),
+                                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23})),
+                                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99})),
+                                        ShardId("sB")),
+                        "testX",
+                        false);
             }
 
             return 10;
@@ -218,13 +210,10 @@ TEST_F(SyncShardVersionRetry, ShouldNotBreakOnTimeseriesBucketNamespaceRewrite) 
         if (++tries < 5) {
             const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
             const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
-            uassert(StaleConfigInfo(
-                        nss().makeTimeseriesBucketsNamespace(),
-                        ShardVersionFactory::make(ChunkVersion(gen1, {5, 23}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardVersionFactory::make(ChunkVersion(gen2, {6, 99}),
-                                                  boost::optional<CollectionIndexes>(boost::none)),
-                        ShardId("sB")),
+            uassert(StaleConfigInfo(nss().makeTimeseriesBucketsNamespace(),
+                                    ShardVersionFactory::make(ChunkVersion(gen1, {5, 23})),
+                                    ShardVersionFactory::make(ChunkVersion(gen2, {6, 99})),
+                                    ShardId("sB")),
                     "testX",
                     false);
         }

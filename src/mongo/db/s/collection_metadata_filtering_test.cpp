@@ -52,7 +52,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
@@ -188,12 +187,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
     testFilterFn(scopedCss->getOwnershipFilter(
@@ -219,12 +216,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
     testFilterFn(scopedCss->getOwnershipFilter(
@@ -258,12 +253,10 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     auto scopedCss =
         CollectionShardingState::assertCollectionLockedAndAcquire(operationContext(), kNss);
     testFilterFn(scopedCss->getOwnershipFilter(

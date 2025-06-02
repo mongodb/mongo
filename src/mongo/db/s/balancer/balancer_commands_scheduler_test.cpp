@@ -52,7 +52,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
@@ -236,16 +235,15 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
     _scheduler.start(operationContext());
     ChunkType chunk = makeChunk(0, kShardId0);
 
-    auto futureResponse = _scheduler.requestDataSize(
-        operationContext(),
-        kNss,
-        chunk.getShard(),
-        chunk.getRange(),
-        ShardVersionFactory::make(chunk.getVersion(),
-                                  boost::optional<CollectionIndexes>(boost::none)),
-        KeyPattern(BSON("x" << 1)),
-        false /* issuedByRemoteUser */,
-        (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);
+    auto futureResponse =
+        _scheduler.requestDataSize(operationContext(),
+                                   kNss,
+                                   chunk.getShard(),
+                                   chunk.getRange(),
+                                   ShardVersionFactory::make(chunk.getVersion()),
+                                   KeyPattern(BSON("x" << 1)),
+                                   false /* issuedByRemoteUser */,
+                                   (kDefaultMaxChunkSizeBytes / 100) * 25 /* maxSize */);
     auto swReceivedDataSize = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedDataSize.getStatus());
     auto receivedDataSize = swReceivedDataSize.getValue();

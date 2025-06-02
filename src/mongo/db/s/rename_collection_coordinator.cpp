@@ -77,7 +77,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
@@ -485,29 +484,6 @@ SemiFuture<BatchedCommandResponse> deleteZonesStatement(const txn_api::Transacti
     return txnClient.runCRUDOp(request, {-1});
 }
 
-SemiFuture<BatchedCommandResponse> deleteShardingIndexCatalogMetadataStatement(
-    const txn_api::TransactionClient& txnClient, const boost::optional<UUID>& uuid) {
-    if (uuid) {
-        // delete index catalog metadata
-        BatchedCommandRequest request([&] {
-            write_ops::DeleteCommandRequest deleteOp(
-                NamespaceString::kConfigsvrIndexCatalogNamespace);
-            deleteOp.setDeletes({[&] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(IndexCatalogType::kCollectionUUIDFieldName << *uuid));
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return deleteOp;
-        }());
-
-        return txnClient.runCRUDOp(request, {-1});
-    } else {
-        return noOpStatement();
-    }
-}
-
-
 void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const boost::optional<CollectionType>& optFromCollType,
                                            const NamespaceString& fromNss,
@@ -555,13 +531,6 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                                              {} /*shards*/,
                                                              2,
                                                              deleteCollResponse);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-
-                    return deleteShardingIndexCatalogMetadataStatement(txnClient,
-                                                                       droppedTargetUUID);
                 })
                 // Delete "FROM" collection
                 .thenRunOn(txnExec)
@@ -653,13 +622,6 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                                              {},
                                                              2,
                                                              deleteCollResponse);
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& response) {
-                    uassertStatusOK(response.toStatus());
-
-                    return deleteShardingIndexCatalogMetadataStatement(txnClient,
-                                                                       droppedTargetUUID);
                 })
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& response) {
@@ -1121,8 +1083,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         opCtx, _request.getTo()));
                 auto placementVersion =
                     cm.hasRoutingTable() ? cm.getVersion() : ChunkVersion::UNSHARDED();
-                _response = RenameCollectionResponse(ShardVersionFactory::make(
-                    std::move(placementVersion), boost::none /* IndexVersion */));
+                _response = RenameCollectionResponse(
+                    ShardVersionFactory::make(std::move(placementVersion)));
 
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,

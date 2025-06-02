@@ -39,7 +39,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
@@ -90,9 +89,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
         ASSERT_EQ(insertRequest.getBatchType(), BatchedCommandRequest::BatchType_Insert);
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns_forTest());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 2}),
-                                            boost::optional<CollectionIndexes>(boost::none))
-                      .toString(),
+        ASSERT_EQ(ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 2})).toString(),
                   insertRequest.getShardVersion().toString());
     }
 }

@@ -88,8 +88,7 @@ public:
         ScopedSetShardRole scopedSetShardRole{
             opCtx,
             ns,
-            ShardVersionFactory::make(
-                metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+            ShardVersionFactory::make(metadata) /* shardVersion */,
             boost::none /* databaseVersion */};
 
         const auto coll = acquireCollection(

@@ -51,7 +51,6 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
@@ -711,7 +710,6 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, InsertIsTargetedToDbPrimarySh
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
     ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
-    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
 }
 
 TEST_F(CollectionRoutingInfoTargeterUntrackedTest, UpdateIsTargetedToDbPrimaryShard) {
@@ -725,7 +723,6 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, UpdateIsTargetedToDbPrimarySh
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
     ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
-    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
 }
 
 TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimaryShard) {
@@ -739,7 +736,6 @@ TEST_F(CollectionRoutingInfoTargeterUntrackedTest, DeleteIsTargetedToDbPrimarySh
     ASSERT_EQ(primaryShard, shardEndpoint.shardName);
     ASSERT_EQ(dbVersion, shardEndpoint.databaseVersion);
     ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
-    ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
 }
 
 /**
@@ -898,7 +894,6 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUntrackedTimes
         ASSERT_EQ(_dbPrimaryShard, shardEndpoint.shardName);
         ASSERT_EQ(_dbVersion, shardEndpoint.databaseVersion);
         ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
-        ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
     };
 
     CollectionRoutingInfoTargeter cri(operationContext(), _untrackedTimeseriesNss);

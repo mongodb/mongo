@@ -371,14 +371,10 @@ protected:
     const BSONObj shardKey = BSON("skey" << 1);
     const Timestamp cloneTimestamp = Timestamp(220, 220);
 
-    const ShardVersion shardVersion0 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(224, 224)},
-                     CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none));
-    const ShardVersion shardVersion1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(224, 225)},
-                     CollectionPlacement(10, 2)),
-        boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersion0 = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(224, 224)}, CollectionPlacement(10, 1)));
+    const ShardVersion shardVersion1 = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(224, 225)}, CollectionPlacement(10, 2)));
 
     const std::map<ShardId, ShardVersion> shardVersions{{shardId0, shardVersion0},
                                                         {shardId1, shardVersion1}};

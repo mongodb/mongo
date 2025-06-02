@@ -442,7 +442,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     try {
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
-        const auto shardVersion = ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none);
+        const auto shardVersion = ShardVersionFactory::make(ChunkVersion::IGNORED());
         auto scopedRole = ScopedSetShardRole(opCtx, *nss, shardVersion, boost::none);
         const auto coll =
             acquireCollection(opCtx,

@@ -49,7 +49,6 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -276,15 +275,6 @@ public:
         const NamespaceString& nss,
         const ChunkVersion& sinceVersion,
         const repl::ReadConcernArgs& readConcern) = 0;
-
-    /**
-     * Retrieves the collection metadata and its global index metadata. This function will return
-     * all of the global idexes for a collection.
-     */
-    virtual std::pair<CollectionType, std::vector<IndexCatalogType>>
-    getCollectionAndShardingIndexCatalogEntries(OperationContext* opCtx,
-                                                const NamespaceString& nss,
-                                                const repl::ReadConcernArgs& readConcern) = 0;
 
     /**
      * Retrieves all zones defined for the specified collection. The returned vector is sorted based

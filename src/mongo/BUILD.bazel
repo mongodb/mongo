@@ -774,7 +774,6 @@ filegroup(
         "//src/mongo/s:chunk_version.h",
         "//src/mongo/s:database_version.h",
         "//src/mongo/s:database_version_base_gen",
-        "//src/mongo/s:index_version.h",
         "//src/mongo/s:shard_key_pattern.h",
         "//src/mongo/s:shard_version.h",
         "//src/mongo/s:stale_exception.h",

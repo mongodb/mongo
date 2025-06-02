@@ -10,15 +10,6 @@ exports_files(
 )
 
 idl_generator(
-    name = "type_index_catalog_gen",
-    src = "type_index_catalog.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-idl_generator(
     name = "type_namespace_placement_gen",
     src = "type_namespace_placement.idl",
     deps = [

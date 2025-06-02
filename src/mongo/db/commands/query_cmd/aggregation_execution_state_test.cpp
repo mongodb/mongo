@@ -92,10 +92,8 @@ protected:
                                           ShardId shardName,
                                           bool requiresExtendedRangeSupport = false) {
         // Made up a shard version
-        const ShardVersion shardVersion = ShardVersionFactory::make(
-            ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)},
-                         CollectionPlacement(10, 1)),
-            boost::optional<CollectionIndexes>(boost::none));
+        const ShardVersion shardVersion = ShardVersionFactory::make(ChunkVersion(
+            CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
 
 
         const auto uuid = [&] {

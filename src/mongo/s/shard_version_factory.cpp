@@ -29,53 +29,25 @@
 
 #include "mongo/s/shard_version_factory.h"
 
-#include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
-
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
 
-ShardVersion ShardVersionFactory::make(
-    const ChunkManager& chunkManager, const boost::optional<CollectionIndexes>& collectionIndexes) {
-    tassert(7288900,
-            str::stream() << "Cannot create ShardVersion when placement version has uuid "
-                          << chunkManager.getUUID() << " and index version has uuid "
-                          << collectionIndexes->uuid(),
-            !collectionIndexes || chunkManager.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(chunkManager.getVersion(), collectionIndexes, boost::none);
+ShardVersion ShardVersionFactory::make(const ChunkManager& chunkManager) {
+    return ShardVersion(chunkManager.getVersion(), boost::none);
 }
 
-ShardVersion ShardVersionFactory::make(
-    const ChunkManager& chunkManager,
-    const ShardId& shardId,
-    const boost::optional<CollectionIndexes>& collectionIndexes) {
-
-    tassert(7288901,
-            str::stream() << "Cannot create ShardVersion when placement version has uuid "
-                          << chunkManager.getUUID() << " and index version has uuid "
-                          << collectionIndexes->uuid(),
-            !collectionIndexes || chunkManager.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(chunkManager.getVersion(shardId), collectionIndexes, boost::none);
+ShardVersion ShardVersionFactory::make(const ChunkManager& chunkManager, const ShardId& shardId) {
+    return ShardVersion(chunkManager.getVersion(shardId), boost::none);
 }
 
-ShardVersion ShardVersionFactory::make(
-    const CollectionMetadata& cm, const boost::optional<CollectionIndexes>& collectionIndexes) {
-    tassert(7288902,
-            str::stream() << "Cannot create ShardVersion when placement version has uuid "
-                          << cm.getUUID() << " and index version has uuid "
-                          << collectionIndexes->uuid(),
-            !collectionIndexes || !cm.isSharded() || cm.uuidMatches(collectionIndexes->uuid()));
-    return ShardVersion(cm.getShardPlacementVersion(), collectionIndexes, boost::none);
+ShardVersion ShardVersionFactory::make(const CollectionMetadata& cm) {
+    return ShardVersion(cm.getShardPlacementVersion(), boost::none);
 }
 
 
-// The other three constructors should be used instead of this one whenever possible. This
-// builder should only be used for the rare cases in which we know that the chunk version and
-// collection indexes come from the same collection.
-ShardVersion ShardVersionFactory::make(
-    const ChunkVersion& chunkVersion, const boost::optional<CollectionIndexes>& collectionIndexes) {
-    return ShardVersion(chunkVersion, collectionIndexes, boost::none);
+// The other three constructors should be used instead of this one whenever possible.
+ShardVersion ShardVersionFactory::make(const ChunkVersion& chunkVersion) {
+    return ShardVersion(chunkVersion, boost::none);
 }
 }  // namespace mongo

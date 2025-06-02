@@ -70,7 +70,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -136,9 +135,8 @@ protected:
 
     const NamespaceString nssShardedCollection1 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "sharded");
-    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
 
     const NamespaceString nssView =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "view");
@@ -1641,8 +1639,7 @@ TEST_F(ShardRoleTest,
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersionFactory::make(newPlacementVersion,
-                                         boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(newPlacementVersion);
     }();
     const auto uuid = getCollectionUUID(operationContext(), nss);
     installShardedCollectionMetadata(
@@ -1695,8 +1692,8 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernTim
             shardVersionShardedCollection1.placementVersion().getTimestamp();
         Timestamp newCollectionTimestamp{currentCollectionTimestamp.getSecs() + 100, 0};
 
-        return ShardVersionFactory::make(ChunkVersion({OID::gen(), newCollectionTimestamp}, {1, 0}),
-                                         boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(
+            ChunkVersion({OID::gen(), newCollectionTimestamp}, {1, 0}));
     }();
     const auto uuid = getCollectionUUID(operationContext(), nss);
     installShardedCollectionMetadata(
@@ -1776,8 +1773,7 @@ TEST_F(ShardRoleTest, RestoreForWriteInvalidatesAcquisitionIfPlacementConcernDbV
 TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     const auto nss = nssShardedCollection1;
 
-    PlacementConcern placementConcern{
-        {}, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none)};
+    PlacementConcern placementConcern{{}, ShardVersionFactory::make(ChunkVersion::IGNORED())};
     const auto acquisition = acquireCollection(operationContext(),
                                                {
                                                    nss,
@@ -1799,7 +1795,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersionFactory::make(newPlacementVersion, boost::none);
+        return ShardVersionFactory::make(newPlacementVersion);
     }();
 
     const auto uuid = getCollectionUUID(operationContext(), nss);
@@ -1998,8 +1994,7 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
         const auto newShardVersion = [&]() {
             auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
             newPlacementVersion.incMajor();
-            return ShardVersionFactory::make(newPlacementVersion,
-                                             boost::optional<CollectionIndexes>(boost::none));
+            return ShardVersionFactory::make(newPlacementVersion);
         }();
 
         const auto uuid = getCollectionUUID(operationContext(), nss);
@@ -2526,8 +2521,7 @@ DEATH_TEST_F(ShardRoleTest,
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersionFactory::make(newPlacementVersion,
-                                         boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(newPlacementVersion);
     }();
     const auto uuid = getCollectionUUID(operationContext(), nss);
     installShardedCollectionMetadata(

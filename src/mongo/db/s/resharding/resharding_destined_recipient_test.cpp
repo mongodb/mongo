@@ -80,14 +80,12 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -197,14 +195,6 @@ public:
             _colls = std::move(colls);
         }
 
-        std::pair<CollectionType, std::vector<IndexCatalogType>>
-        getCollectionAndShardingIndexCatalogEntries(
-            OperationContext* opCtx,
-            const NamespaceString& nss,
-            const repl::ReadConcernArgs& readConcern) override {
-            return std::make_pair(CollectionType(), std::vector<IndexCatalogType>());
-        }
-
     private:
         const std::vector<ShardType> _shards;
         std::vector<CollectionType> _colls;
@@ -257,8 +247,7 @@ protected:
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
-        env.version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}),
-                                                boost::optional<CollectionIndexes>(boost::none));
+        env.version = ShardVersionFactory::make(ChunkVersion(gen, {1, 0}));
         env.tempNss = NamespaceString::createNamespaceString_forTest(
             kNss.db_forTest(),
             fmt::format("{}{}",
@@ -468,10 +457,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
     auto env = setupReshardingEnv(opCtx, true);
 
     OperationShardingState::setShardRole(
-        opCtx,
-        kNss,
-        ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
-        env.dbVersion);
+        opCtx, kNss, ShardVersionFactory::make(ChunkVersion::IGNORED()), env.dbVersion);
     client.update(
         kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), false /*upsert*/, true /*multi*/);
 

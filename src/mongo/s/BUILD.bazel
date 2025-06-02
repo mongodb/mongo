@@ -201,7 +201,6 @@ mongo_cc_library(
         "router_uptime_reporter.cpp",
         "routing_information_cache.cpp",
         "shard_util.cpp",
-        "sharding_index_catalog_cache.cpp",
         "//src/mongo/s/client:config_shard_wrapper.cpp",
         "//src/mongo/s/client:shard_factory.cpp",
         "//src/mongo/s/client:shard_registry.cpp",
@@ -217,7 +216,6 @@ mongo_cc_library(
         "router_uptime_reporter.h",
         "routing_information_cache.h",
         "shard_util.h",
-        "sharding_index_catalog_cache.h",
         "//src/mongo/db/s:shard_server_catalog_cache_loader.h",
         "//src/mongo/s/client:config_shard_wrapper.h",
         "//src/mongo/s/client:shard_factory.h",
@@ -393,7 +391,6 @@ mongo_cc_library(
         "//src/mongo/s/catalog:type_collection_gen",
         "//src/mongo/s/catalog:type_config_version_gen",
         "//src/mongo/s/catalog:type_database_gen",
-        "//src/mongo/s/catalog:type_index_catalog_gen",
         "//src/mongo/s/catalog:type_mongos.cpp",
         "//src/mongo/s/catalog:type_namespace_placement_gen",
         "//src/mongo/s/catalog:type_remove_shard_event_gen",
@@ -613,19 +610,10 @@ idl_generator(
 )
 
 idl_generator(
-    name = "index_version_gen",
-    src = "index_version.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "shard_version_gen",
     src = "shard_version.idl",
     deps = [
         ":chunk_version_gen",
-        ":index_version_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )
@@ -1118,7 +1106,6 @@ mongo_cc_unit_test(
         "shard_key_pattern_query_util_index_bounds_test.cpp",
         "shard_key_pattern_test.cpp",
         "shard_version_test.cpp",
-        "sharding_index_catalog_cache_test.cpp",
         "sharding_task_executor_test.cpp",
         "stale_exception_test.cpp",
         "stale_shard_version_helpers_test.cpp",

@@ -107,9 +107,8 @@ boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCt
 
 // This shard version is used as the received version in StaleConfigInfo since we do not have
 // information about the received version of the operation.
-ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
-    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                     boost::optional<CollectionIndexes>(boost::none));
+ShardVersion ShardVersionPlacementIgnored() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED());
 }
 
 // Checks that the overall collection 'timestamp' is valid for the current transaction (i.e. this
@@ -261,7 +260,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     uassert(
         StaleConfigInfo(_nss,
                         receivedShardVersion ? *receivedShardVersion
-                                             : ShardVersionPlacementIgnoredNoIndexes(),
+                                             : ShardVersionPlacementIgnored(),
                         boost::none /* wantedVersion */,
                         ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.toStringForErrorMsg()
@@ -515,9 +514,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         return kUntrackedCollection;
 
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
-    const auto& receivedShardVersion = optReceivedShardVersion
-        ? *optReceivedShardVersion
-        : ShardVersionPlacementIgnoredNoIndexes();
+    const auto& receivedShardVersion =
+        optReceivedShardVersion ? *optReceivedShardVersion : ShardVersionPlacementIgnored();
 
     alwaysThrowStaleConfigInfo.execute([&](const auto&) {
         uasserted(StaleConfigInfo(_nss,
@@ -558,7 +556,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& currentMetadata = optCurrentMetadata->get();
 
     const auto wantedPlacementVersion = currentMetadata.getShardPlacementVersion();
-    const auto wantedShardVersion = ShardVersionFactory::make(currentMetadata, boost::none);
+    const auto wantedShardVersion = ShardVersionFactory::make(currentMetadata);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
     const bool isPlacementVersionIgnored =

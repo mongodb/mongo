@@ -53,9 +53,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
@@ -165,34 +163,6 @@ public:
                     chunksArr.doneFast();
                 }
                 metadataBuilder.doneFast();
-            }
-        }
-
-        if (scopedCsr->getCollectionIndexes(opCtx)) {
-            result.append("indexVersion", scopedCsr->getCollectionIndexes(opCtx)->indexVersion());
-
-            if (cmdObj["fullMetadata"].trueValue()) {
-                BSONArrayBuilder indexesArrBuilder;
-                // Added to the result bson if the max bson size is exceeded
-                BSONObjBuilder exceededSizeElt(BSON("exceededSize" << true));
-                bool exceedsSizeLimit = false;
-                scopedCsr->getIndexes(opCtx)->forEachIndex([&](const auto& index) {
-                    BSONObjBuilder indexB(index.toBSON());
-                    if (result.len() + exceededSizeElt.len() + indexesArrBuilder.len() +
-                            indexB.len() >
-                        BSONObjMaxUserSize) {
-                        exceedsSizeLimit = true;
-                    } else {
-                        indexesArrBuilder.append(indexB.done());
-                    }
-
-                    return !exceedsSizeLimit;
-                });
-
-                result.append("indexes", indexesArrBuilder.arr());
-                if (exceedsSizeLimit) {
-                    result.appendElements(exceededSizeElt.done());
-                }
             }
         }
 

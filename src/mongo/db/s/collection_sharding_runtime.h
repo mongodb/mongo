@@ -43,10 +43,7 @@
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -67,9 +64,6 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-
-typedef std::pair<CollectionMetadata, boost::optional<ShardingIndexesCatalogCache>>
-    CollectionPlacementAndIndexInfo;
 
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the
@@ -159,18 +153,6 @@ public:
         OperationContext* opCtx,
         OrphanCleanupPolicy orphanCleanupPolicy,
         const ShardVersion& receivedShardVersion) const override;
-
-    // TODO (SERVER-104972): Remove this function.
-    boost::optional<CollectionIndexes> getCollectionIndexes(
-        OperationContext* opCtx) const override {
-        return boost::none;
-    }
-
-    // TODO (SERVER-104972): Remove this function.
-    boost::optional<ShardingIndexesCatalogCache> getIndexes(
-        OperationContext* opCtx) const override {
-        return boost::none;
-    }
 
     void checkShardVersionOrThrow(OperationContext* opCtx) const override;
 

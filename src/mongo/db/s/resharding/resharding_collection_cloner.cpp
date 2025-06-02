@@ -65,11 +65,9 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -584,12 +582,11 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
         resharding::gReshardingCollectionClonerWriteThreadCount);
 
     if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
-        uassert(StaleConfigInfo(_sourceNss,
-                                ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                                          boost::optional<CollectionIndexes>(
-                                                              boost::none)) /* receivedVersion */,
-                                boost::none /* wantedVersion */,
-                                ShardId{"0"}),
+        uassert(StaleConfigInfo(
+                    _sourceNss,
+                    ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
+                    boost::none /* wantedVersion */,
+                    ShardId{"0"}),
                 str::stream() << "Throwing staleConfig for reshardingCollectionCloner failpoint.",
                 false);
     }

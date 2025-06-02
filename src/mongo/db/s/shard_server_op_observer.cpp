@@ -63,9 +63,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
-#include "mongo/s/index_version.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 

@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 
 #include <utility>

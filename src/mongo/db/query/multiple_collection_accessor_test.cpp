@@ -62,7 +62,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -135,9 +134,8 @@ protected:
     const NamespaceString secondaryView2 =
         NamespaceString::createNamespaceString_forTest(dbNameTestDb, "secondaryView2");
 
-    const ShardVersion shardVersion = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)),
-        boost::optional<CollectionIndexes>(boost::none));
+    const ShardVersion shardVersion = ShardVersionFactory::make(ChunkVersion(
+        CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
 };
 
 void MultipleCollectionAccessorTest::setUp() {

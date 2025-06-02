@@ -108,7 +108,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -978,8 +977,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionExistsWithSameOptions
     }
 
     // The collection already exists and match the requested options
-    CreateCollectionResponse response(
-        ShardVersionFactory::make(cm, boost::none /* indexVersion */));
+    CreateCollectionResponse response(ShardVersionFactory::make(cm));
     response.setCollectionUUID(cm.getUUID());
     return response;
 }
@@ -1572,8 +1570,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
             if (_firstExecution) {
                 const auto& placementVersion = _initialChunks->chunks.back().getVersion();
-                CreateCollectionResponse response{ShardVersionFactory::make(
-                    placementVersion, boost::optional<CollectionIndexes>(boost::none))};
+                CreateCollectionResponse response{ShardVersionFactory::make(placementVersion)};
                 response.setCollectionUUID(_uuid);
                 _result = std::move(response);
             } else {
@@ -1583,8 +1580,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto cm = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx,
                                                                                             nss()));
-                CreateCollectionResponse response{
-                    ShardVersionFactory::make(cm, boost::optional<CollectionIndexes>(boost::none))};
+                CreateCollectionResponse response{ShardVersionFactory::make(cm)};
                 response.setCollectionUUID(cm.getUUID());
                 _result = std::move(response);
             }

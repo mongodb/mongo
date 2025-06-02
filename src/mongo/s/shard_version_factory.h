@@ -32,7 +32,6 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 
 #include <boost/optional/optional.hpp>
@@ -44,21 +43,14 @@ namespace mongo {
  */
 class ShardVersionFactory {
 public:
-    static ShardVersion make(const ChunkManager& chunkManager,
-                             const boost::optional<CollectionIndexes>& collectionIndexes);
+    static ShardVersion make(const ChunkManager& chunkManager);
 
-    static ShardVersion make(const ChunkManager& chunkManager,
-                             const ShardId& shardId,
-                             const boost::optional<CollectionIndexes>& collectionIndexes);
+    static ShardVersion make(const ChunkManager& chunkManager, const ShardId& shardId);
 
-    static ShardVersion make(const CollectionMetadata& cm,
-                             const boost::optional<CollectionIndexes>& collectionIndexes);
+    static ShardVersion make(const CollectionMetadata& cm);
 
-    // The other three builders should be used instead of this one whenever possible. This
-    // builder should only be used for the rare cases in which we know that the chunk version and
-    // collection indexes come from the same collection.
-    static ShardVersion make(const ChunkVersion& chunkVersion,
-                             const boost::optional<CollectionIndexes>& collectionIndexes);
+    // The other three builders should be used instead of this one whenever possible.
+    static ShardVersion make(const ChunkVersion& chunkVersion);
 };
 
 }  // namespace mongo

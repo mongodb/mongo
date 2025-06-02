@@ -52,7 +52,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -190,7 +189,7 @@ const DatabaseVersion& CollectionRoutingInfo::getDbVersion() const {
 }
 
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
-    ShardVersion sv = ShardVersionFactory::make(_cm, boost::none);
+    ShardVersion sv = ShardVersionFactory::make(_cm);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }
@@ -198,7 +197,7 @@ ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
 }
 
 ShardVersion CollectionRoutingInfo::getShardVersion(const ShardId& shardId) const {
-    auto sv = ShardVersionFactory::make(_cm, shardId, boost::none);
+    auto sv = ShardVersionFactory::make(_cm, shardId);
     if (MONGO_unlikely(shouldIgnoreUuidMismatch)) {
         sv.setIgnoreShardingCatalogUuidMismatch();
     }

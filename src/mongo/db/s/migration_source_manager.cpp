@@ -200,12 +200,12 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
-            const auto [metadata, _] = checkCollectionIdentity(opCtx,
-                                                               nss,
-                                                               boost::none /* epoch */,
-                                                               args.getCollectionTimestamp(),
-                                                               *autoColl,
-                                                               *scopedCsr);
+            const auto metadata = checkCollectionIdentity(opCtx,
+                                                          nss,
+                                                          boost::none /* epoch */,
+                                                          args.getCollectionTimestamp(),
+                                                          *autoColl,
+                                                          *scopedCsr);
             return metadata;
         }();
 
@@ -278,19 +278,19 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Snapshot the committed metadata from the time the migration starts and register the
     // MigrationSourceManager on the CSR.
-    const auto [collectionMetadata, collectionIndexInfo, collectionUUID] = [&] {
+    const auto [collectionMetadata, collectionUUID] = [&] {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
 
-        auto [metadata, indexInfo] = checkCollectionIdentity(_opCtx,
-                                                             nss(),
-                                                             boost::none /* epoch */,
-                                                             _args.getCollectionTimestamp(),
-                                                             *autoColl,
-                                                             *scopedCsr);
+        auto metadata = checkCollectionIdentity(_opCtx,
+                                                nss(),
+                                                boost::none /* epoch */,
+                                                _args.getCollectionTimestamp(),
+                                                *autoColl,
+                                                *scopedCsr);
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
@@ -304,8 +304,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         _scopedRegisterer.emplace(this, *scopedCsr);
 
-        return std::make_tuple(
-            std::move(metadata), std::move(indexInfo), std::move(collectionUUID));
+        return std::make_pair(std::move(metadata), std::move(collectionUUID));
     }();
 
     // Drain the execution/cancellation of any existing range deletion task overlapping with the
@@ -349,16 +348,10 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         opCtx->sleepFor(Milliseconds(1000));
     }
 
-    checkShardKeyPattern(_opCtx,
-                         nss(),
-                         collectionMetadata,
-                         collectionIndexInfo,
-                         ChunkRange(*_args.getMin(), *_args.getMax()));
-    checkRangeWithinChunk(_opCtx,
-                          nss(),
-                          collectionMetadata,
-                          collectionIndexInfo,
-                          ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkShardKeyPattern(
+        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkRangeWithinChunk(
+        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
 
     _collectionUUID = collectionUUID;
 

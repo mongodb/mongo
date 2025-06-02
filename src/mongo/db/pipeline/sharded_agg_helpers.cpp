@@ -989,8 +989,8 @@ std::vector<AsyncRequestsSender::Request> buildShardRequests(
 
         // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
         // version check but will nonetheless mark the operation as versioned.
-        auto versionedCmd = appendShardVersion(
-            targetedCommand, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none));
+        auto versionedCmd =
+            appendShardVersion(targetedCommand, ShardVersionFactory::make(ChunkVersion::IGNORED()));
 
         requests.reserve(shardIds.size());
         requests.emplace_back(*shardIds.begin(), std::move(versionedCmd));

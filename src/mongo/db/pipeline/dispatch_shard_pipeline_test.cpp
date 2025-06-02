@@ -57,7 +57,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -236,12 +235,10 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
-            {StaleConfigInfo(
-                 kTestAggregateNss,
-                 ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                           boost::optional<CollectionIndexes>(boost::none)),
-                 boost::none,
-                 ShardId{"0"}),
+            {StaleConfigInfo(kTestAggregateNss,
+                             ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
+                             boost::none,
+                             ShardId{"0"}),
              "Mock error: shard version mismatch"});
     });
     future.default_timed_get();
@@ -287,12 +284,10 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
-            {StaleConfigInfo(
-                 kTestAggregateNss,
-                 ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0}),
-                                           boost::optional<CollectionIndexes>(boost::none)),
-                 boost::none,
-                 ShardId{"0"}),
+            {StaleConfigInfo(kTestAggregateNss,
+                             ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
+                             boost::none,
+                             ShardId{"0"}),
              "Mock error: shard version mismatch"});
     });
 

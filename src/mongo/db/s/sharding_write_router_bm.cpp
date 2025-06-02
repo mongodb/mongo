@@ -64,7 +64,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -157,8 +156,7 @@ protected:
                                         ConnectionString(kConfigHostAndPort),
                                         originatorShard});
 
-            _shardVersion.emplace(ShardVersionFactory::make(
-                chunkManager, originatorShard, boost::optional<CollectionIndexes>(boost::none)));
+            _shardVersion.emplace(ShardVersionFactory::make(chunkManager, originatorShard));
 
             OperationShardingState::setShardRole(
                 opCtx, kNss, _shardVersion, boost::none /* databaseVersion */);

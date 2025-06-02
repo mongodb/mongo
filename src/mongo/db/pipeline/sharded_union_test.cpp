@@ -71,7 +71,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
@@ -215,14 +214,12 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
     onCommand([&](const executor::RemoteCommandRequest& request) {
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
-        return createErrorCursorResponse(
-            Status{StaleConfigInfo(
-                       kTestAggregateNss,
-                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                       boost::none,
-                       ShardId{"0"}),
-                   "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(kTestAggregateNss,
+                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
+                            boost::none,
+                            ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries.
@@ -303,14 +300,12 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
 
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
-        return createErrorCursorResponse(
-            Status{StaleConfigInfo(
-                       kTestAggregateNss,
-                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                       boost::none,
-                       ShardId{"0"}),
-                   "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(kTestAggregateNss,
+                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
+                            boost::none,
+                            ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries. Update the distribution as if a chunk [0, 10] was
@@ -401,24 +396,20 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     Timestamp timestamp{1, 1};
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{StaleConfigInfo(
-                       kTestAggregateNss,
-                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                       boost::none,
-                       ShardId{"0"}),
-                   "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(kTestAggregateNss,
+                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
+                            boost::none,
+                            ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse(
-            Status{StaleConfigInfo(
-                       kTestAggregateNss,
-                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                 boost::optional<CollectionIndexes>(boost::none)),
-                       boost::none,
-                       ShardId{"0"}),
-                   "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(Status{
+            StaleConfigInfo(kTestAggregateNss,
+                            ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 0})),
+                            boost::none,
+                            ShardId{"0"}),
+            "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries. Update the distribution so that all chunks are on

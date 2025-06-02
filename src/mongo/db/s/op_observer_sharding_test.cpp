@@ -66,7 +66,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -159,12 +158,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
     const auto metadata{CollectionMetadata::UNTRACKED()};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kTestNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     auto doc = BSON("key3" << "abc"
@@ -181,12 +178,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     const auto metadata{makeAMetadata(BSON("key" << 1 << "key3" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kTestNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
@@ -208,12 +203,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     const auto metadata{makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kTestNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
@@ -235,12 +228,10 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     const auto metadata{makeAMetadata(BSON("_id" << "hashed"))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    ScopedSetShardRole scopedSetShardRole{
-        operationContext(),
-        kTestNss,
-        ShardVersionFactory::make(
-            metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
-        boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{operationContext(),
+                                          kTestNss,
+                                          ShardVersionFactory::make(metadata) /* shardVersion */,
+                                          boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     auto doc = BSON("key2" << true << "_id"

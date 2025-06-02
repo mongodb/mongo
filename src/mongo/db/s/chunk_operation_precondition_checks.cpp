@@ -41,10 +41,8 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -63,26 +61,23 @@ namespace {
 
 // This shard version is used as the received version in StaleConfigInfo since we do not have
 // information about the received version of the operation.
-ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
-    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
-                                     boost::optional<CollectionIndexes>(boost::none));
+ShardVersion ShardVersionPlacementIgnored() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED());
 }
 
 }  // namespace
 
-CollectionPlacementAndIndexInfo checkCollectionIdentity(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp,
-    const CollectionPtr& collection,
-    const CollectionShardingRuntime& csr) {
+CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const boost::optional<OID>& expectedEpoch,
+                                           const boost::optional<Timestamp>& expectedTimestamp,
+                                           const CollectionPtr& collection,
+                                           const CollectionShardingRuntime& csr) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
     auto optMetadata = csr.getCurrentMetadataIfKnown();
-    auto optShardingIndexCatalogInfo = csr.getIndexes(opCtx);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
@@ -91,7 +86,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     auto metadata = *optMetadata;
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
@@ -102,10 +97,10 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
             collection);
 
     const auto placementVersion = metadata.getShardPlacementVersion();
-    const auto shardVersion = ShardVersionFactory::make(metadata, csr.getCollectionIndexes(opCtx));
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.toStringForErrorMsg()
@@ -115,20 +110,19 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
                 (!expectedTimestamp || expectedTimestamp == placementVersion.getTimestamp()));
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Shard does not contain any chunks for collection.",
             placementVersion.majorVersion() > 0);
 
-    return std::make_pair(metadata, optShardingIndexCatalogInfo);
+    return metadata;
 }
 
-CollectionPlacementAndIndexInfo checkCollectionIdentity(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp) {
+CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const boost::optional<OID>& expectedEpoch,
+                                           const boost::optional<Timestamp>& expectedTimestamp) {
     AutoGetCollection collection(opCtx, nss, MODE_IS);
     const auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
@@ -140,17 +134,13 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
 void checkShardKeyPattern(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const CollectionMetadata& metadata,
-                          const boost::optional<ShardingIndexesCatalogCache>& shardingIndexesInfo,
                           const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
     const auto& keyPattern = metadata.getKeyPattern();
-    const auto shardVersion = ShardVersionFactory::make(
-        metadata,
-        shardingIndexesInfo ? boost::make_optional(shardingIndexesInfo->getCollectionIndexes())
-                            : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "The range " << chunkRange.toString()
@@ -162,17 +152,13 @@ void checkShardKeyPattern(OperationContext* opCtx,
 void checkChunkMatchesRange(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionMetadata& metadata,
-                            const boost::optional<ShardingIndexesCatalogCache>& shardingIndexesInfo,
                             const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion = ShardVersionFactory::make(
-        metadata,
-        shardingIndexesInfo ? boost::make_optional(shardingIndexesInfo->getCollectionIndexes())
-                            : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -181,7 +167,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                 existingChunk.getMin().woCompare(chunkRange.getMin()) == 0);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Chunk bounds " << chunkRange.toString() << " do not exist.",
@@ -191,17 +177,13 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 void checkRangeWithinChunk(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollectionMetadata& metadata,
-                           const boost::optional<ShardingIndexesCatalogCache>& shardingIndexesInfo,
                            const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion = ShardVersionFactory::make(
-        metadata,
-        shardingIndexesInfo ? boost::make_optional(shardingIndexesInfo->getCollectionIndexes())
-                            : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                            ShardVersionPlacementIgnored() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -213,19 +195,15 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 void checkRangeOwnership(OperationContext* opCtx,
                          const NamespaceString& nss,
                          const CollectionMetadata& metadata,
-                         const boost::optional<ShardingIndexesCatalogCache>& shardingIndexesInfo,
                          const ChunkRange& chunkRange) {
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    const auto shardVersion = ShardVersionFactory::make(
-        metadata,
-        shardingIndexesInfo ? boost::make_optional(shardingIndexesInfo->getCollectionIndexes())
-                            : boost::none);
+    const auto shardVersion = ShardVersionFactory::make(metadata);
 
     ChunkType existingChunk;
     BSONObj minKey = chunkRange.getMin();
     do {
         uassert(StaleConfigInfo(nss,
-                                ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                                ShardVersionPlacementIgnored() /* receivedVersion */,
                                 shardVersion /* wantedVersion */,
                                 shardId),
                 str::stream() << "Range with bounds " << chunkRange.toString()
@@ -236,7 +214,7 @@ void checkRangeOwnership(OperationContext* opCtx,
     } while (existingChunk.getMax().woCompare(chunkRange.getMax()) < 0);
     uassert(
         StaleConfigInfo(nss,
-                        ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+                        ShardVersionPlacementIgnored() /* receivedVersion */,
                         shardVersion /* wantedVersion */,
                         shardId),
         str::stream() << "Shard does not contain a sequence of chunks that exactly fills the range "

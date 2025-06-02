@@ -71,9 +71,7 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
@@ -437,7 +435,7 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     ScopedSetShardRole scopedSetShardRole(
         opCtx,
         nss,
-        ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none) /* shardVersion */,
+        ShardVersionFactory::make(ChunkVersion::IGNORED()) /* shardVersion */,
         boost::none /* databaseVersion */);
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);

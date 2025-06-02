@@ -30,7 +30,6 @@
 #include "mongo/s/shard_version.h"
 
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/index_version_gen.h"
 #include "mongo/s/shard_version_gen.h"
 
 #include <boost/move/utility_core.hpp>
@@ -43,7 +42,6 @@ ShardVersion ShardVersion::parse(const BSONElement& element) {
     auto version = parsedVersion.getVersion();
     ShardVersion sv(ChunkVersion({parsedVersion.getEpoch(), parsedVersion.getTimestamp()},
                                  {version.getSecs(), version.getInc()}),
-                    parsedVersion.getIndexVersion(),
                     parsedVersion.getPlacementConflictTime());
     sv._ignoreShardingCatalogUuidMismatch = parsedVersion.getIgnoreCollectionUuidMismatch();
     return sv;
@@ -59,15 +57,11 @@ void ShardVersion::serialize(StringData field, BSONObjBuilder* builder) const {
         version.setIgnoreCollectionUuidMismatch(_ignoreShardingCatalogUuidMismatch);
     }
 
-    CollectionIndexesBase indexVersion;
-    indexVersion.setIndexVersion(_indexVersion);
-    version.setIndex(indexVersion);
-
     builder->append(field, version.toBSON());
 }
 
 std::string ShardVersion::toString() const {
-    return (_indexVersion ? _indexVersion->toString() : "") + "||" + placementVersion().toString();
+    return placementVersion().toString();
 }
 
 }  // namespace mongo

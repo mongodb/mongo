@@ -19,7 +19,6 @@ The list below enumerates the current set of catalog objects in the routing info
 - Database: Cardinality = NumDatabases, Coordinator = (CSRS with a hand-off to the DBPrimary after creation), Causally dependent on ShardsData.
 - Collection: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Database.
 - CollectionPlacement: Cardinality = NumCollections, Coordinator = (DBPrimary with a hand-off to the Donor Shard for migrations), Causally dependent on Collection.
-- CollectionIndexes: Cardinality = NumCollections, Coordinator = DBPrimary, Causally dependent on Collection.
 
 ## Consistency model
 
@@ -31,7 +30,6 @@ The only dependent timelines which are preserved are:
 
 - Everything dependent on ShardsData: Meaning that if a database or collection placement references shard S, then shard S will be present in the ShardRegistry
 - CollectionPlacement and Collection: Meaning that if the cache references placement version V, then it will also reference the collection description which corresponds to that placement
-- CollectionIndexes and Collection: Meaning that if the cache references index version V, then it will also reference the collection description which corresponds to that placement
 
 For example, if the CatalogCache returns a chunk which is placed on shard S1, the same caller is guaranteed to see shard S1 in the ShardRegistry, rather than potentially get ShardNotFound. The inverse is not guaranteed: if a shard S1 is found in the ShardRegistry, there is no guarantee that any collections that have chunks on S1 will be in the CatalogCache.
 
@@ -47,7 +45,6 @@ The objects and their timestamps are as follows:
 - ShardData: `topologyTime`, which is an always increasing value that increments as shards are added and removed and is stored in the config.shards document
 - Database\*: `databaseTimestamp`, which is an always-increasing value that increments each time a database is created or moved
 - CollectionPlacement\*: `collectionTimestamp/epoch/majorVersion/minorVersion`, henceforth referred to as the `collectionVersion`
-- CollectionIndexes\*: `collectionTimestamp/epoch/indexVersion`, henceforth referred to as the `indexVersion`
 
 Because of the "related to" relationships explained above, there is a strict dependency between the various timestamps (please refer to the following section as well for more detail):
 

@@ -43,7 +43,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -102,9 +101,6 @@ public:
     }
     const ShardId& getDbPrimaryShardId() const;
     const DatabaseVersion& getDbVersion() const;
-    const boost::optional<ShardingIndexesCatalogCache>& getIndexesInfo() const {
-        return _sii;
-    }
     // When set to true, the ShardVersions returned by this object will have the
     // 'ignoreCollectionUuidMismatch' flag set, thus instructing the receiving shards to ignore
     // collection UUID mismatches between the sharding catalog and their local catalog.
@@ -114,7 +110,6 @@ public:
 private:
     CachedDatabaseInfo _dbInfo;
     ChunkManager _cm;
-    boost::optional<ShardingIndexesCatalogCache> _sii;
 };
 
 /**

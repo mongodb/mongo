@@ -33,18 +33,16 @@ global:
 
 imports:
     - "mongo/s/chunk_version.idl"
-    - "mongo/s/index_version.idl"
 
 structs:
     ShardVersionBase:
         description:
-            Shard version for the shard version protocol. Includes collection generation,
-            placement version, and index version.
+            Shard version for the shard version protocol. Includes collection generation and
+            placement version.
         strict: false
         chained_structs:
             CollectionGenerationBase: Generation
             CollectionPlacementBase: Placement
-            CollectionIndexesBase: Index
         fields:
             placementConflictTime:
                 description:

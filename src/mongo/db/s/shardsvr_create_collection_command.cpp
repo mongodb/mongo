@@ -109,7 +109,7 @@ boost::optional<ScopedSetShardRole> setShardRoleToShardVersionIgnoredIfNeeded(
     if (!oss.getShardVersion(nss) && OperationShardingState::isComingFromRouter(opCtx)) {
         return ScopedSetShardRole{opCtx,
                                   nss,
-                                  ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                                  ShardVersionFactory::make(ChunkVersion::IGNORED()),
                                   oss.getDbVersion(nss.dbName())};
     }
     return boost::none;

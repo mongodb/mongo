@@ -79,7 +79,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -213,31 +212,6 @@ void deleteCollection(OperationContext* opCtx,
 
     runTransactionOnShardingCatalog(
         opCtx, std::move(transactionChain), writeConcern, osi, executor);
-}
-
-void deleteShardingIndexCatalogMetadata(OperationContext* opCtx,
-                                        const std::shared_ptr<Shard>& configShard,
-                                        const UUID& uuid,
-                                        const WriteConcernOptions& writeConcern) {
-    BatchedCommandRequest request([&] {
-        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrIndexCatalogNamespace);
-        deleteOp.setDeletes({[&] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(IndexCatalogType::kCollectionUUIDFieldName << uuid));
-            entry.setMulti(true);
-            return entry;
-        }()});
-        return deleteOp;
-    }());
-
-    auto response =
-        configShard->runBatchWriteCommand(opCtx,
-                                          Milliseconds::max(),
-                                          request,
-                                          writeConcern,
-                                          Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
-
-    uassertStatusOK(response.toStatus());
 }
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
@@ -419,8 +393,6 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
         opCtx, nss, uuid, writeConcern, osi, executor, logCommitOnConfigPlacementHistory);
 
     deleteChunks(opCtx, configShard, uuid, writeConcern);
-
-    deleteShardingIndexCatalogMetadata(opCtx, configShard, uuid, writeConcern);
 }
 
 void checkRenamePreconditions(OperationContext* opCtx,
@@ -478,8 +450,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
                 cm.isUnique() == unique && cm.isUnsplittable() == unsplittable);
 
-    CreateCollectionResponse response(
-        ShardVersionFactory::make(cm, boost::none /* index version */));
+    CreateCollectionResponse response(ShardVersionFactory::make(cm));
     response.setCollectionUUID(cm.getUUID());
     return response;
 }

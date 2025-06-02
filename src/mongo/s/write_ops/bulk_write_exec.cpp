@@ -62,7 +62,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
@@ -974,7 +973,7 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
                 // Account for optional fields that can be set per namespace to have a conservative
                 // estimate.
                 static const ShardVersion mockShardVersion =
-                    ShardVersionFactory::make(ChunkVersion::IGNORED(), CollectionIndexes());
+                    ShardVersionFactory::make(ChunkVersion::IGNORED());
                 static const DatabaseVersion mockDBVersion =
                     DatabaseVersion(UUID::gen(), Timestamp());
 

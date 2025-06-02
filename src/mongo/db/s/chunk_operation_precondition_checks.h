@@ -31,7 +31,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {
 /**
@@ -42,29 +41,27 @@ namespace mongo {
 /**
  * Checks that the metadata for the collection is present in the CSR, that the collection is sharded
  * according to that metadata, and that the expected epoch and timestamp match what is present in
- * the CSR. Returns the collection metadata and index info.
+ * the CSR. Returns the collection metadata.
  *
  * This function takes the CSR lock and acquires a reference to the collection. Use the version
  * below if you already have both.
  *
  * Throws StaleShardVersion otherwise.
  */
-CollectionPlacementAndIndexInfo checkCollectionIdentity(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp);
+CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const boost::optional<OID>& expectedEpoch,
+                                           const boost::optional<Timestamp>& expectedTimestamp);
 
 /**
  * Same as above, but accepts the CSR and Collection references instead of acquiring them.
  */
-CollectionPlacementAndIndexInfo checkCollectionIdentity(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const boost::optional<OID>& expectedEpoch,
-    const boost::optional<Timestamp>& expectedTimestamp,
-    const CollectionPtr& collection,
-    const CollectionShardingRuntime& csr);
+CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const boost::optional<OID>& expectedEpoch,
+                                           const boost::optional<Timestamp>& expectedTimestamp,
+                                           const CollectionPtr& collection,
+                                           const CollectionShardingRuntime& csr);
 
 /**
  * Checks that the chunk range matches the shard key pattern in the metadata.
@@ -74,7 +71,6 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
 void checkShardKeyPattern(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const CollectionMetadata& metadata,
-                          const boost::optional<ShardingIndexesCatalogCache>& indexInfo,
                           const ChunkRange& chunkRange);
 
 /**
@@ -85,7 +81,6 @@ void checkShardKeyPattern(OperationContext* opCtx,
 void checkChunkMatchesRange(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionMetadata& metadata,
-                            const boost::optional<ShardingIndexesCatalogCache>& indexInfo,
                             const ChunkRange& chunkRange);
 
 /**
@@ -97,7 +92,6 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 void checkRangeWithinChunk(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollectionMetadata& metadata,
-                           const boost::optional<ShardingIndexesCatalogCache>& indexInfo,
                            const ChunkRange& chunkRange);
 
 /**
@@ -108,7 +102,6 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 void checkRangeOwnership(OperationContext* opCtx,
                          const NamespaceString& nss,
                          const CollectionMetadata& metadata,
-                         const boost::optional<ShardingIndexesCatalogCache>& indexInfo,
                          const ChunkRange& chunkRange);
 
 }  // namespace mongo

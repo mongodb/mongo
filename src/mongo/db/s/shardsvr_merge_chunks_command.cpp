@@ -111,10 +111,10 @@ public:
                 uassertStatusOK(
                     FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
                         opCtx, ns(), boost::none));
-                const auto [metadata, indexInfo] =
+                const auto metadata =
                     checkCollectionIdentity(opCtx, ns(), expectedEpoch, expectedTimestamp);
-                checkShardKeyPattern(opCtx, ns(), metadata, indexInfo, chunkRange);
-                checkRangeOwnership(opCtx, ns(), metadata, indexInfo, chunkRange);
+                checkShardKeyPattern(opCtx, ns(), metadata, chunkRange);
+                checkRangeOwnership(opCtx, ns(), metadata, chunkRange);
                 return metadata;
             }();
 

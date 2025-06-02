@@ -173,8 +173,7 @@ public:
         _shardRole = std::make_unique<ScopedSetShardRole>(
             opCtx,
             ns,
-            ShardVersionFactory::make(
-                metadata, boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+            ShardVersionFactory::make(metadata) /* shardVersion */,
             boost::none /* databaseVersion */);
 
         _coll = acquireCollection(

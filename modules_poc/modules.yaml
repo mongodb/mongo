@@ -541,7 +541,6 @@ routing_and_topology:
     - src/mongo/db/s/*shard_version*
     - src/mongo/s/*chunk_version*
     - src/mongo/s/*database_version*
-    - src/mongo/s/index_version*
     - src/mongo/s/*shard_version*
     - src/mongo/s/commands/*database_version*
     - src/mongo/s/commands/*shard_version*

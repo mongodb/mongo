@@ -144,11 +144,9 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
     const DatabaseVersion nss1DbVersion(UUID::gen(), Timestamp(1, 0));
     const ShardEndpoint nss1Shard1(shardId1, ShardVersion::UNSHARDED(), nss1DbVersion);
     const ShardVersion nss2ShardVersion1 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(1, 0)}, CollectionPlacement(1, 0)));
     const ShardVersion nss2ShardVersion2 = ShardVersionFactory::make(
-        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)),
-        boost::optional<CollectionIndexes>(boost::none));
+        ChunkVersion(CollectionGeneration{OID::gen(), Timestamp(2, 0)}, CollectionPlacement(1, 0)));
     const ShardEndpoint nss2Shard1(shardId2, nss2ShardVersion1, boost::none);
     const ShardEndpoint nss2Shard2(shardId2, nss2ShardVersion2, boost::none);
     auto batch = SimpleWriteBatch{{

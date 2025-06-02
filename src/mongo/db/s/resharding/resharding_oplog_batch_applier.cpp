@@ -42,10 +42,8 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future_util.h"
@@ -114,7 +112,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                ScopedSetShardRole scopedSetShardRole(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),
-                                   ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                                   ShardVersionFactory::make(ChunkVersion::IGNORED()),
                                    boost::none /* databaseVersion */);
                                uassertStatusOK(
                                    _crudApplication.applyOperation(opCtx.get(), oplogEntry));

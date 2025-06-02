@@ -179,10 +179,10 @@ public:
             uassertStatusOK(
                 FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
                     opCtx, nss, boost::none));
-            const auto [metadata, indexInfo] = checkCollectionIdentity(
+            const auto metadata = checkCollectionIdentity(
                 opCtx, nss, expectedCollectionEpoch, expectedCollectionTimestamp);
-            checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);
-            checkChunkMatchesRange(opCtx, nss, metadata, indexInfo, chunkRange);
+            checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+            checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
         }
 
         uassertStatusOK(splitChunk(opCtx,
