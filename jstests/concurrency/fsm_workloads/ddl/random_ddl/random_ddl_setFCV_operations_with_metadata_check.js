@@ -219,6 +219,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     // Do more iterations than usual to ensure setFeatureCompatibility is called enough times to
     // have a significant test execution.
-    $config.iterations = 32;
+    $config.iterations = 128;
     return $config;
 });
