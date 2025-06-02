@@ -80,6 +80,7 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -817,7 +818,8 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                 const auto fcvSnapshot =
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                 if (gFeatureFlagRateLimitIngressConnectionEstablishment
-                        .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
+                        .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot) &&
+                    gIngressConnectionEstablishmentRateLimiterEnabled.load()) {
                     uassertStatusOK(session()
                                         ->getTransportLayer()
                                         ->getSessionManager()
