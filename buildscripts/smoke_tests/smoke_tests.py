@@ -294,6 +294,7 @@ component_name_to_formal_name = {
     "replication": "Replication",
     "server-integration": "Storage Engines Server Integration",
     "server-programmability": "Server Programmability",
+    "storage-execution": "Storage Execution",
     "server-bsoncolumn": "Server BSONColumn",
     "server-collection-write-path": "Server Collection Write Path",
     "server-external-sorter": "Server External Sorter",
@@ -308,6 +309,7 @@ component_name_to_formal_name = {
 component_name_to_integration_test_suite = {
     "catalog-and-routing": "catalog_and_routing",
     "replication": "replication",
+    "storage-execution": "storage_execution",
     "server-integration": "server_integration",
     "server-collection-write-path": "server_collection_write_path",
     "server-index-builds": "server_index_builds",
@@ -319,6 +321,7 @@ component_name_to_integration_test_suite = {
 component_name_to_unit_test_tag = {
     "server-integration": "server-integration-smoke",
     "replication": "mongo_unittest",
+    "storage-execution": "server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl",
     "server-bsoncolumn": "server-bsoncolumn",
     "server-collection-write-path": "server-collection-write-path",
     "server-external-sorter": "server-external-sorter",

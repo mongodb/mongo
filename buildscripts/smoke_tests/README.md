@@ -57,9 +57,15 @@ bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=s
 
 ## Storage Execution
 
-The smoke test suites for storage execution are divided up into components.
+The smoke test suites for storage execution are divided up into components. The smoke test suite
+for all of the components that storage execution owns can be run with the following:
 
-The components owned by storage execution are as follows:
+```
+bazel test --test_tag_filters=server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //src/mongo/...
+bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=storage_execution
+```
+
+The individual components owned by storage execution are as follows:
 
 ### Server-BSONColumn
 
