@@ -7,7 +7,7 @@ import {
     isShardedTimeseries,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
 /**
  * Read-only object with each of the numBucketReopeningsFailed* counters set to 0.
@@ -27,7 +27,7 @@ const bucketReopeningsFailedCounters = Object.freeze({
 });
 
 export var TimeseriesTest = class {
-    static verifyAndDropIndex(coll, bucketsColl, shouldHaveOriginalSpec, indexName) {
+    static verifyAndDropIndex(coll, shouldHaveOriginalSpec, indexName) {
         const checkIndexSpec = function(spec, userIndex) {
             assert(spec.hasOwnProperty("v"));
             assert(spec.hasOwnProperty("name"));
@@ -58,7 +58,8 @@ export var TimeseriesTest = class {
             }
         }
 
-        let bucketIndexes = bucketsColl.getIndexes();
+        let bucketIndexes =
+            getTimeseriesCollForRawOps(db, coll).getIndexes(getRawOperationSpec(db));
         for (const index of bucketIndexes) {
             if (index.name === indexName) {
                 sawIndex = true;
@@ -366,47 +367,54 @@ export var TimeseriesTest = class {
         return 0;
     }
 
-    // Check that the hint method can be used with the bucket/user collection index specified by
-    // `indexName`. Ensure that this is not possible when the specified index is hidden. Note that
-    // the `indexName` parameter is expected to be the same for both the buckets collection and
-    // timeseries view.
+    // Check that the hint method can be used with the buckets/user index specified by `indexName`.
+    // Ensure that this is not possible when the specified index is hidden. Note that the
+    // `indexName` parameter is expected to be the same for both the user-visible index, and the raw
+    // index over the buckets.
     static checkHint(coll, indexName, numDocsExpected) {
         const db = coll.getDB();
-        const bucketsColl = getTimeseriesBucketsColl(coll);
 
         // Tests hint() using the index name.
-        assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
+        assert.eq(
+            numDocsExpected,
+            getTimeseriesCollForRawOps(db, coll).find().rawData().hint(indexName).toArray().length);
         assert.eq(numDocsExpected, coll.find().hint(indexName).toArray().length);
 
         // Tests that hint() cannot be used when the index is hidden.
         assert.commandWorked(coll.hideIndex(indexName));
-        assert.commandFailedWithCode(
-            assert.throws(() => bucketsColl.find().hint(indexName).toArray()), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(db, coll)
+                                                             .find()
+                                                             .rawData()
+                                                             .hint(indexName)
+                                                             .toArray()),
+                                                  ErrorCodes.BadValue);
         assert.commandFailedWithCode(assert.throws(() => coll.find().hint(indexName).toArray()),
                                                   ErrorCodes.BadValue);
 
         // Unhide the index and make sure that it can be used again.
         assert.commandWorked(coll.unhideIndex(indexName));
-        assert.eq(numDocsExpected, bucketsColl.find().hint(indexName).toArray().length);
+        assert.eq(
+            numDocsExpected,
+            getTimeseriesCollForRawOps(db, coll).find().rawData().hint(indexName).toArray().length);
         assert.eq(numDocsExpected, coll.find().hint(indexName).toArray().length);
     }
 
     static checkIndex(coll, userKeyPattern, bucketsKeyPattern, numDocsExpected) {
         const db = coll.getDB();
-        const bucketsColl = getTimeseriesBucketsColl(coll);
 
         const expectedName =
             Object.entries(userKeyPattern).map(([key, value]) => `${key}_${value}`).join('_');
 
-        // Check definition on view
+        // Check definition on user-visible index
         const userIndexes = Object.fromEntries(coll.getIndexes().map(idx => [idx.name, idx]));
         assert.contains(expectedName, Object.keys(userIndexes));
         assert.eq(expectedName, userIndexes[expectedName].name);
         assert.eq(userKeyPattern, userIndexes[expectedName].key);
 
-        // Check definition on buckets collection
-        const bucketIndexes =
-            Object.fromEntries(bucketsColl.getIndexes().map(idx => [idx.name, idx]));
+        // Check definition on raw index over the bucket documents
+        const bucketIndexes = Object.fromEntries(getTimeseriesCollForRawOps(db, coll)
+                                                     .getIndexes(getRawOperationSpec(db))
+                                                     .map(idx => [idx.name, idx]));
         assert.contains(expectedName, Object.keys(bucketIndexes));
         assert.eq(expectedName, bucketIndexes[expectedName].name);
         assert.eq(bucketsKeyPattern, bucketIndexes[expectedName].key);

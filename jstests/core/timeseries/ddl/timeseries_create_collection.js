@@ -1,7 +1,5 @@
 /**
- * Tests basic create and drop timeseries Collection behavior. Also test that we fail with
- * NamespaceExists when namespace is already used and that we don't leave orphaned bucket collection
- * in that case.
+ * Tests basic create and drop timeseries Collection behavior.
  *
  * @tags: [
  *   # "Overriding safe failed response for :: create"
@@ -30,36 +28,28 @@ function assertCollExists(
     db,
     collName,
 ) {
-    let collections =
-        new DBCommandCursor(
-            db, assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}})))
-            .toArray();
+    let collInfo = db.getCollection(collName).getMetadata();
     if (exists) {
-        assert.eq(1,
-                  collections.length,
-                  `Collection '${collName}' was not found through listCollections command`);
+        assert(collInfo, `Collection '${collName}' was not found`);
     } else {
-        assert.eq(0,
-                  collections.length,
-                  `Collection '${
-                      collName}' should not exists, but it was found through listCollections: ${
-                      tojson(collections)}`);
+        assert(!collInfo,
+               `Collection '${collName}' should not exists, but it was found: ${tojson(collInfo)}`);
     }
 }
 
-// Create a timeseries collection, listCollection should show view and bucket collection
+// Create a timeseries collection
 assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
 assertCollExists(true, testDB, collName);
 if (viewlessTimeseriesEnabled) {
     assertCollExists(false, testDB, bucketsName);
 } else {
-    assertCollExists(true, testDB, bucketsName);
+    assertCollExists(true, testDB, bucketsName);  // listCollection should show bucket collection
 }
 
-// Drop timeseries collection, both view and bucket collection should be dropped
+// Drop timeseries collection
 coll.drop();
 assertCollExists(false, testDB, collName);
-assertCollExists(false, testDB, bucketsName);
+assertCollExists(false, testDB, bucketsName);  // Bucket collection should also have been dropped
 
 // Create a regular collection on the same namespace and verify result
 assert.commandWorked(testDB.createCollection(collName));
@@ -67,18 +57,18 @@ assertCollExists(true, testDB, collName);
 assertCollExists(false, testDB, bucketsName);
 
 // Create timeseries collection when regular collection already exist on namespace. Command should
-// fail with NamespaceExists and no bucket collection should be created
+// fail with NamespaceExists
 assert.commandFailedWithCode(
     testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}),
     ErrorCodes.NamespaceExists);
 assertCollExists(true, testDB, collName);
-assertCollExists(false, testDB, bucketsName);
+assertCollExists(false, testDB, bucketsName);  // Validate that no orphaned bucket collection exists
 
 coll.drop();
 assertCollExists(false, testDB, collName);
 assertCollExists(false, testDB, bucketsName);
 
-// Create a regular view on the same namespace and verify result
+// Create a view on the same namespace and verify result
 testDB.getCollection("other");
 assert.commandWorked(
     testDB.runCommand({create: collName, viewOn: "other", pipeline: [{$match: {field: "A"}}]}));
@@ -86,9 +76,9 @@ assertCollExists(true, testDB, collName);
 assertCollExists(false, testDB, bucketsName);
 
 // Create timeseries collection when view already exist on namespace. Command should fail with
-// NamespaceExists and no bucket collection should be created
+// NamespaceExists
 assert.commandFailedWithCode(
     testDB.createCollection(collName, {timeseries: {timeField: timeFieldName}}),
     ErrorCodes.NamespaceExists);
 assertCollExists(true, testDB, collName);
-assertCollExists(false, testDB, bucketsName);
+assertCollExists(false, testDB, bucketsName);  // Validate that no orphaned bucket collection exists

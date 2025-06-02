@@ -19,8 +19,10 @@ import {
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {
+    areViewlessTimeseriesEnabled,
+    isShardedTimeseries
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
@@ -32,7 +34,7 @@ TimeseriesTest.run((insert) => {
 
     /**
      * Sets up an empty time-series collection on namespace 'timeseriescoll' using 'timeFieldName'
-     * and 'metaFieldName'. Checks that the buckets collection is created, as well.
+     * and 'metaFieldName'.
      */
     function resetCollections() {
         timeseriescoll.drop();
@@ -43,16 +45,21 @@ TimeseriesTest.run((insert) => {
     }
 
     /**
-     * Runs the find cmd on the time-series and buckets collections using 'bucketsIndexSpec' as an
+     * Runs the find cmd directly on the raw timeseries buckets using 'bucketsIndexSpec' as an
      * index hint. Tests that hide() and unhide() of the index allows find to use or fail to use the
      * index, respectively. Tests that the listIndexes cmd returns the expected results from the
-     * time-series and buckets collections.
+     * time-series collection.
      *
      * Some indexes (e.g. wildcard) need queries specified to use an index: the
      * 'timeseriesFindQuery' and 'bucketsFindQuery' can be used for this purpose.
      */
     function hideUnhideListIndexes(
         timeseriesIndexSpec, bucketsIndexSpec, timeseriesFindQuery = {}, bucketsFindQuery = {}) {
+        // TODO(SERVER-103323): Remove once collMod works for viewless timeseries
+        if (areViewlessTimeseriesEnabled(db)) {
+            return;
+        }
+
         jsTestLog("Testing index spec, time-series: " + tojson(timeseriesIndexSpec) +
                   ", buckets: " + tojson(bucketsIndexSpec));
 
@@ -116,7 +123,7 @@ TimeseriesTest.run((insert) => {
 
         // Check for the index.
         const keys = timeseriesListIndexesCursor.firstBatch.map(d => d.key);
-        // The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
+        // An index on {metaField, timeField} gets built by default on time-series collections.
         let expectedKeys = [{mm: 1, tm: 1}];
         if (isShardedTimeseries(timeseriescoll)) {
             expectedKeys.push({tm: 1});

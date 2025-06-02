@@ -8,6 +8,10 @@
  *   requires_timeseries,
  * ]
  */
+import {
+    getTimeseriesCollForRawOps,
+    kRawOperationSpec,
+} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -51,7 +55,6 @@ TimeseriesTest.run((insert) => {
 
     const setup = function(keysForCreate) {
         const coll = db.getCollection(collName);
-        const bucketsColl = db.getCollection("system.buckets." + collName);
         coll.drop();
 
         jsTestLog("Setting up collection: " + coll.getFullName() +
@@ -61,7 +64,8 @@ TimeseriesTest.run((insert) => {
             coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
         const numUserIndexesBefore = coll.getIndexes().length;
-        const numBucketIndexesBefore = bucketsColl.getIndexes().length;
+        const numBucketIndexesBefore =
+            getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length;
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
@@ -69,7 +73,8 @@ TimeseriesTest.run((insert) => {
                              "failed to create index: " + tojson(keysForCreate));
 
         assert.eq(numUserIndexesBefore + 1, coll.getIndexes().length);
-        assert.eq(numBucketIndexesBefore + 1, bucketsColl.getIndexes().length);
+        assert.eq(numBucketIndexesBefore + 1,
+                  getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).length);
     };
 
     const testIndex = (userKeyPattern, bucketsKeyPattern, numDocs) => {

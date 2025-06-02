@@ -18,13 +18,12 @@
  * ]
  */
 import {
+    createRawTimeseriesIndex,
     getTimeseriesCollForRawOps,
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = 'tm';
@@ -33,7 +32,6 @@ TimeseriesTest.run((insert) => {
     const doc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag1: 'a', tag2: 'b'}};
 
     const coll = db[jsTestName()];
-    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
     coll.drop();
 
     assert.commandWorked(db.createCollection(
@@ -47,8 +45,7 @@ TimeseriesTest.run((insert) => {
         index2: {[metaFieldName + '.tag3']: 1, [metaFieldName + '.tag4']: 1},
     };
 
-    // When enabled, the {meta: 1, time: 1} index gets built by default on the
-    // time-series bucket collection.
+    // An index on {metaField, timeField} gets built by default on time-series collections.
     indexKeys["mm_1_tm_1"] = {[metaFieldName]: 1, [timeFieldName]: 1};
 
     // Create a few indexes on the time-series collections that $indexStats should return.
@@ -63,9 +60,9 @@ TimeseriesTest.run((insert) => {
         indexKeys[shardIndexName] = {[timeFieldName]: 1};
     }
 
-    // Create an index directly on the buckets collection that would not be visible in the
+    // Create a raw index directly over the bucket documents that would not be visible in the
     // time-series collection $indexStats results due to a failed conversion.
-    assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}, 'bucketindex'),
+    assert.commandWorked(createRawTimeseriesIndex(coll, {not_metadata: 1}, 'bucketindex'),
                          'failed to create index: ' + tojson({not_metadata: 1}));
 
     // Check that $indexStats aggregation stage returns key patterns that are consistent with the
@@ -87,7 +84,7 @@ TimeseriesTest.run((insert) => {
     }
 
     // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
-    // $indexStats on the buckets collection.
+    // the raw indexes over the bucket documents of the time-series collection.
     // TODO (SERVER-103876): Remove the rawData from $indexStats.
     const bucketIndexStatsDocs = getTimeseriesCollForRawOps(coll)
                                      .aggregate([{$indexStats: {}}], kRawOperationSpec)

@@ -6,6 +6,11 @@
  *   requires_timeseries,
  * ]
  */
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const testDB = db.getSiblingDB(jsTestName());
 let collCount = 0;
 
@@ -27,7 +32,6 @@ const testOptions = function({
     },
 }) {
     const collName = 'timeseries_' + collCount++;
-    const bucketsCollName = 'system.buckets.' + collName;
 
     assert.commandWorked(testDB.runCommand({drop: collName}));
     fixture.setUp(testDB, collName);
@@ -50,15 +54,18 @@ const testOptions = function({
         const tsColl = collections.find(coll => coll.name == collName);
         assert(tsColl, collections);
         assert.eq(tsColl.type, "timeseries", tsColl);
-
-        const bucketsColl = collections.find(coll => coll.name == bucketsCollName);
-        assert(bucketsColl, collections);
-        assert.eq(bucketsColl.type, "collection", bucketsColl);
-        assert(bucketsColl.options.clusteredIndex, bucketsColl);
         if (createOptions.expireAfterSeconds) {
-            assert.eq(bucketsColl.options.expireAfterSeconds,
-                      createOptions.expireAfterSeconds,
-                      bucketsColl);
+            assert.eq(tsColl.options.expireAfterSeconds, createOptions.expireAfterSeconds, tsColl);
+        }
+
+        const bucketsColl =
+            collections.find(coll => coll.name == getTimeseriesBucketsColl(collName));
+        if (areViewlessTimeseriesEnabled(db)) {
+            assert(!bucketsColl, collections);
+        } else {
+            assert(bucketsColl, collections);
+            assert.eq(bucketsColl.type, "collection", bucketsColl);
+            assert(bucketsColl.options.clusteredIndex, bucketsColl);
         }
 
         assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
@@ -81,7 +88,7 @@ const testOptions = function({
     fixture.tearDown(testDB, collName);
 
     assert(!testDB.getCollectionNames().includes(collName));
-    assert(!testDB.getCollectionNames().includes(bucketsCollName));
+    assert(!testDB.getCollectionNames().includes(getTimeseriesBucketsColl(collName)));
 };
 
 const testValidTimeseriesOptions = function(timeseriesOptions) {

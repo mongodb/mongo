@@ -6,17 +6,16 @@
  *   requires_timeseries,
  * ]
  */
+import {createRawTimeseriesIndex} from "jstests/core/libs/raw_operation_utils.js";
 const coll = db[jsTestName()];
 coll.drop();
 
 const timeFieldName = "time";
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-const bucketsColl = db.getCollection("system.buckets." + coll.getName());
-
-assert.commandWorked(bucketsColl.createIndex({"_id": 1}));
-assert.commandWorked(bucketsColl.createIndex({"_id": 1}, {clustered: true, unique: true}));
+assert.commandWorked(createRawTimeseriesIndex(coll, {"_id": 1}));
+assert.commandWorked(createRawTimeseriesIndex(coll, {"_id": 1}, {clustered: true, unique: true}));
 
 // Passing 'clustered' without unique, regardless of the type of clustered collection, is illegal.
-assert.commandFailedWithCode(bucketsColl.createIndex({"_id": 1}, {clustered: true}),
+assert.commandFailedWithCode(createRawTimeseriesIndex(coll, {"_id": 1}, {clustered: true}),
                              ErrorCodes.CannotCreateIndex);

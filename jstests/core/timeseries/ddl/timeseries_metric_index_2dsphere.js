@@ -13,6 +13,8 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # TODO (SERVER-105506): Remove when explain() works for viewless timeseries on sharded clusters
+ *   viewless_timeseries_bug,
  * ]
  */
 
@@ -32,7 +34,7 @@ TimeseriesTest.run((insert) => {
 
     /**
      * Sets up an empty time-series collection on namespace 'timeseriescoll' using 'timeFieldName'
-     * and 'metaFieldName'. Checks that the buckets collection is created, as well.
+     * and 'metaFieldName'.
      */
     function resetCollections() {
         timeseriescoll.drop();

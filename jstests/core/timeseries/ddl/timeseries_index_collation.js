@@ -20,7 +20,7 @@ TimeseriesTest.run((insert) => {
 
     const coll = db[jsTestName()];
 
-    coll.drop();  // implicitly drops bucketsColl.
+    coll.drop();
 
     // Compares numeric strings as numbers rather than as strings.
     const numericOrdering = {locale: 'en_US', numericOrdering: true};
@@ -36,8 +36,8 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
     }
 
-    // Check bucket collection. We are using all unique metadata values so each measurement should
-    // be in its own bucket.
+    // Check the bucket documents contained in the timeseries collection.
+    // We are using all unique metadata values so each measurement should be in its own bucket.
     const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
     assert.eq(metadata.length, bucketDocs.length, bucketDocs);
 

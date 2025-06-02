@@ -11,11 +11,12 @@
  *   requires_pipeline_optimization,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # TODO (SERVER-105506): Remove when explain() works for viewless timeseries on sharded clusters
+ *   viewless_timeseries_bug,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getAggPlanStage,
     getPlanStages,
@@ -35,8 +36,7 @@ const generateTest = (useHint) => {
 
         /**
          * Sets up an empty time-series collection with options 'collOpts' on namespace 't' using
-         * 'timeFieldName' and 'metaFieldName'. Checks that the buckets collection is created, as
-         * well.
+         * 'timeFieldName' and 'metaFieldName'
          */
         function resetCollections(collOpts = {}) {
             coll.drop();
@@ -45,8 +45,8 @@ const generateTest = (useHint) => {
                 coll.getName(),
                 Object.assign({timeseries: {timeField: timeFieldName, metaField: metaFieldName}},
                               collOpts)));
-            // The {meta: 1, time: 1} index gets built by default on the time-series bucket
-            // collection. When this index is present, the query planner will use it, changing the
+            // An index on {metaField, timeField} gets built by default on time-series collections.
+            // When this index is present, the query planner will use it, changing the
             // expected behaviour of this test. Drop the index.
             assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
         }

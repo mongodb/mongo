@@ -47,7 +47,7 @@ const insensitive = {
     strength: 1
 };
 
-// Find on meta field isn't different from a find on any other view, but let's check it anyway.
+// Test find on meta field
 (function testFind_MetaField() {
     coll.drop();
 

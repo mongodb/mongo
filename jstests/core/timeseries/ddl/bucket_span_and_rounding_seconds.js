@@ -11,6 +11,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -37,14 +38,15 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
 
     const collections =
         assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-    assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
+    assert.isnull(
+        collections.find(entry => entry.name === getTimeseriesCollForDDLOps(db, coll).getName()));
     assert.isnull(collections.find(entry => entry.name === coll.getName()));
 };
 
 (function createTimeseriesCollectionWithBucketSecondsOptions() {
     jsTestLog("Create timeseries collection with bucketRoundingSeconds and bucketMaxSpanSeconds.");
     // Create a timeseries collection with bucketRoundingSeconds, bucketMaxSpanSeconds and
-    // custom parameters. ListCollection should show view and bucket collection with the added
+    // custom parameters. ListCollection should show the timeseries collection with the added
     // properties.
     assert.commandWorked(testDB.createCollection(coll.getName(), {
         timeseries: {
@@ -58,7 +60,7 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
     let collectionEntry =
-        collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
+        collections.find(entry => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
     assert(collectionEntry);
     assert.eq(collectionEntry.options.timeseries.bucketRoundingSeconds, bucketRoundingSecondsTime);
     assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds, bucketMaxSpanSecondsTime);
@@ -83,8 +85,8 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         collections =
             assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-        collectionEntry =
-            collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
+        collectionEntry = collections.find(entry => entry.name ===
+                                               getTimeseriesCollForDDLOps(db, coll).getName());
         assert(collectionEntry);
         assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
@@ -110,8 +112,8 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         collections =
             assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-        collectionEntry =
-            collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
+        collectionEntry = collections.find(entry => entry.name ===
+                                               getTimeseriesCollForDDLOps(db, coll).getName());
         assert(collectionEntry);
         assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
         assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,
@@ -135,7 +137,8 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
     }));
     collections = assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
 
-    collectionEntry = collections.find(entry => entry.name === 'system.buckets.' + coll.getName());
+    collectionEntry =
+        collections.find(entry => entry.name === getTimeseriesCollForDDLOps(db, coll).getName());
     assert(collectionEntry);
     assert.isnull(collectionEntry.options.timeseries.bucketRoundingSeconds);
     assert.eq(collectionEntry.options.timeseries.bucketMaxSpanSeconds,

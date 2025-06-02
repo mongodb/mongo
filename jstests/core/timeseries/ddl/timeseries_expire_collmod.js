@@ -6,6 +6,8 @@
  *   requires_timeseries,
  * ]
  */
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+
 const coll = db[jsTestName()];
 coll.drop();
 
@@ -15,9 +17,7 @@ assert.commandWorked(db.createCollection(
     coll.getName(),
     {timeseries: {timeField: timeFieldName}, expireAfterSeconds: expireAfterSeconds}));
 
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-
-// Cannot use the 'clusteredIndex' option on collections that aren't time-series bucket collections.
+// Cannot use the 'expireAfterSeconds' option on collections that aren't clustered.
 const collNotClustered = db.getCollection(coll.getName() + '_not_clustered');
 collNotClustered.drop();
 assert.commandWorked(db.createCollection(collNotClustered.getName()));
@@ -33,15 +33,15 @@ assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfter
 assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), expireAfterSeconds: -10}),
                              ErrorCodes.InvalidOptions);
 
-let res = assert.commandWorked(
-    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+let collInfo = getTimeseriesCollForDDLOps(db, coll).getMetadata();
 assert.eq(expireAfterSeconds,
-          res.cursor.firstBatch[0].options.expireAfterSeconds,
-          bucketsColl.getName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+          collInfo.options.expireAfterSeconds,
+          getTimeseriesCollForDDLOps(db, coll).getName() + ': ' + expireAfterSeconds + ': ' +
+              tojson(collInfo));
 
 /**
  * Runs collMod on 'collToChange' with the given 'expireAfterSeconds' value and checks the expected
- * value using listCollections on the bucketCollection.
+ * value using listCollections on the collection.
  */
 const runTest = function(collToChange, expireAfterSeconds) {
     assert.commandWorked(db.runCommand({
@@ -49,15 +49,14 @@ const runTest = function(collToChange, expireAfterSeconds) {
         expireAfterSeconds: expireAfterSeconds,
     }));
 
-    res = assert.commandWorked(
-        db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    collInfo = getTimeseriesCollForDDLOps(db, coll).getMetadata();
     if (expireAfterSeconds !== 'off') {
         assert.eq(expireAfterSeconds,
-                  res.cursor.firstBatch[0].options.expireAfterSeconds,
-                  collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+                  collInfo.options.expireAfterSeconds,
+                  collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(collInfo));
     } else {
-        assert(!res.cursor.firstBatch[0].options.hasOwnProperty("expireAfterSeconds"),
-               collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+        assert(!collInfo.options.hasOwnProperty("expireAfterSeconds"),
+               collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(collInfo));
     }
 };
 

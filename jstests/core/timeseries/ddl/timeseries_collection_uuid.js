@@ -7,14 +7,18 @@
  * ]
  */
 
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesCollForDDLOps
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = jsTestName();
 const collName = "coll";
-const bucketsCollName = "system.buckets." + collName;
 
 const testDB = db.getSiblingDB(dbName);
 testDB.dropDatabase();
+const coll = testDB.getCollection(collName);
 
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
@@ -29,9 +33,20 @@ assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 
 const nonexistentUUID = UUID();
-const bucketsCollUUID = testDB.getCollectionInfos({name: bucketsCollName})[0].info.uuid;
+
+// TODO SERVER-105742 simplify once 9.0 becomes last LTS
+// For legacy "viewful" timeseries: timeseriesCollUUID === undefined, bucketsCollUUID !== undefined
+// For viewless timeseries: timeseriesCollUUID !== undefined, timeseriesCollUUID === bucketsCollUUID
+const timeseriesCollUUID = coll.getUUID();
+const bucketsColl = getTimeseriesCollForDDLOps(db, coll);
+const bucketsCollUUID = bucketsColl.getUUID();
 
 const checkResult = function(res, uuid) {
+    if (bsonBinaryEqual(uuid, timeseriesCollUUID)) {
+        assert.commandWorked(res);
+        return;
+    }
+
     assert.commandFailedWithCode(res, ErrorCodes.CollectionUUIDMismatch);
 
     if (res.writeErrors) {
@@ -42,10 +57,17 @@ const checkResult = function(res, uuid) {
     assert.eq(res.db, dbName);
     assert.eq(res.collectionUUID, uuid);
     assert.eq(res.expectedCollection, collName);
-    assert.eq(res.actualCollection, uuid === bucketsCollUUID ? bucketsCollName : null);
+    assert.eq(res.actualCollection,
+              bsonBinaryEqual(uuid, bucketsCollUUID) ? bucketsColl.getName() : null);
 };
 
 const testInsert = function(uuid, ordered) {
+    // TODO(SERVER-105501): Insert into a viewless timeseries by its correct UUID should work
+    if (bsonBinaryEqual(uuid, timeseriesCollUUID)) {
+        assert(areViewlessTimeseriesEnabled(db));
+        return;
+    }
+
     checkResult(testDB.runCommand({
         insert: collName,
         documents: [{t: ISODate()}],
@@ -79,7 +101,7 @@ const testUpdate = function(uuid, field) {
 const testCreateIndex = function(uuid, field) {
     checkResult(testDB.runCommand({
         createIndexes: collName,
-        indexes: [{name: "indexFieldName", key: {[field]: 1}}],
+        indexes: [{name: "indexFieldName" + field, key: {[field]: 1}}],
         collectionUUID: uuid,
     }),
                 uuid);

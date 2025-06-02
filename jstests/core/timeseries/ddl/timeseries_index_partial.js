@@ -9,6 +9,8 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # TODO (SERVER-105506): Remove when explain() works for viewless timeseries on sharded clusters
+ *   viewless_timeseries_bug,
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */
@@ -17,8 +19,6 @@ import {
     kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getAggPlanStage,
     getPlanStages,
@@ -30,22 +30,14 @@ const coll = db[jsTestName()];
 const timeField = 'time';
 const metaField = 'm';
 let extraBucketIndexes = [];
-let buckets = [];
 
 function addCollation(baseSpec, collation) {
     return collation ? {...baseSpec, collation: collation} : baseSpec;
 }
 
-// When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
-// bucket collection.
 function resetCollection(collation) {
     coll.drop();
     extraBucketIndexes = [];
-
-    buckets = db.getCollection('system.buckets.' + coll.getName());
-    // If the collection is sharded, expect an implicitly-created index on time. It will appear
-    // differently in listIndexes depending on whether you look at the time-series collection or
-    // the buckets collection.
 
     const createTimeseriesSpec = {
         timeseries: {timeField, metaField},
@@ -53,6 +45,9 @@ function resetCollection(collation) {
     assert.commandWorked(
         db.createCollection(coll.getName(), addCollation(createTimeseriesSpec, collation)));
 
+    // If the collection is sharded, expect an implicitly-created index on time. It will appear
+    // differently in listIndexes depending on whether you look at the user-visible index or the
+    // raw index over the buckets.
     if (isShardedTimeseries(coll)) {
         const extraBucketIndexesShardedSpec = {
             "v": 2,
@@ -62,6 +57,7 @@ function resetCollection(collation) {
         extraBucketIndexes.push(addCollation(extraBucketIndexesShardedSpec, collation));
     }
 
+    // An index on {metaField, timeField} gets built by default on time-series collections.
     const extraBucketIndexesSpec = {
         "v": 2,
         "key": {"meta": 1, "control.min.time": 1, "control.max.time": 1},
@@ -74,7 +70,8 @@ resetCollection();
 
 // Check that there is no collation in the default index.
 assert.eq(coll.getIndexes()[0].collation, null);
-assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
+assert.sameMembers(getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec),
+                   extraBucketIndexes);
 
 assert.commandWorked(coll.insert([
     // In bucket A, some but not all documents match the partial filter.
@@ -130,7 +127,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         } else {
             ixscanInWinningPlan++;
         }
-        const indexes = buckets.getIndexes();
+        const indexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
         assert(scan,
                "Expected an index scan for predicate: " + tojson(predicate) +
                    " but got: " + tojson(explain) + "\nAvailable indexes were: " + tojson(indexes));
@@ -218,7 +215,8 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     assert.commandWorked(coll.dropIndex({a: 1}));
     // Check that there is no collation in the default index.
     assert.eq(coll.getIndexes()[0].collation, null);
-    assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
+    assert.sameMembers(getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec),
+                       extraBucketIndexes);
     assert.gt(ixscanInWinningPlan, 0);
 }
 
@@ -233,7 +231,8 @@ assert.commandWorked(coll.createIndex({a: 1}, {
         ]
     }
 }));
-assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
+const actualBucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);
+assert.sameMembers(actualBucketIndexes, extraBucketIndexes.concat([
     {
         "v": 2,
         "key": {"control.min.a": 1, "control.max.a": 1},
@@ -425,7 +424,9 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
     function checkPredicateOK({input: predicate, output: expectedBucketPredicate}) {
         const name = 'example_pushdown_index';
         assert.commandWorked(coll.createIndex({a: 1}, {name, partialFilterExpression: predicate}));
-        const indexes = buckets.getIndexes().filter(ix => ix.name === name);
+        const indexes = getTimeseriesCollForRawOps(coll)
+                            .getIndexes(kRawOperationSpec)
+                            .filter(ix => ix.name === name);
         assert.eq(1, indexes.length, "Expected 1 index but got " + tojson(indexes));
         const actualBucketPredicate = indexes[0].partialFilterExpression;
         assert.eq(actualBucketPredicate,

@@ -65,21 +65,32 @@ function validateListCatalog(coll, listCatalogRes, onAdminDB, collExists) {
     }
 }
 function testListCatalog(coll, collExists) {
-    const bucketsColl = getTimeseriesCollForDDLOps(coll.getDB(), coll);
     // Check output of listCatalog on admin namespace
     let listCatalogRes =
-        bucketsColl.getDB()
+        coll.getDB()
             .getSiblingDB('admin')
             .aggregate([
                 {$listCatalog: {}},
-                {$match: {'db': coll.getDB().getName(), 'name': bucketsColl.getName()}}
+                {
+                    $match: {
+                        'db': coll.getDB().getName(),
+                        'name': getTimeseriesCollForDDLOps(coll.getDB(), coll).getName()
+                    }
+                }
             ])
             .toArray();
-    validateListCatalog(bucketsColl, listCatalogRes, true /* onAdminDB */, collExists);
+    validateListCatalog(getTimeseriesCollForDDLOps(coll.getDB(), coll),
+                        listCatalogRes,
+                        true /* onAdminDB */,
+                        collExists);
 
     // Check output of listCatalog on collection namespace
-    listCatalogRes = bucketsColl.aggregate([{$listCatalog: {}}]).toArray();
-    validateListCatalog(bucketsColl, listCatalogRes, false /* onAdminDB */, collExists);
+    listCatalogRes =
+        getTimeseriesCollForDDLOps(coll.getDB(), coll).aggregate([{$listCatalog: {}}]).toArray();
+    validateListCatalog(getTimeseriesCollForDDLOps(coll.getDB(), coll),
+                        listCatalogRes,
+                        false /* onAdminDB */,
+                        collExists);
 }
 
 const coll = db[collName];

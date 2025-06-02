@@ -19,23 +19,21 @@ const caseInsensitive = {
     strength: 2
 };
 
-function runTest(coll, bucketsColl, isCaseSensitiveCollation) {
+function runTest(coll, isCaseSensitiveCollation) {
     TimeseriesTest.run(() => {
         // Creating an index without any collation specifications for both the index and the
         // originalSpec field should pass.
         assert.commandWorked(coll.createIndex({x: 1}, {
             originalSpec: {key: {x: "text"}, name: "x_1"},
         }));
-        TimeseriesTest.verifyAndDropIndex(
-            coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_1");
+        TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ true, "x_1");
 
         // Creating an index with the same originalSpec collation should pass.
         assert.commandWorked(coll.createIndex({x: 1}, {
             collation: caseInsensitive,
             originalSpec: {key: {x: "text"}, name: "x_1", collation: caseInsensitive},
         }));
-        TimeseriesTest.verifyAndDropIndex(
-            coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_1");
+        TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ true, "x_1");
 
         if (isCaseSensitiveCollation) {
             // Creating an index with the same originalSpec collation as the default collation
@@ -43,8 +41,7 @@ function runTest(coll, bucketsColl, isCaseSensitiveCollation) {
             assert.commandWorked(coll.createIndex({x: 1}, {
                 originalSpec: {key: {x: "text"}, name: "x_1", collation: caseSensitive},
             }));
-            TimeseriesTest.verifyAndDropIndex(
-                coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_1");
+            TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ true, "x_1");
         } else {
             assert.commandFailedWithCode(coll.createIndex({x: 1}, {
                 originalSpec: {key: {x: "text"}, name: "x_1", collation: caseSensitive},
@@ -62,8 +59,7 @@ function runTest(coll, bucketsColl, isCaseSensitiveCollation) {
                     name: "x_1",
                 },
             }));
-            TimeseriesTest.verifyAndDropIndex(
-                coll, bucketsColl, /*shouldHaveOriginalSpec=*/ true, "x_1");
+            TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ true, "x_1");
         } else {
             assert.commandFailedWithCode(coll.createIndex({x: 1}, {
                 collation: caseSensitive,
@@ -109,29 +105,26 @@ const metaFieldName = "mm";
 // Default collection collation being caseSensitive.
 jsTestLog("Running with default collection collation: caseSensitive");
 const collWithCollation1 = db.getCollection(collName + '_collation1');
-const bucketsCollWithCollation1 = db.getCollection("system.buckets." + collWithCollation1);
 collWithCollation1.drop();
 assert.commandWorked(db.createCollection(
     collWithCollation1.getName(),
     {timeseries: {timeField: timeFieldName, metaField: metaFieldName}, collation: caseSensitive}));
-runTest(collWithCollation1, bucketsCollWithCollation1, /*isCaseSensitiveCollation*/ true);
+runTest(collWithCollation1, /*isCaseSensitiveCollation*/ true);
 
 // Default collection collation being caseInsensitive.
 jsTestLog("Running with default collection collation: caseInsensitive");
 const collWithCollation2 = db.getCollection(collName + '_collation2');
-const bucketsCollWithCollation2 = db.getCollection("system.buckets." + collWithCollation2);
 collWithCollation2.drop();
 assert.commandWorked(db.createCollection(collWithCollation2.getName(), {
     timeseries: {timeField: timeFieldName, metaField: metaFieldName},
     collation: caseInsensitive
 }));
-runTest(collWithCollation2, bucketsCollWithCollation2, /*isCaseSensitiveCollation*/ false);
+runTest(collWithCollation2, /*isCaseSensitiveCollation*/ false);
 
 // No default collection collation.
 jsTestLog("Running with no default collection collation");
 const collNoCollation = db.getCollection(collName + '_no_collation');
-const bucketsCollNoCollation = db.getCollection("system.buckets." + collNoCollation);
 collNoCollation.drop();
 assert.commandWorked(db.createCollection(
     collNoCollation.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-runTest(collNoCollation, bucketsCollNoCollation, /*isCaseSensitiveCollation*/ false);
+runTest(collNoCollation, /*isCaseSensitiveCollation*/ false);

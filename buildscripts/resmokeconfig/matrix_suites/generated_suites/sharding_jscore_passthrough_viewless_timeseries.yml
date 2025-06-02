@@ -42,17 +42,31 @@ selector:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
   roots:
+    - jstests/core/timeseries/ddl/bucket_span_and_rounding_seconds.js
+    - jstests/core/timeseries/ddl/timeseries_bucket_index.js
     - jstests/core/timeseries/ddl/timeseries_collation.js
+    - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
     - jstests/core/timeseries/ddl/timeseries_compact.js
+    - jstests/core/timeseries/ddl/timeseries_create.js
     - jstests/core/timeseries/ddl/timeseries_create_collection.js
+    - jstests/core/timeseries/ddl/timeseries_expire_collmod.js
+    - jstests/core/timeseries/ddl/timeseries_field_parsed_as_bson.js
+    - jstests/core/timeseries/ddl/timeseries_id_index.js
     - jstests/core/timeseries/ddl/timeseries_index.js
+    - jstests/core/timeseries/ddl/timeseries_index_build_failure.js
     - jstests/core/timeseries/ddl/timeseries_index_collation.js
+    - jstests/core/timeseries/ddl/timeseries_index_spec.js
     - jstests/core/timeseries/ddl/timeseries_index_spec_with_originalSpec.js
+    - jstests/core/timeseries/ddl/timeseries_index_stats.js
     - jstests/core/timeseries/ddl/timeseries_index_ttl_partial.js
     - jstests/core/timeseries/ddl/timeseries_list_catalog.js
+    - jstests/core/timeseries/ddl/timeseries_metric_index_ascending_descending.js
+    - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_wildcard.js
     - jstests/core/timeseries/ddl/timeseries_nondefault_collation.js
+    - jstests/core/timeseries/ddl/timeseries_sparse_index.js
+    - jstests/core/timeseries/ddl/timeseries_special_indexes_metadata.js
     - jstests/core/timeseries/geo/timeseries_geonear.js
     - jstests/core/timeseries/geo/timeseries_geonear_edge_case_measurements.js
     - jstests/core/timeseries/geo/timeseries_geonear_mindistance_and_maxdistance.js
