@@ -5,34 +5,61 @@ import subprocess
 import sys
 import tempfile
 from functools import cache
-from typing import Set
+from typing import Dict, List, Optional, Set
 
 import yaml
 from codeowners.parsers import owners_v1, owners_v2
 from codeowners.validate_codeowners import run_validator
 from utils import evergreen_git
 
-OWNERS_FILE_NAME = "OWNERS"
-OWNERS_FILE_EXTENSIONS = (".yml", ".yaml")
+OWNERS_FILE_NAMES = ("OWNERS.yml", "OWNERS.yaml")
 parsers = {
     "1.0.0": owners_v1.OwnersParserV1(),
     "2.0.0": owners_v2.OwnersParserV2(),
 }
 
 
-def process_owners_file(output_lines: list[str], directory: str) -> None:
-    owners_file_paths = []
-    for file_extension in OWNERS_FILE_EXTENSIONS:
-        file_name = f"{OWNERS_FILE_NAME}{file_extension}"
-        owners_file_path = os.path.join(directory, file_name)
-        if os.path.exists(owners_file_path):
-            owners_file_paths.append(owners_file_path)
+class FileNode:
+    def __init__(self, directory: str):
+        self.dirs: Dict[str, FileNode] = {}
+        self.owners_file: Optional[str] = None
+        self.directory = directory
 
-    if not owners_file_paths:
+
+def add_file_to_tree(root_node: FileNode, file_parts: List[str]):
+    current_node = root_node
+    for i, dir in enumerate(file_parts[:-1]):
+        node_dirs = current_node.dirs
+        if dir not in node_dirs:
+            directory = "/".join(file_parts[: i + 1])
+            node_dirs[dir] = FileNode(f"./{directory}")
+
+        current_node = node_dirs[dir]
+
+    assert (
+        current_node.owners_file is None
+    ), f"{'/'.join(file_parts[:-1])} there are two OWNERS files in this directory"
+    current_node.owners_file = file_parts[-1]
+
+
+def build_tree(files: List[str]) -> FileNode:
+    root_node = FileNode("./")
+    for file in files:
+        file_parts = file.split("/")
+        file_name = file_parts[-1]
+        if file_name not in OWNERS_FILE_NAMES:
+            continue
+        add_file_to_tree(root_node, file_parts)
+
+    return root_node
+
+
+def process_owners_file(output_lines: list[str], node: FileNode) -> None:
+    directory = node.directory
+    file_name = node.owners_file
+    if not file_name:
         return
-
-    assert len(owners_file_paths) <= 1, f"More than 1 OWNERS file found in {directory}"
-    owners_file_path = owners_file_paths[0]
+    owners_file_path = os.path.join(directory, file_name)
     print(f"parsing: {owners_file_path}")
     output_lines.append(f"# The following patterns are parsed from {owners_file_path}")
 
@@ -48,14 +75,10 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
 
 # Order matters, we need to always add the contents of the root directory to codeowners first
 # and work our way to the outside directories in that order.
-def process_dir(output_lines: list[str], directory: str) -> None:
-    process_owners_file(output_lines, directory)
-    for item in sorted(os.listdir(directory)):
-        path = os.path.join(directory, item)
-        if not os.path.isdir(path) or os.path.islink(path):
-            continue
-
-        process_dir(output_lines, path)
+def process_dir(output_lines: list[str], node: FileNode) -> None:
+    process_owners_file(output_lines, node)
+    for directory in sorted(node.dirs.keys()):
+        process_dir(output_lines, node.dirs[directory])
 
 
 def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents):
@@ -278,7 +301,9 @@ def main():
 
     print(f"Scanning for OWNERS.yml files in {os.path.abspath(os.curdir)}")
     try:
-        process_dir(output_lines, "./")
+        files = evergreen_git.get_files_to_lint()
+        root_node = build_tree(files)
+        process_dir(output_lines, root_node)
     except Exception as ex:
         print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
         print(
