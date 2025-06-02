@@ -40,7 +40,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/semantic_analysis.h"

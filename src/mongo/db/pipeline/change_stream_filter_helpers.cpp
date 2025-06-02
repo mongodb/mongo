@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -284,8 +283,8 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
     // "o.applyOps" stores the list of operations, so it must be an array.
     applyOpsBuilder.append("op", "c");
     applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
-    applyOpsBuilder.append("o.prepare", BSON("$not" << BSON("$eq" << true)));
-    applyOpsBuilder.append("o.partialTxn", BSON("$not" << BSON("$eq" << true)));
+    applyOpsBuilder.append("o.prepare", BSON("$ne" << true));
+    applyOpsBuilder.append("o.partialTxn", BSON("$ne" << true));
     {
         // Include this 'applyOps' if it has an operation with a matching namespace _or_ if it has a
         // 'prevOpTime' link to another 'applyOps' command, indicating a multi-entry transaction.

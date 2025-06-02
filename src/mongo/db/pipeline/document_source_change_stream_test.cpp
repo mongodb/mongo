@@ -58,7 +58,6 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"

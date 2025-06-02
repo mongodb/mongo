@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -84,6 +83,10 @@ using AggExpressionRewrite =
 
 namespace {
 const auto kExistsTrue = Document{{"$exists", true}};
+
+// Note: there is no physical '$exists' operator that can check for field-nonexistence.
+// That means the expression '{field: {$exists: false}}' is syntactic sugar and will be turned into
+// the slightly less efficient expression '{$not: {field: {$exists: true}}}' by the parser.
 const auto kExistsFalse = Document{{"$exists", false}};
 
 // Maps the operation type to the corresponding rewritten document in the oplog format.
@@ -125,6 +128,14 @@ const std::array<std::string, 3> kUpdateDescriptionUpdateOplogFields = {
 const std::array<std::string, 2> kUpdateDescriptionRemoveOplogFields = {"o.diff.d", "o.$unset"};
 
 const std::set<std::string> kNSValidSubFieldNames = {"ns.db", "ns.coll"};
+
+/**
+ * Whether or not a change stream event type is a CRUD operation.
+ */
+bool isCrudOperation(StringData name) {
+    return name == "insert"_sd || name == "update"_sd || name == "replace"_sd ||
+        name == "delete"_sd;
+}
 
 /**
  * Helpers to clone an expression to the same type and rename the fields to which it applies.
@@ -212,14 +223,63 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
 
             auto rewrittenOr = std::make_unique<OrMatchExpression>();
 
-            // Add the rewritten sub-expression to the '$or' expression. Abandon the entire rewrite,
-            // if any of the rewrite fails.
+            // First collect all requested operation types in a vector. The operation types in the
+            // IN list should be sorted and unique already.
+            std::vector<StringData> operationTypes;
             for (const auto& elem : inME->getEqualities()) {
-                if (auto rewrittenExpr = getRewrittenOpType(elem)) {
-                    rewrittenOr->add(std::move(rewrittenExpr));
-                    continue;
+                // Abandon the entire rewrite if any of the rewrites fails.
+                if (BSONType::String == elem.type() &&
+                    kOpTypeRewriteMap.contains(elem.valueStringData())) {
+                    operationTypes.push_back(elem.valueStringData());
                 }
-                return nullptr;
+            }
+
+            // Sort the collection operation types so that CRUD operations come first.
+            std::sort(
+                operationTypes.begin(), operationTypes.end(), [&](StringData lhs, StringData rhs) {
+                    bool lhsIsCrud = isCrudOperation(lhs);
+                    bool rhsIsCrud = isCrudOperation(rhs);
+                    if (lhsIsCrud != rhsIsCrud) {
+                        // If one of the compared operations is a CRUD operation and the other
+                        // isn't, sort the CRUD operation first because it should have higher
+                        // selectivity.
+                        return lhsIsCrud;
+                    }
+
+                    // Otherwise sort alphabetically by operation type name so the
+                    return lhs < rhs;
+                });
+
+            // The individual matches for "update" and "replace" are:
+            // - update:  {op: "u", "o._id": {$exists: false}}
+            // - replace: {op: "u", "o._id": {$exists: true}}
+            // These can be fused together into a single match:
+            // - fused:   {op: "u"}
+            // This also allows further optimizations so that the single op type match can be fused
+            // with other op type matches into a single IN list match for the op type, e.g.
+            //            {op: {$in: [...]}}
+            constexpr StringData kFusedUpdateReplace = "fusedUpdateReplace"_sd;
+
+            auto itUpdate = std::find(operationTypes.begin(), operationTypes.end(), "update");
+            auto itReplace = std::find(operationTypes.begin(), operationTypes.end(), "replace");
+            if (itUpdate != operationTypes.end() && itReplace != operationTypes.end()) {
+                // We need to return both 'update' and 'replace' events. We will now turn 'update'
+                // into a temporary 'fusedUpdateReplace' event, and remove 'replace' from the
+                // vector, so we will end up only with 'fusedUpdateReplace'.
+                *itUpdate = kFusedUpdateReplace;
+                operationTypes.erase(itReplace);
+            }
+
+            // Add the rewritten sub-expressions to the final '$or' expression.
+            for (auto&& op : operationTypes) {
+                if (op == kFusedUpdateReplace) {
+                    // 'updateReplace' translates to just '{op: "u"}'.
+                    rewrittenOr->add(MatchExpressionParser::parseAndNormalize(
+                        backingBsonObjs.emplace_back(BSON("op" << "u")), expCtx));
+                } else {
+                    rewrittenOr->add(MatchExpressionParser::parseAndNormalize(
+                        backingBsonObjs.emplace_back(kOpTypeRewriteMap.at(op).toBson()), expCtx));
+                }
             }
             return rewrittenOr;
         }
