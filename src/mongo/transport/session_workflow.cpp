@@ -795,9 +795,8 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
                 if (gFeatureFlagRateLimitIngressConnectionEstablishment
                         .isEnabledUseLatestFCVWhenUninitialized(fcvSnapshot)) {
-                    uassertStatusOK(_serviceContext->getServiceEntryPoint()
-                                        ->getSessionEstablishmentRateLimiter()
-                                        .throttleIfNeeded(client()));
+                    uassertStatusOK(SessionEstablishmentRateLimiter::get(*_serviceContext)
+                                        ->throttleIfNeeded(client()));
                 }
                 _inFirstIteration = false;
             }

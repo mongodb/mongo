@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/session_establishment_rate_limiter_utils.h"
 
 namespace mongo::transport {
 

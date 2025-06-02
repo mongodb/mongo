@@ -23,7 +23,9 @@ env.Library(
     target='transport_layer_common',
     source=[
         'hello_metrics.cpp',
+        'session_establishment_rate_limiter_utils.cpp',
         'session.cpp',
+        'session_establishment_rate_limiter.cpp',
         'transport_layer.cpp',
         'transport_options.cpp',
         'transport_options.idl',
@@ -33,6 +35,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/admission/rate_limiter',
         '$BUILD_DIR/mongo/db/connection_health_metrics_parameter',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
     ],
@@ -153,7 +156,6 @@ env.Library(
     source=[
         'service_entry_point_impl.cpp',
         'service_entry_point_impl.idl',
-        'service_entry_point_utils.cpp',
         'session_workflow.cpp',
     ],
     LIBDEPS=[

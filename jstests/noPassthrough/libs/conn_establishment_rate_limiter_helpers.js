@@ -1,8 +1,20 @@
+const getLimiterStats = (conn, {log = false}) => {
+    const serverStatus = conn.adminCommand({serverStatus: 1});
+    assert(serverStatus, "Failed to get server status");
+    const result = {
+        connections: serverStatus.connections,
+        ingressSessionEstablishmentQueues: serverStatus.queues.ingressSessionEstablishment
+    };
+    if (log) {
+        jsTestLog("Limiter stats: " + tojson(result));
+    }
+    return result;
+};
+
 const getConnectionStats = (conn) => {
-    const connStats = conn.adminCommand({serverStatus: 1})["connections"];
-    assert.neq(null, connStats, "Failed to get connection stats");
-    jsTestLog("Connection stats: " + tojson(connStats));
-    return connStats;
+    const {connections} = getLimiterStats(conn, {log: true});
+    assert(connections, "Failed to get connection stats");
+    return connections;
 };
 
 const runTestStandaloneParamsSetAtStartup = (setParams, testCase) => {

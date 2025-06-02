@@ -53,13 +53,14 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
-#include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
+#include "mongo/transport/session_establishment_rate_limiter_utils.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -422,23 +423,33 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
         bob->append(n, static_cast<int>(v));
     };
 
-    appendInt("current", sessionCount - _sessionEstablishmentRateLimiter.queued());
+    transport::SessionEstablishmentRateLimiter* rateLimiter = nullptr;
+    int64_t rateLimiterQueued{0};
+    int64_t rateLimiterRejected{0};
+    if (_svcCtx) {
+        rateLimiter = transport::SessionEstablishmentRateLimiter::get(*_svcCtx);
+        rateLimiterQueued = rateLimiter->queued();
+        rateLimiterRejected = rateLimiter->rejected();
+    }
+
+    appendInt("current", sessionCount - rateLimiterQueued);
     appendInt("available", _maxSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
 
     // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
-        appendInt("rejected", _rejectedSessions + _sessionEstablishmentRateLimiter.rejected());
+        appendInt("rejected", _rejectedSessions + rateLimiterRejected);
     }
 
     invariant(_svcCtx);
-    appendInt("active",
-              _svcCtx->getActiveClientOperations() - _sessionEstablishmentRateLimiter.queued());
+    appendInt("active", _svcCtx->getActiveClientOperations() - rateLimiterQueued);
 
-    _sessionEstablishmentRateLimiter.appendStats(bob);
+    if (rateLimiter) {
+        rateLimiter->appendStatsConnections(bob);
+    }
 
     const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
-    appendInt("threaded", seStats.usesDedicated - _sessionEstablishmentRateLimiter.queued());
+    appendInt("threaded", seStats.usesDedicated - rateLimiterQueued);
     if (!serverGlobalParams.maxIncomingConnsOverride.empty())
         appendInt("limitExempt", seStats.limitExempt);
 

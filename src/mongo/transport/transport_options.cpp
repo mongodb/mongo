@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/transport/transport_options.h"
@@ -112,13 +113,11 @@ Status MaxEstablishingConnectionsOverrideServerParameter::setFromString(
 }
 
 template <typename Callback>
-Status runWithServiceEntryPoint(Callback&& updateFunc) try {
+Status runWithSessionEstablishmentRateLimiter(Callback&& updateFunc) try {
     // If the global service context hasn't yet been initialized, then the parameters will be
     // set on SessionManager construction rather than through the hooks here.
     if (MONGO_likely(hasGlobalServiceContext())) {
-        if (auto sep = getGlobalServiceContext()->getServiceEntryPoint(); sep) {
-            updateFunc(sep);
-        }
+        updateFunc(SessionEstablishmentRateLimiter::get(*getGlobalServiceContext()));
     }
     return Status::OK();
 } catch (const DBException& ex) {
@@ -126,20 +125,21 @@ Status runWithServiceEntryPoint(Callback&& updateFunc) try {
 }
 
 Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
-    return runWithServiceEntryPoint([newValue](ServiceEntryPoint* sep) {
-        sep->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(newValue);
-    });
+    return runWithSessionEstablishmentRateLimiter(
+        [newValue](SessionEstablishmentRateLimiter* limiter) {
+            limiter->setRefreshRatePerSec(newValue);
+        });
 }
 
 Status onUpdateEstablishmentBurstSize(int32_t newValue) {
-    return runWithServiceEntryPoint([newValue](ServiceEntryPoint* sep) {
-        sep->getSessionEstablishmentRateLimiter().setBurstSize(newValue);
-    });
+    return runWithSessionEstablishmentRateLimiter(
+        [newValue](SessionEstablishmentRateLimiter* limiter) { limiter->setBurstSize(newValue); });
 }
 
 Status onUpdateEstablishmentMaxQueueDepth(int32_t newValue) {
-    return runWithServiceEntryPoint([newValue](ServiceEntryPoint* sep) {
-        sep->getSessionEstablishmentRateLimiter().setMaxQueueDepth(newValue);
-    });
+    return runWithSessionEstablishmentRateLimiter(
+        [newValue](SessionEstablishmentRateLimiter* limiter) {
+            limiter->setMaxQueueDepth(newValue);
+        });
 }
 }  // namespace mongo::transport

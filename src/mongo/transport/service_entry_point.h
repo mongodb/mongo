@@ -36,7 +36,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -127,18 +126,8 @@ public:
     virtual void incrementLBConnections(){};
     virtual void decrementLBConnections(){};
 
-    /**
-     * Returns the rate limiter component used for session establishment. New sessions should call
-     * into this component to ensure they are respecting the configured establishment rate limit.
-     */
-    transport::SessionEstablishmentRateLimiter& getSessionEstablishmentRateLimiter() {
-        return _sessionEstablishmentRateLimiter;
-    }
-
 protected:
     ServiceEntryPoint() = default;
-
-    transport::SessionEstablishmentRateLimiter _sessionEstablishmentRateLimiter;
 };
 
 }  // namespace mongo
