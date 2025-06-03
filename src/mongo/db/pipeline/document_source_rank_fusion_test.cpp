@@ -3373,8 +3373,7 @@ TEST_F(DocumentSourceRankFusionTest, QueryShapeDebugString) {
                 },
                 {
                     "$sort": {
-                        "HASH<author>": 1,
-                        "$_internalOutputSortKeyMetadata": true
+                        "HASH<author>": 1
                     }
                 },
                 {
@@ -3586,8 +3585,7 @@ TEST_F(DocumentSourceRankFusionTest, RepresentativeQueryShape) {
                 },
                 {
                     "$sort": {
-                        "author": 1,
-                        "$_internalOutputSortKeyMetadata": true
+                        "author": 1
                     }
                 },
                 {

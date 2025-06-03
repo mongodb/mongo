@@ -401,7 +401,8 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
     } else {
         MutableDocument mutDoc(_sortExecutor->sortPattern().serialize(
             SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
-        if (_outputSortKeyMetadata) {
+        // If we are serializing for query shape, omit this field in order to maintain stabiilty.
+        if (_outputSortKeyMetadata && opts.isKeepingLiteralsUnchanged()) {
             mutDoc[kInternalOutputSortKey] = Value(_outputSortKeyMetadata);
         }
         array.push_back(Value(DOC(kStageName << mutDoc.freeze())));

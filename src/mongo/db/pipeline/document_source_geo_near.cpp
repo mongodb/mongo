@@ -90,7 +90,6 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
         result.setField(kKeyFieldName, Value(opts.serializeFieldPath(*keyFieldPath)));
     }
 
-
     // Serialize the expression as a literal if possible
     auto serializeExpr = [&](boost::intrusive_ptr<Expression> expr) -> Value {
         if (auto constExpr = dynamic_cast<ExpressionConstant*>(expr.get()); constExpr) {
@@ -113,7 +112,10 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
         result.setField("minDistance", serializeExpr(minDistance));
     }
 
-    result.setField("query", query ? Value(query->getMatchExpression()->serialize(opts)) : Value());
+    // When the query is missing, we serialize to an empty document here (instead of omitting) in
+    // order to maintain stability of the query shape hash for this stage. See SERVER-104645.
+    result.setField("query",
+                    query ? Value(query->getMatchExpression()->serialize(opts)) : Value{BSONObj{}});
     result.setField("spherical", opts.serializeLiteral(spherical));
     if (distanceMultiplier) {
         result.setField("distanceMultiplier", opts.serializeLiteral(*distanceMultiplier));

@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -216,6 +217,16 @@ TEST_F(DocumentSourceSortTest, ParseableSerialization) {
     sort2->serializeToArray(arr, SerializationOptions{.serializeForCloning = true});
     ASSERT_EQUALS(arr.size(), 1U);
     ASSERT_VALUE_EQ(arr[0], Value(fromjson("{$sort: {a: 1, $_internalLimit: 2}}")));
+}
+
+TEST_F(DocumentSourceSortTest, QueryShapeSerializationOmitsInternalField) {
+    // Test that the serialized spec omits _internalOutputSortKey when serializing for query shape.
+    auto expCtx = getExpCtx();
+    auto sort = DocumentSourceSort::create(
+        expCtx, {BSON("a" << 1), expCtx}, {.outputSortKeyMetadata = true});
+    vector<Value> arr;
+    sort->serializeToArray(arr, SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
+    ASSERT_VALUE_EQ(arr[0], Value{fromjson("{$sort: {a: 1}}")});
 }
 
 TEST_F(DocumentSourceSortTest, DoesNotPushProjectBeforeSelf) {

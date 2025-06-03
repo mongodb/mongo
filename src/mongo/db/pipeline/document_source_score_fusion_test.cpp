@@ -2644,6 +2644,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckWeightsAppliedMultiplePipelines) {
                                             "$const": 40
                                         }
                                     ],
+                                    "query": {},
                                     "spherical": false
                                 }
                             },
