@@ -98,16 +98,16 @@ function hasConnPoolStats(args) {
     jsTestLog("Check #" + checkNum + " successful");
 }
 
-function checkConnPoolStats() {
+function logConnPoolStats() {
     const ret = mongos.runCommand({"connPoolStats": 1});
-    const poolStats = ret["pools"]["NetworkInterfaceTL-TaskExecutorPool-0"];
+    const poolStats = ret["pools"];
     jsTestLog(poolStats);
 }
 
 function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     // Start pooling with a ping
     mongos.adminCommand({multicast: {ping: 0}});
-    checkConnPoolStats();
+    logConnPoolStats();
 
     // Block connections from finishing
     const fpRs = configureFailPointForRS(st.rs0.nodes,
@@ -122,7 +122,7 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     if (secondaryFollows) {
         hasConnPoolStats({ready: 10, hosts: secondaryOnly});
     }
-    checkConnPoolStats();
+    logConnPoolStats();
 
     // Launch a bunch of secondary finds
     launchFinds({times: 20, readPref: "secondary"});
@@ -132,7 +132,7 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     if (primaryFollows) {
         hasConnPoolStats({ready: 10, active: 10, hosts: primaryOnly});
     }
-    checkConnPoolStats();
+    logConnPoolStats();
 
     fpRs.off();
 

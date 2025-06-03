@@ -5,3 +5,6 @@ filters:
   - "generated_suites/*viewless_timeseries.yml":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "generated_suites/sharding_task_executor_pool_size*":
+    approvers:
+      - 10gen/server-networking-and-observability

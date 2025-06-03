@@ -24,15 +24,26 @@ const kOperations = 5;
 const testDB = st.s.getDB(kDbName);
 const coll = testDB.getCollection(kCollName);
 
+const numPools = assert.commandWorked(
+    st.s.adminCommand({"getParameter": 1, "taskExecutorPoolSize": 1}))["taskExecutorPoolSize"];
+
+function sumOverPools(diagnosticData, host, property) {
+    let sum = 0;
+    for (const pool of Object.keys(diagnosticData["pools"])) {
+        const poolStats = diagnosticData["pools"][pool];
+        if (poolStats.hasOwnProperty(host)) {
+            sum += poolStats[host][property] || 0;
+        }
+    }
+    return sum;
+}
+
 function getDiagnosticData() {
-    let stats;
-    assert.soon(() => {
-        stats = verifyGetDiagnosticData(st.s.getDB("admin")).router.connPoolStats;
-        return stats["pools"].hasOwnProperty('NetworkInterfaceTL-TaskExecutorPool-0');
-    }, "Failed to load NetworkInterfaceTL-TaskExecutorPool-0 in FTDC within time limit");
+    let stats = verifyGetDiagnosticData(st.s.getDB("admin")).router.connPoolStats;
+    jsTestLog("FTDC stats: " + tojson(stats));
     assert(stats.hasOwnProperty('totalWasUsedOnce'));
     assert(stats.hasOwnProperty('totalConnUsageTimeMillis'));
-    return stats["pools"]["NetworkInterfaceTL-TaskExecutorPool-0"];
+    return stats;
 }
 
 var threads = [];
@@ -63,32 +74,32 @@ function resetPools() {
     // FTDC data is collected periodically. Check that the data returned reflects that the pools
     // have been dropped before resuming testing.
     assert.soon(() => {
-        const stats = getDiagnosticData()[allHosts[0]];
+        const stats = getDiagnosticData();
         // The shard has a single node in its replica set.
-        return stats.inUse == 0;
+        return sumOverPools(stats, allHosts[0], "inUse") == 0;
     }, "Failed to wait for pool stats to reflect dropped pools");
 }
 
 [1, 2, 3].forEach(v => assert.commandWorked(coll.insert({x: v})));
 st.rs0.awaitReplication();
 
-// Check that the amount of time connections from the pool are in-use monotonically increases with
+// Check that the amount of time connections from the pools are in-use monotonically increases with
 // each operation that is run.
-let previous = getDiagnosticData()["poolConnUsageTimeMillis"];
+let previous = getDiagnosticData()["totalConnUsageTimeMillis"];
 let initialVal = previous;
 for (let i = 0; i < kOperations; i++) {
     jsTestLog("Issuing find #" + i);
     assert.commandWorked(testDB.runCommand({"find": kCollName}));
     assert.soon(() => {
         let poolStats = getDiagnosticData();
-        return poolStats["poolConnUsageTimeMillis"] >= previous;
-    }, "poolConnUsageTime failed to update within time limit", 10 * 1000);
-    let res = getDiagnosticData()["poolConnUsageTimeMillis"];
+        return poolStats["totalConnUsageTimeMillis"] >= previous;
+    }, "totalConnUsageTime failed to update within time limit", 10 * 1000);
+    let res = getDiagnosticData()["totalConnUsageTimeMillis"];
     previous = res;
 }
-assert.gte(getDiagnosticData()["poolConnUsageTimeMillis"],
+assert.gte(getDiagnosticData()["totalConnUsageTimeMillis"],
            initialVal,
-           "poolConnUsageTimeMillis failed to increase after issuing find operations");
+           "totalConnUsageTimeMillis failed to increase after issuing find operations");
 
 resetPools();
 
@@ -98,30 +109,37 @@ assert.commandWorked(st.s.adminCommand({
     ShardingTaskExecutorPoolRefreshRequirementMS: 1000
 }));
 
-// Launch 3 blocked finds and verify that all 3 are in-use.
+// Launch 3 blocked finds per pool and verify that all are in-use.
 jsTestLog("Launching blocked finds");
 const fpRs =
     configureFailPointForRS(st.rs0.nodes,
                             "waitInFindBeforeMakingBatch",
                             {shouldCheckForInterrupt: true, nss: kDbName + "." + kCollName});
-launchFinds({times: 3, readPref: "primary"});
+const numFinds = 3 * numPools;
+launchFinds({times: numFinds, readPref: "primary"});
 assert.soon(() => {
     let poolStats = getDiagnosticData();
-    return poolStats["poolInUse"] == 3;
+    return poolStats["totalInUse"] == numFinds;
 }, "Launched finds failed to be marked as inUse within time limit", 10 * 1000);
 
-// Unblock finds, and reduce pool size to verify that dropped connections were marked as having been
-// used only once and remaining connections are no longer active.
-jsTestLog("Unblocking finds, reducing pool size");
+// Unblock finds and ensure that the connections are no longer in-use.
+jsTestLog("Unblocking finds");
 fpRs.off();
+
+assert.soon(() => {
+    return getDiagnosticData()["totalInUse"] == 0;
+}, "In use connections failed to be drop to 0 within time limit", 20 * 1000);
+
+// Reduce pool size to verify that dropped connections were marked as having been used only once.
+jsTestLog("Reducing pool size");
 assert.commandWorked(st.s.adminCommand(
     {"setParameter": 1, ShardingTaskExecutorPoolMinSize: 1, ShardingTaskExecutorPoolMaxSize: 1}));
+
 assert.soon(() => {
-    let poolStats = getDiagnosticData();
     // Other connections (e.g. connection to config primary running {find: "shards"}) may be
     // dropped as a result of the max connections restriction, so it's possible more than 2
-    // connections are dropped.
-    return poolStats["poolInUse"] == 0 && poolStats["poolWasUsedOnce"] >= 2;
+    // connections are dropped per pool.
+    return getDiagnosticData()["totalWasUsedOnce"] >= 2 * numPools;
 }, "Dropped connections failed to be marked as wasUsedOnce within time limit", 20 * 1000);
 
 threads.forEach(function(thread) {

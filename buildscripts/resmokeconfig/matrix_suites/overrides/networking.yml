@@ -1,0 +1,11 @@
+### Overrides for matrix suites that set networking-related parameters.
+- name: task_executor_pool_size_8
+  value:
+    executor:
+      config:
+        shell_options:
+          nodb: ""
+          global_vars:
+            TestData:
+              setParametersMongos:
+                taskExecutorPoolSize: 8

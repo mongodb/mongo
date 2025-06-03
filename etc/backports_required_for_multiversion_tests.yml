@@ -442,6 +442,12 @@ last-continuous:
       ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_critical_section_repl_lag.js
       ticket: SERVER-104303
+    - test_file: jstests/sharding/conn_pool_stats.js
+      ticket: SERVER-102477
+    - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js
+      ticket: SERVER-102477
+    - test_file: jstests/noPassthrough/network/set_step_params.js
+      ticket: SERVER-102477
   suites: null
 last-lts:
   all:
@@ -939,4 +945,10 @@ last-lts:
       ticket: SERVER-103554
     - test_file: jstests/sharding/resharding_critical_section_repl_lag.js
       ticket: SERVER-104303
+    - test_file: jstests/sharding/conn_pool_stats.js
+      ticket: SERVER-102477
+    - test_file: jstests/noPassthrough/ftdc/ftdc_connection_reuse.js
+      ticket: SERVER-102477
+    - test_file: jstests/noPassthrough/network/set_step_params.js
+      ticket: SERVER-102477
   suites: null

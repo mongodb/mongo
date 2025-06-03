@@ -1748,6 +1748,21 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
+    name: sharding_task_executor_pool_size_8_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_cluster_scalability",
+        "default",
+        "incompatible_mac",
+        "sharding",
+        "common",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+
+  - <<: *gen_task_template
     name: sharding_hello_failures_gen
     tags:
       [
