@@ -106,9 +106,8 @@ protected:
                 "Mock duplicate key error"};
     }
 
-    WriteOp setupTwoShardTest(CollectionGeneration& gen,
-                              std::vector<std::unique_ptr<TargetedWrite>>& targeted,
-                              bool isTransactional) const {
+    std::pair<WriteOp, std::vector<std::unique_ptr<TargetedWrite>>> setupTwoShardTest(
+        CollectionGeneration& gen, bool isTransactional) const {
         ShardEndpoint endpointA(
             ShardId("shardA"), ShardVersionFactory::make(ChunkVersion(gen, {10, 0})), boost::none);
         ShardEndpoint endpointB(
@@ -137,7 +136,9 @@ protected:
                                 {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
                                  MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
 
-        writeOp.targetWrites(_opCtx, targeter, &targeted);
+        std::vector<std::unique_ptr<TargetedWrite>> targeted =
+            writeOp.targetWrites(_opCtx, targeter).writes;
+
         ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
         ASSERT_EQUALS(targeted.size(), 2u);
         sortByEndpoint(&targeted);
@@ -152,7 +153,7 @@ protected:
                 *targeted[1]->endpoint.shardVersion));
         }
 
-        return writeOp;
+        return {std::move(writeOp), std::move(targeted)};
     }
 
     WriteOpTest() {
@@ -199,8 +200,8 @@ TEST_F(WriteOpTest, TargetSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -234,8 +235,8 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpointA);
@@ -270,8 +271,9 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
+
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 3u);
     sortByEndpoint(&targeted);
@@ -294,8 +296,7 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
 
 TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
     CollectionGeneration gen(OID(), Timestamp(1, 1));
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    auto writeOp = setupTwoShardTest(gen, targeted, false);
+    auto [writeOp, targeted] = setupTwoShardTest(gen, false);
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
@@ -312,8 +313,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
 
 TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp2) {
     CollectionGeneration gen(OID(), Timestamp(1, 1));
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    auto writeOp = setupTwoShardTest(gen, targeted, false);
+    auto [writeOp, targeted] = setupTwoShardTest(gen, false);
 
     // Simulate two errors: one retryable error and another non-retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
@@ -335,8 +335,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp2) {
 
 TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp3) {
     CollectionGeneration gen(OID(), Timestamp(1, 1));
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    auto writeOp = setupTwoShardTest(gen, targeted, false);
+    auto [writeOp, targeted] = setupTwoShardTest(gen, false);
 
     // Simulate two errors: one non-retryable error and another retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
@@ -373,8 +372,8 @@ TEST_F(WriteOpTest, ErrorSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -403,8 +402,8 @@ TEST_F(WriteOpTest, CancelSingle) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -500,8 +499,8 @@ TEST_F(WriteOpTest, RetrySingleOp) {
 
     MockNSTargeter targeter(kNss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(targeted.size(), 1u);
     assertEndpointsEqual(targeted.front()->endpoint, endpoint);
@@ -548,8 +547,8 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
                              MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
                              MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    writeOp.targetWrites(_opCtx, targeter, &targeted);
+    std::vector<std::unique_ptr<TargetedWrite>> targeted =
+        writeOp.targetWrites(_opCtx, targeter).writes;
 
     // The write should only target shardA and shardB and send real shard versions to each.
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Pending);
@@ -567,8 +566,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
 
 TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
     CollectionGeneration gen(OID(), Timestamp(1, 1));
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    auto writeOp = setupTwoShardTest(gen, targeted, true);
+    auto [writeOp, targeted] = setupTwoShardTest(gen, true);
 
     // Simulate retryable error.
     write_ops::WriteError retryableError(0, getMockRetriableError(gen));
@@ -581,8 +579,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp1) {
 
 TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp2) {
     CollectionGeneration gen(OID(), Timestamp(1, 1));
-    std::vector<std::unique_ptr<TargetedWrite>> targeted;
-    auto writeOp = setupTwoShardTest(gen, targeted, true);
+    auto [writeOp, targeted] = setupTwoShardTest(gen, true);
 
     // Simulate non-retryable error.
     write_ops::WriteError nonRetryableError(0, getMockRetriableError(gen));

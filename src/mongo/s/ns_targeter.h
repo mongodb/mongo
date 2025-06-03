@@ -63,6 +63,23 @@ namespace mongo {
  */
 class NSTargeter {
 public:
+    struct TargetingResult {
+        TargetingResult() = default;
+
+        TargetingResult(std::vector<ShardEndpoint> endpoints) : endpoints(std::move(endpoints)) {}
+
+        TargetingResult(std::vector<ShardEndpoint> endpoints,
+                        bool useTwoPhaseWriteProtocol,
+                        bool isNonTargetedRetryableWriteWithId)
+            : endpoints(std::move(endpoints)),
+              useTwoPhaseWriteProtocol(useTwoPhaseWriteProtocol),
+              isNonTargetedRetryableWriteWithId(isNonTargetedRetryableWriteWithId) {}
+
+        std::vector<ShardEndpoint> endpoints;
+        bool useTwoPhaseWriteProtocol = false;
+        bool isNonTargetedRetryableWriteWithId = false;
+    };
+
     virtual ~NSTargeter() = default;
 
     /**
@@ -75,34 +92,24 @@ public:
     /**
      * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is
      * malformed with respect to the shard key pattern of the collection.
-     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
-     * insert.
      */
     virtual ShardEndpoint targetInsert(OperationContext* opCtx, const BSONObj& doc) const = 0;
 
     /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard update or throws
-     * ShardKeyNotFound if 'updateOp' misses a shard key, but the type of update requires it.
-     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
-     * update.
+     * Returns a TargetingResult (which contains a vector of ShardEndpoints) for a potentially
+     * multi-shard update or throws ShardKeyNotFound if 'itemRef' misses a shard key, but the type
+     * of update requires it.
      */
-    virtual std::vector<ShardEndpoint> targetUpdate(
-        OperationContext* opCtx,
-        const BatchItemRef& itemRef,
-        bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const = 0;
+    virtual TargetingResult targetUpdate(OperationContext* opCtx,
+                                         const BatchItemRef& itemRef) const = 0;
 
     /**
-     * Returns a vector of ShardEndpoints for a potentially multi-shard delete or throws
-     * ShardKeyNotFound if 'deleteOp' misses a shard key, but the type of delete requires it.
-     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
-     * delete.
+     * Returns a TargetingResult (which contains a vector of ShardEndpoints) for a potentially
+     * multi-shard delete or throws ShardKeyNotFound if 'itemRef' misses a shard key, but the type
+     * of delete requires it.
      */
-    virtual std::vector<ShardEndpoint> targetDelete(
-        OperationContext* opCtx,
-        const BatchItemRef& itemRef,
-        bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const = 0;
+    virtual TargetingResult targetDelete(OperationContext* opCtx,
+                                         const BatchItemRef& itemRef) const = 0;
 
     /**
      * Returns a vector of ShardEndpoints for all shards.

@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/shard_version.h"
@@ -186,90 +187,175 @@ BulkWriteReplyItem WriteOp::takeBulkWriteReplyItem() {
     return std::move(_bulkWriteReplyItem.value());
 }
 
-void WriteOp::targetWrites(OperationContext* opCtx,
-                           const NSTargeter& targeter,
-                           std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
-                           bool* useTwoPhaseWriteProtocol,
-                           bool* isNonTargetedWriteWithoutShardKeyWithExactId) {
+WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
+                                                  const NSTargeter& targeter,
+                                                  bool enableMultiWriteBlockingMigrations) {
     invariant(_childOps.empty());
-    auto endpoints = [&] {
-        if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
-        } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            return targeter.targetUpdate(opCtx,
-                                         _itemRef,
-                                         useTwoPhaseWriteProtocol,
-                                         isNonTargetedWriteWithoutShardKeyWithExactId);
-        } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            return targeter.targetDelete(opCtx,
-                                         _itemRef,
-                                         useTwoPhaseWriteProtocol,
-                                         isNonTargetedWriteWithoutShardKeyWithExactId);
-        }
-        MONGO_UNREACHABLE;
-    }();
-    // For update/delete operations targeting multiple endpoints:
-    // - If not part of a transaction, we must target all endpoints since partial results cannot be
-    // retried
-    // - Exception: data shards can be specifically targeted if the user enables
-    // 'onlyTargetDataOwningShardsForMultiWrites'
-    // - Note that StaleConfig errors with partially applied writes will fail with non-retryable
-    // QueryPlanKilled
-    // - Users must determine if their operation is idempotent and can be safely retried
-    // - NOTE: Index inserts are currently specially targeted only at the current collection to
-    // avoid creating collections everywhere.
+    const BatchedCommandRequest::BatchType opType = _itemRef.getOpType();
+    const bool isInsert = opType == BatchedCommandRequest::BatchType_Insert;
+    const bool isUpdate = opType == BatchedCommandRequest::BatchType_Update;
+    const bool isDelete = opType == BatchedCommandRequest::BatchType_Delete;
     const bool inTransaction = bool(TransactionRouter::get(opCtx));
-    const bool targetAllShards = [&]() {
-        if (endpoints.size() > 1u && !inTransaction) {
-            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* onlyTargetDataOwningShardsForMultiWritesParam = clusterParameters->get<
-                ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
-                "onlyTargetDataOwningShardsForMultiWrites");
-            return !onlyTargetDataOwningShardsForMultiWritesParam->getValue(boost::none)
-                        .getEnabled();
+
+    std::vector<ShardEndpoint> endpoints;
+    bool useTwoPhaseWriteProtocol = false;
+    bool isNonTargetedRetryableWriteWithId = false;
+
+    if (isInsert) {
+        endpoints = std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
+    } else if (isUpdate || isDelete) {
+        auto targetingResult = isUpdate ? targeter.targetUpdate(opCtx, _itemRef)
+                                        : targeter.targetDelete(opCtx, _itemRef);
+
+        endpoints = std::move(targetingResult.endpoints);
+        useTwoPhaseWriteProtocol = targetingResult.useTwoPhaseWriteProtocol;
+        isNonTargetedRetryableWriteWithId = targetingResult.isNonTargetedRetryableWriteWithId;
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    const bool multipleEndpoints = endpoints.size() > 1u;
+
+    const bool isMultiWrite = [&] {
+        if (isUpdate) {
+            return _itemRef.getUpdateRef().getMulti();
+        } else if (isDelete) {
+            return _itemRef.getDeleteRef().getMulti();
         }
         return false;
     }();
-    if (targetAllShards) {
-        endpoints = targeter.targetAllShards(opCtx);
-    }
 
-    const auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-        opCtx, targeter.getNS(), _itemRef.getOpType(), endpoints);
+    // Check if an update or delete requires using a non ordinary writeType. An updateOne
+    // or deleteOne necessitates using the two phase write in the case where the query does
+    // not contain a shard key or _id to target by.
+    //
+    // Handle time-series retryable updates using the two phase write protocol only when
+    // there is more than one shard that owns chunks.
+    WriteType writeType = [&] {
+        if (isUpdate || isDelete) {
+            const bool isTimeseriesRetryableUpdateOp =
+                targeter.isTrackedTimeSeriesBucketsNamespace() && isUpdate &&
+                opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() &&
+                !isRawDataOperation(opCtx);
 
-    for (auto&& endpoint : endpoints) {
-        // If the operation was already successfull on that shard, do not repeat it
-        if (_successfulShardSet.count(endpoint.shardName))
-            continue;
+            if (!isMultiWrite && isNonTargetedRetryableWriteWithId) {
+                return WriteType::WithoutShardKeyWithId;
+            }
+            if (!isMultiWrite && useTwoPhaseWriteProtocol &&
+                (!isTimeseriesRetryableUpdateOp || multipleEndpoints)) {
+                return WriteType::WithoutShardKeyOrId;
+            }
+            if (isMultiWrite && enableMultiWriteBlockingMigrations) {
+                return WriteType::MultiWriteBlockingMigrations;
+            }
+            if (isTimeseriesRetryableUpdateOp) {
+                return WriteType::TimeseriesRetryableUpdate;
+            }
+        }
 
-        _childOps.emplace_back(this);
+        return WriteType::Ordinary;
+    }();
 
-        WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
+    // If the op is an update or delete which targets multiple endpoints and 'inTransaction'
+    // is false and 'writeType' is "Ordinary" or "WithoutShardKeyWithId", -AND- if either the
+    // op is not multi:true or the "onlyTargetDataOwningShardsForMultiWrites" cluster param is
+    // not enabled, then we must target all endpoints (since partial results cannot be retried)
+    // and for Ordinary writes we must also set 'shardVersion' to IGNORED on all endpoints.
+    if ((isUpdate || isDelete) && multipleEndpoints && !inTransaction &&
+        (writeType == WriteType::Ordinary || writeType == WriteType::WithoutShardKeyWithId)) {
+        // We only need to target all shards (and set 'shardVersion' to IGNORED on all endpoints
+        // for Ordinary writes when 'onlyTargetDataOwningShardsForMultiWrites' is false or when
+        // 'isMultiWrite' is false.
+        //
+        // In the case where 'isMultiWrite' is true and 'onlyTargetDataOwningShardsForMultiWrites'
+        // is true, StaleConfig errors with partially applied writes will fail with non-retryable
+        // QueryPlanKilled, and the user can choose to manually re-run the command if they determine
+        // it's safe to do so (i.e. if the operation is idempotent).
+        const bool targetAllShards = [&] {
+            if (isMultiWrite) {
+                // Fetch the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
+                auto* clusterParam = ServerParameterSet::getClusterParameterSet()
+                                         ->get<ClusterParameterWithStorage<
+                                             OnlyTargetDataOwningShardsForMultiWritesParam>>(
+                                             "onlyTargetDataOwningShardsForMultiWrites");
+                // Return false if cluster param is enabled, otherwise return true.
+                return !clusterParam->getValue(boost::none).getEnabled();
+            }
+            return true;
+        }();
 
-        if (targetAllShards) {
-            // Do not ignore shard version if this is WriteType::WithoutShardKeyWithId
-            // TODO: PM-3673 for non-retryable writes.
-            if ((isNonTargetedWriteWithoutShardKeyWithExactId &&
-                 !*isNonTargetedWriteWithoutShardKeyWithExactId) ||
-                (!isNonTargetedWriteWithoutShardKeyWithExactId)) {
+        if (targetAllShards && writeType == WriteType::WithoutShardKeyWithId) {
+            // For WithoutShardKeyWithId WriteOps running outside of a transaction that need to
+            // target more than one endpoint, all shards are targeted.
+            //
+            // TODO SERVER-101167: For WithoutShardKeyWithId write ops, we should only target the
+            // shards that are needed (instead of targeting all shards).
+            endpoints = targeter.targetAllShards(opCtx);
+        } else if (targetAllShards && writeType == WriteType::Ordinary) {
+            // For Ordinary WriteOps running outside of a transaction that need to target more than
+            // one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
+            // endpoints. Currently there are two cases where this block of code is reached:
+            //   1) multi:true updates/upserts/deletes outside of transaction (where
+            //      'isTimeseriesRetryableUpdateOp' and 'enableMultiWriteBlockingMigrations' are
+            //      both false)
+            //   2) non-retryable or sessionless multi:false non-upsert updates/deletes
+            //      that have an _id equality outside of a transaction (where
+            //      'isTimeseriesRetryableUpdateOp' is false)
+            //
+            // TODO SPM-1153: Implement a new approach for multi:true updates/upserts/deletes that
+            // does not need set 'shardVersion' to IGNORED and that can target only the relevant
+            // shards when 'multipleEndpoints' is true (instead of targeting all shards).
+            //
+            // TODO SPM-3673: For non-retryable/sessionless multi:false non-upsert updates/deletes
+            // that have an _id equality, implement a different approach that doesn't need to set
+            // 'shardVersion' to IGNORED and that can target only the relevant shards when
+            // 'multipleEndpoints' is true (instead of targeting all shards).
+            endpoints = targeter.targetAllShards(opCtx);
+
+            for (auto& endpoint : endpoints) {
                 endpoint.shardVersion->setPlacementVersionIgnored();
             }
         }
+    }
+
+    // Remove shards from 'endpoints' where the operation was already successful.
+    if (!_successfulShardSet.empty()) {
+        std::erase_if(endpoints, [&](auto&& e) { return _successfulShardSet.count(e.shardName); });
+    }
+
+    TargetWritesResult result;
+    result.writeType = writeType;
+
+    // If all operations currently targeted were already successful, then that means that
+    // the operation is finished.
+    if (endpoints.empty()) {
+        _state = WriteOpState_Completed;
+        return result;
+    }
+
+    const auto targetedSampleId =
+        analyze_shard_key::tryGenerateTargetedSampleId(opCtx, targeter.getNS(), opType, endpoints);
+
+    for (auto&& endpoint : endpoints) {
+        WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size());
 
         const auto sampleId = targetedSampleId && targetedSampleId->isFor(endpoint)
             ? boost::make_optional(targetedSampleId->getId())
             : boost::none;
 
-        targetedWrites->push_back(
+        result.writes.push_back(
             std::make_unique<TargetedWrite>(std::move(endpoint), ref, std::move(sampleId)));
 
-        _childOps.back().pendingWrite = targetedWrites->back().get();
-        _childOps.back().state = WriteOpState_Pending;
+        ChildWriteOp childOp(this);
+        childOp.pendingWrite = result.writes.back().get();
+        childOp.state = WriteOpState_Pending;
+
+        _childOps.emplace_back(std::move(childOp));
     }
 
-    // If all operations currently targeted were successful on a previous round we might have 0
-    // childOps, that would mean that the operation is finished.
-    _state = _childOps.size() ? WriteOpState_Pending : WriteOpState_Completed;
+    _state = WriteOpState_Pending;
+
+    return result;
 }
 
 size_t WriteOp::getNumTargeted() {

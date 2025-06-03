@@ -76,6 +76,7 @@ public:
         kStaleDbVersion,
         kCannotImplicitlyCreateCollection
     };
+
     /**
      * Initializes the targeter with the latest routing information for the namespace, which means
      * it may have to block and load information from the config server.
@@ -101,29 +102,15 @@ public:
 
     /**
      * Attempts to target an update request by shard key and returns a vector of shards to target.
-     *
-     * The usage of the useTwoPhaseWriteProtocol boolean pointer is to determine whether or not we
-     * have received a query that does not have the full shard key or is not an _id query and should
-     * use the two phase write protocol to execute the write.
      */
-    std::vector<ShardEndpoint> targetUpdate(
-        OperationContext* opCtx,
-        const BatchItemRef& itemRef,
-        bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override;
+    TargetingResult targetUpdate(OperationContext* opCtx,
+                                 const BatchItemRef& itemRef) const override;
 
     /**
      * Attempts to target an delete request by shard key and returns a vector of shards to target.
-     *
-     * The usage of the useTwoPhaseWriteProtocol boolean pointer is to determine whether or not we
-     * have received a query that does not have the full shard key or is not an _id query and should
-     * use the two phase write protocol to execute the write.
      */
-    std::vector<ShardEndpoint> targetDelete(
-        OperationContext* opCtx,
-        const BatchItemRef& itemRef,
-        bool* useTwoPhaseWriteProtocol = nullptr,
-        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr) const override;
+    TargetingResult targetDelete(OperationContext* opCtx,
+                                 const BatchItemRef& itemRef) const override;
 
     std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx) const override;
 

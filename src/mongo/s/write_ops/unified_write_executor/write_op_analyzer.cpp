@@ -50,10 +50,10 @@ Analysis WriteOpAnalyzer::analyze(OperationContext* opCtx,
                     targeter.targetInsert(opCtx, op.getRef().getDocument())};
             }
             case WriteType::kUpdate: {
-                return targeter.targetUpdate(opCtx, op.getRef());
+                return targeter.targetUpdate(opCtx, op.getRef()).endpoints;
             }
             case WriteType::kDelete: {
-                return targeter.targetDelete(opCtx, op.getRef());
+                return targeter.targetDelete(opCtx, op.getRef()).endpoints;
             }
             case WriteType::kFindAndMod:
                 MONGO_UNIMPLEMENTED;

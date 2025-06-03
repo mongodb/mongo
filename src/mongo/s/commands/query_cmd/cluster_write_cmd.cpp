@@ -438,13 +438,13 @@ void ClusterWriteCmd::commandOpWrite(OperationContext* opCtx,
     CollectionRoutingInfoTargeter targeter(opCtx, nss);
     auto endpoints = [&] {
         // Note that this implementation will not handle targeting retries and does not
-        // completely emulate write behavior
+        // completely emulate write behavior.
         if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, targetingBatchItem.getDocument())};
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            return targeter.targetUpdate(opCtx, targetingBatchItem);
+            return targeter.targetUpdate(opCtx, targetingBatchItem).endpoints;
         } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            return targeter.targetDelete(opCtx, targetingBatchItem);
+            return targeter.targetDelete(opCtx, targetingBatchItem).endpoints;
         }
         MONGO_UNREACHABLE;
     }();

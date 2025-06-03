@@ -78,15 +78,26 @@ enum WriteOpState {
     WriteOpState_Error,
 };
 
+/**
+ * The WriteType enum is used to categorize each write based on which approach BatchWriteExec
+ * will use to execute the write.
+ *
+ * Note that the "WithoutShardKeyWithId" type is only used for non-transactional retryable writes
+ * with an "_id" equality.
+ * TODO PM-3673: Make it possible to use "WithoutShardKeyWithId" for non-transactional non-retryable
+ * writes with an "_id" equality as well.
+ */
 enum class WriteType {
     Ordinary,
     TimeseriesRetryableUpdate,
     WithoutShardKeyOrId,
-    // We only categorize non transactional retryable writes into this write type.
-    // TODO: PM-3673 for non-retryable writes.
     WithoutShardKeyWithId,
     MultiWriteBlockingMigrations,
 };
+
+inline bool writeTypeSupportsGrouping(WriteType t) {
+    return t == WriteType::Ordinary || t == WriteType::WithoutShardKeyWithId;
+}
 
 /**
  * State of a write in-progress (to a single shard) which is one part of a larger write
@@ -144,6 +155,13 @@ struct ChildWriteOp {
  */
 class WriteOp {
 public:
+    struct TargetWritesResult {
+        TargetWritesResult() = default;
+
+        std::vector<std::unique_ptr<TargetedWrite>> writes;
+        WriteType writeType = WriteType::Ordinary;
+    };
+
     WriteOp(BatchItemRef itemRef, bool inTxn) : _itemRef(std::move(itemRef)), _inTxn(inTxn) {}
 
     /**
@@ -192,11 +210,9 @@ public:
      * The ShardTargeter determines the ShardEndpoints to send child writes to, but is not
      * modified by this operation.
      */
-    void targetWrites(OperationContext* opCtx,
-                      const NSTargeter& targeter,
-                      std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
-                      bool* useTwoPhaseWriteProtocol = nullptr,
-                      bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr);
+    TargetWritesResult targetWrites(OperationContext* opCtx,
+                                    const NSTargeter& targeter,
+                                    bool enableMultiWriteBlockingMigrations = false);
 
     /**
      * Returns the number of child writes that were last targeted.

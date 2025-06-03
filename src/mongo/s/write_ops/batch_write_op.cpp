@@ -275,11 +275,10 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
-bool shouldCoordinateMultiUpdate(OperationContext* opCtx,
-                                 PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations,
-                                 bool isMultiWrite) {
-    if (!isMultiWrite || !pauseMigrations.isEnabled()) {
-        // If this is not a multi write or if the cluster parameter is off, the op is not relevant.
+bool shouldCoordinateMultiWrite(OperationContext* opCtx,
+                                PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations) {
+    if (!pauseMigrations.isEnabled()) {
+        // If the cluster parameter is off, return false.
         return false;
     }
 
@@ -354,39 +353,35 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     // Returns WriteType::WriteWithoutShardKeyWithId if there is any write of that type in the
     // batch. We send WriteType::WriteWithoutShardKeyWithId in batches of only such writes.
 
-    WriteType writeType = WriteType::Ordinary;
+    boost::optional<WriteType> writeType;
 
     std::map<NamespaceString, std::set<const ShardEndpoint*, EndpointComp>> nsEndpointMap;
     std::map<NamespaceString, std::set<ShardId>> nsShardIdMap;
 
     for (auto& writeOp : writeOps) {
-        bool useTwoPhaseWriteProtocol = false;
-        bool isNonTargetedWriteWithoutShardKeyWithExactId = false;
-        // Only target Ready op.
-        if (writeOp.getWriteState() != WriteOpState_Ready)
-            continue;
-
-        // If we got a WithoutShardKeyOrId or TimeseriesRetryableUpdate write in the previous
-        // iteration, it should be sent in its own batch.
-        if (writeType == WriteType::WithoutShardKeyOrId ||
-            writeType == WriteType::TimeseriesRetryableUpdate ||
-            writeType == WriteType::MultiWriteBlockingMigrations) {
+        // If the previous iteration encountered a write that doesn't support grouping (such as
+        // WithoutShardKeyOrId or TimeseriesRetryableUpdate), then that write should be sent in
+        // its own batch.
+        if (writeType && !writeTypeSupportsGrouping(*writeType)) {
             break;
+        }
+
+        // Skip 'writeOp' if it is not in the "Ready" state.
+        if (writeOp.getWriteState() != WriteOpState_Ready) {
+            continue;
         }
 
         const auto& targeter = getTargeterFn(writeOp);
 
-        std::vector<std::unique_ptr<TargetedWrite>> writes;
-        auto targetStatus = [&] {
+        const bool enableMultiWriteBlockingMigrations =
+            shouldCoordinateMultiWrite(opCtx, pauseMigrations);
+
+        auto [targetStatus, result] = [&]() -> std::pair<Status, WriteOp::TargetWritesResult> {
             try {
-                writeOp.targetWrites(opCtx,
-                                     targeter,
-                                     &writes,
-                                     &useTwoPhaseWriteProtocol,
-                                     &isNonTargetedWriteWithoutShardKeyWithExactId);
-                return Status::OK();
+                return {Status::OK(),
+                        writeOp.targetWrites(opCtx, targeter, enableMultiWriteBlockingMigrations)};
             } catch (const DBException& ex) {
-                return ex.toStatus();
+                return {ex.toStatus(), WriteOp::TargetWritesResult{}};
             }
         }();
 
@@ -429,11 +424,11 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                 return targetStatus;
             } else if (!ordered || batchMap.empty()) {
                 // Record an error for this batch
-
                 writeOp.setOpError(targetError);
 
-                if (ordered)
-                    return writeType;
+                if (ordered) {
+                    return writeType ? *writeType : WriteType::Ordinary;
+                }
 
                 continue;
             } else {
@@ -446,13 +441,30 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         }
 
+        // Set up a guard so that 'writeOp' will be reset to "ready" if we exit this block
+        // before 'finishedProcessingWriteOp' gets set to true.
+        bool finishedProcessingWriteOp = false;
+        ON_BLOCK_EXIT([&] {
+            if (!finishedProcessingWriteOp) {
+                writeOp.resetWriteToReady(opCtx);
+            }
+        });
+
+        // If the WriteType of 'writeOp' is different than the current batch's WriteType, then
+        // 'writeOp' cannot be added to the current batch. Also, if 'writeOp' doesn't support
+        // grouping, then 'writeOp' cannot be added to the current batch because it must be in
+        // a batch by itself.
+        if (writeType &&
+            (result.writeType != *writeType || !writeTypeSupportsGrouping(result.writeType))) {
+            break;
+        }
+
         // If writes are ordered and we have a targeted endpoint, make sure we don't need to send
         // these targeted writes to any other endpoints.
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
             if (isNewBatchRequiredOrdered(
-                    targeter.getNS(), writes, batchMap, nsShardIdMap, nsEndpointMap)) {
-                writeOp.resetWriteToReady(opCtx);
+                    targeter.getNS(), result.writes, batchMap, nsShardIdMap, nsEndpointMap)) {
                 break;
             }
         }
@@ -461,95 +473,28 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         // the same shard with a different shardVersion. We can continue to look for the next writes
         // that can still be included in the same batch.
         if (!ordered &&
-            isNewBatchRequiredUnordered(targeter.getNS(), writes, nsShardIdMap, nsEndpointMap)) {
-            writeOp.resetWriteToReady(opCtx);
+            isNewBatchRequiredUnordered(
+                targeter.getNS(), result.writes, nsShardIdMap, nsEndpointMap)) {
             continue;
         }
 
-        for (auto&& write : writes) {
+        for (auto&& write : result.writes) {
             write->estimatedSizeBytes = getWriteSizeFn(writeOp, write->endpoint.shardName);
         }
 
-        if (wouldMakeBatchesTooBig(writes, batchMap)) {
+        if (wouldMakeBatchesTooBig(result.writes, batchMap)) {
             invariant(!batchMap.empty());
             LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
-            writeOp.resetWriteToReady(opCtx);
             break;
         }
 
-        auto isTimeseriesRetryableUpdate = targeter.isTrackedTimeSeriesBucketsNamespace() &&
-            writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
-            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction() &&
-            !isRawDataOperation(opCtx);
-        if (isTimeseriesRetryableUpdate) {
-            if (!batchMap.empty()) {
-                writeOp.resetWriteToReady(opCtx);
-                break;
-            } else {
-                writeType = WriteType::TimeseriesRetryableUpdate;
-                writeOp.setWriteType(WriteType::TimeseriesRetryableUpdate);
-            }
-        }
+        // Targeting succeeded.
+        writeType = result.writeType;
+        writeOp.setWriteType(result.writeType);
+        finishedProcessingWriteOp = true;
 
-        // Check if an update or delete requires using a non ordinary writeType.
-        // An updateOne or deleteOne necessitates using the two phase write in the case
-        // where the query does not contain a shard key or _id to target by.
-        if (auto writeItem = writeOp.getWriteItem();
-            writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
-            writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-
-            auto isMultiWrite = [&] {
-                if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                    auto updateReq = writeItem.getUpdateRef();
-                    return updateReq.getMulti();
-                } else {
-                    auto deleteReq = writeItem.getDeleteRef();
-                    return deleteReq.getMulti();
-                }
-            }();
-
-            if (shouldCoordinateMultiUpdate(opCtx, pauseMigrations, isMultiWrite)) {
-                // Multi writes blocking migrations should be in their own batch.
-                if (!batchMap.empty()) {
-                    writeOp.resetWriteToReady(opCtx);
-                    break;
-                } else {
-                    writeType = WriteType::MultiWriteBlockingMigrations;
-                    writeOp.setWriteType(writeType);
-                }
-            }
-
-            auto writeWithoutShardKeyOrId = !isMultiWrite && useTwoPhaseWriteProtocol;
-            // Handle time-series retryable updates using the two phase write protocol only when
-            // there is more than one shard that owns chunks.
-            if (isTimeseriesRetryableUpdate) {
-                writeWithoutShardKeyOrId &= writes.size() > 1;
-            }
-            if (writeWithoutShardKeyOrId) {
-                // Writes without shard key should be in their own batch.
-                if (!batchMap.empty()) {
-                    writeOp.resetWriteToReady(opCtx);
-                    break;
-                } else {
-                    writeType = WriteType::WithoutShardKeyOrId;
-                    writeOp.setWriteType(writeType);
-                }
-            };
-
-            if (!isMultiWrite && isNonTargetedWriteWithoutShardKeyWithExactId) {
-                writeType = WriteType::WithoutShardKeyWithId;
-                writeOp.setWriteType(writeType);
-            }
-
-            if (writeOp.getWriteType() == WriteType::Ordinary &&
-                writeType == WriteType::WithoutShardKeyWithId) {
-                writeOp.resetWriteToReady(opCtx);
-                break;
-            }
-        }
-
-        // Targeting went ok, add to appropriate TargetedBatch
-        for (auto&& write : writes) {
+        // Add each TargetedWrite to the appropriate TargetedBatch.
+        for (auto&& write : result.writes) {
             const auto& shardId = write->endpoint.shardName;
             TargetedBatchMap::iterator batchIt = batchMap.find(shardId);
             if (batchIt == batchMap.end()) {
@@ -566,16 +511,14 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         }
         LOGV2_DEBUG(9986807, 5, "Targeting complete for child batch to shard");
 
-        // Relinquish ownership of TargetedWrites, now the TargetedBatches own them
-        writes.clear();
-
         // Break if we're ordered and we have more than one endpoint - later writes cannot be
         // enforced as ordered across multiple shard endpoints.
-        if (ordered && batchMap.size() > 1u)
+        if (ordered && batchMap.size() > 1u) {
             break;
+        }
     }
 
-    return writeType;
+    return writeType ? *writeType : WriteType::Ordinary;
 }
 
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
