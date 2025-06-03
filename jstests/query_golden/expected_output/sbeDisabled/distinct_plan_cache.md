@@ -9,7 +9,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					],
 					"y" : [
 						"[5.0, 5.0]"
@@ -71,7 +71,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					],
 					"y" : [
 						"[5.0, 5.0]"
@@ -133,10 +133,10 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(12.0, inf.0]"
+						"(12.0, inf]"
 					],
 					"y" : [
-						"[-inf.0, 200.0)"
+						"[-inf, 200.0)"
 					]
 				},
 				"indexName" : "x_1_y_1",
@@ -196,10 +196,10 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(12.0, inf.0]"
+						"(12.0, inf]"
 					],
 					"y" : [
-						"[-inf.0, 250.0)"
+						"[-inf, 250.0)"
 					]
 				},
 				"indexName" : "x_1_y_1",
@@ -266,7 +266,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"y" : [
-						"[-inf.0, 105.0)"
+						"[-inf, 105.0)"
 					],
 					"z" : [
 						"[MinKey, MaxKey]"
@@ -330,7 +330,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"y" : [
-						"[-inf.0, 105.0)"
+						"[-inf, 105.0)"
 					],
 					"z" : [
 						"[MinKey, MaxKey]"

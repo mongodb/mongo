@@ -68,10 +68,10 @@ const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
 // 'subpathBounds' property indicates whether the bounds for '$_path' are supposed to contain
 // all subpaths rather than a single point-interval, i.e. ["path.to.field.", "path.to.field/").
 const operationList = [
-    {expression: {$gte: 3}, bounds: ['[3.0, inf.0]']},
-    {expression: {$gt: 3}, bounds: ['(3.0, inf.0]']},
-    {expression: {$lt: 7}, bounds: ['[-inf.0, 7.0)']},
-    {expression: {$lte: 7}, bounds: ['[-inf.0, 7.0]']},
+    {expression: {$gte: 3}, bounds: ['[3.0, inf]']},
+    {expression: {$gt: 3}, bounds: ['(3.0, inf]']},
+    {expression: {$lt: 7}, bounds: ['[-inf, 7.0)']},
+    {expression: {$lte: 7}, bounds: ['[-inf, 7.0]']},
     {expression: {$eq: 5}, bounds: ['[5.0, 5.0]']},
     {
         expression: {$in: [3, 5, 7, 9]},
@@ -98,14 +98,14 @@ const operationList = [
 const operationListCompound = [
     {
         query: {'a': 3, 'b.c': {$gte: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[MinKey, MaxKey]']},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf]'], 'c': ['[MinKey, MaxKey]']},
         path: 'b.c',
         subpathBounds: false,
         expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
     {
         query: {'a': 3, 'b.c': {$gte: 3}, 'c': {$lt: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[-inf.0, 3.0)']},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf]'], 'c': ['[-inf, 3.0)']},
         path: 'b.c',
         subpathBounds: false,
         expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
@@ -160,6 +160,26 @@ function makeExpectedBounds(op, path) {
     return expectedBounds;
 }
 
+// Older versions of mongodb will return bounds containing inf.0 instead of
+// inf, due to a formatting bug for doubles. Clean these up so our test
+// can do a proper comparison. We should be able to delete this once
+// the multishard test isn't using anything older that MongoDB 9.0.
+
+function fixupBoundsStrings(strlist) {
+    // We should also fix up nan.0, but none of our tests use it.
+    return strlist.map(s => s.replace("inf.0", "inf"));
+}
+
+function fixupOldVersionBounds(bounds) {
+    // We don't do a true deep copy here. Instead, we just make a copy of the
+    // element we need to modify.
+    let ret = {};
+    for (const path in bounds) {
+        ret[path] = fixupBoundsStrings(bounds[path]);
+    }
+    return ret;
+}
+
 // Given a keyPattern and (optional) pathProjection, this function builds a $** index on the
 // collection and then tests each of the match expression in the 'operationList' on each indexed
 // field in turn. The 'expectedPaths' argument lists the set of paths which we expect to have
@@ -204,7 +224,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
             // Verify that the winning plan uses the $** index with the expected bounds.
             assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
             assert.docEq({$_path: 1, [path]: 1}, ixScans[0].keyPattern);
-            assert.docEq(expectedBounds, ixScans[0].indexBounds);
+            assert.docEq(expectedBounds, fixupOldVersionBounds(ixScans[0].indexBounds));
 
             // Verify that the results obtained from the $** index are identical to a COLLSCAN.
             // We must explicitly hint the wildcard index, because we also sort on {_id: 1} to
@@ -236,7 +256,8 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         for (let offset = 0; offset < ixScanBounds.length; offset += orQueryBounds.length) {
             const ixBounds = ixScanBounds.slice(offset, offset + orQueryBounds.length);
             orQueryBounds.forEach(
-                exBound => assert(ixBounds.some(ixBound => !bsonWoCompare(ixBound, exBound))));
+                exBound => assert(ixBounds.some(
+                    ixBound => !bsonWoCompare(fixupOldVersionBounds(ixBound), exBound))));
         }
 
         // Verify that the results obtained from the $** index are identical to a COLLSCAN.
@@ -272,7 +293,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
         for (let ixScan of winningIxScan.concat(rejectedIxScans)) {
             // {$_path: ["['path.to.field', 'path.to.field']"], path.to.field: [[bounds]]}
             const ixScanPath = JSON.parse(ixScan.indexBounds.$_path[0])[0];
-            assert.eq(ixScan.indexBounds[ixScanPath], op.bounds);
+            assert.eq(fixupBoundsStrings(ixScan.indexBounds[ixScanPath]), op.bounds);
             assert(expectedPaths.includes(ixScanPath));
         }
 
@@ -311,8 +332,9 @@ function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         // Use "tojson()" in order to make ordering of fields matter.
         assert.docEq(tojson(op.expectedKeyPattern), tojson(ixScans[0].keyPattern), explainRes);
-        if (tojson(expectedBounds) != tojson(ixScans[0].indexBounds)) {
-            assert.docEq(expectedBounds, ixScans[0].indexBounds, explainRes);
+        let fixedBounds = fixupOldVersionBounds(ixScans[0].indexBounds);
+        if (tojson(expectedBounds) != tojson(fixedBounds)) {
+            assert.docEq(expectedBounds, fixedBounds, explainRes);
         }
 
         // Verify that the results obtained from the compound wildcard index are identical to a

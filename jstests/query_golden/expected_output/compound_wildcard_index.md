@@ -23,7 +23,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			],
 			"num" : [
 				"[MinKey, MaxKey]"
@@ -59,7 +59,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			],
 			"num" : [
 				"[1.0, 1.0]"
@@ -102,7 +102,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			],
 			"num" : [
 				"[1.0, 1.0]"
@@ -136,7 +136,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			],
 			"num" : [
 				"[1.0, 1.0]"
@@ -210,7 +210,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			]
 		},
 		"keyPattern" : {
@@ -273,7 +273,7 @@
 		"indexName" : "sub.num_1",
 		"indexBounds" : {
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			]
 		},
 		"keyPattern" : {
@@ -323,7 +323,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"(4.0, inf.0]"
+				"(4.0, inf]"
 			]
 		},
 		"keyPattern" : {
@@ -342,7 +342,7 @@
 				"[\"sub.num\", \"sub.num\"]"
 			],
 			"sub.num" : [
-				"[-inf.0, 10.0)"
+				"[-inf, 10.0)"
 			]
 		},
 		"keyPattern" : {
@@ -421,7 +421,7 @@
 		"indexName" : "sub.num_1",
 		"indexBounds" : {
 			"sub.num" : [
-				"[-inf.0, 10.0)"
+				"[-inf, 10.0)"
 			]
 		},
 		"keyPattern" : {
@@ -475,7 +475,7 @@
 				"[\"num\", \"num\"]"
 			],
 			"num" : [
-				"[-inf.0, 0.0]"
+				"[-inf, 0.0]"
 			]
 		},
 		"keyPattern" : {

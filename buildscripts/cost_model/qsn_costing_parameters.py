@@ -216,7 +216,7 @@ if __name__ == "__main__":
                     "direction": "forward",
                     "indexBounds": {
                     "as": [
-                        "[-inf.0, 4)"
+                        "[-inf, 4)"
                     ],
                     "mixed1": [
                         "[MinKey, MaxKey]"
@@ -246,7 +246,7 @@ if __name__ == "__main__":
                 "direction": "forward",
                 "indexBounds": {
                     "as": [
-                    "(4, inf.0]"
+                    "(4, inf]"
                     ],
                     "mixed1": [
                     "[MinKey, MaxKey]"

@@ -36,7 +36,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <type_traits>
@@ -296,8 +296,7 @@ bool FieldRef::isNumericPathComponentStrict(StringData component) {
 }
 
 bool FieldRef::isNumericPathComponentLenient(StringData component) {
-    return !component.empty() &&
-        std::all_of(component.begin(), component.end(), [](auto c) { return ctype::isDigit(c); });
+    return !component.empty() && str::isAllDigits(component);
 }
 
 bool FieldRef::isNumericPathComponentStrict(FieldIndex i) const {

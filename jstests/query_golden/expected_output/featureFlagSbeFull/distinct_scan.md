@@ -507,7 +507,7 @@ Execution Engine: classic
 				"direction" : "forward",
 				"indexBounds" : {
 					"a" : [
-						"[-inf.0, 3.0]"
+						"[-inf, 3.0]"
 					],
 					"b" : [
 						"[MinKey, MaxKey]"
@@ -544,7 +544,7 @@ Execution Engine: classic
 			"direction" : "forward",
 			"indexBounds" : {
 				"a" : [
-					"[-inf.0, 3.0]"
+					"[-inf, 3.0]"
 				]
 			},
 			"indexName" : "a_1",
@@ -611,7 +611,7 @@ Execution Engine: classic
 							"direction" : "forward",
 							"indexBounds" : {
 								"a" : [
-									"[-inf.0, 3.0]"
+									"[-inf, 3.0]"
 								],
 								"b" : [
 									"[MinKey, MaxKey]"
@@ -648,7 +648,7 @@ Execution Engine: classic
 						"direction" : "forward",
 						"indexBounds" : {
 							"a" : [
-								"[-inf.0, 3.0]"
+								"[-inf, 3.0]"
 							]
 						},
 						"indexName" : "a_1",

@@ -42,6 +42,7 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/itoa.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/shared_buffer_fragment.h"
@@ -824,8 +825,7 @@ public:
         MONGO_verify(z >= 0);
         MONGO_verify(z < maxSize);
         _buf.setlen(prev + z);
-        if (strchr(start, '.') == nullptr && strchr(start, 'E') == nullptr &&
-            strchr(start, 'N') == nullptr) {
+        if (str::isAllDigits(*start == '-' ? start + 1 : start)) {
             write(".0", 2);
         }
     }

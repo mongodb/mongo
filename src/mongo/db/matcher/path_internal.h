@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-bool isAllDigits(StringData str);
-
 /**
  * Finds the element at 'path' in 'doc', starting at 'startIndex' in 'path'. If none is found, an
  * EOO element is returned. If an array is encountered along 'path', the traversal stops early, and

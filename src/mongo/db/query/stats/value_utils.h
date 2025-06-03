@@ -296,7 +296,7 @@ bool isEmptyInterval(sbe::value::TypeTags startTag,
  * Returns true if the interval covers a full type. This helps to determine if the interval is
  * estimable by a type count. The design of this method follows the definition of a full interval as
  * inclusive the minimum value of the current type and either:
- * a) inclusive the maximum value of the current type (if representable, e.g., [nan.0, inf.0])
+ * a) inclusive the maximum value of the current type (if representable, e.g., [nan, inf])
  * or
  * b) exclusive the minimume value of the next type (e.g., for Object, [{}, [])).
  */

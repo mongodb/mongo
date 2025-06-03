@@ -30,15 +30,10 @@
 #include "mongo/db/matcher/path_internal.h"
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/util/ctype.h"
 
 #include <algorithm>
 
 namespace mongo {
-
-bool isAllDigits(StringData str) {
-    return std::all_of(str.begin(), str.end(), [](char c) { return ctype::isDigit(c); });
-}
 
 BSONElement getFieldDottedOrArray(const BSONObj& doc,
                                   const FieldRef& path,

@@ -132,7 +132,10 @@ for (const stage of planStages) {
         // field being the wildcard field.
         const expectedKeyPattern = {"num": 1, "$_path": 1};
         assert.eq(stage.keyPattern, expectedKeyPattern, stage);
-        assert.eq(stage.indexBounds["num"], ["[1.0, inf.0]"], stage);
+        // inf.0 comes from a legacy number formatting bug. We need
+        // this workaround for shard testing against multiple versions.
+        assert.eq(
+            stage.indexBounds["num"].map(s => s.replace("inf.0", "inf")), ["[1.0, inf]"], stage);
         // The CWI used to answer a $or query should be expanded to include all paths and all keys
         // for the wildcard field.
         assert.eq(stage.indexBounds["$_path"], ["[MinKey, MinKey]", "[\"\", {})"], stage);

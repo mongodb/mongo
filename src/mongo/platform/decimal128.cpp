@@ -158,7 +158,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
         ++charsConsumed;
     }
 
-    if (!std::all_of(exponent.begin(), exponent.end(), [](char c) { return ctype::isDigit(c); })) {
+    if (!str::isAllDigits(exponent)) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }

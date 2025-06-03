@@ -34,7 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -370,9 +370,7 @@ private:
     // and consists solely of digits.
     bool isEquivalentToIPv4DottedDecimal() const {
         return !_fullyQualified && _nameComponents.size() == 4 &&
-            std::all_of(begin(_nameComponents), end(_nameComponents), [](const auto& s) {
-                return std::all_of(begin(s), end(s), [](char c) { return ctype::isDigit(c); });
-            });
+            std::all_of(begin(_nameComponents), end(_nameComponents), str::isAllDigits);
     }
 
     // Hostname components are stored top-first (e.g. "com","mongodb","www").

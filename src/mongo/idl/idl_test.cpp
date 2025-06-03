@@ -518,13 +518,13 @@ TEST(IDLStructTests, DurationParse) {
         Struct_with_durations::parse(ctxt, notADurationDoc),
         AssertionException,
         ErrorCodes::FailedToParse,
-        fmt::format("Expected an integer, but found NaN in: secs: {}.0", kNANRepr));
+        fmt::format("Expected an integer, but found NaN in: secs: {}", kNANRepr));
 
     auto endOfTimeDoc = BSON("secs" << std::numeric_limits<double>::infinity());
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, endOfTimeDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
-                                "Cannot represent as a 64-bit integer: secs: inf.0");
+                                "Cannot represent as a 64-bit integer: secs: inf");
 }
 
 TEST(IDLStructTests, DurationSerialize) {
@@ -571,13 +571,13 @@ TEST(IDLStructTests, EpochsParse) {
         Struct_with_epochs::parse(ctxt, notATimeDoc),
         AssertionException,
         ErrorCodes::FailedToParse,
-        fmt::format("Expected an integer, but found NaN in: ecma: {}.0", kNANRepr));
+        fmt::format("Expected an integer, but found NaN in: ecma: {}", kNANRepr));
 
     auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, endOfTimeDoc),
                                 AssertionException,
                                 ErrorCodes::FailedToParse,
-                                "Cannot represent as a 64-bit integer: unix: inf.0");
+                                "Cannot represent as a 64-bit integer: unix: inf");
 }
 
 TEST(IDLStructTests, EpochSerialize) {

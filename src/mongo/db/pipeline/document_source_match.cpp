@@ -45,7 +45,7 @@
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -198,22 +198,17 @@ namespace {
 // the Match expression has been successfully parsed so they can assume that
 // input is well formed.
 
-bool isAllDigits(StringData str) {
-    return !str.empty() &&
-        std::all_of(str.begin(), str.end(), [](char c) { return ctype::isDigit(c); });
-}
-
 bool isFieldnameRedactSafe(StringData fieldName) {
     // Can't have numeric elements in the dotted path since redacting elements from an array
     // would change the indexes.
 
     const size_t dotPos = fieldName.find('.');
     if (dotPos == string::npos)
-        return !isAllDigits(fieldName);
+        return fieldName.empty() || !str::isAllDigits(fieldName);
 
     const StringData part = fieldName.substr(0, dotPos);
     const StringData rest = fieldName.substr(dotPos + 1);
-    return !isAllDigits(part) && isFieldnameRedactSafe(rest);
+    return (part.empty() || !str::isAllDigits(part)) && isFieldnameRedactSafe(rest);
 }
 
 bool isTypeRedactSafeInComparison(BSONType type) {

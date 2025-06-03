@@ -162,7 +162,7 @@ TEST_F(CMCollapseTreeTest, AllValue) {
     checkIndexBounds("{b: 2}", expected);
 }
 
-// { 'a' : { '$not' : { '$gt' : 1 } } } -> a: [MinKey, 1.0], (inf.0, MaxKey]
+// { 'a' : { '$not' : { '$gt' : 1 } } } -> a: [MinKey, 1.0], (inf, MaxKey]
 TEST_F(CMCollapseTreeTest, NegativeGT) {
     OrderedIntervalList expected;
     {
@@ -204,7 +204,7 @@ TEST_F(CMCollapseTreeTest, OrOfAnd) {
 }
 
 // {$or: [{a:{$gt:2,$lt:10}}, {a:{$gt:0,$lt:15}}, {a:{$gt:20}}]}
-//   -> a: (0.0, 15.0), (20.0, inf.0]
+//   -> a: (0.0, 15.0), (20.0, inf]
 TEST_F(CMCollapseTreeTest, OrOfAnd2) {
     OrderedIntervalList expected;
     expected.intervals.push_back(Interval(BSON("" << 0.0 << "" << 15.0), false, false));
@@ -664,7 +664,7 @@ TEST_F(CMCollapseTreeTest, GeoNearDoesNotAffectOtherBounds) {
             expected);
     }
     // With compound index {a: 1, c: 1}
-    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], c: (2, inf.0]
+    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], c: (2, inf]
     {
         IndexBounds expectedBounds;
         expectedBounds.fields.push_back(OrderedIntervalList());
@@ -685,7 +685,7 @@ TEST_F(CMCollapseTreeTest, GeoNearDoesNotAffectOtherBounds) {
                                 expectedBounds);
     }
     // With compound index {a: 1, b: 1, c: 1}
-    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], b: [MinKey, MaxKey], c: (2, inf.0]
+    // {a: 2, b: {$near: ...}, c: {$gt: 2}} -> a: [2, 2], b: [MinKey, MaxKey], c: (2, inf]
     {
         IndexBounds expectedBounds;
         expectedBounds.fields.push_back(OrderedIntervalList());

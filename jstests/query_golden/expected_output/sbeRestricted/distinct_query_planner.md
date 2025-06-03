@@ -265,7 +265,7 @@ Execution Engine: sbe
 			"direction" : "forward",
 			"indexBounds" : {
 				"a" : [
-					"(3.0, inf.0]"
+					"(3.0, inf]"
 				]
 			},
 			"indexName" : "a_1",

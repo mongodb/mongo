@@ -20,7 +20,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 3.0)"
+						"[inf, 3.0)"
 					]
 				},
 				"indexName" : "x_-1",
@@ -50,7 +50,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					]
 				},
 				"indexName" : "x_1",
@@ -194,7 +194,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 3.0)"
+						"[inf, 3.0)"
 					]
 				},
 				"indexName" : "x_-1",
@@ -226,7 +226,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					]
 				},
 				"indexName" : "x_1",
@@ -522,7 +522,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 3.0)"
+						"[inf, 3.0)"
 					],
 					"y" : [
 						"[5.0, 5.0]"
@@ -558,7 +558,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					],
 					"y" : [
 						"[5.0, 5.0]"
@@ -594,7 +594,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(3.0, inf.0]"
+						"(3.0, inf]"
 					],
 					"y" : [
 						"[5.0, 5.0]"
@@ -636,7 +636,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(3.0, inf.0]"
+					"(3.0, inf]"
 				],
 				"y" : [
 					"[5.0, 5.0]"
@@ -697,8 +697,8 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 6.0)",
-						"(4.0, -inf.0]"
+						"[inf, 6.0)",
+						"(4.0, -inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -734,8 +734,8 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[-inf.0, 4.0)",
-						"(6.0, inf.0]"
+						"[-inf, 4.0)",
+						"(6.0, inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -779,7 +779,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(4.0, -inf.0]"
+						"(4.0, -inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -804,7 +804,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(6.0, inf.0]"
+						"(6.0, inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -841,7 +841,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[-inf.0, 4.0)"
+						"[-inf, 4.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -871,7 +871,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(6.0, inf.0]"
+						"(6.0, inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -908,7 +908,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 6.0)"
+						"[inf, 6.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -933,7 +933,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[-inf.0, 4.0)"
+						"[-inf, 4.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -970,7 +970,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[-inf.0, 4.0)"
+						"[-inf, 4.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1000,7 +1000,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[inf.0, 6.0)"
+						"[inf, 6.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1037,7 +1037,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(6.0, inf.0]"
+						"(6.0, inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1067,7 +1067,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"[-inf.0, 4.0)"
+						"[-inf, 4.0)"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1104,7 +1104,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(6.0, inf.0]"
+						"(6.0, inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1134,7 +1134,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(4.0, -inf.0]"
+						"(4.0, -inf]"
 					],
 					"y" : [
 						"[MinKey, MaxKey]"
@@ -1169,8 +1169,8 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"[-inf.0, 4.0)",
-					"(6.0, inf.0]"
+					"[-inf, 4.0)",
+					"(6.0, inf]"
 				],
 				"y" : [
 					"[MinKey, MaxKey]"
@@ -1408,7 +1408,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(3.0, inf.0]"
+					"(3.0, inf]"
 				],
 				"y" : [
 					"[MinKey, MaxKey]"
@@ -1474,7 +1474,7 @@
 					"[MinKey, MaxKey]"
 				],
 				"y" : [
-					"[-inf.0, 7.0)"
+					"[-inf, 7.0)"
 				]
 			},
 			"indexName" : "y_1_x_1",
@@ -1549,7 +1549,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(-1.0, inf.0]"
+						"(-1.0, inf]"
 					]
 				},
 				"indexName" : "x_1",
@@ -1579,7 +1579,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"y" : [
-						"[-inf.0, 250.0)"
+						"[-inf, 250.0)"
 					],
 					"z" : [
 						"[MinKey, MaxKey]"
@@ -1614,10 +1614,10 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(-1.0, inf.0]"
+					"(-1.0, inf]"
 				],
 				"y" : [
-					"[-inf.0, 250.0)"
+					"[-inf, 250.0)"
 				]
 			},
 			"indexName" : "x_1_y_1",
@@ -1662,10 +1662,10 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(-1.0, inf.0]"
+						"(-1.0, inf]"
 					],
 					"y" : [
-						"[-inf.0, 105.0)"
+						"[-inf, 105.0)"
 					]
 				},
 				"indexName" : "x_1_y_1",
@@ -1699,7 +1699,7 @@
 				"direction" : "forward",
 				"indexBounds" : {
 					"x" : [
-						"(-1.0, inf.0]"
+						"(-1.0, inf]"
 					]
 				},
 				"indexName" : "x_1",
@@ -1730,7 +1730,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"y" : [
-					"[-inf.0, 105.0)"
+					"[-inf, 105.0)"
 				],
 				"z" : [
 					"[MinKey, MaxKey]"
@@ -1822,7 +1822,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"y" : [
-					"[-inf.0, 105.0)"
+					"[-inf, 105.0)"
 				],
 				"z" : [
 					"[MinKey, MaxKey]"
@@ -1868,7 +1868,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(3.0, inf.0]"
+					"(3.0, inf]"
 				],
 				"y" : [
 					"[5.0, 5.0]"
@@ -1917,7 +1917,7 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(-1.0, inf.0]"
+					"(-1.0, inf]"
 				]
 			},
 			"indexName" : "x_1",
@@ -1990,10 +1990,10 @@
 			"direction" : "forward",
 			"indexBounds" : {
 				"x" : [
-					"(-1.0, inf.0]"
+					"(-1.0, inf]"
 				],
 				"y" : [
-					"[-inf.0, 105.0)"
+					"[-inf, 105.0)"
 				]
 			},
 			"indexName" : "x_1_y_1",
