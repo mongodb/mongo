@@ -27,37 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 
 namespace mongo::classic_runtime_planner {
 
-MultiPlanner::MultiPlanner(PlannerData plannerData,
-                           std::vector<std::unique_ptr<QuerySolution>> solutions,
-                           QueryPlanner::CostBasedRankerResult cbrResult)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(cbrResult)) {
-    auto stage = std::make_unique<MultiPlanStage>(
-        cq()->getExpCtxRaw(),
-        collections().getMainCollectionPtrOrAcquisition(),
-        cq(),
-        plan_cache_util::ClassicPlanCacheWriter{
-            opCtx(), collections().getMainCollectionPtrOrAcquisition(), false /* executeInSbe */});
-    for (auto&& solution : solutions) {
-        solution->indexFilterApplied = plannerParams().indexFiltersApplied;
-        auto executableTree = buildExecutableTree(*solution);
-        stage->addPlan(std::move(solution), std::move(executableTree), ws());
-    }
-    setRoot(std::move(stage));
-    // Need to do this after the move to make the static analyzer happy. The pointer is
-    // stored as a PlanStage pointer, so we need to reinterpret cast during retrieval.
-    _multiplanStage = reinterpret_cast<MultiPlanStage*>(getRoot());
+SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
+    PlannerData plannerData,
+    std::unique_ptr<QuerySolution> querySolution,
+    QueryPlanner::CostBasedRankerResult cbrResult)
+    : ClassicPlannerInterface(std::move(plannerData), std::move(cbrResult)),
+      _querySolution(std::move(querySolution)) {
+    auto root = buildExecutableTree(*_querySolution);
+    setRoot(std::move(root));
 }
 
-Status MultiPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
-    return _multiplanStage->pickBestPlan(planYieldPolicy);
+Status SingleSolutionPassthroughPlanner::doPlan(PlanYieldPolicy* planYieldPolicy) {
+    // Nothing to do.
+    return Status::OK();
 }
 
-std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
-    // The query solutions are owned by the 'MultiPlan' stage.
-    return nullptr;
+std::unique_ptr<QuerySolution> SingleSolutionPassthroughPlanner::extractQuerySolution() {
+    return std::move(_querySolution);
 }
 }  // namespace mongo::classic_runtime_planner

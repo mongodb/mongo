@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 
 #include "mongo/db/exec/batched_delete_stage.h"
 #include "mongo/db/exec/count.h"

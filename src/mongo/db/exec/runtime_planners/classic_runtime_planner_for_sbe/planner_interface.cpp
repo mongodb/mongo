@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"

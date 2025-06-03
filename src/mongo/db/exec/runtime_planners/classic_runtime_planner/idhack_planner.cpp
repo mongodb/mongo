@@ -30,10 +30,10 @@
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/return_key.h"
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 
 namespace mongo::classic_runtime_planner {
 

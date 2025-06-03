@@ -1739,6 +1739,18 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/exec/mutable_bson/**/* @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/exec/mutable_bson/**/OWNERS.yml @10gen/query-execution-staff-leads @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/exec/runtime_planners/OWNERS.yml
+/src/mongo/db/exec/runtime_planners/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/exec/runtime_planners/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/exec/runtime_planners/classic_runtime_planner/OWNERS.yml
+/src/mongo/db/exec/runtime_planners/classic_runtime_planner/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/exec/runtime_planners/classic_runtime_planner/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/OWNERS.yml
+/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/exec/runtime_planners/classic_runtime_planner_for_sbe/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
 /src/mongo/db/exec/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
 
@@ -2188,14 +2200,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/ce/OWNERS.yml
 /src/mongo/db/query/ce/**/* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/ce/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/query/classic_runtime_planner/OWNERS.yml
-/src/mongo/db/query/classic_runtime_planner/**/* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/classic_runtime_planner/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
-
-# The following patterns are parsed from ./src/mongo/db/query/classic_runtime_planner_for_sbe/OWNERS.yml
-/src/mongo/db/query/classic_runtime_planner_for_sbe/**/* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/query/classic_runtime_planner_for_sbe/**/OWNERS.yml @10gen/query-optimization-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/client_cursor/OWNERS.yml
 /src/mongo/db/query/client_cursor/**/* @10gen/query-execution @svc-auto-approve-bot

@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
-#include "mongo/db/query/planner_interface.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"

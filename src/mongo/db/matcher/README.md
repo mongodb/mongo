@@ -2,7 +2,7 @@
 
 ## Overview
 
-A query is first parsed into a [logical model](../query/README_logical_models.md), representing the query's semantics in a structured format. This logical model is then normalized, transformed, and optimized, making it more amenable to efficient execution. These rewrites are based on predefined rules, or heuristics. We call them **heuristic rewrites** because we don't know for sure whether the rewritten result will be better than the original - we just have a best guess. Once the logical model is optimized, the query planner [generates](../query/plan_enumerator/README.md) multiple candidate physical representations and [selects](../query/classic_runtime_planner/README.md) the most efficient plan for execution.
+A query is first parsed into a [logical model](../query/README_logical_models.md), representing the query's semantics in a structured format. This logical model is then normalized, transformed, and optimized, making it more amenable to efficient execution. These rewrites are based on predefined rules, or heuristics. We call them **heuristic rewrites** because we don't know for sure whether the rewritten result will be better than the original - we just have a best guess. Once the logical model is optimized, the query planner [generates](../query/plan_enumerator/README.md) multiple candidate physical representations and [selects](../exec/runtime_planners/classic_runtime_planner/README.md) the most efficient plan for execution.
 
 This README will cover rewrites on the `MatchExpression` component of a find query or `$match` stage. It does not cover subsequent stages such as query compilation (stage builders). To learn more about rewrites on aggregate pipelines, refer to the [Pipeline Rewrites README](../pipeline/README.md).
 
