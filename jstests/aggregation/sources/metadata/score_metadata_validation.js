@@ -2,9 +2,6 @@
  * Test that references to "score" are correctly validated with the $score stage in different
  * relative positions.
  *
- * TODO SERVER-97341: This test only checks if the query succeeds or not. We should also test (here
- * or in another file) that the output is correct.
- *
  * TODO SERVER-100946 Enable this test to be run in $facets.
  *
  * featureFlagRankFusionBasic is required to enable use of "score".
@@ -43,24 +40,94 @@ const limitStage = {
 const groupStage = {
     $group: {_id: null, myField: {$max: "$a"}}
 };
+const constantProjectMyScoreStage = {
+    $project: {myScore: {$const: 7}}
+};
+const sortStage = {
+    $sort: {_id: 1}
+};
+const inhibitOptimizationStage = {
+    $_internalInhibitOptimization: {}
+};
+
+function runPipelineAndCheckExpectedMetaScoreResult(scorePipeline, expectedResultsPipeline) {
+    let actualResult = coll.aggregate(scorePipeline).toArray();
+    let expectedResult = coll.aggregate(expectedResultsPipeline).toArray();
+    assert.eq(actualResult, expectedResult);
+}
 
 // Project'ing "score" immediately after $score works.
-assert.commandWorked(db.runCommand(
-    {aggregate: collName, pipeline: [scoreStage, metaProjectScoreStage], cursor: {}}));
+(function projectScoreAfterScoreStageWorks() {
+    runPipelineAndCheckExpectedMetaScoreResult(
+        [scoreStage, metaProjectScoreStage, inhibitOptimizationStage, sortStage],
+        [constantProjectMyScoreStage, inhibitOptimizationStage, sortStage]);
+})();
 
 // Project'ing "score" many stages after $score works.
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [scoreStage, matchStage, skipStage, limitStage, metaProjectScoreStage],
-    cursor: {}
-}));
+(function projectScoreManyStagesAfterScoreStageWorks() {
+    runPipelineAndCheckExpectedMetaScoreResult(
+        [
+            scoreStage,
+            matchStage,
+            skipStage,
+            limitStage,
+            metaProjectScoreStage,
+            inhibitOptimizationStage,
+            sortStage
+        ],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            constantProjectMyScoreStage,
+            inhibitOptimizationStage,
+            sortStage
+        ]);
+})();
 
 // Project'ing "score" works when $score isn't the first stage.
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [matchStage, skipStage, scoreStage, limitStage, metaProjectScoreStage],
-    cursor: {}
-}));
+(function projectScoreWhenScoreStageIsNotFirst() {
+    runPipelineAndCheckExpectedMetaScoreResult(
+        [
+            matchStage,
+            skipStage,
+            scoreStage,
+            limitStage,
+            metaProjectScoreStage,
+            inhibitOptimizationStage,
+            sortStage
+        ],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            constantProjectMyScoreStage,
+            inhibitOptimizationStage,
+            sortStage
+        ]);
+})();
+
+// Project'ing "score" works with multiple stages involved when $score is not a constant.
+(function projectScoreWhenScoreStageIsNotConstant() {
+    runPipelineAndCheckExpectedMetaScoreResult(
+        [
+            {$score: {score: "$a", normalizeFunction: "none"}},
+            matchStage,
+            skipStage,
+            limitStage,
+            metaProjectScoreStage,
+            inhibitOptimizationStage,
+            sortStage
+        ],
+        [
+            matchStage,
+            skipStage,
+            limitStage,
+            {$project: {myScore: "$a"}},
+            inhibitOptimizationStage,
+            sortStage
+        ]);
+})();
 
 // Project'ing "score" after a $group is rejected since $group drops the per-document metadata.
 assert.commandFailedWithCode(db.runCommand({
