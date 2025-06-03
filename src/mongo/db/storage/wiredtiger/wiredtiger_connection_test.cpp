@@ -269,4 +269,27 @@ TEST(WiredTigerConnectionTest, CheckSessionCacheMax) {
     ASSERT_EQUALS(connection->getIdleSessionsCount(), 6U);
 }
 
+TEST(WiredTigerConnectionTest, SettingSessionCacheMaxToZeroDisablesSessionCaching) {
+    auto maxSessionCacheSize = 0;
+    WiredTigerConnectionHarnessHelper harnessHelper("", maxSessionCacheSize);
+    WiredTigerConnection* connection = harnessHelper.getConnection();
+
+    ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
+
+    // An idle timeout of 0 means never expire idle sessions.
+    connection->closeExpiredIdleSessions(0);
+    {
+        std::array<WiredTigerManagedSession, 10> sessions;
+
+        for (auto& session : sessions) {
+            session = connection->getUninterruptibleSession();
+        }
+        // Check that the cache is empty here.
+        ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
+    }
+    // Destroying a session puts it in the session cache. Here, since we disabled session caching,
+    // the session cache should still be empty.
+    ASSERT_EQUALS(connection->getIdleSessionsCount(), 0U);
+}
+
 }  // namespace mongo
