@@ -89,6 +89,13 @@ common --strategy=CcGenerateIntermediateDwp=local
 common --strategy=CcGenerateDwp=local
 common --modify_execution_info=^(TestRunner|CppLink|CppArchive|SolibSymlink|ExtractDebuginfo|StripDebuginfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=+no-remote-cache
 
+# Global clang tidy flags to avoid invalidating analysis cache between clang-tidy / regular runs
+common --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp"
+common --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
+common --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
+common --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
+common --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
+
 # Aliases for config flags
 common --flag_alias=linkstatic=//bazel/config:linkstatic
 common --flag_alias=compiler_type=//bazel/config:compiler_type
@@ -432,16 +439,12 @@ common --remote_upload_local_results=False
 # Settings specific for clang-tidy
 --config=clang-tidy
 common:clang-tidy --config=dbg
+common:clang-tidy --remote_download_outputs=minimal
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --keep_going
 common:clang-tidy --aspects @bazel_clang_tidy//clang_tidy:clang_tidy.bzl%clang_tidy_aspect
 common:clang-tidy --output_groups=report
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_excludes=".pb.cc,icu_init.cpp"
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_config=//:clang_tidy_config_strict
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_executable=//:clang_tidy
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_additional_deps=//:toolchain_files
-common:clang-tidy --@bazel_clang_tidy//:clang_tidy_plugin_deps=//src/mongo/tools/mongo_tidy_checks:mongo_tidy_checks
 
 --config=mod-scanner
 common:mod-scanner --config=dbg
