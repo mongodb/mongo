@@ -119,6 +119,9 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     }
 
     if (auto napTime = doubleToMillis(waitForTokenSecs); napTime > Milliseconds{0}) {
+        // Calculate the deadline before incrementing the queued metric to ensure that unit tests
+        // don't advance the mock clock before the sleep deadline is calculated.
+        Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + napTime;
         if (auto status = _impl->enqueue(); !status.isOK()) {
             _impl->stats.rejectedAdmissions.incrementRelaxed();
             return status;
@@ -134,7 +137,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
                         "Going to sleep waiting for token acquisition",
                         "rateLimiterName"_attr = _impl->name,
                         "napTimeMillis"_attr = napTime.toString());
-            opCtx->sleepFor(napTime);
+            opCtx->sleepUntil(deadline);
         } catch (const DBException& e) {
             _impl->stats.interruptedInQueue.incrementRelaxed();
             LOGV2_DEBUG(10440800,
