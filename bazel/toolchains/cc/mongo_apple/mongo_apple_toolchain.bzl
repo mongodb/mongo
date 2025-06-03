@@ -300,22 +300,10 @@ that LLVM_VERSION has been defined in //.bazelrc.local or //.bazelrc file."""
         error_message = """
 Unable to find the prefix LLVM path using brew command: {}. Please make
 sure that you have installed the LLVM toolchain using Homebrew:
-    `brew install llvm@<version>`
-or update the LLVM_VERSION in the //.bazelrc file or //.bazelrc.local.""".format(" ".join(brew_command))
+    `brew install llvm@{} lld@{}`.
+or update the LLVM_VERSION in the //.bazelrc file or //.bazelrc.local.""".format(" ".join(brew_command), llvm_version, llvm_version)
         return False, "", "", error_message
     llvm_path = result.stdout.strip()
-
-    # The path needs to be validated to ensure that it exists.
-    # The error message is injected in the build file as users may not
-    # have installed the LLVM toolchain yet. If the user attempt to use
-    # it, a build error will be raised with the message.
-    if not repository_ctx.path(llvm_path).exists:
-        error_message = """
-You have specified to use the local clang --local_clang_compiler but unable to find the LLVM path:
-    {}.
-Please make sure that you have installed the LLVM toolchain using Homebrew: 
-    `brew install llvm@<version>`.""".format(llvm_path)
-        return False, "", "", error_message
 
     # Find the real path to the LLVM installation as we need to include the LLVM
     # lib and headers directories as part of built-in directories.
@@ -332,6 +320,10 @@ Please make sure that you have installed the LLVM toolchain using Homebrew:
     return True, llvm_path, llvm_version, ""
 
 def _get_lld_info(repository_ctx, llvm_version):
+    error_message = """
+Unable to find the lld path. Please make sure that you have installed the lld using Homebrew: 
+    `brew install lld@{}`.""".format(llvm_version)
+
     brew_command = [
         "/bin/bash",
         "-c",
@@ -339,11 +331,18 @@ def _get_lld_info(repository_ctx, llvm_version):
     ]
     result = repository_ctx.execute(brew_command)
     if result.return_code != 0:
-        return False, "", "Failed to find the prefix of LLD path using brew command: {}".format(" ".join(brew_command))
+        return False, "", error_message
     lld_path = result.stdout.strip()
 
-    if not repository_ctx.path(lld_path).exists:
-        return False, "", "The LLD_PATH does not exist: {}".format(lld_path)
+    command = [
+        "/bin/bash",
+        "-c",
+        "readlink -f {}".format(lld_path),
+    ]
+    result = repository_ctx.execute(command)
+    if result.return_code != 0:
+        return False, "", error_message
+    lld_path = result.stdout.strip()
 
     return True, lld_path, ""
 
