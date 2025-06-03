@@ -164,7 +164,8 @@ OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
         databaseHolder->closeAll(opCtx.get());
     }
 
-    catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_serviceContext);
+    catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_serviceContext,
+                                                                    true /* memLeakAllowed */);
 }
 
 ClientStrand* OpMsgFuzzerFixture::_getStrand(ClusterRole role) {

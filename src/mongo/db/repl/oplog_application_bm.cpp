@@ -177,9 +177,6 @@ public:
         repl::ReplicationCoordinator::set(
             _svcCtx, std::unique_ptr<repl::ReplicationCoordinator>(_replCoord));
 
-        // Disable fast shutdown so that WT can free memory.
-        globalFailPointRegistry().find("WTDisableFastShutDown")->setMode(FailPoint::alwaysOn);
-
         catalog::startUpStorageEngineAndCollectionCatalog(
             _svcCtx,
             &cc(),
@@ -250,8 +247,9 @@ public:
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->closeAll(opCtx);
 
-        // Shut down storage engine.
-        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_svcCtx);
+        // Shut down storage engine and free memory.
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(_svcCtx,
+                                                                        false /* memLeakAllowed */);
     }
 
     // Shut down the storage engine, clear the dbpath, and restart the storage engine with empty

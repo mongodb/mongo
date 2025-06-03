@@ -28,10 +28,6 @@
  */
 
 
-#ifdef _WIN32
-#define NVALGRIND
-#endif
-
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 
 #include "mongo/base/error_codes.h"
@@ -48,28 +44,10 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <valgrind/valgrind.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-
-namespace {
-
-#if __has_feature(address_sanitizer)
-constexpr bool kAddressSanitizerEnabled = true;
-#else
-constexpr bool kAddressSanitizerEnabled = false;
-#endif
-
-#if __has_feature(thread_sanitizer)
-constexpr bool kThreadSanitizerEnabled = true;
-#else
-constexpr bool kThreadSanitizerEnabled = false;
-#endif
-
-}  // namespace
-
 SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalName,
                                                  const std::string& path,
                                                  ClockSource* clockSource,
@@ -113,7 +91,8 @@ SpillWiredTigerKVEngine::~SpillWiredTigerKVEngine() {
     // storage engine.
     ServerParameterSet::getNodeParameterSet()->remove("spillWiredTigerEngineRuntimeConfig");
 
-    cleanShutdown();
+    bool memLeakAllowed = true;
+    cleanShutdown(memLeakAllowed);
 }
 
 void SpillWiredTigerKVEngine::_openWiredTiger(const std::string& path,
@@ -197,7 +176,7 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
     return status;
 }
 
-void SpillWiredTigerKVEngine::cleanShutdown() {
+void SpillWiredTigerKVEngine::cleanShutdown(bool memLeakAllowed) {
     LOGV2(10158003, "SpillWiredTigerKVEngine shutting down");
 
     if (!_conn) {
@@ -205,16 +184,9 @@ void SpillWiredTigerKVEngine::cleanShutdown() {
     }
 
     _connection->shuttingDown();
-    _connection.reset();
 
-    // We want WiredTiger to leak memory for faster shutdown except when we are running tools to
-    // look for memory leaks.
-    bool leak_memory = !kAddressSanitizerEnabled;
     std::string closeConfig = "";
-    if (RUNNING_ON_VALGRIND) {  // NOLINT
-        leak_memory = false;
-    }
-    if (leak_memory) {
+    if (memLeakAllowed) {
         closeConfig = "leak_memory=true,";
     }
 

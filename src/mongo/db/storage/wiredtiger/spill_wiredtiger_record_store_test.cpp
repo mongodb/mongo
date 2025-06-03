@@ -61,6 +61,15 @@ protected:
             "a.b"));
     }
 
+    ~SpillWiredTigerRecordStoreTest() override {
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        _kvEngine->cleanShutdown(memLeakAllowed);
+    }
+
     std::unique_ptr<SpillWiredTigerRecordStore> makeTemporaryRecordStore(const std::string& ns,
                                                                          KeyFormat keyFormat) {
         StringData ident = ns;

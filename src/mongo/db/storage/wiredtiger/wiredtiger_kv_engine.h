@@ -459,7 +459,7 @@ public:
 
     std::vector<std::string> getAllIdents(RecoveryUnit&) const override;
 
-    void cleanShutdown() override;
+    void cleanShutdown(bool memLeakAllowed) override;
 
     SnapshotManager* getSnapshotManager() const final {
         return &_connection->snapshotManager();

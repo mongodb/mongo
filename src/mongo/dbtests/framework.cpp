@@ -93,7 +93,8 @@ int runDbTests(int argc, char** argv) {
         if (!serviceContext->getStorageEngine())
             return;
 
-        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext);
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
+                                                                        true /* memLeakAllowed */);
     });
 
     ThreadClient tc("testsuite", serviceContext->getService());

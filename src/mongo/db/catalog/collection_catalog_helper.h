@@ -134,8 +134,10 @@ Status dropCollectionsWithPrefix(OperationContext* opCtx,
 
 /**
  * Shuts down collection catalog and storage engine cleanly.
+ * Set `memLeakAllowed` to true for faster shutdown.
  */
-void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* service);
+void shutDownCollectionCatalogAndGlobalStorageEngineCleanly(ServiceContext* service,
+                                                            bool memLeakAllowed);
 
 /**
  * Starts up storage engine and initializes the collection catalog.

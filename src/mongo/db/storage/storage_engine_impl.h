@@ -138,7 +138,7 @@ public:
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
         OperationContext* opCtx, StringData ident, KeyFormat keyFormat) override;
 
-    void cleanShutdown(ServiceContext* svcCtx) override;
+    void cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) override;
 
     void setStableTimestamp(Timestamp stableTimestamp, bool force = false) override;
 

@@ -190,7 +190,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void cleanShutdown() override;
+    void cleanShutdown(bool memLeakAllowed) override;
 
 private:
     void _openWiredTiger(const std::string& path, const std::string& wtOpenConfig);

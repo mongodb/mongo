@@ -358,9 +358,12 @@ public:
      * override this method if they have clean-up to do that is different from unclean shutdown.
      * MongoDB will not call into the storage subsystem after calling this function.
      *
+     * The storage engine is allowed to leak memory for faster shutdown, except when the process is
+     * not exiting or when running tools to look for memory leaks.
+     *
      * There is intentionally no uncleanShutdown().
      */
-    virtual void cleanShutdown() = 0;
+    virtual void cleanShutdown(bool memLeakAllowed) = 0;
 
     /**
      * Return the SnapshotManager for this KVEngine or NULL if not supported.

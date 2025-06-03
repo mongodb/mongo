@@ -233,10 +233,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(
     }
 }
 
-void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
+void shutdownGlobalStorageEngineCleanly(ServiceContext* service, bool memLeakAllowed) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
-    storageEngine->cleanShutdown(service);
+    storageEngine->cleanShutdown(service, memLeakAllowed);
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {
         lockFile->clearPidAndUnlock();
@@ -253,7 +253,8 @@ StorageEngine::LastShutdownState reinitializeStorageEngine(
     std::function<void()> changeConfigurationCallback) {
     auto service = opCtx->getServiceContext();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    shutdownGlobalStorageEngineCleanly(service);
+    // Tell storage engine to free memory since the process is not exiting.
+    shutdownGlobalStorageEngineCleanly(service, false /* memLeakAllowed */);
     shard_role_details::setRecoveryUnit(opCtx,
                                         std::make_unique<RecoveryUnitNoop>(),
                                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

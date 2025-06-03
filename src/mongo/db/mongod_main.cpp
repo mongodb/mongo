@@ -1960,7 +1960,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                        TimedSectionId::shutDownStorageEngine,
                                        &shutdownTimeElapsedBuilder);
         LOGV2(4784930, "Shutting down the storage engine");
-        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext);
+        // Allow memory leak for faster shutdown.
+        catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
+                                                                        true /* memLeakAllowed */);
     }
 
     // We drop the scope cache because leak sanitizer can't see across the

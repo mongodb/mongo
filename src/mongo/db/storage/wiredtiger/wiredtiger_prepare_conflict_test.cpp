@@ -84,6 +84,15 @@ public:
         recoveryUnit = std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit());
     }
 
+    ~WiredTigerPrepareConflictTest() override {
+#if __has_feature(address_sanitizer)
+        constexpr bool memLeakAllowed = false;
+#else
+        constexpr bool memLeakAllowed = true;
+#endif
+        kvEngine->cleanShutdown(memLeakAllowed);
+    }
+
     unittest::TempDir home{"temp"};
     ClockSourceMock cs;
     std::unique_ptr<WiredTigerKVEngine> kvEngine;

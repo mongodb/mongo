@@ -61,12 +61,17 @@
 #include <algorithm>
 #include <memory>
 
+#ifdef _WIN32
+#define NVALGRIND
+#endif
+
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <valgrind/valgrind.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -463,16 +468,22 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     }
 }
 
-void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
+void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowed) {
     _timestampMonitor.reset();
 
     _catalog.reset();
     _catalogRecordStore.reset();
 
-    _engine->cleanShutdown();
+#if __has_feature(address_sanitizer)
+    memLeakAllowed = false;
+#endif
+    if (RUNNING_ON_VALGRIND) {  // NOLINT
+        memLeakAllowed = false;
+    }
+    _engine->cleanShutdown(memLeakAllowed);
     // intentionally not deleting _engine
     if (_spillKVEngine) {
-        _spillKVEngine->cleanShutdown();
+        _spillKVEngine->cleanShutdown(memLeakAllowed);
     }
 }
 
