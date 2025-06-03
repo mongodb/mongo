@@ -179,6 +179,30 @@ tasks:
             --keep_going
             --build_tag_filters=${bazel_filters_for_cache_hydration}
 
+  - name: build_source_graph_index
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+          bazel_args: --intree_compdb
+      - func: "bazel compile"
+        vars:
+          targets: //src/...
+          bazel_args: --output_groups=compilation_outputs --build_enterprise=True --config=dbg --remote_download_outputs=all
+      - func: "bazel run"
+        vars:
+          target: //:scip-clang -- --compdb-path ./compile_commands.json
+      - func: "bazel run"
+        vars:
+          target: //:scip-src -- code-intel upload -file=index.scip
+          args: -github-token=${SOURCE_GRAPH_GITHUB_CLONER_TOKEN}
+          env: SRC_ENDPOINT=https://mongodb.sourcegraphcloud.com SRC_ACCESS_TOKEN=${SOURCE_GRAPH_API_ACCESS_TOKEN}
+          redact_args: true
+
   - name: hydrate_bazel_profile_opt
     tags:
       [
@@ -973,6 +997,12 @@ task_groups:
       - hydrate_bazel_profile_dbg
       - hydrate_bazel_profile_dbg_aubsan
       - hydrate_bazel_profile_dbg_tsan
+
+  - <<: *compile_task_group_template
+    name: build_source_graph_index_TG
+    max_hosts: -1
+    tasks:
+      - build_source_graph_index
 
   - <<: *compile_bazel_task_group_template
     name: compile_bazel_windows_TG
