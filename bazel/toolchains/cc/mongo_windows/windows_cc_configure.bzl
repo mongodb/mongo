@@ -928,4 +928,18 @@ def is_msvc_exists(repository_ctx, vc_path):
 def is_msvc_version_set(repository_ctx):
     return _get_env_var(repository_ctx, "BAZEL_VC_FULL_VERSION") != None
 
+def has_atl_installed(repository_ctx, vc_path, vars):
+    full_version = _get_vc_full_version(repository_ctx, vc_path)
+    path = escape_string("%s\\Tools\\MSVC\\%s\\ATLMFC\\include" % (vc_path, full_version)).replace("\\", "\\\\")
+    if path not in vars["INCLUDE"].split(";"):
+        message = """
+ALT component is not installed. Please run Visual Studio Installer
+and install the ALT component that matches to compiler version %s""" % full_version
+        auto_configure_fail(message)
+
+def has_win_sdk_installed(repository_ctx, vars):
+    winsdk_dir = vars["WINDOWSSDKDIR"] or ""
+    if winsdk_dir == "" or not repository_ctx.path(winsdk_dir).exists:
+        auto_configure_fail("Windows SDK is not installed. Please run the Visual Studio Installer and install Windows SDK 11.")
+
 ###

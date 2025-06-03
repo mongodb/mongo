@@ -4,6 +4,8 @@ load(
     "find_msvc_tool",
     "find_vc_path",
     "get_tmp_dir",
+    "has_atl_installed",
+    "has_win_sdk_installed",
     "is_msvc_exists",
     "is_msvc_version_set",
     "setup_vc_env_vars",
@@ -20,7 +22,7 @@ def _impl_gen_windows_toolchain_build_file(ctx):
     ctx.report_progress("Generating the required cc environment variables")
     vc_path = find_vc_path(ctx)
     if vc_path == None:
-        auto_configure_fail("Microsoft Visual Studio (VS) is not installed. Please install VS with VC and ATL support.")
+        auto_configure_fail("Microsoft Visual Studio (VS) is not installed. Please install VS with VC, ATL and SDK support.")
 
     # Verify that the VC build tools exists.
     msvc_exists, msvc_version = is_msvc_exists(ctx, vc_path)
@@ -37,6 +39,10 @@ def _impl_gen_windows_toolchain_build_file(ctx):
         auto_configure_fail(message)
 
     vars = setup_vc_env_vars(ctx, vc_path)
+
+    # verify that in the include_dirs, the ATL and Windows SDK are installed.
+    has_atl_installed(ctx, vc_path, vars)
+    has_win_sdk_installed(ctx, vars)
 
     include_dirs = vars["INCLUDE"]
     if include_dirs == None:
@@ -74,6 +80,10 @@ def _impl_gen_windows_toolchain_build_file(ctx):
         if tool_path == None:
             auto_configure_fail("locating the full path for tool %s was not found" % tool_name)
         substitutions[sub] = tool_path
+
+    # Save all the information to the file in bazel out to be used for debugging
+    # purpose.
+    ctx.file("windows_toolchain_config.json", json.encode(substitutions), executable = False)
 
     ctx.report_progress("Generating toolchain build file")
     ctx.template(
