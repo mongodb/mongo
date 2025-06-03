@@ -385,6 +385,7 @@ Su
 Subdirectory
 Subprocess
 TAILQ
+TCMalloc
 TESTUTIL
 TID
 TMP
@@ -474,6 +475,7 @@ WithSeeds
 Wl
 Wmissing
 WriteFile
+Wundef
 Wuninitialized
 Wunused
 XP
@@ -638,6 +640,7 @@ cookiep
 copydoc
 countp
 cp
+cplusplus
 cpp
 cppsuite
 cpu
