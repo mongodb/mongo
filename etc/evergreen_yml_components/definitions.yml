@@ -245,6 +245,17 @@ functions:
       extract_to: src
       build_variants: *package_variants
 
+  "fetch msi files":
+    command: s3.get
+    display_name: "fetch msi files"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-msi-files-signed.tgz
+      bucket: mciuploads
+      extract_to: src
+      build_variants: ["enterprise-windows", "windows"]
+
   "fetch dist tarball": &fetch_dist_tarball
     command: s3.get
     display_name: "fetch dist tarball"

@@ -1,0 +1,516 @@
+# This file contains compile and related tasks that only run on nightly/reference nightly exclusive variants
+
+################################################
+#                   Variable                   #
+################################################
+variables:
+  # TODO: split this up into the user files.
+  # List of all variants that make mongocryptd
+  # If a variant is listed here and has a push task, mongocryptd is pushed
+  - mongocryptd_variants: &mongocryptd_variants
+      - enterprise-amazon2023
+      # TODO(SERVER-85904) - enterprise-amazon2023-lto
+      - enterprise-amazon2023-arm64
+      - enterprise-amazon2023-arm64-grav4
+      # TODO(SERVER-85904) - enterprise-amazon2023-arm64-lto
+      - enterprise-debian12-64
+      - enterprise-linux-64-amazon-ami
+      - enterprise-macos
+      - enterprise-macos-arm64
+      - enterprise-rhel-81-ppc64le
+      - enterprise-rhel-8-64-bit
+      - enterprise-rhel-8-64-bit-coverage
+      - enterprise-rhel-8-64-bit-suggested
+      - enterprise-rhel-8-arm64
+      - enterprise-rhel-83-s390x
+      - enterprise-rhel-9-ppc64le
+      - enterprise-rhel-90-64-bit
+      - enterprise-rhel-90-arm64
+      - enterprise-rhel-93-64-bit
+      - enterprise-rhel-93-arm64
+      - enterprise-suse15-64
+      - enterprise-ubuntu2004-arm64
+      - enterprise-ubuntu2204-arm64
+      - enterprise-ubuntu2404-arm64
+      - enterprise-ubuntu2004-64
+      - enterprise-ubuntu2204-64
+      - enterprise-ubuntu2404
+      - enterprise-windows
+      - enterprise-windows-debug-unoptimized
+      - enterprise-windows-inmem
+      - enterprise-windows-wtdevelop
+
+################################################
+#                    Tasks                     #
+################################################
+tasks:
+  - name: sign_windows_msi
+    run_on: rhel8.7-small
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "auxiliary",
+        "windows_release_critical",
+        "incompatible_development_variant",
+        "requires_compile_variant",
+        "publish",
+      ]
+    depends_on:
+      - name: package
+    stepback: false
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "fetch packages"
+      # signing windows msi - will not sign in patch build but still pretend it did
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/garasign_jsign_sign.sh"
+      - command: archive.targz_pack
+        params:
+          target: "msi-files-signed.tgz"
+          source_dir: "src"
+          include:
+            - "mongodb-${push_name}-${push_arch}-${suffix}.msi"
+            - "mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1"
+            - "mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256"
+            - "mongodb-${push_name}-${push_arch}-${suffix}.msi.md5"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: msi-files-signed.tgz
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-msi-files-signed.tgz
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: MSI Files
+
+  - name: test_windows_msi
+    run_on: windows-2022-small
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "auxiliary",
+        "windows_release_critical",
+        "incompatible_development_variant",
+        "requires_compile_variant",
+        "publish",
+      ]
+    depends_on:
+      - name: sign_windows_msi
+    stepback: false
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "fetch msi files"
+      # testing windows msi
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/msi_validation.py"
+            - "mongodb-${push_name}-${push_arch}-${suffix}.msi"
+
+  - name: push
+    run_on: rhel8.7-small
+    tags:
+      [
+        "assigned_to_jira_team_devprod_build",
+        "release_critical",
+        "incompatible_development_variant",
+        "requires_compile_variant",
+        "publish",
+      ]
+    patchable: false
+    depends_on:
+      - name: package
+      - name: jsCore
+      - name: run_dbtest
+      - name: replica_sets_jscore_passthrough_gen
+      - name: test_windows_msi
+        variant: "windows"
+      - name: test_windows_msi
+        variant: "enterprise-windows"
+    stepback: false
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "get and apply version expansions"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch msi files"
+      - func: "fetch dist tarball"
+      # Fetch mongocryptd
+      - command: s3.get
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          remote_file: ${mongo_cryptd}
+          bucket: mciuploads
+          local_file: src/mongo-cryptd.tgz
+          build_variants: *mongocryptd_variants
+      - func: "f_expansions_write"
+      - func: "fetch dist debugsymbols"
+      - func: "set up remote credentials"
+        vars:
+          aws_key_remote: ${repo_aws_key}
+          aws_secret_remote: ${repo_aws_secret}
+      - func: "f_expansions_write"
+
+      # login to container registry
+      - command: subprocess.exec
+        params:
+          binary: bash
+          silent: true
+          args:
+            - "./src/evergreen/container_registry_login.sh"
+
+      # signing linux artifacts
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/garasign_gpg_sign.sh"
+
+      # Put the binaries tarball/zipfile
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+      # Put the cryptd tarball/zipfile
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols
+      # push directly to repo due to limitations in file size SERVER-63432
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          permissions: public-read
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+          bucket: ${push_bucket}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the binaries tarball signature
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball signature
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols signature
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          permissions: public-read
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+          bucket: ${push_bucket}
+          content_type: ${content_type|application/gzip}
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI file
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          permissions: public-read
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
+          bucket: ${push_bucket}
+          content_type: application/x-msi
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
+          skip_existing: ${is_release}
+
+      # Put the binaries tarball sha1
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          aws_key: ${aws_key}
+          permissions: public-read
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball sha1
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          aws_key: ${aws_key}
+          permissions: public-read
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols sha1
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          aws_key: ${aws_key}
+          permissions: public-read
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+          skip_existing: ${is_release}
+          optional: true
+
+      # Push the signed MSI sha1
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          permissions: public-read
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
+          skip_existing: ${is_release}
+
+      # Put the binaries tarball sha256
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: public-read
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball sha256
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          permissions: public-read
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols sha256
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI sha256
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
+          bucket: ${push_bucket}
+          permissions: public-read
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
+          skip_existing: ${is_release}
+          content_type: text/plain
+
+      # Put the binaries tarball md5
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+
+      # Put the cryptd tarball md5
+      - command: s3.put
+        params:
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          aws_key: ${aws_key}
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+          build_variants: *mongocryptd_variants
+
+      # Put the debug symbols md5
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+          bucket: ${push_bucket}
+          content_type: text/plain
+          permissions: public-read
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+          skip_existing: ${is_release}
+          optional: true
+
+      # Put the signed MSI md5
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          build_variants: ["enterprise-windows", "windows"]
+          local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
+          bucket: ${push_bucket}
+          permissions: public-read
+          content_type: text/plain
+          remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
+          skip_existing: ${is_release}
+
+      - command: subprocess.exec
+        params:
+          continue_on_err: true
+          binary: bash
+          env:
+            SERVER_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+            SERVER_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+            CRYPTD_TARBALL_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+            CRYPTD_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+            SOURCE_TARBALL_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}
+            SOURCE_TARBALL_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}
+            DEBUG_SYMBOLS_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+            DEBUG_SYMBOLS_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+            SERVER_TARBALL_SIGNATURE_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+            SERVER_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+            CRYPTD_TARBALL_SIGNATURE_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+            CRYPTD_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+            SOURCE_TARBALL_SIGNATURE_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
+            SOURCE_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
+            DEBUG_SYMBOLS_TARBALL_SIGNATURE_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+            DEBUG_SYMBOLS_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+            MSI_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
+            MSI_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
+            SERVER_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+            SERVER_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+            CRYPTD_TARBALL_SHA1_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+            CRYPTD_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+            SOURCE_TARBALL_SHA1_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
+            SOURCE_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
+            DEBUG_SYMBOLS_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+            DEBUG_SYMBOLS_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+            MSI_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
+            MSI_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
+            SERVER_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+            SERVER_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+            CRYPTD_TARBALL_SHA256_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+            CRYPTD_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+            SOURCE_TARBALL_SHA256_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
+            SOURCE_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
+            DEBUG_SYMBOLS_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+            DEBUG_SYMBOLS_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+            MSI_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
+            MSI_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
+            SERVER_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+            SERVER_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+            CRYPTD_TARBALL_MD5_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+            CRYPTD_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+            SOURCE_TARBALL_MD5_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
+            SOURCE_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
+            DEBUG_SYMBOLS_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+            DEBUG_SYMBOLS_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+            MSI_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
+            MSI_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
+            AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
+            AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
+            UPLOAD_LOCK_IMAGE: ${upload_lock_image}
+            UPLOAD_BUCKET: ${upload_lock_bucket}
+            AWS_REGION: ${upload_lock_region}
+            EVERGREEN_TASK_ID: ${task_id}
+          args:
+            - "./src/evergreen/run_upload_lock_push.sh"
+      #Trace artifacts (binaries, cryptd, debug, MSI) using Papertrail
+      - command: subprocess.exec
+        params:
+          binary: bash
+          env:
+            IS_RELEASE: ${is_release}
+          args:
+            - "./src/evergreen/papertrail_generate_expansions.sh"
+      - command: expansions.update
+        params:
+          file: src/papertrail-expansions.yml
+      - func: "f_expansions_write"
+      - command: papertrail.trace
+        params:
+          key_id: ${papertrail_key_id}
+          secret_key: ${papertrail_secret_key}
+          product: ${product_for_papertrail}
+          version: ${release_version}
+          filenames:
+            - "src/mongodb-${push_name}-${push_arch}*"
+            - "src/mongodb-cryptd-${push_name}-${push_arch}*"

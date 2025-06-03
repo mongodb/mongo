@@ -3,3 +3,12 @@ filters:
   - "performance_thresholds.yml":
     approvers:
       - 10gen/performance
+  - "evergreen_yml_components/tasks/compile_tasks_nightly.yml":
+    approvers:
+      - 10gen/devprod-build
+  - "evergreen_yml_components/tasks/compile_tasks_shared.yml":
+    approvers:
+      - 10gen/devprod-build
+  - "evergreen_yml_components/tasks/compile_tasks.yml":
+    approvers:
+      - 10gen/devprod-build

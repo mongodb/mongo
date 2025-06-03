@@ -220,6 +220,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/OWNERS.yml
 /etc/**/performance_thresholds.yml @10gen/performance @svc-auto-approve-bot
+/etc/evergreen_yml_components/tasks/compile_tasks_nightly.yml @10gen/devprod-build @svc-auto-approve-bot
+/etc/evergreen_yml_components/tasks/compile_tasks_shared.yml @10gen/devprod-build @svc-auto-approve-bot
+/etc/evergreen_yml_components/tasks/compile_tasks.yml @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query @svc-auto-approve-bot
