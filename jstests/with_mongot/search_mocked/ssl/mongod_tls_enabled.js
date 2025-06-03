@@ -110,6 +110,5 @@ for (const mode of ["preferTLS", "requireTLS"]) {
         {mongotMockTLSMode: "requireTLS", mongodTLSMode: "requireTLS", searchTLSMode: mode});
 }
 
-// Confirm that the default of searchTLSMode is "disabled" so this should fail.
-// TODO SERVER-99787 update this test.
-verifyTLSConfigurationFails({mongotMockTLSMode: "requireTLS", mongodTLSMode: "requireTLS"});
+// Confirm that the default of searchTLSMode is "globalTLS" so this should pass.
+verifyTLSConfigurationPasses({mongotMockTLSMode: "requireTLS", mongodTLSMode: "requireTLS"});

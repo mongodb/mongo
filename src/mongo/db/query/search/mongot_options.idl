@@ -83,6 +83,5 @@ server_parameters:
         set_at: [startup]
         cpp_vartype: std::string
         cpp_varname: "searchTLSMode"
-        # TODO SERVER-99787 Change default to "globalTLS"
-        default: "disabled"
+        default: "globalTLS"
         redact: false
