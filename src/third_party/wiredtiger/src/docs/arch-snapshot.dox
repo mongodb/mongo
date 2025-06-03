@@ -18,6 +18,8 @@ records before the transaction started. The default isolation level is \c snapsh
 - \c read-committed: Read-committed transactions ensure a transaction is able to see committed updates by other transactions
 at the time of reading. To achieve this, under a read-committed isolation, a snapshot is created when performing a search. The
 same snapshot is used for all subsequent reads until another search is called.
+- \c read-uncommitted: Read-uncommitted transactions do not take a snapshot, and allow dirty reads (uncommitted
+modifications made by other transactions).
 
 See @ref transactions for further details about how WiredTiger transactions utilize snapshots to create isolation guarantees and
 implement concurrency control.
@@ -167,4 +169,13 @@ transaction and snapshot state. This being independent from the application's ru
 When checkpoints are running, application transactions using snapshots will also store the checkpoints transaction ID as a concurrent transaction.
 This allowing a snapshot to ignore any uncommitted changes the checkpoint has written to the metadata.
 
+@section snapshot_read_uncommitted Snapshot Read-uncommitted \& Modifies
+
+It is possible that a read-uncommitted reader can not reconstruct a full value. This is
+because a snapshot isolation writer can abort the updates in parallel and leave the
+reader with an update list that does not contain enough information to reconstruct
+the full value. It is impossible to distinguish if an aborted modify or update happened prior
+to the call of the function, or if it is being done in parallel. In this case, we will return
+back to the user with a WT_ROLLBACK error. Once the user reads the record again, the update
+chain will contain the aborted operations already.
 */

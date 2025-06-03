@@ -37,7 +37,6 @@
     }                         \
     }                         \
     while (0)
-
 /*
  * __wt_modify_idempotent --
  *     Check if a modify operation is idempotent.
@@ -447,8 +446,8 @@ err:
  *     Takes an in-memory modify and populates an update value with the reconstructed full value.
  */
 int
-__wt_modify_reconstruct_from_upd_list(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *modify, WT_UPDATE_VALUE *upd_value)
+__wt_modify_reconstruct_from_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
+  WT_UPDATE *modify, WT_UPDATE_VALUE *upd_value, WT_OP_CONTEXT context)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -465,6 +464,17 @@ __wt_modify_reconstruct_from_upd_list(
     upd_value->tw.start_txn = modify->txnid;
     onpage_retry = true;
 
+    /*
+     * It is possible that a read-uncommitted reader can not reconstruct a full value. This is
+     * because a snapshot isolation writer can abort the updates in parallel and leave the reader
+     * with an update list that does not contain enough information to reconstruct the full value.
+     * It is impossible to distinguish if an aborted modify or update happened prior to the call of
+     * the function, or if it is being done in parallel. In this case, we will return back to the
+     * user with a rollback error.
+     */
+    if (context == WT_OPCTX_TRANSACTION && session->txn->isolation == WT_ISO_READ_UNCOMMITTED)
+        WT_RET_MSG(session, WT_ROLLBACK,
+          "Read-uncommitted readers do not support reconstructing a record with modifies.");
 retry:
     /* Construct full update */
     __wt_update_vector_init(session, &modifies);

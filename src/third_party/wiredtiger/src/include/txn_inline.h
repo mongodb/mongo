@@ -1267,7 +1267,8 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
     if (upd->type != WT_UPDATE_MODIFY || cbt->upd_value->skip_buf)
         __wt_upd_value_assign(cbt->upd_value, upd);
     else
-        WT_RET(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
+        WT_RET(__wt_modify_reconstruct_from_upd_list(
+          session, cbt, upd, cbt->upd_value, WT_OPCTX_TRANSACTION));
     return (0);
 }
 

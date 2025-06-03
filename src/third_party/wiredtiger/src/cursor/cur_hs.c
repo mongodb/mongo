@@ -73,7 +73,8 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      * Make sure this session has a cached history store cursor, otherwise we can deadlock with a
      * session wanting exclusive access to a handle: that session will have a handle list write lock
      * and will be waiting on eviction to drain, we'll be inside eviction waiting on a handle list
-     * read lock to open a history store cursor.
+     * read lock to open a history store cursor. If we are recovering metadata, we aren't ready to
+     * open the history store, and we can't deadlock because we are single threaded.
      *
      * The test for the no-reconciliation flag is necessary because the session may already be doing
      * history store operations and if we open/close the existing history store cursor, we can
@@ -89,7 +90,8 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      *
      * FIXME-WT-6037: This isn't reasonable and needs a better fix.
      */
-    if (F_ISSET(conn, WT_CONN_IN_MEMORY) || F_ISSET(session, WT_SESSION_NO_RECONCILE) ||
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_RECOVERING_METADATA) ||
+      F_ISSET(session, WT_SESSION_NO_RECONCILE) ||
       (session->dhandle != NULL && WT_IS_METADATA(S2BT(session)->dhandle)) ||
       session == conn->default_session)
         return (0);

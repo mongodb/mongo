@@ -382,3 +382,8 @@ typedef struct {
         (upd_select)->no_ts_tombstone = false;  \
         WT_TIME_WINDOW_INIT(&(upd_select)->tw); \
     } while (0)
+
+/*
+ * Enumeration used to track the context of reconstructing modifies within a update list.
+ */
+typedef enum { WT_OPCTX_TRANSACTION, WT_OPCTX_RECONCILATION } WT_OP_CONTEXT;

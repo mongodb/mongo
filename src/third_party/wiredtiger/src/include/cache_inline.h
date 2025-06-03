@@ -486,12 +486,19 @@ static WT_INLINE int
 __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bool *didworkp)
 {
     WT_BTREE *btree;
+    WT_CONNECTION_IMPL *conn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
     double pct_full;
 
+    conn = S2C(session);
+
     if (didworkp != NULL)
         *didworkp = false;
+
+    /* It is not safe to proceed if the eviction server threads aren't setup yet. */
+    if (!__wt_atomic_loadbool(&conn->evict_server_running))
+        return (0);
 
     /* Eviction causes reconciliation. So don't evict if we can't reconcile */
     if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
@@ -516,7 +523,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
      * evict what we can. Otherwise, we are at a transaction boundary and we can work harder to make
      * sure there is free space in the cache.
      */
-    txn_global = &S2C(session)->txn_global;
+    txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
     busy = busy || __wt_atomic_loadv64(&txn_shared->id) != WT_TXN_NONE ||
       session->hazards.num_active > 0 ||
@@ -534,7 +541,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
         return (0);
 
     /* In memory configurations don't block when the cache is full. */
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+    if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         return (0);
 
     /*
@@ -551,11 +558,18 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
         return (0);
 
     /*
+     * If the caller is holding shared resources, only evict if the cache is at any of its eviction
+     * targets.
+     */
+    if (busy && pct_full < 100.0)
+        return (0);
+
+    /*
      * Some callers (those waiting for slow operations), will sleep if there was no cache work to
      * do. After this point, let them skip the sleep.
      */
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wt_cache_eviction_worker(session, busy, readonly, pct_full));
+    return (__wt_cache_eviction_worker(session, busy, readonly));
 }

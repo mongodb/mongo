@@ -45,6 +45,10 @@ __conn_dhandle_config_set(WT_SESSION_IMPL *session)
     base = NULL;
     tmp = NULL;
 
+    /* We should never be looking at metadata before it's been recovered. */
+    WT_ASSERT_ALWAYS(session, !F_ISSET(S2C(session), WT_CONN_RECOVERING_METADATA),
+      "Assert failure: %s: attempt to open data handle during metadata recovery", session->name);
+
     /*
      * Read the object's entry from the metadata file, we're done if we don't find one.
      */
