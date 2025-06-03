@@ -437,7 +437,6 @@ testQuery = [
 
 assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
 
-// TODO SERVER-94602 Test scoreDetails with nested scoreFusion.
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
 
