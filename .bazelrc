@@ -439,7 +439,7 @@ common --remote_upload_local_results=False
 # Settings specific for clang-tidy
 --config=clang-tidy
 common:clang-tidy --config=dbg
-common:clang-tidy --remote_download_outputs=minimal
+common:clang-tidy --remote_download_outputs=all
 common:clang-tidy --build_tag_filters=-third_party,-mongo-tidy-tests,-third_party_debug,-mongo-tidy-tests_debug
 common:clang-tidy --//bazel/config:compiler_type=clang
 common:clang-tidy --keep_going
