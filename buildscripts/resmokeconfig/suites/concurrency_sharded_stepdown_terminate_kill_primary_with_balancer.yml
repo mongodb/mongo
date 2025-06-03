@@ -62,6 +62,13 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
+    # long_secondary_reads.js initializes each test by creating 2000 documents.
+    # If a stepdown occurs during initialization, the test fails with the error:
+    # "InterruptedDueToReplStateChange".
+    # TODO SERVER-105488: Investigate alternative methods for initializing the test collection
+    # to avoid stepdown-related interruptions.
+    - jstests/concurrency/fsm_workloads/query/long_secondary_reads.js
+
   exclude_with_any_tags:
     - requires_standalone
     - assumes_balancer_off
