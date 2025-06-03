@@ -105,4 +105,5 @@ feature_flags:
     featureFlagRateLimitIngressConnectionEstablishment:
         description: "Queues connection establishment after exceeding the maximum rate"
         cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
-        default: false
+        default: true
+        version: 7.0

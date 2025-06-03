@@ -528,8 +528,6 @@ public:
     }
 
 private:
-    RAIIServerParameterControllerForTest featureFlagController{
-        "featureFlagRateLimitIngressConnectionEstablishment", true};
     RAIIServerParameterControllerForTest featureEnabled{
         "ingressConnectionEstablishmentRateLimiterEnabled", true};
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
