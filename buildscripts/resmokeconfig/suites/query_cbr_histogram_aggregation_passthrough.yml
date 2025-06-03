@@ -32,6 +32,7 @@ selector:
     # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
     # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
     - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
+    - jstests/aggregation/sources/sort/sort_via_index_pbt.js
     - jstests/aggregation/timeseries/timeseries_group_aggregations.js
 
   exclude_with_any_tags:

@@ -19,6 +19,8 @@
  * config_shard_incompatible,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
+ * # This test runs commands that are not allowed with security token: setParameter.
+ * not_allowed_with_signed_security_token,
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
@@ -26,8 +28,8 @@ import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.j
 import {
     getAggPipelineModel,
     getSingleFieldProjectArb,
-    limitArb,
-    sortArb
+    getSortArb,
+    limitArb
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -157,7 +159,7 @@ function checkSortResults(query, results) {
     return true;
 }
 const sortTest = {
-    stageArb: sortArb,
+    stageArb: getSortArb(),
     checkResultsFn: checkSortResults,
     failMsg: '$sort did not output documents in sorted order.'
 };

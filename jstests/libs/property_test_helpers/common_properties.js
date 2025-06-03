@@ -26,8 +26,10 @@ function getAllVariationsOfQueryShape(shapeIx, getQuery, testHelpers) {
 /*
  * Runs one of each query shape with the first parameters plugged in, comparing the experiment
  * results to the control results.
+ * The `statsCollectorFn`, if provided, is run on the explain of each query on the experiment
+ * collection.
  */
-export function createCorrectnessProperty(controlColl, experimentColl) {
+export function createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn) {
     return function queryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
         const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
 
@@ -38,6 +40,11 @@ export function createCorrectnessProperty(controlColl, experimentColl) {
             const query = queries[i];
             const controlResults = resultMap[i];
             const experimentResults = experimentColl.aggregate(query).toArray();
+
+            if (statsCollectorFn) {
+                statsCollectorFn(experimentColl.explain().aggregate(query));
+            }
+
             if (!testHelpers.comp(controlResults, experimentResults)) {
                 return {
                     passed: false,
@@ -57,8 +64,10 @@ export function createCorrectnessProperty(controlColl, experimentColl) {
 /*
  * Runs similar query shapes with different parameters plugged in to trigger the plan cache, and
  * compares to control results.
+ * The `statsCollectorFn`, if provided, is run on the explain of each query on the experiment
+ * collection.
  */
-export function createCacheCorrectnessProperty(controlColl, experimentColl) {
+export function createCacheCorrectnessProperty(controlColl, experimentColl, statsCollectorFn) {
     return function queriesUsingCacheHaveSameResultsAsControl(getQuery, testHelpers) {
         // The first query we have available for each query shape.
         const firstQueryOfEachShape = [];
@@ -87,6 +96,11 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl) {
             const query = remainingQueries[i];
             const controlResults = resultMap[i];
             const experimentResults = experimentColl.aggregate(query).toArray();
+
+            if (statsCollectorFn) {
+                statsCollectorFn(experimentColl.explain().aggregate(query));
+            }
+
             if (!testHelpers.comp(controlResults, experimentResults)) {
                 return {
                     passed: false,

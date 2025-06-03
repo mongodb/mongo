@@ -82,6 +82,7 @@
       # This test runs many aggregations and is very slow in this passthrough. Since it doesn't
       # provide much additional coverage we can exclude it.
       - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
+      - jstests/aggregation/sources/sort/sort_via_index_pbt.js
       - jstests/aggregation/timeseries/timeseries_group_aggregations.js
     exclude_with_any_tags:
       - assumes_standalone_mongod

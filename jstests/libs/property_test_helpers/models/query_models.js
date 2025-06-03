@@ -46,11 +46,34 @@ const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destFie
     return {$addFields: {[destField]: sourceField}};
 });
 
-export const sortArb = fc.tuple(fieldArb, fc.constantFrom(1, -1)).map(function([field, sortOrder]) {
-    // If we sort on two or more fields, we run into the problem of sorting keys that
-    // are parallel arrays. This is not allowed in MQL.
-    return {$sort: {[field]: sortOrder}};
-});
+/*
+ * Generates a random $sort, with [1, maxNumSortComponents] sort components.
+ *
+ * `maxNumSortComponents` defaults to 1, because combining $sort on multiple fields with other
+ * aggregation stages can lead to parallel key errors. For example
+ *    [{$addFields: {a: '$array'}}, {$sort: {a: 1, array: 1}}]
+ * attempts to sort on two array fields. This is not allowed in MQL.
+ *
+ * If the caller has guarantees about what stages will precede the $sort and can avoid parallel key
+ * issues, they may set `maxNumSortComponents` to something greater than 1.
+ */
+export function getSortArb(maxNumSortComponents = 1) {
+    const sortDirectionArb = fc.constantFrom(1, -1);
+    const sortComponent = fc.record({field: fieldArb, dir: sortDirectionArb});
+    return fc
+        .uniqueArray(sortComponent, {
+            minLength: 1,
+            maxLength: maxNumSortComponents,
+            selector: fieldAndDir => fieldAndDir.field,
+        })
+        .map(components => {
+            const sortSpec = {};
+            for (const {field, dir} of components) {
+                sortSpec[field] = dir;
+            }
+            return {$sort: sortSpec};
+        });
+}
 
 export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
 export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
@@ -71,7 +94,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
-            sortArb,
+            getSortArb(),
             groupArb
         ];
     } else {
@@ -84,7 +107,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
-            sortArb,
+            getSortArb(),
             groupArb
         ];
     }
