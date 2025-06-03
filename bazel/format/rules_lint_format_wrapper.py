@@ -9,7 +9,13 @@ from buildscripts.unittest_grouper import validate_bazel_groups
 
 def _git_distance(args: list) -> int:
     command = ["git", "rev-list", "--count"] + args
-    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running git command: {' '.join(command)}")
+        print(f"stderr: {e.stderr.strip()}")
+        print(f"stdout: {e.stdout.strip()}")
+        raise
     return int(result.stdout.strip())
 
 
@@ -187,20 +193,20 @@ def main() -> int:
 
     os.chdir(default_dir)
 
-    distance = _git_distance([f"{args.origin_branch}..HEAD"])
-    if distance > 100:
-        print(
-            f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits"
-        )
-        print("WARNING!!! Defaulting to formatting all files, this may take a while.")
-        print(
-            "Please update your local branch with the latest changes from origin, or use `bazel run format -- --origin-branch other_branch` to select a different origin branch"
-        )
-        args.all = True
-
-    files_to_format = (
-        _get_files_changed_since_fork_point(args.origin_branch) if not args.all else "all"
-    )
+    files_to_format = "all"
+    if not args.all:
+        distance = _git_distance([f"{args.origin_branch}..HEAD"])
+        if distance > 100:
+            print(
+                f"The number of commits between current branch and origin branch ({args.origin_branch}) is too large: {distance} commits"
+            )
+            print("WARNING!!! Defaulting to formatting all files, this may take a while.")
+            print(
+                "Please update your local branch with the latest changes from origin, or use `bazel run format -- --origin-branch other_branch` to select a different origin branch"
+            )
+            args.all = True
+        else:
+            files_to_format = _get_files_changed_since_fork_point(args.origin_branch)
 
     def files_to_format_contains_bazel_file(files: Union[List[str], str]) -> bool:
         if files == "all":
