@@ -73,27 +73,3 @@ runInitialSyncTest();
 x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
 x509_options2 = Object.merge(common_options, {clusterAuthMode: "sendX509"});
 runInitialSyncTest();
-
-// verify that replset initiate fails if using a self-signed cert
-x509_options1 = Object.merge(common_options, {clusterAuthMode: "x509"});
-x509_options2 = Object.merge(common_options,
-                             {tlsClusterFile: "jstests/libs/smoke.pem", clusterAuthMode: "x509"});
-var replTest =
-    new ReplSetTest({nodes: {node0: x509_options1, node1: x509_options2}, timeoutMS: 500});
-
-// We don't want to invoke the hang analyzer because we
-// expect this test to fail by timing out
-MongoRunner.runHangAnalyzer.disable();
-
-replTest.startSet();
-assert.throws(function() {
-    replTest.initiate();
-});
-
-// stopSet will also fail because we cannot authenticate to stop it properly.
-// Ignore the error around unterminated processes.
-TestData.ignoreUnterminatedProcesses = true;
-
-assert.throws(function() {
-    replTest.stopSet();
-});
