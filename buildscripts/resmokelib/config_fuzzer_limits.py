@@ -372,6 +372,10 @@ config_fuzzer_params = {
         # We need a higher timeout to account for test slowness
         "receiveChunkWaitForRangeDeleterTimeoutMS": {"default": 300_000, "fuzz_at": ["startup"]},
         "defaultConfigCommandTimeoutMS": {"default": 90_000, "fuzz_at": ["startup"]},
+        # Disable the periodic thread to abort multi-document transactions when under cache
+        # pressure. As the storage engine parameters are fuzzed at runtime, it can make the thread
+        # fire unpredictably, resulting in test failures that expect transactions to succeed.
+        "cachePressureQueryPeriodMilliseconds": {"default": 0, "fuzz_at": ["startup"]},
         "maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes": {
             "min": 2_097_152,
             "max": 6_291_456,
