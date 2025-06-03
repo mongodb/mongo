@@ -42,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -123,6 +124,12 @@ public:
 
                 const auto remainingTime = metrics.getHighEstimateRemainingTimeMillis();
                 response.setRecipientRemainingMillis(remainingTime);
+
+                const auto prepareThreshold = Milliseconds(
+                    resharding::gRemainingReshardingOperationTimePrepareThresholdMillis.load());
+                if (remainingTime <= prepareThreshold) {
+                    recipients[0]->prepareForCriticalSection();
+                }
             }
 
             return response;

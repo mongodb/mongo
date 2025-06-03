@@ -245,7 +245,7 @@ public:
 
     void startOplogApplication() override {};
 
-    void onEnteringCriticalSection() override {};
+    void prepareForCriticalSection() override {};
 
     SharedSemiFuture<void> awaitCloningDone() override {
         return makeReadyFutureWith([] {}).share();

@@ -130,9 +130,9 @@ public:
     virtual void startOplogApplication() = 0;
 
     /**
-     * Notifies the data replication machinery that the critical section has started.
+     * Makes the data replication machinery prepare for the critical section.
      */
-    virtual void onEnteringCriticalSection() = 0;
+    virtual void prepareForCriticalSection() = 0;
 
     /**
      * Returns a future that becomes ready when either
@@ -195,7 +195,7 @@ public:
 
     void startOplogApplication() override;
 
-    void onEnteringCriticalSection() override;
+    void prepareForCriticalSection() override;
 
     SharedSemiFuture<void> awaitCloningDone() override;
 

@@ -178,6 +178,11 @@ public:
     void interrupt(Status status) override;
 
     /**
+     * Makes the recipient prepare for the critical section.
+     */
+    void prepareForCriticalSection();
+
+    /**
      * Returns a Future fulfilled once the recipient locally persists its final state before the
      * coordinator makes its decision to commit or abort (RecipientStateEnum::kError or
      * RecipientStateEnum::kStrictConsistency).

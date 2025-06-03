@@ -1375,24 +1375,24 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that
-    // onEnteringCriticalSection() interrupts the in-progress aggregation. So the fetcher should not
+    // prepareForCriticalSection() interrupts the in-progress aggregation. So the fetcher should not
     // schedule a getMore command after this.
-    auto cursorIdBeforeCriticalSection = 123;
-    auto aggBeforeCriticalSectionFuture = launchAsync([&, this] {
+    auto cursorIdBeforePrepare = 123;
+    auto aggBeforePrepareFuture = launchAsync([&, this] {
         onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
             auto expectedReadPref = ReadPreferenceSetting{
                 ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
             assertAggregateReadPreference(request, expectedReadPref);
 
-            fetcher.onEnteringCriticalSection();
+            fetcher.prepareForCriticalSection();
 
             auto postBatchResumeToken = _fetchTimestamp + 1;
             return makeMockAggregateResponse(
-                postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforeCriticalSection);
+                postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
         });
     });
 
-    aggBeforeCriticalSectionFuture.default_timed_get();
+    aggBeforePrepareFuture.default_timed_get();
 
     // Depending on when the interrupt occurs, the fetcher may still try to kill the cursor after
     // the cancellation. In that case, schedule a response for the killCursor command.
@@ -1404,13 +1404,13 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
                   NamespaceString::kRsOplogNamespace.toString_forTest());
         ASSERT_EQ(parsedRequest.getCursorIds().size(), 1U);
-        ASSERT_EQ(parsedRequest.getCursorIds()[0], cursorIdBeforeCriticalSection);
+        ASSERT_EQ(parsedRequest.getCursorIds()[0], cursorIdBeforePrepare);
         return BSONObj{};
     };
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
     // fetcher does not schedule a getMore command after seeing the final oplog entry.
-    auto cursorIdDuringCriticalSection = 456;
+    auto cursorIdAfterPrepare = 456;
     auto makeAggResponse = [&](const executor::RemoteCommandRequest& request) {
         auto expectedReadPref = ReadPreferenceSetting{ReadPreference::PrimaryOnly};
         assertAggregateReadPreference(request, expectedReadPref);
@@ -1418,8 +1418,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_Targ
         auto postBatchResumeToken = _fetchTimestamp + 2;
         auto oplogEntries = BSON_ARRAY(
             makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken));
-        return makeMockAggregateResponse(
-            postBatchResumeToken, oplogEntries, cursorIdDuringCriticalSection);
+        return makeMockAggregateResponse(postBatchResumeToken, oplogEntries, cursorIdAfterPrepare);
     };
 
     bool scheduledAggResponse = false;
@@ -1475,26 +1474,26 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
     auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that
-    // onEnteringCriticalSection() does not interrupt the in-progress aggregation. The fetcher
+    // prepareForCriticalSection() does not interrupt the in-progress aggregation. The fetcher
     // should schedule a getMore command after this.
-    auto cursorIdBeforeCriticalSection = 123;
+    auto cursorIdBeforePrepare = 123;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto expectedReadPref = ReadPreferenceSetting{
             ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
         assertAggregateReadPreference(request, expectedReadPref);
 
-        fetcher.onEnteringCriticalSection();
+        fetcher.prepareForCriticalSection();
 
         auto postBatchResumeToken = _fetchTimestamp + 1;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforeCriticalSection);
+            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
     });
 
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        assertGetMoreCursorId(request, cursorIdBeforeCriticalSection);
+        assertGetMoreCursorId(request, cursorIdBeforePrepare);
         auto postBatchResumeToken = _fetchTimestamp + 2;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforeCriticalSection);
+            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
     });
 
     // The fetcher should kill the cursor after exhausting it.
@@ -1506,13 +1505,13 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
         ASSERT_EQ(parsedRequest.getNamespace().ns_forTest(),
                   NamespaceString::kRsOplogNamespace.toString_forTest());
         ASSERT_EQ(parsedRequest.getCursorIds().size(), 1U);
-        ASSERT_EQ(parsedRequest.getCursorIds()[0], cursorIdBeforeCriticalSection);
+        ASSERT_EQ(parsedRequest.getCursorIds()[0], cursorIdBeforePrepare);
         return BSONObj{};
     });
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
     // fetcher does not schedule a getMore command after seeing the final oplog entry.
-    auto cursorIdDuringCriticalSection = 456;
+    auto cursorIdAfterPrepare = 456;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto expectedReadPref = ReadPreferenceSetting{
             ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
@@ -1521,8 +1520,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
         auto postBatchResumeToken = _fetchTimestamp + 2;
         auto oplogEntries = BSON_ARRAY(
             makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken));
-        return makeMockAggregateResponse(
-            postBatchResumeToken, oplogEntries, cursorIdDuringCriticalSection);
+        return makeMockAggregateResponse(postBatchResumeToken, oplogEntries, cursorIdAfterPrepare);
     });
 
     ASSERT_OK(fetcherFuture.getNoThrow());
@@ -1530,7 +1528,7 @@ TEST_F(ReshardingOplogFetcherTest, ReadPreferenceBeforeAfterCriticalSection_NotT
     executor->join();
 }
 
-TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
+TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionBeforeScheduling) {
     const NamespaceString outputCollectionNss =
         NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
     const NamespaceString dataCollectionNss =
@@ -1552,7 +1550,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
                                    _destinationShard,
                                    outputCollectionNss,
                                    true /* storeProgress */);
-    fetcher.onEnteringCriticalSection();
+    fetcher.prepareForCriticalSection();
 
     auto executor = makeExecutor();
     executor->startup();
@@ -1560,7 +1558,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
     // fetcher does not schedule a getMore command after seeing the final oplog entry.
-    auto cursorIdDuringCriticalSection = 123;
+    auto cursorIdAfterPrepare = 123;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto expectedReadPref = ReadPreferenceSetting{ReadPreference::PrimaryOnly};
         assertAggregateReadPreference(request, expectedReadPref);
@@ -1568,8 +1566,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
         auto postBatchResumeToken = _fetchTimestamp + 1;
         auto oplogEntries = BSON_ARRAY(
             makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken));
-        return makeMockAggregateResponse(
-            postBatchResumeToken, oplogEntries, cursorIdDuringCriticalSection);
+        return makeMockAggregateResponse(postBatchResumeToken, oplogEntries, cursorIdAfterPrepare);
     });
 
     ASSERT_OK(fetcherFuture.getNoThrow());
@@ -1577,7 +1574,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionBeforeScheduling) {
     executor->join();
 }
 
-TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionMoreThanOnce) {
+TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionMoreThanOnce) {
     const NamespaceString outputCollectionNss =
         NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
     const NamespaceString dataCollectionNss =
@@ -1606,41 +1603,46 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionMoreThanOnce) {
     // Make the cursor for the the aggregate command below have id 0 to make the fetcher not
     // schedule a getMore command so that the test does not need to also schedule a getMore
     // response.
-    auto cursorIdBeforeCriticalSection = 0;
+    auto cursorIdBeforePrepare = 0;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto expectedReadPref = ReadPreferenceSetting{
             ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
         assertAggregateReadPreference(request, expectedReadPref);
 
-        fetcher.onEnteringCriticalSection();
-        fetcher.onEnteringCriticalSection();
+        // This should interrupt the in-progress aggregation.
+        fetcher.prepareForCriticalSection();
+        // This should not interrupt the in-progress aggregation since it has already been
+        // interrupted.
+        fetcher.prepareForCriticalSection();
 
         auto postBatchResumeToken = _fetchTimestamp + 1;
         return makeMockAggregateResponse(
-            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforeCriticalSection);
+            postBatchResumeToken, {} /* oplogEntries */, cursorIdBeforePrepare);
     });
 
     // Make the cursor for the the aggregate command below have a non-zero id to test that the
     // fetcher does not schedule a getMore command after seeing the final oplog entry.
-    auto cursorIdDuringCriticalSection = 123;
+    auto cursorIdAfterPrepare = 123;
     onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
         auto expectedReadPref = ReadPreferenceSetting{ReadPreference::PrimaryOnly};
         assertAggregateReadPreference(request, expectedReadPref);
 
+        // This should not interrupt the in-progress aggregation.
+        fetcher.prepareForCriticalSection();
+
         auto postBatchResumeToken = _fetchTimestamp + 2;
         auto oplogEntries = BSON_ARRAY(
             makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken));
-        return makeMockAggregateResponse(
-            postBatchResumeToken, oplogEntries, cursorIdDuringCriticalSection);
+        return makeMockAggregateResponse(postBatchResumeToken, oplogEntries, cursorIdAfterPrepare);
     });
 
     ASSERT_OK(fetcherFuture.getNoThrow());
-    fetcher.onEnteringCriticalSection();
+    fetcher.prepareForCriticalSection();
     executor->shutdown();
     executor->join();
 }
 
-TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionAfterFetchingFinalOplogEntry) {
+TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOplogEntry) {
     for (bool targetPrimary : {false, true}) {
         LOGV2(10355403, "Running case", "targetPrimary"_attr = targetPrimary);
 
@@ -1678,7 +1680,7 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionAfterFetchingFinalOp
         auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
 
         auto cursorId = 123;
-        auto aggBeforeCriticalSectionFuture = launchAsync([&, this] {
+        auto aggBeforePrepareFuture = launchAsync([&, this] {
             onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
                 auto expectedReadPref = ReadPreferenceSetting{
                     ReadPreference::Nearest, ReadPreferenceSetting::kMinimalMaxStalenessValue};
@@ -1693,11 +1695,11 @@ TEST_F(ReshardingOplogFetcherTest, OnEnteringCriticalSectionAfterFetchingFinalOp
 
         fp->waitForTimesEntered(timesEnteredBefore + 1);
 
-        fetcher.onEnteringCriticalSection();
+        fetcher.prepareForCriticalSection();
         auto timesEnteredAfter = fp->setMode(FailPoint::off);
         ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
 
-        aggBeforeCriticalSectionFuture.default_timed_get();
+        aggBeforePrepareFuture.default_timed_get();
 
         // Schedule a response for the killCursor command to prevent its request from interfering
         // with the next test case.

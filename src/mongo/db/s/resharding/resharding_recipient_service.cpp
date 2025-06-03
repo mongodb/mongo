@@ -672,6 +672,13 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     }
 }
 
+void ReshardingRecipientService::RecipientStateMachine::prepareForCriticalSection() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    if (_dataReplication) {
+        _dataReplication->prepareForCriticalSection();
+    }
+}
+
 SharedSemiFuture<void>
 ReshardingRecipientService::RecipientStateMachine::awaitChangeStreamsMonitorStartedForTest() {
     if (!_metadata.getPerformVerification() || _skipCloningAndApplying) {
@@ -747,7 +754,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
 
     if (coordinatorState == CoordinatorStateEnum::kBlockingWrites) {
         if (_dataReplication) {
-            _dataReplication->onEnteringCriticalSection();
+            _dataReplication->prepareForCriticalSection();
         }
     }
 

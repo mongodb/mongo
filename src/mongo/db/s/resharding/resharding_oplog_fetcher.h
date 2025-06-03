@@ -127,16 +127,16 @@ public:
     bool iterate(Client* client, CancelableOperationContextFactory factory);
 
     /**
-     * Notifies the oplog fetcher that the critical section has started. Currently, this makes the
-     * fetcher start doing the following to reduce the likelihood of not finishing oplog fetching
-     * within the critical section timeout:
+     * Makes the oplog fetcher prepare for the critical section. Currently, this makes the fetcher
+     * start doing the following to reduce the likelihood of not finishing oplog fetching within the
+     * critical section timeout:
      * - Start fetching oplog entries from the primary node instead of the "nearest" node which
      *   could be a lagged secondary.
      * - Sleep for reshardingOplogFetcherSleepMillisDuringCriticalSection instead of
      *   reshardingOplogFetcherSleepMillisBeforeCriticalSection after exhausting the oplog entries
      *   returned by the previous cursor.
      */
-    void onEnteringCriticalSection();
+    void prepareForCriticalSection();
 
     int getNumOplogEntriesCopied() const {
         return _numOplogEntriesCopied;
@@ -185,11 +185,11 @@ private:
     const bool _storeProgress;
 
     int _numOplogEntriesCopied = 0;
-    AtomicWord<bool> _inCriticalSection;
 
     stdx::mutex _mutex;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
+    AtomicWord<bool> _isPreparingForCriticalSection;
     // The cancellation source for the current aggregation.
     boost::optional<CancellationSource> _aggCancelSource;
 

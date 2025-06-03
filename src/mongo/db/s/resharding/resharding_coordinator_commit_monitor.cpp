@@ -160,6 +160,8 @@ CoordinatorCommitMonitor::queryRemainingOperationTime() const {
     const auto cmdObj = makeCommandObj(_ns);
     const auto requests = makeRequests(cmdObj, _participantShards);
 
+    hangBeforeQueryingRecipients.pauseWhileSet();
+
     LOGV2_DEBUG(5392001,
                 kDiagnosticLogLevel,
                 "Querying participant shards to estimate the remaining operation time",
@@ -176,7 +178,6 @@ CoordinatorCommitMonitor::queryRemainingOperationTime() const {
                             nullptr /* resourceYielder */,
                             {} /* designatedHostMap */);
 
-    hangBeforeQueryingRecipients.pauseWhileSet();
 
     auto minTimeToEnterCriticalSection = Milliseconds::max();
     auto maxTimeToEnterCriticalSection = Milliseconds(0);

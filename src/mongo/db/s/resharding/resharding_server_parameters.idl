@@ -315,6 +315,19 @@ server_parameters:
             gte: 0
         redact: false
 
+    remainingReshardingOperationTimePrepareThresholdMillis:
+        description: >-
+            Controls the threshold for resharding recipients to start prepare for the critical
+            section, for example, by expediting the oplog fetching.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gRemainingReshardingOperationTimePrepareThresholdMillis
+        default:
+            expr: 60 * 1000
+        validator:
+            gte: 0
+        redact: false
+
     reshardingRemainingTimeEstimateAccountsForDonorReplicationLag:
         description: >-
             Controls whether the remaining time estimate on the resharding coordinator, when trying

@@ -349,7 +349,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
 
             // Wait a little before re-running the aggregation pipeline on the donor's oplog.
             auto sleepDuration = Milliseconds{
-                _inCriticalSection.load()
+                _isPreparingForCriticalSection.load()
                     ? resharding::gReshardingOplogFetcherSleepMillisDuringCriticalSection.load()
                     : resharding::gReshardingOplogFetcherSleepMillisBeforeCriticalSection.load()};
             return executor->sleepFor(sleepDuration, cancelToken)
@@ -445,7 +445,7 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
         aggRequest.setReadConcern(readConcernArgs);
     }
 
-    auto readPref = _inCriticalSection.load() &&
+    auto readPref = _isPreparingForCriticalSection.load() &&
             resharding::gReshardingOplogFetcherTargetPrimaryDuringCriticalSection.load()
         ? ReadPreferenceSetting{ReadPreference::PrimaryOnly}
         : ReadPreferenceSetting{ReadPreference::Nearest,
@@ -620,9 +620,14 @@ bool ReshardingOplogFetcher::consume(Client* client,
     return moreToCome;
 }
 
-void ReshardingOplogFetcher::onEnteringCriticalSection() {
-    _inCriticalSection.store(true);
+void ReshardingOplogFetcher::prepareForCriticalSection() {
     stdx::lock_guard lk(_mutex);
+
+    if (_isPreparingForCriticalSection.load()) {
+        return;
+    }
+
+    _isPreparingForCriticalSection.store(true);
     // Stop consuming the current aggregation and start a new one.
     if (resharding::gReshardingOplogFetcherTargetPrimaryDuringCriticalSection.load() &&
         _aggCancelSource) {
