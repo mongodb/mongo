@@ -147,15 +147,48 @@ bool OplogWriterBatcher::_pollFromBuffer(OperationContext* opCtx,
 
     if (delaySecsLatestTimestamp) {
         auto& lastEntry = batch->back();
-        auto entryTime = Date_t::fromDurationSinceEpoch(
+        auto currentEntryTime = Date_t::fromDurationSinceEpoch(
             Seconds(lastEntry.getField(OplogEntry::kTimestampFieldName).timestamp().getSecs()));
-        // See if the last entry has passed secondaryDelaySecs, which means all entries in
-        // this batch has passed secondaryDelaySecs. This could cause earlier entries in the
-        // same batch got delayed longer but that only happens in a rare case and only in
-        // one batch.
-        if (entryTime > *delaySecsLatestTimestamp) {
+
+        // Find the latest oplog entry that satisfies the delaySecsLatestTimestamp.
+        auto oplogBatchVector = batch->getBatch();
+        auto latestEntryBeforeDelaySecsIndex = static_cast<int>(batch->count()) - 1;
+        size_t originalBatchByteSize = batch->byteSize();
+        size_t nextBatchByteSize = originalBatchByteSize;
+        while (currentEntryTime > *delaySecsLatestTimestamp &&
+               latestEntryBeforeDelaySecsIndex > 0) {
+            latestEntryBeforeDelaySecsIndex -= 1;
+            auto currentEntry = oplogBatchVector[latestEntryBeforeDelaySecsIndex];
+
+            currentEntryTime = Date_t::fromDurationSinceEpoch(Seconds(
+                currentEntry.getField(OplogEntry::kTimestampFieldName).timestamp().getSecs()));
+
+            nextBatchByteSize -= currentEntry.objsize();
+        }
+
+        // If the entire batch doesn't satisfy the delaySecsLatestTimestamp, then we will stash this
+        // batch for next iteration.
+        if (latestEntryBeforeDelaySecsIndex == 0 && currentEntryTime > *delaySecsLatestTimestamp) {
             _stashedBatch = std::move(*batch);
             return false;
+        }
+
+        // Set batch to the first part of the batch that satisfies the delaySecsLatestTimestamp.
+        auto batchVectorToReturn =
+            std::vector<BSONObj>(oplogBatchVector.begin(),
+                                 oplogBatchVector.begin() + latestEntryBeforeDelaySecsIndex + 1);
+        *batch = OplogWriterBatch(batchVectorToReturn, nextBatchByteSize);
+
+        // Set _stashedBatch to the rest of the batch that the secondary still needs to wait for. If
+        // the entire batch satisfies the delay, set _stashedBatch to boost::none so that next time
+        // it pops from the oplog buffer.
+        auto stashedBatchVector = std::vector<BSONObj>(
+            oplogBatchVector.begin() + latestEntryBeforeDelaySecsIndex + 1, oplogBatchVector.end());
+        if (stashedBatchVector.empty()) {
+            _stashedBatch = boost::none;
+        } else {
+            _stashedBatch =
+                OplogWriterBatch(stashedBatchVector, originalBatchByteSize - nextBatchByteSize);
         }
     }
 
