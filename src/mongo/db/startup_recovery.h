@@ -55,14 +55,10 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
                                BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 /**
- * Runs startup recovery after system startup, specifying whether to recover as a replica set
- * being started in standalone mode (no index build resumption).
+ * Runs startup recovery after system startup.
  */
-enum class StartupRecoveryMode { kAuto, kReplicaSetMember, kReplicaSetMemberInStandalone };
-
-void runStartupRecoveryInMode(OperationContext* opCtx,
-                              StorageEngine::LastShutdownState lastShutdownState,
-                              StartupRecoveryMode mode);
+void runStartupRecovery(OperationContext* opCtx,
+                        StorageEngine::LastShutdownState lastShutdownState);
 
 /**
  * Ensures data on the change stream collections is consistent on startup. Only after unclean

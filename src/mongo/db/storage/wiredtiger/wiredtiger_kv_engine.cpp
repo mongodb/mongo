@@ -759,8 +759,8 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
     }
 }
 
-void WiredTigerKVEngine::setInStandaloneMode(bool inStandaloneMode) {
-    _inStandaloneMode.store(inStandaloneMode);
+void WiredTigerKVEngine::setInStandaloneMode() {
+    _inStandaloneMode.store(true);
 }
 
 void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::string& wtOpenConfig) {

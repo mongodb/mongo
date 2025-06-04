@@ -93,7 +93,7 @@ public:
 
     void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
 
-    void setInStandaloneMode(bool inStandaloneMode) override;
+    void setInStandaloneMode() override;
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override;
 

@@ -530,8 +530,8 @@ void StorageEngineImpl::notifyReplStartupRecoveryComplete(RecoveryUnit& ru) {
     _engine->notifyReplStartupRecoveryComplete(ru);
 }
 
-void StorageEngineImpl::setInStandaloneMode(bool inStandaloneMode) {
-    _engine->setInStandaloneMode(inStandaloneMode);
+void StorageEngineImpl::setInStandaloneMode() {
+    _engine->setInStandaloneMode();
 }
 
 std::unique_ptr<RecoveryUnit> StorageEngineImpl::newRecoveryUnit() {

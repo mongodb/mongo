@@ -312,7 +312,7 @@ public:
 
     void notifyStorageStartupRecoveryComplete() override;
     void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
-    void setInStandaloneMode(bool inStandaloneMode) override;
+    void setInStandaloneMode() override;
 
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);

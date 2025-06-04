@@ -115,8 +115,6 @@
 namespace mongo {
 namespace {
 
-using startup_recovery::StartupRecoveryMode;
-
 // Exit after repair has started, but before data is repaired.
 MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
 // Exit after repairing data, but before the replica set configuration is invalidated.
@@ -629,28 +627,10 @@ void reconcileCatalogAndRestartUnfinishedIndexBuilds(
 
 /**
  * Sets the appropriate flag on the service context decorable 'replSetMemberInStandaloneMode' to
- * 'true' if this is a replica set node running in standalone mode, otherwise 'false'.
+ * 'true' if this is a replica set node running in standalone mode.
  */
-void setReplSetMemberInStandaloneMode(OperationContext* opCtx,
-                                      StartupRecoveryMode mode,
-                                      StorageEngine* engine) {
-    if (mode == StartupRecoveryMode::kReplicaSetMember) {
-        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
-        engine->setInStandaloneMode(false);
-        return;
-    } else if (mode == StartupRecoveryMode::kReplicaSetMemberInStandalone) {
-        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
-        engine->setInStandaloneMode(true);
-        return;
-    }
-
-    const bool usingReplication =
-        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
-
-    if (usingReplication) {
-        // Not in standalone mode.
-        setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
-        engine->setInStandaloneMode(false);
+void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StorageEngine* engine) {
+    if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
         return;
     }
 
@@ -659,12 +639,8 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx,
         opCtx, NamespaceString::kSystemReplSetNamespace);
     if (collection && !collection->isEmpty(opCtx)) {
         setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), true);
-        engine->setInStandaloneMode(true);
-        return;
+        engine->setInStandaloneMode();
     }
-
-    setReplSetMemberInStandaloneMode(opCtx->getServiceContext(), false);
-    engine->setInStandaloneMode(false);
 }
 
 // Perform startup procedures for --repair mode.
@@ -752,7 +728,7 @@ void startupRepair(OperationContext* opCtx,
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
         // This must be set before rebuilding index builds on replicated collections.
-        setReplSetMemberInStandaloneMode(opCtx, StartupRecoveryMode::kAuto, storageEngine);
+        setReplSetMemberInStandaloneMode(opCtx, storageEngine);
         dbNames.erase(it);
     }
 
@@ -881,7 +857,6 @@ void offlineValidate(OperationContext* opCtx) {
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
                      StorageEngine::LastShutdownState lastShutdownState,
-                     StartupRecoveryMode mode,
                      BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
     invariant(!storageGlobalParams.repair);
 
@@ -889,7 +864,7 @@ void startupRecovery(OperationContext* opCtx,
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
     // before determining whether to restart index builds.
-    setReplSetMemberInStandaloneMode(opCtx, mode, storageEngine);
+    setReplSetMemberInStandaloneMode(opCtx, storageEngine);
 
     // Initialize FCV before rebuilding indexes that may have features dependent on FCV.
     {
@@ -968,22 +943,16 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     } else if (storageGlobalParams.validate) {
         offlineValidate(opCtx);
     } else {
-        startupRecovery(opCtx,
-                        storageEngine,
-                        lastShutdownState,
-                        StartupRecoveryMode::kAuto,
-                        startupTimeElapsedBuilder);
+        startupRecovery(opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);
     }
 }
 
 /**
- * Runs startup recovery after system startup, either in replSet mode (will
- * restart index builds) or replSet standalone mode (will not restart index builds).  In no
- * case will it create an FCV document nor run repair or read-only recovery.
+ * Runs startup recovery after system startup, will restart index builds if in replSet mode
+ * In no case will it create an FCV document nor run repair or read-only recovery.
  */
-void runStartupRecoveryInMode(OperationContext* opCtx,
-                              StorageEngine::LastShutdownState lastShutdownState,
-                              StartupRecoveryMode mode) {
+void runStartupRecovery(OperationContext* opCtx,
+                        StorageEngine::LastShutdownState lastShutdownState) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
@@ -992,9 +961,7 @@ void runStartupRecoveryInMode(OperationContext* opCtx,
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
     invariant(usingReplication);
-    invariant(mode == StartupRecoveryMode::kReplicaSetMember ||
-              mode == StartupRecoveryMode::kReplicaSetMemberInStandalone);
-    startupRecovery(opCtx, storageEngine, lastShutdownState, mode);
+    startupRecovery(opCtx, storageEngine, lastShutdownState);
 }
 
 void recoverChangeStreamCollections(OperationContext* opCtx,

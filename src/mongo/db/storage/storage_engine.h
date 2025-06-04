@@ -214,7 +214,7 @@ public:
      * The storage engine can save several elements of ReplSettings on construction.  Standalone
      * mode is one such setting that can change after construction and need to be updated.
      */
-    virtual void setInStandaloneMode(bool inStandaloneMode) {}
+    virtual void setInStandaloneMode() {}
 
     /**
      * Returns a new interface to the storage engine's recovery unit.  The recovery
