@@ -88,9 +88,10 @@ void ShardingTestFixtureCommon::shutdownExecutorPool() {
     _executorPoolShutDown = true;
 
     grid->getExecutorPool()->shutdown_forTest();
-    executor::NetworkInterfaceMock::InNetworkGuard(_mockNetwork)->runReadyNetworkOperations();
-    executor::NetworkInterfaceMock::InNetworkGuard(_mockNetworkForPool)
-        ->runReadyNetworkOperations();
+    for (auto mockNet : {&_mockNetwork, &_mockNetworkForPool}) {
+        executor::NetworkInterfaceMock::InNetworkGuard(*mockNet)
+            ->drainUnfinishedNetworkOperations();
+    }
     grid->getExecutorPool()->join_forTest();
 }
 

@@ -604,6 +604,9 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(stdx::unique_lock<stdx::mute
             }
 
             LOGV2(9786900, "Canceling network operation", "request"_attr = requestString);
+            if (_onCancelAction) {
+                _onCancelAction();
+            }
 
             stdx::unique_lock<stdx::mutex> lk(_mutex);
             ResponseStatus rs = ResponseStatus::make_forTest(

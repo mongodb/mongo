@@ -38,7 +38,9 @@
 #include "mongo/executor/task_executor_test_common.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
@@ -317,6 +319,49 @@ TEST_F(ThreadPoolExecutorTest, NotifyEventAfterShutdown) {
     executor.join();
 
     executor.signalEvent(swHandle.getValue());
+}
+
+/**
+ * This test reproduces a race where one thread shuts down the ThreadPoolTaskExecutor while another
+ * thread is in the middle of canceling work scheduled on it. The race can cause a hang if the
+ * shutdown thread attempts to drain work before the cancellation thread finishes processing the
+ * cancellation. Calling NetworkInterfaceMock::drainUnfinishedNetworkOperations before joining the
+ * executor will fix this.
+ */
+TEST_F(ThreadPoolExecutorTest, CancelFromAnotherThread) {
+    auto& executor = getExecutor();
+    launchExecutorThread();
+
+    auto remote = HostAndPort("dummyHost:1234");
+    auto rcr = RemoteCommandRequest(remote, DatabaseName::kAdmin, BSON("hello" << 1), nullptr);
+    auto pf = makePromiseFuture<void>();
+    auto swCbHandle = executor.scheduleRemoteCommand(
+        rcr, [&](const TaskExecutor::RemoteCommandCallbackArgs& args) {
+            pf.promise.setWith([&] { return args.response.status; });
+        });
+    ASSERT_OK(swCbHandle);
+
+    auto tpte = checked_cast<ThreadPoolTaskExecutor*>(&executor);
+    auto net = checked_cast<NetworkInterfaceMock*>(tpte->getNetworkInterface().get());
+
+    Notification<void> startedCancellation;
+    Notification<void> finishedShutdown;
+    net->setOnCancelAction([&]() {
+        // Signal to the main test thread that this thread began handling cancellation.
+        startedCancellation.set();
+
+        // Block cancellation until the main test thread finished shutting down the executor.
+        finishedShutdown.get();
+    });
+
+    unittest::JoinThread th{[&] {
+        executor.cancel(swCbHandle.getValue());
+    }};
+
+    startedCancellation.get();
+    shutdownExecutorThread();
+    finishedShutdown.set();
+    joinExecutorThread();
 }
 
 }  // namespace

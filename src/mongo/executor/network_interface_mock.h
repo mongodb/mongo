@@ -394,6 +394,10 @@ public:
         return _responses.size();
     }
 
+    void setOnCancelAction(std::function<void()> cb) {
+        _onCancelAction = std::move(cb);
+    }
+
 private:
     /**
      * Information describing a scheduled alarm.
@@ -512,6 +516,8 @@ private:
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
     stdx::mutex _mutex;
+
+    std::function<void()> _onCancelAction;
 
     // A mocked clock source.
     std::unique_ptr<ClockSourceMock> _clkSource;  // (M)
