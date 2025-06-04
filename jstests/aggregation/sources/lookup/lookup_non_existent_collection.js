@@ -17,9 +17,6 @@ if (checkSbeCompletelyDisabled(db)) {
     quit();
 }
 
-const localColl = db.getCollection("local");
-const foreignColl = db.getCollection("foreign");
-
 db.localColl.drop();
 db.foreignColl.drop();
 assert.commandWorked(db.localColl.insert({_id: 1, a: 5}));
@@ -29,6 +26,15 @@ const pipeline =
     [{$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}}];
 let explain = db.localColl.explain().aggregate(pipeline);
 assert(aggPlanHasStage(explain, "EQ_LOOKUP"), explain);
+
+// Test lookup with multiple foreign collections, one of which does not exist.
+db.nonExistingForeignColl.drop();
+const pipelineWithNonExistentForeign = [
+    {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}},
+    {$lookup: {from: "nonExistingForeignColl", localField: "a", foreignField: "b", as: "result2"}}
+];
+let results = db.localColl.aggregate(pipelineWithNonExistentForeign).toArray();
+assert.eq(results.length, 1, results);
 
 // Remove the main collection and check the EOF plan.
 db.localColl.drop();

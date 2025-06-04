@@ -201,13 +201,13 @@ private:
     }
 
     inline boost::optional<CollectionAcquisition> _lookupCollectionAcquisition(UUID uuid) const {
-        if (_mainAcq && _mainAcq->isCollection() && uuid == _mainAcq->getCollection().uuid()) {
+        if (_mainAcq && _mainAcq->collectionExists() && uuid == _mainAcq->getCollection().uuid()) {
             return _mainAcq->getCollection();
         }
         // Since _secondaryAcq is keyed by NamespaceString, iterate over all secondary
         // acquisitions.
         for (const auto& entry : _secondaryAcq) {
-            if (entry.second.isCollection() && entry.second.getCollection().uuid() == uuid) {
+            if (entry.second.collectionExists() && entry.second.getCollection().uuid() == uuid) {
                 return entry.second.getCollection();
             }
         }
