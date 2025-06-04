@@ -120,17 +120,19 @@ E --> H
 
 ## Admission Priority
 
-Associated with every operation is an admission priority, stored as a part of the
-[AdmissionContext](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/admission_context.h#L40).
-By default, operations are 'normal' priority.
+As operations gets admitted through execution control and ingress admission, they get tickets from
+those queues. Associated with every ticket is an admission priority for that admission. By default,
+tickets have 'normal' priority. For ingress admission, operations created by a process-internal
+client are exempted when performing the ingress admission check. For execution control, exemption
+must be set explicitly.
 
 In the Flow Control ticketing system, operations of 'immediate' priority bypass ticket acquisition
 regardless of ticket availability. Tickets that are not 'immediate' priority must throttle when
 there are no tickets available in both Flow Control and Execution Control.
 
-Flow Control is only concerned whether an operation is 'immediate' priority and does not
-differentiate between 'normal' and 'low' priorities. The current version of Execution Control relies
-on admission priority to administer tickets when the server is under load.
+Flow Control is only concerned whether an operation is 'immediate' priority.
+The current version of Execution Control only takes into account if the priority is exempt or not,
+as exempt priority is the only one beside normal priority.
 
 **AdmissionContext::Priority**
 
@@ -139,59 +141,20 @@ on admission priority to administer tickets when the server is under load.
   prepared transactions).
 - `kNormal` - An operation that should be throttled when the server is under load. If an operation
   is throttled, it will not affect availability or observability. Most operations, both user and
-  internal, should use this priority unless they qualify as 'kLow' or 'kExempt' priority.
-- `kLow` - Reserved for background tasks that have no other operations dependent on them. The
-  operation will be throttled under load and make significantly less progress compared to operations
-  of higher priorities in the Execution Control.
+  internal, should use this priority unless they qualify as 'kExempt' priority.
 
 [See AdmissionContext::Priority for more
-details](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/util/concurrency/admission_context.h#L45-L67).
+details](https://github.com/mongodb/mongo/blob/r8.0.9/src/mongo/util/concurrency/admission_context.h#L49-L71).
 
-### How to Set Admission Priority
+### How to Exempt an Operation
 
-The preferred method for setting an operation's priority is through the RAII type
-[ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747).
+Some operation may need to be exempt from execution control. In the cases where an operation must
+be explicitly set as exempt, use the RAII type
+[ScopedAdmissionPriority](https://github.com/mongodb/mongo/blob/r8.0.9/src/mongo/util/concurrency/admission_context.h#L136).
 
 ```
-ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
+ScopedAdmissionPriority<ExecutionAdmissionContext> priority(opCtx, AdmissionContext::Priority::kExempt);
 ```
-
-Since the GlobalLock may be acquired and released multiple times throughout an operation's lifetime,
-it's important to limit the scope of reprioritization to prevent unintentional side-effects.
-However, if there is a special circumstance where the RAII cannot possibly be used, the priority can
-be set directly through
-[Locker::setAdmissionPriority()](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L525).
-
-### Developer Guidelines for Declaring Low Admission Priority
-
-Developers must evaluate the consequences of each low priority operation from falling too far
-behind, and should try to implement safeguards to avoid any undesirable behaviors for excessive
-delays in low priority operations.
-
-Whenever possible, an operation should dynamically choose when to be deprioritized or
-re-prioritized. More specifically, all low-priority candidates should assess the impact of
-deprioritizing their operation with respect to the state of the system before taking the GlobalLock
-with low priority.
-
-For example, since TTL deletes can be an expensive background task, they should default to low
-priority. However, it's important they don't fall too far behind TTL inserts - otherwise, there is a
-risk of unbounded collection growth. To remedy this issue, TTL deletes on a collection [are
-reprioritized](https://github.com/mongodb/mongo/blob/d1a0e34e1e67d4a2b23104af2512d14290b25e5f/src/mongo/db/ttl.idl#L96)
-to normal priority if they can't catch up after n-sub-passes.
-
-Examples of Deprioritized Operations:
-
-- [TTL
-  deletes](https://github.com/mongodb/mongo/blob/0ceb784512f81f77f0bc55001f83ca77d1aa1d84/src/mongo/db/ttl.cpp#L488)
-- [Persisting sampled queries for analyze shard
-  key](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
-- [Unbounded Index
-  Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
-- [Unbounded Collection
-  Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
-- Index Builds
-  [(1)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064),
-  [(2)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
 
 # Data-Node Ingress Admission Control
 
