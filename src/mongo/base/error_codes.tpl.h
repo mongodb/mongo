@@ -35,8 +35,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class Status;
 class DBException;
@@ -49,7 +50,7 @@ namespace $ec.extra_ns {
     //#end if
     class $ec.extra_class;
     //#if $ec.extra_ns
-}  // namespace extra_ns
+}  // namespace $ec.extra_ns
 //#end if
 //#end if
 //#end for

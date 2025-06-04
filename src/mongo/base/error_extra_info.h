@@ -36,8 +36,9 @@
 // much without creating a cycle.
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class BSONObj;
 class BSONObjBuilder;
@@ -202,4 +203,4 @@ private:
 
 }  // namespace nested::twice
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
