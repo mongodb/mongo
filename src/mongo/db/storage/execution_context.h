@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
+#include "mongo/db/storage/storage_metrics.h"
 
 namespace mongo {
 

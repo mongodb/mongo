@@ -713,6 +713,7 @@ mongo_cc_library(
         ":write_block_bypass",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
         "//src/mongo/s:grid",
@@ -1483,7 +1484,6 @@ mongo_cc_library(
     deps = [
         ":server_base",
         ":shard_filterer",
-        ":shard_role_api",  # TODO(SERVER-93876): Remove.
         ":working_set_common",
         "//src/mongo/db/exec:working_set",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
@@ -2265,7 +2265,6 @@ mongo_cc_library(
         "server_base",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/session:logical_session_id",
-        "//src/mongo/db/storage:recovery_unit_base",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/util:clock_sources",
         "//src/mongo/util:periodic_runner",

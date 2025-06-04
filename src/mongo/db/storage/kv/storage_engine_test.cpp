@@ -63,6 +63,7 @@
 #include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_impl.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
@@ -866,6 +867,10 @@ public:
                                      /*directoryForIndexes=*/false,
                                      /*forRepair=*/false,
                                      /*lockFileCreatedByUncleanShutdown=*/false};
+
+        shard_role_details::setRecoveryUnit(opCtx.get(),
+                                            std::make_unique<RecoveryUnitNoop>(),
+                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         _storageEngine =
             std::make_unique<StorageEngineImpl>(opCtx.get(),
                                                 std::make_unique<TimestampMockKVEngine>(),

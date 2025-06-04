@@ -60,6 +60,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/mixed_schema_buckets_state.h"
 #include "mongo/db/timeseries/timeseries_gen.h"

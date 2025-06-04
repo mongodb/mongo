@@ -87,7 +87,12 @@ std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Lock
 }
 
 std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx, ClientLock& clientLock) {
-    return opCtx->releaseRecoveryUnit_DO_NOT_USE(clientLock);
+    auto ru = storage_details::swapRecoveryUnit(opCtx, nullptr);
+    if (ru) {
+        ru->setOperationContext(nullptr);
+    }
+
+    return ru;
 }
 
 std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx) {
@@ -97,14 +102,23 @@ std::unique_ptr<RecoveryUnit> releaseRecoveryUnit(OperationContext* opCtx) {
 
 std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx,
                                                             ClientLock& clientLock) {
-    return opCtx->releaseAndReplaceRecoveryUnit_DO_NOT_USE(clientLock);
+    auto ru = releaseRecoveryUnit(opCtx, clientLock);
+    setRecoveryUnit(opCtx,
+                    opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                    WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
+                    clientLock);
+    return ru;
 }
 
 WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
                                                    std::unique_ptr<RecoveryUnit> unit,
                                                    WriteUnitOfWork::RecoveryUnitState state,
                                                    ClientLock& clientLock) {
-    return opCtx->setRecoveryUnit_DO_NOT_USE(std::move(unit), state, clientLock);
+    if (unit) {
+        unit->setOperationContext(opCtx);
+    }
+    storage_details::setRecoveryUnit(opCtx, std::move(unit));
+    return opCtx->setRecoveryUnitState_DO_NOT_USE(state, clientLock);
 }
 
 WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,

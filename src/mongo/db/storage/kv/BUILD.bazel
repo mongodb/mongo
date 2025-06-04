@@ -38,7 +38,6 @@ mongo_cc_library(
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:service_context_d",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/catalog:catalog_impl",
         "//src/mongo/db/catalog:durable_catalog",
         "//src/mongo/db/concurrency:lock_manager",

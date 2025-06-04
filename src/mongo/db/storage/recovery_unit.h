@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/storage_stats.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -114,6 +113,7 @@ class RecoveryUnit {
 
 public:
     virtual ~RecoveryUnit() = default;
+
 
     /**
      * A Snapshot is a decorable type whose lifetime is tied to the the lifetime of a
@@ -1055,5 +1055,13 @@ private:
     bool _prepared = false;
 };
 
+namespace storage_details {
 
+RecoveryUnit* getRecoveryUnit(OperationContext* opCtx);
+const RecoveryUnit* getRecoveryUnit(const OperationContext* opCtx);
+void setRecoveryUnit(OperationContext* opCtx, std::unique_ptr<RecoveryUnit>);
+std::unique_ptr<RecoveryUnit> swapRecoveryUnit(OperationContext* opCtx,
+                                               std::unique_ptr<RecoveryUnit> newRu);
+
+}  // namespace storage_details
 }  // namespace mongo

@@ -617,7 +617,6 @@ mongo_cc_library(
         ":record_store_test_harness",
         ":storage_options",
         "//src/mongo/db:record_id_helpers",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/update:update_document_diff",
     ],
@@ -636,7 +635,6 @@ mongo_cc_library(
         ":record_store_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/unittest",
     ],
 )
@@ -657,7 +655,6 @@ mongo_cc_library(
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:service_context",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/unittest",
     ],
@@ -686,7 +683,6 @@ mongo_cc_library(
     deps = [
         ":sorted_data_interface_test_harness",
         ":storage_options",
-        "//src/mongo/db:shard_role_api",
     ],
 )
 
@@ -772,7 +768,6 @@ mongo_cc_library(
     ],
     deps = [
         ":sorted_data_interface_test_harness",
-        "//src/mongo/db:shard_role_api",
         "//src/third_party/benchmark",
     ],
 )
@@ -784,7 +779,6 @@ mongo_cc_library(
     ],
     deps = [
         ":record_store_test_harness",
-        "//src/mongo/db:shard_role_api",
         "//src/third_party/benchmark",
     ],
 )

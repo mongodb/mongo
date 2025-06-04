@@ -691,7 +691,6 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:service_context",
         "//src/mongo/db:shard_filterer",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/auth",
         "//src/mongo/db/catalog:collection_catalog",
         "//src/mongo/db/commands:fsync_locked",
@@ -1186,7 +1185,6 @@ mongo_cc_library(
     ],
     deps = [
         ":aggregation",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/s:async_requests_sender",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/query:cluster_query_knobs",

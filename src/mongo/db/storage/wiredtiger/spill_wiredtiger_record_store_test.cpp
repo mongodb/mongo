@@ -57,8 +57,7 @@ protected:
 
         _recordStore = makeTemporaryRecordStore("a.b", KeyFormat::Long);
         ASSERT_TRUE(_kvEngine->hasIdent(
-            _recordStore->getRecoveryUnit(*shard_role_details::getRecoveryUnit(_opCtx.get())),
-            "a.b"));
+            _recordStore->getRecoveryUnit(*storage_details::getRecoveryUnit(_opCtx.get())), "a.b"));
     }
 
     ~SpillWiredTigerRecordStoreTest() override {
@@ -272,7 +271,7 @@ TEST_F(SpillWiredTigerRecordStoreTest, RangeTruncate) {
 
 // Test that RecordCursor works as expected.
 TEST_F(SpillWiredTigerRecordStoreTest, RecordCursor) {
-    auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
+    auto& ru = *storage_details::getRecoveryUnit(_opCtx.get());
 
     std::vector<std::string> recordDataVec(11);
     for (int32_t i = 1; i <= 10; ++i) {

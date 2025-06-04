@@ -48,7 +48,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -69,7 +68,7 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
 
     ASSERT_THROWS(rs->storageSize(ru), AssertionException);
 }
@@ -89,7 +88,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
 
         StorageWriteTransaction txn(ru);
         for (int i = 0; i < N; i++) {
@@ -125,7 +124,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
         auto ret = new WiredTigerRecordStore(
             nullptr,
-            WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx.get())),
+            WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx.get())),
             params);
         rs.reset(ret);
     }
@@ -135,8 +134,8 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        auto& ru = *checked_cast<WiredTigerRecoveryUnit*>(
-            shard_role_details::getRecoveryUnit(opCtx.get()));
+        auto& ru =
+            *checked_cast<WiredTigerRecoveryUnit*>(storage_details::getRecoveryUnit(opCtx.get()));
 
         {
             StorageWriteTransaction txn(ru);
@@ -200,7 +199,7 @@ TEST_F(SizeStorerUpdateTest, Basic) {
 
 TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
 
     RecordId recordId;
     {
@@ -257,7 +256,7 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
 // properly flushed to disk.
 TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtx.get());
 
     // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
     {

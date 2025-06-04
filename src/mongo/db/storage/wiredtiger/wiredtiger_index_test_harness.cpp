@@ -109,7 +109,7 @@ public:
                                                   isLogged);
         ASSERT_OK(result.getStatus());
 
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto& ru = *storage_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
         invariant(Status::OK() ==
                   WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
@@ -150,7 +150,7 @@ public:
             WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
         ASSERT_OK(result.getStatus());
 
-        auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+        auto& ru = *storage_details::getRecoveryUnit(opCtx);
         std::string uri = "table:" + ns;
         invariant(Status::OK() ==
                   WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));

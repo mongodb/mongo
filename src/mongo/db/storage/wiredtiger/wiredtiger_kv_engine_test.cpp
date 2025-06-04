@@ -62,7 +62,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
@@ -162,9 +161,9 @@ public:
 protected:
     ServiceContext::UniqueOperationContext _makeOperationContext() {
         auto opCtx = makeOperationContext();
-        shard_role_details::setRecoveryUnit(opCtx.get(),
-                                            _helper.getEngine()->newRecoveryUnit(),
-                                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        auto ru = _helper.getEngine()->newRecoveryUnit();
+        ru->setOperationContext(opCtx.get());
+        storage_details::setRecoveryUnit(opCtx.get(), std::move(ru));
         return opCtx;
     }
 
@@ -178,7 +177,7 @@ public:
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     auto opCtxPtr = _makeOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtxPtr.get());
 
     std::string ident = "collection-1234";
     RecordStore::Options options;
@@ -224,7 +223,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!err) << err.message();
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *storage_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
     // engine and the restoration process can be tested.
@@ -238,7 +237,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtxPtr.get());
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";
@@ -271,7 +270,7 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     _helper.getWiredTigerKVEngine()->checkpoint();
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *storage_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
     auto status = _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(nss, ident, options);
@@ -441,7 +440,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
     _helper.getWiredTigerKVEngine()->dropIdentForImport(
-        *opCtxPtr.get(), *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident);
+        *opCtxPtr.get(), *storage_details::getRecoveryUnit(opCtxPtr.get()), ident);
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
     // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
@@ -453,7 +452,7 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
     ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
-        *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
+        *storage_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // WiredTiger drops files asynchronously.
     for (size_t check = 0; check < 30; check++) {
@@ -483,7 +482,7 @@ TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
     const bool roundUpIfTooOld = false;
     // Pin the oldest timestamp to "3".
     auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 3, roundUpIfTooOld));
+        *storage_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 3, roundUpIfTooOld));
     // Assert that the pinning method returns the same timestamp as was requested.
     ASSERT_EQ(initTs + 3, pinnedTs);
     // Assert that pinning the oldest timestamp does not advance it.
@@ -519,13 +518,13 @@ TEST_F(WiredTigerKVEngineTest, TestMultiPinOldestTimestamp) {
     const bool roundUpIfTooOld = false;
     // Have "A" pin the timestamp to "1".
     auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 1, roundUpIfTooOld));
+        *storage_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 1, roundUpIfTooOld));
     ASSERT_EQ(initTs + 1, pinnedTs);
     ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Have "B" pin the timestamp to "2".
     pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs + 2, roundUpIfTooOld));
+        *storage_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs + 2, roundUpIfTooOld));
     ASSERT_EQ(initTs + 2, pinnedTs);
     ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
 
@@ -562,13 +561,13 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
     // When rounding on error, the pin will succeed, but the return value will be the current oldest
     // timestamp instead of the requested value.
     auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs - 1, roundUpIfTooOld));
+        *storage_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs - 1, roundUpIfTooOld));
     ASSERT_EQ(initTs, pinnedTs);
     ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Using "fail on error" will result in a not-OK return value.
     ASSERT_NOT_OK(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs - 1, failOnError));
+        *storage_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs - 1, failOnError));
     ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
@@ -578,7 +577,7 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
  */
 TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecovery) {
     auto opCtxRaii = _makeOperationContext();
-    auto& ru = *shard_role_details::getRecoveryUnit(opCtxRaii.get());
+    auto& ru = *storage_details::getRecoveryUnit(opCtxRaii.get());
 
     // oldest and stable are both null.
     ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
@@ -616,7 +615,7 @@ TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecoveryStab
     const Timestamp initTs = Timestamp(10, 0);
     _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
     ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(
-        *shard_role_details::getRecoveryUnit(opCtxRaii.get())));
+        *storage_details::getRecoveryUnit(opCtxRaii.get())));
 }
 
 TEST_F(WiredTigerKVEngineTest, ExtractIdentFromPath) {
@@ -780,8 +779,7 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
 
     // Get a session. This will open a transaction.
     WiredTigerSession* session =
-        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtxPtr.get()))
-            ->getSession();
+        WiredTigerRecoveryUnit::get(storage_details::getRecoveryUnit(opCtxPtr.get()))->getSession();
     invariant(session);
 
     // WT will return EBUSY due to the open transaction.
@@ -793,7 +791,7 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
                   .code());
 
     // Close the open transaction.
-    WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtxPtr.get()))
+    WiredTigerRecoveryUnit::get(storage_details::getRecoveryUnit(opCtxPtr.get()))
         ->abandonSnapshot();
 
     // WT will no longer return EBUSY.
@@ -907,7 +905,7 @@ TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackup
 
 DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
     auto opCtx = _makeOperationContext();
-    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
+    storage_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
     opCtx->getServiceContext()->getStorageEngine()->waitUntilDurable(opCtx.get());
 }
 
@@ -935,7 +933,7 @@ protected:
 
     Status removeIdent(StringData ident) {
         return _helper.getWiredTigerKVEngine()->dropIdent(
-            *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
+            *storage_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }
 
 private:

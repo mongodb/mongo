@@ -36,7 +36,6 @@
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

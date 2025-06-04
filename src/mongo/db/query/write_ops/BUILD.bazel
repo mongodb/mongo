@@ -38,7 +38,6 @@ mongo_cc_library(
         "//src/mongo/db:disk_use_options_idl",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db:server_base",
-        "//src/mongo/db:shard_role_api",
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
         "//src/mongo/db/update:update_driver",

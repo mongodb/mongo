@@ -67,7 +67,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/db/validate/validate_options.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/logv2/log.h"
@@ -594,7 +593,7 @@ public:
     }
 
     bool restore(bool tolerateCappedRepositioning = true) final {
-        _ru = shard_role_details::getRecoveryUnit(_opCtx);
+        _ru = storage_details::getRecoveryUnit(_opCtx);
         auto& wtRu = WiredTigerRecoveryUnitBase::get(*_ru);
 
         if (!_cursor) {
@@ -1951,7 +1950,7 @@ void WiredTigerRecordStoreCursorBase::reattachToOperationContext(OperationContex
 }
 
 RecoveryUnit& WiredTigerRecordStoreCursorBase::getRecoveryUnit() const {
-    return *shard_role_details::getRecoveryUnit(_opCtx);
+    return *storage_details::getRecoveryUnit(_opCtx);
 }
 
 WiredTigerRecordStoreCursor::WiredTigerRecordStoreCursor(OperationContext* opCtx,
