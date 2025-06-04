@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import glob
 import json
 import multiprocessing
 import os
 import re
+import subprocess
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed, wait
 from datetime import datetime
@@ -120,14 +120,45 @@ def is_submodule_usage(decl: Decl, mod: str) -> bool:
     return decl["mod"] == mod or mod.startswith(decl["mod"] + ".")
 
 
+def get_paths(timer: Timer):
+    project_root = os.path.dirname(os.path.abspath(sys.argv[0])) + "/.."
+    subprocess.run(
+        ["bazel", "build", "--config=mod-scanner", "//src/mongo/..."], cwd=project_root, check=True
+    )
+    timer.mark("built")
+
+    proc = subprocess.run(
+        [
+            "bazel",
+            "aquery",
+            "--config=mod-scanner",
+            'outputs(".*mod_scanner_decls.json.*", mnemonic(ModScanner, //src/mongo/...))',
+            "--noinclude_commandline",
+            "--noinclude_artifacts",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=project_root,
+        check=True,
+    )
+
+    outputs = []
+    for line in proc.stdout.split("\n"):
+        if line.startswith("  Environment:") and "MOD_SCANNER_OUTPUT=" in line:
+            m = re.search("MOD_SCANNER_OUTPUT=([^,]+),", line)
+            if m:
+                outputs.append(m.group(1))
+    timer.mark("sources_found")
+    return outputs
+
+
 def main(
     jobs: int = typer.Option(os.cpu_count(), "--jobs", "-j"),
     intra_module: bool = typer.Option(False, help="Include intra-module accesses"),
 ):
     timer = Timer()
-    paths = glob.glob(b"bazel-bin/**/*.mod_scanner_decls.json.zst", recursive=True)
+    paths = get_paths(timer)
     num_paths = len(paths)
-    timer.mark("globbed")
 
     if jobs > 1:
         with multiprocessing.Manager() as manager:

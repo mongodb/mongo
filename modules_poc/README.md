@@ -128,8 +128,6 @@ This will build the `merged_decls.json` file in the current directory:
 
 ```bash
 buildscripts/poetry_sync.sh # make sure the python env has the right packages installed
-find bazel-out/ -name '*.mod_scanner_decls.json*' -delete # get rid of old data files
-bazel build --config=mod-scanner  "//src/mongo/..."
 python modules_poc/merge_decls.py
 ```
 
