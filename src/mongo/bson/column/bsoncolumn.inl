@@ -32,7 +32,7 @@ namespace bsoncolumn {
 
 template <class Buffer>
 requires Appendable<Buffer>
-MONGO_COMPILER_ALWAYS_INLINE void BSONColumnBlockBased::decompress(Buffer& buffer) const {
+MONGO_COMPILER_ALWAYS_INLINE_GCC14 void BSONColumnBlockBased::decompress(Buffer& buffer) const {
     const char* ptr = _binary;
     const char* end = _binary + _size;
     BSONType type = EOO;  // needs to be set as something else before deltas are parsed

@@ -369,11 +369,11 @@ inline size_t visitAll(const char* buffer,
                        const VisitMissing& visitMissing);
 
 template <typename T, typename Visit, typename VisitMissing>
-MONGO_COMPILER_ALWAYS_INLINE inline size_t visitAll(const char* buffer,
-                                                    size_t size,
-                                                    uint64_t& prevNonRLE,
-                                                    const Visit& visit,
-                                                    const VisitMissing& visitMissing) {
+MONGO_COMPILER_ALWAYS_INLINE_GCC14 inline size_t visitAll(const char* buffer,
+                                                          size_t size,
+                                                          uint64_t& prevNonRLE,
+                                                          const Visit& visit,
+                                                          const VisitMissing& visitMissing) {
     return visitAll<T>(buffer, size, prevNonRLE, visit, [&visit]() { visit(0); }, visitMissing);
 }
 

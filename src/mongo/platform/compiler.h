@@ -165,6 +165,16 @@
 #endif
 
 /**
+ * Force a function to be inlined as a temporary measure to buy-back performance regressions
+ * downstream of the switch to using the v5 toolchain.
+ * TODO(SERVER-105707): Reevaluate each use of this macro once we have enabled LTO/PGO and
+ * other post-compilation optimizations; for each, either delete the use or change it to use
+ * MONGO_COMPILER_ALWAYS_INLINE, committing the forced inlining choice permanently. Then delete
+ * this macro definition.
+ */
+#define MONGO_COMPILER_ALWAYS_INLINE_GCC14 MONGO_COMPILER_ALWAYS_INLINE
+
+/**
  * Tells the compiler that it can assume that this line will never execute.
  * Unlike with MONGO_UNREACHABLE, there is no runtime check and reaching this
  * macro is completely undefined behavior. It should only be used where it is

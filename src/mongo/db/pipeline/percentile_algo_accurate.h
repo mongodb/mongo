@@ -49,7 +49,7 @@ class AccuratePercentile : public PercentileAlgorithm, public PartialPercentile<
 public:
     AccuratePercentile() = default;  // no config required for this algorithm
 
-    MONGO_COMPILER_ALWAYS_INLINE void incorporate(double input) final {
+    MONGO_COMPILER_ALWAYS_INLINE_GCC14 void incorporate(double input) final {
         if (std::isnan(input)) {
             return;
         }

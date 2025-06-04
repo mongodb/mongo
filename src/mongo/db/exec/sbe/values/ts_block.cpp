@@ -70,7 +70,7 @@ public:
         _positions.reserve(expectedCount);
     }
 
-    MONGO_COMPILER_ALWAYS_INLINE void push_back(const Element& e) {
+    MONGO_COMPILER_ALWAYS_INLINE_GCC14 void push_back(const Element& e) {
         auto [tag, val] = e;
         _allValuesShallow = _allValuesShallow && value::isShallowType(tag);
         _tags.push_back(tag);
