@@ -27,10 +27,12 @@ def main():
     # Filegroups for select tags - used to group targets for installing
     autogenerate_targets(sys.argv, sys.argv[1])
 
+    enterprise = True
     if check_bazel_command_type(sys.argv[1:]) not in ["clean", "shutdown", "version", None]:
         args = sys.argv
         enterprise_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise"
         if not enterprise_mod.exists():
+            enterprise = False
             print(
                 f"{enterprise_mod.relative_to(REPO_ROOT).as_posix()} missing, defaulting to local non-enterprise build (--config=local --build_enterprise=False). Add the directory to not automatically add these options."
             )
@@ -41,7 +43,9 @@ def main():
         write_workstation_bazelrc(args)
 
         args = test_runner_interface(
-            sys.argv[1:], autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1"
+            sys.argv[1:],
+            autocomplete_query=os.environ.get("MONGO_AUTOCOMPLETE_QUERY") == "1",
+            enterprise=enterprise,
         )
 
     else:

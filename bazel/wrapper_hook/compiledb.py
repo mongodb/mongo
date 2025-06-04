@@ -42,7 +42,7 @@ def run_pty_command(cmd):
     return stdout
 
 
-def generate_compiledb(bazel_bin, persistent_compdb):
+def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
     if persistent_compdb:
         info_proc = subprocess.run(
             [bazel_bin, "info", "output_base"], capture_output=True, text=True
@@ -60,6 +60,9 @@ def generate_compiledb(bazel_bin, persistent_compdb):
             "Using default compiledb config, create a '.bazelrc.compiledb' file to customize the compiledb config..."
         )
         compiledb_config = ["--config=dbg"]
+
+    if not enterprise:
+        compiledb_config.append("--build_enterprise=False")
 
     query_cmd = (
         [bazel_bin]

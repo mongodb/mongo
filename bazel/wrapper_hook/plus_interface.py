@@ -60,7 +60,9 @@ def check_bazel_command_type(args):
             return arg
 
 
-def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_buildozer_output):
+def test_runner_interface(
+    args, autocomplete_query, get_buildozer_output=get_buildozer_output, enterprise=True
+):
     start = time.time()
 
     plus_autocomplete_query = False
@@ -104,7 +106,7 @@ def test_runner_interface(args, autocomplete_query, get_buildozer_output=get_bui
             skip_plus_interface = False
 
     if compiledb_target:
-        generate_compiledb(args[0], persistent_compdb)
+        generate_compiledb(args[0], persistent_compdb, enterprise)
 
     if lint_target:
         command_start_index = args.index("lint") + 1
