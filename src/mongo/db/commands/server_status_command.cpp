@@ -172,7 +172,15 @@ public:
                 continue;
             }
 
-            section->appendSection(opCtx, elem, &result);
+            try {
+                section->appendSection(opCtx, elem, &result);
+            } catch (...) {
+                LOGV2_ERROR(9761501,
+                            "Section threw an error",
+                            "error"_attr = exceptionToStatus(),
+                            "section"_attr = section->getSectionName());
+                throw;
+            }
             timeBuilder.appendNumber(
                 static_cast<std::string>(str::stream() << "after " << section->getSectionName()),
                 durationCount<Milliseconds>(clock->now() - runStart));

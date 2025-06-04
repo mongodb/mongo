@@ -363,13 +363,21 @@ void SyncFTDCCollectorCollection::_collect(OperationContext* opCtx,
             continue;
         }
 
-        BSONObjBuilder subObjBuilder(builder->subobjStart(collector->name()));
+        try {
+            BSONObjBuilder subObjBuilder(builder->subobjStart(collector->name()));
 
-        // Add a Date_t before and after each BSON is collected so that we can track timing of
-        // the collector.
-        subObjBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
-        collector->collect(opCtx, subObjBuilder);
-        subObjBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
+            // Add a Date_t before and after each BSON is collected so that we can track timing of
+            // the collector.
+            subObjBuilder.appendDate(kFTDCCollectStartField, getCurrentDate(opCtx));
+            collector->collect(opCtx, subObjBuilder);
+            subObjBuilder.appendDate(kFTDCCollectEndField, getCurrentDate(opCtx));
+        } catch (...) {
+            LOGV2_ERROR(9761500,
+                        "Collector threw an error",
+                        "error"_attr = exceptionToStatus(),
+                        "collector"_attr = collector->name());
+            throw;
+        }
 
         // Ensure the collector did not set a read timestamp.
         invariant(shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource() ==
