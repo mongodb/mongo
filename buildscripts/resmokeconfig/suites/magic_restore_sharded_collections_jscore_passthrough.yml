@@ -60,6 +60,7 @@ selector:
     - jstests/core/query/type/type_array.js
     - jstests/core/timeseries/query/timeseries_internal_bounded_sort_compound_mixed_types.js
     - jstests/core/query/json_schema/unique_items.js
+    - jstests/core/query/update/update_array_many_elements.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
     - jstests/core/query/max_doc_size.js
