@@ -1762,10 +1762,11 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
         auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(innerStage);
         if (unwindStage) {
-            solnForAgg = std::make_unique<UnwindNode>(std::move(solnForAgg) /* child */,
-                                                      unwindStage->getUnwindPath() /* fieldPath */,
-                                                      unwindStage->preserveNullAndEmptyArrays(),
-                                                      unwindStage->indexPath());
+            solnForAgg = std::make_unique<UnwindNode>(
+                std::move(solnForAgg) /* child */,
+                UnwindNode::UnwindSpec{unwindStage->getUnwindPath() /* fieldPath */,
+                                       unwindStage->preserveNullAndEmptyArrays(),
+                                       unwindStage->indexPath()});
             continue;
         }
 

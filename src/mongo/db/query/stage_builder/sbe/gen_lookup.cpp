@@ -1367,8 +1367,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
         // foreign collection in DocumentSourceLookup::doOptimizeAt() to avoid ever absorbing the
         // $unwind, as that computation happens later and requires several inputs that are not
         // available at the time of doOptimizeAt().)
-        return buildOnlyUnwind(&(eqLookupUnwindNode->unwindNode),
+        return buildOnlyUnwind(eqLookupUnwindNode->unwindSpec,
                                reqs,
+                               eqLookupUnwindNode->nodeId(),
                                foreignStage,
                                localOutputs,
                                localDocSlot,

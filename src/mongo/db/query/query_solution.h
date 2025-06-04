@@ -951,14 +951,24 @@ struct MatchNode : public QuerySolutionNode {
  * UnwindNode is used for $unwind aggregation stages that are pushed down to SBE.
  */
 struct UnwindNode : public QuerySolutionNode {
-    UnwindNode(std::unique_ptr<QuerySolutionNode> child,
-               const FieldPath& fieldPath,
-               bool preserveNullAndEmptyArrays,
-               const boost::optional<FieldPath>& indexPath)
-        : QuerySolutionNode(std::move(child)),
-          fieldPath{fieldPath},
-          preserveNullAndEmptyArrays{preserveNullAndEmptyArrays},
-          indexPath(indexPath) {}
+    /**
+     * This struct describes an Unwind operation. It's factored into a separate 'Spec' type since
+     * EqLookupUnwind nodes also have to store a copy of this information.
+     */
+    struct UnwindSpec {
+        // Path in the document to the field to unwind.
+        FieldPath fieldPath;
+
+        // Iff true, then if the path is null, missing, or an empty array, unwind outputs the
+        // document.
+        bool preserveNullAndEmptyArrays;
+
+        // Optional output path in which to return the array index unwound to this output doc.
+        boost::optional<FieldPath> indexPath;
+    };
+
+    UnwindNode(std::unique_ptr<QuerySolutionNode> child, UnwindSpec spec)
+        : QuerySolutionNode(std::move(child)), spec(std::move(spec)) {}
 
     StageType getType() const override {
         return STAGE_UNWIND;
@@ -986,14 +996,7 @@ struct UnwindNode : public QuerySolutionNode {
     void appendToString(str::stream* ss, int indent) const final;
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
-    // Path in the document to the field to unwind.
-    FieldPath fieldPath;
-
-    // Iff true, then if the path is null, missing, or an empty array, unwind outputs the document.
-    bool preserveNullAndEmptyArrays;
-
-    // Optional output path in which to return the array index unwound to this output doc.
-    const boost::optional<FieldPath>& indexPath;
+    UnwindSpec spec;
 };  // struct UnwindNode
 
 /**
@@ -1860,10 +1863,7 @@ struct EqLookupUnwindNode : public QuerySolutionNode {
           idxEntry(std::move(idxEntry)),
           shouldProduceBson(shouldProduceBson),
           // $unwind-specific data members.
-          unwindNode{nullptr /* child */,
-                     joinField /* fieldPath */,
-                     preserveNullAndEmptyArrays,
-                     indexPath},
+          unwindSpec{joinField /* fieldPath */, preserveNullAndEmptyArrays, indexPath},
           scanDirection(scanDirection) {}
 
     StageType getType() const override {
@@ -1939,9 +1939,8 @@ struct EqLookupUnwindNode : public QuerySolutionNode {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Represents the absorbed $unwind stage, which may be used in the stage builder for this $LU
-    // node. Its 'child' member is set to nullptr to avoid an unwanted recursion to the current $LU,
-    // which is conceptually the $unwind's parent.
-    struct UnwindNode unwindNode;
+    // node.
+    UnwindNode::UnwindSpec unwindSpec;
 
     /**
      * Scan direction if hinted, default forward.

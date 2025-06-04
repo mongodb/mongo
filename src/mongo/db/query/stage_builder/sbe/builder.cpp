@@ -1941,8 +1941,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildMatch(const Query
  */
 std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const QuerySolutionNode* root,
                                                                       const PlanStageReqs& reqs) {
-    const UnwindNode* un = static_cast<const UnwindNode*>(root);
-    const FieldPath& fp = un->fieldPath;
+    const UnwindNode* unwindNode = static_cast<const UnwindNode*>(root);
+    const FieldPath& fieldPath = unwindNode->spec.fieldPath;
 
     //
     // Build the execution subtree for the child plan subtree.
@@ -1951,10 +1951,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const Quer
     // The child must produce all of the slots required by the parent of this UnwindNode, plus this
     // node needs to produce the result slot.
     PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
-    auto [stage, outputs] = build(un->children[0].get(), childReqs);
+    auto [stage, outputs] = build(unwindNode->children[0].get(), childReqs);
 
     // Clear the root of the original field being unwound so later plan stages do not reference it.
-    outputs.clearField(fp.getSubpath(0));
+    outputs.clearField(fieldPath.getSubpath(0));
     SbSlot childResultSlot = outputs.getResultObj();
 
     //
@@ -1964,7 +1964,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const Quer
     // only the former supports dotted paths.
     //
     std::vector<std::string> fields;
-    fields.emplace_back(fp.fullPath());
+    fields.emplace_back(fieldPath.fullPath());
     auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
                                                      fields,
                                                      childResultSlot,
@@ -1976,7 +1976,13 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const Quer
     SbSlot getFieldSlot = outSlots[0];
 
     // Continue building the unwind and projection to results.
-    return buildOnlyUnwind(un, reqs, stage, outputs, childResultSlot, getFieldSlot);
+    return buildOnlyUnwind(unwindNode->spec,
+                           reqs,
+                           unwindNode->nodeId(),
+                           stage,
+                           outputs,
+                           childResultSlot,
+                           getFieldSlot);
 }  // buildUnwind
 
 namespace {
@@ -2064,22 +2070,24 @@ SbExpr projectUnwindOutputs(StageBuilderState& state,
  * nonexistent foreign collection, where the $lookup result array is empty and thus its
  * materialization is not a performance or memory problem.
  */
-std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(const UnwindNode* un,
-                                                                          const PlanStageReqs& reqs,
-                                                                          SbStage& stage,
-                                                                          PlanStageSlots& outputs,
-                                                                          SbSlot childResultSlot,
-                                                                          SbSlot getFieldSlot) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
+    const UnwindNode::UnwindSpec& un,
+    const PlanStageReqs& reqs,
+    PlanNodeId nodeId,
+    SbStage& stage,
+    PlanStageSlots& outputs,
+    SbSlot childResultSlot,
+    SbSlot getFieldSlot) {
     using namespace std::literals::string_literals;
 
-    SbBuilder b(_state, un->nodeId());
+    SbBuilder b(_state, nodeId);
 
     //
     // Build the unwind execution node itself. This will unwind the value in 'getFieldSlot' into
     // 'unwindSlot' and place the array index value into 'arrayIndexSlot'.
     //
     auto [unwindStage, unwindSlot, arrayIndexSlot] =
-        b.makeUnwind(std::move(stage), getFieldSlot /* inField */, un->preserveNullAndEmptyArrays);
+        b.makeUnwind(std::move(stage), getFieldSlot /* inField */, un.preserveNullAndEmptyArrays);
     stage = std::move(unwindStage);
 
     //
@@ -2094,9 +2102,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(const 
     // The projection expression that adds the index and/or unwind values to the result doc.
     SbExpr finalProjectExpr;
 
-    bool hasIndexPath = un->indexPath.has_value();
-    const std::string& unwindPath = un->fieldPath.fullPath();
-    const std::string& indexOutputPath = hasIndexPath ? un->indexPath->fullPath() : ""s;
+    bool hasIndexPath = un.indexPath.has_value();
+    const std::string& unwindPath = un.fieldPath.fullPath();
+    const std::string& indexOutputPath = hasIndexPath ? un.indexPath->fullPath() : ""s;
 
     if (hasIndexPath) {
         // "includeArrayIndex" option (Cases 1-3). The index is always projected in these.
