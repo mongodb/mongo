@@ -74,7 +74,8 @@ protected:
                                                                          KeyFormat keyFormat) {
         StringData ident = ns;
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        auto rs = _kvEngine->makeTemporaryRecordStore(_opCtx.get(), ident, keyFormat);
+        auto rs = _kvEngine->makeTemporaryRecordStore(
+            *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, keyFormat);
         return std::unique_ptr<SpillWiredTigerRecordStore>(
             dynamic_cast<SpillWiredTigerRecordStore*>(rs.release()));
     }

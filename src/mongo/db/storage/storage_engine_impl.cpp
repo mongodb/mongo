@@ -622,15 +622,15 @@ std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* 
                                                               KeyFormat keyFormat) {
     invariant(_spillKVEngine);
     std::unique_ptr<RecordStore> rs = _spillKVEngine->makeTemporaryRecordStore(
-        opCtx, ident::generateNewInternalIdent(), keyFormat);
+        *shard_role_details::getRecoveryUnit(opCtx), ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
     return std::make_unique<SpillTable>(std::move(rs));
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(
     OperationContext* opCtx, KeyFormat keyFormat) {
-    std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, ident::generateNewInternalIdent(), keyFormat);
+    std::unique_ptr<RecordStore> rs = _engine->makeTemporaryRecordStore(
+        *shard_role_details::getRecoveryUnit(opCtx), ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(22258, 1, "Created temporary record store", "ident"_attr = rs->getIdent());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
@@ -639,7 +639,9 @@ std::unique_ptr<TemporaryRecordStore>
 StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationContext* opCtx,
                                                                   KeyFormat keyFormat) {
     std::unique_ptr<RecordStore> rs =
-        _engine->makeTemporaryRecordStore(opCtx, generateNewResumableIndexBuildIdent(), keyFormat);
+        _engine->makeTemporaryRecordStore(*shard_role_details::getRecoveryUnit(opCtx),
+                                          generateNewResumableIndexBuildIdent(),
+                                          keyFormat);
     LOGV2_DEBUG(4921500,
                 1,
                 "Created temporary record store for resumable index build",
@@ -649,7 +651,8 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
-    auto rs = _engine->getTemporaryRecordStore(opCtx, ident, keyFormat);
+    auto rs = _engine->getTemporaryRecordStore(
+        *shard_role_details::getRecoveryUnit(opCtx), ident, keyFormat);
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 

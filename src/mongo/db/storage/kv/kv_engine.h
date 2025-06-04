@@ -103,7 +103,7 @@ public:
      * the same settings as a regular collection, and would differ in behaviour as when it was
      * originally created with `makeTemporaryRecordStore`.
      */
-    virtual std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
+    virtual std::unique_ptr<RecordStore> getTemporaryRecordStore(RecoveryUnit& ru,
                                                                  StringData ident,
                                                                  KeyFormat keyFormat) = 0;
 
@@ -132,7 +132,7 @@ public:
      * RecordStores initially created with `makeTemporaryRecordStore` must be opened with
      * `getTemporaryRecordStore`.
      */
-    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+    virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(RecoveryUnit& ru,
                                                                   StringData ident,
                                                                   KeyFormat keyFormat) = 0;
 

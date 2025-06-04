@@ -106,8 +106,9 @@ void SpillWiredTigerKVEngine::_openWiredTiger(const std::string& path,
     }
 }
 
-std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(
-    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(RecoveryUnit& ru,
+                                                                              StringData ident,
+                                                                              KeyFormat keyFormat) {
     SpillWiredTigerRecordStore::Params params;
     params.baseParams.uuid = boost::none;
     params.baseParams.ident = ident.toString();
@@ -121,7 +122,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(
 }
 
 std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
-    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+    RecoveryUnit& ru, StringData ident, KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
@@ -140,7 +141,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
                 "config"_attr = config);
     uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
 
-    return getTemporaryRecordStore(opCtx, ident, keyFormat);
+    return getTemporaryRecordStore(ru, ident, keyFormat);
 }
 
 bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {

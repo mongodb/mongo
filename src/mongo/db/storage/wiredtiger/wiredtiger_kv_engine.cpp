@@ -1846,7 +1846,7 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
         WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
 }
 
-std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(OperationContext* opCtx,
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(RecoveryUnit& ru,
                                                                          StringData ident,
                                                                          KeyFormat keyFormat) {
     // We don't log writes to temporary record stores.
@@ -1864,11 +1864,10 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Operati
     params.sizeStorer = nullptr;
     // Temporary collections do not need to reconcile collection size/counts.
     params.tracksSizeAdjustments = false;
-    return std::make_unique<WiredTigerRecordStore>(
-        this, WiredTigerRecoveryUnit::get(*shard_role_details::getRecoveryUnit(opCtx)), params);
+    return std::make_unique<WiredTigerRecordStore>(this, WiredTigerRecoveryUnit::get(ru), params);
 }
 
-std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
+std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(RecoveryUnit& ru,
                                                                           StringData ident,
                                                                           KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
@@ -1894,7 +1893,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
         uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
     }
 
-    return getTemporaryRecordStore(opCtx, ident, keyFormat);
+    return getTemporaryRecordStore(ru, ident, keyFormat);
 }
 
 void WiredTigerKVEngine::alterIdentMetadata(RecoveryUnit& ru,

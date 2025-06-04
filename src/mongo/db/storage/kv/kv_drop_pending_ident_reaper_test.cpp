@@ -96,13 +96,13 @@ public:
         return Status::OK();
     }
 
-    std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
+    std::unique_ptr<RecordStore> getTemporaryRecordStore(RecoveryUnit& ru,
                                                          StringData ident,
                                                          KeyFormat keyFormat) override {
         return {};
     }
 
-    std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
+    std::unique_ptr<RecordStore> makeTemporaryRecordStore(RecoveryUnit& ru,
                                                           StringData ident,
                                                           KeyFormat keyFormat) override {
         return {};
