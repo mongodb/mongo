@@ -713,7 +713,7 @@ __evict_update_work(WT_SESSION_IMPL *session)
     bytes_inuse = __wt_cache_bytes_inuse(cache);
     if (__wt_evict_clean_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_CLEAN_HARD);
-        WT_STAT_CONN_INCR(session, cache_eviction_trigger_clean_reached);
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_reached);
     } else if (bytes_inuse > (target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_CLEAN);
     }
@@ -732,6 +732,23 @@ __evict_update_work(WT_SESSION_IMPL *session)
         WT_STAT_CONN_INCR(session, cache_eviction_trigger_updates_reached);
     } else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_UPDATES);
+    }
+
+    /*
+     * If application threads are blocked by data in cache, track the fill ratio.
+     *
+     */
+    uint64_t cache_fill_ratio = bytes_inuse / bytes_max;
+    bool evict_is_hard = LF_ISSET(WT_EVICT_CACHE_HARD);
+    if (evict_is_hard) {
+        if (cache_fill_ratio < 0.25)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_lt_25);
+        else if (cache_fill_ratio < 0.50)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_25_50);
+        else if (cache_fill_ratio < 0.75)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_50_75);
+        else
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_gt_75);
     }
 
     /*

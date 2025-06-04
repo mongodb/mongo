@@ -402,6 +402,10 @@ __wt_background_compact_end(WT_SESSION_IMPL *session)
           session, background_compact_ema, conn->background_compact.bytes_rewritten_ema);
     }
 
+    __wt_verbose_info(session, WT_VERB_COMPACT_PROGRESS,
+      "%s: background compaction finished (status: %s) - reclaimed %" PRIu64 " bytes", uri,
+      (compact_stat->prev_compact_success ? "success" : "failure"), (uint64_t)bytes_recovered);
+
     return (0);
 }
 
