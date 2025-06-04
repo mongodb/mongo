@@ -103,7 +103,6 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(constrainMemoryForBulkBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterSettingUpIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
@@ -113,21 +112,16 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 
 namespace {
 
-size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
+size_t getEachIndexBuildMaxMemoryUsageBytes(boost::optional<size_t> maxMemoryUsageBytes,
+                                            size_t numIndexSpecs) {
     if (numIndexSpecs == 0) {
         return 0;
     }
 
-    auto result = static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
-        numIndexSpecs;
-
-    // When enabled by a test, this failpoint allows the test to set the maximum allowed memory for
-    // an index build to an unreasonably low value that is below what the user configuration will
-    // allow.
-    constrainMemoryForBulkBuild.execute(
-        [&](const BSONObj& data) { result = data["maxBytes"].numberLong(); });
-
-    return result;
+    auto maxBytes = maxMemoryUsageBytes.has_value()
+        ? maxMemoryUsageBytes.get()
+        : static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024;
+    return maxBytes / numIndexSpecs;
 }
 
 auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
@@ -259,12 +253,20 @@ MultiIndexBlock::OnInitFn MultiIndexBlock::makeTimestampedIndexOnInitFn(Operatio
     };
 }
 
-StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
-                                                       CollectionWriter& collection,
-                                                       const BSONObj& spec,
-                                                       OnInitFn onInit) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
+    OperationContext* opCtx,
+    CollectionWriter& collection,
+    const BSONObj& spec,
+    OnInitFn onInit,
+    const boost::optional<size_t> maxMemoryUsageBytes) {
     const auto indexes = std::vector<BSONObj>(1, spec);
-    return init(opCtx, collection, indexes, onInit, InitMode::SteadyState, boost::none);
+    return init(opCtx,
+                collection,
+                indexes,
+                onInit,
+                InitMode::SteadyState,
+                boost::none,
+                maxMemoryUsageBytes);
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
@@ -272,8 +274,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     CollectionWriter& collection,
     const std::vector<BSONObj>& indexSpecs,
     OnInitFn onInit,
-    InitMode initMode,
-    const boost::optional<ResumeIndexInfo>& resumeInfo) {
+    const InitMode initMode,
+    const boost::optional<ResumeIndexInfo>& resumeInfo,
+    const boost::optional<size_t> maxMemoryUsageBytes) {
     invariant(
         shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(collection->ns(), MODE_X),
         str::stream() << "Collection " << collection->ns().toStringForErrorMsg() << " with UUID "
@@ -313,7 +316,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         std::vector<BSONObj> indexInfoObjs;
         indexInfoObjs.reserve(indexSpecs.size());
         std::size_t eachIndexBuildMaxMemoryUsageBytes =
-            getEachIndexBuildMaxMemoryUsageBytes(indexSpecs.size());
+            getEachIndexBuildMaxMemoryUsageBytes(maxMemoryUsageBytes, indexSpecs.size());
 
         // Initializing individual index build blocks below performs un-timestamped writes to the
         // durable catalog. It's possible for the onInit function to set multiple timestamps
@@ -426,7 +429,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
-            // ConstraintEnforcement is checked dynamically via callback (shouldRelaxContraints) on
+            // ConstraintEnforcement is checked dynamically via callback (shouldRelaxConstraints) on
             // steady state replication. On other modes, constraints are always relaxed.
             index.options.getKeysMode = initMode == InitMode::SteadyState
                 ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsCallback
@@ -583,11 +586,11 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         _lastRecordIdInserted = boost::none;
         for (auto& index : _indexes) {
             auto indexCatalogEntry = index.block->getEntry(opCtx, collection);
-            index.bulk =
-                index.real->initiateBulk(indexCatalogEntry,
-                                         getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
-                                         /*stateInfo=*/boost::none,
-                                         collection->ns().dbName());
+            index.bulk = index.real->initiateBulk(
+                indexCatalogEntry,
+                getEachIndexBuildMaxMemoryUsageBytes(boost::none, _indexes.size()),
+                /*stateInfo=*/boost::none,
+                collection->ns().dbName());
         }
     };
 
