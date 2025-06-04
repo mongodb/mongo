@@ -1528,6 +1528,7 @@ def _impl(ctx):
             flag_set(
                 actions = all_link_actions,
                 flag_groups = [flag_group(flags = [
+                    "-lc++",
                     "-no-canonical-prefixes",
                     "-fobjc-link-runtime",
                 ])],
