@@ -14,8 +14,14 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {assertPlanUsesDistinctScan} from "jstests/libs/query/group_to_distinct_scan_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+
+if (isSlowBuild(db)) {
+    jsTestLog('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
+    quit();
+}
 
 const coll = db.distinct_scan_optimization;
 coll.drop();

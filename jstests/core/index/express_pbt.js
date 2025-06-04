@@ -7,13 +7,20 @@
  * perform as expected.
  *
  * @tags: [
- * requires_fcv_80
+ * requires_fcv_80,
+ * requires_getmore,
  * ]
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
+
+if (isSlowBuild(db)) {
+    jsTestLog('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
+    quit();
+}
 
 const fieldArb = fc.constantFrom('_id', 'a', 'b', 'c', 'd', 'e', 'f');
 const projectFieldsArb = fc.uniqueArray(fieldArb, {minLength: 0, maxLength: 7});
