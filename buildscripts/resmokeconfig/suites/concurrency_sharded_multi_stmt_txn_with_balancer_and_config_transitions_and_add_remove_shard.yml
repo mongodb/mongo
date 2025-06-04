@@ -132,14 +132,14 @@ executor:
           traceExceptions: false
           runningWithBalancer: true
           shardsAddedRemoved: true
-          hasRandomShardsAddedRemoved: true
+          hasRandomShardsAddedRemoved: false # TODO(SERVER-91474): turn this to true when fixing the ticket
           implicitlyShardOnCreateCollectionOnly: true
           useActionPermittedFile: [ContinuousAddRemoveShard]
           shardCollectionProbability: 0.5
   hooks:
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
-      add_remove_random_shards: true
+      add_remove_random_shards: false # TODO(SERVER-91474): turn this to true when fixing the ticket
       move_primary_comment: *movePrimaryComment
       is_fsm_workload: true
     - class: CheckShardFilteringMetadata
@@ -150,7 +150,7 @@ executor:
         global_vars:
           TestData:
             shardsAddedRemoved: true
-            hasRandomShardsAddedRemoved: true
+            hasRandomShardsAddedRemoved: false # TODO(SERVER-91474): turn this to true when fixing the ticket
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
