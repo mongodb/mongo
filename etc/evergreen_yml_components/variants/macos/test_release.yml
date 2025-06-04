@@ -102,3 +102,105 @@ buildvariants:
       - name: run_unit_tests_TG
       - name: .development_critical !.incompatible_mac
       - name: .release_critical !.incompatible_mac !publish_packages
+
+  # This is temporary until we have fully deprecated the Apple xcode clang tooling.
+  - name: macos-arm64-oss-llvm-clang
+    display_name: macOS arm64 OSS LLVM Clang
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - macos-14-arm64
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+        --enableEnterpriseTests=off
+      push_path: osx
+      push_bucket: downloads.mongodb.org
+      push_name: macos
+      push_arch: arm64
+      bazel_compile_flags: >-
+        --build_enterprise=False
+        --local_clang_compiler
+      resmoke_jobs_max: 6
+      compile_variant: macos-arm64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+      - name: run_unit_tests_TG
+      - name: .development_critical !.incompatible_community !.incompatible_mac
+      - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
+
+    # This is temporary until we have fully deprecated the Apple xcode clang tooling.
+  - name: macos-oss-llvm-clang
+    display_name: macOS OSS LLVM Clang
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - macos-14
+    expansions:
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
+        --enableEnterpriseTests=off
+      push_path: osx
+      push_bucket: downloads.mongodb.org
+      push_name: macos
+      push_arch: x86_64
+      bazel_compile_flags: >-
+        --build_enterprise=False
+        --local_clang_compiler
+      resmoke_jobs_max: 6
+      compile_variant: macos
+    tasks:
+      - name: compile_test_and_package_serial_TG
+      - name: run_unit_tests_TG
+      - name: .development_critical !.incompatible_community !.incompatible_mac
+      - name: .release_critical !.incompatible_community !.incompatible_mac !publish_packages
+
+  # This is temporary until we have fully deprecated the Apple xcode clang tooling.
+  - name: enterprise-macos-oss-llvm-clang
+    display_name: Enterprise macOS OSS LLVM Clang
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - macos-14
+    expansions:
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      push_path: osx
+      push_bucket: downloads.10gen.com
+      push_name: macos
+      push_arch: x86_64-enterprise
+      bazel_compile_flags: --local_clang_compiler
+      resmoke_jobs_max: 6
+      compile_variant: enterprise-macos
+    tasks:
+      - name: compile_test_and_package_serial_TG
+      - name: run_unit_tests_TG
+      - name: .development_critical !.incompatible_mac
+      - name: .release_critical !.incompatible_mac !publish_packages
+
+  # This is temporary until we have fully deprecated the Apple xcode clang tooling.
+  - name: enterprise-macos-arm64-oss-llvm-clang
+    display_name: Enterprise macOS arm64 OSS LLVM Clang
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+    run_on:
+      - macos-14-arm64
+    expansions:
+      test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_external_data_source
+      additional_package_targets: >-
+        archive-mongocryptd-stripped
+        archive-mongocryptd-debug
+      push_path: osx
+      push_bucket: downloads.10gen.com
+      push_name: macos
+      push_arch: arm64-enterprise
+      bazel_compile_flags: --local_clang_compiler
+      resmoke_jobs_max: 6
+      compile_variant: enterprise-macos-arm64
+    tasks:
+      - name: compile_test_and_package_serial_TG
+      - name: run_unit_tests_TG
+      - name: .development_critical !.incompatible_mac
+      - name: .release_critical !.incompatible_mac !publish_packages

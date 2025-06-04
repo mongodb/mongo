@@ -13,6 +13,8 @@ build_variant_large_distro_exceptions:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
+  - enterprise-macos-oss-llvm-clang
+  - enterprise-macos-arm64-oss-llvm-clang
   - enterprise-rhel-8-64-bit
   - enterprise-rhel-8-64-bit-coverage
   - enterprise-rhel-81-ppc64le
@@ -34,6 +36,8 @@ build_variant_large_distro_exceptions:
   - linux-x86-dynamic-debug-compile-required
   - macos
   - macos-arm64
+  - macos-oss-llvm-clang
+  - macos-arm64-oss-llvm-clang
   - macos-debug-suggested
   - rhel8
   - rhel8-debug-asan
