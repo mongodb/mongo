@@ -162,8 +162,11 @@ public:
      *
      * 'tolerateCappedRepositioning' allows repositioning a capped cursor, which is useful for
      * range writes.
+     *
+     * TODO (SERVER-105846): Remove the overload without RecoveryUnit.
      */
     virtual bool restore(bool tolerateCappedRepositioning = true) = 0;
+    virtual bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) = 0;
 
     /**
      * Detaches from the OperationContext. Releases storage-engine resources, unless

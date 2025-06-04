@@ -593,7 +593,10 @@ public:
     }
 
     bool restore(bool tolerateCappedRepositioning = true) final {
-        _ru = storage_details::getRecoveryUnit(_opCtx);
+        return restore(*storage_details::getRecoveryUnit(_opCtx), tolerateCappedRepositioning);
+    }
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
+        _ru = &ru;
         auto& wtRu = WiredTigerRecoveryUnitBase::get(*_ru);
 
         if (!_cursor) {
@@ -1900,7 +1903,10 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 }
 
 bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
-    _ru = &getRecoveryUnit();
+    return restore(getRecoveryUnit(), tolerateCappedRepositioning);
+}
+bool WiredTigerRecordStoreCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) {
+    _ru = &ru;
 
     if (!_cursor) {
         auto& wtRu = WiredTigerRecoveryUnitBase::get(*_ru);
@@ -2014,7 +2020,10 @@ void WiredTigerCappedCursorBase::save() {
 }
 
 bool WiredTigerCappedCursorBase::restore(bool tolerateCappedRepositioning) {
-    _ru = &getRecoveryUnit();
+    return restore(getRecoveryUnit(), tolerateCappedRepositioning);
+}
+bool WiredTigerCappedCursorBase::restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) {
+    _ru = &ru;
 
     if (!_cursor) {
         auto& wtRu = WiredTigerRecoveryUnitBase::get(*_ru);

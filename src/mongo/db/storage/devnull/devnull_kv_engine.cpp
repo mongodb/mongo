@@ -74,6 +74,9 @@ public:
     bool restore(bool tolerateCappedRepositioning = true) final {
         return true;
     }
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) final {
+        return true;
+    }
     void detachFromOperationContext() final {}
     void reattachToOperationContext(OperationContext* opCtx) final {}
     void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}

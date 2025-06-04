@@ -508,6 +508,7 @@ public:
     void saveUnpositioned() override;
 
     bool restore(bool tolerateCappedRepositioning = true) override;
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) override;
 
     void detachFromOperationContext() override;
 
@@ -622,6 +623,7 @@ public:
     void save() override;
 
     bool restore(bool tolerateCappedRepositioning = true) override;
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning = true) override;
 
 protected:
     /**

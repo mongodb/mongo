@@ -90,6 +90,9 @@ public:
     bool restore(bool tolerateCappedRepositioning) override {
         return true;
     }
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) override {
+        return true;
+    }
     void detachFromOperationContext() override {}
     void reattachToOperationContext(OperationContext* opCtx) override {}
     void setSaveStorageCursorOnDetachFromOperationContext(bool) override {}

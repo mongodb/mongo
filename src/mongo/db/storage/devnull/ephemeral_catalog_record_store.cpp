@@ -169,6 +169,9 @@ public:
         // Capped iterators die on invalidation rather than advancing.
         return !(_isCapped && _lastMoveWasRestore);
     }
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
+        return restore(tolerateCappedRepositioning);
+    }
 
     uint64_t getCheckpointId() const final {
         return 0;
@@ -254,6 +257,9 @@ public:
 
         // Capped iterators die on invalidation rather than advancing.
         return !(_isCapped && _lastMoveWasRestore);
+    }
+    bool restore(RecoveryUnit& ru, bool tolerateCappedRepositioning) final {
+        return restore(tolerateCappedRepositioning);
     }
 
     void detachFromOperationContext() final {}
