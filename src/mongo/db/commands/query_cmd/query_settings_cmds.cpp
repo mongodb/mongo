@@ -202,8 +202,11 @@ void readModifyWriteQuerySettingsConfigOption(
         if (queryShapeHashQueryInstanceOptPair.second.has_value()) {
             upsertQueryShapeRepresentativeQuery(
                 opCtx,
-                QueryShapeRepresentativeQuery(queryShapeHashQueryInstanceOptPair.first,
-                                              *queryShapeHashQueryInstanceOptPair.second));
+                QueryShapeRepresentativeQuery(
+                    /* queryShapeHash */ queryShapeHashQueryInstanceOptPair.first,
+                    /* representativeQuery */ *queryShapeHashQueryInstanceOptPair.second,
+                    // TODO SERVER-105686 Avoid removing in-progress representative queries.
+                    /* lastModifiedTime */ LogicalTime()));
         }
     }
 

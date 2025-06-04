@@ -127,3 +127,6 @@ structs:
             representativeQuery:
                 type: object_owned
                 stability: internal
+            lastModifiedTime:
+                type: logicalTime
+                stability: internal
