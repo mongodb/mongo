@@ -1,17 +1,5 @@
 # Parsing Stack Traces
 
-## `addr2line`
-
-[`addr2line`][1] is a utility to translate addresses into filenames and line numbers.
-
-```
-addr2line -e mongod -ifC <offset>
-```
-
-## `c++filt`
-
-Use [`c++filt`][2] to demangle function names by pasting the whole stack trace to stdin.
-
 ## Finding the Right Binary
 
 To find the correct binary for a specific log you need to:
@@ -24,36 +12,45 @@ To find the correct binary for a specific log you need to:
 curl -O http://s3.amazonaws.com/downloads.mongodb.org/linux/mongodb-linux-x86_64-debugsymbols-1.x.x.tgz
 ```
 
-You can also get the debugsymbols archive for official builds through [the Downloads page][3]. In the
+You can also get the debugsymbols archive for official builds through [the Downloads page][1]. In the
 Archived Releases section, click on the appropriate platform link to view the available archives.
 Select the appropriate debug symbols archive.
 
-### Example: Reading the Log
+## Using mongosymb.py to get file and line numbers
 
-Note that the log has lines like this:
-
-```
-/home/abc/mongod(_ZN5mongo15printStackTraceERSo+0x27) [0x689280]
-```
-
-You want to use the address in between the brackets `0x689280`. Note that you will get more than one
-stack frame for the address if the code is inlined.
-
-### Example: Using `addr2line`
-
-Actual example from a v1.8.1 64-bit Linux build:
+Stacktraces are logged on a line with `msg` `BACKTRACE`. The full backtrace contents are available in
+an attribute named `bt`. To convert this into a list of source locations with file and line numbers,
+copy the contents of the `bt` JSON blob into a file, then direct the contents of that file into
+the standard input of `buildscripts/mongosymb.py`:
 
 ```
-$ curl http://downloads.mongodb.org/linux/mongodb-linux-x86_64-debugsymbols-1.8.1.tgz > out.tgz
-$ tar -xzf out.tgz
-$ cd mongodb-linux-x86_64-debugsymbols-1.8.1/
-$ cd bin
-$ addr2line --help
-$ addr2line -i -e mongod 0x6d6a74
-/mnt/home/buildbot/slave/Linux_64bit_V1.8/mongo/db/repl/health.cpp:394
-$ addr2line -i -e mongod 0x6d0694
-/mnt/home/buildbot/slave/Linux_64bit_V1.8/mongo/db/repl/rs.h:385
-/mnt/home/buildbot/slave/Linux_64bit_V1.8/mongo/db/repl/replset_commands.cpp:111
+cat bt | buildscripts/mongosymb.py --debug-file-resolver=path path/to/debug/symbols/file
+```
+
+### Example
+
+Given these contents of `bt`:
+
+```
+{"bt":{"backtrace":[{"a":"C7FB141ACA08","b":"C7FAFAD30000","o":"1947CA08","s":"_ZN5mongo18stack_trace_detail12_GLOBAL__N_117getStackTraceImplERKNS1_7OptionsE","C":"mongo::stack_trace_detail::(anonymous namespace)::getStackTraceImpl(mongo::stack_trace_detail::(anonymous namespace)::Options const&)","s+":"5C"},{"a":"C7FB141ACC98","b":"C7FAFAD30000","o":"1947CC98","s":"_ZN5mongo15printStackTraceEv","C":"mongo::printStackTrace()","s+":"44"},{"a":"C7FB1417B8A8","b":"C7FAFAD30000","o":"1944B8A8","s":"_ZN5mongo12_GLOBAL__N_126printStackTraceNoRecursionEv","C":"mongo::(anonymous namespace)::printStackTraceNoRecursion()","s+":"38"},{"a":"C7FB1417AEAC","b":"C7FAFAD30000","o":"1944AEAC","s":"_ZN5mongo12_GLOBAL__N_115printErrorBlockEv","C":"mongo::(anonymous namespace)::printErrorBlock()","s+":"C"},{"a":"C7FB1417B1FC","b":"C7FAFAD30000","o":"1944B1FC","s":"abruptQuitWithAddrSignal","s+":"118"},{"a":"E4B2A019B9D0","b":"E4B2A019B000","o":"9D0","s":"__kernel_rt_sigreturn","s+":"0"},{"a":"C7FB0A37ADD0","b":"C7FAFAD30000","o":"F64ADD0","s":"_ZN5mongo12_GLOBAL__N_114_initAndListenEPNS_14ServiceContextE","C":"mongo::(anonymous namespace)::_initAndListen(mongo::ServiceContext*)","s+":"AC"},{"a":"C7FB0A3785CC","b":"C7FAFAD30000","o":"F6485CC","s":"_ZN5mongo12_GLOBAL__N_113initAndListenEPNS_14ServiceContextE","C":"mongo::(anonymous namespace)::initAndListen(mongo::ServiceContext*)","s+":"2C"},{"a":"C7FB0A373ED4","b":"C7FAFAD30000","o":"F643ED4","s":"_ZN5mongo11mongod_mainEiPPc","C":"mongo::mongod_main(int, char**)","s+":"7C8"},{"a":"C7FB0A364448","b":"C7FAFAD30000","o":"F634448","s":"main","s+":"24"},{"a":"E4B29F8573FC","b":"E4B29F830000","o":"273FC","s":"__libc_start_call_main","s+":"6C"},{"a":"E4B29F8574CC","b":"E4B29F830000","o":"274CC","s":"__libc_start_main_alias_2","s+":"98"}],"processInfo":{ <redacted> }}}
+```
+
+The following command might produce the following output:
+
+```
+$ cat bt | buildscripts/mongosymb.py --debug-file-resolver=path bazel-bin/install-mongod/bin/mongod
+...
+ /proc/self/cwd/src/mongo/util/stacktrace_posix.cpp:428:19: mongo::stack_trace_detail::(anonymous namespace)::getStackTraceImpl(mongo::stack_trace_detail::(anonymous namespace)::Options const&)
+ /proc/self/cwd/src/mongo/util/stacktrace_posix.cpp:480:5: mongo::printStackTrace()
+ /proc/self/cwd/src/mongo/util/signal_handlers_synchronous.cpp:204:9: mongo::(anonymous namespace)::printStackTraceNoRecursion()
+ /proc/self/cwd/src/mongo/util/signal_handlers_synchronous.cpp:232:5: mongo::(anonymous namespace)::printErrorBlock()
+ /proc/self/cwd/src/mongo/util/signal_handlers_synchronous.cpp:321:5: abruptQuitWithAddrSignal
+ ??:0:0: ??
+ /proc/self/cwd/src/mongo/db/mongod_main.cpp:527:48: mongo::(anonymous namespace)::_initAndListen(mongo::ServiceContext*)
+ /proc/self/cwd/src/mongo/db/mongod_main.cpp:1194:16: mongo::(anonymous namespace)::initAndListen(mongo::ServiceContext*)
+ /proc/self/cwd/src/mongo/db/mongod_main.cpp:2117:25: mongo::mongod_main(int, char**)
+ /proc/self/cwd/src/mongo/db/mongod.cpp:45:22: main
+...
 ```
 
 ## Stack Trace Schema
@@ -157,6 +154,4 @@ Partial example showing a few typical frames:
 }
 ```
 
-[1]: https://sourceware.org/binutils/docs/binutils/addr2line.html
-[2]: https://sourceware.org/binutils/docs-2.17/binutils/c_002b_002bfilt.html
-[3]: https://www.mongodb.com/download-center
+[1]: https://www.mongodb.com/download-center
