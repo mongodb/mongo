@@ -62,14 +62,14 @@ TEST(JSONPointerTest, ParseInterestingCharacterFields) {
 }
 
 TEST(JSONPointerTest, EscapeCharacterParse) {
-    BSONObj obj =
-        BSON("a/b" << 1 << "m~n" << 2 << "o~/~p" << 3 << "~1" << 4 << "~" << 5 << "test~~/~" << 6);
+    BSONObj obj = BSON("a/b" << 1 << "m~n" << 2 << "o~/~p" << 3 << "~1" << 4 << "~00" << 5
+                             << "test~0~//1~0" << 6);
     assertPointerEvaluatesTo("/a~1b", obj, "a/b", 1);
     assertPointerEvaluatesTo("/m~0n", obj, "m~n", 2);
     assertPointerEvaluatesTo("/o~0~1~0p", obj, "o~/~p", 3);
     assertPointerEvaluatesTo("/~01", obj, "~1", 4);
-    assertPointerEvaluatesTo("/~000", obj, "~", 5);
-    assertPointerEvaluatesTo("/test~00~0~1~00", obj, "test~~/~", 6);
+    assertPointerEvaluatesTo("/~000", obj, "~00", 5);
+    assertPointerEvaluatesTo("/test~00~0~1~11~00", obj, "test~0~//1~0", 6);
 }
 
 TEST(JSONPointerTest, EmptyKeyTest) {

@@ -57,7 +57,8 @@ std::string replaceEscapeChars(std::string str) {
     // Replace all '~0' with '~' after all other tilda characters have been removed.
     size_t escapeLoc = 0;
     while ((escapeLoc = str.find("~0", escapeLoc)) != std::string::npos) {
-        str.replace(escapeLoc, 2, "~");
+        // Replace with '~' and increment to ensure that '~' isn't checked twice.
+        str.replace(escapeLoc++, 2, "~");
     }
     return str;
 }
