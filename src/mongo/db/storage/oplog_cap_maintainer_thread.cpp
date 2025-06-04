@@ -148,7 +148,8 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
     {
         // Oplog state could have changed while yielding. Reacquire global lock
         // and refresh oplog state to ensure we have a valid pointer.
-        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+        Lock::GlobalLock globalLk(
+            opCtx, MODE_IX, Date_t::max(), Lock::InterruptBehavior::kThrow, {.skipRSTLLock = true});
         auto rs = LocalOplogInfo::get(opCtx)->getRecordStore();
         if (!rs) {
             LOGV2_DEBUG(9064300, 2, "oplog collection does not exist");
