@@ -37,7 +37,15 @@
 namespace mongo {
 namespace unified_write_executor {
 
-using WriteBatchResponse = std::map<ShardId, StatusWith<executor::RemoteCommandResponse>>;
+struct ShardResponse {
+    StatusWith<executor::RemoteCommandResponse> swResponse;
+    // Ops referencing the original command from the client in the order they were specified in the
+    // command to the shard. The items in this array should appear in the order you would see them
+    // in the reply item's of a bulk write so that response.ops[replyItem.getIdx()] shound return
+    // the corresponding WriteOp from the original command from the client.
+    std::vector<WriteOp> ops;
+};
+using WriteBatchResponse = std::map<ShardId, ShardResponse>;
 
 class WriteBatchExecutor {
 public:

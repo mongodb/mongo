@@ -51,6 +51,23 @@ class WriteOp {
 public:
     WriteOp(const BulkWriteCommandRequest& request, int index) : _request(request), _index(index) {}
 
+    // copy/move constructor/operators so that _request can only be modified via by changing which
+    // op this is referencing or making a new reference to the same op.
+    WriteOp(const WriteOp& other) : _request(other._request), _index(other._index) {}
+    WriteOp(WriteOp&& other) : _request(other._request), _index(other._index) {}
+    WriteOp& operator=(const WriteOp& other) {
+        const_cast<BulkWriteCommandRequest&>(_request) = other._request;
+        _index = other._index;
+        return *this;
+    }
+    WriteOp& operator=(WriteOp&& other) {
+        const_cast<BulkWriteCommandRequest&>(_request) =
+            const_cast<BulkWriteCommandRequest&>(other._request);
+        _index = other._index;
+        return *this;
+    }
+    ~WriteOp() = default;
+
     WriteOpId getId() const {
         return _index;
     }

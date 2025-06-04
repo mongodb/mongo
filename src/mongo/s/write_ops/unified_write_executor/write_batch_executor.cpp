@@ -95,9 +95,10 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
     WriteBatchResponse shardResponses;
     while (!sender.done()) {
-        auto shardResponse = sender.next();
-        shardResponses.emplace(std::move(shardResponse.shardId),
-                               std::move(shardResponse.swResponse));
+        auto arsResponse = sender.next();
+        ShardResponse shardResponse{std::move(arsResponse.swResponse),
+                                    batch.requestByShardId.at(arsResponse.shardId).ops};
+        shardResponses.emplace(std::move(arsResponse.shardId), std::move(shardResponse));
     }
     tassert(10346800,
             "There should same number of requests and responses from a simple write batch",

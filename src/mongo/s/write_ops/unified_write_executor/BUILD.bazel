@@ -13,12 +13,14 @@ mongo_cc_library(
     name = "unified_write_executor",
     srcs = [
         "write_batch_executor.cpp",
+        "write_batch_response_processor.cpp",
         "write_op_analyzer.cpp",
         "write_op_batcher.cpp",
         "write_op_producer.cpp",
     ],
     hdrs = [
         "write_batch_executor.h",
+        "write_batch_response_processor.h",
         "write_op.h",
         "write_op_analyzer.h",
         "write_op_batcher.h",
@@ -35,6 +37,7 @@ mongo_cc_unit_test(
     name = "unified_write_executor_test",
     srcs = [
         "write_batch_executor_test.cpp",
+        "write_batch_response_processor_test.cpp",
         "write_op_analyzer_test.cpp",
         "write_op_batcher_test.cpp",
         "write_op_producer_test.cpp",

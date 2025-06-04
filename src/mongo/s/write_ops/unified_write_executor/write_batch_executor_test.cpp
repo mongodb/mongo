@@ -179,8 +179,8 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatch) {
         ASSERT_EQ(2, responses.size());
         for (auto& [shardId, response] : responses) {
             ASSERT(expectedShardIds.contains(shardId));
-            ASSERT(response.getStatus().isOK());
-            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.getValue().data);
+            ASSERT(response.swResponse.getStatus().isOK());
+            ASSERT_BSONOBJ_EQ(BSON("ok" << 1), response.swResponse.getValue().data);
         }
     });
 
