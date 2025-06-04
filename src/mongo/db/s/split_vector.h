@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_role.h"
 
 #include <vector>
 
@@ -60,7 +60,7 @@ class OperationContext;
  * makes maxChunkSize equal the size of the chunk.
  */
 std::vector<BSONObj> splitVector(OperationContext* opCtx,
-                                 const NamespaceString& nss,
+                                 const CollectionAcquisition& collection,
                                  const BSONObj& keyPattern,
                                  const BSONObj& min,
                                  const BSONObj& max,

@@ -105,9 +105,16 @@ private:
     const long long docSizeBytes = BSON(kPattern << 1).objsize();
 };
 
+CollectionAcquisition acquireColl(OperationContext* opCtx, const NamespaceString& nss) {
+    return acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+}
+
 TEST_F(SplitVectorTest, SplitVectorInHalf) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -126,8 +133,9 @@ TEST_F(SplitVectorTest, SplitVectorInHalf) {
 }
 
 TEST_F(SplitVectorTest, ForceSplit) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -146,8 +154,9 @@ TEST_F(SplitVectorTest, ForceSplit) {
 }
 
 TEST_F(SplitVectorTest, MaxChunkObjectsSet) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -175,8 +184,9 @@ TEST_F(SplitVectorTest, MaxChunkObjectsSet) {
 }
 
 TEST_F(SplitVectorTest, SplitEveryThird) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -202,8 +212,9 @@ TEST_F(SplitVectorTest, SplitEveryThird) {
 }
 
 TEST_F(SplitVectorTest, MaxSplitPointsSet) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -225,8 +236,9 @@ TEST_F(SplitVectorTest, MaxSplitPointsSet) {
 }
 
 TEST_F(SplitVectorTest, IgnoreMaxChunkObjects) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -254,8 +266,9 @@ TEST_F(SplitVectorTest, IgnoreMaxChunkObjects) {
 }
 
 TEST_F(SplitVectorTest, NoSplit) {
+    const auto coll = acquireColl(operationContext(), kNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kNss,
+                                                 coll,
                                                  BSON(kPattern << 1),
                                                  BSON(kPattern << 0),
                                                  BSON(kPattern << 100),
@@ -268,23 +281,25 @@ TEST_F(SplitVectorTest, NoSplit) {
 }
 
 TEST_F(SplitVectorTest, NoCollection) {
-    ASSERT_THROWS_CODE(
-        splitVector(operationContext(),
-                    NamespaceString::createNamespaceString_forTest("dummy", "collection"),
-                    BSON(kPattern << 1),
-                    BSON(kPattern << 0),
-                    BSON(kPattern << 100),
-                    false,
-                    boost::none,
-                    boost::none,
-                    boost::none),
-        DBException,
-        ErrorCodes::NamespaceNotFound);
+    const auto coll = acquireColl(
+        operationContext(), NamespaceString::createNamespaceString_forTest("dummy", "collection"));
+    ASSERT_THROWS_CODE(splitVector(operationContext(),
+                                   coll,
+                                   BSON(kPattern << 1),
+                                   BSON(kPattern << 0),
+                                   BSON(kPattern << 100),
+                                   false,
+                                   boost::none,
+                                   boost::none,
+                                   boost::none),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 TEST_F(SplitVectorTest, NoIndex) {
+    const auto coll = acquireColl(operationContext(), kNss);
     ASSERT_THROWS_CODE(splitVector(operationContext(),
-                                   kNss,
+                                   coll,
                                    BSON("foo" << 1),
                                    BSON(kPattern << 0),
                                    BSON(kPattern << 100),
@@ -297,8 +312,9 @@ TEST_F(SplitVectorTest, NoIndex) {
 }
 
 TEST_F(SplitVectorTest, NoMaxChunkSize) {
+    const auto coll = acquireColl(operationContext(), kNss);
     ASSERT_THROWS_CODE(splitVector(operationContext(),
-                                   kNss,
+                                   coll,
                                    BSON(kPattern << 1),
                                    BSON(kPattern << 0),
                                    BSON(kPattern << 100),
@@ -350,8 +366,9 @@ private:
 };
 
 TEST_F(SplitVectorJumboTest, JumboChunk) {
+    const auto coll = acquireColl(operationContext(), kJumboNss);
     std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kJumboNss,
+                                                 coll,
                                                  BSON(kJumboPattern << 1),
                                                  BSON(kJumboPattern << 1),
                                                  BSON(kJumboPattern << 2),
@@ -417,15 +434,9 @@ public:
 };
 
 TEST_F(SplitVectorMaxResponseSizeTest, MaxResponseSize) {
-    std::vector<BSONObj> splitKeys = splitVector(operationContext(),
-                                                 kMaxResponseNss,
-                                                 BSON("a" << 1),
-                                                 {},
-                                                 {},
-                                                 false,
-                                                 boost::none,
-                                                 boost::none,
-                                                 1LL);
+    const auto coll = acquireColl(operationContext(), kMaxResponseNss);
+    std::vector<BSONObj> splitKeys = splitVector(
+        operationContext(), coll, BSON("a" << 1), {}, {}, false, boost::none, boost::none, 1LL);
 
     ASSERT_EQUALS((int)splitKeys.size(), numDocs - 2);
 

@@ -33,8 +33,6 @@
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/keypattern.h"
@@ -45,8 +43,8 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
@@ -83,7 +81,7 @@ auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
 }  // namespace
 
 std::vector<BSONObj> splitVector(OperationContext* opCtx,
-                                 const NamespaceString& nss,
+                                 const CollectionAcquisition& collection,
                                  const BSONObj& keyPattern,
                                  const BSONObj& min,
                                  const BSONObj& max,
@@ -91,6 +89,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                  boost::optional<long long> maxSplitPoints,
                                  boost::optional<long long> maxChunkObjects,
                                  boost::optional<long long> maxChunkSizeBytes) {
+    const auto& nss = collection.nss();
+
     std::vector<BSONObj> splitKeys;
     std::size_t splitVectorResponseSize = 0;
 
@@ -100,13 +100,14 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
     }
 
     {
-        AutoGetCollection collection(opCtx, nss, MODE_IS);
-        uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection);
+        uassert(ErrorCodes::NamespaceNotFound, "ns not found", collection.exists());
+
+        const auto& collectionPtr = collection.getCollectionPtr();
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
         const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                           *collection,
+                                                           collectionPtr,
                                                            keyPattern,
                                                            /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
@@ -127,8 +128,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         }
 
         // Get the size estimate for this namespace
-        const long long recCount = collection->numRecords(opCtx);
-        const long long dataSize = collection->dataSize(opCtx);
+        const long long recCount = collectionPtr->numRecords(opCtx);
+        const long long dataSize = collectionPtr->dataSize(opCtx);
 
         // Now that we have the size estimate, go over the remaining parameters and apply any
         // maximum size restrictions specified there.
@@ -185,7 +186,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         long long numChunks = 0;
 
         auto exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                       &collection.getCollection(),
+                                                       collection,
                                                        *shardKeyIdx,
                                                        minKey,
                                                        maxKey,
@@ -205,7 +206,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
             // invalidate `exec` in the outer scope below.
             auto exec =
                 InternalPlanner::shardKeyIndexScan(opCtx,
-                                                   &collection.getCollection(),
+                                                   collection,
                                                    *shardKeyIdx,
                                                    maxKey,
                                                    minKey,
@@ -318,7 +319,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
             // Since the previous `exec` plan is finished, we are not violating the requirement
             // that only one yieldable plan is active.
             exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                      &collection.getCollection(),
+                                                      collection,
                                                       *shardKeyIdx,
                                                       minKey,
                                                       maxKey,
