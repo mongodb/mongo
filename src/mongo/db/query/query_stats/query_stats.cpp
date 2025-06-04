@@ -72,9 +72,9 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManag
     QueryStatsStoreManager::get =
         ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
 
-const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
+const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiter>>
     QueryStatsStoreManager::getRateLimiter =
-        ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
+        ServiceContext::declareDecoration<std::unique_ptr<RateLimiter>>();
 
 // Fail point to mimic the operation fails during 'registerRequest()'.
 MONGO_FAIL_POINT_DEFINE(queryStatsFailToSerializeKey);
@@ -187,7 +187,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         auto configuredSamplingRate = internalQueryStatsRateLimit.load();
-        QueryStatsStoreManager::getRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
+        QueryStatsStoreManager::getRateLimiter(serviceCtx) = RateLimiter::createWindowBased(
             configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
     }};
 
@@ -219,8 +219,7 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (samplingRate < INT_MAX &&
-        !QueryStatsStoreManager::getRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
+    if (samplingRate < INT_MAX && !QueryStatsStoreManager::getRateLimiter(serviceCtx)->handle()) {
         queryStatsRateLimitedRequestsMetric.increment();
         LOGV2_DEBUG(8473002,
                     5,

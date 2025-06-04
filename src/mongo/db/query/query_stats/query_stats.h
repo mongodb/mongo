@@ -106,7 +106,7 @@ public:
     // The query stats store can be configured using these objects on a per-ServiceContext level.
     // This is essentially global, but can be manipulated by unit tests.
     static const ServiceContext::Decoration<std::unique_ptr<QueryStatsStoreManager>> get;
-    static const ServiceContext::Decoration<std::unique_ptr<RateLimiting>> getRateLimiter;
+    static const ServiceContext::Decoration<std::unique_ptr<RateLimiter>> getRateLimiter;
 
     template <typename... QueryStatsStoreArgs>
     QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)

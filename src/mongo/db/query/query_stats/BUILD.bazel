@@ -16,6 +16,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "rate_limiting.h",
+        "//src/mongo/util:overloaded_visitor.h",
     ],
     deps = [
         "//src/mongo:base",

@@ -30,48 +30,54 @@
 #include "mongo/db/query/query_stats/rate_limiting.h"
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
-TEST(RateLimitingTest, FixedWindowSucceeds) {
-    auto rl = RateLimiting(1);
-    ASSERT_TRUE(rl.handleRequestFixedWindow());
+
+TEST(RateLimiterTest, SlidingWindowSucceeds) {
+    auto rl = RateLimiter::createWindowBased(1, Hours{1});
+    ASSERT_TRUE(rl->handle());
 }
 
-TEST(RateLimitingTest, SlidingWindowSucceeds) {
-    auto rl = RateLimiting(1);
-    ASSERT_TRUE(rl.handleRequestSlidingWindow());
+TEST(RateLimiterTest, SlidingWindowFails) {
+    auto rl = RateLimiter::createWindowBased(0, Hours{1});
+    ASSERT_FALSE(rl->handle());
 }
 
-TEST(RateLimitingTest, FixedWindowFails) {
-    auto rl = RateLimiting(0);
-    ASSERT_FALSE(rl.handleRequestFixedWindow());
+TEST(RateLimiterTest, SlidingWindowSucceedsThenFails) {
+    auto rl = RateLimiter::createWindowBased(1, Hours{1});
+    ASSERT_TRUE(rl->handle());
+    ASSERT_FALSE(rl->handle());
+    ASSERT_FALSE(rl->handle());
 }
 
-TEST(RateLimitingTest, SlidingWindowFails) {
-    auto rl = RateLimiting(0);
-    ASSERT_FALSE(rl.handleRequestSlidingWindow());
+TEST(RateLimiterTest, SampleBasedSucceeds) {
+    auto rl = RateLimiter::createSampleBased(10 /* 1% */, 0 /* seed */);
+    size_t requestCount = 10000;
+    size_t numHandles = 0;
+    for (size_t i = 0; i < requestCount; i++) {
+        if (rl->handle()) {
+            numHandles++;
+        }
+    }
+    ASSERT_APPROX_EQUAL((double)numHandles, 100, 5 /* variance for randomness */);
 }
 
-TEST(RateLimitingTest, FixedWindowSucceedsThenFails) {
-    auto rl = RateLimiting(1, Hours{1});
-    ASSERT_TRUE(rl.handleRequestFixedWindow());
-    ASSERT_FALSE(rl.handleRequestFixedWindow());
-    ASSERT_FALSE(rl.handleRequestFixedWindow());
+TEST(RateLimiterTest, SampleBasedFails) {
+    auto rl = RateLimiter::createSampleBased(0 /* 0% */, 0 /* seed */);
+    ASSERT_FALSE(rl->handle());
 }
 
-TEST(RateLimitingTest, SlidingWindowSucceedsThenFails) {
-    auto rl = RateLimiting(1, Hours{1});
-    ASSERT_TRUE(rl.handleRequestSlidingWindow());
-    ASSERT_FALSE(rl.handleRequestSlidingWindow());
-    ASSERT_FALSE(rl.handleRequestSlidingWindow());
-}
-
-TEST(RateLimitingTest, FixedWindowPermitsRequestAfterWindowExpires) {
-    auto rl = RateLimiting(1, Milliseconds{10});
-    ASSERT_TRUE(rl.handleRequestFixedWindow());
-    sleepmillis(11);
-    ASSERT_TRUE(rl.handleRequestFixedWindow());
+TEST(RateLimiterTest, PolicyGetter) {
+    {
+        auto rl = RateLimiter::createWindowBased(100, Hours{1});
+        ASSERT_EQ(rl->getSamplingRate(), 100);
+        ASSERT_TRUE(rl->getPolicyType() == RateLimiter::PolicyType::kWindowBasedPolicy);
+    }
+    {
+        auto rl = RateLimiter::createSampleBased(10 /* 1% */, 0 /* seed */);
+        ASSERT_EQ(rl->getSamplingRate(), 10);
+        ASSERT_TRUE(rl->getPolicyType() == RateLimiter::PolicyType::kSampleBasedPolicy);
+    }
 }
 
 }  // namespace mongo

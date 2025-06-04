@@ -50,8 +50,8 @@ constexpr long long consistentWorkTimeMicros = 10;
 constexpr long long numThreads = 256;
 
 // Rate limit some fraction of the overall work for a request with a sliding window.
-int requestWithSlidingWindow(RateLimiting& limit) {
-    if (limit.handleRequestSlidingWindow()) {
+int handleRequest(RateLimiter& limit) {
+    if (limit.handle()) {
         sleepmicros(rateLimitedWorkTimeMicros);
     }
     sleepmicros(consistentWorkTimeMicros);
@@ -75,24 +75,44 @@ int requestDeactivated() {
 void BM_SlidingWindow(benchmark::State& state) {
     // The rate limiter needs a clock source passed in.
     static std::unique_ptr<ClockSource> clockSource;
-    static std::unique_ptr<RateLimiting> rateLimit;
+    static std::unique_ptr<RateLimiter> rateLimit;
 
     // Initialize the rate limiter only on the first thread to start up.
     if (state.thread_index == 0) {
         clockSource = std::make_unique<SystemClockSource>();
         rateLimit =
-            std::make_unique<RateLimiting>(state.range(0), Milliseconds(1), clockSource.get());
+            RateLimiter::createWindowBased(state.range(0), Milliseconds(1), clockSource.get());
     }
 
     // Run the benchmark.
     for (auto keepRunning : state) {
-        benchmark::DoNotOptimize(requestWithSlidingWindow(*rateLimit));
+        benchmark::DoNotOptimize(handleRequest(*rateLimit));
     }
 
     // Clean up the rate limiter when the benchmark is done.
     if (state.thread_index == 0) {
         rateLimit.reset();
         clockSource.reset();
+    }
+}
+
+// Benchmark sample based rate limiting.
+void BM_SampleBased(benchmark::State& state) {
+    static std::unique_ptr<RateLimiter> rateLimit;
+
+    // Initialize the rate limiter only on the first thread to start up.
+    if (state.thread_index == 0) {
+        rateLimit = RateLimiter::createSampleBased(state.range(0), /* random seed */ 17);
+    }
+
+    // Run the benchmark.
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(handleRequest(*rateLimit));
+    }
+
+    // Clean up the rate limiter when the benchmark is done.
+    if (state.thread_index == 0) {
+        rateLimit.reset();
     }
 }
 
@@ -136,6 +156,19 @@ BENCHMARK(BM_SlidingWindow)
     ->Arg(1024)
     ->Arg(2048)
     ->Arg(4816)
+    ->Threads(numThreads);
+
+
+BENCHMARK(BM_SampleBased)
+    ->ArgName("rate limit in % denominated by 1000")
+    ->Arg(0)
+    ->Arg(10)
+    ->Arg(20)
+    ->Arg(30)
+    ->Arg(40)
+    ->Arg(50)
+    ->Arg(90)
+    ->Arg(100)
     ->Threads(numThreads);
 
 }  // namespace

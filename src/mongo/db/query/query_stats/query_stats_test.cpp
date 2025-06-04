@@ -70,7 +70,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
 
     // First call to registerRequest() should be rate limited.
     QueryStatsStoreManager::getRateLimiter(opCtx->getServiceContext()) =
-        std::make_unique<RateLimiting>(0, Seconds{1});
+        RateLimiter::createWindowBased(0, Seconds{1});
     ASSERT_DOES_NOT_THROW(query_stats::registerRequest(opCtx.get(), nss, [&]() {
         return std::make_unique<query_stats::FindKey>(
             expCtx,
@@ -121,7 +121,7 @@ TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxDisabledBetween) {
         std::make_unique<QueryStatsStoreManager>(16 * 1024 * 1024, 1);
 
     QueryStatsStoreManager::getRateLimiter(serviceCtx) =
-        std::make_unique<RateLimiting>(-1, Seconds{1});
+        RateLimiter::createWindowBased(-1, Seconds{1});
 
     {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
@@ -192,7 +192,7 @@ TEST_F(QueryStatsTest, RegisterRequestAbsorbsErrors) {
     auto& opDebug = CurOp::get(*opCtx)->debug();
 
     QueryStatsStoreManager::getRateLimiter(getServiceContext()) =
-        std::make_unique<RateLimiting>(-1, Seconds{1});
+        RateLimiter::createWindowBased(-1, Seconds{1});
 
     // First case - don't treat errors as fatal.
     internalQueryStatsErrorsAreCommandFatal.store(false);
