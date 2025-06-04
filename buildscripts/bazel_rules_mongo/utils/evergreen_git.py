@@ -1,6 +1,6 @@
 import os
 from functools import cache
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import yaml
 from git import Remote, Repo
@@ -130,20 +130,15 @@ def get_file_at_revision(file: str, revision: str) -> Optional[str]:
         raise ex
 
 
-def get_files_to_lint() -> Set[str]:
-    # Returns all tracked files and files that would be added with a git add
+def get_files_to_lint() -> List[str]:
+    # Returns all tracked files and unstaged files
     repo = Repo()
-    tracked_files = set(repo.git.execute(["git", "ls-files"]).split("\n"))
-
-    files_to_add = repo.git.execute(["git", "add", ".", "--dry-run"])
-    for line in files_to_add.split("\n"):
-        if not line:
-            continue
-        assert (
-            line[:3] == "add"
-        ), f"output line was expected in the format `add 'file_path'`: {line}"
-        path = line[5:-1]
-        print(path)
-        tracked_files.add(path)
-
+    # all tracked files by git
+    tracked_files = repo.git.execute(["git", "ls-files"]).split("\n")
+    # all unstaged files from git
+    tracked_files.extend(
+        repo.git.execute(["git", "ls-files", "--others", "--exclude-standard"]).split("\n")
+    )
+    # remove any empty entries
+    tracked_files = list(filter(bool, tracked_files))
     return tracked_files
