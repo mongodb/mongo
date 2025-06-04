@@ -919,6 +919,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/api_version/OWNERS.yml
 /jstests/noPassthrough/api_version/**/* @10gen/query-optimization @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/backup_export/OWNERS.yml
+/jstests/noPassthrough/backup_export/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/backup_restore/OWNERS.yml
 /jstests/noPassthrough/backup_restore/**/* @10gen/server-backup-restore @svc-auto-approve-bot
 
