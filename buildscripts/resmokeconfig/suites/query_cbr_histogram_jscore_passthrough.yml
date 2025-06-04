@@ -44,6 +44,7 @@ selector:
     - jstests/core/index/express_pbt.js
     - jstests/core/query/explain/is_cached_is_true_for_one_plan_pbt.js
     - jstests/core/query/query_knob_correctness_pbt.js
+    - jstests/core/query/or/subplanning_pbt.js
 
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js

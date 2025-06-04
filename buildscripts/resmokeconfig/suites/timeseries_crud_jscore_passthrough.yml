@@ -237,6 +237,7 @@ selector:
     - jstests/core/query/index_correctness_pbt.js
     - jstests/core/query/partial_index_pbt.js
     - jstests/core/query/query_knob_correctness_pbt.js
+    - jstests/core/query/or/subplanning_pbt.js
     # Time-series collections have different indexes from regular collections.
     - jstests/core/query/array/arrayfind4.js
     - jstests/core/query/array/arrayfind9.js

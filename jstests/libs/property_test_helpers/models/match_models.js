@@ -58,7 +58,7 @@ function getLeafConditionArb(
 
 // A configurable predicate model. Provides fine-grained control of which operators are allowed in
 // the predicate.
-function getMatchPredicateSpec({
+export function getMatchPredicateSpec({
     // Specifies the arbitrary to place at the leaf of comparisons. For example, for
     // {a: {$eq: _}}
     // We could place a constant scalar, or a list of scalars (the default) to parameterize the
