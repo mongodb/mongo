@@ -176,3 +176,8 @@ feature_flags:
         cpp_varname: gFeatureFlagRateLimitIngressConnectionEstablishment
         default: true
         shouldBeFCVGated: false
+    featureFlagIngressRateLimiting:
+        description: "Limit the rate of operation going through ingress admission"
+        cpp_varname: gFeatureFlagIngressRateLimiting
+        default: false
+        shouldBeFCVGated: false
