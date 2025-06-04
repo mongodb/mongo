@@ -1095,7 +1095,7 @@ tasks:
           args:
             - "./src/evergreen/run_python_script_with_report.sh"
             - "validate-modules-yaml"
-            - "modules_poc/mod_scanner.py"
+            - "modules_poc/mod_mapping.py"
             - "--validate-modules"
       - func: "bazel compile"
         vars:

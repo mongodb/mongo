@@ -5,6 +5,7 @@ py_binary(
     srcs = [
         "__init__.py",
         "cindex.py",
+        "mod_mapping.py",
         "mod_scanner.py",
     ],
     data = [

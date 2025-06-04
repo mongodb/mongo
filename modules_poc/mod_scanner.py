@@ -11,20 +11,16 @@ from datetime import datetime
 from functools import cache, cached_property
 from glob import glob
 from pathlib import Path  # if you haven't already done so
-from typing import Literal, NamedTuple, NoReturn
+from typing import Literal, NoReturn
 
-import codeowners
 import pyzstd
 import regex as re
 import yaml
-from codeowners import CodeOwners
 
 try:
     from yaml import CDumper as Dumper
-    from yaml import CLoader as Loader
 except ImportError:
     raise RuntimeError("Why no cYaml?")
-    # from yaml import Loader, Dumper
 
 file = Path(__file__).resolve()
 parent, root = file.parent, file.parents[1]
@@ -42,7 +38,7 @@ from cindex import (
     RefQualifierKind,
     TranslationUnit,
 )
-from cindex import File as ClangFile
+from mod_mapping import mod_for_file, normpath_for_file
 
 
 def perr(*values):
@@ -52,12 +48,6 @@ def perr(*values):
 def perr_exit(*values) -> NoReturn:
     perr(*values)
     sys.exit(1)
-
-
-if codeowners.path_to_regex("/**/bar").match("/foobar"):
-    # Detect an outdated version suffering from https://github.com/sbdchd/codeowners/issues/43.
-    # We need to update to at least 0.8.0 to get the fix.
-    perr_exit("please run buildscripts/poetry_sync.sh to update dependencies")
 
 
 # Monkey patch some features into clang's python binding. Keeping commented out for now in case we decide not to use modified lib.
@@ -81,26 +71,6 @@ def is_tu(c: Cursor | CursorKind):
 
 out_from_env = os.environ.get("MOD_SCANNER_OUTPUT", None)
 is_local = out_from_env is None
-
-
-with open(root / ".github/CODEOWNERS") as f:
-    code_owners = CodeOwners(f.read())
-
-with open(parent / "modules.yaml") as f:
-
-    def parseModules():
-        raw_mods = yaml.load(f, Loader=Loader)
-        lines = []
-        for mod, info in raw_mods.items():
-            for glob in info["files"]:
-                lines.append(f"/{glob} @10gen/{mod}")
-        # If multiple rules match, later wins. So put rules with more
-        # specificity later. For all of our current rules, longer means more
-        # specific.
-        lines.sort(key=lambda l: len(l.split()[0]))
-        return "\n".join(lines)
-
-    modules = CodeOwners(parseModules())
 
 
 class DecoratedCursor(Cursor):
@@ -353,73 +323,8 @@ def get_visibility(
     return parent_vis
 
 
-def normpath_for_file(f: Cursor | ClangFile | str | None) -> str | None:
-    if f is None:
-        return None
-    if isinstance(f, Cursor):
-        return normpath_for_file(f.location.file)
-
-    name = f.name if type(f) == ClangFile else f
-    if "/third_party/" in name:
-        return None
-
-    offset = name.find("src/mongo")
-    if offset == -1:
-        return None
-
-    name = name[offset:]
-    return os.path.normpath(name)  # fix up a/X/../b/c.h -> a/b/c.h
-
-
-file_mod_map: dict[str, str] = {}
 complete_headers = set[str]()
 incomplete_headers = set[str]()
-
-
-def mod_for_file(f: ClangFile | str | None) -> str | None:
-    name = normpath_for_file(f)
-    if not name:
-        return None
-
-    if name and name.endswith("_gen.h") or name.endswith("_gen.cpp"):
-        name = re.sub(r"_gen\.(h|cpp)$", ".idl", name)
-
-    if name in file_mod_map:
-        return file_mod_map[name]
-
-    match modules.of(name):
-        case []:
-            mod = "__NONE__"
-        case [[kind, mod]]:
-            assert kind == "TEAM"
-            ignore = "@10gen/"
-            assert mod.startswith(ignore)
-            mod = mod[len(ignore) :]
-        case owners:
-            perr_exit(
-                f"ERROR: multiple owners for file {name}: {', '.join(mod for (_, mod) in owners)}"
-            )
-    file_mod_map[name] = mod
-    return mod
-
-
-def teams_for_file(f: ClangFile | str | None):
-    name = normpath_for_file(f)
-    if name is None:
-        return []
-
-    # No need to cache since this is called once per file
-    teams = []
-    for kind, owner in code_owners.of(name):
-        if kind != "TEAM":  # ignore both individual engineers and svc-auto-approve-bot
-            continue
-        ignore = "@10gen/"
-        assert owner.startswith(ignore)
-        owner = owner[len(ignore) :]
-        owner = owner.replace("-", "_")  # easier for processing with jq
-        teams.append(owner)
-
-    return teams if teams else ["__NO_OWNER__"]
 
 
 def make_vis_from(c: DecoratedCursor | None):
@@ -850,108 +755,6 @@ class Timer:
 timer = Timer()
 
 
-# TODO: this should probably be pulled out to a separate program, with all functions
-# only called by it moved out as well. That requires pulling mod_for_file() out to a lib.
-# It is only part of mod_scanner because it needs that function.
-
-
-def glob_paths():
-    for path in glob("src/mongo/**/*", recursive=True):
-        if "/third_party/" in path:
-            continue
-        extensions = ("h", "cpp", "idl", "c", "defs", "inl", "hpp")
-        if not any(path.endswith(f".{ext}") for ext in extensions):
-            continue
-        yield path
-
-
-def dump_modules() -> None:
-    out: dict[str, dict[str, dict[str, list[str]]]] = {}
-    for path in glob_paths():
-        mod = mod_for_file(path)
-        assert mod  # None would mean not first-party, but that is already filtered out.
-        (dir, leaf) = path.rsplit("/", 1)
-        for team in teams_for_file(path):
-            # In cases where multiple teams own a file, this will list the file multiple times.
-            # This is intended to play nicely with teams trying to filter to just the files they own.
-            out.setdefault(mod, {}).setdefault(team, {}).setdefault(dir, []).append(leaf)
-
-    for teams in out.values():
-        for dirs in teams.values():
-            for files in dirs.values():
-                files.sort()
-    yaml.dump(out, open("modules_dump.yaml", "w"))
-
-
-def dump_list() -> None:
-    for line in sorted(f"{path} -- {mod_for_file(path)}" for path in glob_paths()):
-        print(line)
-
-
-def validate_modules() -> bool:
-    def glob_is_prefix(short: str, long: str):
-        # Simplistic but good enough for now. In particular, I want to make sure we would
-        # catch things like "foo*" and "*bar*" both matching "foobar".
-        assert len(short) <= len(long)  # argument are sorted by length before calling
-        if short == long:
-            return False  # duplicates are treated as errors
-        if long.startswith(short):
-            return True  # foo and foo/ are prefixes of foo/bar
-        if short.endswith("*") and long.startswith(short[:-1]):
-            return True  # foo* is a prefix of foo/bar and foobar
-        return False
-
-    class Info(NamedTuple):
-        mod: str
-        glob: str
-
-    info_for_line = {
-        info[3]: Info(
-            mod=info[2][0][1].removeprefix("@10gen/"),
-            glob=info[1][1:],
-        )
-        for info in modules.paths
-    }
-    seen_lines = set[int]()
-
-    failed = False
-    for path in glob_paths():
-        matches = list(modules.matching_lines(path))
-        for match in matches:
-            seen_lines.add(match[1])
-
-        if not matches:
-            teams = " and ".join(teams_for_file(path))
-            perr(f"Error: {path} owned by {teams} doesn't match any globs in modules.yaml")
-            failed = True
-
-        if len(matches) <= 1:
-            continue
-
-        infos = sorted((info_for_line[match[1]] for match in matches), key=lambda i: len(i.glob))
-        for i in range(0, len(infos)):
-            for j in range(i, len(infos)):
-                a = infos[i]
-                b = infos[j]
-                if a.mod != b.mod and not glob_is_prefix(a.glob, b.glob):
-                    perr(
-                        f"Error: {path} matches multiple globs that are neither prefixes nor same module:"
-                    )
-                    for info in infos:
-                        perr(f"  {info.glob}  ({info.mod})")
-                    failed = True
-                    break
-            else:
-                continue
-            break  # break out of outer loop
-
-    for line, info in info_for_line.items():
-        if line not in seen_lines:
-            perr(f"Error: glob '{info.glob}' in module {info.mod} doesn't match any files")
-            failed = True
-    return failed
-
-
 def parseTU(args: list[str] | str):
     if not Config.loaded:
         Config.set_compatibility_check(False)
@@ -1039,21 +842,13 @@ def dump_unused_inputs(outPath: str, tu: TranslationUnit):
 
 
 def main():
-    args = sys.argv[1:] or ["src/mongo/platform/waitable_atomic_test.cpp"]
+    args = sys.argv[1:]
 
     if len(args) == 0:
         perr_exit("invalid number of arguments")
 
     if len(args) == 1 and args[0].startswith("--"):
-        match args[0]:
-            case "--dump-modules":
-                sys.exit(dump_modules())
-            case "--dump-modules-list":
-                sys.exit(dump_list())
-            case "--validate-modules":
-                sys.exit(validate_modules())
-            case unknown:
-                sys.exit(f"unknown flag {unknown}")
+        perr_exit(f"{sys.argv[0]} doesn't support runtime options")
 
     tu = parseTU(args)
 

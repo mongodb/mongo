@@ -31,9 +31,9 @@ When submitting a review, you are strongly encouraged to include
 a generated diff of the changes to the modules list. This can be done by running:
 
 ```bash
-modules_poc/mod_scanner.py --dump-modules-list > modules.old
+modules_poc/mod_mapping.py --dump-modules-list > modules.old
 # make your changes
-diff -u0 modules.old <(modules_poc/mod_scanner.py --dump-modules-list)
+diff -u0 modules.old <(modules_poc/mod_mapping.py --dump-modules-list)
 ```
 
 Github will nicely format the diff if you put it in a block like this:
@@ -53,7 +53,7 @@ Github will nicely format the diff if you put it in a block like this:
 
 ### Showing assigned and unassigned files
 
-Run `modules_poc/mod_scanner.py --dump-modules` to produce a `modules_dump.yaml`
+Run `modules_poc/mod_mapping.py --dump-modules` to produce a `modules_dump.yaml`
 file in current directory. This file is a multi-level map from
 module name to team name to directory path to list of file names.
 For unassigned files it uses `__NONE__` as the module name, and for unowned
