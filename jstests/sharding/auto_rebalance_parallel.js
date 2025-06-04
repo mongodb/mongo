@@ -46,7 +46,7 @@ function checkCollectionBalanced(collName) {
 }
 
 function countMoves(collName) {
-    return config.changelog.find({what: 'moveChunk.start', ns: collName}).itcount();
+    return config.changelog.find({what: 'moveChunk.commit', ns: collName}).itcount();
 }
 
 prepareCollectionForBalance('TestDB.TestColl1');
