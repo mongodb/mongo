@@ -116,13 +116,14 @@ auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
 }  // namespace
 
 std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
+                                                      const CollectionAcquisition& acquisition,
                                                       const BSONObj& keyPattern,
                                                       const BSONObj& min,
                                                       const BSONObj& max,
                                                       long long maxChunkSizeBytes,
                                                       boost::optional<int> limit,
                                                       bool forward) {
+    const auto& nss = acquisition.nss();
     if (limit) {
         uassert(ErrorCodes::InvalidOptions, "autoSplitVector expects a positive limit", *limit > 0);
     }
@@ -136,15 +137,15 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
     auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
     {
-        AutoGetCollection collection(opCtx, nss, MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "namespace " << nss.toStringForErrorMsg() << " does not exists",
-                collection);
+                acquisition.exists());
 
         // Get the size estimate for this namespace
-        const long long totalLocalCollDocuments = collection->numRecords(opCtx);
-        const long long dataSize = collection->dataSize(opCtx);
+        const auto& collPtr = acquisition.getCollectionPtr();
+        const long long totalLocalCollDocuments = collPtr->numRecords(opCtx);
+        const long long dataSize = collPtr->dataSize(opCtx);
 
         // Return empty vector if current estimated data size is less than max chunk size
         if (dataSize < maxChunkSizeBytes || totalLocalCollDocuments == 0) {
@@ -154,7 +155,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
         const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                           *collection,
+                                                           collPtr,
                                                            keyPattern,
                                                            /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
@@ -170,7 +171,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
                                  PlanYieldPolicy::YieldPolicy yieldPolicy,
                                  InternalPlanner::Direction direction) {
             return InternalPlanner::shardKeyIndexScan(opCtx,
-                                                      &(*collection),
+                                                      acquisition,
                                                       *shardKeyIdx,
                                                       minKey,
                                                       maxKey,
@@ -232,7 +233,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
             LOGV2_WARNING(
                 5865001,
                 "Possible low cardinality key detected in range. Range contains only a single key.",
-                logAttrs(collection.getNss()),
+                logAttrs(nss),
                 "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
                 "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
                 "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), firstKeyInOriginalChunk)));

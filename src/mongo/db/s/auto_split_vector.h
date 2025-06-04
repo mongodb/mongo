@@ -35,6 +35,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/assert_util.h"
 
 #include <utility>
@@ -123,7 +124,7 @@ namespace mongo {
  * Returned continuation flag: false.
  */
 std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
-                                                      const NamespaceString& nss,
+                                                      const CollectionAcquisition& acquisition,
                                                       const BSONObj& keyPattern,
                                                       const BSONObj& min,
                                                       const BSONObj& max,

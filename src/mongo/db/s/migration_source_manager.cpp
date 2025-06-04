@@ -120,14 +120,14 @@ const char kWriteConcernField[] = "writeConcern";
  * a max bound if needMaxBound is true and a min bound if forward is false.
  */
 BSONObj computeOtherBound(OperationContext* opCtx,
-                          const NamespaceString& nss,
+                          const CollectionAcquisition& acquisition,
                           const BSONObj& min,
                           const BSONObj& max,
                           const ShardKeyPattern& skPattern,
                           const long long maxChunkSizeBytes,
                           bool needMaxBound) {
     auto [splitKeys, _] = autoSplitVector(
-        opCtx, nss, skPattern.toBSON(), min, max, maxChunkSizeBytes, 1, needMaxBound);
+        opCtx, acquisition, skPattern.toBSON(), min, max, maxChunkSizeBytes, 1, needMaxBound);
     if (splitKeys.size()) {
         return std::move(splitKeys.front());
     }
@@ -196,15 +196,19 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
 
     // Compute the max or min bound in case only one is set (moveRange)
     if (!args.getMax().has_value() || !args.getMin().has_value()) {
+        auto acquisition =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kRead),
+                              MODE_IS);
         const auto metadata = [&]() {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             const auto metadata = checkCollectionIdentity(opCtx,
                                                           nss,
                                                           boost::none /* epoch */,
                                                           args.getCollectionTimestamp(),
-                                                          *autoColl,
+                                                          acquisition.getCollectionPtr(),
                                                           *scopedCsr);
             return metadata;
         }();
@@ -215,7 +219,7 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             const auto cm = metadata.getChunkManager();
             const auto owningChunk = cm->findIntersectingChunkWithSimpleCollation(min);
             const auto max = computeOtherBound(opCtx,
-                                               nss,
+                                               acquisition,
                                                min,
                                                owningChunk.getMax(),
                                                cm->getShardKeyPattern(),
@@ -229,7 +233,7 @@ MigrationSourceManager MigrationSourceManager::createMigrationSourceManager(
             const auto cm = metadata.getChunkManager();
             const auto owningChunk = getChunkForMaxBound(*cm, max);
             const auto min = computeOtherBound(opCtx,
-                                               nss,
+                                               acquisition,
                                                owningChunk.getMin(),
                                                max,
                                                cm->getShardKeyPattern(),

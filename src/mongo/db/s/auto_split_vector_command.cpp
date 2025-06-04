@@ -110,25 +110,23 @@ public:
                     req.getMaxChunkSizeBytes() >= kSmallestChunkSizeBytesSupported &&
                         req.getMaxChunkSizeBytes() <= kBiggestChunkSizeBytesSupported);
 
-            {
-                const auto collection =
-                    acquireCollection(opCtx,
-                                      CollectionAcquisitionRequest::fromOpCtx(
-                                          opCtx, ns(), AcquisitionPrerequisites::kRead),
-                                      MODE_IS);
-                uassert(
-                    ErrorCodes::InvalidOptions,
+            const auto acquisition =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx, ns(), AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            uassert(ErrorCodes::InvalidOptions,
                     fmt::format(
                         "The range {} for the namespace {} is required to be owned by one shard",
                         rangeString(req.getMin(), req.getMax()),
                         ns().toStringForErrorMsg()),
-                    !collection.getShardingDescription().isSharded() ||
-                        collection.getShardingFilter()->isRangeEntirelyOwned(
+                    !acquisition.getShardingDescription().isSharded() ||
+                        acquisition.getShardingFilter()->isRangeEntirelyOwned(
                             req.getMin(), req.getMax(), false /*includeMaxBound*/));
-            }
+
 
             auto [splitPoints, continuation] = autoSplitVector(opCtx,
-                                                               ns(),
+                                                               acquisition,
                                                                req.getKeyPattern(),
                                                                req.getMin(),
                                                                req.getMax(),
