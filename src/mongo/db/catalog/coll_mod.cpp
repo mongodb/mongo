@@ -189,7 +189,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
     const boost::optional<ShardKeyPattern>& shardKeyPattern) {
 
     bool isView = !coll;
-    bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
+    bool isTimeseries = coll && coll->isTimeseriesCollection();
 
     ParsedCollModRequest parsed;
     auto& cmr = cmd.getCollModRequest();
@@ -384,6 +384,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             // Disallow index hiding/unhiding on system collections.
             // Bucket collections, which hold data for user-created time-series collections, do
             // not have this restriction.
+            //
+            // TODO SERVER-105548 remove the check on buckets collection after 9.0 becomes last LTS
             if (nss.isSystem() && !nss.isTimeseriesBucketsCollection()) {
                 return {ErrorCodes::BadValue, "Can't hide index on system collection"};
             }
@@ -860,6 +862,7 @@ Status _collModInternal(OperationContext* opCtx,
 
     // If collection/view does not exist, short circuit and return.
     if (!coll && !view) {
+        // TODO SERVER-105548 remove the check on buckets collection after 9.0 becomes last LTS
         if (nss.isTimeseriesBucketsCollection()) {
             // If a sharded time-series collection is dropped, it's possible that a stale mongos
             // sends the request on the buckets namespace instead of the view namespace. Ensure that

@@ -140,15 +140,32 @@ public:
                                                           opCtx->getWriteConcern());
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-            // If the needsUnblock flag is set, we must have blocked the CRUD operations in the
-            // previous phase of collMod operation for granularity updates. Unblock it now after we
-            // have updated the granularity.
             if (request().getNeedsUnblock()) {
-                // This is only ever used for time-series collection as of now.
-                uassert(6102802,
-                        "collMod unblocking should always be on a time-series collection",
-                        timeseries::getTimeseriesOptions(opCtx, ns(), true));
-                auto bucketNs = ns().makeTimeseriesBucketsNamespace();
+                // If the needsUnblock flag is set, we must have blocked the CRUD operations in the
+                // previous phase of collMod operation for granularity updates. Unblock it now after
+                // we have updated the granularity.
+
+                // TODO SERVER-105548 remove bucketNs and always use namespace from request `ns()`
+                // once 9.0 becomes lastLTS
+                const auto bucketNs = [&] {
+                    auto [collAcq, _] = timeseries::acquireCollectionWithBucketsLookup(
+                        opCtx,
+                        CollectionAcquisitionRequest::fromOpCtx(
+                            opCtx, ns(), AcquisitionPrerequisites::OperationType::kRead),
+                        LockMode::MODE_IS);
+
+                    uassert(10332301,
+                            fmt::format("Received collMod participant command for collection '{}', "
+                                        "but collection was not found in shard catalog",
+                                        ns().toStringForErrorMsg()),
+                            collAcq.exists());
+
+                    // This is only ever used for time-series collection as of now.
+                    uassert(6102802,
+                            "collMod unblocking should always be on a time-series collection",
+                            collAcq.getCollectionPtr()->getTimeseriesOptions());
+                    return collAcq.nss();
+                }();
 
                 auto service = ShardingRecoveryService::get(opCtx);
                 const auto reason =

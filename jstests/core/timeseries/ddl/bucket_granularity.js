@@ -10,8 +10,6 @@
  *   # This test calls "find" with a filter on "_id" whose value is a namespace string. We cannot
  *   # test it as the override does not inject tenant prefix to this special namespace.
  *   simulate_atlas_proxy_incompatible,
- *   # TODO (SERVER-103323): Remove once collMod works for viewless timeseries
- *   viewless_timeseries_bug,
  * ]
  */
 

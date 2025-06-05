@@ -49,10 +49,13 @@ selector:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
   roots:
+    - jstests/core/timeseries/ddl/bucket_granularity.js
     - jstests/core/timeseries/ddl/bucket_span_and_rounding_seconds.js
+    - jstests/core/timeseries/ddl/bucket_timestamp_rounding.js
     - jstests/core/timeseries/ddl/timeseries_bucket_index.js
     - jstests/core/timeseries/ddl/timeseries_collation.js
     - jstests/core/timeseries/ddl/timeseries_collection_uuid.js
+    - jstests/core/timeseries/ddl/timeseries_collmod.js
     - jstests/core/timeseries/ddl/timeseries_compact.js
     - jstests/core/timeseries/ddl/timeseries_create.js
     - jstests/core/timeseries/ddl/timeseries_create_collection.js

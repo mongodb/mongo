@@ -208,86 +208,63 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(coll.dropIndexes(['myindex2']), 'failed to drop indexes: [myindex2]');
         assertIndexNotExists(coll, spec, bucketSpec);
 
-        // TODO SERVER-103323 enable the following test case also for viewless timeseries
-        if (!viewlessTimeseriesEnabled) {
-            // Check that we are able to hide and unhide the index by name.
-            assert.commandWorked(coll.createIndex(spec, {name: 'hide1'}),
-                                 'failed to create index: ' + tojson(spec));
+        // Check that we are able to hide and unhide the index by name.
+        assert.commandWorked(coll.createIndex(spec, {name: 'hide1'}),
+                             'failed to create index: ' + tojson(spec));
 
-            assertIndexExists(coll, spec, bucketSpec);
-            assertIndexNotHidden(coll, spec, bucketSpec);
+        assertIndexExists(coll, spec, bucketSpec);
+        assertIndexNotHidden(coll, spec, bucketSpec);
 
-            assert.eq(1,
-                      getTimeseriesCollForRawOps(coll)
-                          .find()
-                          .rawData()
-                          .hint(bucketSpec)
-                          .toArray()
-                          .length);
-            assert.eq(1, coll.find().hint(spec).toArray().length);
-            assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
-            assertIndexHidden(coll, spec, bucketSpec);
+        assert.eq(
+            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
+        assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
+        assertIndexHidden(coll, spec, bucketSpec);
 
-            assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
-                                                                 .find()
-                                                                 .rawData()
-                                                                 .hint(bucketSpec)
-                                                                 .toArray()),
-                                                      ErrorCodes.BadValue);
-            assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
-                                                      ErrorCodes.BadValue);
-            assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
-            assertIndexNotHidden(coll, spec, bucketSpec);
+        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
+                                                             .find()
+                                                             .rawData()
+                                                             .hint(bucketSpec)
+                                                             .toArray()),
+                                                  ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
+                                                  ErrorCodes.BadValue);
+        assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
+        assertIndexNotHidden(coll, spec, bucketSpec);
 
-            assert.eq(1,
-                      getTimeseriesCollForRawOps(coll)
-                          .find()
-                          .rawData()
-                          .hint(bucketSpec)
-                          .toArray()
-                          .length);
-            assert.eq(1, coll.find().hint(spec).toArray().length);
-            assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
-            assertIndexNotExists(coll, spec, bucketSpec);
+        assert.eq(
+            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
+        assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
+        assertIndexNotExists(coll, spec, bucketSpec);
 
-            // Check that we are able to hide and unhide the index by key.
-            assert.commandWorked(coll.createIndex(spec, {name: 'hide2'}),
-                                 'failed to create index: ' + tojson(spec));
-            assertIndexExists(coll, spec, bucketSpec);
-            assertIndexNotHidden(coll, spec, bucketSpec);
+        // Check that we are able to hide and unhide the index by key.
+        assert.commandWorked(coll.createIndex(spec, {name: 'hide2'}),
+                             'failed to create index: ' + tojson(spec));
+        assertIndexExists(coll, spec, bucketSpec);
+        assertIndexNotHidden(coll, spec, bucketSpec);
 
-            assert.eq(1,
-                      getTimeseriesCollForRawOps(coll)
-                          .find()
-                          .rawData()
-                          .hint(bucketSpec)
-                          .toArray()
-                          .length);
-            assert.eq(1, coll.find().hint(spec).toArray().length);
-            assert.commandWorked(coll.hideIndex(spec), 'failed to hide index: hide2');
-            assertIndexHidden(coll, spec, bucketSpec);
+        assert.eq(
+            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
+        assert.commandWorked(coll.hideIndex(spec), 'failed to hide index: hide2');
+        assertIndexHidden(coll, spec, bucketSpec);
 
-            assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
-                                                                 .find()
-                                                                 .rawData()
-                                                                 .hint(bucketSpec)
-                                                                 .toArray()),
-                                                      ErrorCodes.BadValue);
-            assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
-                                                      ErrorCodes.BadValue);
-            assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide2');
-            assertIndexNotHidden(coll, spec, bucketSpec);
+        assert.commandFailedWithCode(assert.throws(() => getTimeseriesCollForRawOps(coll)
+                                                             .find()
+                                                             .rawData()
+                                                             .hint(bucketSpec)
+                                                             .toArray()),
+                                                  ErrorCodes.BadValue);
+        assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
+                                                  ErrorCodes.BadValue);
+        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide2');
+        assertIndexNotHidden(coll, spec, bucketSpec);
 
-            assert.eq(1,
-                      getTimeseriesCollForRawOps(coll)
-                          .find()
-                          .rawData()
-                          .hint(bucketSpec)
-                          .toArray()
-                          .length);
-            assert.eq(1, coll.find().hint(spec).toArray().length);
-            assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
-        }
+        assert.eq(
+            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
+        assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
 
         // Check that we are able to create the index as hidden.
         assert.commandWorked(coll.createIndex(spec, {name: 'hide3', hidden: true}),
@@ -303,19 +280,11 @@ TimeseriesTest.run((insert) => {
                                                   ErrorCodes.BadValue);
         assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
-        // TODO SERVER-103323 enable the following test case also for viewless timeseries
-        if (!viewlessTimeseriesEnabled) {
-            assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide3');
-            assertIndexNotHidden(coll, spec, bucketSpec);
-            assert.eq(1,
-                      getTimeseriesCollForRawOps(coll)
-                          .find()
-                          .rawData()
-                          .hint(bucketSpec)
-                          .toArray()
-                          .length);
-            assert.eq(1, coll.find().hint(spec).toArray().length);
-        }
+        assert.commandWorked(coll.unhideIndex(spec), 'failed to unhide index: hide3');
+        assertIndexNotHidden(coll, spec, bucketSpec);
+        assert.eq(
+            1, getTimeseriesCollForRawOps(coll).find().rawData().hint(bucketSpec).toArray().length);
+        assert.eq(1, coll.find().hint(spec).toArray().length);
         assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide3');
         assertIndexNotExists(coll, spec, bucketSpec);
 
@@ -409,10 +378,7 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
     assert.commandWorked(coll.createIndex({not_metadata: 1}));
-    // TODO SERVER-103323 enable the following test case also for viewless timeseries
-    if (!viewlessTimeseriesEnabled) {
-        assert.commandWorked(coll.hideIndex({not_metadata: 1}));
-    }
+    assert.commandWorked(coll.hideIndex({not_metadata: 1}));
     assert.commandWorked(coll.dropIndex({not_metadata: 1}));
 
     // Index names are not transformed. dropIndexes checks the name over the raw indexes over

@@ -7,8 +7,6 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-103323): Remove once collMod works for viewless timeseries
- *   viewless_timeseries_bug,
  * ]
  */
 

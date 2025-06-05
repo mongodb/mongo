@@ -170,9 +170,23 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
 void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
     if (!_collInfo) {
         CollectionInfo info;
-        info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, originalNss(), true);
-        info.nsForTargeting =
-            info.timeSeriesOptions ? originalNss().makeTimeseriesBucketsNamespace() : originalNss();
+        try {
+            // TODO SERVER-105548 switch back to acquireCollection once 9.0 becomes last LTS
+            auto [collAcq, _] = timeseries::acquireCollectionWithBucketsLookup(
+                opCtx,
+                CollectionAcquisitionRequest(originalNss(),
+                                             PlacementConcern::kPretendUnsharded,
+                                             repl::ReadConcernArgs::kLocal,
+                                             AcquisitionPrerequisites::OperationType::kRead),
+                LockMode::MODE_IS);
+
+            info.timeSeriesOptions =
+                collAcq.exists() ? collAcq.getCollectionPtr()->getTimeseriesOptions() : boost::none;
+            // TODO SERVER-105548 remove nsForTargeting once 9.0 becomes last LTS
+            info.nsForTargeting = collAcq.nss();
+        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+            info.nsForTargeting = originalNss();
+        }
         const auto optColl =
             sharding_ddl_util::getCollectionFromConfigServer(opCtx, info.nsForTargeting);
         info.isTracked = (bool)optColl;

@@ -89,6 +89,8 @@ private:
         boost::optional<TimeseriesOptions> timeSeriesOptions;
         // The targeting namespace can be different from the original namespace in some cases, like
         // time-series collections.
+        //
+        // TODO SERVER-105548 remove nsForTargeting once 9.0 becomes last LTS
         NamespaceString nsForTargeting;
     };
 

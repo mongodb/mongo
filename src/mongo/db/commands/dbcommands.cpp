@@ -590,8 +590,8 @@ public:
 
             staticValidateCollMod(opCtx, nss, cmd.getCollModRequest());
 
-
             // Updating granularity on sharded time-series collections is not allowed.
+            // TODO SERVER-105548 remove completely this check once 9.0 becomes last LTS
             auto catalogClient =
                 Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogClient() : nullptr;
             if (catalogClient && cmd.getTimeseries() && cmd.getTimeseries()->getGranularity()) {

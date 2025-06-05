@@ -8,9 +8,6 @@
  *   requires_non_retryable_commands,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO (SERVER-103323): Remove once collMod works for viewless timeseries
- *   viewless_timeseries_bug,
- *   # During fcv upgrade/downgrade the index created might not be what we expect.
  * ]
  */
 

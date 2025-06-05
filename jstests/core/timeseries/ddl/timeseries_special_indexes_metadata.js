@@ -55,11 +55,6 @@ TimeseriesTest.run((insert) => {
      */
     function hideUnhideListIndexes(
         timeseriesIndexSpec, bucketsIndexSpec, timeseriesFindQuery = {}, bucketsFindQuery = {}) {
-        // TODO(SERVER-103323): Remove once collMod works for viewless timeseries
-        if (areViewlessTimeseriesEnabled(db)) {
-            return;
-        }
-
         jsTestLog("Testing index spec, time-series: " + tojson(timeseriesIndexSpec) +
                   ", buckets: " + tojson(bucketsIndexSpec));
 
