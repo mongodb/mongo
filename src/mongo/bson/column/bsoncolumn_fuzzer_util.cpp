@@ -311,27 +311,26 @@ bool createFuzzedElement(const char*& ptr,
     // dictate how many within that order of magnitude to add.
 
     // repetitionFactor represents a scale of repetition (single, block, max block)
-    // repetitionFactor can go up to 11, 0-7 provide 3 bits for specifying types of
-    // repetition, 8-11 mean no repetition (so as to avoid biasing too far away
-    // from singleton values)
+    // repetitionFactor can go up to 11, 0-8 mean no repetition, this is a bias
+    // towards singletons so as not to have too many runs (each individual element
+    // in a fuzzer input has this chance, so there will be many RLE cases explored)
+    // 9 means we add 0-119 more copies of the element
+    // 10 means we additionally add 0-15 full rle blocks (120 copies each)
+    // 11 means we additionally add 0-9 max rle blocks (120 * 16 copies each)
     uint8_t repetitionFactor = typeRun / 22;
     repetition = 1;
-    if (repetitionFactor < 8) {
-        if (repetitionFactor % 2 == 1) {  // 1st bit: add singletons of repetition
-            READ_BYTE(ptr, end, singles, % 120);
-            repetition += singles;
-        }
-        repetitionFactor /= 2;
-        if (repetitionFactor % 2 == 1) {  // 2nd bit: add full rle blocks
-            READ_BYTE(ptr, end, blocks, % 16);
-            repetition += blocks * mongo::simple8b_internal::kRleMultiplier;
-        }
-        repetitionFactor /= 2;
-        if (repetitionFactor % 2 == 1) {  // 3rd bit: add max rle blocks
-            READ_BYTE(ptr, end, maxBlocks, % 10)
-            repetition += maxBlocks * mongo::simple8b_internal::kRleMultiplier *
-                mongo::simple8b_internal::kMaxRleCount;
-        }
+    if (repetitionFactor >= 9) {  // add singletons of repetition
+        READ_BYTE(ptr, end, singles, % 120);
+        repetition += singles;
+    }
+    if (repetitionFactor >= 10) {  // add full rle blocks
+        READ_BYTE(ptr, end, blocks, % 16);
+        repetition += blocks * mongo::simple8b_internal::kRleMultiplier;
+    }
+    if (repetitionFactor >= 11) {  // add max rle blocks
+        READ_BYTE(ptr, end, maxBlocks, % 10)
+        repetition += maxBlocks * mongo::simple8b_internal::kRleMultiplier *
+            mongo::simple8b_internal::kMaxRleCount;
     }
 
     // Construct a BSONElement based on type.
