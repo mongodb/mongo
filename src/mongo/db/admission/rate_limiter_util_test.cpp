@@ -74,7 +74,7 @@ private:
 
 // Verify that a RateLimiter with sufficient capacity will dispense a token.
 TEST_F(RateLimiterTest, BasicTokenAcquisition) {
-    RateLimiter rateLimiter(DBL_MAX, DBL_MAX, INT_MAX);
+    RateLimiter rateLimiter(DBL_MAX, DBL_MAX, INT_MAX, "BasicTokenAcquisition");
     auto opCtx = makeOperationContext();
     ASSERT_OK(rateLimiter.acquireToken(opCtx.get()));
 
@@ -91,9 +91,10 @@ TEST_F(RateLimiterTest, BasicTokenAcquisition) {
 
 // Verify that RateLimiter::setBurstSize range checks its input.
 TEST_F(RateLimiterTest, InvalidBurstSize) {
-    ASSERT_THROWS_CODE(RateLimiter(1.0, 0, 0), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        RateLimiter(1.0, 0, 0, "InvalidBurstSize"), DBException, ErrorCodes::InvalidOptions);
 
-    RateLimiter rateLimiter(DBL_MAX, DBL_MAX, INT_MAX);
+    RateLimiter rateLimiter(DBL_MAX, DBL_MAX, INT_MAX, "InvalidBurstSize");
     ASSERT_THROWS_CODE(rateLimiter.setBurstSize(0), DBException, ErrorCodes::InvalidOptions);
 }
 
@@ -108,7 +109,8 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
         const int64_t numThreads = 10;
         const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
 
-        RateLimiter rateLimiter(refreshRate, maxTokens, INT_MAX);
+        RateLimiter rateLimiter(
+            refreshRate, maxTokens, INT_MAX, "ConcurrentTokenAcquisitionWithQueueing");
 
         auto clientsWithOps = makeClientsWithOpCtxs(numThreads);
 
@@ -228,7 +230,7 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
 // - but there are already the maximum number of threads enqueued.
 TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 1);
+        RateLimiter rateLimiter(.01, 1.0, 1, "RejectOverMaxWaiters");
         auto clientsWithOps = makeClientsWithOpCtxs(3);
         Notification<void> firstTokenAcquired;
         Notification<void> hasFailed;
@@ -262,9 +264,14 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
         // Wait until one of the operations has failed.
         hasFailed.get();
 
-        // Assert that exactly one of the statuses is a TemporarilyUnavailable error.
-        auto unavailableStatus = Status(ErrorCodes::TemporarilyUnavailable, "");
-        ASSERT((status1 == unavailableStatus) ^ (status2 == unavailableStatus));
+        LOGV2(10574302,
+              "At least one thread finished",
+              "status1"_attr = status1,
+              "status2"_attr = status2);
+
+        // Assert that exactly one of the statuses is from rate limiter rejection.
+        ASSERT((status1.code() == RateLimiter::kRejectedErrorCode) ^
+               (status2.code() == RateLimiter::kRejectedErrorCode));
         ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
 
         // Interrupt the other token acquisition.
@@ -276,7 +283,7 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
 // otherwise queue are instead rejected.
 TEST_F(RateLimiterTest, QueueingDisabled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 0);
+        RateLimiter rateLimiter(.01, 1.0, 0, "QueueingDisabled");
         auto clientsWithOps = makeClientsWithOpCtxs(2);
         Notification<void> firstTokenAcquired;
 
@@ -294,7 +301,8 @@ TEST_F(RateLimiterTest, QueueingDisabled) {
         threads.emplace_back(monitor.spawn([&]() {
             firstTokenAcquired.get();
             Status token = rateLimiter.acquireToken(clientsWithOps[1].second.get());
-            ASSERT_EQ(token, Status(ErrorCodes::TemporarilyUnavailable, ""));
+            LOGV2(10574301, "Final token acquisition result", "status"_attr = token);
+            ASSERT_EQ(token, Status(RateLimiter::kRejectedErrorCode, ""));
 
             ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
             ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
@@ -307,7 +315,7 @@ TEST_F(RateLimiterTest, QueueingDisabled) {
 // the rate limiter wakes up the thread and returns the appropriate error status.
 TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationKilled");
         auto clientsWithOps = makeClientsWithOpCtxs(2);
         Notification<void> firstTokenAcquired;
         std::vector<unittest::JoinThread> threads;
@@ -346,7 +354,7 @@ TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
 // returns the error status corresponding to the reason for the interruption.
 TEST_F(RateLimiterTest, InterruptedDueToOperationDeadline) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationDeadline");
         auto clientsWithOps = makeClientsWithOpCtxs(2);
         Notification<void> firstTokenAcquired;
         std::vector<unittest::JoinThread> threads;
@@ -388,7 +396,7 @@ TEST_F(RateLimiterTest, InterruptedDueToOperationDeadline) {
 // service shutdown.
 TEST_F(RateLimiterTest, InterruptedDueToKillAllOperations) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToKillAllOperations");
         auto clientsWithOps = makeClientsWithOpCtxs(2);
         Notification<void> firstTokenAcquired;
         Notification<void> secondTokenInterrupted;
@@ -437,7 +445,7 @@ TEST_F(RateLimiterTest, InterruptedDueToKillAllOperations) {
 
 // Verify that `RateLimiter::recordExemption()` increments the exemption metric but no others.
 TEST_F(RateLimiterTest, RecordExemption) {
-    RateLimiter rateLimiter(INT_MAX, INT_MAX, INT_MAX);
+    RateLimiter rateLimiter(INT_MAX, INT_MAX, INT_MAX, "RecordExemption");
     rateLimiter.recordExemption();
 
     ASSERT_EQ(rateLimiter.stats().exemptedAdmissions.get(), 1);

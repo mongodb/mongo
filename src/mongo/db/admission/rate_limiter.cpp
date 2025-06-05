@@ -76,12 +76,10 @@ struct RateLimiter::RateLimiterPrivate {
         int64_t expected = queued.load();
         do {
             if (expected >= maxDepth) {
-                return Status(ErrorCodes::TemporarilyUnavailable,
-                              fmt::format("RateLimiter queue depth has exceeded the maxQueueDepth. "
-                                          "numWaiters={}; maxQueueDepth={}; rateLimiterName={}",
-                                          expected,
-                                          maxDepth,
-                                          name));
+                return Status(kRejectedErrorCode,
+                              fmt::format("Rate limiter '{}' maximum queue depth ({}) exceeded",
+                                          name,
+                                          maxDepth));
             }
         } while (!queued.compareAndSwap(&expected, expected + 1));
 
