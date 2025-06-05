@@ -52,13 +52,6 @@ mongo_cc_library(
         "//bazel/config:not_windows": ["platform/build_posix"],
         "//conditions:default": [],
     }),
-    linkopts = select({
-        "@platforms//os:macos": [
-            "-lc++",
-            "-lc++abi",
-        ],
-        "//conditions:default": [],
-    }),
     local_defines = ["HAVE_CONFIG_H"],
     deps = [],
 )
