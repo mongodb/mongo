@@ -29,7 +29,6 @@
 
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
-#include "mongo/db/memory_tracking/op_memory_use.h"
 #include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
@@ -39,6 +38,9 @@
 namespace mongo {
 
 namespace {
+
+const OperationContext::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromOpCtx =
+    OperationContext::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
 
 const ClientCursor::Decoration<std::unique_ptr<OperationMemoryUsageTracker>> _getFromClientCursor =
     ClientCursor::declareDecoration<std::unique_ptr<OperationMemoryUsageTracker>>();
@@ -69,7 +71,7 @@ std::unique_ptr<OperationMemoryUsageTracker>& getFromClientCursor(auto* cursor) 
  */
 OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsageTracker(
     OperationContext* opCtx) {
-    OperationMemoryUsageTracker* opTracker = OpMemoryUse::operationMemoryAggregator(opCtx).get();
+    OperationMemoryUsageTracker* opTracker = _getFromOpCtx(opCtx).get();
     if (!opTracker) {
         auto uniqueTracker = std::make_unique<OperationMemoryUsageTracker>(opCtx);
         opTracker = uniqueTracker.get();
@@ -81,7 +83,7 @@ OperationMemoryUsageTracker* OperationMemoryUsageTracker::getOperationMemoryUsag
                 CurOp::get(opTracker->_opCtx)
                     ->setMemoryTrackingStats(currentMemoryBytes, maxUsedMemoryBytes);
             });
-        OpMemoryUse::operationMemoryAggregator(opCtx) = std::move(uniqueTracker);
+        _getFromOpCtx(opCtx) = std::move(uniqueTracker);
     }
 
     return opTracker;
@@ -122,8 +124,7 @@ void OperationMemoryUsageTracker::moveToCursorIfAvailable(OperationContext* opCt
 
 template <class C>
 void OperationMemoryUsageTracker::_moveToCursorIfAvailable(OperationContext* opCtx, C* cursor) {
-    std::unique_ptr<OperationMemoryUsageTracker> opCtxTracker{
-        std::move(OpMemoryUse::operationMemoryAggregator(opCtx))};
+    std::unique_ptr<OperationMemoryUsageTracker> opCtxTracker{std::move(_getFromOpCtx(opCtx))};
     if (opCtxTracker) {
         std::unique_ptr<OperationMemoryUsageTracker>& cursorTracker = getFromClientCursor(cursor);
         tassert(10076200,
@@ -149,8 +150,7 @@ void OperationMemoryUsageTracker::_moveToOpCtxIfAvailable(C* cursor, OperationCo
     std::unique_ptr<OperationMemoryUsageTracker> cursorTracker{
         std::move(getFromClientCursor(cursor))};
     if (cursorTracker) {
-        std::unique_ptr<OperationMemoryUsageTracker>& opCtxTracker =
-            OpMemoryUse::operationMemoryAggregator(opCtx);
+        std::unique_ptr<OperationMemoryUsageTracker>& opCtxTracker = _getFromOpCtx(opCtx);
         tassert(10076201,
                 "OperationMemoryUsageTracker already attached to OperationContext",
                 !opCtxTracker);

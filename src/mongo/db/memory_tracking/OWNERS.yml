@@ -11,9 +11,6 @@ filters:
   - "memory_usage_tracker*":
     approvers:
       - 10gen/query-execution-classic
-  - "op_memory_use*":
-    approvers:
-      - 10gen/query-integration-observability
   - "operation_memory_usage_tracker*":
     approvers:
       - 10gen/query-integration-observability

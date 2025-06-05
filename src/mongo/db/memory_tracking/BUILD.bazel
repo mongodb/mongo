@@ -12,13 +12,11 @@ exports_files(
 mongo_cc_library(
     name = "memory_tracking",
     srcs = [
-        "op_memory_use.cpp",
         "operation_memory_usage_tracker.cpp",
         "//src/mongo/db/query/client_cursor:clientcursor.h",
     ],
     hdrs = [
         "memory_usage_tracker.h",
-        "op_memory_use.h",
         "operation_memory_usage_tracker.h",
     ],
     deps = [
@@ -33,7 +31,6 @@ mongo_cc_unit_test(
     name = "memory_tracking_test",
     srcs = [
         "memory_usage_tracker_test.cpp",
-        "op_memory_use_test.cpp",
         "operation_memory_usage_tracker_test.cpp",
     ],
     tags = ["mongo_unittest_second_group"],
