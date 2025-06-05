@@ -743,20 +743,6 @@ const nestedLookupExpected = [
 ];
 assert.sameMembers(nestedLookupExpected, nested.toArray());
 
-// TODO SERVER-96439 add non-mock test case for this.
-// $lookup against non-trivial view($search) fails.
-// view1.drop();
-// assert.commandWorked(db.createView(view1.getName(), coll.getName(), [
-//     {$project: {"_id": 1}},
-// ]));
-
-// assert.commandFailedWithCode(db.runCommand({
-//     aggregate: collBase.getName(),
-//     pipeline: makeLookupSearchPipeline(view1.getName(), {query: "cakes", path: "title"}),
-//     cursor: {}
-// }),
-//                              40602);
-
 // $lookup against trivial view($search) works.
 const lookupSearchViewQuery = setupSearchQuery(
     "cake",
