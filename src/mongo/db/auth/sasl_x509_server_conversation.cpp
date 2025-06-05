@@ -217,7 +217,7 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
                       "cluster authentication, check the --clusterAuthMode flag");
     }
 
-    if (!client->isInternalClient()) {
+    if (!client->isPossiblyUnauthenticatedInternalClient()) {
         LOGV2_WARNING(8209200,
                       "Client isn't a mongod or mongos, but is connecting with a certificate "
                       "with cluster membership");
