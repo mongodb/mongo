@@ -3153,7 +3153,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
 
     ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9402501);
+                       9402502);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
@@ -3185,10 +3185,10 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
     ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       16436);
+                       9402502);
 }
 
-TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
+TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionWithNotAllowed) {
     auto expCtx = getExpCtx();
     auto fromNs = NamespaceString::createNamespaceString_forTest("test.pipeline_test");
     getExpCtx()->setResolvedNamespaces(
@@ -3231,214 +3231,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionwithAllowed) {
         }
     })");
 
-    const auto desugaredList =
-        DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
-    const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
-    BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "expectedStages": [
-                {
-                    "$sample": {
-                        "size": 10
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "score": { "$const": 5.0 }
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "score": {
-                            "$divide": [
-                                {
-                                    "$const": 1
-                                },
-                                {
-                                    "$add": [
-                                        {
-                                            "$const": 1
-                                        },
-                                        {
-                                            "$exp": [
-                                                {
-                                                    "$multiply": [
-                                                        {
-                                                            "$const": -1
-                                                        },
-                                                        {
-                                                            "$meta": "score"
-                                                        }
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$limit": 10
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": {
-                            "docs": "$$ROOT"
-                        }
-                    }
-                },
-                {
-                    "$addFields": {
-                        "name1_score": {
-                            "$multiply": [
-                                {
-                                    $meta: "score"
-                                },
-                                {
-                                    "$const": 1.0
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$unionWith": {
-                        "coll": "pipeline_test",
-                        "pipeline": [
-                            {
-                                "$unionWith": {
-                                    "coll": "novels",
-                                    "pipeline": [
-                                        {
-                                            "$limit": 3
-                                        },
-                                        {
-                                            "$unionWith": {
-                                                "coll": "shortstories",
-                                                "pipeline": []
-                                            }
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "$setMetadata": {
-                                    "score": { "$const": 5.0 }
-                                }
-                            },
-                            {
-                                "$setMetadata": {
-                                    "score": {
-                                        "$divide": [
-                                            {
-                                                "$const": 1
-                                            },
-                                            {
-                                                "$add": [
-                                                    {
-                                                        "$const": 1
-                                                    },
-                                                    {
-                                                        "$exp": [
-                                                            {
-                                                                "$multiply": [
-                                                                    {
-                                                                        "$const": -1
-                                                                    },
-                                                                    {
-                                                                        "$meta": "score"
-                                                                    }
-                                                                ]
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                }
-                            },
-                            {
-                                "$replaceRoot": {
-                                    "newRoot": {
-                                        "docs": "$$ROOT"
-                                    }
-                                }
-                            },
-                            {
-                                "$addFields": {
-                                    "name2_score": {
-                                        "$multiply": [
-                                            {
-                                                $meta: "score"
-                                            },
-                                            {
-                                                "$const": 1.0
-                                            }
-                                        ]
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": "$docs._id",
-                        "docs": {
-                            "$first": "$docs"
-                        },
-                        "name1_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$name1_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "name2_score": {
-                            "$max": {
-                                "$ifNull": [
-                                    "$name2_score",
-                                    {
-                                        "$const": 0
-                                    }
-                                ]
-                            }
-                        },
-                        "$willBeMerged": false
-                    }
-                },
-                {
-                    "$setMetadata": {
-                        "score": {
-                            "$avg": [
-                                "$name1_score",
-                                "$name2_score"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "$sort": {
-                        "$computed0": {$meta: "score"},
-                        "_id": 1
-                    }
-                },
-                {
-                    "$replaceRoot": {
-                        "newRoot": "$docs"
-                    }
-                }
-            ]
-        })",
-        asOneObj);
+    ASSERT_THROWS_CODE(DocumentSourceScoreFusion::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       9402502);
 }
 
 TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {

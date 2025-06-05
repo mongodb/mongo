@@ -381,8 +381,6 @@ bool DocumentSourceGeoNear::hasQuery() const {
 void DocumentSourceGeoNear::parseOptions(BSONObj options,
                                          const boost::intrusive_ptr<ExpressionContext>& pCtx) {
 
-    const std::string nearStr = "near";
-    const std::string distanceFieldStr = "distanceField";
     // First, check for explicitly-disallowed fields.
 
     // The old geoNear command used to accept a collation. We explicitly ban it here, since the
@@ -402,15 +400,15 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
     uassert(50856, "$geoNear no longer supports the 'start' argument.", !options["start"]);
 
     // The "near" parameter is required.
-    uassert(5860400, "$geoNear requires a 'near' argument", options[nearStr]);
+    uassert(5860400, "$geoNear requires a 'near' argument", options[kNearFieldName]);
 
     // go through all the fields
     for (auto&& argument : options) {
         const auto argName = argument.fieldNameStringData();
-        if (argName == nearStr) {
+        if (argName == kNearFieldName) {
             _nearGeometry =
                 Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
-        } else if (argName == distanceFieldStr) {
+        } else if (argName == kDistanceFieldFieldName) {
             uassert(16606,
                     "$geoNear requires that the 'distanceField' option is a String",
                     argument.type() == BSONType::string);
@@ -437,7 +435,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
             }
         } else if (argName == "spherical") {
             spherical = argument.trueValue();
-        } else if (argName == "includeLocs") {
+        } else if (argName == kIncludeLocsFieldName) {
             uassert(16607,
                     "$geoNear requires that 'includeLocs' option is a String",
                     argument.type() == BSONType::string);

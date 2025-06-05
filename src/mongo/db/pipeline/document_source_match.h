@@ -60,6 +60,8 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource, public exec::agg::Stage {
 public:
+    static bool containsTextOperator(const MatchExpression& expr);
+
     DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

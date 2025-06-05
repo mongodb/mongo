@@ -32,8 +32,18 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_score.h"
+#include "mongo/db/pipeline/document_source_score_fusion.h"
 #include "mongo/db/pipeline/document_source_set_metadata.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/util/string_util.h"
@@ -185,6 +195,183 @@ void failWeightsValidationWithPipelineSuggestions(
 
     // Fail query.
     uasserted(9967500, errorMsg);
+}
+
+Status isSelectionPipeline(const std::vector<BSONObj>& bsonPipeline) {
+    if (bsonPipeline.empty()) {
+        return Status(ErrorCodes::Error::BadValue, "Input pipeline must not be empty.");
+    }
+
+    for (const auto& stage : bsonPipeline) {
+        if (auto status = isSelectionStage(stage); !status.isOK()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status isSelectionStage(const BSONObj& bsonStage) {
+    // Please keep the following in alphabetical order.
+    static const std::set<StringData> validSelectionStagesForHybridSearch = {
+        DocumentSourceInternalInhibitOptimization::kStageName,
+        DocumentSourceLimit::kStageName,
+        DocumentSourceMatch::kStageName,
+        DocumentSourceRankFusion::kStageName,
+        DocumentSourceSample::kStageName,
+        DocumentSourceScore::kStageName,
+        DocumentSourceScoreFusion::kStageName,
+        DocumentSourceSkip::kStageName,
+        DocumentSourceSort::kStageName,
+        DocumentSourceVectorSearch::kStageName,
+    };
+
+    if (bsonStage.isEmpty()) {
+        // Empty BSON stage was provided - it is not a selection stage.
+        return Status(ErrorCodes::Error::InvalidBSON, "Input stages must not be empty.");
+    }
+
+    auto fieldName = *bsonStage.getFieldNames<std::set<std::string>>().begin();
+    if (validSelectionStagesForHybridSearch.contains(fieldName)) {
+        return Status::OK();
+    }
+
+    // The following stages are conditionally selection stages, depending on the specification.
+    if (bsonStage.hasField(DocumentSourceGeoNear::kStageName)) {
+        // $geoNear is only a selection stage if it does not specify 'includeLocs' or
+        // 'distanceField'.
+        const auto& spec = bsonStage[DocumentSourceGeoNear::kStageName];
+        if (!spec.isABSONObj()) {
+            // The spec for $geoNear should be a BSON object.
+            return Status(ErrorCodes::Error::InvalidBSON,
+                          "Spec for $geoNear must be a BSON object, but was given: " +
+                              bsonStage.toString());
+        }
+
+        const auto& specBsonObj = spec.Obj();
+        bool hasModificationFields =
+            specBsonObj.hasField(DocumentSourceGeoNear::kDistanceFieldFieldName) ||
+            specBsonObj.hasField(DocumentSourceGeoNear::kIncludeLocsFieldName);
+        return hasModificationFields
+            ? Status(ErrorCodes::Error::BadValue,
+                     "$geoNear is only a selection stage if 'includeLocs' and 'distanceField' are "
+                     "not specified, because these options modify the input documents by adding "
+                     "output fields.")
+            : Status::OK();
+    }
+
+    if (bsonStage.hasField(DocumentSourceSearch::kStageName)) {
+        // $search is only a selection stage if 'returnStoredSource' is false.
+        const auto& spec = bsonStage[DocumentSourceSearch::kStageName];
+        if (!spec.isABSONObj()) {
+            // The spec for $search should be a BSON object.
+            return Status(ErrorCodes::Error::InvalidBSON,
+                          "Spec for $search must be a BSON object, but was given: " +
+                              bsonStage.toString());
+        }
+
+        const auto& specBsonObj = spec.Obj();
+        if (!specBsonObj.hasField(mongot_cursor::kReturnStoredSourceArg)) {
+            // The spec does not specify 'returnStoredSource' and the default is false.
+            // This is a selection stage.
+            return Status::OK();
+        }
+
+        const auto& returnStoredSourceArg = specBsonObj[mongot_cursor::kReturnStoredSourceArg];
+        if (!returnStoredSourceArg.isBoolean()) {
+            // 'returnStoredSource' should be a bool.
+            return Status(ErrorCodes::Error::InvalidBSON,
+                          "Spec for 'returnStoredSource' should be a boolean, but was given: " +
+                              bsonStage.toString());
+        }
+
+        return returnStoredSourceArg.boolean()
+            ? Status(ErrorCodes::Error::BadValue,
+                     "$search is only a selection stage if 'returnStoredSource' is false because "
+                     "it modifies the output fields.")
+            : Status::OK();
+    }
+
+    // If here, then the stage was not a valid hybrid search selection stage.
+    return Status(
+        ErrorCodes::Error::BadValue,
+        fieldName +
+            " is not a selection stage because it modifies or transforms the input documents.");
+}
+
+Status isRankedPipeline(const std::vector<BSONObj>& bsonPipeline) {
+    if (bsonPipeline.empty()) {
+        return Status(ErrorCodes::Error::BadValue, "Input pipeline must not be empty.");
+    }
+
+    // Please keep the following in alphabetical order.
+    static const std::set<StringData> implicitlyRankedStages{
+        DocumentSourceGeoNear::kStageName,
+        DocumentSourceRankFusion::kStageName,
+        DocumentSourceScoreFusion::kStageName,
+        DocumentSourceSearch::kStageName,
+        DocumentSourceVectorSearch::kStageName,
+    };
+
+    // Check if the pipeline begins with an implicitly ranked stage.
+    const auto& firstStage = bsonPipeline.front();
+    bool firstStageIsImplicitlyRanked = !firstStage.isEmpty() &&
+        implicitlyRankedStages.contains(*firstStage.getFieldNames<std::set<std::string>>().begin());
+
+    // Check if the pipeline has an explicit $sort stage.
+    bool hasSortStage = std::any_of(bsonPipeline.begin(), bsonPipeline.end(), [](auto&& stage) {
+        return stage.hasField(DocumentSourceSort::kStageName);
+    });
+
+    return (firstStageIsImplicitlyRanked || hasSortStage)
+        ? Status::OK()
+        : Status(ErrorCodes::Error::BadValue,
+                 "Pipeline did not begin with a ranked stage and did not contain an explicit $sort "
+                 "stage.");
+}
+
+Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    if (bsonPipeline.empty()) {
+        return Status(ErrorCodes::Error::BadValue, "Input pipeline must not be empty.");
+    }
+
+    // Please keep the following in alphabetical order.
+    static const std::set<StringData> implicitlyScoredStages{
+        DocumentSourceRankFusion::kStageName,
+        DocumentSourceScoreFusion::kStageName,
+        DocumentSourceSearch::kStageName,
+        DocumentSourceVectorSearch::kStageName,
+    };
+
+    const auto& firstStage = bsonPipeline.front();
+
+    // A $match stage w/ a $text operator is a scored stage.
+    if (firstStage.hasField(DocumentSourceMatch::kStageName) &&
+        firstStage[DocumentSourceMatch::kStageName].isABSONObj()) {
+        const auto& matchSpec = firstStage[DocumentSourceMatch::kStageName].Obj();
+        std::unique_ptr<MatchExpression> expr = uassertStatusOK(MatchExpressionParser::parse(
+            matchSpec, expCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
+        if (DocumentSourceMatch::containsTextOperator(*expr)) {
+            return Status::OK();
+        }
+    }
+
+    // Check if the pipeline begins with an implicitly scored stage.
+    bool firstStageIsImplicitlyScored = !firstStage.isEmpty() &&
+        implicitlyScoredStages.contains(*firstStage.getFieldNames<std::set<std::string>>().begin());
+
+    // Check if the pipeline has an explicit $score stage.
+    bool hasScoreStage = std::any_of(bsonPipeline.begin(), bsonPipeline.end(), [](auto&& stage) {
+        return stage.hasField(DocumentSourceScore::kStageName);
+    });
+
+    return firstStageIsImplicitlyScored || hasScoreStage
+        ? Status::OK()
+        : Status(
+              ErrorCodes::Error::BadValue,
+              "Pipeline did not begin with a scored stage and did not contain an explicit $score "
+              "stage.");
 }
 
 namespace score_details {

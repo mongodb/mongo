@@ -122,3 +122,20 @@ assert.commandFailedWithCode(
         }
     }]),
     9402500);
+
+// Check that non-selection pipeline is invalid
+assert.commandFailedWithCode(
+    runPipeline([{
+        $scoreFusion: {
+            input: {
+                pipelines: {
+                    pipeOne:
+                        [{$score: {score: 2, normalizeFunction: "none"}}, {$project: {score3: 1}}]
+                },
+                normalization: "none"
+            },
+        }
+    }]),
+    9402502);
+
+// TODO: SERVER-104730 add tests for nested $scoreFusion/$rankFusion

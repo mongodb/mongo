@@ -77,6 +77,32 @@ void failWeightsValidationWithPipelineSuggestions(
     const std::vector<std::string>& invalidWeights,
     StringData stageName);
 
+/**
+ * Returns no error if the BSON pipeline is a selection pipeline. A selection pipeline only
+ * retrieves a set of documents from a collection, without doing any modifications. For example it
+ * cannot do a $project or $replaceRoot.
+ */
+Status isSelectionPipeline(const std::vector<BSONObj>& bsonPipeline);
+
+/**
+ * Returns no error if the BSON stage is a selection stage. A selection stage only retrieves a set
+ * of documents from a collection, without doing any modifications.
+ */
+Status isSelectionStage(const BSONObj& bsonStage);
+
+/**
+ * Returns no error if the BSON pipeline is a ranked pipeline. A ranked pipeline is a pipeline that
+ * starts with an implicitly ranked stage, or contains an explicit $sort.
+ */
+Status isRankedPipeline(const std::vector<BSONObj>& bsonPipeline);
+
+/**
+ * Returns no error if the BSON pipeline is an scored pipeline. An ordered pipeline is a pipeline
+ * that begins with a stage that generates a score, or contains an explicit $score.
+ */
+Status isScoredPipeline(const std::vector<BSONObj>& bsonPipeline,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 namespace score_details {
 /**
  * Construct the scoreDetails field name and obj (ex: name_scoreDetails: {$mergeObjects:

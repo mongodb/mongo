@@ -61,6 +61,9 @@ class DocumentSourceGeoNear : public DocumentSource, public exec::agg::Stage {
 public:
     static constexpr StringData kKeyFieldName = "key"_sd;
     static constexpr StringData kStageName = "$geoNear"_sd;
+    static constexpr StringData kDistanceFieldFieldName = "distanceField"_sd;
+    static constexpr StringData kIncludeLocsFieldName = "includeLocs"_sd;
+    static constexpr StringData kNearFieldName = "near"_sd;
 
     /**
      * Only exposed for testing.

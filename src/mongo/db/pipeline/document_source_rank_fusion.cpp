@@ -93,55 +93,29 @@ static const std::string rankFusionStageName = "rankFusion";
  * can modify the documents in any way. Only stages that retrieve, limit, or order documents are
  * allowed.
  */
-static void rankFusionPipelineValidator(const Pipeline& pipeline) {
-    // Note that we don't check for $rankFusion and $scoreFusion explicitly because it will be
-    // desugared by this point.
-    static const std::set<StringData> implicitlyOrderedStages{
-        DocumentSourceVectorSearch::kStageName,
-        DocumentSourceSearch::kStageName,
-        DocumentSourceGeoNear::kStageName};
-    const auto& sources = pipeline.getSources();
-
+static void rankFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline) {
     static const std::string rankPipelineMsg =
         "All subpipelines to the $rankFusion stage must begin with one of $search, "
         "$vectorSearch, $geoNear, $scoreFusion, $rankFusion or have a custom $sort in "
         "the pipeline.";
     uassert(9834300,
             str::stream() << "$rankFusion input pipeline cannot be empty. " << rankPipelineMsg,
-            !sources.empty());
+            !pipeline.empty());
 
-    auto firstStageName = sources.front()->getSourceName();
-    auto isRankedPipeline = implicitlyOrderedStages.contains(firstStageName) ||
-        std::any_of(sources.begin(), sources.end(), [](auto& stage) {
-                                return stage->getSourceName() == DocumentSourceSort::kStageName;
-                            });
-    uassert(9191100, rankPipelineMsg, isRankedPipeline);
 
-    for (const auto& stage : sources) {
-        if (stage->getSourceName() == DocumentSourceGeoNear::kStageName) {
-            uassert(9191101,
-                    str::stream() << "$geoNear can be used in a $rankFusion subpipeline but not "
-                                     "when includeLocs or distanceField is specified because they "
-                                     "modify the documents by adding an output field. Only stages "
-                                     "that retrieve, limit, or order documents are allowed.",
-                    stage->constraints().noFieldModifications);
-        } else if (stage->getSourceName() == DocumentSourceSearch::kStageName) {
-            uassert(
-                9191102,
-                str::stream()
-                    << "$search can be used in a $rankFusion subpipeline but not when "
-                       "returnStoredSource is set to true because it modifies the output fields. "
-                       "Only stages that retrieve, limit, or order documents are allowed.",
-                stage->constraints().noFieldModifications);
-        } else {
-            uassert(9191103,
-                    str::stream() << stage->getSourceName()
-                                  << " is not allowed in a $rankFusion subpipeline because it "
-                                     "modifies the documents or transforms their fields. Only "
-                                     "stages that retrieve, limit, or order documents are allowed.",
-                    stage->constraints().noFieldModifications);
-        }
+    auto rankedPipelineStatus = hybrid_scoring_util::isRankedPipeline(pipeline);
+    if (!rankedPipelineStatus.isOK()) {
+        uasserted(9191100, rankedPipelineStatus.reason() + " " + rankPipelineMsg);
     }
+
+    auto selectionPipelineStatus = hybrid_scoring_util::isSelectionPipeline(pipeline);
+    if (!selectionPipelineStatus.isOK()) {
+        uasserted(9191103,
+                  selectionPipelineStatus.reason() +
+                      " Only stages that retrieve, limit, or order documents are allowed.");
+    }
+
+    // TODO: SERVER-104730 explicitly ban nested $scoreFusion/$rankFusion
 }
 
 auto makeSureSortKeyIsOutput(const auto& stageList) {
@@ -494,8 +468,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
     // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& elem : spec.getInput().getPipelines()) {
-        auto pipeline = Pipeline::parse(parsePipelineFromBSON(elem), pExpCtx);
-        rankFusionPipelineValidator(*pipeline);
+        auto bsonPipeline = parsePipelineFromBSON(elem);
+        rankFusionBsonPipelineValidator(bsonPipeline);
+
+        auto pipeline = Pipeline::parse(bsonPipeline, pExpCtx);
 
         auto inputName = elem.fieldName();
         uassertStatusOKWithContext(

@@ -387,37 +387,36 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
  * modify the documents in any way. Only stages that retrieve, limit, or order documents are
  * allowed.
  */
-static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
-    const auto& sources = pipeline.getSources();
-
+static void scoreFusionBsonPipelineValidator(const std::vector<BSONObj>& pipeline,
+                                             boost::intrusive_ptr<ExpressionContext> expCtx) {
     static const std::string scorePipelineMsg =
         "All subpipelines to the $scoreFusion stage must begin with one of $search, "
         "$vectorSearch, $rankFusion, $scoreFusion or have a custom $score in the pipeline.";
     uassert(9402503,
             str::stream() << "$scoreFusion input pipeline cannot be empty. " << scorePipelineMsg,
-            !sources.empty());
+            !pipeline.empty());
 
-    uassert(
-        9402500, scorePipelineMsg, pipeline.generatesMetadataType(DocumentMetadataFields::kScore));
-
-    for (const auto& stage : sources) {
-        if (stage->getSourceName() == DocumentSourceSearch::kStageName) {
-            uassert(
-                9402501,
-                str::stream()
-                    << "$search can be used in a $scoreFusion subpipeline but not when "
-                       "returnStoredSource is set to true because it modifies the output fields. "
-                       "Only stages that retrieve, limit, or order documents are allowed.",
-                stage->constraints().noFieldModifications);
-        } else {
-            uassert(9402502,
-                    str::stream() << stage->getSourceName()
-                                  << " is not allowed in a $scoreFusion subpipeline because it "
-                                     "modifies the documents or transforms their fields. Only "
-                                     "stages that retrieve, limit, or order documents are allowed.",
-                    stage->constraints().noFieldModifications);
-        }
+    auto scoredPipelineStatus = hybrid_scoring_util::isScoredPipeline(pipeline, expCtx);
+    if (!scoredPipelineStatus.isOK()) {
+        uasserted(9402500, scorePipelineMsg + " " + scoredPipelineStatus.reason());
     }
+
+    auto selectionPipelineStatus = hybrid_scoring_util::isSelectionPipeline(pipeline);
+    if (!selectionPipelineStatus.isOK()) {
+        uasserted(9402502,
+                  selectionPipelineStatus.reason() +
+                      " Only stages that retrieve, limit, or order documents are allowed.");
+    }
+
+    // TODO: SERVER-104730 explicitly ban nested $scoreFusion/$rankFusion
+}
+
+static void scoreFusionPipelineValidator(const Pipeline& pipeline) {
+    tassert(
+        10535800,
+        "The metadata dependency tracker determined $scoreFusion input pipeline does not generate "
+        "score metadata, despite the input pipeline stages being previously validated as such.",
+        pipeline.generatesMetadataType(DocumentMetadataFields::kScore));
 }
 
 /**
@@ -704,8 +703,11 @@ parseAndValidateScoredSelectionPipelines(const ScoreFusionSpec& spec,
                                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     std::map<std::string, std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
     for (const auto& innerPipelineBsonElem : spec.getInput().getPipelines()) {
-        auto pipeline = Pipeline::parse(parsePipelineFromBSON(innerPipelineBsonElem), pExpCtx);
+        auto bsonPipeline = parsePipelineFromBSON(innerPipelineBsonElem);
         // Ensure that all pipelines are valid scored selection pipelines.
+        scoreFusionBsonPipelineValidator(bsonPipeline, pExpCtx);
+
+        auto pipeline = Pipeline::parse(bsonPipeline, pExpCtx);
         scoreFusionPipelineValidator(*pipeline);
 
         // Validate pipeline name.

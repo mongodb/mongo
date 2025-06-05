@@ -60,19 +60,6 @@
 
 namespace mongo {
 
-namespace {
-
-bool containsTextOperator(const MatchExpression& expr) {
-    if (expr.matchType() == MatchExpression::MatchType::TEXT)
-        return true;
-    for (auto child : expr) {
-        if (containsTextOperator(*child))
-            return true;
-    }
-    return false;
-}
-
-}  // namespace
 using boost::intrusive_ptr;
 using std::pair;
 using std::string;
@@ -84,6 +71,16 @@ REGISTER_DOCUMENT_SOURCE(match,
                          DocumentSourceMatch::createFromBson,
                          AllowedWithApiStrict::kAlways);
 ALLOCATE_DOCUMENT_SOURCE_ID(match, DocumentSourceMatch::id)
+
+bool DocumentSourceMatch::containsTextOperator(const MatchExpression& expr) {
+    if (expr.matchType() == MatchExpression::MatchType::TEXT)
+        return true;
+    for (auto child : expr) {
+        if (containsTextOperator(*child))
+            return true;
+    }
+    return false;
+}
 
 DocumentSourceMatch::DocumentSourceMatch(std::unique_ptr<MatchExpression> expr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
