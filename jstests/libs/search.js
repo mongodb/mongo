@@ -123,6 +123,15 @@ function _runListSearchIndexOnNode(coll, indexName, latestDefinition) {
     });
 }
 
+function _verifySearchIndexDropped(coll, indexName) {
+    let searchIndexArray = coll.aggregate([{$listSearchIndexes: {"name": indexName}}]).toArray();
+
+    // If the index was properly dropped, the array should be empty.
+    assert.eq(searchIndexArray.length,
+              0,
+              "Search index '" + indexName + "' still exists when $listSearchIndexes is executed.");
+}
+
 function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefinition = null) {
     let response = assert.commandWorked(coll.getDB().runCommand(userCmd));
     // Please see block comment at the top of this file to understand the sharded implementation.
@@ -130,7 +139,6 @@ function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefi
         assert.commandWorked(
             coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
     } else {
-        // dropSearchIndex returns once the index is deleted so no need to run $listSearchIndexes.
         if (Object.keys(userCmd)[0] != 'dropSearchIndex') {
             _runListSearchIndexOnNode(coll, indexName, latestDefinition);
         }
@@ -163,7 +171,12 @@ export function dropSearchIndex(coll, keys) {
     }
     let name = keys["name"];
     let userCmd = {dropSearchIndex: coll.getName(), name};
-    return _runAndReplicateSearchIndexCommand(coll, userCmd, name);
+    let res = _runAndReplicateSearchIndexCommand(coll, userCmd, name);
+
+    // Verify the index was properly dropped by running $listSearchIndexes.
+    _verifySearchIndexDropped(coll, name);
+
+    return res;
 }
 
 export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
