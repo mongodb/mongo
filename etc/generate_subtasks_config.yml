@@ -57,3 +57,5 @@ build_variant_large_distro_exceptions:
   - ubuntu1804-container
   - windows-compile-required
   - windows-debug-suggested
+  - macos-oss-llvm-clang-debug-suggested
+  - enterprise-macos-oss-llvm-clang
