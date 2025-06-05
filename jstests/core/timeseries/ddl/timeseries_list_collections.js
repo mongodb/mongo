@@ -4,8 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO(SERVER-105339): listCollections should not return clusteredIndex field
- *   viewless_timeseries_bug,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -84,6 +82,11 @@ const testOptions = function(options) {
     // Exclude the collection UUID from the comparison, as it is randomly generated.
     assert.eq(areViewlessTimeseriesEnabled(db), collectionDocument.info.uuid !== undefined);
     delete collectionDocument.info.uuid;
+
+    if (areViewlessTimeseriesEnabled(db)) {
+        // TODO(SERVER-105339): listCollections should not return clusteredIndex field
+        delete collectionDocument.options.clusteredIndex;
+    }
 
     assert.docEq(
         {name: coll.getName(), type: 'timeseries', options: options, info: {readOnly: false}},
