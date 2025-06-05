@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
@@ -586,14 +587,8 @@ public:
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
             const auto& cmd = request();
             const auto& nss = request().getNamespace();
-            // Targeting the underlying buckets collection directly would make the time-series
-            // Collection out of sync with the time-series view document. Additionally, we want to
-            // ultimately obscure/hide the underlying buckets collection from the user, so we're
-            // disallowing targetting it.
-            uassert(ErrorCodes::InvalidNamespace,
-                    "collMod on a time-series collection's underlying buckets collection is not "
-                    "supported.",
-                    !nss.isTimeseriesBucketsCollection());
+
+            staticValidateCollMod(opCtx, nss, cmd.getCollModRequest());
 
 
             // Updating granularity on sharded time-series collections is not allowed.

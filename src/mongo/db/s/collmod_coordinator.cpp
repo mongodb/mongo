@@ -278,6 +278,14 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then([this, anchor = shared_from_this()] {
+            if (_doc.getPhase() == Phase::kUnset) {
+                // Unpersisted phase executed only the first time we start the coordinator
+                auto opCtxHolder = makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                staticValidateCollMod(opCtx, originalNss(), _request);
+            }
+        })
         .then([this, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();

@@ -76,6 +76,16 @@ Status processCollModCommand(OperationContext* opCtx,
                              BSONObjBuilder* result);
 
 /**
+ * Performs static validation of CollMod request.
+ *
+ * Static checks are the ones perfomed exclusively on the request itself without accessing the
+ * catalog.
+ */
+void staticValidateCollMod(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           const CollModRequest& request);
+
+/**
  * Performs the collection modification described in "cmd" on the collection "ns". Only checks for
  * duplicates for the 'applyOps' command.
  */

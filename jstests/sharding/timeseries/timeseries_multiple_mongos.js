@@ -132,8 +132,6 @@ runTest({
     }
 });
 
-runTest({shardKey: {[metaField]: 1}, cmdObj: {collMod: bucketsCollName, expireAfterSeconds: 3600}});
-
 runTest(
     {shardKey: {[metaField]: 1}, cmdObj: {aggregate: bucketsCollName, pipeline: [], cursor: {}}});
 

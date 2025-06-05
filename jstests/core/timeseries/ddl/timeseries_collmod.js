@@ -81,11 +81,18 @@ assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {"granula
 
 // collMod against the underlying buckets collection should fail: not allowed to target the buckets
 // collection.
-// TODO (SERVER-103323): Decide if this should return NamespaceNotFound for viewless timeseries
 assert.commandFailedWithCode(
     db.runCommand(
         {"collMod": getTimeseriesBucketsColl(collName), "timeseries": {"granularity": "hours"}}),
-    [ErrorCodes.InvalidNamespace, 6201808 /* mongos error code */]);
+    [
+        ErrorCodes.InvalidNamespace,
+        // Error code thrown by collmod coordinator.
+        //
+        // TODO SERVER-105548 remove the following error code once 9.0 becomes last LTS
+        // Currently needded for multiversion compability. Since 8.2 we throw InvalidNamespace also
+        // on sharded clusters.
+        6201808,
+    ]);
 
 // Tries to set one seconds parameter without the other (bucketMaxSpanSeconds or
 // bucketRoundingSeconds).
