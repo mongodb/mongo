@@ -51,7 +51,7 @@ namespace mongo::fle {
  * default. Changing the value of the feature flag with RAIIServerParameterControllerForTest() does
  * not solve the issue because the registration logic is not re-hit.
  *
- * TODO SERVER-59280: delete this manual registration of the encTextSearch expressions
+ * TODO SERVER-101213: delete this manual registration of the encTextSearch expressions
  * ($encStrStartsWith, etc.) expression and any callers once the feature flag is enabled.
  */
 inline void registerEncTextSearchExpressions() {
