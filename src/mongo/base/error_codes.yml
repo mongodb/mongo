@@ -880,6 +880,7 @@ error_codes:
       name: StreamProcessorInvalidNamespace,
       categories: [StreamProcessorUserError],
     }
+  - {code: 449, name: RateLimitExceeded, categories: [SystemOverloadedError]}
 
   # Error codes 4000-8999 are reserved.
 

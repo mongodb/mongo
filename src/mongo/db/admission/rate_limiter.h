@@ -86,10 +86,16 @@ public:
         MovingAverage averageTimeQueuedMicros{0.2};
     };
 
+    /**
+     * The error code used when the rate limter denies a request to acquire a token (e.g. because
+     * the max queue depth is exceeded).
+     */
+    constexpr static ErrorCodes::Error kRejectedErrorCode = ErrorCodes::RateLimitExceeded;
+
     RateLimiter(double refreshRatePerSec,
                 double burstSize,
                 int64_t maxQueueDepth,
-                std::string name = "");
+                std::string name);
 
     ~RateLimiter();
 
@@ -120,7 +126,8 @@ public:
 
     /**
      * The maximum number of requests enqueued waiting for a token. Token requests that come in and
-     * will queue past the maxQueueDepth will be rejected with a TemporarilyUnavailable error.
+     * will queue past the maxQueueDepth will be rejected with a RateLimiter::kRejectedErrorCode
+     * error.
      */
     void setMaxQueueDepth(int64_t maxQueueDepth);
 

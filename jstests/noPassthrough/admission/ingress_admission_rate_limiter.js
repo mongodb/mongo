@@ -79,7 +79,7 @@ const testRateLimiterError = (conn) => {
         const result = db.runCommand({insert: collName, documents: [{dummy: 1}]});
 
         if (result.ok === 0) {
-            assert.commandFailedWithCode(result, ErrorCodes.TemporarilyUnavailable);
+            assert.commandFailedWithCode(result, ErrorCodes.RateLimitExceeded);
             assertContainSystemOverloadedErrorLabel(result);
         }
     }, conn.host);
