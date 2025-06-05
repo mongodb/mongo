@@ -5660,6 +5660,18 @@ export function restartSecondaries(cluster, clusterType) {
     }
 }
 
+function awaitReplication(cluster, clusterType) {
+    if (clusterType == "rs") {
+        cluster.awaitReplication();
+    } else {
+        assert.eq(clusterType, "sharded");
+        const shards = cluster.getAllShards();
+        shards.forEach((rs) => {
+            rs.awaitReplication();
+        });
+    }
+}
+
 /**
  * Assert that the result contains a write concern error. Typically we expect WCEs to be
  * reported in the WriteConcernErrors field, but some commands nest the WCE and other actually
@@ -5972,6 +5984,7 @@ export function checkWriteConcernBehaviorForAllCommands(
 
         restartSecondaries(cluster, clusterType);
 
+        awaitReplication(cluster, clusterType);
         return;
     }
 
@@ -6041,6 +6054,8 @@ export function checkWriteConcernBehaviorForAllCommands(
 
         restartSecondaries(cluster, clusterType);
     })();
+
+    awaitReplication(cluster, clusterType);
 }
 
 export function checkWriteConcernBehaviorAdditionalCRUDOps(conn,
@@ -6070,6 +6085,8 @@ export function checkWriteConcernBehaviorAdditionalCRUDOps(conn,
                                      shardedCollection);
 
     restartSecondaries(cluster, clusterType);
+
+    awaitReplication(cluster, clusterType);
 }
 
 export function checkWriteConcernBehaviorUpdatingDocShardKey(conn,
@@ -6166,6 +6183,8 @@ export function checkWriteConcernBehaviorUpdatingDocShardKey(conn,
                                      limitToTimeseriesViews);
 
     restartSecondaries(cluster, clusterType);
+
+    awaitReplication(cluster, clusterType);
 }
 
 export function precmdShardKey(shardKey, conn, cluster, dbName, collName) {
