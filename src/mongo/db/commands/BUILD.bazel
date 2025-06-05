@@ -1207,6 +1207,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:audit",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/s:sharding_api",
     ],
 )

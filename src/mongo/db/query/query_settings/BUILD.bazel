@@ -27,11 +27,13 @@ mongo_cc_library(
         "index_hints_serialization.cpp",
         "query_framework_serialization.cpp",
         "query_settings_comment.cpp",
+        "query_settings_hash.cpp",
         ":query_settings_gen",
     ],
     hdrs = [
         "index_hints_serialization.h",
         "query_framework_serialization.h",
+        "query_settings_hash.h",
     ],
     deps = [
         ":query_settings_service_dependencies",
@@ -72,14 +74,12 @@ mongo_cc_library(
     name = "query_settings_service",
     srcs = [
         "query_settings_cluster_parameter_impl.cpp",
-        "query_settings_hash.cpp",
         "query_settings_manager.cpp",
         "query_settings_manager.h",
         "query_settings_service.cpp",
         ":query_settings_cluster_parameter_gen",
     ],
     hdrs = [
-        "query_settings_hash.h",
         "query_settings_service.h",
     ],
     deps = [

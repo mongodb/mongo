@@ -31,7 +31,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/sbe:query_sbe",
         "//src/mongo/db/query:canonical_query_base",
         "//src/mongo/db/query:memory_util",
-        "//src/mongo/db/query/query_settings:query_settings_service",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 

@@ -56,6 +56,7 @@ mongo_cc_library(
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:shard_key_diagnostic_printer",
+        "//src/mongo/db/query/query_settings:query_settings_service",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/query/exec:cluster_cursor",
