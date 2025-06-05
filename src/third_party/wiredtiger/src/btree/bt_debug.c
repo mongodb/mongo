@@ -693,7 +693,7 @@ __debug_cell_kv(
     if (unpack->raw == WT_CELL_DEL)
         return (0);
 
-    WT_RET(page == NULL ? __wt_dsk_cell_data_ref_kv(session, page_type, unpack, ds->t1) :
+    WT_RET(page == NULL ? __wt_dsk_cell_data_ref_kv(session, unpack, ds->t1) :
                           __wt_page_cell_data_ref_kv(session, page, unpack, ds->t1));
 
     /* Standard key/value cells. */

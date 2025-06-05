@@ -1407,7 +1407,7 @@ record_loop:
                      * Original is an overflow item; we used it for a key and now we need another
                      * copy; read it into memory.
                      */
-                    WT_ERR(__wt_dsk_cell_data_ref_kv(session, WT_PAGE_COL_VAR, vpack, orig));
+                    WT_ERR(__wt_dsk_cell_data_ref_kv(session, vpack, orig));
                     data = orig->data;
                     size = (uint32_t)orig->size;
 

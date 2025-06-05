@@ -1258,27 +1258,15 @@ __wt_cell_get_tw(WT_CELL_UNPACK_KV *unpack_value, WT_TIME_WINDOW **twp)
  *     Set a buffer to reference the data from an unpacked cell.
  */
 static WT_INLINE int
-__cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
-  WT_CELL_UNPACK_COMMON *unpack, WT_ITEM *store)
+__cell_data_ref(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_COMMON *unpack, WT_ITEM *store)
 {
-    bool decoded;
-
     /* Reference the cell's data, optionally decode it. */
     switch (unpack->type) {
     case WT_CELL_KEY:
-        store->data = unpack->data;
-        store->size = unpack->size;
-        if (page_type == WT_PAGE_ROW_INT)
-            return (0);
-        break;
     case WT_CELL_VALUE:
         store->data = unpack->data;
         store->size = unpack->size;
-        break;
-    case WT_CELL_KEY_OVFL:
-        WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
-        if (page_type == WT_PAGE_ROW_INT || decoded)
-            return (0);
         break;
     case WT_CELL_VALUE_OVFL:
         /*
@@ -1286,9 +1274,9 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
          * it may be removed by checkpoint concurrently.
          */
         __wt_timing_stress(session, WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE, NULL);
-        WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
-        if (decoded)
-            return (0);
+        /* FALLTHROUGH */
+    case WT_CELL_KEY_OVFL:
+        WT_RET(__wt_ovfl_read(session, page, unpack, store));
         break;
     default:
         return (__wt_illegal_value(session, unpack->type));
@@ -1302,10 +1290,9 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
  *     Set a buffer to reference the data from an unpacked address cell.
  */
 static WT_INLINE int
-__wt_dsk_cell_data_ref_addr(
-  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_ADDR *unpack, WT_ITEM *store)
+__wt_dsk_cell_data_ref_addr(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *unpack, WT_ITEM *store)
 {
-    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
+    return (__cell_data_ref(session, NULL, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*
@@ -1320,12 +1307,11 @@ __wt_dsk_cell_data_ref_addr(
  *     version means it might be.
  */
 static WT_INLINE int
-__wt_dsk_cell_data_ref_kv(
-  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
+__wt_dsk_cell_data_ref_kv(WT_SESSION_IMPL *session, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
 {
     WT_ASSERT(session, unpack != NULL);
     WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
-    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
+    return (__cell_data_ref(session, NULL, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*
@@ -1336,7 +1322,7 @@ static WT_INLINE int
 __wt_page_cell_data_ref_kv(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
 {
-    return (__cell_data_ref(session, page, page->type, (WT_CELL_UNPACK_COMMON *)unpack, store));
+    return (__cell_data_ref(session, page, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*

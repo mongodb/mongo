@@ -2713,8 +2713,13 @@ __wt_txn_is_blocking(WT_SESSION_IMPL *session)
     /*
      * Check if either the transaction's ID or its pinned ID is equal to the oldest transaction ID.
      */
-    if (__wt_atomic_loadv64(&txn_shared->id) == global_oldest ||
+    bool is_txn_id_global_oldest;
+    if (((is_txn_id_global_oldest = __wt_atomic_loadv64(&txn_shared->id) == global_oldest)) ||
       __wt_atomic_loadv64(&txn_shared->pinned_id) == global_oldest) {
+        if (is_txn_id_global_oldest)
+            WT_STAT_CONN_INCR(session, txn_rollback_oldest_id);
+        else
+            WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
         WT_RET_SUB(
           session, WT_ROLLBACK, WT_OLDEST_FOR_EVICTION, WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION);
     }

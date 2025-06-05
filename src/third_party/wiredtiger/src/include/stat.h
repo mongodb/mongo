@@ -1138,6 +1138,7 @@ struct __wt_connection_stats {
     int64_t txn_read_race_prepare_commit;
     int64_t txn_read_overflow_remove;
     int64_t txn_rollback_oldest_pinned;
+    int64_t txn_rollback_oldest_id;
     int64_t txn_prepare;
     int64_t txn_prepare_commit;
     int64_t txn_prepare_active;

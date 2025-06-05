@@ -869,7 +869,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
              * Instantiate any overflow keys; WiredTiger depends on this, assuming any overflow key
              * is instantiated, and any keys that aren't instantiated cannot be overflow items.
              */
-            WT_ERR(__wt_dsk_cell_data_ref_addr(session, page->type, &unpack, current));
+            WT_ERR(__wt_dsk_cell_data_ref_addr(session, &unpack, current));
 
             WT_ERR(__wti_row_ikey_incr(session, page, WT_PAGE_DISK_OFFSET(page, unpack.cell),
               current->data, current->size, ref));

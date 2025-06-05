@@ -2118,6 +2118,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: a reader raced with a prepared transaction commit and skipped an update or updates",
   "transaction: number of times overflow removed value is read",
   "transaction: oldest pinned transaction ID rolled back for eviction",
+  "transaction: oldest transaction ID rolled back for eviction",
   "transaction: prepared transactions",
   "transaction: prepared transactions committed",
   "transaction: prepared transactions currently active",
@@ -2936,6 +2937,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_read_race_prepare_commit = 0;
     stats->txn_read_overflow_remove = 0;
     stats->txn_rollback_oldest_pinned = 0;
+    stats->txn_rollback_oldest_id = 0;
     stats->txn_prepare = 0;
     stats->txn_prepare_commit = 0;
     stats->txn_prepare_active = 0;
@@ -3871,6 +3873,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_read_race_prepare_commit += WT_STAT_CONN_READ(from, txn_read_race_prepare_commit);
     to->txn_read_overflow_remove += WT_STAT_CONN_READ(from, txn_read_overflow_remove);
     to->txn_rollback_oldest_pinned += WT_STAT_CONN_READ(from, txn_rollback_oldest_pinned);
+    to->txn_rollback_oldest_id += WT_STAT_CONN_READ(from, txn_rollback_oldest_id);
     to->txn_prepare += WT_STAT_CONN_READ(from, txn_prepare);
     to->txn_prepare_commit += WT_STAT_CONN_READ(from, txn_prepare_commit);
     to->txn_prepare_active += WT_STAT_CONN_READ(from, txn_prepare_active);

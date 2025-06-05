@@ -433,9 +433,13 @@ __wt_modify_reconstruct_from_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE 
     if (context == WT_OPCTX_TRANSACTION && session->txn->isolation == WT_ISO_READ_UNCOMMITTED)
         WT_RET_SUB(session, WT_ROLLBACK, WT_MODIFY_READ_UNCOMMITTED,
           "Read-uncommitted readers do not support reconstructing a record with modifies.");
-retry:
-    /* Construct full update */
+
+    /* Initial modifies vector initialization. */
     __wt_update_vector_init(session, &modifies);
+retry:
+    /* When retrying, the vector might already contain allocated memory that should be released. */
+    __wt_update_vector_free(&modifies);
+
     /* Find a complete update. */
     for (upd = modify; upd != NULL; upd = upd->next) {
         if (upd->txnid == WT_TXN_ABORTED)
