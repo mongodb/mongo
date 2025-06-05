@@ -18,10 +18,7 @@
  * ]
  */
 
-import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isTimeSeriesCollection} from "jstests/libs/cmd_object_utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode

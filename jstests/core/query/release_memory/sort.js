@@ -72,7 +72,7 @@ const pipelines = [
 ];
 
 for (let pipeline of pipelines) {
-    jsTestLog("Testing pipeline: " + tojson(pipeline));
+    jsTest.log.info("Testing pipeline: ", pipeline);
 
     let previousSpillCount = getSortSpillCounter();
     assertCursorSortedByIndex(coll.aggregate(pipeline));

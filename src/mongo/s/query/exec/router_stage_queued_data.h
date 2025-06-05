@@ -58,7 +58,6 @@ public:
         return Status::OK();
     }
 
-
     void kill(OperationContext* opCtx) final;
 
     bool remotesExhausted() const final;

@@ -38,7 +38,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
 
 void RouterStageQueuedData::queueResult(ClusterQueryResult&& result) {

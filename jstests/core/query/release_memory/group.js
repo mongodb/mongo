@@ -106,13 +106,7 @@ const pipeline = [{
 }];
 
 for (const coll of [collFew, collMany]) {
-    // TODO(SERVER-104522) Remove the mergeCursors
     const explain = coll.explain().aggregate(pipeline);
-    if (hasMergeCursors(explain)) {
-        jsTest.log(
-            `Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
-        quit();
-    }
 
     // Get all the results to use as a reference. Set 'allowDiskUse' to false to disable increased
     // spilling in debug builds.
@@ -191,28 +185,6 @@ for (const coll of [collFew, collMany]) {
         setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
     }
 
-    // Disallow spilling in group
-    {
-        jsTest.log(`Running releaseMemory with no allowDiskUse`);
-
-        // Retrieve the first batch without spilling.
-        jsTest.log.info("Running pipeline: ", pipeline[0]);
-        const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
-        const cursorId = cursor.getId();
-
-        // Release memory (i.e., spill)
-        const releaseMemoryCmd = {releaseMemory: [cursorId]};
-        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
-        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
-        assert.commandWorked(releaseMemoryRes);
-        assertReleaseMemoryFailedWithCode(
-            releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-
-        jsTest.log.info("Running getMore");
-        const results = cursor.toArray();
-        assertArrayEq({actual: results, expected: expectedResults});
-    }
-
     // Return all results in the first batch.
     {
         jsTest.log(`Return all results in the first batch`);
@@ -245,6 +217,35 @@ for (const coll of [collFew, collMany]) {
 
         setServerParameter(sbeMemorySizeKnob, sbeMemorySizeInitialValue);
         setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
+    }
+
+    if (hasMergeCursors(explain)) {
+        // When `allowDiskUse` is false and a pipeline with `$mergeCursors` is used, operations
+        // might execute in `mongos`. So, the group operation will be performed on `mongos`, and
+        // `forceSpill` will be disregarded.
+        quit();
+    }
+
+    // Disallow spilling in group.
+    {
+        jsTest.log(`Running releaseMemory with no allowDiskUse`);
+
+        // Retrieve the first batch without spilling.
+        jsTest.log.info("Running pipeline: ", pipeline[0]);
+        const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
+        const cursorId = cursor.getId();
+
+        // Release memory (i.e., spill)
+        const releaseMemoryCmd = {releaseMemory: [cursorId]};
+        jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+        const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+        assert.commandWorked(releaseMemoryRes);
+        assertReleaseMemoryFailedWithCode(
+            releaseMemoryRes, cursorId, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+
+        jsTest.log.info("Running getMore");
+        const results = cursor.toArray();
+        assertArrayEq({actual: results, expected: expectedResults});
     }
 }
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);

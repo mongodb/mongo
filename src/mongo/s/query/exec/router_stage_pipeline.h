@@ -62,7 +62,9 @@ public:
 
     Status releaseMemory() final {
         try {
-            _mergePipeline->forceSpill();
+            if (_mergeCursorsStage) {
+                _mergeCursorsStage->forceSpill();
+            }
             // When I have the bytes I will return them from here. Now, I have nothing to return.
             return Status::OK();
         } catch (const DBException& e) {

@@ -60,13 +60,6 @@ const pipeline = [{
     }
 }];
 
-// TODO Remove the mergeCursors on SERVER-104522
-const explain = coll.explain().aggregate(pipeline);
-if (hasMergeCursors(explain)) {
-    jsTest.log(`Skipping test. Pipeline has $mergeCursors but spilling on mongos is not allowed`);
-    quit();
-}
-
 // Get all the results to use as a reference.
 const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
 
@@ -127,6 +120,14 @@ const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArra
     assert.lt(initialSpillCount, getSpillCounter());
 
     setServerParameter(memoryInitialValue);
+}
+
+const explain = coll.explain().aggregate(pipeline);
+if (hasMergeCursors(explain)) {
+    // When `allowDiskUse` is false and a pipeline with `$mergeCursors` is used, operations
+    // might execute in `mongos`. So, the setWindowFields operation will be performed on `mongos`,
+    // and `forceSpill` will be disregarded.
+    quit();
 }
 
 // Disallow spilling in setWindowFields.
