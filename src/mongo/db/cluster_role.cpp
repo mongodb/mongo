@@ -47,8 +47,9 @@ const std::array<std::pair<ClusterRole, StringData>, 3> roleNames{{
 }  // namespace
 
 void ClusterRole::_checkRole() const {
-    invariant(!hasExclusively(ClusterRole::ConfigServer),
-              "Role cannot be set to config server only");
+    tassert(10555101,
+            "Role cannot be set to config server only",
+            !hasExclusively(ClusterRole::ConfigServer));
 }
 
 BSONArray toBSON(ClusterRole role) {

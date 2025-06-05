@@ -157,7 +157,7 @@ inline logv2::LogService toLogService(ClusterRole role) {
         return logv2::LogService::router;
     if (role.hasExclusively(ClusterRole::None))
         return logv2::LogService::none;
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(10555100);
 }
 
 }  // namespace mongo
