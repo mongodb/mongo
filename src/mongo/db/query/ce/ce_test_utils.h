@@ -82,10 +82,12 @@ struct BenchmarkConfiguration {
     size_t size;
     DataDistributionEnum dataDistribution;
     DataType dataType;
-    QueryType queryType;
+    boost::optional<QueryType> queryType;
+    boost::optional<size_t> ndv;
+    boost::optional<size_t> numberOfQueries;
 
-    // Inclusive minimum and maximum bounds for randomly generated data, ensuring each data falls
-    // within these limits.
+    // Inclusive minimum and maximum bounds for randomly generated data, ensuring each data
+    // falls within these limits.
     std::pair<size_t, size_t> dataInterval;
     sbe::value::TypeTags sbeDataType;
     double nanProb = 0;
@@ -94,36 +96,53 @@ struct BenchmarkConfiguration {
     BenchmarkConfiguration(size_t size,
                            DataDistributionEnum dataDistribution,
                            DataType dataType,
-                           QueryType queryType)
-        : size(size), dataDistribution(dataDistribution), dataType(dataType), queryType(queryType) {
+                           boost::optional<QueryType> queryType = boost::none,
+                           boost::optional<size_t> ndv = boost::none,
+                           boost::optional<size_t> numberOfQueries = boost::none)
+        : size(size),
+          dataDistribution(dataDistribution),
+          dataType(dataType),
+          queryType(queryType),
+          ndv(ndv),
+          numberOfQueries(numberOfQueries) {
+        initializeCommonConfigBasedOnDataType(dataType);
+    }
+
+    void initializeCommonConfigBasedOnDataType(DataType dataType) {
         switch (dataType) {
-            case kInt:
+            case kInt: {
                 sbeDataType = sbe::value::TypeTags::NumberInt64;
-                dataInterval = {0, 1000};
+                auto upperIntervalLimit = ndv.has_value() ? ndv.value() * 2 : 1000;
+                dataInterval = {0, upperIntervalLimit};
                 break;
+            }
             case kStringSmall:
+                // the data interval here represents the length of the string
                 sbeDataType = sbe::value::TypeTags::StringSmall;
                 dataInterval = {1, 8};
                 break;
             case kString:
+                // the data interval here represents the length of the string
                 sbeDataType = sbe::value::TypeTags::StringBig;
                 dataInterval = {16, 32};
                 break;
-            case kDouble:
+            case kDouble: {
                 sbeDataType = sbe::value::TypeTags::NumberDouble;
-                dataInterval = {0, 1000};
+                auto upperIntervalLimit = ndv.has_value() ? ndv.value() * 2 : 1000;
+                dataInterval = {0, upperIntervalLimit};
                 break;
+            }
             case kBoolean:
                 sbeDataType = sbe::value::TypeTags::Boolean;
                 dataInterval = {0, 2};
                 break;
             case kNull:
                 sbeDataType = sbe::value::TypeTags::Null;
-                dataInterval = {0, 1000};
+                dataInterval = {0, 1};
                 break;
             case kNan:
                 sbeDataType = sbe::value::TypeTags::NumberDouble;
-                dataInterval = {0, 1000};
+                dataInterval = {0, 1};
                 nanProb = 1;
                 break;
             case kArray:

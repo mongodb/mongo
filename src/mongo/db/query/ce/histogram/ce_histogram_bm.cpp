@@ -164,7 +164,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
         typeCombinationQuery.typeTag = sbe::value::TypeTags::NumberInt64;
     }
 
-    auto queryIntervals = generateIntervals(configuration.queryType,
+    auto queryIntervals = generateIntervals(configuration.queryType.value(),
                                             configuration.dataInterval,
                                             numberOfQueries,
                                             typeCombinationQuery,
@@ -173,7 +173,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     tassert(9787300, "queryIntervals should have at least one interval", queryIntervals.size() > 0);
     size_t i = 0;
     for (auto curState : state) {
-        benchmark::DoNotOptimize(runSingleQuery(configuration.queryType,
+        benchmark::DoNotOptimize(runSingleQuery(configuration.queryType.value(),
                                                 queryIntervals[i].first,
                                                 queryIntervals[i].second,
                                                 ceHist,
