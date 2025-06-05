@@ -135,7 +135,6 @@ private:
             _dbpath.path(),
             _cs.get(),
             std::move(wtConfig),
-            false,
             _forRepair,
             getGlobalReplSettings().isReplSet(),
             repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),

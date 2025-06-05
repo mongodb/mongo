@@ -67,7 +67,7 @@ SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalNam
         }
     }
 
-    std::string config = generateWTOpenConfigString(_wtConfig, true /* ephemeral */);
+    std::string config = generateWTOpenConfigString(_wtConfig);
     LOGV2(10158000, "Opening spill WiredTiger", "config"_attr = config);
 
     auto startTime = Date_t::now();

@@ -76,7 +76,6 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
         &_cs,
         std::move(wtConfig),
         false,
-        false,
         getGlobalReplSettings().isReplSet(),
         repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
         getReplSetMemberInStandaloneMode(getGlobalServiceContext()));

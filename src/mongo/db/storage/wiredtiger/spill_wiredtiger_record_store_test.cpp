@@ -52,6 +52,8 @@ protected:
         wtConfig.cacheSizeMB = 1;
         wtConfig.inMemory = true;
         wtConfig.logEnabled = false;
+        wtConfig.prefetchEnabled = false;
+        wtConfig.restoreEnabled = false;
         _kvEngine = std::make_unique<SpillWiredTigerKVEngine>(
             std::string{kWiredTigerEngineName}, _dbpath.path(), &_clockSource, std::move(wtConfig));
 
