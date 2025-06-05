@@ -900,6 +900,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/error_and_log_validation_action.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/create_coll_validator_new_feature_no_applyops_check.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/multiVersion/targetedTestsLastLtsFeatures/**/profile_filter_query_feature_flag.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/multiVersion/targetedTestsLastLtsFeatures/**/fle2_text_search_preview.js @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/OWNERS.yml
 /jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

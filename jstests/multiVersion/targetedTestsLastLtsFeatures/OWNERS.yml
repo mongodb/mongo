@@ -12,3 +12,6 @@ filters:
   - "profile_filter_query_feature_flag.js":
     approvers:
       - 10gen/query-integration-observability
+  - "fle2_text_search_preview.js":
+    approvers:
+      - 10gen/server-security
