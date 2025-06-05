@@ -373,13 +373,6 @@ private:
     Status _createNewCursor(bool initialFind);
 
     /**
-     * This function will create an `AggregateCommandRequest` object that will do a `$match` to find
-     * all entries greater than the last fetched timestamp.
-     */
-    AggregateCommandRequest _makeAggregateCommandRequest(long long maxTimeMs,
-                                                         Timestamp startTs) const;
-
-    /**
      * This function will create the `find` query to issue to the sync source. It is provided with
      * the value to use as the "maxTimeMS" for the find command.
      */
