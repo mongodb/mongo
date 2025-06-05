@@ -246,6 +246,8 @@ def get_visibility(
 ) -> GetVisibilityResult:
     if c.kind != CursorKind.NAMESPACE:
         last_non_ns_parent = c
+    is_internal_namespace = c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling)
+    in_complete_header = normpath_for_file(c) in complete_headers
 
     # ideally this would be in an if c.has_attrs() block, but that seems to not work in all cases.
     # TODO: try again when on a newer clang. Also might be worth seeing if we can narrow down
@@ -253,6 +255,12 @@ def get_visibility(
     for child in c.get_children():
         if child.kind != CursorKind.ANNOTATE_ATTR:
             continue
+        if is_internal_namespace:
+            perr(
+                pretty_location(c.location)
+                + ": namespaces ending in 'detail(s)' or 'internal(s)' are implicitly private, ignoring module tag"
+            )
+            break
         terms = child.spelling.split("::")
         if not (len(terms) >= 3 and terms.pop(0) == "mongo" and terms.pop(0) == "mod"):
             continue
@@ -274,6 +282,10 @@ def get_visibility(
                 "needs_replacement",
             )
         return GetVisibilityResult(attr, alt, c, last_non_ns_parent)
+
+    # details and internal namespaces
+    if is_internal_namespace and in_complete_header:
+        return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
     # Apply high-priority defaults that override parent's visibility
     if not scanning_parent:
@@ -304,10 +316,6 @@ def get_visibility(
             if c.spelling.endswith("forTest"):
                 return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
-            # details and internal namespaces
-            if c.kind == CursorKind.NAMESPACE and DETAIL_REGEX.match(c.spelling):
-                return GetVisibilityResult("private", None, c, last_non_ns_parent)
-
     if c.normalized_parent:
         parent_vis = get_visibility(
             c.normalized_parent, scanning_parent=True, last_non_ns_parent=last_non_ns_parent
@@ -316,9 +324,8 @@ def get_visibility(
         parent_vis = GetVisibilityResult("UNKNOWN", None, None, None)  # break recursion
 
     # Apply low-priority defaults that defer to parent's visibility
-    if not scanning_parent and parent_vis.attr == "UNKNOWN":
-        if normpath_for_file(c) in complete_headers:
-            return GetVisibilityResult("private", None, c, last_non_ns_parent)
+    if not scanning_parent and parent_vis.attr == "UNKNOWN" and in_complete_header:
+        return GetVisibilityResult("private", None, c, last_non_ns_parent)
 
     return parent_vis
 
