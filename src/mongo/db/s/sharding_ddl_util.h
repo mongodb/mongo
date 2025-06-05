@@ -137,6 +137,16 @@ void removeCollAndChunksMetadataFromConfig(
     bool logCommitOnConfigPlacementHistory = true);
 
 /**
+ * Log the effects of a dropCollection commit by inserting a new document in config.placementHistory
+ * (if not already present).
+ */
+void logDropCollectionCommitOnConfigPlacementHistory(
+    OperationContext* opCtx,
+    const NamespacePlacementType& committedPlacementChange,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& executor);
+
+/**
  * Delete the query analyzer document associated to the passed in namespace.
  */
 void removeQueryAnalyzerMetadata(OperationContext* opCtx,
@@ -358,11 +368,16 @@ AuthoritativeMetadataAccessLevelEnum getGrantedAuthoritativeMetadataAccessLevel(
 
 boost::optional<ShardId> pickDataBearingShard(OperationContext* opCtx, const UUID& collUuid);
 
+/**
+ * Request to the specified shard the generation of a 'namespacePlacementChange' notification
+ * matching the commit of a sharding DDL operation, meant to drive the behavior of change stream
+ * readers.
+ */
 void generatePlacementChangeNotificationOnShard(
     OperationContext* opCtx,
     const NamespacePlacementChanged& placementChangeNotification,
     const ShardId& shard,
-    const OperationSessionInfo& osi,
+    std::function<OperationSessionInfo(OperationContext*)> buildNewSessionFn,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token);
 

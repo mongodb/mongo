@@ -296,7 +296,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     const auto changeStreamsNotifierShardId = [&]() {
         auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
-        if (!_doc.getChangeStreamPreciseShardTargetingEnabled()) {
+        if (!_doc.getChangeStreamPreciseShardTargetingEnabled() || !collIsSharded) {
             return primaryShardId;
         }
 
@@ -304,20 +304,21 @@ void DropCollectionCoordinator::_commitDropCollection(
             return _doc.getChangeStreamsNotifier().value();
         }
 
-        boost::optional<ShardId> notifierShardId = collIsSharded
-            ? sharding_ddl_util::pickDataBearingShard(opCtx, _doc.getCollInfo()->getUuid())
-            : primaryShardId;
-
-        tassert(10361100,
-                "Unable to retrieve the identity of a data bearing shard for the collection beng "
-                "dropped",
-                notifierShardId.has_value());
+        auto dataBearingShard =
+            sharding_ddl_util::pickDataBearingShard(opCtx, _doc.getCollInfo()->getUuid());
+        if (!dataBearingShard) {
+            LOGV2_WARNING(10361100,
+                          "Unable to retrieve the identity of a data bearing shard for the "
+                          "collection beng dropped (possibly due to a metadata inconsistency)",
+                          "nss"_attr = nss());
+            dataBearingShard = primaryShardId;
+        }
 
         auto newDoc = _doc;
-        newDoc.setChangeStreamsNotifier(notifierShardId);
+        newDoc.setChangeStreamsNotifier(dataBearingShard);
         _updateStateDocument(opCtx, std::move(newDoc));
 
-        return *notifierShardId;
+        return *dataBearingShard;
     }();
 
     LOGV2_DEBUG(5390504,
@@ -383,72 +384,29 @@ void DropCollectionCoordinator::_commitDropCollection(
     sendParticipantCommand(otherParticipants, true /*fromMigrateParam*/);
     sendParticipantCommand({changeStreamsNotifierShardId}, false /*fromMigrateParam*/);
 
-    // 3. Insert the effects of the commit into config.placementHistory, if not already present.
-    //    The operation is performed through a transaction to ensure serialization with concurrent
-    //    resetPlacementHistory() requests.
-    const auto commitTime = [&]() {
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        return currentTime.clusterTime().asTimestamp();
-    }();
-
     if (collIsSharded) {
-        const auto insertHistoricalPlacementTxn = [&](const txn_api::TransactionClient& txnClient,
-                                                      ExecutorPtr txnExec) {
-            FindCommandRequest query(NamespaceString::kConfigsvrPlacementHistoryNamespace);
-            query.setFilter(BSON(
-                NamespacePlacementType::kNssFieldName
-                << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())));
-            query.setSort(BSON(NamespacePlacementType::kTimestampFieldName << -1));
-            query.setLimit(1);
+        // 3. Insert the effects of the commit into config.placementHistory, if not already present.
+        const auto commitTime = [&]() {
+            const auto currentTime = VectorClock::get(opCtx)->getTime();
+            return currentTime.clusterTime().asTimestamp();
+        }();
 
-            return txnClient.exhaustiveFind(query)
-                .thenRunOn(txnExec)
-                .then([&](const std::vector<BSONObj>& match) {
-                    const auto& collUuid = _doc.getCollInfo()->getUuid();
-                    if (match.size() == 1) {
-                        const auto latestEntry = NamespacePlacementType::parse(
-                            IDLParserContext("dropCollectionLocally"), match[0]);
-                        if (latestEntry.getUuid() == collUuid && latestEntry.getShards().empty()) {
-                            BatchedCommandResponse noOpResponse;
-                            noOpResponse.setStatus(Status::OK());
-                            noOpResponse.setN(0);
-                            return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                        }
-                    }
 
-                    NamespacePlacementType placementInfo(nss(), commitTime, {});
-                    placementInfo.setUuid(collUuid);
-
-                    write_ops::InsertCommandRequest insertPlacementEntry(
-                        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                        {placementInfo.toBSON()});
-                    return txnClient.runCRUDOp(insertPlacementEntry, {1});
-                })
-                .thenRunOn(txnExec)
-                .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
-                    uassertStatusOK(insertPlacementEntryResponse.toStatus());
-                })
-                .semi();
-        };
-
+        NamespacePlacementType placementInfo(nss(), commitTime, {});
+        placementInfo.setUuid(_doc.getCollInfo()->getUuid());
         const auto session = getNewSession(opCtx);
-        auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
-                                      WriteConcernOptions::SyncMode::UNSET,
-                                      WriteConcernOptions::kNoTimeout};
 
 
-        sharding_ddl_util::runTransactionOnShardingCatalog(
-            opCtx, std::move(insertHistoricalPlacementTxn), wc, session, **executor);
-    }
+        sharding_ddl_util::logDropCollectionCommitOnConfigPlacementHistory(
+            opCtx, placementInfo, session, **executor);
 
-    // 4. Generate the namespacePlacementChanged op entry to support the post-commit activity of
-    // change stream readers.
-    {
+        // 4. Notify change stream readers about the placement change caused by this commit.
         NamespacePlacementChanged notification(nss(), commitTime);
-        const auto session = getNewSession(opCtx);
-
+        auto buildNewSessionFn = [this](OperationContext* opCtx) {
+            return getNewSession(opCtx);
+        };
         sharding_ddl_util::generatePlacementChangeNotificationOnShard(
-            opCtx, notification, changeStreamsNotifierShardId, session, executor, token);
+            opCtx, notification, changeStreamsNotifierShardId, buildNewSessionFn, executor, token);
     }
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());

@@ -82,8 +82,9 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    void _dropShardedCollection(OperationContext* opCtx,
+    void _dropTrackedCollection(OperationContext* opCtx,
                                 const CollectionType& coll,
+                                const ShardId& changeStreamsNotifierShardId,
                                 std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                 const CancellationToken& token);
 

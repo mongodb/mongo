@@ -36,6 +36,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     DropDatabaseCoordinatorPhase:
@@ -66,8 +67,14 @@ structs:
                 type: DropDatabaseCoordinatorPhase
                 default: kUnset
             collInfo:
-                description: "Collection currently being dropped."
+                description: "Sharded/Unsplittable collection currently being dropped."
                 type: CollectionInfo
+                optional: true
+            collChangeStreamsNotifier:
+                type: shard_id
+                description:
+                    "The identity of the Shard that will generate the op log entries about the sharded/unsplittable collection being dropped
+                    (which drive the behavior of change stream readers V2)."
                 optional: true
             authoritativeMetadataAccessLevel:
                 type: AuthoritativeMetadataAccessLevel

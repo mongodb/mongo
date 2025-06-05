@@ -395,6 +395,60 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
     deleteChunks(opCtx, configShard, uuid, writeConcern);
 }
 
+void logDropCollectionCommitOnConfigPlacementHistory(
+    OperationContext* opCtx,
+    const NamespacePlacementType& placementChangeToLog,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    //    The operation is performed through a transaction to ensure serialization with concurrent
+    //    resetPlacementHistory() requests.
+    const auto insertHistoricalPlacementTxn = [&](const txn_api::TransactionClient& txnClient,
+                                                  ExecutorPtr txnExec) {
+        FindCommandRequest query(NamespaceString::kConfigsvrPlacementHistoryNamespace);
+        query.setFilter(
+            BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(
+                     placementChangeToLog.getNss(), SerializationContext::stateDefault())));
+        query.setSort(BSON(NamespacePlacementType::kTimestampFieldName << -1));
+        query.setLimit(1);
+
+        return txnClient.exhaustiveFind(query)
+            .thenRunOn(txnExec)
+            .then([&](const std::vector<BSONObj>& match) {
+                const auto& collUuidToLog = placementChangeToLog.getUuid();
+                if (match.size() == 1) {
+                    const auto latestEntry = NamespacePlacementType::parse(
+                        IDLParserContext("dropCollectionLocally"), match[0]);
+                    if (collUuidToLog && latestEntry.getUuid() == collUuidToLog.value() &&
+                        latestEntry.getShards().empty()) {
+                        BatchedCommandResponse noOpResponse;
+                        noOpResponse.setStatus(Status::OK());
+                        noOpResponse.setN(0);
+                        return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                    }
+                }
+
+                write_ops::InsertCommandRequest insertPlacementEntry(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    {placementChangeToLog.toBSON()});
+                return txnClient.runCRUDOp(insertPlacementEntry, {1});
+            })
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                uassertStatusOK(insertPlacementEntryResponse.toStatus());
+            })
+            .semi();
+    };
+
+    auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
+                                  WriteConcernOptions::SyncMode::UNSET,
+                                  WriteConcernOptions::kNoTimeout};
+
+
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(insertHistoricalPlacementTxn), wc, osi, executor);
+}
+
+
 void checkRenamePreconditions(OperationContext* opCtx,
                               const NamespaceString& toNss,
                               const boost::optional<CollectionType>& optToCollType,
@@ -887,7 +941,7 @@ void generatePlacementChangeNotificationOnShard(
     OperationContext* opCtx,
     const NamespacePlacementChanged& placementChangeNotification,
     const ShardId& shard,
-    const OperationSessionInfo& osi,
+    std::function<OperationSessionInfo(OperationContext*)> buildNewSessionFn,
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token) {
     LOGV2(10386900,
@@ -900,11 +954,13 @@ void generatePlacementChangeNotificationOnShard(
         notifyChangeStreamsOnNamespacePlacementChanged(opCtx, placementChangeNotification);
         return;
     }
+
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kNamespacePlacementChanged,
                                                placementChangeNotification.toBSON());
     request.setDbName(DatabaseName::kAdmin);
 
     generic_argument_util::setMajorityWriteConcern(request);
+    const auto osi = buildNewSessionFn(opCtx);
     generic_argument_util::setOperationSessionInfo(request, osi);
 
     auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrNotifyShardingEventRequest>>(
