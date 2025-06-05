@@ -15,10 +15,6 @@ src:src/third_party/immer/dist/immer/detail/hamts/node.hpp
 # s2 compatibility
 fun:_ZN8S2CellId14FromFaceIJWrapEiii
 
-# TODO SERVER-88345 Remove simple8b from the denylist.
-# This is a temporary change. 
-# Simple8b has known ubsan crashes that is hurting development of the decoder API.
-src:src/mongo/bson/column/simple8b*
 src:src/mongo/bson/column/bsoncolumn_helpers.h
 src:src/third_party/abseil-cpp/dist/absl/numeric/int128_have_intrinsic.inc
 
