@@ -808,6 +808,24 @@ DBCollection.prototype.getShardVersion = function() {
     return this._db._adminCommand({getShardVersion: this._fullName});
 };
 
+DBCollection.prototype.getIndexesByKey = function(keyPattern, opts) {
+    assert(isObject(keyPattern), "keyPattern param must be an object");
+    return this.getIndexes(opts).filter(index => friendlyEqual(index.key, keyPattern));
+};
+
+DBCollection.prototype.getIndexByKey = function(keyPattern, opts) {
+    const indexes = this.getIndexesByKey(keyPattern, opts);
+    assert.lte(indexes.length,
+               1,
+               `Found multiple indexes matching key pattern ${
+                   tojsononeline(keyPattern)}. Index list: ${tojson(indexes)}`);
+    return indexes.pop();
+};
+
+DBCollection.prototype.getIndexByName = function(indexName, opts) {
+    return this.getIndexes(opts).find(index => indexName === index.name);
+};
+
 DBCollection.prototype.getIndexes = function(params) {
     let res = this.runCommand("listIndexes", params);
 
@@ -932,13 +950,8 @@ DBCollection.prototype.stats = function(args) {
     var getIndexName = function(collection, indexKey) {
         if (!isObject(indexKey))
             return undefined;
-        var indexName;
-        collection.getIndexes().forEach(function(spec) {
-            if (friendlyEqual(spec.key, options.indexDetailsKey)) {
-                indexName = spec.name;
-            }
-        });
-        return indexName;
+        let index = collection.getIndexByKey(indexKey);
+        return index?.name;
     };
 
     var filterIndexName = options.indexDetailsName || getIndexName(this, options.indexDetailsKey);

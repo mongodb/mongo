@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/unittest/unittest.h"
@@ -108,14 +109,33 @@ void testBothWaysIndexSpecConversion(const TimeseriesOptions& timeseriesOptions,
 TEST(TimeseriesIndexSchemaConversionTest, OriginalSpecFieldName) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
 
+    const auto logicalKeyPattern = BSON("key" << BSON("a" << 1));
+
     BSONObj bucketsIndexSpec =
         BSON(timeseries::kKeyFieldName << BSON("control.min.a" << 1 << "control.max.a" << 1)
-                                       << timeseries::kOriginalSpecFieldName << BSON("abc" << 123));
+                                       << timeseries::kOriginalSpecFieldName << logicalKeyPattern);
 
     auto timeseriesIndexSpecResult =
         timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndexSpec);
     ASSERT(timeseriesIndexSpecResult);
-    ASSERT_BSONOBJ_EQ(*timeseriesIndexSpecResult, BSON("abc" << 123));
+    ASSERT_BSONOBJ_EQ(*timeseriesIndexSpecResult, logicalKeyPattern);
+}
+
+TEST(TimeseriesIndexSchemaConversionTest, OriginalSpecFieldNameAdditionalProperties) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+
+    auto logicalKeyPattern = BSON("key" << BSON("a" << 1));
+
+    BSONObj bucketsIndexSpec =
+        BSON(timeseries::kKeyFieldName << BSON("control.min.a" << 1 << "control.max.a" << 1)
+                                       << IndexDescriptor::kHiddenFieldName << true
+                                       << timeseries::kOriginalSpecFieldName << logicalKeyPattern);
+
+    auto timeseriesIndexSpecResult =
+        timeseries::createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndexSpec);
+    ASSERT(timeseriesIndexSpecResult);
+    ASSERT_BSONOBJ_EQ(*timeseriesIndexSpecResult,
+                      logicalKeyPattern.addFields(BSON(IndexDescriptor::kHiddenFieldName << true)));
 }
 
 // {} is invalid.

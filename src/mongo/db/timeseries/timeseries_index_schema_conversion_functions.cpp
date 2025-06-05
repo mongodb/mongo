@@ -58,6 +58,7 @@
 #include <tuple>
 #include <utility>
 
+#include "src/mongo/db/index/index_descriptor.h"
 #include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -469,26 +470,38 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndexSpec(
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
 
-    if (bucketsIndex.hasField(kOriginalSpecFieldName)) {
-        // This buckets index has the original user index definition available, return it if the
-        // time-series metric indexes feature flag is enabled. If the feature flag isn't enabled,
-        // the reverse mapping mechanism will be used. This is necessary to skip returning any
-        // incompatible indexes created when the feature flag was enabled.
-        BSONObj intermediateObj = bucketsIndex.getObjectField(kOriginalSpecFieldName);
-        return intermediateObj.addField(bucketsIndex[IndexDescriptor::k2dsphereVersionFieldName]);
-    }
-    if (bucketsIndex.hasField(kKeyFieldName)) {
-        auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
-            timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());
-        if (timeseriesKeyValue) {
-            // This creates a BSONObj copy with the kOriginalSpecFieldName field removed, if it
-            // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
-            BSONObj intermediateObj =
-                bucketsIndex.removeFields(StringDataSet{kOriginalSpecFieldName});
-            return intermediateObj.addFields(BSON(kKeyFieldName << timeseriesKeyValue.value()),
-                                             StringDataSet{kKeyFieldName});
+    if (const auto originalSpecObj =
+            bucketsIndex.getField(IndexDescriptor::kOriginalSpecFieldName)) {
+        // The raw bucket index spec contains the `originalSpec` object.
+        // This object contains some properties of the index spec already in logical format.
+
+        // Create a copy of the raw bucket index spec without the `originalSpec` field.
+        BSONObj logicalSpec =
+            bucketsIndex.removeFields(StringDataSet{IndexDescriptor::kOriginalSpecFieldName});
+
+        // Extract only specific fields from `originalSpec` and substitute these fields in the top
+        // level index spec object
+        static const StringDataSet fieldsToExtractFromOriginalSpecs = {
+            IndexDescriptor::kKeyPatternFieldName, IndexDescriptor::kPartialFilterExprFieldName};
+
+        logicalSpec = logicalSpec.addFields(originalSpecObj.embeddedObject(),
+                                            fieldsToExtractFromOriginalSpecs);
+        return logicalSpec;
+    } else if (const auto rawKeyPattern =
+                   bucketsIndex.getField(IndexDescriptor::kKeyPatternFieldName)) {
+        // The raw bucket index spec does not contains the `originalSpec` object but contains the
+        // `key` field with key pattern in raw bucket format.
+
+        // Translate the raw key pattern to logical key pattern.
+        auto logicalKeyPattern = createTimeseriesIndexSpecFromBucketsIndexSpec(
+            timeseriesOptions, rawKeyPattern.embeddedObject());
+        if (logicalKeyPattern) {
+            // Substitute the raw key pattern with logical key pattern
+            return bucketsIndex.addFields(
+                BSON(IndexDescriptor::kKeyPatternFieldName << logicalKeyPattern.value()));
         }
     }
+
     return boost::none;
 }
 
