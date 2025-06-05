@@ -277,10 +277,11 @@ void setUpOperationDeadline(OperationContext* opCtx,
  * Sets up the OperationContext in order to correctly inherit options like the read concern from the
  * cursor to this operation.
  */
-void setUpOperationContextStateForGetMore(OperationContext* opCtx,
-                                          const ClientCursor& cursor,
-                                          const GetMoreCommandRequest& cmd,
-                                          bool disableAwaitDataFailpointActive) {
+void setUpOperationContextAndCurOpStateForGetMore(OperationContext* opCtx,
+                                                  CurOp* curOp,
+                                                  const ClientCursor& cursor,
+                                                  const GetMoreCommandRequest& cmd,
+                                                  bool disableAwaitDataFailpointActive) {
     applyConcernsAndReadPreference(opCtx, cursor);
 
     auto apiParamsFromClient = APIParameters::get(opCtx);
@@ -294,12 +295,21 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
 
     setUpOperationDeadline(opCtx, cursor, cmd, disableAwaitDataFailpointActive);
 
-    // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
-    // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
-    auto comment = cursor.getOriginatingCommandObj()["comment"];
-    if (!opCtx->getComment() && comment) {
+    auto originatingCommand = cursor.getOriginatingCommandObj();
+    if (!originatingCommand.isEmpty()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setComment(comment.wrap());
+
+        // Ensure that the original query or command object is available in the slow query log,
+        // profiler and currentOp.
+        curOp->setOriginatingCommand(lk, originatingCommand);
+
+        // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
+        // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
+        auto comment = originatingCommand["comment"];
+
+        if (!opCtx->getComment() && comment) {
+            opCtx->setComment(comment.wrap());
+        }
     }
 }
 
@@ -522,8 +532,8 @@ public:
                 MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
 
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
-            setUpOperationContextStateForGetMore(
-                opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
+            setUpOperationContextAndCurOpStateForGetMore(
+                opCtx, curOp, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
 
             NamespaceString nss = ns();
             CursorLocks locks{opCtx, nss, cursorPin};
@@ -563,13 +573,6 @@ public:
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 curOp->setPlanSummary(lk, planSummary);
-
-                // Ensure that the original query or command object is available in the slow query
-                // log, profiler and currentOp.
-                auto originatingCommand = cursorPin->getOriginatingCommandObj();
-                if (!originatingCommand.isEmpty()) {
-                    curOp->setOriginatingCommand(lk, originatingCommand);
-                }
 
                 curOp->debug().queryFramework = exec->getQueryFramework();
                 curOp->setShouldOmitDiagnosticInformation(
