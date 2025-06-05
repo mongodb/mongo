@@ -125,7 +125,7 @@ abt::ABT makeNaryOp(abt::Operations op, abt::ABTVector args) {
 
 abt::ABT generateABTNullOrMissing(abt::ABT var) {
     return makeFillEmptyTrue(makeABTFunction(
-        "typeMatch"_sd, std::move(var), abt::Constant::int32(getBSONTypeMask(BSONType::jstNULL))));
+        "typeMatch"_sd, std::move(var), abt::Constant::int32(getBSONTypeMask(BSONType::null))));
 }
 
 abt::ABT generateABTNullOrMissing(abt::ProjectionName var) {
@@ -136,8 +136,8 @@ abt::ABT generateABTNullMissingOrUndefined(abt::ABT var) {
     return makeFillEmptyTrue(
         makeABTFunction("typeMatch"_sd,
                         std::move(var),
-                        abt::Constant::int32(getBSONTypeMask(BSONType::jstNULL) |
-                                             getBSONTypeMask(BSONType::Undefined))));
+                        abt::Constant::int32(getBSONTypeMask(BSONType::null) |
+                                             getBSONTypeMask(BSONType::undefined))));
 }
 
 abt::ABT generateABTNullMissingOrUndefined(abt::ProjectionName var) {
@@ -181,7 +181,7 @@ abt::ABT generateABTLongLongMinCheck(abt::ProjectionName var) {
         abt::Operations::And,
         makeABTFunction("typeMatch"_sd,
                         makeVariable(var),
-                        abt::Constant::int32(getBSONTypeMask(BSONType::NumberLong))),
+                        abt::Constant::int32(getBSONTypeMask(BSONType::numberLong))),
         abt::make<abt::BinaryOp>(abt::Operations::Eq,
                                  makeVariable(var),
                                  abt::Constant::int64(std::numeric_limits<int64_t>::min())));

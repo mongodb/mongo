@@ -298,7 +298,7 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         }
         BSONObj out;
         bool ok = conn.runCommand(DatabaseName::kAdmin, BSON("_isSelf" << 1), out);
-        bool me = ok && out["id"].type() == jstOID && instanceId == out["id"].OID();
+        bool me = ok && out["id"].type() == BSONType::oid && instanceId == out["id"].OID();
 
         return me;
     } catch (const std::exception& e) {

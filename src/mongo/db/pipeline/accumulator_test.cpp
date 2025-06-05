@@ -2010,11 +2010,11 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
     AccumulatorExpMovingAvg acc{expCtx.get(), Decimal128{0.75}};  // alpha (decay factor) == 0.75
 
     // The constructor arg does not "initialize" 'acc', it just sets its decaying avg multiplier.
-    ASSERT_EQ(jstNULL, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
 
     // Process a non-numeric input. Still not initialized.
     acc.processInternal(Value("string"_sd), false /* merging */);
-    ASSERT_EQ(jstNULL, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
 
     // Process integer input 1. This will initialize the accumulator to the value of the input,
     // but it will not be internally stored as a decimal as this is not needed to maintain the
@@ -2033,7 +2033,7 @@ TEST(Accumulators, AccumulatorExpMovingAvg) {
 
     // Back to uninitialized after reset().
     acc.reset();
-    ASSERT_EQ(jstNULL, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::null, acc.getValue(false /* toBeMerged */).getType());
 }
 
 /* ------------------------- AccumulatorPercentile ---------------------------------------------- */
@@ -2050,7 +2050,7 @@ void accumulatorPercentileHelper(PercentileMethodEnum method,
     // Processing a non-numeric input when not merging does not accumulate anything, so the current
     // value should be an array of [null, null].
     acc.processInternal(Value("string"_sd), false /* merging */);
-    ASSERT_EQ(Array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
     std::ostringstream oss;
     oss << acc.getValue(false /* toBeMerged */);  // final value
     ASSERT_EQ("[null, null]", oss.str());
@@ -2060,16 +2060,16 @@ void accumulatorPercentileHelper(PercentileMethodEnum method,
         double val = 0.1 * i;
         acc.processInternal(Value(val), false /* merging */);
     }
-    ASSERT_EQ(Array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
     oss.str("");
     oss << acc.getValue(false /* toBeMerged */);  // final value
     ASSERT_EQ(mergeFalseExpected, oss.str());
-    ASSERT_EQ(Array, acc.getValue(true /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(true /* toBeMerged */).getType());
     // We cannot easily test the getValue(true) values as they differ on different platforms.
 
     // Verify reset() clears the accumulator.
     acc.reset();
-    ASSERT_EQ(Array, acc.getValue(false /* toBeMerged */).getType());
+    ASSERT_EQ(BSONType::array, acc.getValue(false /* toBeMerged */).getType());
     oss.str("");
     oss << acc.getValue(false /* toBeMerged */);  // final value
     ASSERT_EQ("[null, null]", oss.str());

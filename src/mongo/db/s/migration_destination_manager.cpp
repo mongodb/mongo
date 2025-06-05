@@ -901,7 +901,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
         }
 
         if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName];
-            indexNameElem.type() == BSONType::String &&
+            indexNameElem.type() == BSONType::string &&
             indexNameElem.valueStringData() == IndexConstants::kIdIndexName) {
             // The _id index always uses the collection's default collation and so there is no need
             // to add the collation field to attempt to disambiguate.
@@ -1040,7 +1040,7 @@ void _dropLocalIndexes(OperationContext* opCtx,
         }
         // If the local index doesn't exist on the donor and isn't the _id index, drop it.
         auto indexNameElem = recipientIndex[IndexDescriptor::kIndexNameFieldName];
-        if (indexNameElem.type() == BSONType::String && dropIndex &&
+        if (indexNameElem.type() == BSONType::string && dropIndex &&
             !IndexDescriptor::isIdIndexPattern(
                 recipientIndex[IndexDescriptor::kKeyPatternFieldName].Obj())) {
             BSONObj info;

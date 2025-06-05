@@ -79,7 +79,7 @@ TEST(Decimal128BSONTest, TestsConstructingDecimalWithBsonDump) {
 
     while (it.more()) {
         BSONElement testCase = it.next();
-        if (testCase.type() == Object) {
+        if (testCase.type() == BSONType::object) {
             BSONObj b = testCase.Obj();
             BSONElement desc = b.getField("description");
             BSONElement bson = b.getField("bson");

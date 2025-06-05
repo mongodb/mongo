@@ -176,7 +176,7 @@ DocumentSourceFindAndModifyImageLookup::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5806003,
             str::stream() << "the '" << kStageName << "' spec must be an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     bool includeCommitTimestamp = false;
     for (auto&& subElem : elem.Obj()) {
@@ -185,7 +185,7 @@ DocumentSourceFindAndModifyImageLookup::createFromBson(
                     str::stream() << "expected a boolean for the "
                                   << kIncludeCommitTransactionTimestampFieldName << " option to "
                                   << kStageName << " stage, got " << typeName(subElem.type()),
-                    subElem.type() == Bool);
+                    subElem.type() == BSONType::boolean);
             includeCommitTimestamp = subElem.Bool();
         } else {
             uasserted(6387800,
@@ -281,7 +281,7 @@ Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(D
         tassert(6387806,
                 str::stream() << "'" << CommitTransactionOplogObject::kCommitTimestampFieldName
                               << "' field is not a BSON Timestamp",
-                commitTxnTs.getType() == BSONType::bsonTimestamp);
+                commitTxnTs.getType() == BSONType::timestamp);
         MutableDocument mutableInputDoc{inputDoc};
         mutableInputDoc.remove(CommitTransactionOplogObject::kCommitTimestampFieldName);
         return {mutableInputDoc.freeze().toBson(), commitTxnTs.getTimestamp()};

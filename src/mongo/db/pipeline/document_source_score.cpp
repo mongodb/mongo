@@ -383,7 +383,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScore::createFromB
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = ScoreSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     return constructDesugaredOutput(spec, pExpCtx);

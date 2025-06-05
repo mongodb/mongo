@@ -199,7 +199,7 @@ public:
         TransactionsStats stats;
 
         bool includeLastCommitted = true;
-        if (configElement.type() == BSONType::Object) {
+        if (configElement.type() == BSONType::object) {
             includeLastCommitted = configElement.Obj()["includeLastCommitted"].trueValue();
         }
 

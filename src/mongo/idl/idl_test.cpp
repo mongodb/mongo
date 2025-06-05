@@ -269,16 +269,17 @@ void TestLoopback(TestT test_value) {
 /// Type tests:
 // Positive: Test we can serialize the type out and back again
 TEST(IDLOneTypeTests, TestLoopbackTest) {
-    TestLoopback<One_string, StringData, String>("test_value");
-    TestLoopback<One_int, std::int32_t, NumberInt>(123);
-    TestLoopback<One_long, std::int64_t, NumberLong>(456);
-    TestLoopback<One_double, double, NumberDouble>(3.14159);
-    TestLoopback<One_bool, bool, Bool>(true);
-    TestLoopback<One_objectid, const OID&, jstOID>(OID::max());
-    TestLoopback<One_date, const Date_t&, Date>(Date_t::now());
-    TestLoopback<One_timestamp, const Timestamp&, bsonTimestamp>(Timestamp::max());
-    TestLoopback<One_plain_object, const BSONObj&, Object>(BSON("Hello" << "World"));
-    TestLoopback<One_plain_array, const BSONArray&, Array>(BSON_ARRAY("Hello" << "World"));
+    TestLoopback<One_string, StringData, BSONType::string>("test_value");
+    TestLoopback<One_int, std::int32_t, BSONType::numberInt>(123);
+    TestLoopback<One_long, std::int64_t, BSONType::numberLong>(456);
+    TestLoopback<One_double, double, BSONType::numberDouble>(3.14159);
+    TestLoopback<One_bool, bool, BSONType::boolean>(true);
+    TestLoopback<One_objectid, const OID&, BSONType::oid>(OID::max());
+    TestLoopback<One_date, const Date_t&, BSONType::date>(Date_t::now());
+    TestLoopback<One_timestamp, const Timestamp&, BSONType::timestamp>(Timestamp::max());
+    TestLoopback<One_plain_object, const BSONObj&, BSONType::object>(BSON("Hello" << "World"));
+    TestLoopback<One_plain_array, const BSONArray&, BSONType::array>(
+        BSON_ARRAY("Hello" << "World"));
 }
 
 // Test we compare an object with optional BSONObjs correctly
@@ -289,7 +290,7 @@ TEST(IDLOneTypeTests, TestOptionalObjectTest) {
     auto testDoc = BSON("value" << testValue << "value2" << testValue << "opt_value" << testValue);
 
     auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), Object);
+    ASSERT_EQUALS(element.type(), BSONType::object);
 
     auto testStruct = One_plain_optional_object::parse(ctxt, testDoc);
     assert_same_types<decltype(testStruct.getValue()), const BSONObj&>();
@@ -335,63 +336,65 @@ void TestParse(TestT test_value) {
 // Test each of types either fail or succeeded based on the parser's bson type
 template <typename ParserT, BSONType Parser_bson_type>
 void TestParsers() {
-    TestParse<ParserT, Parser_bson_type, StringData, String>("test_value");
-    TestParse<ParserT, Parser_bson_type, std::int32_t, NumberInt>(123);
-    TestParse<ParserT, Parser_bson_type, std::int64_t, NumberLong>(456);
-    TestParse<ParserT, Parser_bson_type, double, NumberDouble>(3.14159);
-    TestParse<ParserT, Parser_bson_type, bool, Bool>(true);
-    TestParse<ParserT, Parser_bson_type, OID, jstOID>(OID::max());
-    TestParse<ParserT, Parser_bson_type, Date_t, Date>(Date_t::now());
-    TestParse<ParserT, Parser_bson_type, Timestamp, bsonTimestamp>(Timestamp::max());
+    TestParse<ParserT, Parser_bson_type, StringData, BSONType::string>("test_value");
+    TestParse<ParserT, Parser_bson_type, std::int32_t, BSONType::numberInt>(123);
+    TestParse<ParserT, Parser_bson_type, std::int64_t, BSONType::numberLong>(456);
+    TestParse<ParserT, Parser_bson_type, double, BSONType::numberDouble>(3.14159);
+    TestParse<ParserT, Parser_bson_type, bool, BSONType::boolean>(true);
+    TestParse<ParserT, Parser_bson_type, OID, BSONType::oid>(OID::max());
+    TestParse<ParserT, Parser_bson_type, Date_t, BSONType::date>(Date_t::now());
+    TestParse<ParserT, Parser_bson_type, Timestamp, BSONType::timestamp>(Timestamp::max());
 }
 
 // Negative: document with wrong types for required field
 TEST(IDLOneTypeTests, TestNegativeWrongTypes) {
-    TestParsers<One_string, String>();
-    TestParsers<One_int, NumberInt>();
-    TestParsers<One_long, NumberLong>();
-    TestParsers<One_double, NumberDouble>();
-    TestParsers<One_bool, Bool>();
-    TestParsers<One_objectid, jstOID>();
-    TestParsers<One_date, Date>();
-    TestParsers<One_timestamp, bsonTimestamp>();
+    TestParsers<One_string, BSONType::string>();
+    TestParsers<One_int, BSONType::numberInt>();
+    TestParsers<One_long, BSONType::numberLong>();
+    TestParsers<One_double, BSONType::numberDouble>();
+    TestParsers<One_bool, BSONType::boolean>();
+    TestParsers<One_objectid, BSONType::oid>();
+    TestParsers<One_date, BSONType::date>();
+    TestParsers<One_timestamp, BSONType::timestamp>();
 }
 
 // Negative: document with wrong types for required field
 TEST(IDLOneTypeTests, TestNegativeRequiredNullTypes) {
-    TestParse<One_string, String, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_int, NumberInt, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_long, NumberLong, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_double, NumberDouble, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_bool, Bool, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_objectid, jstOID, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_date, Date, NullLabeler, jstNULL>(BSONNULL);
-    TestParse<One_timestamp, bsonTimestamp, NullLabeler, jstNULL>(BSONNULL);
+    TestParse<One_string, BSONType::string, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_int, BSONType::numberInt, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_long, BSONType::numberLong, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_double, BSONType::numberDouble, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_bool, BSONType::boolean, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_objectid, BSONType::oid, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_date, BSONType::date, NullLabeler, BSONType::null>(BSONNULL);
+    TestParse<One_timestamp, BSONType::timestamp, NullLabeler, BSONType::null>(BSONNULL);
 }
 
 // Negative: document with wrong types for required field
 TEST(IDLOneTypeTests, TestNegativeRequiredUndefinedTypes) {
-    TestParse<One_string, String, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_int, NumberInt, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_long, NumberLong, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_double, NumberDouble, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_bool, Bool, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_objectid, jstOID, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_date, Date, UndefinedLabeler, Undefined>(BSONUndefined);
-    TestParse<One_timestamp, bsonTimestamp, UndefinedLabeler, Undefined>(BSONUndefined);
+    TestParse<One_string, BSONType::string, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_int, BSONType::numberInt, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_long, BSONType::numberLong, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_double, BSONType::numberDouble, UndefinedLabeler, BSONType::undefined>(
+        BSONUndefined);
+    TestParse<One_bool, BSONType::boolean, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_objectid, BSONType::oid, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_date, BSONType::date, UndefinedLabeler, BSONType::undefined>(BSONUndefined);
+    TestParse<One_timestamp, BSONType::timestamp, UndefinedLabeler, BSONType::undefined>(
+        BSONUndefined);
 }
 
 
 // Mixed: test a type that accepts multiple bson types
 TEST(IDLOneTypeTests, TestSafeInt64) {
-    TestParse<One_safeint64, NumberInt, StringData, String>("test_value");
-    TestParse<One_safeint64, NumberInt, std::int32_t, NumberInt>(123);
-    TestParse<One_safeint64, NumberLong, std::int64_t, NumberLong>(456);
-    TestParse<One_safeint64, NumberDouble, double, NumberDouble>(3.14159);
-    TestParse<One_safeint64, NumberInt, bool, Bool>(true);
-    TestParse<One_safeint64, NumberInt, OID, jstOID>(OID::max());
-    TestParse<One_safeint64, NumberInt, Date_t, Date>(Date_t::now());
-    TestParse<One_safeint64, NumberInt, Timestamp, bsonTimestamp>(Timestamp::max());
+    TestParse<One_safeint64, BSONType::numberInt, StringData, BSONType::string>("test_value");
+    TestParse<One_safeint64, BSONType::numberInt, std::int32_t, BSONType::numberInt>(123);
+    TestParse<One_safeint64, BSONType::numberLong, std::int64_t, BSONType::numberLong>(456);
+    TestParse<One_safeint64, BSONType::numberDouble, double, BSONType::numberDouble>(3.14159);
+    TestParse<One_safeint64, BSONType::numberInt, bool, BSONType::boolean>(true);
+    TestParse<One_safeint64, BSONType::numberInt, OID, BSONType::oid>(OID::max());
+    TestParse<One_safeint64, BSONType::numberInt, Date_t, BSONType::date>(Date_t::now());
+    TestParse<One_safeint64, BSONType::numberInt, Timestamp, BSONType::timestamp>(Timestamp::max());
 }
 
 // Mixed: test a type that accepts NamespaceString
@@ -401,7 +404,7 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     auto testDoc = BSON(One_namespacestring::kValueFieldName << "foo.bar");
 
     auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), String);
+    ASSERT_EQUALS(element.type(), BSONType::string);
 
     auto testStruct = One_namespacestring::parse(ctxt, testDoc);
     assert_same_types<decltype(testStruct.getValue()), const NamespaceString&>();
@@ -590,9 +593,9 @@ TEST(IDLStructTests, EpochSerialize) {
 
     auto unixElem = obj["unix"];
     auto ecmaElem = obj["ecma"];
-    ASSERT_EQ(unixElem.type(), NumberLong);
+    ASSERT_EQ(unixElem.type(), BSONType::numberLong);
     ASSERT_EQ(unixElem.numberLong(), 86400);
-    ASSERT_EQ(ecmaElem.type(), NumberLong);
+    ASSERT_EQ(ecmaElem.type(), BSONType::numberLong);
     ASSERT_EQ(ecmaElem.numberLong(), 2 * 86400 * 1000);
 }
 
@@ -765,33 +768,34 @@ void TestLoopbackVariant(TestT test_value) {
 }
 
 TEST(IDLVariantTests, TestVariantRoundtrip) {
-    TestLoopbackVariant<One_variant, int, NumberInt>(1);
-    TestLoopbackVariant<One_variant, std::string, String>("test_value");
+    TestLoopbackVariant<One_variant, int, BSONType::numberInt>(1);
+    TestLoopbackVariant<One_variant, std::string, BSONType::string>("test_value");
 
-    TestLoopbackVariant<One_variant_uuid, int, NumberInt>(1);
-    TestLoopbackVariant<One_variant_uuid, UUID, BinData>(UUID::gen());
+    TestLoopbackVariant<One_variant_uuid, int, BSONType::numberInt>(1);
+    TestLoopbackVariant<One_variant_uuid, UUID, BSONType::binData>(UUID::gen());
 
-    TestLoopbackVariant<One_variant_compound, std::string, String>("test_value");
-    TestLoopbackVariant<One_variant_compound, BSONObj, Object>(BSON("x" << 1));
-    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({});
-    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({"a"});
-    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, Array>({"a", "b"});
+    TestLoopbackVariant<One_variant_compound, std::string, BSONType::string>("test_value");
+    TestLoopbackVariant<One_variant_compound, BSONObj, BSONType::object>(BSON("x" << 1));
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, BSONType::array>({});
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, BSONType::array>({"a"});
+    TestLoopbackVariant<One_variant_compound, std::vector<std::string>, BSONType::array>(
+        {"a", "b"});
 
-    TestLoopbackVariant<One_variant_struct, int, NumberInt>(1);
-    TestLoopbackVariant<One_variant_struct, One_string, Object>(One_string("test_value"));
+    TestLoopbackVariant<One_variant_struct, int, BSONType::numberInt>(1);
+    TestLoopbackVariant<One_variant_struct, One_string, BSONType::object>(One_string("test_value"));
 
-    TestLoopbackVariant<One_variant_struct_array, int, NumberInt>(1);
-    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+    TestLoopbackVariant<One_variant_struct_array, int, BSONType::numberInt>(1);
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, BSONType::array>(
         std::vector<One_string>());
-    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, BSONType::array>(
         {One_string("a")});
-    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, Array>(
+    TestLoopbackVariant<One_variant_struct_array, std::vector<One_string>, BSONType::array>(
         {One_string("a"), One_string("b")});
 }
 
 TEST(IDLVariantTests, TestVariantSafeInt) {
-    TestLoopbackVariant<One_variant_safeInt, std::string, String>("test_value");
-    TestLoopbackVariant<One_variant_safeInt, int, NumberInt>(1);
+    TestLoopbackVariant<One_variant_safeInt, std::string, BSONType::string>("test_value");
+    TestLoopbackVariant<One_variant_safeInt, int, BSONType::numberInt>(1);
 
     // safeInt accepts all numbers, but always deserializes and serializes as int32.
     IDLParserContext ctxt("root");
@@ -807,10 +811,10 @@ TEST(IDLVariantTests, TestVariantSafeInt) {
 TEST(IDLVariantTests, TestVariantSafeIntArray) {
     using int32vec = std::vector<std::int32_t>;
 
-    TestLoopbackVariant<One_variant_safeInt_array, std::string, String>("test_value");
-    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({});
-    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({1});
-    TestLoopbackVariant<One_variant_safeInt_array, int32vec, Array>({1, 2});
+    TestLoopbackVariant<One_variant_safeInt_array, std::string, BSONType::string>("test_value");
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, BSONType::array>({});
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, BSONType::array>({1});
+    TestLoopbackVariant<One_variant_safeInt_array, int32vec, BSONType::array>({1, 2});
 
     // Use ASSERT instead of ASSERT_EQ to avoid operator<<
     IDLParserContext ctxt("root");
@@ -839,11 +843,12 @@ TEST(IDLVariantTests, TestVariantTwoStructs) {
 }
 
 TEST(IDLVariantTests, TestVariantTwoArrays) {
-    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({});
-    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({1});
-    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, Array>({1, 2});
-    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, Array>({"a"});
-    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, Array>({"a", "b"});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, BSONType::array>({});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, BSONType::array>({1});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<int>, BSONType::array>({1, 2});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, BSONType::array>({"a"});
+    TestLoopbackVariant<One_variant_two_arrays, std::vector<std::string>, BSONType::array>(
+        {"a", "b"});
 
     // This variant can be array<int> or array<string>. It assumes an empty array is array<int>
     // because that type is declared first in the IDL.
@@ -2540,7 +2545,7 @@ void TestBinDataParse() {
     auto testDoc = BSON("value" << BSONBinData(testData, 16, Test_bindata_type));
 
     auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), BinData);
+    ASSERT_EQUALS(element.type(), BSONType::binData);
     ASSERT_EQUALS(element.binDataType(), Test_bindata_type);
 
     if (Parser_bindata_type != Test_bindata_type) {
@@ -2574,7 +2579,7 @@ TEST(IDLBinData, TestCustomType) {
     auto testDoc = BSON("value" << BSONBinData(testData, 14, BinDataGeneral));
 
     auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), BinData);
+    ASSERT_EQUALS(element.type(), BSONType::binData);
     ASSERT_EQUALS(element.binDataType(), BinDataGeneral);
 
     auto testStruct = One_bindata_custom::parse(ctxt, testDoc);
@@ -2610,7 +2615,7 @@ TEST(IDLBinData, TestUUIDclass) {
     auto testDoc = BSON("value" << uuid);
 
     auto element = testDoc.firstElement();
-    ASSERT_EQUALS(element.type(), BinData);
+    ASSERT_EQUALS(element.type(), BSONType::binData);
     ASSERT_EQUALS(element.binDataType(), newUUID);
 
     auto testStruct = One_UUID::parse(ctxt, testDoc);
@@ -3429,16 +3434,19 @@ void TestLoopbackCommandTypeVariant(TestT test_value) {
 }
 
 TEST(IDLCommand, TestCommandTypeVariant) {
-    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, int, NumberInt>(1);
-    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::string, String>("test_value");
-    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::vector<std::string>, Array>(
-        {"x", "y"});
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, int, BSONType::numberInt>(1);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand, std::string, BSONType::string>(
+        "test_value");
+    TestLoopbackCommandTypeVariant<CommandTypeVariantCommand,
+                                   std::vector<std::string>,
+                                   BSONType::array>({"x", "y"});
 
-    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, int, NumberInt>(1);
-    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, UUID, BinData>(UUID::gen());
+    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, int, BSONType::numberInt>(1);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantUUIDCommand, UUID, BSONType::binData>(
+        UUID::gen());
 
-    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, bool, Bool>(true);
-    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, One_string, Object>(
+    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, bool, BSONType::boolean>(true);
+    TestLoopbackCommandTypeVariant<CommandTypeVariantStructCommand, One_string, BSONType::object>(
         One_string("test_value"));
 }
 
@@ -4380,7 +4388,8 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeField) {
         BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << BSON_ARRAY("a" << "b")
                                                     << "$db"
                                                     << "db"),
-        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << jstNULL << "$db"
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << BSONType::null
+                                                    << "$db"
                                                     << "db")};
     for (auto&& obj : differentTypeObjs) {
         auto parsed = CommandWithAnyTypeMember::parse(ctxt, obj);
@@ -4420,28 +4429,28 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
                                                          << "string literal"
                                                          << "$db"
                                                          << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), String);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::string);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().str(), "string literal");
 
     parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
                                                   BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << 1234 << "$db"
                                                        << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), NumberInt);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::numberInt);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().numberInt(), 1234);
 
     parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
                                                   BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << 1234.5 << "$db"
                                                        << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), NumberDouble);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::numberDouble);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().numberDouble(), 1234.5);
 
     parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
                                                   BSON(CommandWithAnyTypeOwnedMember::kCommandName
                                                        << 1 << "anyTypeField" << OID::max() << "$db"
                                                        << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), jstOID);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::oid);
     ASSERT_EQ(parsed.getAnyTypeField().getElement().OID(), OID::max());
 
     parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
@@ -4449,7 +4458,7 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
                                                        << 1 << "anyTypeField" << BSON("a" << "b")
                                                        << "$db"
                                                        << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), Object);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(parsed.getAnyTypeField().getElement().Obj(), BSON("a" << "b"));
 
     parsed = CommandWithAnyTypeOwnedMember::parse(ctxt,
@@ -4457,7 +4466,7 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
                                                        << 1 << "anyTypeField"
                                                        << BSON_ARRAY("a" << "b") << "$db"
                                                        << "db"));
-    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), Array);
+    ASSERT_EQ(parsed.getAnyTypeField().getElement().type(), BSONType::array);
     ASSERT_BSONELT_EQ(parsed.getAnyTypeField().getElement(),
                       BSON("anyTypeField" << BSON_ARRAY("a" << "b"))["anyTypeField"]);
 }
@@ -5198,7 +5207,7 @@ TEST(IDLFieldTests, TestOptionalBoolField) {
     }
 
     {
-        auto testDoc = BSON("optBoolField" << jstNULL);
+        auto testDoc = BSON("optBoolField" << BSONType::null);
         ASSERT_THROWS(OptionalBool::parseFromBSON(testDoc.firstElement()), AssertionException);
     }
 

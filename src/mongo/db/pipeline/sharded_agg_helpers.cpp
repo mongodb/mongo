@@ -1536,7 +1536,7 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         stages.reserve(serialization.size());
 
         for (const auto& stageObj : serialization) {
-            invariant(stageObj.getType() == BSONType::Object);
+            invariant(stageObj.getType() == BSONType::object);
             stages.push_back(stageObj.getDocument().toBson());
         }
 

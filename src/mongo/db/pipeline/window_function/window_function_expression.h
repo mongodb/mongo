@@ -472,7 +472,7 @@ public:
             accumulatorName = argName;
             uassert(5371603,
                     str::stream() << accumulatorName << " must be specified with '{}' as the value",
-                    arg.type() == BSONType::Object && arg.embeddedObject().nFields() == 0);
+                    arg.type() == BSONType::object && arg.embeddedObject().nFields() == 0);
         } else {
             tasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Window function found an unknown argument: " << argName);
@@ -657,7 +657,7 @@ protected:
         {
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << kArgUnit << "' must be a string, but got " << arg.type(),
-                    arg.type() == String);
+                    arg.type() == BSONType::string);
             unit = parseTimeUnit(arg.valueStringData());
             switch (*unit) {
                 // These larger time units vary so much, it doesn't make sense to define a
@@ -735,7 +735,7 @@ public:
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "$derivative expects an object, but got a "
                               << derivativeArgs.type() << ": " << derivativeArgs,
-                derivativeArgs.type() == BSONType::Object);
+                derivativeArgs.type() == BSONType::object);
 
         boost::intrusive_ptr<::mongo::Expression> input;
         boost::optional<TimeUnit> unit;
@@ -813,7 +813,7 @@ public:
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "$integral expects an object, but got a " << integralArgs.type()
                               << ": " << integralArgs,
-                integralArgs.type() == BSONType::Object);
+                integralArgs.type() == BSONType::object);
 
         boost::intrusive_ptr<::mongo::Expression> input;
         boost::optional<TimeUnit> unit = boost::none;

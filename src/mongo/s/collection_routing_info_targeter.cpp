@@ -344,7 +344,7 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
     uassert(5743702,
             str::stream() << "'" << timeField
                           << "' must be present and contain a valid BSON UTC datetime value",
-            !timeElement.eoo() && timeElement.type() == BSONType::Date);
+            !timeElement.eoo() && timeElement.type() == BSONType::date);
     auto roundedTimeValue =
         timeseries::roundTimestampToGranularity(timeElement.date(), timeseriesOptions);
     {

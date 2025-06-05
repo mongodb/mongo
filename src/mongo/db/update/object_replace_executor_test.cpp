@@ -123,13 +123,13 @@ TEST_F(ObjectReplaceExecutorTest, NonIdTimestampsModified) {
 
     auto elemA = doc.root()["a"];
     ASSERT_TRUE(elemA.ok());
-    ASSERT_EQUALS(elemA.getType(), BSONType::bsonTimestamp);
+    ASSERT_EQUALS(elemA.getType(), BSONType::timestamp);
     ASSERT_NOT_EQUALS(0U, elemA.getValueTimestamp().getSecs());
     ASSERT_NOT_EQUALS(0U, elemA.getValueTimestamp().getInc());
 
     auto elemB = doc.root()["b"];
     ASSERT_TRUE(elemB.ok());
-    ASSERT_EQUALS(elemB.getType(), BSONType::bsonTimestamp);
+    ASSERT_EQUALS(elemB.getType(), BSONType::timestamp);
     ASSERT_NOT_EQUALS(0U, elemB.getValueTimestamp().getSecs());
     ASSERT_NOT_EQUALS(0U, elemB.getValueTimestamp().getInc());
 

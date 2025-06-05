@@ -182,7 +182,7 @@ Value GranularityRounderPreferredNumbers::roundUp(Value value) {
         return value;
     }
 
-    if (value.getType() == BSONType::NumberDecimal) {
+    if (value.getType() == BSONType::numberDecimal) {
         Decimal128 number = value.getDecimal();
         Decimal128 multiplier = Decimal128(1);
 
@@ -267,7 +267,7 @@ Value GranularityRounderPreferredNumbers::roundDown(Value value) {
         return value;
     }
 
-    if (value.getType() == BSONType::NumberDecimal) {
+    if (value.getType() == BSONType::numberDecimal) {
         Decimal128 number = value.getDecimal();
         Decimal128 multiplier = Decimal128(1);
 

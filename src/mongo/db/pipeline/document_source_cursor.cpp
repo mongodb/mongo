@@ -261,7 +261,7 @@ void DocumentSourceCursor::_updateOplogTimestamp() {
     // If we are about to return a result, set our oplog timestamp to the optime of that result.
     if (!_currentBatch.isEmpty()) {
         const auto& ts = _currentBatch.peekFront().getField(repl::OpTime::kTimestampFieldName);
-        invariant(ts.getType() == BSONType::bsonTimestamp);
+        invariant(ts.getType() == BSONType::timestamp);
         _latestOplogTimestamp = ts.getTimestamp();
         return;
     }

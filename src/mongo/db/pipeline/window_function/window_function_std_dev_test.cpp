@@ -79,16 +79,16 @@ TEST_F(WindowFunctionStdDevTest, ReturnsDouble) {
     pop.add(Value{1});
     pop.add(Value{2});
     pop.add(Value{3});
-    ASSERT_EQ(pop.getValue().getType(), NumberDouble);
+    ASSERT_EQ(pop.getValue().getType(), BSONType::numberDouble);
 
     samp.add(Value{1});
     samp.add(Value{2});
     samp.add(Value{3});
     // Returns 1.0
-    ASSERT_EQ(samp.getValue().getType(), NumberDouble);
+    ASSERT_EQ(samp.getValue().getType(), BSONType::numberDouble);
 
     pop.add(Value{Decimal128("100000000000000000000000000000")});
-    ASSERT_EQ(pop.getValue().getType(), NumberDouble);
+    ASSERT_EQ(pop.getValue().getType(), BSONType::numberDouble);
 }
 
 

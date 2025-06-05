@@ -138,17 +138,17 @@ private:
         if (!value.numeric())
             return;
         switch (value.getType()) {
-            case NumberInt:
+            case BSONType::numberInt:
                 accountForIntegral(value.getInt(), quantity);
                 break;
-            case NumberLong:
+            case BSONType::numberLong:
                 accountForIntegral(value.getLong(), quantity);
                 break;
-            case NumberDouble:
+            case BSONType::numberDouble:
                 _doubleCount += quantity;
                 accountForDouble(value.getDouble(), quantity);
                 break;
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 _decimalCount += quantity;
                 accountForDecimal(value.getDecimal(), quantity);
                 break;

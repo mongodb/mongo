@@ -248,7 +248,7 @@ Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {
         // Populate the current time for time based expiration of pre-images.
         if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
             const BSONType bsonType = currentTimeElem.type();
-            if (bsonType == BSONType::String) {
+            if (bsonType == BSONType::string) {
                 auto stringDate = currentTimeElem.String();
                 currentTime = dateFromISOString(stringDate).getValue();
             } else {
@@ -257,7 +257,7 @@ Date_t getCurrentTimeForPreImageRemoval(OperationContext* opCtx) {
                             << "Expected type for 'currentTimeForTimeBasedExpiration' is "
                                "'date' or a 'string' representation of ISODate, but found: "
                             << bsonType,
-                        bsonType == BSONType::Date);
+                        bsonType == BSONType::date);
 
                 currentTime = currentTimeElem.Date();
             }

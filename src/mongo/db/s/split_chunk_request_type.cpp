@@ -111,7 +111,7 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
     {
         BSONElement splitPointsElem;
         auto splitPointsElemStatus =
-            bsonExtractTypedField(cmdObj, kSplitPoints, mongo::Array, &splitPointsElem);
+            bsonExtractTypedField(cmdObj, kSplitPoints, BSONType::array, &splitPointsElem);
 
         if (!splitPointsElemStatus.isOK()) {
             return splitPointsElemStatus;

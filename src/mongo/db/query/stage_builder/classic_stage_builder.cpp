@@ -452,7 +452,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                     BSONObjIterator arrIt{arr};
                     invariant(arrIt.more());
                     auto firstElt = arrIt.next();
-                    invariant(firstElt.type() == BSONType::Object);
+                    invariant(firstElt.type() == BSONType::object);
                     invariant(!arrIt.more());
                     BSONObj doc = firstElt.embeddedObject();
 

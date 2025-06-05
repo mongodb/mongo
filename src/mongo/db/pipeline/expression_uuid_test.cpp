@@ -78,7 +78,7 @@ TEST_F(ExpressionUUIDTest, Basic) {
     auto exp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto validateIsBindata = [](const Value& value) {
-        ASSERT_EQ(BSONType::BinData, value.getType());
+        ASSERT_EQ(BSONType::binData, value.getType());
         ASSERT_EQ(value.getBinData().type, newUUID);
     };
 

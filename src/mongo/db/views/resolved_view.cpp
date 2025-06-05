@@ -68,11 +68,11 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
 
     uassert(40250,
             "View definition must have 'ns' field of type string",
-            viewDef.hasField("ns") && viewDef.getField("ns").type() == BSONType::String);
+            viewDef.hasField("ns") && viewDef.getField("ns").type() == BSONType::string);
 
     uassert(40251,
             "View definition must have 'pipeline' field of type array",
-            viewDef.hasField("pipeline") && viewDef.getField("pipeline").type() == BSONType::Array);
+            viewDef.hasField("pipeline") && viewDef.getField("pipeline").type() == BSONType::array);
 
     std::vector<BSONObj> pipeline;
     for (auto&& item : viewDef["pipeline"].Obj()) {
@@ -83,7 +83,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
     if (auto collationElt = viewDef["collation"]) {
         uassert(40639,
                 "View definition 'collation' field must be an object",
-                collationElt.type() == BSONType::Object);
+                collationElt.type() == BSONType::object);
         collationSpec = collationElt.embeddedObject().getOwned();
     }
 
@@ -100,7 +100,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         uassert(6067204,
                 str::stream() << "view definition must have " << kTimeseriesMayContainMixedData
                               << " of type bool or no such field",
-                mixedSchemaElem.type() == BSONType::Bool);
+                mixedSchemaElem.type() == BSONType::boolean);
 
         mixedSchema = boost::optional<bool>(mixedSchemaElem.boolean());
     }
@@ -110,7 +110,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         uassert(6646910,
                 str::stream() << "view definition must have " << kTimeseriesUsesExtendedRange
                               << " of type bool or no such field",
-                usesExtendedRangeElem.type() == BSONType::Bool);
+                usesExtendedRangeElem.type() == BSONType::boolean);
 
         usesExtendedRange = boost::optional<bool>(usesExtendedRangeElem.boolean());
     }
@@ -120,7 +120,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         uassert(7823304,
                 str::stream() << "view definition must have " << kTimeseriesfixedBuckets
                               << " of type bool or no such field",
-                fixedBucketsElem.type() == BSONType::Bool);
+                fixedBucketsElem.type() == BSONType::boolean);
 
         fixedBuckets = boost::optional<bool>(fixedBucketsElem.boolean());
     }
@@ -163,7 +163,7 @@ std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdRepl
 
 
 ResolvedView ResolvedView::parseFromBSON(const BSONElement& elem) {
-    uassert(936370, "resolvedView must be an object", elem.type() == BSONType::Object);
+    uassert(936370, "resolvedView must be an object", elem.type() == BSONType::object);
     BSONObjBuilder localBuilder;
     localBuilder.append("resolvedView", elem.Obj());
     return fromBSON(localBuilder.done());

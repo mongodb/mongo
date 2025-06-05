@@ -84,7 +84,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
     auto commandName = first.fieldNameStringData();
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << commandName << " value must be a string",
-            first.type() == mongo::String);
+            first.type() == BSONType::string);
 
     auto buildUUIDElem = obj.getField("indexBuildUUID");
     if (buildUUIDElem.eoo()) {
@@ -101,7 +101,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
         return {ErrorCodes::BadValue, str::stream() << "Missing required field 'indexes'"};
     }
 
-    if (indexesElem.type() != Array) {
+    if (indexesElem.type() != BSONType::array) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field 'indexes' must be an array of index spec objects"};
     }
@@ -129,7 +129,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
         if (causeElem.eoo()) {
             return {ErrorCodes::BadValue, "Missing required field 'cause'."};
         }
-        if (causeElem.type() != Object) {
+        if (causeElem.type() != BSONType::object) {
             return {ErrorCodes::BadValue, "Field 'cause' must be an object."};
         }
         auto causeStatusObj = causeElem.Obj();

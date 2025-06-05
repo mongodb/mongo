@@ -204,7 +204,7 @@ TEST_F(GoldenGenFilternTest, TestSimpleExpr) {
                 "SizeMatchExpression"_sd);
     }
     {
-        TypeMatchExpression typeExpr("field1"_sd, MatcherTypeSet{BSONType::NumberInt});
+        TypeMatchExpression typeExpr("field1"_sd, MatcherTypeSet{BSONType::numberInt});
         runTest(&typeExpr,
                 rootSlot,
                 false /* isFilterOverIxscan */,

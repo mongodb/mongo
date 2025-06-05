@@ -244,7 +244,7 @@ void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& eve
                              "Expected: "
                           << BSON("_id" << resumeToken) << " but found: "
                           << (idField.missing() ? BSONObj() : BSON("_id" << idField)),
-            resumeToken.getType() == BSONType::Object &&
+            resumeToken.getType() == BSONType::object &&
                 ValueComparator::kInstance.evaluate(idField == resumeToken));
 }
 

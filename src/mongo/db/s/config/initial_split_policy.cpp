@@ -654,8 +654,8 @@ void PresplitHashedZonesSplitPolicy::_validate(const ShardKeyPattern& shardKeyPa
                            "pre-splitting. Cannot have MinKey or MaxKey in the lower bound for "
                            "fields preceding the hashed field but found one, for zone "
                         << tag.getTag(),
-                    (*startItr).type() != BSONType::MinKey &&
-                        (*startItr).type() != BSONType::MaxKey);
+                    (*startItr).type() != BSONType::minKey &&
+                        (*startItr).type() != BSONType::maxKey);
             isPrefixDifferent = isPrefixDifferent || (*startItr).woCompare(*endItr);
             ++endItr;
             // Forward the iterator until hashed field is reached.
@@ -674,7 +674,7 @@ void PresplitHashedZonesSplitPolicy::_validate(const ShardKeyPattern& shardKeyPa
                              "hashed pre-splitting. The hashed field value for lower bound must "
                              "be MinKey, for zone "
                           << tag.getTag(),
-            (*startItr).type() == BSONType::MinKey);
+            (*startItr).type() == BSONType::minKey);
 
         // Each field in the lower bound after the hashed field must be set to MinKey.
         while (startItr.more()) {
@@ -683,7 +683,7 @@ void PresplitHashedZonesSplitPolicy::_validate(const ShardKeyPattern& shardKeyPa
                                      "hashed pre-splitting. The fields after the hashed field must "
                                      "have MinKey value, for zone "
                                   << tag.getTag(),
-                    (*startItr++).type() == BSONType::MinKey);
+                    (*startItr++).type() == BSONType::minKey);
         }
     }
 }

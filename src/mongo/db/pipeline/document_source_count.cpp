@@ -62,7 +62,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40156,
             str::stream() << "the count field must be a non-empty string",
-            elem.type() == String);
+            elem.type() == BSONType::string);
 
     StringData elemString = elem.valueStringData();
     uassert(

@@ -666,7 +666,7 @@ boost::optional<SearchQueryViewSpec> getViewFromBSONObj(
     boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj spec) {
     // First, check if the view is held on the spec object (sharded scenarios).
     boost::optional<SearchQueryViewSpec> view;
-    if (spec.hasField("view") && spec["view"].type() == BSONType::Object) {
+    if (spec.hasField("view") && spec["view"].type() == BSONType::object) {
         // If we are setting the view from the spec, the spec must be from an internal client. This
         // is to prevent users from injecting a view into a search stage definition.
         assertAllowedInternalIfRequired(

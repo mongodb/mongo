@@ -83,7 +83,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDPointerToBSON, "tassert") {
     ASSERT_BSONOBJ_EQ(resultObj, BSON("pointer" << "/pointer"));
     BSONElement pointer = resultObj["pointer"];
     ASSERT(pointer);
-    ASSERT_EQ(pointer.type(), BSONType::String);
+    ASSERT_EQ(pointer.type(), BSONType::string);
 
     EncryptSchemaKeyId parsedPointer = EncryptSchemaKeyId::parseFromBSON(pointer);
     ASSERT_EQ(parsedPointer.type(), EncryptSchemaKeyId::Type::kJSONPointer);
@@ -103,7 +103,7 @@ DEATH_TEST(EncryptSchemaTest, KeyIDArrayToBSON, "tassert") {
     ASSERT_BSONOBJ_EQ(resultObj, BSON("array" << BSON_ARRAY(uuidList[0] << uuidList[1])));
     BSONElement array = resultObj["array"];
     ASSERT(array);
-    ASSERT_EQ(array.type(), BSONType::Array);
+    ASSERT_EQ(array.type(), BSONType::array);
     ASSERT_EQ(array.Array().size(), unsigned{2});
 
     EncryptSchemaKeyId parsedArray = EncryptSchemaKeyId::parseFromBSON(array);
@@ -125,7 +125,7 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
     IDLParserContext ctxt("encrypt");
     auto encryptInfo = EncryptionInfo::parse(ctxt, encryptInfoBSON);
     MatcherTypeSet resultMatcherSet;
-    resultMatcherSet.bsonTypes.insert(BSONType::NumberInt);
+    resultMatcherSet.bsonTypes.insert(BSONType::numberInt);
     ASSERT_TRUE(encryptInfo.getBsonType() == BSONTypeSet(resultMatcherSet));
     ASSERT_TRUE(encryptInfo.getAlgorithm().value() == FleAlgorithmEnum::kDeterministic);
     EncryptSchemaKeyId keyid = encryptInfo.getKeyId().value();

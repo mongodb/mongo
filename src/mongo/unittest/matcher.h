@@ -629,13 +629,13 @@ public:
         if (!tr)
             return MatchResult{false,
                                fmt::format("type failed: {} {}", typeName(x.type()), tr.message())};
-        if (t == NumberInt)
+        if (t == BSONType::numberInt)
             return detail::typeTolerantMatch(_value, x.Int());
-        if (t == NumberLong)
+        if (t == BSONType::numberLong)
             return detail::typeTolerantMatch(_value, x.Long());
-        if (t == NumberDouble)
+        if (t == BSONType::numberDouble)
             return detail::typeTolerantMatch(_value, x.Double());
-        if (t == String)
+        if (t == BSONType::string)
             return detail::typeTolerantMatch(_value, x.String());
         // need to support more BSON element types.
         return MatchResult{false,

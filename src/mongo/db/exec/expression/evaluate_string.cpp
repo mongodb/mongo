@@ -51,7 +51,7 @@ Value evaluate(const ExpressionConcat& expr, const Document& root, Variables* va
 
         uassert(16702,
                 str::stream() << "$concat only supports strings, not " << typeName(val.getType()),
-                val.getType() == String);
+                val.getType() == BSONType::string);
 
         result << val.coerceToString();
     }
@@ -74,15 +74,15 @@ Value evaluateReplace(ExpressionReplace& expr,
     uassert(51746,
             str::stream() << expr.getOpName()
                           << " requires that 'input' be a string, found: " << input.toString(),
-            input.getType() == BSONType::String || input.nullish());
+            input.getType() == BSONType::string || input.nullish());
     uassert(51745,
             str::stream() << expr.getOpName()
                           << " requires that 'find' be a string, found: " << find.toString(),
-            find.getType() == BSONType::String || find.nullish());
+            find.getType() == BSONType::string || find.nullish());
     uassert(51744,
             str::stream() << expr.getOpName() << " requires that 'replacement' be a string, found: "
                           << replacement.toString(),
-            replacement.getType() == BSONType::String || replacement.nullish());
+            replacement.getType() == BSONType::string || replacement.nullish());
 
     // Return null if any arg is nullish.
     if (input.nullish()) {
@@ -284,7 +284,7 @@ Value evaluate(const ExpressionStrLenBytes& expr, const Document& root, Variable
     uassert(34473,
             str::stream() << "$strLenBytes requires a string argument, found: "
                           << typeName(str.getType()),
-            str.getType() == BSONType::String);
+            str.getType() == BSONType::string);
 
     return strLenBytes(str.getStringData());
 }
@@ -298,9 +298,9 @@ Value evaluate(const ExpressionBinarySize& expr, const Document& root, Variables
     uassert(51276,
             str::stream() << "$binarySize requires a string or BinData argument, found: "
                           << typeName(arg.getType()),
-            arg.getType() == BSONType::BinData || arg.getType() == BSONType::String);
+            arg.getType() == BSONType::binData || arg.getType() == BSONType::string);
 
-    if (arg.getType() == BSONType::String) {
+    if (arg.getType() == BSONType::string) {
         return strLenBytes(arg.getStringData());
     }
 
@@ -314,7 +314,7 @@ Value evaluate(const ExpressionStrLenCP& expr, const Document& root, Variables* 
     uassert(34471,
             str::stream() << "$strLenCP requires a string argument, found: "
                           << typeName(val.getType()),
-            val.getType() == String);
+            val.getType() == BSONType::string);
 
     std::string stringVal = val.getString();
     size_t strLen = str::lengthInUTF8CodePoints(stringVal);
@@ -349,7 +349,7 @@ Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* vari
             str::stream() << expr.getName() << " requires its input to be a string, got "
                           << unvalidatedInput.toString() << " (of type "
                           << typeName(unvalidatedInput.getType()) << ") instead.",
-            unvalidatedInput.getType() == BSONType::String);
+            unvalidatedInput.getType() == BSONType::string);
     const StringData input(unvalidatedInput.getStringData());
 
     auto trimType = expr.getTrimType();
@@ -369,7 +369,7 @@ Value evaluate(const ExpressionTrim& expr, const Document& root, Variables* vari
             str::stream() << expr.getName() << " requires 'chars' to be a string, got "
                           << unvalidatedUserChars.toString() << " (of type "
                           << typeName(unvalidatedUserChars.getType()) << ") instead.",
-            unvalidatedUserChars.getType() == BSONType::String);
+            unvalidatedUserChars.getType() == BSONType::string);
 
     return Value(str_trim_utils::doTrim(
         input,
@@ -392,12 +392,12 @@ Value evaluate(const ExpressionSplit& expr, const Document& root, Variables* var
             str::stream() << "$split requires an expression that evaluates to a string as a first "
                              "argument, found: "
                           << typeName(inputArg.getType()),
-            inputArg.getType() == BSONType::String);
+            inputArg.getType() == BSONType::string);
     uassert(40086,
             str::stream() << "$split requires an expression that evaluates to a string as a second "
                              "argument, found: "
                           << typeName(separatorArg.getType()),
-            separatorArg.getType() == BSONType::String);
+            separatorArg.getType() == BSONType::string);
 
     StringData input = inputArg.getStringData();
     StringData separator = separatorArg.getStringData();
@@ -459,14 +459,14 @@ Value evaluate(const ExpressionIndexOfBytes& expr, const Document& root, Variabl
     uassert(40091,
             str::stream() << "$indexOfBytes requires a string as the first argument, found: "
                           << typeName(stringArg.getType()),
-            stringArg.getType() == String);
+            stringArg.getType() == BSONType::string);
     const std::string& input = stringArg.getString();
 
     Value tokenArg = children[1]->evaluate(root, variables);
     uassert(40092,
             str::stream() << "$indexOfBytes requires a string as the second argument, found: "
                           << typeName(tokenArg.getType()),
-            tokenArg.getType() == String);
+            tokenArg.getType() == BSONType::string);
     const std::string& token = tokenArg.getString();
 
     size_t startIndex = 0;
@@ -507,14 +507,14 @@ Value evaluate(const ExpressionIndexOfCP& expr, const Document& root, Variables*
     uassert(40093,
             str::stream() << "$indexOfCP requires a string as the first argument, found: "
                           << typeName(stringArg.getType()),
-            stringArg.getType() == String);
+            stringArg.getType() == BSONType::string);
     const std::string& input = stringArg.getString();
 
     Value tokenArg = children[1]->evaluate(root, variables);
     uassert(40094,
             str::stream() << "$indexOfCP requires a string as the second argument, found: "
                           << typeName(tokenArg.getType()),
-            tokenArg.getType() == String);
+            tokenArg.getType() == BSONType::string);
     const std::string& token = tokenArg.getString();
 
     size_t startCodePointIndex = 0;

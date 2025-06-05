@@ -355,7 +355,7 @@ Status SetFilter::set(OperationContext* opCtx,
     if (indexesElt.eoo()) {
         return Status(ErrorCodes::BadValue, "required field indexes missing");
     }
-    if (indexesElt.type() != mongo::Array) {
+    if (indexesElt.type() != BSONType::array) {
         return Status(ErrorCodes::BadValue, "required field indexes must be an array");
     }
     vector<BSONElement> indexesEltArray = indexesElt.Array();
@@ -366,13 +366,13 @@ Status SetFilter::set(OperationContext* opCtx,
     BSONObjSet indexes = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     stdx::unordered_set<std::string> indexNames;
     for (const auto& elt : indexesEltArray) {
-        if (elt.type() == BSONType::Object) {
+        if (elt.type() == BSONType::object) {
             BSONObj obj = elt.Obj();
             if (obj.isEmpty()) {
                 return Status(ErrorCodes::BadValue, "index specification cannot be empty");
             }
             indexes.insert(obj.getOwned());
-        } else if (elt.type() == BSONType::String) {
+        } else if (elt.type() == BSONType::string) {
             indexNames.insert(elt.String());
         } else {
             return Status(ErrorCodes::BadValue, "each item in indexes must be an object or string");

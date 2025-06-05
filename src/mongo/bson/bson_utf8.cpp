@@ -46,25 +46,25 @@ bool isValidUTF8(const BSONObj& obj) {
         }
         switch (elem.type()) {
             // Base cases.
-            case Code:
-            case String:
-            case Symbol: {
+            case BSONType::code:
+            case BSONType::string:
+            case BSONType::symbol: {
                 return str::validUTF8(elem.valueStringData());
             }
-            case DBRef: {
+            case BSONType::dbRef: {
                 return str::validUTF8(elem.dbrefNS());
             }
-            case RegEx: {
+            case BSONType::regEx: {
                 return str::validUTF8(elem.regex()) && str::validUTF8(elem.regexFlags());
             }
             // Recursive cases.
-            case Object: {
+            case BSONType::object: {
                 return isValidUTF8(elem.Obj());
             }
-            case Array: {
+            case BSONType::array: {
                 return isValidUTF8(elem.Obj());
             }
-            case CodeWScope: {
+            case BSONType::codeWScope: {
                 return str::validUTF8(elem.codeWScopeCode()) &&
                     isValidUTF8(elem.codeWScopeObject());
             }
@@ -80,23 +80,23 @@ void scrubInvalidUTF8(BSONElement elem, StringData fieldName, BSONObjBuilder& su
     };
 
     switch (elem.type()) {
-        case Code: {
+        case BSONType::code: {
             subObjBuilder.appendCode(fieldName, scrub(elem.valueStringData()));
             break;
         }
-        case String: {
+        case BSONType::string: {
             subObjBuilder.append(fieldName, scrub(elem.valueStringData()));
             break;
         }
-        case Symbol: {
+        case BSONType::symbol: {
             subObjBuilder.appendSymbol(fieldName, scrub(elem.valueStringData()));
             break;
         }
-        case DBRef: {
+        case BSONType::dbRef: {
             subObjBuilder.appendDBRef(fieldName, scrub(elem.dbrefNS()), elem.dbrefOID());
             break;
         }
-        case RegEx: {
+        case BSONType::regEx: {
             // Scrub the specific component(s) of the regex expression that has invalid UTF-8.
             auto regexStr = scrub(elem.regex());
             auto regexFlags = scrub(elem.regexFlags());
@@ -115,19 +115,19 @@ void scrubInvalidUTF8(const BSONObj& obj, BSONObjBuilder& parentBuilder) {
 
         switch (elem.type()) {
             // Recursive cases.
-            case Object: {
+            case BSONType::object: {
                 BSONObjBuilder sub(parentBuilder.subobjStart(
                     str::validUTF8(fieldName) ? fieldName : str::scrubInvalidUTF8(fieldName)));
                 scrubInvalidUTF8(elem.Obj(), sub);
                 break;
             }
-            case Array: {
+            case BSONType::array: {
                 BSONObjBuilder sub(parentBuilder.subarrayStart(
                     str::validUTF8(fieldName) ? fieldName : str::scrubInvalidUTF8(fieldName)));
                 scrubInvalidUTF8(elem.Obj(), sub);
                 break;
             }
-            case CodeWScope: {
+            case BSONType::codeWScope: {
                 // CodeWScope has both a String and a BSONObj, so we want to recursively call
                 // scrubInvalidUTF8 on the BSONObj and also scrub the String in the Code
                 // portion.

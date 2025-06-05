@@ -72,7 +72,7 @@ ReplSetWriteConcernModeDefinitions ReplSetWriteConcernModeDefinitions::parseFrom
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected " << fieldName << " to be an Object, it actually had type "
                           << typeName(patternMapElement.type()),
-            patternMapElement.type() == Object);
+            patternMapElement.type() == BSONType::object);
     Definitions definitions;
     BSONObj modes = patternMapElement.Obj();
     for (auto&& modeElement : modes) {
@@ -83,7 +83,7 @@ ReplSetWriteConcernModeDefinitions ReplSetWriteConcernModeDefinitions::parseFrom
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Expected " << fieldName << '.' << modeElement.fieldName()
                               << " to be an Object, not " << typeName(modeElement.type()),
-                modeElement.type() == Object);
+                modeElement.type() == BSONType::object);
         Definition& definition = definitions[modeElement.fieldNameStringData()];
         for (auto&& constraintElement : modeElement.Obj()) {
             uassert(ErrorCodes::TypeMismatch,

@@ -42,68 +42,68 @@ template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(StringData fieldName, int t) {
     switch (t) {
         // Shared canonical types
-        case NumberInt:
-        case NumberDouble:
-        case NumberLong:
-        case NumberDecimal:
+        case stdx::to_underlying(BSONType::numberInt):
+        case stdx::to_underlying(BSONType::numberDouble):
+        case stdx::to_underlying(BSONType::numberLong):
+        case stdx::to_underlying(BSONType::numberDecimal):
             append(fieldName, std::numeric_limits<double>::quiet_NaN());
             return static_cast<Derived&>(*this);
-        case Symbol:
-        case String:
+        case stdx::to_underlying(BSONType::symbol):
+        case stdx::to_underlying(BSONType::string):
             append(fieldName, "");
             return static_cast<Derived&>(*this);
-        case Date:
+        case stdx::to_underlying(BSONType::date):
             appendDate(fieldName, Date_t::min());
             return static_cast<Derived&>(*this);
-        case bsonTimestamp:
+        case stdx::to_underlying(BSONType::timestamp):
             appendTimestamp(fieldName, 0);
             return static_cast<Derived&>(*this);
-        case Undefined:  // shared with EOO
+        case stdx::to_underlying(BSONType::undefined):  // shared with EOO
             appendUndefined(fieldName);
             return static_cast<Derived&>(*this);
 
         // Separate canonical types
-        case MinKey:
+        case stdx::to_underlying(BSONType::minKey):
             appendMinKey(fieldName);
             return static_cast<Derived&>(*this);
-        case MaxKey:
+        case stdx::to_underlying(BSONType::maxKey):
             appendMaxKey(fieldName);
             return static_cast<Derived&>(*this);
-        case jstOID: {
+        case stdx::to_underlying(BSONType::oid): {
             OID o;
             appendOID(fieldName, &o);
             return static_cast<Derived&>(*this);
         }
-        case Bool:
+        case stdx::to_underlying(BSONType::boolean):
             appendBool(fieldName, false);
             return static_cast<Derived&>(*this);
-        case jstNULL:
+        case stdx::to_underlying(BSONType::null):
             appendNull(fieldName);
             return static_cast<Derived&>(*this);
-        case Object:
+        case stdx::to_underlying(BSONType::object):
             append(fieldName, BSONObj());
             return static_cast<Derived&>(*this);
-        case Array:
+        case stdx::to_underlying(BSONType::array):
             appendArray(fieldName, BSONObj());
             return static_cast<Derived&>(*this);
-        case BinData:
+        case stdx::to_underlying(BSONType::binData):
             appendBinData(fieldName, 0, BinDataGeneral, (const char*)nullptr);
             return static_cast<Derived&>(*this);
-        case RegEx:
+        case stdx::to_underlying(BSONType::regEx):
             appendRegex(fieldName, "");
             return static_cast<Derived&>(*this);
-        case DBRef: {
+        case stdx::to_underlying(BSONType::dbRef): {
             OID o;
             appendDBRef(fieldName, "", o);
             return static_cast<Derived&>(*this);
         }
-        case Code:
+        case stdx::to_underlying(BSONType::code):
             appendCode(fieldName, "");
             return static_cast<Derived&>(*this);
-        case CodeWScope:
+        case stdx::to_underlying(BSONType::codeWScope):
             appendCodeWScope(fieldName, "", BSONObj());
             return static_cast<Derived&>(*this);
-    };
+    }
     LOGV2(20101, "type not supported for appendMinElementForType: {t}", "t"_attr = t);
     uassert(10061, "type not supported for appendMinElementForType", false);
 }
@@ -112,65 +112,65 @@ template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(StringData fieldName, int t) {
     switch (t) {
         // Shared canonical types
-        case NumberInt:
-        case NumberDouble:
-        case NumberLong:
-        case NumberDecimal:
+        case stdx::to_underlying(BSONType::numberInt):
+        case stdx::to_underlying(BSONType::numberDouble):
+        case stdx::to_underlying(BSONType::numberLong):
+        case stdx::to_underlying(BSONType::numberDecimal):
             append(fieldName, std::numeric_limits<double>::infinity());
             return static_cast<Derived&>(*this);
-        case Symbol:
-        case String:
-            appendMinForType(fieldName, Object);
+        case stdx::to_underlying(BSONType::symbol):
+        case stdx::to_underlying(BSONType::string):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::object));
             return static_cast<Derived&>(*this);
-        case Date:
+        case stdx::to_underlying(BSONType::date):
             appendDate(fieldName, Date_t::max());
             return static_cast<Derived&>(*this);
-        case bsonTimestamp:
+        case stdx::to_underlying(BSONType::timestamp):
             append(fieldName, Timestamp::max());
             return static_cast<Derived&>(*this);
-        case Undefined:  // shared with EOO
+        case stdx::to_underlying(BSONType::undefined):  // shared with EOO
             appendUndefined(fieldName);
             return static_cast<Derived&>(*this);
 
         // Separate canonical types
-        case MinKey:
+        case stdx::to_underlying(BSONType::minKey):
             appendMinKey(fieldName);
             return static_cast<Derived&>(*this);
-        case MaxKey:
+        case stdx::to_underlying(BSONType::maxKey):
             appendMaxKey(fieldName);
             return static_cast<Derived&>(*this);
-        case jstOID: {
+        case stdx::to_underlying(BSONType::oid): {
             OID o = OID::max();
             appendOID(fieldName, &o);
             return static_cast<Derived&>(*this);
         }
-        case Bool:
+        case stdx::to_underlying(BSONType::boolean):
             appendBool(fieldName, true);
             return static_cast<Derived&>(*this);
-        case jstNULL:
+        case stdx::to_underlying(BSONType::null):
             appendNull(fieldName);
             return static_cast<Derived&>(*this);
-        case Object:
-            appendMinForType(fieldName, Array);
+        case stdx::to_underlying(BSONType::object):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::array));
             return static_cast<Derived&>(*this);
-        case Array:
-            appendMinForType(fieldName, BinData);
+        case stdx::to_underlying(BSONType::array):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::binData));
             return static_cast<Derived&>(*this);
-        case BinData:
-            appendMinForType(fieldName, jstOID);
+        case stdx::to_underlying(BSONType::binData):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::oid));
             return static_cast<Derived&>(*this);
-        case RegEx:
-            appendMinForType(fieldName, DBRef);
+        case stdx::to_underlying(BSONType::regEx):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::dbRef));
             return static_cast<Derived&>(*this);
-        case DBRef:
-            appendMinForType(fieldName, Code);
+        case stdx::to_underlying(BSONType::dbRef):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::code));
             return static_cast<Derived&>(*this);
-        case Code:
-            appendMinForType(fieldName, CodeWScope);
+        case stdx::to_underlying(BSONType::code):
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::codeWScope));
             return static_cast<Derived&>(*this);
-        case CodeWScope:
+        case stdx::to_underlying(BSONType::codeWScope):
             // This upper bound may change if a new bson type is added.
-            appendMinForType(fieldName, MaxKey);
+            appendMinForType(fieldName, stdx::to_underlying(BSONType::maxKey));
             return static_cast<Derived&>(*this);
     }
     LOGV2(20102, "type not supported for appendMaxElementForType: {t}", "t"_attr = t);
@@ -179,7 +179,7 @@ Derived& BSONObjBuilderBase<Derived, B>::appendMaxForType(StringData fieldName, 
 
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendDate(StringData fieldName, Date_t dt) {
-    _b.appendNum((char)Date);
+    _b.appendNum((char)BSONType::date);
     _b.appendCStr(fieldName);
     _b.appendNum(dt.toMillisSinceEpoch());
     return static_cast<Derived&>(*this);

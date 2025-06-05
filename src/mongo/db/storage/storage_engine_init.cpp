@@ -338,7 +338,7 @@ Status validateStorageOptions(
     while (storageIt.more()) {
         BSONElement storageElement = storageIt.next();
         StringData storageEngineName = storageElement.fieldNameStringData();
-        if (storageElement.type() != mongo::Object) {
+        if (storageElement.type() != BSONType::object) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "'storageEngine." << storageElement.fieldNameStringData()
                                         << "' has to be an embedded document.");

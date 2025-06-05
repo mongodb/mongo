@@ -132,7 +132,7 @@ void aggregateTimeseriesStats(const BSONObj& shardTimeseriesStats,
     for (const auto& shardTimeseriesStat : shardTimeseriesStats) {
         // "bucketsNs" is the only timeseries stat that is not a number, so it requires special
         // handling.
-        if (shardTimeseriesStat.type() == BSONType::String) {
+        if (shardTimeseriesStat.type() == BSONType::string) {
             invariant(shardTimeseriesStat.fieldNameStringData() == "bucketsNs",
                       str::stream() << "Found an unexpected field '"
                                     << shardTimeseriesStat.fieldNameStringData()

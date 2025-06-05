@@ -526,7 +526,7 @@ struct BSONTypeValue {
     int64_t size() const;
 
 private:
-    BSONType _type = BSONType::EOO;
+    BSONType _type = BSONType::eoo;
 };
 
 class SchemaElement;

@@ -91,8 +91,8 @@ private:
         // quantity should be 1 if adding value, -1 if removing value
         if (!value.numeric())
             return;
-        if ((value.getType() == NumberDouble && !std::isfinite(value.getDouble())) ||
-            (value.getType() == NumberDecimal && !value.getDecimal().isFinite())) {
+        if ((value.getType() == BSONType::numberDouble && !std::isfinite(value.getDouble())) ||
+            (value.getType() == BSONType::numberDecimal && !value.getDecimal().isFinite())) {
             _nonfiniteValueCount += quantity;
             return;
         }

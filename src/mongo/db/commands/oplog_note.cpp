@@ -152,7 +152,7 @@ public:
         }
 
         BSONElement dataElement;
-        auto dataStatus = bsonExtractTypedField(cmdObj, "data", Object, &dataElement);
+        auto dataStatus = bsonExtractTypedField(cmdObj, "data", BSONType::object, &dataElement);
         uassertStatusOK(dataStatus);
 
         Timestamp maxClusterTime;

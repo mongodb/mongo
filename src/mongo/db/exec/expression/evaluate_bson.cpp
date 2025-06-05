@@ -56,7 +56,7 @@ Value evaluate(const ExpressionBsonSize& expr, const Document& root, Variables* 
     uassert(31393,
             str::stream() << "$bsonSize requires a document input, found: "
                           << typeName(arg.getType()),
-            arg.getType() == BSONType::Object);
+            arg.getType() == BSONType::object);
 
     return Value(arg.getDocument().toBson().objsize());
 }
@@ -73,10 +73,10 @@ Value evaluatePath(const FieldPath& fieldPath, size_t index, const Document& inp
     // Try to dive deeper
     const Value val = input[fieldPath.getFieldNameHashed(index)];
     switch (val.getType()) {
-        case Object:
+        case BSONType::object:
             return evaluatePath(fieldPath, index + 1, val.getDocument());
 
-        case Array:
+        case BSONType::array:
             return evaluatePathArray(fieldPath, index + 1, val);
 
         default:
@@ -91,7 +91,7 @@ Value evaluatePathArray(const FieldPath& fieldPath, size_t index, const Value& i
     std::vector<Value> result;
     const std::vector<Value>& array = input.getArray();
     for (size_t i = 0; i < array.size(); i++) {
-        if (array[i].getType() != Object) {
+        if (array[i].getType() != BSONType::object) {
             continue;
         }
 
@@ -113,7 +113,7 @@ Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* 
                           << " requires 'field' to evaluate to type String, "
                              "but got "
                           << typeName(fieldValue.getType()),
-            fieldValue.getType() == BSONType::String);
+            fieldValue.getType() == BSONType::string);
 
     auto inputValue = expr.getInput()->evaluate(root, variables);
     if (inputValue.nullish()) {
@@ -122,7 +122,7 @@ Value evaluate(const ExpressionGetField& expr, const Document& root, Variables* 
         } else {
             return Value(BSONNULL);
         }
-    } else if (inputValue.getType() != BSONType::Object) {
+    } else if (inputValue.getType() != BSONType::object) {
         return Value();
     }
 
@@ -138,7 +138,7 @@ Value evaluate(const ExpressionSetField& expr, const Document& root, Variables* 
     uassert(4161105,
             str::stream() << ExpressionSetField::kExpressionName
                           << " requires 'input' to evaluate to type Object",
-            input.getType() == BSONType::Object);
+            input.getType() == BSONType::object);
 
     auto value = expr.getValue()->evaluate(root, variables);
 

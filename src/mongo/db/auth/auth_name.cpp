@@ -97,15 +97,15 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<Tenant
         const auto fieldName = element.fieldNameStringData();
 
         if (fieldName == T::kFieldName) {
-            validateField(element, kNameFieldBit, String);
+            validateField(element, kNameFieldBit, BSONType::string);
             name = element.valueStringData();
 
         } else if (fieldName == "db"_sd) {
-            validateField(element, kDbFieldBit, String);
+            validateField(element, kDbFieldBit, BSONType::string);
             db = element.valueStringData();
 
         } else if (fieldName == kTenantFieldName) {
-            validateField(element, kTenantFieldBit, jstOID);
+            validateField(element, kTenantFieldBit, BSONType::oid);
             tenant = TenantId::parseFromBSON(element);
             if (activeTenant) {
                 uassert(ErrorCodes::BadValue,
@@ -137,9 +137,9 @@ T AuthName<T>::parseFromBSONObj(const BSONObj& obj, const boost::optional<Tenant
 template <typename T>
 T AuthName<T>::parseFromBSON(const BSONElement& elem,
                              const boost::optional<TenantId>& activeTenant) {
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::string) {
         return uassertStatusOK(parse(elem.valueStringData(), activeTenant));
-    } else if (elem.type() == Object) {
+    } else if (elem.type() == BSONType::object) {
         const auto obj = elem.embeddedObject();
         return parseFromBSONObj(obj, activeTenant);
     } else {

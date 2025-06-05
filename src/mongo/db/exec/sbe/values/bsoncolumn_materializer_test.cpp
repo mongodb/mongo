@@ -674,9 +674,9 @@ TEST_F(BSONColumnMaterializerTest, DecompressAllUnmatchedPath) {
     SBEPath path{
         value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
                                       {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
-    setExpectedElements({{value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO}});
+    setExpectedElements({{value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)}});
     std::vector<int32_t> expectedPositions{1, 1, 1};
     verifyDecompressWithPositions(input, path, expectedPositions);
 }
@@ -693,8 +693,8 @@ TEST_F(BSONColumnMaterializerTest, DecompressSomeUnmatchedPath) {
         value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
                                       {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
     setExpectedElements({{value::TypeTags::NumberInt32, 1},
-                         {value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
                          {value::TypeTags::NumberInt32, 5}});
 
     std::vector<int32_t> expectedPositions{1, 1, 1, 1};
@@ -719,14 +719,14 @@ TEST_F(BSONColumnMaterializerTest, DecompressUnmatchedPathInObject) {
 
     // TODO SERVER-87339 remove the last field. The container should only have 8 elements.
     setExpectedElements({{value::TypeTags::NumberInt32, 1},
-                         {value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
                          {value::TypeTags::NumberInt32, 4},
                          {value::TypeTags::NumberInt32, 5},
                          {value::TypeTags::NumberInt32, 6},
-                         {value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO},
-                         {value::TypeTags::Nothing, EOO}});
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)},
+                         {value::TypeTags::Nothing, stdx::to_underlying(BSONType::eoo)}});
     // TODO SERVER-87339 the last position info should be 2.
     std::vector<int32_t> expectedPositions{1, 1, 1, 3, 3};
     verifyDecompressWithPositions(input, path, expectedPositions);

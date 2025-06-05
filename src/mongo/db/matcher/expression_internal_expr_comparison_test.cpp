@@ -45,7 +45,7 @@ namespace mongo {
 
 DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
                  CannotCompareToArray,
-                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::Array)#") {
+                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::array)#") {
     BSONObj operand = BSON("x" << BSON_ARRAY(1 << 2));
     InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
@@ -53,7 +53,7 @@ DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
 
 DEATH_TEST_REGEX(InternalExprComparisonMatchExpression,
                  CannotCompareToUndefined,
-                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::Undefined)#") {
+                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::undefined)#") {
     BSONObj operand = BSON("x" << BSONUndefined);
     InternalExprGTMatchExpression gt(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());

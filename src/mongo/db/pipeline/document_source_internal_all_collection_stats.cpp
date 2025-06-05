@@ -183,7 +183,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
     uassert(6789103,
             str::stream() << "$_internalAllCollectionStats must take a nested object but found: "
                           << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     uassert(6789104,
             "The $_internalAllCollectionStats stage must be run on the admin database",

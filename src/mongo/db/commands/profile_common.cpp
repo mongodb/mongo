@@ -167,9 +167,9 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
 }
 
 ObjectOrUnset parseObjectOrUnset(const BSONElement& element) {
-    if (element.type() == BSONType::Object) {
+    if (element.type() == BSONType::object) {
         return {{element.Obj()}};
-    } else if (element.type() == BSONType::String && element.String() == "unset"_sd) {
+    } else if (element.type() == BSONType::string && element.String() == "unset"_sd) {
         return {{}};
     } else {
         uasserted(ErrorCodes::BadValue, "Expected an object, or the string 'unset'.");

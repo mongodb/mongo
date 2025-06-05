@@ -103,7 +103,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$search value must be an object. Found: " << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto specObj = elem.embeddedObject();
     // If kMongotQueryFieldName is present, this is the case that we re-create the
     // DocumentSource from a serialized DocumentSourceSearch that was originally parsed on a

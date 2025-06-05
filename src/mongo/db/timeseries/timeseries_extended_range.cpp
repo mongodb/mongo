@@ -83,7 +83,7 @@ bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
         auto timeElem = minObj.getField(options.getTimeField());
         uassert(6781402,
                 "Time series bucket document does not have a valid min time element",
-                timeElem && BSONType::Date == timeElem.type());
+                timeElem && BSONType::date == timeElem.type());
 
         auto date = timeElem.Date();
         return dateOutsideStandardRange(date);

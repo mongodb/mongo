@@ -89,8 +89,8 @@ void assertBSONTypeEquals(BSONType actual, BSONType expected, T value, int i) {
 
 TEST(BSONObjBuilderTest, AppendInt64T) {
     auto obj = BSON("a" << int64_t{5} << "b" << int64_t{1ll << 40});
-    ASSERT_EQ(obj["a"].type(), NumberLong);
-    ASSERT_EQ(obj["b"].type(), NumberLong);
+    ASSERT_EQ(obj["a"].type(), BSONType::numberLong);
+    ASSERT_EQ(obj["b"].type(), BSONType::numberLong);
     ASSERT_EQ(obj["a"].Long(), 5);
     ASSERT_EQ(obj["b"].Long(), 1ll << 40);
 }
@@ -122,32 +122,32 @@ TEST(BSONObjBuilderTest, AppendNumberLongLong) {
     struct {
         long long v;
         BSONType t;
-    } data[] = {{0, mongo::NumberInt},
-                {-100, mongo::NumberInt},
-                {100, mongo::NumberInt},
-                {minInt, mongo::NumberInt},
-                {maxInt, mongo::NumberInt},
-                {minInt - 1, mongo::NumberLong},
-                {maxInt + 1, mongo::NumberLong},
-                {minEncodableDouble, mongo::NumberLong},
-                {maxEncodableDouble, mongo::NumberLong},
-                {minEncodableDouble - 1, mongo::NumberLong},
-                {maxEncodableDouble + 1, mongo::NumberLong},
-                {minDouble, mongo::NumberLong},
-                {maxDouble, mongo::NumberLong},
-                {minDouble - 1, mongo::NumberLong},
-                {maxDouble + 1, mongo::NumberLong},
-                {minLongLong, mongo::NumberLong},
-                {maxLongLong, mongo::NumberLong},
-                {0, mongo::Undefined}};
-    for (int i = 0; data[i].t != mongo::Undefined; i++) {
+    } data[] = {{0, BSONType::numberInt},
+                {-100, BSONType::numberInt},
+                {100, BSONType::numberInt},
+                {minInt, BSONType::numberInt},
+                {maxInt, BSONType::numberInt},
+                {minInt - 1, BSONType::numberLong},
+                {maxInt + 1, BSONType::numberLong},
+                {minEncodableDouble, BSONType::numberLong},
+                {maxEncodableDouble, BSONType::numberLong},
+                {minEncodableDouble - 1, BSONType::numberLong},
+                {maxEncodableDouble + 1, BSONType::numberLong},
+                {minDouble, BSONType::numberLong},
+                {maxDouble, BSONType::numberLong},
+                {minDouble - 1, BSONType::numberLong},
+                {maxDouble + 1, BSONType::numberLong},
+                {minLongLong, BSONType::numberLong},
+                {maxLongLong, BSONType::numberLong},
+                {0, BSONType::undefined}};
+    for (int i = 0; data[i].t != BSONType::undefined; i++) {
         long long v = data[i].v;
         BSONObjBuilder b;
         b.appendNumber("a", v);
         BSONObj o = b.obj();
         ASSERT_EQUALS(o.nFields(), 1);
         BSONElement e = o.getField("a");
-        if (data[i].t != mongo::NumberDouble) {
+        if (data[i].t != BSONType::numberDouble) {
             long long n = e.numberLong();
             ASSERT_EQUALS(n, v);
         } else {
@@ -178,7 +178,7 @@ TEST(BSONObjBuilderTest, AppendNumberLongLongMinCompareObject) {
 
 TEST(BSONObjBuilderTest, AppendMaxTimestampConversion) {
     BSONObjBuilder b;
-    b.appendMaxForType("a", mongo::bsonTimestamp);
+    b.appendMaxForType("a", stdx::to_underlying(BSONType::timestamp));
     BSONObj o1 = b.obj();
 
     BSONElement e = o1.getField("a");

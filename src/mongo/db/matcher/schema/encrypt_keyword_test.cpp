@@ -255,8 +255,10 @@ TEST(JSONSchemaParserEncryptTest, FailsToParseWithBadBSONType) {
     auto result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 
-    schema = BSON("properties" << BSON(
-                      "foo" << BSON("encrypt" << BSON("bsonType" << (BSONType::JSTypeMax + 1)))));
+    schema =
+        BSON("properties" << BSON(
+                 "foo" << BSON("encrypt" << BSON(
+                                   "bsonType" << (stdx::to_underlying(BSONType::jsTypeMax) + 1)))));
     result = JSONSchemaParser::parse(new ExpressionContextForTest(), schema);
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
 }

@@ -500,7 +500,7 @@ TEST(MatchExpressionParameterizationVisitor, SizeMatchExpressionSetsOneParamId) 
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithStringSetsOneParamId) {
-    TypeMatchExpression expr{"a"_sd, BSONType::String};
+    TypeMatchExpression expr{"a"_sd, BSONType::string};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
@@ -510,7 +510,7 @@ TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithStringSetsOn
 }
 
 TEST(MatchExpressionParameterizationVisitor, TypeMatchExpressionWithArraySetsNoParamIds) {
-    TypeMatchExpression expr{"a"_sd, BSONType::Array};
+    TypeMatchExpression expr{"a"_sd, BSONType::array};
 
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};

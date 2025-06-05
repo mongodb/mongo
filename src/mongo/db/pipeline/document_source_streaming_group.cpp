@@ -143,7 +143,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
     uassert(7026702,
             "streaming group must specify an array of monotonic id fields " +
                 kMonotonicIdFieldsSpecField,
-            monotonicIdFieldsElem.type() == Array);
+            monotonicIdFieldsElem.type() == BSONType::array);
     const auto& monotonicIdFields = monotonicIdFieldsElem.Array();
     const auto& idFieldNames = groupStage->_groupProcessor.getIdFieldNames();
     if (idFieldNames.empty()) {
@@ -158,7 +158,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
         for (const auto& fieldNameElem : monotonicIdFields) {
             uassert(7026704,
                     kMonotonicIdFieldsSpecField + " elements must be strings",
-                    fieldNameElem.type() == String);
+                    fieldNameElem.type() == BSONType::string);
             StringData fieldName = fieldNameElem.valueStringData();
             auto it = std::find(idFieldNames.begin(), idFieldNames.end(), fieldName);
             uassert(7026705, "id field not found", it != idFieldNames.end());

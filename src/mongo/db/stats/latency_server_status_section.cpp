@@ -54,7 +54,7 @@ public:
         BSONObjBuilder latencyBuilder;
         bool includeHistograms = false;
         bool slowBuckets = false;
-        if (configElem.type() == BSONType::Object) {
+        if (configElem.type() == BSONType::object) {
             includeHistograms = configElem.Obj()["histograms"].trueValue();
             slowBuckets = configElem.Obj()["slowBuckets"].trueValue();
         }
@@ -75,7 +75,7 @@ class WorkingTimeHistogramServerStatusSection final : public ServerStatusSection
         BSONObjBuilder latencyBuilder;
         bool includeHistograms = false;
         bool slowBuckets = false;
-        if (configElem.type() == BSONType::Object) {
+        if (configElem.type() == BSONType::object) {
             includeHistograms = configElem.Obj()["histograms"].trueValue();
             slowBuckets = configElem.Obj()["slowBuckets"].trueValue();
         }

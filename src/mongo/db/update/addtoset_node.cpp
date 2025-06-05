@@ -76,11 +76,11 @@ Status AddToSetNode::init(BSONElement modExpr,
     bool isEach = false;
 
     // If the value of 'modExpr' is an object whose first field is '$each', treat it as an $each.
-    if (modExpr.type() == BSONType::Object) {
+    if (modExpr.type() == BSONType::object) {
         auto firstElement = modExpr.Obj().firstElement();
         if (firstElement && firstElement.fieldNameStringData() == "$each") {
             isEach = true;
-            if (firstElement.type() != BSONType::Array) {
+            if (firstElement.type() != BSONType::array) {
                 return Status(
                     ErrorCodes::TypeMismatch,
                     str::stream()
@@ -117,7 +117,7 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(mutablebson::Elem
             str::stream() << "Cannot apply $addToSet to non-array field. Field named '"
                           << element->getFieldName() << "' has non-array type "
                           << typeName(element->getType()),
-            element->getType() == BSONType::Array);
+            element->getType() == BSONType::array);
 
     // Find the set of elements that do not already exist in the array 'element'.
     std::vector<BSONElement> elementsToAdd;

@@ -171,7 +171,7 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             setGeoNearPoint(val);
             break;
         case DocumentMetadataFields::kIndexKey:
-            assertType(BSONType::Object);
+            assertType(BSONType::object);
             setIndexKey(val.getDocument().toBson());
             break;
         case DocumentMetadataFields::kRandVal:
@@ -194,19 +194,19 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             setTextScore(val.getDouble());
             break;
         case DocumentMetadataFields::kSearchScoreDetails:
-            assertType(BSONType::Object);
+            assertType(BSONType::object);
             setSearchScoreDetails(val.getDocument().toBson());
             break;
         case DocumentMetadataFields::kTimeseriesBucketMinTime:
-            assertType(BSONType::Date);
+            assertType(BSONType::date);
             setTimeseriesBucketMinTime(val.getDate());
             break;
         case DocumentMetadataFields::kTimeseriesBucketMaxTime:
-            assertType(BSONType::Date);
+            assertType(BSONType::date);
             setTimeseriesBucketMaxTime(val.getDate());
             break;
         case DocumentMetadataFields::kSearchSortValues:
-            assertType(BSONType::Object);
+            assertType(BSONType::object);
             setSearchSortValues(val.getDocument().toBson());
             break;
         case DocumentMetadataFields::kSearchSequenceToken:
@@ -224,14 +224,14 @@ void DocumentMetadataFields::setMetaFieldFromValue(MetaType type, Value val) {
             // When using this API to set scoreDetails (likely via $setMetadata), it's required for
             // 'scoreDetails' to have a "value" field with which 'score' will be set as well. That
             // validation is done inside setScoreAndScoreDetails().
-            assertType(BSONType::Object);
+            assertType(BSONType::object);
             setScoreAndScoreDetails(val);
             break;
         case DocumentMetadataFields::kSortKey:
             tasserted(9733901,
                       "Cannot set the sort key without knowing if it is a single element key");
         case DocumentMetadataFields::kStream:
-            assertType(BSONType::Object);
+            assertType(BSONType::object);
             setStream(std::move(val));
             break;
         case DocumentMetadataFields::kChangeStreamControlEvent:

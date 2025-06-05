@@ -76,7 +76,7 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
 
 bool isInfinite(ImplicitValue val) {
     constexpr auto inf = std::numeric_limits<double>::infinity();
-    if (val.getType() != BSONType::NumberDouble) {
+    if (val.getType() != BSONType::numberDouble) {
         return false;
     }
     auto num = val.getDouble();
@@ -92,55 +92,55 @@ void validateQueryBounds(BSONType indexType, ImplicitValue lb, ImplicitValue ub)
     // Bounds of any type might have an infinite endpoint because open-ended bounds are represented
     // with the undefined endpoint as infinity or -infinity.
     switch (indexType) {
-        case NumberInt:
+        case BSONType::numberInt:
             uassert(
                 6901306,
                 "If the index type is NumberInt, then lower bound for query must be an int or be a "
                 "long that is within the range of int.",
-                isInfinite(lb) || lb.getType() == BSONType::NumberInt ||
-                    (lb.getType() == BSONType::NumberLong && isWithinInt(lb.getLong())));
+                isInfinite(lb) || lb.getType() == BSONType::numberInt ||
+                    (lb.getType() == BSONType::numberLong && isWithinInt(lb.getLong())));
             uassert(
                 6901307,
                 "If the index type is NumberInt, then upper bound for query must be an int or be a "
                 "long that is within the range of int.",
-                isInfinite(ub) || ub.getType() == BSONType::NumberInt ||
-                    (ub.getType() == BSONType::NumberLong && isWithinInt(ub.getLong())));
+                isInfinite(ub) || ub.getType() == BSONType::numberInt ||
+                    (ub.getType() == BSONType::numberLong && isWithinInt(ub.getLong())));
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             uassert(
                 6901308,
                 "Lower bound for query over NumberLong must be either a NumberLong or NumberInt.",
-                isInfinite(lb) || lb.getType() == BSONType::NumberLong ||
-                    lb.getType() == BSONType::NumberInt);
+                isInfinite(lb) || lb.getType() == BSONType::numberLong ||
+                    lb.getType() == BSONType::numberInt);
             uassert(
                 6901309,
                 "Upper bound for query over NumberLong must be either a NumberLong or NumberInt.",
-                isInfinite(ub) || ub.getType() == BSONType::NumberLong ||
-                    ub.getType() == BSONType::NumberInt);
+                isInfinite(ub) || ub.getType() == BSONType::numberLong ||
+                    ub.getType() == BSONType::numberInt);
             break;
-        case Date:
+        case BSONType::date:
             uassert(6901310,
                     "Lower bound for query over Date must be a Date.",
-                    isInfinite(lb) || lb.getType() == BSONType::Date);
+                    isInfinite(lb) || lb.getType() == BSONType::date);
             uassert(6901311,
                     "Upper bound for query over Date must be a Date.",
-                    isInfinite(ub) || ub.getType() == BSONType::Date);
+                    isInfinite(ub) || ub.getType() == BSONType::date);
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             uassert(6901312,
                     "Lower bound for query over NumberDouble must be a NumberDouble.",
-                    lb.getType() == BSONType::NumberDouble);
+                    lb.getType() == BSONType::numberDouble);
             uassert(6901313,
                     "Upper bound for query over NumberDouble must be a NumberDouble.",
-                    ub.getType() == BSONType::NumberDouble);
+                    ub.getType() == BSONType::numberDouble);
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             uassert(6901314,
                     "Lower bound for query over NumberDecimal must be a NumberDecimal.",
-                    isInfinite(lb) || lb.getType() == BSONType::NumberDecimal);
+                    isInfinite(lb) || lb.getType() == BSONType::numberDecimal);
             uassert(6901315,
                     "Upper bound for query over NumberDecimal must be a NumberDecimal.",
-                    isInfinite(ub) || ub.getType() == BSONType::NumberDecimal);
+                    isInfinite(ub) || ub.getType() == BSONType::numberDecimal);
             break;
         default:
             uasserted(6901305,
@@ -162,7 +162,7 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
     if (edgesInfo.getPrecision().has_value()) {
         uassert(6967102,
                 "Precision can only be set if type is floating point",
-                min.type() == BSONType::NumberDecimal || min.type() == BSONType::NumberDouble);
+                min.type() == BSONType::numberDecimal || min.type() == BSONType::numberDouble);
     }
 
     if (edgesInfo.getTrimFactor().has_value()) {
@@ -211,7 +211,7 @@ void validateIDLFLE2RangeInsertSpec(const FLE2RangeInsertSpec* spec) {
     if (spec->getPrecision().has_value()) {
         uassert(8574102,
                 "Precision can only be set if type is floating point",
-                valueType == BSONType::NumberDecimal || valueType == BSONType::NumberDouble);
+                valueType == BSONType::numberDecimal || valueType == BSONType::numberDouble);
     }
 }
 

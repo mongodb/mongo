@@ -1180,8 +1180,15 @@ private:
         ASSERT_EQUALS(1U, _client.count(_nss, code()));
         ASSERT_EQUALS(1U, _client.count(_nss, codeWScope()));
 
-        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)Code))));
-        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)CodeWScope))));
+        ASSERT_EQUALS(
+            1U,
+            _client.count(_nss,
+                          BSON("a" << BSON("$type" << int(stdx::to_underlying(BSONType::code))))));
+        ASSERT_EQUALS(
+            1U,
+            _client.count(
+                _nss,
+                BSON("a" << BSON("$type" << int(stdx::to_underlying(BSONType::codeWScope))))));
     }
     BSONObj code() const {
         BSONObjBuilder codeBuilder;
@@ -1214,7 +1221,10 @@ private:
         _client.remove(_nss, BSONObj());
         _client.insert(_nss, dbref());
         ASSERT_EQUALS(1U, _client.count(_nss, dbref()));
-        ASSERT_EQUALS(1U, _client.count(_nss, BSON("a" << BSON("$type" << (int)DBRef))));
+        ASSERT_EQUALS(
+            1U,
+            _client.count(_nss,
+                          BSON("a" << BSON("$type" << int(stdx::to_underlying(BSONType::dbRef))))));
     }
     BSONObj dbref() const {
         BSONObjBuilder b;

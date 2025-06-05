@@ -32,12 +32,12 @@ namespace mongo {
 namespace docs_needed_bounds {
 DocsNeededConstraint parseDocsNeededConstraintFromBSON(const BSONElement& elem) {
     if (elem.isNumber() &&
-        (elem.type() == BSONType::NumberInt || elem.type() == BSONType::NumberLong)) {
+        (elem.type() == BSONType::numberInt || elem.type() == BSONType::numberLong)) {
         uassert(ErrorCodes::BadValue, "DocsNeededConstraint cannot be NaN.", !elem.isNaN());
         auto val = elem.safeNumberLong();
         uassert(ErrorCodes::BadValue, "DocsNeededConstraint number value must be >= 0.", val >= 0);
         return val;
-    } else if (elem.type() == BSONType::String) {
+    } else if (elem.type() == BSONType::string) {
         if (elem.str() == kNeedAllName) {
             return NeedAll();
         } else if (elem.str() == kUnknownName) {

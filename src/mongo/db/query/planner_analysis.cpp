@@ -991,7 +991,7 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
         }
 
         for (auto& elt : indexEntry.keyPattern) {
-            if (elt.type() == BSONType::String && elt.String() == "2dsphere") {
+            if (elt.type() == BSONType::string && elt.String() == "2dsphere") {
                 twoDSphereFields.insert(elt.fieldName());
             }
         }
@@ -1006,7 +1006,7 @@ BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
     BSONObjIterator kpIt(indexKeyPattern);
     while (kpIt.more()) {
         BSONElement elt = kpIt.next();
-        if (elt.type() == mongo::String) {
+        if (elt.type() == BSONType::string) {
             break;
         }
         // The canonical check as to whether a key pattern element is "ascending" or "descending" is

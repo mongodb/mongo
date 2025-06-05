@@ -54,14 +54,14 @@ Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType*
         return status;
 
     *type = payloadElement.type();
-    if (payloadElement.type() == BinData) {
+    if (payloadElement.type() == BSONType::binData) {
         const char* payloadData;
         int payloadLen;
         payloadData = payloadElement.binData(payloadLen);
         if (payloadLen < 0)
             return Status(ErrorCodes::InvalidLength, "Negative payload length");
         *payload = std::string(payloadData, payloadData + payloadLen);
-    } else if (payloadElement.type() == String) {
+    } else if (payloadElement.type() == BSONType::string) {
         try {
             *payload = base64::decode(payloadElement.str());
         } catch (AssertionException& e) {

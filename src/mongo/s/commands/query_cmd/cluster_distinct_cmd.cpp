@@ -482,7 +482,7 @@ public:
                             str::stream()
                                 << "Expected 'values' field to be of type Array, but found "
                                 << typeName(values.type()),
-                            values.type() == BSONType::Array);
+                            values.type() == BSONType::array);
                     BSONObjIterator it(values.embeddedObject());
                     while (it.more()) {
                         BSONElement nxt = it.next();

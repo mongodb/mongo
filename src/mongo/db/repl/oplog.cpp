@@ -718,7 +718,7 @@ NamespaceString extractNs(DatabaseName dbName, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(40073,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
-            first.canonicalType() == canonicalizeBSONType(mongo::String));
+            first.canonicalType() == canonicalizeBSONType(BSONType::string));
     StringData coll = first.valueStringData();
     uassert(28635, "no collection name specified", !coll.empty());
     return NamespaceStringUtil::deserialize(dbName, coll);
@@ -861,7 +861,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           invariant(first.fieldNameStringData() == "createIndexes");
           uassert(ErrorCodes::InvalidNamespace,
                   "createIndexes value must be a string",
-                  first.type() == mongo::String);
+                  first.type() == BSONType::string);
           BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           boost::optional<Lock::CollectionLock> collLock;

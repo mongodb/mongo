@@ -430,7 +430,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
 
     boost::optional<BSONObj> postBatchResumeToken;
     if (auto elem = cursorObj["postBatchResumeToken"]) {
-        if (elem.type() != BSONType::Object)
+        if (elem.type() != BSONType::object)
             return Status(ErrorCodes::Error(5761702),
                           "Expected field 'postBatchResumeToken' to be of object type");
         postBatchResumeToken = elem.Obj().getOwned();

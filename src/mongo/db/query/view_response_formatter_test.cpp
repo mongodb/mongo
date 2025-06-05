@@ -121,7 +121,7 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseSuccessfully) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), bob);
-    ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithNumberInt) {
@@ -131,7 +131,7 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseWithNumberInt) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(BSON("n" << std::numeric_limits<int>::max() << "ok" << 1), bob);
-    ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithNumberLong) {
@@ -142,7 +142,7 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseWithNumberLong) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(BSON("n" << std::numeric_limits<long long>::max() << "ok" << 1), bob);
-    ASSERT_EQ(BSONType::NumberLong, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberLong, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
@@ -152,7 +152,7 @@ TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), bob);
-    ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatSubsequentCountResponseWithLong) {
@@ -163,7 +163,7 @@ TEST(ViewResponseFormatter, FormatSubsequentCountResponseWithLong) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(BSON("n" << std::numeric_limits<long long>::max() << "ok" << 1), bob);
-    ASSERT_EQ(BSONType::NumberLong, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberLong, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) {
@@ -183,7 +183,7 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) 
         formatter.appendAsCountResponse(&builder, tenantId);
         BSONObj bob = builder.obj();
         ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), bob);
-        ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+        ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
     }
 }
 
@@ -194,7 +194,7 @@ TEST(ViewResponseFormatter, FormatEmptyInitialCountResponseSuccessfully) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 0, ok: 1}"), bob);
-    ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatEmptySubsequentCountResponseSuccessfully) {
@@ -204,7 +204,7 @@ TEST(ViewResponseFormatter, FormatEmptySubsequentCountResponseSuccessfully) {
     formatter.appendAsCountResponse(&builder, boost::none);
     BSONObj bob = builder.obj();
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 0, ok: 1}"), bob);
-    ASSERT_EQ(BSONType::NumberInt, bob.getField("n"_sd).type());
+    ASSERT_EQ(BSONType::numberInt, bob.getField("n"_sd).type());
 }
 
 TEST(ViewResponseFormatter, FormatFailedCountResponseFails) {

@@ -908,10 +908,10 @@ TEST(EqOp, MatchesNestedNull) {
 }
 
 TEST(EqOp, MatchesMinKey) {
-    BSONObj operand = BSON("a" << MinKey);
+    BSONObj operand = BSON("a" << BSONType::minKey);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(exec::matcher::matchesBSON(&eq, minKeyObj, nullptr));
@@ -925,10 +925,10 @@ TEST(EqOp, MatchesMinKey) {
 
 
 TEST(EqOp, MatchesMaxKey) {
-    BSONObj operand = BSON("a" << MaxKey);
+    BSONObj operand = BSON("a" << BSONType::maxKey);
     EqualityMatchExpression eq("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(!exec::matcher::matchesBSON(&eq, minKeyObj, nullptr));
@@ -1057,10 +1057,10 @@ TEST(LtOp, MatchesDotNotationNull) {
 }
 
 TEST(LtOp, MatchesMinKey) {
-    BSONObj operand = BSON("a" << MinKey);
+    BSONObj operand = BSON("a" << BSONType::minKey);
     LTMatchExpression lt("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(!exec::matcher::matchesBSON(&lt, minKeyObj, nullptr));
@@ -1073,10 +1073,10 @@ TEST(LtOp, MatchesMinKey) {
 }
 
 TEST(LtOp, MatchesMaxKey) {
-    BSONObj operand = BSON("a" << MaxKey);
+    BSONObj operand = BSON("a" << BSONType::maxKey);
     LTMatchExpression lt("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(exec::matcher::matchesBSON(&lt, minKeyObj, nullptr));
@@ -1167,10 +1167,10 @@ TEST(LteOp, MatchesDotNotationNull) {
 }
 
 TEST(LteOp, MatchesMinKey) {
-    BSONObj operand = BSON("a" << MinKey);
+    BSONObj operand = BSON("a" << BSONType::minKey);
     LTEMatchExpression lte("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(exec::matcher::matchesBSON(&lte, minKeyObj, nullptr));
@@ -1183,10 +1183,10 @@ TEST(LteOp, MatchesMinKey) {
 }
 
 TEST(LteOp, MatchesMaxKey) {
-    BSONObj operand = BSON("a" << MaxKey);
+    BSONObj operand = BSON("a" << BSONType::maxKey);
     LTEMatchExpression lte("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(exec::matcher::matchesBSON(&lte, minKeyObj, nullptr));
@@ -1266,10 +1266,10 @@ TEST(GtOp, MatchesDotNotationNull) {
 }
 
 TEST(GtOp, MatchesMinKey) {
-    BSONObj operand = BSON("a" << MinKey);
+    BSONObj operand = BSON("a" << BSONType::minKey);
     GTMatchExpression gt("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(!exec::matcher::matchesBSON(&gt, minKeyObj, nullptr));
@@ -1282,10 +1282,10 @@ TEST(GtOp, MatchesMinKey) {
 }
 
 TEST(GtOp, MatchesMaxKey) {
-    BSONObj operand = BSON("a" << MaxKey);
+    BSONObj operand = BSON("a" << BSONType::maxKey);
     GTMatchExpression gt("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(!exec::matcher::matchesBSON(&gt, minKeyObj, nullptr));
@@ -1377,10 +1377,10 @@ TEST(GteOp, MatchesDotNotationNull) {
 }
 
 TEST(GteOp, MatchesMinKey) {
-    BSONObj operand = BSON("a" << MinKey);
+    BSONObj operand = BSON("a" << BSONType::minKey);
     GTEMatchExpression gte("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(exec::matcher::matchesBSON(&gte, minKeyObj, nullptr));
@@ -1393,10 +1393,10 @@ TEST(GteOp, MatchesMinKey) {
 }
 
 TEST(GteOp, MatchesMaxKey) {
-    BSONObj operand = BSON("a" << MaxKey);
+    BSONObj operand = BSON("a" << BSONType::maxKey);
     GTEMatchExpression gte("a"_sd, operand["a"]);
-    BSONObj minKeyObj = BSON("a" << MinKey);
-    BSONObj maxKeyObj = BSON("a" << MaxKey);
+    BSONObj minKeyObj = BSON("a" << BSONType::minKey);
+    BSONObj maxKeyObj = BSON("a" << BSONType::maxKey);
     BSONObj numObj = BSON("a" << 4);
 
     ASSERT(!exec::matcher::matchesBSON(&gte, minKeyObj, nullptr));
@@ -1761,24 +1761,24 @@ TEST(InMatchExpression, MatchesNull) {
 }
 
 TEST(InMatchExpression, MatchesMinKey) {
-    BSONObj operand = BSON_ARRAY(MinKey);
+    BSONObj operand = BSON_ARRAY(BSONType::minKey);
     InMatchExpression in("a"_sd);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << MinKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << MaxKey), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << BSONType::minKey), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSONType::maxKey), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
 }
 
 TEST(InMatchExpression, MatchesMaxKey) {
-    BSONObj operand = BSON_ARRAY(MaxKey);
+    BSONObj operand = BSON_ARRAY(BSONType::maxKey);
     InMatchExpression in("a"_sd);
     std::vector<BSONElement> equalities{operand.firstElement()};
     ASSERT_OK(in.setEqualities(std::move(equalities)));
 
-    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << MaxKey), nullptr));
-    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << MinKey), nullptr));
+    ASSERT(exec::matcher::matchesBSON(&in, BSON("a" << BSONType::maxKey), nullptr));
+    ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << BSONType::minKey), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&in, BSON("a" << 4), nullptr));
 }
 
@@ -2919,7 +2919,7 @@ TEST(NorOp, ElemMatchKey) {
 TEST(ExpressionTypeTest, MatchesElementStringType) {
     BSONObj match = BSON("a" << "abc");
     BSONObj notMatch = BSON("a" << 5);
-    TypeMatchExpression type(""_sd, String);
+    TypeMatchExpression type(""_sd, BSONType::string);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -2927,7 +2927,7 @@ TEST(ExpressionTypeTest, MatchesElementStringType) {
 TEST(ExpressionTypeTest, MatchesElementNullType) {
     BSONObj match = BSON("a" << BSONNULL);
     BSONObj notMatch = BSON("a" << "abc");
-    TypeMatchExpression type(""_sd, jstNULL);
+    TypeMatchExpression type(""_sd, BSONType::null);
     ASSERT(exec::matcher::matchesSingleElement(&type, match["a"]));
     ASSERT(!exec::matcher::matchesSingleElement(&type, notMatch["a"]));
 }
@@ -2937,9 +2937,9 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
     BSONObj match2 = BSON("a" << 1LL);
     BSONObj match3 = BSON("a" << 2.5);
     BSONObj notMatch = BSON("a" << "abc");
-    ASSERT_EQ(BSONType::NumberInt, match1["a"].type());
-    ASSERT_EQ(BSONType::NumberLong, match2["a"].type());
-    ASSERT_EQ(BSONType::NumberDouble, match3["a"].type());
+    ASSERT_EQ(BSONType::numberInt, match1["a"].type());
+    ASSERT_EQ(BSONType::numberLong, match2["a"].type());
+    ASSERT_EQ(BSONType::numberDouble, match3["a"].type());
 
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
@@ -2953,13 +2953,13 @@ TEST(ExpressionTypeTest, MatchesElementNumber) {
 }
 
 TEST(ExpressionTypeTest, MatchesScalar) {
-    TypeMatchExpression type("a"_sd, Bool);
+    TypeMatchExpression type("a"_sd, BSONType::boolean);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << true), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesArray) {
-    TypeMatchExpression type("a"_sd, NumberInt);
+    TypeMatchExpression type("a"_sd, BSONType::numberInt);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4)), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("a" << 4)), nullptr));
@@ -2968,7 +2968,7 @@ TEST(ExpressionTypeTest, MatchesArray) {
 }
 
 TEST(ExpressionTypeTest, TypeArrayMatchesOuterAndInnerArray) {
-    TypeMatchExpression type("a"_sd, Array);
+    TypeMatchExpression type("a"_sd, BSONType::array);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSONArray()), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(4 << "a")), nullptr));
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSONArray() << 2)), nullptr));
@@ -2976,44 +2976,44 @@ TEST(ExpressionTypeTest, TypeArrayMatchesOuterAndInnerArray) {
 }
 
 TEST(ExpressionTypeTest, MatchesObject) {
-    TypeMatchExpression type("a"_sd, Object);
+    TypeMatchExpression type("a"_sd, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << 1)), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationFieldObject) {
-    TypeMatchExpression type("a.b"_sd, Object);
+    TypeMatchExpression type("a.b"_sd, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << BSON("c" << 1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON("b" << 1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementArray) {
-    TypeMatchExpression type("a.0"_sd, Array);
+    TypeMatchExpression type("a.0"_sd, BSONType::array);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSON_ARRAY(1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("b")), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementScalar) {
-    TypeMatchExpression type("a.0"_sd, String);
+    TypeMatchExpression type("a.0"_sd, BSONType::string);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY("b")), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesDotNotationArrayElementObject) {
-    TypeMatchExpression type("a.0"_sd, Object);
+    TypeMatchExpression type("a.0"_sd, BSONType::object);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(BSON("b" << 1))), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << BSON_ARRAY(1)), nullptr));
 }
 
 TEST(ExpressionTypeTest, MatchesNull) {
-    TypeMatchExpression type("a"_sd, jstNULL);
+    TypeMatchExpression type("a"_sd, BSONType::null);
     ASSERT(exec::matcher::matchesBSON(&type, BSON("a" << BSONNULL), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 4), nullptr));
     ASSERT(!exec::matcher::matchesBSON(&type, BSONObj(), nullptr));
 }
 
 TEST(ExpressionTypeTest, ElemMatchKey) {
-    TypeMatchExpression type("a.b"_sd, String);
+    TypeMatchExpression type("a.b"_sd, BSONType::string);
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT(!exec::matcher::matchesBSON(&type, BSON("a" << 1), &details));
@@ -3031,7 +3031,7 @@ TEST(ExpressionTypeTest, ElemMatchKey) {
 }
 
 TEST(ExpressionTypeTest, InternalSchemaTypeArrayOnlyMatchesArrays) {
-    InternalSchemaTypeExpression expr("a"_sd, BSONType::Array);
+    InternalSchemaTypeExpression expr("a"_sd, BSONType::array);
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: [1]}")));
     ASSERT_TRUE(exec::matcher::matchesBSON(&expr, fromjson("{a: [{b: 1}, {b: 2}]}")));
@@ -3054,8 +3054,8 @@ TEST(ExpressionTypeTest, InternalSchemaTypeNumberDoesNotMatchArrays) {
 TEST(ExpressionTypeTest, TypeExprWithMultipleTypesMatchesAllSuchTypes) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Object);
+    typeSet.bsonTypes.insert(BSONType::string);
+    typeSet.bsonTypes.insert(BSONType::object);
     TypeMatchExpression expr("a"_sd, std::move(typeSet));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));
@@ -3070,8 +3070,8 @@ TEST(ExpressionTypeTest, TypeExprWithMultipleTypesMatchesAllSuchTypes) {
 TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTypes) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Object);
+    typeSet.bsonTypes.insert(BSONType::string);
+    typeSet.bsonTypes.insert(BSONType::object);
     InternalSchemaTypeExpression expr("a"_sd, std::move(typeSet));
 
     ASSERT_FALSE(exec::matcher::matchesBSON(&expr, fromjson("{a: []}")));

@@ -229,7 +229,7 @@ private:
                 fieldName,
                 [&]() {
                     boost::optional<std::string> result;
-                    if (expectedField.type() != BSONType::jstNULL) {
+                    if (expectedField.type() != BSONType::null) {
                         result = expectedField.String();
                     }
                     return result;
@@ -243,7 +243,7 @@ private:
                 fieldName,
                 [&]() {
                     boost::optional<int> result;
-                    if (expectedField.type() != BSONType::jstNULL) {
+                    if (expectedField.type() != BSONType::null) {
                         result = expectedField.numberInt();
                     }
                     return result;
@@ -257,7 +257,7 @@ private:
                 fieldName,
                 [&]() {
                     boost::optional<OID> result;
-                    if (expectedField.type() != BSONType::jstNULL) {
+                    if (expectedField.type() != BSONType::null) {
                         result = expectedField.OID();
                     }
                     return result;
@@ -271,7 +271,7 @@ private:
                 fieldName,
                 [&]() {
                     boost::optional<int> result;
-                    if (expectedField.type() != BSONType::jstNULL) {
+                    if (expectedField.type() != BSONType::null) {
                         result = expectedField.numberInt();
                     }
                     return result;

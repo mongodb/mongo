@@ -57,7 +57,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalInhibitOptimization::
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$_internalInhibitOptimization must take a nested object but found: "
                           << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
     uassert(ErrorCodes::FailedToParse,

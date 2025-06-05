@@ -129,7 +129,7 @@ public:
         {
             BSONElement keyPatternElem;
             auto keyPatternStatus =
-                bsonExtractTypedField(cmdObj, "keyPattern", Object, &keyPatternElem);
+                bsonExtractTypedField(cmdObj, "keyPattern", BSONType::object, &keyPatternElem);
 
             if (!keyPatternStatus.isOK()) {
                 errmsg = "need to specify the key pattern the collection is sharded over";
@@ -150,7 +150,7 @@ public:
         {
             BSONElement splitKeysElem;
             auto splitKeysElemStatus =
-                bsonExtractTypedField(cmdObj, "splitKeys", mongo::Array, &splitKeysElem);
+                bsonExtractTypedField(cmdObj, "splitKeys", BSONType::array, &splitKeysElem);
 
             if (!splitKeysElemStatus.isOK()) {
                 errmsg = "need to provide the split points to chunk over";

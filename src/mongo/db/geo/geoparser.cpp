@@ -189,7 +189,7 @@ static Status coordToPoint(double lng, double lat, S2Point* out) {
 }
 
 static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
-    if (Array != elem.type()) {
+    if (BSONType::array != elem.type()) {
         return BAD_VALUE("GeoJSON coordinates must be an array, instead got type "
                          << typeName(elem.type()));
     }
@@ -205,7 +205,7 @@ static Status parseGeoJSONCoordinate(const BSONElement& elem, S2Point* out) {
 
 // "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
 static Status parseArrayOfCoordinates(const BSONElement& elem, vector<S2Point>* out) {
-    if (Array != elem.type()) {
+    if (BSONType::array != elem.type()) {
         return BAD_VALUE("GeoJSON coordinates must be an array of coordinates, instead got type "
                          << typeName(elem.type()));
     }
@@ -256,7 +256,7 @@ static Status isLoopClosed(const vector<S2Point>& loop, const BSONElement loopEl
 static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
                                              bool skipValidation,
                                              S2Polygon* out) {
-    if (Array != elem.type()) {
+    if (BSONType::array != elem.type()) {
         return BAD_VALUE("Polygon coordinates must be an array, instead got type "
                          << typeName(elem.type()));
     }
@@ -369,7 +369,7 @@ static Status parseGeoJSONPolygonCoordinates(const BSONElement& elem,
 }
 
 static Status parseBigSimplePolygonCoordinates(const BSONElement& elem, BigSimplePolygon* out) {
-    if (Array != elem.type()) {
+    if (BSONType::array != elem.type()) {
         return BAD_VALUE("Coordinates of polygon must be an array, instead got type "
                          << typeName(elem.type()));
     }
@@ -440,7 +440,8 @@ static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphe
     BSONObj crsObj = crsElt.embeddedObject();
 
     // "type": "name"
-    if (String != crsObj[kCrsTypeField].type() || kCrsNameField != crsObj[kCrsTypeField].String())
+    if (BSONType::string != crsObj[kCrsTypeField].type() ||
+        kCrsNameField != crsObj[kCrsTypeField].String())
         return BAD_VALUE("GeoJSON CRS must have field \"type\": \"name\"");
 
     // "properties"
@@ -450,7 +451,7 @@ static Status parseGeoJSONCRS(const BSONObj& obj, CRS* crs, bool allowStrictSphe
                          << typeName(propertiesElt.type()));
     }
     BSONObj propertiesObj = propertiesElt.embeddedObject();
-    if (String != propertiesObj[kPropertiesNameField].type()) {
+    if (BSONType::string != propertiesObj[kPropertiesNameField].type()) {
         return BAD_VALUE("In CRS, \"properties.name\" must be a string, instead got type "
                          << typeName(propertiesObj[kPropertiesNameField].type()));
     }
@@ -504,7 +505,7 @@ Status parsePoint(const BSONElement& elem, PointWithCRS* out, bool allowAddlFiel
     }
     BSONObj obj = elem.Obj();
     // location: [1, 2] or location: {x: 1, y:2}
-    if (Array == elem.type() || obj.firstElement().isNumber()) {
+    if (BSONType::array == elem.type() || obj.firstElement().isNumber()) {
         // Legacy point
         return GeoParser::parseLegacyPoint(elem, out, allowAddlFields);
     }
@@ -659,7 +660,7 @@ Status GeoParser::parseMultiLine(const BSONObj& obj, bool skipValidation, MultiL
         return status;
 
     BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_COORDINATES);
-    if (Array != coordElt.type()) {
+    if (BSONType::array != coordElt.type()) {
         return BAD_VALUE("MultiLineString coordinates must be an array, instead got type "
                          << typeName(coordElt.type()));
     }
@@ -692,7 +693,7 @@ Status GeoParser::parseMultiPolygon(const BSONObj& obj,
         return status;
 
     BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_COORDINATES);
-    if (Array != coordElt.type()) {
+    if (BSONType::array != coordElt.type()) {
         return BAD_VALUE("MultiPolygon coordinates must be an array, instead got type "
                          << typeName(coordElt.type()));
     }
@@ -787,7 +788,7 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
                                           bool skipValidation,
                                           GeometryCollection* out) {
     BSONElement coordElt = dps::extractElementAtDottedPath(obj, GEOJSON_GEOMETRIES);
-    if (Array != coordElt.type()) {
+    if (BSONType::array != coordElt.type()) {
         return BAD_VALUE("GeometryCollection geometries must be an array, instead got type "
                          << typeName(coordElt.type()));
     }
@@ -796,7 +797,7 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
         return BAD_VALUE("GeometryCollection geometries must have at least 1 element");
 
     for (size_t i = 0; i < geometries.size(); ++i) {
-        if (Object != geometries[i].type())
+        if (BSONType::object != geometries[i].type())
             return BAD_VALUE("Element " << i
                                         << " of \"geometries\" must be an object, instead got type "
                                         << typeName(geometries[i].type()) << ": "
@@ -879,7 +880,7 @@ GeoParser::GeoSpecifier GeoParser::parseGeoSpecifier(const BSONElement& type) {
 
 GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
     BSONElement type = dps::extractElementAtDottedPath(obj, GEOJSON_TYPE);
-    if (String != type.type()) {
+    if (BSONType::string != type.type()) {
         return GeoParser::GEOJSON_UNKNOWN;
     }
     return geoJSONTypeStringToEnum(type.checkAndGetStringData());
@@ -891,7 +892,7 @@ void GeoParser::assertValidGeoJSONType(const BSONObj& obj) {
     uassert(8459801,
             str::stream() << "Expected valid geojson of type string, got non-string type of value "
                           << type,
-            String == type.type());
+            BSONType::string == type.type());
     auto str = type.checkAndGetStringData();
     uassert(8459800,
             str::stream() << "Expected valid geojson type, got " << str,

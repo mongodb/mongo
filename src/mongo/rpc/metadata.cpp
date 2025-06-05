@@ -180,11 +180,11 @@ boost::optional<StringData> commandNameToDocumentSequenceName(StringData command
 }
 
 bool isArrayOfObjects(BSONElement array) {
-    if (array.type() != Array)
+    if (array.type() != BSONType::array)
         return false;
 
     for (auto elem : array.Obj()) {
-        if (elem.type() != Object)
+        if (elem.type() != BSONType::object)
             return false;
     }
 

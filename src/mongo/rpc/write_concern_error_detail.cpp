@@ -162,7 +162,7 @@ WriteConcernErrorDetail getWriteConcernErrorDetail(const BSONElement& wcErrorEle
 
 std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(const BSONObj& obj) {
     BSONElement wcErrorElem;
-    Status status = bsonExtractTypedField(obj, "writeConcernError", Object, &wcErrorElem);
+    Status status = bsonExtractTypedField(obj, "writeConcernError", BSONType::object, &wcErrorElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return nullptr;

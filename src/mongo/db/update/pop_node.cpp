@@ -61,7 +61,7 @@ ModifierNode::ModifyResult PopNode::updateExistingElement(mutablebson::Element* 
             str::stream() << "Path '" << elementPath.dottedField()
                           << "' contains an element of non-array type '"
                           << typeName(element->getType()) << "'",
-            element->getType() == BSONType::Array);
+            element->getType() == BSONType::array);
 
     if (!element->hasChildren()) {
         // The path exists and contains an array, but the array is empty.

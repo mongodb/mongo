@@ -437,7 +437,7 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
             str::stream() << "CollectionScan was asked to track latest operation time, "
                              "but found a result without a valid 'ts' field: "
                           << record.data.toBson().toString(),
-            tsElem.type() == BSONType::bsonTimestamp);
+            tsElem.type() == BSONType::timestamp);
     LOGV2_DEBUG(550450,
                 5,
                 "Setting _latestOplogEntryTimestamp to the max of the timestamp of the current "

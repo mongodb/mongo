@@ -80,8 +80,8 @@ void extractInputField(const Value& textInput,
                        boost::optional<std::string>& extractedInput) {
     uassert(51104,
             str::stream() << opName << " needs 'input' to be of type string",
-            textInput.nullish() || textInput.getType() == BSONType::String);
-    if (textInput.getType() == BSONType::String) {
+            textInput.nullish() || textInput.getType() == BSONType::string);
+    if (textInput.getType() == BSONType::string) {
         extractedInput = textInput.getString();
     }
 }
@@ -93,14 +93,14 @@ void extractRegexAndOptions(const Value& regexPattern,
                             boost::optional<std::string>& extractedOptions) {
     uassert(51105,
             str::stream() << opName << " needs 'regex' to be of type string or regex",
-            regexPattern.nullish() || regexPattern.getType() == BSONType::String ||
-                regexPattern.getType() == BSONType::RegEx);
+            regexPattern.nullish() || regexPattern.getType() == BSONType::string ||
+                regexPattern.getType() == BSONType::regEx);
     uassert(51106,
             str::stream() << opName << " needs 'options' to be of type string",
-            regexOptions.nullish() || regexOptions.getType() == BSONType::String);
+            regexOptions.nullish() || regexOptions.getType() == BSONType::string);
 
     // The 'regex' field can be a RegEx object and may have its own options...
-    if (regexPattern.getType() == BSONType::RegEx) {
+    if (regexPattern.getType() == BSONType::regEx) {
         StringData regexFlags = regexPattern.getRegexFlags();
         extractedPattern = regexPattern.getRegex();
         uassert(51107,
@@ -111,7 +111,7 @@ void extractRegexAndOptions(const Value& regexPattern,
         if (!regexFlags.empty()) {
             extractedOptions = regexFlags.toString();
         }
-    } else if (regexPattern.getType() == BSONType::String) {
+    } else if (regexPattern.getType() == BSONType::string) {
         // ...or it can be a string field with options specified separately.
         extractedPattern = regexPattern.getString();
     }
@@ -291,7 +291,7 @@ Value evaluate(const ExpressionRegexFindAll& expr, const Document& root, Variabl
     // is a match.
     do {
         auto matchObj = nextMatch(&executionState, expr.getOpName());
-        if (matchObj.getType() == BSONType::jstNULL) {
+        if (matchObj.getType() == BSONType::null) {
             break;
         }
         totalDocSize += matchObj.getApproximateSize();

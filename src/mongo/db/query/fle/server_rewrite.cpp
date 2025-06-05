@@ -236,7 +236,7 @@ std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
             uassert(9775500,
                     "Each namespace schema "
                     "must be an object",
-                    elem.type() == Object);
+                    elem.type() == BSONType::object);
             auto schemaNs = NamespaceStringUtil::deserialize(
                 boost::none, elem.fieldNameStringData(), SerializationContext::stateDefault());
             auto efc = EncryptionInformationHelpers::getAndValidateSchema(schemaNs, encryptInfo);

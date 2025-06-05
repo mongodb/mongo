@@ -58,7 +58,7 @@ public:
         // treat them as regular numeric values for the purposes of addition after making sure that
         // only one date is present in the operand list.
         Value valToAdd;
-        if (operand.getType() == Date) {
+        if (operand.getType() == BSONType::date) {
             uassert(16612, "only one date allowed in an $add expression", !isDate);
             Value oldValue = getValue();
             longTotal = 0;
@@ -78,21 +78,21 @@ public:
         // If this operation widens the return type, perform any necessary type conversions.
         if (oldWidestType != widestType) {
             switch (widestType) {
-                case NumberLong:
+                case BSONType::numberLong:
                     // Int -> Long is handled by the same sum.
                     break;
-                case NumberDouble:
+                case BSONType::numberDouble:
                     // Int/Long -> Double converts the existing longTotal to a doubleTotal.
                     doubleTotal = longTotal;
                     break;
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     // Convert the right total to NumberDecimal by looking at the old widest type.
                     switch (oldWidestType) {
-                        case NumberInt:
-                        case NumberLong:
+                        case BSONType::numberInt:
+                        case BSONType::numberLong:
                             decimalTotal = Decimal128(longTotal);
                             break;
-                        case NumberDouble:
+                        case BSONType::numberDouble:
                             decimalTotal = Decimal128(doubleTotal);
                             break;
                         default:
@@ -106,22 +106,22 @@ public:
 
         // Perform the add operation.
         switch (widestType) {
-            case NumberInt:
-            case NumberLong:
+            case BSONType::numberInt:
+            case BSONType::numberLong:
                 // If the long long arithmetic overflows, promote the result to a NumberDouble and
                 // start incrementing the doubleTotal.
                 long long newLongTotal;
                 if (overflow::add(longTotal, valToAdd.coerceToLong(), &newLongTotal)) {
-                    widestType = NumberDouble;
+                    widestType = BSONType::numberDouble;
                     doubleTotal = longTotal + valToAdd.coerceToDouble();
                 } else {
                     longTotal = newLongTotal;
                 }
                 break;
-            case NumberDouble:
+            case BSONType::numberDouble:
                 doubleTotal += valToAdd.coerceToDouble();
                 break;
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 decimalTotal = decimalTotal.add(valToAdd.coerceToDecimal());
                 break;
             default:
@@ -137,13 +137,13 @@ public:
             return Value(Date_t::fromMillisSinceEpoch(longTotal));
         } else {
             switch (widestType) {
-                case NumberInt:
+                case BSONType::numberInt:
                     return Value::createIntOrLong(longTotal);
-                case NumberLong:
+                case BSONType::numberLong:
                     return Value(longTotal);
-                case NumberDouble:
+                case BSONType::numberDouble:
                     return Value(doubleTotal);
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     return Value(decimalTotal);
                 default:
                     MONGO_UNREACHABLE;
@@ -155,13 +155,13 @@ private:
     // Convert 'valToAdd' into the data type used for dates (long long) and add it to 'longTotal'.
     void addToDateValue(const Value& valToAdd) {
         switch (valToAdd.getType()) {
-            case NumberInt:
-            case NumberLong:
+            case BSONType::numberInt:
+            case BSONType::numberLong:
                 if (overflow::add(longTotal, valToAdd.coerceToLong(), &longTotal)) {
                     uasserted(ErrorCodes::Overflow, "date overflow");
                 }
                 break;
-            case NumberDouble: {
+            case BSONType::numberDouble: {
                 using limits = std::numeric_limits<long long>;
                 double doubleToAdd = valToAdd.coerceToDouble();
                 uassert(ErrorCodes::Overflow,
@@ -176,7 +176,7 @@ private:
                 }
                 break;
             }
-            case NumberDecimal: {
+            case BSONType::numberDecimal: {
                 Decimal128 decimalToAdd = valToAdd.coerceToDecimal();
 
                 std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
@@ -195,12 +195,12 @@ private:
     long long longTotal = 0;
     double doubleTotal = 0;
     Decimal128 decimalTotal;
-    BSONType widestType = NumberInt;
+    BSONType widestType = BSONType::numberInt;
     bool isDate = false;
 };
 
 Status checkAddOperandType(const Value& val) {
-    if (!val.numeric() && val.getType() != Date) {
+    if (!val.numeric() && val.getType() != BSONType::date) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "$add only supports numeric or date types, not "
                                     << typeName(val.getType()));
@@ -248,7 +248,7 @@ Value evaluate(const ExpressionAdd& expr, const Document& root, Variables* varia
 StatusWith<Value> evaluateDivide(Value lhs, Value rhs) {
     if (lhs.numeric() && rhs.numeric()) {
         // If, and only if, either side is decimal, return decimal.
-        if (lhs.getType() == NumberDecimal || rhs.getType() == NumberDecimal) {
+        if (lhs.getType() == BSONType::numberDecimal || rhs.getType() == BSONType::numberDecimal) {
             Decimal128 numer = lhs.coerceToDecimal();
             Decimal128 denom = rhs.coerceToDecimal();
             if (denom.isZero()) {
@@ -281,7 +281,7 @@ StatusWith<Value> evaluateMod(Value lhs, Value rhs) {
     if (lhs.numeric() && rhs.numeric()) {
 
         // If either side is decimal, perform the operation in decimal.
-        if (leftType == NumberDecimal || rightType == NumberDecimal) {
+        if (leftType == BSONType::numberDecimal || rightType == BSONType::numberDecimal) {
             Decimal128 left = lhs.coerceToDecimal();
             Decimal128 right = rhs.coerceToDecimal();
             if (right.isZero()) {
@@ -297,12 +297,12 @@ StatusWith<Value> evaluateMod(Value lhs, Value rhs) {
             return Status(ErrorCodes::Error(16610), str::stream() << "can't $mod by zero");
         }
 
-        if (leftType == NumberDouble || rightType == NumberDouble) {
+        if (leftType == BSONType::numberDouble || rightType == BSONType::numberDouble) {
             double left = lhs.coerceToDouble();
             return Value(fmod(left, right));
         }
 
-        if (leftType == NumberLong || rightType == NumberLong) {
+        if (leftType == BSONType::numberLong || rightType == BSONType::numberLong) {
             // if either is long, return long
             long long left = lhs.coerceToLong();
             long long rightLong = rhs.coerceToLong();
@@ -333,7 +333,7 @@ class MultiplyState {
     double doubleProduct = 1;
     long long longProduct = 1;
     Decimal128 decimalProduct;  // This will be initialized on encountering the first decimal.
-    BSONType productType = NumberInt;
+    BSONType productType = BSONType::numberInt;
 
 public:
     void operator*=(const Value& val) {
@@ -341,10 +341,10 @@ public:
 
         BSONType oldProductType = productType;
         productType = Value::getWidestNumeric(productType, val.getType());
-        if (productType == NumberDecimal) {
+        if (productType == BSONType::numberDecimal) {
             // On finding the first decimal, convert the partial product to decimal.
-            if (oldProductType != NumberDecimal) {
-                decimalProduct = oldProductType == NumberDouble
+            if (oldProductType != BSONType::numberDecimal) {
+                decimalProduct = oldProductType == BSONType::numberDouble
                     ? Decimal128(doubleProduct, Decimal128::kRoundTo15Digits)
                     : Decimal128(static_cast<int64_t>(longProduct));
             }
@@ -352,27 +352,27 @@ public:
         } else {
             doubleProduct *= val.coerceToDouble();
 
-            if (productType != NumberDouble) {
+            if (productType != BSONType::numberDouble) {
                 // If `productType` is not a double, it must be one of the integer types, so we
                 // attempt to update `longProduct`.
                 if (!std::isfinite(val.coerceToDouble()) ||
                     overflow::mul(longProduct, val.coerceToLong(), &longProduct)) {
                     // The multiplier is either Infinity or NaN, or the `longProduct` would
                     // have overflowed, so we're abandoning it.
-                    productType = NumberDouble;
+                    productType = BSONType::numberDouble;
                 }
             }
         }
     }
 
     Value getValue() const {
-        if (productType == NumberDouble) {
+        if (productType == BSONType::numberDouble) {
             return Value(doubleProduct);
-        } else if (productType == NumberLong) {
+        } else if (productType == BSONType::numberLong) {
             return Value(longProduct);
-        } else if (productType == NumberInt) {
+        } else if (productType == BSONType::numberInt) {
             return Value::createIntOrLong(longProduct);
-        } else if (productType == NumberDecimal) {
+        } else if (productType == BSONType::numberDecimal) {
             return Value(decimalProduct);
         } else {
             massert(16418, "$multiply resulted in a non-numeric type", false);
@@ -441,7 +441,8 @@ Value evaluate(const ExpressionLog& expr, const Document& root, Variables* varia
             str::stream() << "$log's base must be numeric, not " << typeName(baseVal.getType()),
             baseVal.numeric());
 
-    if (argVal.getType() == NumberDecimal || baseVal.getType() == NumberDecimal) {
+    if (argVal.getType() == BSONType::numberDecimal ||
+        baseVal.getType() == BSONType::numberDecimal) {
         Decimal128 argDecimal = argVal.coerceToDecimal();
         Decimal128 baseDecimal = baseVal.coerceToDecimal();
 
@@ -547,15 +548,15 @@ Value evaluate(const ExpressionRange& expr, const Document& root, Variables* var
 StatusWith<Value> evaluateSubtract(Value lhs, Value rhs) {
     BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
-    if (diffType == NumberDecimal) {
+    if (diffType == BSONType::numberDecimal) {
         Decimal128 right = rhs.coerceToDecimal();
         Decimal128 left = lhs.coerceToDecimal();
         return Value(left.subtract(right));
-    } else if (diffType == NumberDouble) {
+    } else if (diffType == BSONType::numberDouble) {
         double right = rhs.coerceToDouble();
         double left = lhs.coerceToDouble();
         return Value(left - right);
-    } else if (diffType == NumberLong) {
+    } else if (diffType == BSONType::numberLong) {
         long long result;
 
         // If there is an overflow, convert the values to doubles.
@@ -563,26 +564,26 @@ StatusWith<Value> evaluateSubtract(Value lhs, Value rhs) {
             return Value(lhs.coerceToDouble() - rhs.coerceToDouble());
         }
         return Value(result);
-    } else if (diffType == NumberInt) {
+    } else if (diffType == BSONType::numberInt) {
         long long right = rhs.coerceToLong();
         long long left = lhs.coerceToLong();
         return Value::createIntOrLong(left - right);
     } else if (lhs.nullish() || rhs.nullish()) {
         return Value(BSONNULL);
-    } else if (lhs.getType() == Date) {
+    } else if (lhs.getType() == BSONType::date) {
         BSONType rhsType = rhs.getType();
         switch (rhsType) {
-            case Date:
+            case BSONType::date:
                 return Value(durationCount<Milliseconds>(lhs.getDate() - rhs.getDate()));
-            case NumberInt:
-            case NumberLong: {
+            case BSONType::numberInt:
+            case BSONType::numberLong: {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
                 if (overflow::sub(longDiff, rhs.coerceToLong(), &longDiff)) {
                     return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
                 }
                 return Value(Date_t::fromMillisSinceEpoch(longDiff));
             }
-            case NumberDouble: {
+            case BSONType::numberDouble: {
                 using limits = std::numeric_limits<long long>;
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
                 double doubleRhs = rhs.coerceToDouble();
@@ -594,7 +595,7 @@ StatusWith<Value> evaluateSubtract(Value lhs, Value rhs) {
                 }
                 return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
             }
-            case NumberDecimal: {
+            case BSONType::numberDecimal: {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
                 Decimal128 decimalRhs = rhs.coerceToDecimal();
                 std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
@@ -666,14 +667,14 @@ Value evaluateRoundOrTrunc(const Document& root,
     // Construct 10^-precisionValue, which will be used as the quantize reference.
     auto quantum = Decimal128(0LL, Decimal128::kExponentBias - precisionValue, 0LL, 1LL);
     switch (numericArg.getType()) {
-        case BSONType::NumberDecimal: {
+        case BSONType::numberDecimal: {
             if (numericArg.getDecimal().isInfinite()) {
                 return numericArg;
             }
             auto out = numericArg.getDecimal().quantize(quantum, roundingMode);
             return Value(out);
         }
-        case BSONType::NumberDouble: {
+        case BSONType::numberDouble: {
             auto dec = Decimal128(numericArg.getDouble(), Decimal128::kRoundTo34Digits);
             if (dec.isInfinite()) {
                 return numericArg;
@@ -681,8 +682,8 @@ Value evaluateRoundOrTrunc(const Document& root,
             auto out = dec.quantize(quantum, roundingMode);
             return Value(out.toDouble());
         }
-        case BSONType::NumberInt:
-        case BSONType::NumberLong: {
+        case BSONType::numberInt:
+        case BSONType::numberLong: {
             if (precisionValue >= 0) {
                 return numericArg;
             }
@@ -692,7 +693,7 @@ Value evaluateRoundOrTrunc(const Document& root,
             uint32_t flags = 0;
             auto outll = out.toLong(&flags);
             assertFlagsValid(flags, opName, numericArgll, precisionValue);
-            if (numericArg.getType() == BSONType::NumberLong ||
+            if (numericArg.getType() == BSONType::numberLong ||
                 outll > std::numeric_limits<int>::max()) {
                 // Even if the original was an int to begin with - it has to be a long now.
                 return Value(static_cast<long long>(outll));
@@ -758,211 +759,252 @@ public:
         //
         // Conversions from NumberDouble
         //
-        table[BSONType::NumberDouble][BSONType::NumberDouble] = &performIdentityConversion;
-        table[BSONType::NumberDouble][BSONType::String] = &performFormatDouble;
-        table[BSONType::NumberDouble][BSONType::Bool] = [](ExpressionContext* const expCtx,
-                                                           Value inputValue) {
-            return Value(inputValue.coerceToBool());
-        };
-        table[BSONType::NumberDouble][BSONType::Date] = &performCastNumberToDate;
-        table[BSONType::NumberDouble][BSONType::NumberInt] = &performCastDoubleToInt;
-        table[BSONType::NumberDouble][BSONType::NumberLong] = &performCastDoubleToLong;
-        table[BSONType::NumberDouble][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
-                                                                    Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberDouble)]
+             [stdx::to_underlying(BSONType::numberDouble)] = &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::numberDouble)][stdx::to_underlying(BSONType::string)] =
+            &performFormatDouble;
+        table[stdx::to_underlying(BSONType::numberDouble)][stdx::to_underlying(BSONType::boolean)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.coerceToBool());
+            };
+        table[stdx::to_underlying(BSONType::numberDouble)][stdx::to_underlying(BSONType::date)] =
+            &performCastNumberToDate;
+        table[stdx::to_underlying(BSONType::numberDouble)]
+             [stdx::to_underlying(BSONType::numberInt)] = &performCastDoubleToInt;
+        table[stdx::to_underlying(BSONType::numberDouble)]
+             [stdx::to_underlying(BSONType::numberLong)] = &performCastDoubleToLong;
+        table[stdx::to_underlying(BSONType::numberDouble)][stdx::to_underlying(
+            BSONType::numberDecimal)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToDecimal());
         };
-        table[BSONType::NumberDouble][BSONType::BinData] = &performConvertDoubleToBinData;
+        table[stdx::to_underlying(BSONType::numberDouble)][stdx::to_underlying(BSONType::binData)] =
+            &performConvertDoubleToBinData;
 
         //
         // Conversions from String
         //
-        table[BSONType::String][BSONType::NumberDouble] = &parseStringToNumber<double, 0>;
-        table[BSONType::String][BSONType::String] = &performIdentityConversion;
-        table[BSONType::String][BSONType::jstOID] = &parseStringToOID;
-        table[BSONType::String][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::String][BSONType::Date] = [](ExpressionContext* const expCtx,
-                                                     Value inputValue) {
-            return Value(expCtx->getTimeZoneDatabase()->fromString(
-                inputValue.getStringData(), mongo::TimeZoneDatabase::utcZone()));
-        };
-        table[BSONType::String][BSONType::NumberInt] = &parseStringToNumber<int, 10>;
-        table[BSONType::String][BSONType::NumberLong] = &parseStringToNumber<long long, 10>;
-        table[BSONType::String][BSONType::NumberDecimal] = &parseStringToNumber<Decimal128, 0>;
-        table[BSONType::String][BSONType::BinData] = &parseStringToBinData;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::numberDouble)] =
+            &parseStringToNumber<double, 0>;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::string)] =
+            &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::oid)] =
+            &parseStringToOID;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::date)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(expCtx->getTimeZoneDatabase()->fromString(
+                    inputValue.getStringData(), mongo::TimeZoneDatabase::utcZone()));
+            };
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::numberInt)] =
+            &parseStringToNumber<int, 10>;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::numberLong)] =
+            &parseStringToNumber<long long, 10>;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::numberDecimal)] =
+            &parseStringToNumber<Decimal128, 0>;
+        table[stdx::to_underlying(BSONType::string)][stdx::to_underlying(BSONType::binData)] =
+            &parseStringToBinData;
 
         //
         // Conversions from BinData
         //
-        table[BSONType::BinData][BSONType::BinData] = &performConvertBinDataToBinData;
-        table[BSONType::BinData][BSONType::String] = &performConvertBinDataToString;
-        table[BSONType::BinData][BSONType::NumberInt] = &performConvertBinDataToInt;
-        table[BSONType::BinData][BSONType::NumberLong] = &performConvertBinDataToLong;
-        table[BSONType::BinData][BSONType::NumberDouble] = &performConvertBinDataToDouble;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::binData)] =
+            &performConvertBinDataToBinData;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::string)] =
+            &performConvertBinDataToString;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::numberInt)] =
+            &performConvertBinDataToInt;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::numberLong)] =
+            &performConvertBinDataToLong;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::numberDouble)] =
+            &performConvertBinDataToDouble;
 
         //
         // Conversions from jstOID
         //
-        table[BSONType::jstOID][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                       Value inputValue) {
-            return Value(inputValue.getOid().toString());
-        };
-        table[BSONType::jstOID][BSONType::jstOID] = &performIdentityConversion;
-        table[BSONType::jstOID][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::jstOID][BSONType::Date] = [](ExpressionContext* const expCtx,
-                                                     Value inputValue) {
-            return Value(inputValue.getOid().asDateT());
-        };
+        table[stdx::to_underlying(BSONType::oid)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.getOid().toString());
+            };
+        table[stdx::to_underlying(BSONType::oid)][stdx::to_underlying(BSONType::oid)] =
+            &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::oid)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::oid)][stdx::to_underlying(BSONType::date)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.getOid().asDateT());
+            };
 
         //
         // Conversions from Bool
         //
-        table[BSONType::Bool][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
-                                                           Value inputValue) {
-            return inputValue.getBool() ? Value(1.0) : Value(0.0);
-        };
-        table[BSONType::Bool][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                     Value inputValue) {
-            return inputValue.getBool() ? Value("true"_sd) : Value("false"_sd);
-        };
-        table[BSONType::Bool][BSONType::Bool] = &performIdentityConversion;
-        table[BSONType::Bool][BSONType::NumberInt] = [](ExpressionContext* const expCtx,
-                                                        Value inputValue) {
-            return inputValue.getBool() ? Value(int{1}) : Value(int{0});
-        };
-        table[BSONType::Bool][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
-                                                         Value inputValue) {
-            return inputValue.getBool() ? Value(1LL) : Value(0LL);
-        };
-        table[BSONType::Bool][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
-                                                            Value inputValue) {
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::numberDouble)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return inputValue.getBool() ? Value(1.0) : Value(0.0);
+            };
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return inputValue.getBool() ? Value("true"_sd) : Value("false"_sd);
+            };
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::boolean)] =
+            &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::numberInt)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return inputValue.getBool() ? Value(int{1}) : Value(int{0});
+            };
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(BSONType::numberLong)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return inputValue.getBool() ? Value(1LL) : Value(0LL);
+            };
+        table[stdx::to_underlying(BSONType::boolean)][stdx::to_underlying(
+            BSONType::numberDecimal)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return inputValue.getBool() ? Value(Decimal128(1)) : Value(Decimal128(0));
         };
 
         //
         // Conversions from Date
         //
-        table[BSONType::Date][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
-                                                           Value inputValue) {
-            return Value(static_cast<double>(inputValue.getDate().toMillisSinceEpoch()));
-        };
-        table[BSONType::Date][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                     Value inputValue) {
-            auto dateString = uassertStatusOK(
-                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, inputValue.getDate()));
-            return Value(dateString);
-        };
-        table[BSONType::Date][BSONType::Bool] = [](ExpressionContext* const expCtx,
-                                                   Value inputValue) {
-            return Value(inputValue.coerceToBool());
-        };
-        table[BSONType::Date][BSONType::Date] = &performIdentityConversion;
-        table[BSONType::Date][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
-                                                         Value inputValue) {
-            return Value(inputValue.getDate().toMillisSinceEpoch());
-        };
-        table[BSONType::Date][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
-                                                            Value inputValue) {
-            return Value(
-                Decimal128(static_cast<int64_t>(inputValue.getDate().toMillisSinceEpoch())));
-        };
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::numberDouble)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(static_cast<double>(inputValue.getDate().toMillisSinceEpoch()));
+            };
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                auto dateString = uassertStatusOK(TimeZoneDatabase::utcZone().formatDate(
+                    kIsoFormatStringZ, inputValue.getDate()));
+                return Value(dateString);
+            };
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::boolean)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.coerceToBool());
+            };
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::date)] =
+            &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::numberLong)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.getDate().toMillisSinceEpoch());
+            };
+        table[stdx::to_underlying(BSONType::date)][stdx::to_underlying(BSONType::numberDecimal)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(
+                    Decimal128(static_cast<int64_t>(inputValue.getDate().toMillisSinceEpoch())));
+            };
 
         //
         // Conversions from bsonTimestamp
         //
-        table[BSONType::bsonTimestamp][BSONType::Date] = [](ExpressionContext* const expCtx,
-                                                            Value inputValue) {
-            return Value(inputValue.coerceToDate());
-        };
+        table[stdx::to_underlying(BSONType::timestamp)][stdx::to_underlying(BSONType::date)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.coerceToDate());
+            };
 
         //
         // Conversions from NumberInt
         //
-        table[BSONType::NumberInt][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
-                                                                Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(
+            BSONType::numberDouble)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToDouble());
         };
-        table[BSONType::NumberInt][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                          Value inputValue) {
-            str::stream str;
-            str << inputValue.getInt();
-            return Value(StringData(str));
-        };
-        table[BSONType::NumberInt][BSONType::Bool] = [](ExpressionContext* const expCtx,
-                                                        Value inputValue) {
-            return Value(inputValue.coerceToBool());
-        };
-        table[BSONType::NumberInt][BSONType::NumberInt] = &performIdentityConversion;
-        table[BSONType::NumberInt][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
-                                                              Value inputValue) {
-            return Value(static_cast<long long>(inputValue.getInt()));
-        };
-        table[BSONType::NumberInt][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
-                                                                 Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                str::stream str;
+                str << inputValue.getInt();
+                return Value(StringData(str));
+            };
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::boolean)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.coerceToBool());
+            };
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::numberInt)] =
+            &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::numberLong)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(static_cast<long long>(inputValue.getInt()));
+            };
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(
+            BSONType::numberDecimal)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToDecimal());
         };
-        table[BSONType::NumberInt][BSONType::BinData] = &performConvertIntToBinData;
+        table[stdx::to_underlying(BSONType::numberInt)][stdx::to_underlying(BSONType::binData)] =
+            &performConvertIntToBinData;
 
         //
         // Conversions from NumberLong
         //
-        table[BSONType::NumberLong][BSONType::NumberDouble] = [](ExpressionContext* const expCtx,
-                                                                 Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(
+            BSONType::numberDouble)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToDouble());
         };
-        table[BSONType::NumberLong][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                           Value inputValue) {
-            str::stream str;
-            str << inputValue.getLong();
-            return Value(StringData(str));
-        };
-        table[BSONType::NumberLong][BSONType::Bool] = [](ExpressionContext* const expCtx,
-                                                         Value inputValue) {
-            return Value(inputValue.coerceToBool());
-        };
-        table[BSONType::NumberLong][BSONType::Date] = &performCastNumberToDate;
-        table[BSONType::NumberLong][BSONType::NumberInt] = &performCastLongToInt;
-        table[BSONType::NumberLong][BSONType::NumberLong] = &performIdentityConversion;
-        table[BSONType::NumberLong][BSONType::NumberDecimal] = [](ExpressionContext* const expCtx,
-                                                                  Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                str::stream str;
+                str << inputValue.getLong();
+                return Value(StringData(str));
+            };
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::boolean)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.coerceToBool());
+            };
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::date)] =
+            &performCastNumberToDate;
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::numberInt)] =
+            &performCastLongToInt;
+        table[stdx::to_underlying(BSONType::numberLong)]
+             [stdx::to_underlying(BSONType::numberLong)] = &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(
+            BSONType::numberDecimal)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToDecimal());
         };
-        table[BSONType::NumberLong][BSONType::BinData] = &performConvertLongToBinData;
+        table[stdx::to_underlying(BSONType::numberLong)][stdx::to_underlying(BSONType::binData)] =
+            &performConvertLongToBinData;
 
         //
         // Conversions from NumberDecimal
         //
-        table[BSONType::NumberDecimal][BSONType::NumberDouble] = &performCastDecimalToDouble;
-        table[BSONType::NumberDecimal][BSONType::String] = [](ExpressionContext* const expCtx,
-                                                              Value inputValue) {
-            return Value(inputValue.getDecimal().toString());
-        };
-        table[BSONType::NumberDecimal][BSONType::Bool] = [](ExpressionContext* const expCtx,
-                                                            Value inputValue) {
+        table[stdx::to_underlying(BSONType::numberDecimal)]
+             [stdx::to_underlying(BSONType::numberDouble)] = &performCastDecimalToDouble;
+        table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(BSONType::string)] =
+            [](ExpressionContext* const expCtx, Value inputValue) {
+                return Value(inputValue.getDecimal().toString());
+            };
+        table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(
+            BSONType::boolean)] = [](ExpressionContext* const expCtx, Value inputValue) {
             return Value(inputValue.coerceToBool());
         };
-        table[BSONType::NumberDecimal][BSONType::Date] = &performCastNumberToDate;
-        table[BSONType::NumberDecimal][BSONType::NumberInt] = [](ExpressionContext* const expCtx,
-                                                                 Value inputValue) {
-            return performCastDecimalToInt(BSONType::NumberInt, inputValue);
+        table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(BSONType::date)] =
+            &performCastNumberToDate;
+        table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(
+            BSONType::numberInt)] = [](ExpressionContext* const expCtx, Value inputValue) {
+            return performCastDecimalToInt(BSONType::numberInt, inputValue);
         };
-        table[BSONType::NumberDecimal][BSONType::NumberLong] = [](ExpressionContext* const expCtx,
-                                                                  Value inputValue) {
-            return performCastDecimalToInt(BSONType::NumberLong, inputValue);
+        table[stdx::to_underlying(BSONType::numberDecimal)][stdx::to_underlying(
+            BSONType::numberLong)] = [](ExpressionContext* const expCtx, Value inputValue) {
+            return performCastDecimalToInt(BSONType::numberLong, inputValue);
         };
-        table[BSONType::NumberDecimal][BSONType::NumberDecimal] = &performIdentityConversion;
+        table[stdx::to_underlying(BSONType::numberDecimal)]
+             [stdx::to_underlying(BSONType::numberDecimal)] = &performIdentityConversion;
 
         //
         // Miscellaneous conversions to Bool
         //
-        table[BSONType::Object][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::Array][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::BinData][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::RegEx][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::DBRef][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::Code][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::Symbol][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::CodeWScope][BSONType::Bool] = &performConvertToTrue;
-        table[BSONType::bsonTimestamp][BSONType::Bool] = &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::object)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::array)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::binData)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::regEx)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::dbRef)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::code)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::symbol)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::codeWScope)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
+        table[stdx::to_underlying(BSONType::timestamp)][stdx::to_underlying(BSONType::boolean)] =
+            &performConvertToTrue;
     }
 
     ConversionFunc findConversionFunc(BSONType inputType,
@@ -972,14 +1014,16 @@ public:
                                       boost::optional<ByteOrderArg> byteOrder) const {
         AnyConversionFunc foundFunction;
 
-        // Note: We can't use BSONType::MinKey (-1) or BSONType::MaxKey (127) as table indexes,
+        // Note: We can't use BSONType::minKey (-1) or BSONType::maxKey (127) as table indexes,
         // so we have to treat them as special cases.
-        if (inputType != BSONType::MinKey && inputType != BSONType::MaxKey &&
-            targetType != BSONType::MinKey && targetType != BSONType::MaxKey) {
-            invariant(inputType >= 0 && inputType <= JSTypeMax);
-            invariant(targetType >= 0 && targetType <= JSTypeMax);
-            foundFunction = table[inputType][targetType];
-        } else if (targetType == BSONType::Bool) {
+        if (inputType != BSONType::minKey && inputType != BSONType::maxKey &&
+            targetType != BSONType::minKey && targetType != BSONType::maxKey) {
+            invariant(stdx::to_underlying(inputType) >= 0 &&
+                      stdx::to_underlying(inputType) <= stdx::to_underlying(BSONType::jsTypeMax));
+            invariant(stdx::to_underlying(targetType) >= 0 &&
+                      stdx::to_underlying(targetType) <= stdx::to_underlying(BSONType::jsTypeMax));
+            foundFunction = table[stdx::to_underlying(inputType)][stdx::to_underlying(targetType)];
+        } else if (targetType == BSONType::boolean) {
             // This is a conversion from MinKey or MaxKey to Bool, which is allowed (and always
             // returns true).
             foundFunction = &performConvertToTrue;
@@ -997,7 +1041,8 @@ public:
     }
 
 private:
-    AnyConversionFunc table[JSTypeMax + 1][JSTypeMax + 1];
+    AnyConversionFunc table[stdx::to_underlying(BSONType::jsTypeMax) + 1]
+                           [stdx::to_underlying(BSONType::jsTypeMax) + 1];
 
     ConversionFunc makeConversionFunc(AnyConversionFunc foundFunction,
                                       BSONType inputType,
@@ -1099,7 +1144,7 @@ private:
     }
 
     static Value performCastDecimalToInt(BSONType targetType, Value inputValue) {
-        invariant(targetType == BSONType::NumberInt || targetType == BSONType::NumberLong);
+        invariant(targetType == BSONType::numberInt || targetType == BSONType::numberLong);
         Decimal128 inputDecimal = inputValue.getDecimal();
 
         // Performing these checks up front allows us to provide more specific error messages than
@@ -1114,11 +1159,11 @@ private:
 
         std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
         Value result;
-        if (targetType == BSONType::NumberInt) {
+        if (targetType == BSONType::numberInt) {
             int intVal =
                 inputDecimal.toInt(&signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
             result = Value(intVal);
-        } else if (targetType == BSONType::NumberLong) {
+        } else if (targetType == BSONType::numberLong) {
             long long longVal =
                 inputDecimal.toLong(&signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
             result = Value(longVal);
@@ -1172,15 +1217,15 @@ private:
         long long millisSinceEpoch;
 
         switch (inputValue.getType()) {
-            case BSONType::NumberLong:
+            case BSONType::numberLong:
                 millisSinceEpoch = inputValue.getLong();
                 break;
-            case BSONType::NumberDouble:
+            case BSONType::numberDouble:
                 millisSinceEpoch = performCastDoubleToLong(expCtx, inputValue).getLong();
                 break;
-            case BSONType::NumberDecimal:
+            case BSONType::numberDecimal:
                 millisSinceEpoch =
-                    performCastDecimalToInt(BSONType::NumberLong, inputValue).getLong();
+                    performCastDecimalToInt(BSONType::numberLong, inputValue).getLong();
                 break;
             default:
                 MONGO_UNREACHABLE;
@@ -1515,7 +1560,7 @@ boost::optional<BinDataFormat> parseBinDataFormat(Value formatValue) {
             str::stream() << "$convert requires that 'format' be a string, found: "
                           << typeName(formatValue.getType()) << " with value "
                           << formatValue.toString(),
-            formatValue.getType() == BSONType::String);
+            formatValue.getType() == BSONType::string);
 
     static const StringDataMap<BinDataFormat> stringToBinDataFormat{
         {toStringData(BinDataFormat::kAuto), BinDataFormat::kAuto},
@@ -1545,7 +1590,7 @@ boost::optional<ConvertByteOrderType> parseByteOrder(Value byteOrderValue) {
             str::stream() << "$convert requires that 'byteOrder' be a string, found: "
                           << typeName(byteOrderValue.getType()) << " with value "
                           << byteOrderValue.toString(),
-            byteOrderValue.getType() == BSONType::String);
+            byteOrderValue.getType() == BSONType::string);
 
     static const StringDataMap<ConvertByteOrderType> stringToByteOrder{
         {toStringData(ConvertByteOrderType::big), ConvertByteOrderType::big},
@@ -1564,13 +1609,13 @@ boost::optional<ConvertByteOrderType> parseByteOrder(Value byteOrderValue) {
 
 bool requestingConvertBinDataNumeric(ExpressionConvert::ConvertTargetTypeInfo targetTypeInfo,
                                      BSONType inputType) {
-    return (inputType == BSONType::BinData &&
-            (targetTypeInfo.type == BSONType::NumberInt ||
-             targetTypeInfo.type == BSONType::NumberLong ||
-             targetTypeInfo.type == BSONType::NumberDouble)) ||
-        ((inputType == BSONType::NumberInt || inputType == BSONType::NumberLong ||
-          inputType == BSONType::NumberDouble) &&
-         targetTypeInfo.type == BSONType::BinData);
+    return (inputType == BSONType::binData &&
+            (targetTypeInfo.type == BSONType::numberInt ||
+             targetTypeInfo.type == BSONType::numberLong ||
+             targetTypeInfo.type == BSONType::numberDouble)) ||
+        ((inputType == BSONType::numberInt || inputType == BSONType::numberLong ||
+          inputType == BSONType::numberDouble) &&
+         targetTypeInfo.type == BSONType::binData);
 }
 
 Value performConversion(const ExpressionConvert& expr,
@@ -1588,8 +1633,8 @@ Value performConversion(const ExpressionConvert& expr,
                              "compatibility version. See "
                           << feature_compatibility_version_documentation::compatibilityLink()
                           << ".",
-            expr.getAllowBinDataConvert() || targetTypeInfo.type == BSONType::Bool ||
-                (inputType != BSONType::BinData && targetTypeInfo.type != BSONType::BinData));
+            expr.getAllowBinDataConvert() || targetTypeInfo.type == BSONType::boolean ||
+                (inputType != BSONType::binData && targetTypeInfo.type != BSONType::binData));
 
     uassert(ErrorCodes::ConversionFailure,
             str::stream()
@@ -1663,9 +1708,9 @@ Value evaluateSingleNumericArg(const T& expr,
 Value evaluate(const ExpressionAbs& expr, const Document& root, Variables* variables) {
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
         BSONType type = numericArg.getType();
-        if (type == NumberDouble) {
+        if (type == BSONType::numberDouble) {
             return Value(std::abs(numericArg.getDouble()));
-        } else if (type == NumberDecimal) {
+        } else if (type == BSONType::numberDecimal) {
             return Value(numericArg.getDecimal().toAbs());
         } else {
             long long num = numericArg.getLong();
@@ -1673,7 +1718,7 @@ Value evaluate(const ExpressionAbs& expr, const Document& root, Variables* varia
                     "can't take $abs of long long min",
                     num != std::numeric_limits<long long>::min());
             long long absVal = std::abs(num);
-            return type == NumberLong ? Value(absVal) : Value::createIntOrLong(absVal);
+            return type == BSONType::numberLong ? Value(absVal) : Value::createIntOrLong(absVal);
         }
     });
 }
@@ -1682,9 +1727,9 @@ Value evaluate(const ExpressionCeil& expr, const Document& root, Variables* vari
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
         // There's no point in taking the ceiling of integers or longs, it will have no effect.
         switch (numericArg.getType()) {
-            case NumberDouble:
+            case BSONType::numberDouble:
                 return Value(std::ceil(numericArg.getDouble()));
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 // Round toward the nearest decimal with a zero exponent in the positive direction.
                 return Value(numericArg.getDecimal().quantize(Decimal128::kNormalizedZero,
                                                               Decimal128::kRoundTowardPositive));
@@ -1697,7 +1742,7 @@ Value evaluate(const ExpressionCeil& expr, const Document& root, Variables* vari
 Value evaluate(const ExpressionExp& expr, const Document& root, Variables* variables) {
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
         // $exp always returns either a double or a decimal number, as e is irrational.
-        if (numericArg.getType() == NumberDecimal) {
+        if (numericArg.getType() == BSONType::numberDecimal) {
             return Value(numericArg.coerceToDecimal().exp());
         }
 
@@ -1823,7 +1868,7 @@ Value evaluate(const ExpressionPow& expr, const Document& root, Variables* varia
     };
 
     // If either argument is decimal, return a decimal.
-    if (baseType == NumberDecimal || expType == NumberDecimal) {
+    if (baseType == BSONType::numberDecimal || expType == BSONType::numberDecimal) {
         Decimal128 baseDecimal = baseVal.coerceToDecimal();
         Decimal128 expDecimal = expVal.coerceToDecimal();
         checkNonZeroAndNeg(baseDecimal.isZero() && expDecimal.isNegative());
@@ -1836,14 +1881,14 @@ Value evaluate(const ExpressionPow& expr, const Document& root, Variables* varia
     checkNonZeroAndNeg(baseDouble == 0 && expDouble < 0);
 
     // If either argument is a double, return a double.
-    if (baseType == NumberDouble || expType == NumberDouble) {
+    if (baseType == BSONType::numberDouble || expType == BSONType::numberDouble) {
         return Value(std::pow(baseDouble, expDouble));
     }
 
     // If either number is a long, return a long. If both numbers are ints, then return an int if
     // the result fits or a long if it is too big.
     const auto formatResult = [baseType, expType](long long res) {
-        if (baseType == NumberLong || expType == NumberLong) {
+        if (baseType == BSONType::numberLong || expType == BSONType::numberLong) {
             return Value(res);
         }
         return Value::createIntOrLong(res);
@@ -1917,9 +1962,9 @@ Value evaluate(const ExpressionFloor& expr, const Document& root, Variables* var
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
         // There's no point in taking the floor of integers or longs, it will have no effect.
         switch (numericArg.getType()) {
-            case NumberDouble:
+            case BSONType::numberDouble:
                 return Value(std::floor(numericArg.getDouble()));
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 // Round toward the nearest decimal with a zero exponent in the negative direction.
                 return Value(numericArg.getDecimal().quantize(Decimal128::kNormalizedZero,
                                                               Decimal128::kRoundTowardNegative));
@@ -1931,7 +1976,7 @@ Value evaluate(const ExpressionFloor& expr, const Document& root, Variables* var
 
 Value evaluate(const ExpressionLn& expr, const Document& root, Variables* variables) {
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
-        if (numericArg.getType() == NumberDecimal) {
+        if (numericArg.getType() == BSONType::numberDecimal) {
             Decimal128 argDecimal = numericArg.getDecimal();
             if (argDecimal.isGreater(Decimal128::kNormalizedZero))
                 return Value(argDecimal.log());
@@ -1947,7 +1992,7 @@ Value evaluate(const ExpressionLn& expr, const Document& root, Variables* variab
 
 Value evaluate(const ExpressionLog10& expr, const Document& root, Variables* variables) {
     return evaluateSingleNumericArg(expr, root, variables, [](const Value& numericArg) {
-        if (numericArg.getType() == NumberDecimal) {
+        if (numericArg.getType() == BSONType::numberDecimal) {
             Decimal128 argDecimal = numericArg.getDecimal();
             if (argDecimal.isGreater(Decimal128::kNormalizedZero))
                 return Value(argDecimal.log10());
@@ -1969,7 +2014,7 @@ Value evaluate(const ExpressionSqrt& expr, const Document& root, Variables* vari
             uassert(28714, "$sqrt's argument must be greater than or equal to 0", nonNegative);
         };
 
-        if (numericArg.getType() == NumberDecimal) {
+        if (numericArg.getType() == BSONType::numberDecimal) {
             Decimal128 argDec = numericArg.getDecimal();
             checkArg(!argDec.isLess(Decimal128::kNormalizedZero));  // NaN returns Nan without error
             return Value(argDec.sqrt());
@@ -1984,9 +2029,9 @@ Value evaluate(const ExpressionBitNot& expr, const Document& root, Variables* va
     return evaluateSingleNumericArg(expr, root, variables, [&expr](const Value& numericArg) {
         BSONType type = numericArg.getType();
 
-        if (type == NumberInt) {
+        if (type == BSONType::numberInt) {
             return Value(~numericArg.getInt());
-        } else if (type == NumberLong) {
+        } else if (type == BSONType::numberLong) {
             return Value(~numericArg.getLong());
         } else {
             uasserted(ErrorCodes::TypeMismatch,
@@ -2006,7 +2051,7 @@ Value doDegreeRadiansConversion(const Value& numericArg,
                                 Decimal128 decimalFactor,
                                 double doubleFactor) {
     switch (numericArg.getType()) {
-        case BSONType::NumberDecimal:
+        case BSONType::numberDecimal:
             return Value(numericArg.getDecimal().multiply(decimalFactor));
         default:
             return Value(numericArg.coerceToDouble() * doubleFactor);
@@ -2046,17 +2091,17 @@ Value evaluate(const ExpressionArcTangent2& expr, const Document& root, Variable
                           << typeName(arg2.getType()),
             arg2.numeric());
 
-    auto totalType = BSONType::NumberDouble;
+    auto totalType = BSONType::numberDouble;
     // If the type of either argument is NumberDecimal, we promote to Decimal128.
-    if (arg1.getType() == BSONType::NumberDecimal || arg2.getType() == BSONType::NumberDecimal) {
-        totalType = BSONType::NumberDecimal;
+    if (arg1.getType() == BSONType::numberDecimal || arg2.getType() == BSONType::numberDecimal) {
+        totalType = BSONType::numberDecimal;
     }
     switch (totalType) {
-        case BSONType::NumberDecimal: {
+        case BSONType::numberDecimal: {
             auto dec = arg1.coerceToDecimal();
             return Value(dec.atan2(arg2.coerceToDecimal()));
         }
-        case BSONType::NumberDouble: {
+        case BSONType::numberDouble: {
             return Value(std::atan2(arg1.coerceToDouble(), arg2.coerceToDouble()));
         }
         default:
@@ -2083,7 +2128,7 @@ Value evaluateBoundedTrigonometric(const T& expr,
     return evaluateSingleNumericArg(
         expr, root, variables, [&expr, doubleFunc, decimalFunc](const Value& numericArg) {
             switch (numericArg.getType()) {
-                case BSONType::NumberDouble: {
+                case BSONType::numberDouble: {
                     auto input = numericArg.getDouble();
                     if (isnan(input)) {
                         return numericArg;
@@ -2091,7 +2136,7 @@ Value evaluateBoundedTrigonometric(const T& expr,
                     expr.assertBounds(input);
                     return Value(doubleFunc(input));
                 }
-                case BSONType::NumberDecimal: {
+                case BSONType::numberDecimal: {
                     auto input = numericArg.getDecimal();
                     if (isnan(input)) {
                         return numericArg;
@@ -2120,9 +2165,9 @@ Value evaluateUnboundedTrigonometric(const T& expr,
     return evaluateSingleNumericArg(
         expr, root, variables, [doubleFunc, decimalFunc](const Value& numericArg) {
             switch (numericArg.getType()) {
-                case BSONType::NumberDouble:
+                case BSONType::numberDouble:
                     return Value(doubleFunc(numericArg.getDouble()));
-                case BSONType::NumberDecimal:
+                case BSONType::numberDecimal:
                     return Value(decimalFunc(numericArg.getDecimal()));
                 default: {
                     auto num = static_cast<double>(numericArg.getLong());

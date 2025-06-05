@@ -77,7 +77,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        assertMergingInputType(input, Array);
+        assertMergingInputType(input, BSONType::array);
 
         for (auto&& val : input.getArray()) {
             addValue(val);

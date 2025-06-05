@@ -130,18 +130,18 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5480000,
             "$_internalConvertBucketIndexStats specification must be an object",
-            specElem.type() == Object);
+            specElem.type() == BSONType::object);
 
     TimeseriesConversionOptions timeseriesOptions;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == timeseries::kTimeFieldName) {
-            uassert(5480001, "timeField field must be a string", elem.type() == BSONType::String);
+            uassert(5480001, "timeField field must be a string", elem.type() == BSONType::string);
             timeseriesOptions.timeField = elem.str();
         } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5480002,
                     str::stream() << "metaField field must be a string, got: " << elem.type(),
-                    elem.type() == BSONType::String);
+                    elem.type() == BSONType::string);
             timeseriesOptions.metaField = elem.str();
         } else {
             uasserted(5480003,

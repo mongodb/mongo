@@ -86,7 +86,7 @@ namespace {
 // Given a serialized document source, appends execution stats 'nReturned' and
 // 'executionTimeMillisEstimate' to it.
 Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
-    invariant(docSource.getType() == BSONType::Object);
+    invariant(docSource.getType() == BSONType::object);
     MutableDocument doc(docSource.getDocument());
     auto nReturned = static_cast<long long>(stats.advanced);
     doc.addField("nReturned", Value(nReturned));
@@ -258,11 +258,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFromArray(
 
     tassert(6253719,
             "Expected array for Pipeline::parseFromArray",
-            rawPipelineElement.type() == BSONType::Array);
+            rawPipelineElement.type() == BSONType::array);
     auto rawStages = rawPipelineElement.Array();
 
     return parseCommon<BSONElement>(rawStages, expCtx, validator, false, [](BSONElement e) {
-        uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::Object);
+        uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::object);
         return e.embeddedObject();
     });
 }
@@ -400,12 +400,12 @@ void Pipeline::optimizeEachStage(SourceContainer* container) {
 
 bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
     auto pipelineElement = cmd["pipeline"];
-    if (pipelineElement.type() != BSONType::Array) {
+    if (pipelineElement.type() != BSONType::array) {
         return false;
     }
 
     for (auto stage : pipelineElement.Obj()) {
-        if (stage.type() != BSONType::Object) {
+        if (stage.type() != BSONType::object) {
             return false;
         }
 
@@ -614,7 +614,7 @@ std::vector<BSONObj> Pipeline::serializeContainerForLogging(
     std::vector<Value> serialized = serializeContainer(container, opts);
     std::vector<BSONObj> redacted;
     for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::Object);
+        invariant(stage.getType() == BSONType::object);
         redacted.push_back(redact(stage.getDocument().toBson()));
     }
     return redacted;
@@ -639,7 +639,7 @@ std::vector<BSONObj> Pipeline::serializeToBson(
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
     for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::Object);
+        invariant(stage.getType() == BSONType::object);
         asBson.push_back(stage.getDocument().toBson());
     }
     return asBson;

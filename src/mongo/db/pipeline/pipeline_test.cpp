@@ -176,10 +176,10 @@ protected:
         const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson);
         const BSONObj outputPipeExpected = pipelineFromJsonArray(outputPipeJson);
 
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         std::vector<BSONObj> rawPipeline;
         for (auto&& stageElem : inputBson["pipeline"].Array()) {
-            ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+            ASSERT_EQUALS(stageElem.type(), BSONType::object);
             rawPipeline.push_back(stageElem.embeddedObject());
         }
         AggregateCommandRequest request(aggNss, rawPipeline);
@@ -4406,10 +4406,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> getOptimizedPipeline(const BSONObj in
     QueryTestServiceContext testServiceContext;
     auto opCtx = testServiceContext.makeOperationContext();
 
-    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+    ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
     std::vector<BSONObj> rawPipeline;
     for (auto&& stageElem : inputBson["pipeline"].Array()) {
-        ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+        ASSERT_EQUALS(stageElem.type(), BSONType::object);
         rawPipeline.push_back(stageElem.embeddedObject());
     }
     AggregateCommandRequest request(kTestNss, rawPipeline);
@@ -4741,10 +4741,10 @@ public:
         const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson);
         const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson);
 
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         std::vector<BSONObj> rawPipeline;
         for (auto&& stageElem : inputBson["pipeline"].Array()) {
-            ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+            ASSERT_EQUALS(stageElem.type(), BSONType::object);
             rawPipeline.push_back(stageElem.embeddedObject());
         }
         AggregateCommandRequest request(kTestNss, rawPipeline);

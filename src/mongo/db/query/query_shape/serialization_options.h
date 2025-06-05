@@ -143,11 +143,11 @@ struct SerializationOptions {
     void addHmacedArrayToBuilder(BSONArrayBuilder* bab,
                                  const std::vector<BSONElement>& array) const {
         for (const auto& elem : array) {
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 BSONObjBuilder subObj(bab->subobjStart());
                 addHmacedObjToBuilder(&subObj, elem.Obj());
                 subObj.done();
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 BSONArrayBuilder subArr(bab->subarrayStart());
                 addHmacedArrayToBuilder(&subArr, elem.Array());
                 subArr.done();
@@ -160,11 +160,11 @@ struct SerializationOptions {
     void addHmacedObjToBuilder(BSONObjBuilder* bob, const BSONObj& objToHmac) const {
         for (const auto& elem : objToHmac) {
             auto fieldName = serializeFieldPath(elem.fieldName());
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 BSONObjBuilder subObj(bob->subobjStart(fieldName));
                 addHmacedObjToBuilder(&subObj, elem.Obj());
                 subObj.done();
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 BSONArrayBuilder subArr(bob->subarrayStart(fieldName));
                 addHmacedArrayToBuilder(&subArr, elem.Array());
                 subArr.done();

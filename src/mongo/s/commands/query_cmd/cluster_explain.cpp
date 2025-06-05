@@ -190,7 +190,7 @@ void ClusterExplain::validateShardResponses(
         uassert(ErrorCodes::OperationFailed,
                 str::stream() << "Explain command on shard " << response.shardId
                               << " failed, caused by: " << responseData,
-                responseData["queryPlanner"].type() == Object);
+                responseData["queryPlanner"].type() == BSONType::object);
 
         if (responseData.hasField("executionStats")) {
             numShardsExecStats++;

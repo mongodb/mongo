@@ -580,7 +580,7 @@ bool execPrompt(mongo::Scope& scope, const char* promptFunction, std::string& pr
     std::string execStatement = std::string("__promptWrapper__(") + promptFunction + ");";
     scope.exec("delete __prompt__;", "", false, false, false, 0);
     scope.exec(execStatement, "", false, false, false, 0);
-    if (scope.type("__prompt__") == String) {
+    if (scope.type("__prompt__") == stdx::to_underlying(BSONType::string)) {
         prompt = scope.getString("__prompt__");
         return true;
     }
@@ -595,7 +595,7 @@ bool execPrompt(mongo::Scope& scope, const char* promptFunction, std::string& pr
 static void edit(const std::string& whatToEdit) {
     // EDITOR may be defined in the JavaScript scope or in the environment
     std::string editor;
-    if (shellMainScope->type("EDITOR") == String) {
+    if (shellMainScope->type("EDITOR") == stdx::to_underlying(BSONType::string)) {
         editor = shellMainScope->getString("EDITOR");
     } else {
         static const char* editorFromEnv = getenv("EDITOR");
@@ -622,7 +622,7 @@ static void edit(const std::string& whatToEdit) {
     if (editingVariable) {
         // If "whatToEdit" is undeclared or uninitialized, declare
         int varType = shellMainScope->type(whatToEdit.c_str());
-        if (varType == Undefined) {
+        if (varType == stdx::to_underlying(BSONType::undefined)) {
             shellMainScope->exec("var " + whatToEdit, "(shell)", false, true, false);
         }
 
@@ -1265,9 +1265,10 @@ int mongo_main(int argc, char* argv[]) {
                 gotInterrupted = false;
 
                 promptType = scope->type("prompt");
-                if (promptType == String) {
+                if (promptType == stdx::to_underlying(BSONType::string)) {
                     prompt = scope->getString("prompt");
-                } else if ((promptType == Code) && execPrompt(*scope, "prompt", prompt)) {
+                } else if ((promptType == stdx::to_underlying(BSONType::code)) &&
+                           execPrompt(*scope, "prompt", prompt)) {
                 } else if (execPrompt(*scope, "defaultPrompt", prompt)) {
                 } else {
                     prompt = "> ";

@@ -86,11 +86,11 @@ void ValueWriter::setOriginalBSON(BSONObj* obj) {
 
 int ValueWriter::type() {
     if (_value.isNull())
-        return BSONType::jstNULL;
+        return stdx::to_underlying(BSONType::null);
     if (_value.isUndefined())
-        return BSONType::Undefined;
+        return stdx::to_underlying(BSONType::undefined);
     if (_value.isString())
-        return BSONType::String;
+        return stdx::to_underlying(BSONType::string);
 
     bool isArray;
 
@@ -98,11 +98,11 @@ int ValueWriter::type() {
         uasserted(ErrorCodes::BadValue, "unable to check if type is an array");
     }
     if (isArray) {
-        return BSONType::Array;
+        return stdx::to_underlying(BSONType::array);
     }
 
     if (_value.isBoolean()) {
-        return BSONType::Bool;
+        return stdx::to_underlying(BSONType::boolean);
     }
 
     // We could do something more sophisticated here by checking to see if we
@@ -110,7 +110,7 @@ int ValueWriter::type() {
     // way, for now just always come back as double for numbers though (it's
     // what we did for v8)
     if (_value.isNumber()) {
-        return BSONType::NumberDouble;
+        return stdx::to_underlying(BSONType::numberDouble);
     }
 
     if (_value.isObject()) {
@@ -121,7 +121,7 @@ int ValueWriter::type() {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a date");
         }
         if (isDate) {
-            return BSONType::Date;
+            return stdx::to_underlying(BSONType::date);
         }
 
         bool isRegExp;
@@ -129,35 +129,35 @@ int ValueWriter::type() {
             uasserted(ErrorCodes::BadValue, "unable to check if type is a regexp");
         }
         if (isRegExp) {
-            return BSONType::RegEx;
+            return stdx::to_underlying(BSONType::regEx);
         }
 
         if (js::IsFunctionObject(obj)) {
-            return BSONType::Code;
+            return stdx::to_underlying(BSONType::code);
         }
 
         if (auto jsClass = JS::GetClass(obj)) {
             auto scope = getScope(_context);
             if (scope->getProto<NumberIntInfo>().getJSClass() == jsClass) {
-                return BSONType::NumberInt;
+                return stdx::to_underlying(BSONType::numberInt);
             } else if (scope->getProto<NumberLongInfo>().getJSClass() == jsClass) {
-                return BSONType::NumberLong;
+                return stdx::to_underlying(BSONType::numberLong);
             } else if (scope->getProto<NumberDecimalInfo>().getJSClass() == jsClass) {
-                return BSONType::NumberDecimal;
+                return stdx::to_underlying(BSONType::numberDecimal);
             } else if (scope->getProto<OIDInfo>().getJSClass() == jsClass) {
-                return BSONType::jstOID;
+                return stdx::to_underlying(BSONType::oid);
             } else if (scope->getProto<BinDataInfo>().getJSClass() == jsClass) {
-                return BSONType::BinData;
+                return stdx::to_underlying(BSONType::binData);
             } else if (scope->getProto<TimestampInfo>().getJSClass() == jsClass) {
-                return BSONType::bsonTimestamp;
+                return stdx::to_underlying(BSONType::timestamp);
             } else if (scope->getProto<MinKeyInfo>().getJSClass() == jsClass) {
-                return BSONType::MinKey;
+                return stdx::to_underlying(BSONType::minKey);
             } else if (scope->getProto<MaxKeyInfo>().getJSClass() == jsClass) {
-                return BSONType::MaxKey;
+                return stdx::to_underlying(BSONType::maxKey);
             }
         }
 
-        return BSONType::Object;
+        return stdx::to_underlying(BSONType::object);
     }
 
     uasserted(ErrorCodes::BadValue, "unable to get type");
@@ -369,7 +369,7 @@ void ValueWriter::writeThis(BSONObjBuilder* b,
         if (intval && _originalParent) {
             // This makes copying an object of numbers O(n**2) :(
             BSONElement elmt = _originalParent->getField(sd);
-            if (elmt.type() == mongo::NumberInt) {
+            if (elmt.type() == BSONType::numberInt) {
                 b->append(sd, *intval);
                 return;
             }
@@ -428,15 +428,15 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
             if (scope->getProto<CodeInfo>().getJSClass() == jsclass) {
                 if (o.hasOwnField(InternedString::scope)  // CodeWScope
-                    && o.type(InternedString::scope) == mongo::Object) {
-                    if (o.type(InternedString::code) != mongo::String) {
+                    && o.type(InternedString::scope) == stdx::to_underlying(BSONType::object)) {
+                    if (o.type(InternedString::code) != stdx::to_underlying(BSONType::string)) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }
 
                     b->appendCodeWScope(
                         sd, o.getString(InternedString::code), o.getObject(InternedString::scope));
                 } else {  // Code
-                    if (o.type(InternedString::code) != mongo::String) {
+                    if (o.type(InternedString::code) != stdx::to_underlying(BSONType::string)) {
                         uasserted(ErrorCodes::BadValue, "code must be a string");
                     }
 

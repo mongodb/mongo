@@ -102,10 +102,10 @@ void FastPathProjectionNode<ProjectionNode, BaseProjectionNode>::_applyProjectio
                    childIt != this->_children.end()) {
             auto child = static_cast<const ProjectionNode*>(childIt->second.get());
 
-            if (bsonElement.type() == BSONType::Object) {
+            if (bsonElement.type() == BSONType::object) {
                 BSONObjBuilder subBob{bob->subobjStart(fieldName)};
                 child->_applyProjections(bsonElement.embeddedObject(), &subBob);
-            } else if (bsonElement.type() == BSONType::Array) {
+            } else if (bsonElement.type() == BSONType::array) {
                 BSONArrayBuilder subBab{bob->subarrayStart(fieldName)};
                 child->_applyProjectionsToArray(bsonElement.embeddedObject(), &subBab);
             } else {
@@ -125,10 +125,10 @@ void FastPathProjectionNode<ProjectionNode, BaseProjectionNode>::_applyProjectio
     BSONObj array, BSONArrayBuilder* bab) const {
     const auto* projectionNode = static_cast<const ProjectionNode*>(this);
     for (auto&& bsonElement : array) {
-        if (bsonElement.type() == BSONType::Object) {
+        if (bsonElement.type() == BSONType::object) {
             BSONObjBuilder subBob{bab->subobjStart()};
             _applyProjections(bsonElement.embeddedObject(), &subBob);
-        } else if (bsonElement.type() == BSONType::Array) {
+        } else if (bsonElement.type() == BSONType::array) {
             if (this->_policies.arrayRecursionPolicy ==
                 ProjectionPolicies::ArrayRecursionPolicy::kDoNotRecurseNestedArrays) {
                 projectionNode->_applyToNonProjectedField(bsonElement, bab);

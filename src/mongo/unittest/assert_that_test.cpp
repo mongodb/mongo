@@ -210,10 +210,10 @@ TEST(AssertThat, StatusIs) {
 
 TEST(AssertThat, BSONObj) {
     auto obj = BSONObjBuilder{}.append("i", 123).append("s", "hi").obj();
-    ASSERT_THAT(obj, BSONObjHas(BSONElementIs(Eq("i"), Eq(NumberInt), Any())));
+    ASSERT_THAT(obj, BSONObjHas(BSONElementIs(Eq("i"), Eq(BSONType::numberInt), Any())));
     ASSERT_THAT(obj,
-                AllOf(BSONObjHas(BSONElementIs(Eq("i"), Eq(NumberInt), Eq(123))),
-                      BSONObjHas(BSONElementIs(Eq("s"), Eq(String), Eq("hi")))));
+                AllOf(BSONObjHas(BSONElementIs(Eq("i"), Eq(BSONType::numberInt), Eq(123))),
+                      BSONObjHas(BSONElementIs(Eq("s"), Eq(BSONType::string), Eq("hi")))));
     ASSERT_THAT(obj, Not(BSONObjHas(BSONElementIs(Eq("x"), Any(), Any()))));
 }
 
@@ -257,8 +257,8 @@ TEST(AssertThat, Demo) {
     // BSONElement and BSONObj
     auto obj = BSONObjBuilder{}.append("i", 123).append("s", "hi").obj();
     ASSERT_THAT(obj,
-                AllOf(BSONObjHas(BSONElementIs(Eq("i"), Eq(NumberInt), Eq(123))),
-                      BSONObjHas(BSONElementIs(Eq("s"), Eq(String), Eq("hi")))));
+                AllOf(BSONObjHas(BSONElementIs(Eq("i"), Eq(BSONType::numberInt), Eq(123))),
+                      BSONObjHas(BSONElementIs(Eq("s"), Eq(BSONType::string), Eq("hi")))));
     ASSERT_THAT(obj, Not(BSONObjHas(BSONElementIs(Eq("x"), Any(), Any()))));
 }
 

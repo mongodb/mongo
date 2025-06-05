@@ -890,7 +890,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             // As ObjectId holds time at a second granularity, the rewrite value used for a $lt/$lte
             // predicate on _id may be rounded up by a second to missing results due to trunacted
@@ -951,7 +951,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
             oid.init(date);
@@ -1009,7 +1009,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[4].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
             oid.init(date);
@@ -1018,7 +1018,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[5].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             ASSERT_TRUE(oid.compare(idPred->getData().OID()) > 0);
         }
@@ -1069,7 +1069,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
             oid.init(dateMinusBucketSpan);
@@ -1122,7 +1122,7 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             auto idPred = dynamic_cast<ComparisonMatchExpressionBase*>((*children)[2].get());
 
             ASSERT_EQ(idPred->path(), "_id"_sd);
-            ASSERT_EQ(idPred->getData().type(), BSONType::jstOID);
+            ASSERT_EQ(idPred->getData().type(), BSONType::oid);
 
             OID oid;
             oid.init(date - Seconds{3600});

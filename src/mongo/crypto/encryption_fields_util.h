@@ -47,35 +47,35 @@ namespace mongo {
  */
 inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
     switch (type) {
-        case BinData:
-        case Code:
-        case RegEx:
-        case String:
+        case BSONType::binData:
+        case BSONType::code:
+        case BSONType::regEx:
+        case BSONType::string:
 
-        case NumberInt:
-        case NumberLong:
-        case Bool:
-        case bsonTimestamp:
-        case Date:
-        case jstOID:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::boolean:
+        case BSONType::timestamp:
+        case BSONType::date:
+        case BSONType::oid:
 
-        case Symbol:
-        case DBRef:
+        case BSONType::symbol:
+        case BSONType::dbRef:
             return true;
 
         // Non-deterministic
-        case CodeWScope:
-        case Array:
-        case Object:
-        case NumberDecimal:
-        case NumberDouble:
+        case BSONType::codeWScope:
+        case BSONType::array:
+        case BSONType::object:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
 
         // Singletons
-        case EOO:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::null:
+        case BSONType::maxKey:
+        case BSONType::minKey:
+        case BSONType::undefined:
             return false;
         default:
             MONGO_UNREACHABLE;
@@ -87,35 +87,35 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
  */
 inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
     switch (type) {
-        case NumberInt:
-        case NumberLong:
-        case NumberDecimal:
-        case NumberDouble:
-        case Date:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::date:
             return true;
 
         // Valid for FLE Equality but not for Range.
-        case bsonTimestamp:
-        case Bool:
-        case BinData:
-        case Code:
-        case RegEx:
-        case String:
-        case jstOID:
-        case Symbol:
-        case DBRef:
+        case BSONType::timestamp:
+        case BSONType::boolean:
+        case BSONType::binData:
+        case BSONType::code:
+        case BSONType::regEx:
+        case BSONType::string:
+        case BSONType::oid:
+        case BSONType::symbol:
+        case BSONType::dbRef:
 
         // Non-deterministic
-        case CodeWScope:
-        case Array:
-        case Object:
+        case BSONType::codeWScope:
+        case BSONType::array:
+        case BSONType::object:
 
         // Singletons
-        case EOO:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::null:
+        case BSONType::maxKey:
+        case BSONType::minKey:
+        case BSONType::undefined:
             return false;
     }
     MONGO_UNREACHABLE;
@@ -126,35 +126,35 @@ inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
  */
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
     switch (type) {
-        case BinData:
-        case Code:
-        case RegEx:
-        case String:
+        case BSONType::binData:
+        case BSONType::code:
+        case BSONType::regEx:
+        case BSONType::string:
 
-        case NumberInt:
-        case NumberLong:
-        case Bool:
-        case bsonTimestamp:
-        case Date:
-        case jstOID:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::boolean:
+        case BSONType::timestamp:
+        case BSONType::date:
+        case BSONType::oid:
 
-        case Array:
-        case Object:
-        case NumberDecimal:
-        case NumberDouble:
+        case BSONType::array:
+        case BSONType::object:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
 
         // Deprecated
-        case Symbol:
-        case CodeWScope:
-        case DBRef:
+        case BSONType::symbol:
+        case BSONType::codeWScope:
+        case BSONType::dbRef:
             return true;
 
         // Singletons
-        case EOO:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::null:
+        case BSONType::maxKey:
+        case BSONType::minKey:
+        case BSONType::undefined:
             return false;
         default:
             MONGO_UNREACHABLE;
@@ -166,7 +166,7 @@ inline bool isFLE2UnindexedSupportedType(BSONType type) {
  * encryption.
  */
 inline bool isFLE2TextIndexedSupportedType(BSONType type) {
-    return type == BSONType::String;
+    return type == BSONType::string;
 }
 
 /**

@@ -92,14 +92,14 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
     if (source.hasField(tags.name())) {
         shard._tags = std::vector<std::string>();
         BSONElement tagsElement;
-        Status status = bsonExtractTypedField(source, tags.name(), Array, &tagsElement);
+        Status status = bsonExtractTypedField(source, tags.name(), BSONType::array, &tagsElement);
         if (!status.isOK())
             return status;
 
         BSONObjIterator it(tagsElement.Obj());
         while (it.more()) {
             BSONElement tagElement = it.next();
-            if (tagElement.type() != String) {
+            if (tagElement.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << tags.name()
                                             << "\" array must be strings but found "

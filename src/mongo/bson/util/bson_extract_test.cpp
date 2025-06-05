@@ -59,14 +59,16 @@ TEST(ExtractBSON, ExtractTypedField) {
     BSONObj obj = BSON("a" << 1 << "b"
                            << "hello");
     BSONElement element;
-    ASSERT_OK(bsonExtractTypedField(obj, "a", NumberInt, &element));
+    ASSERT_OK(bsonExtractTypedField(obj, "a", BSONType::numberInt, &element));
     ASSERT_EQUALS(1, element.Int());
-    ASSERT_OK(bsonExtractTypedField(obj, "b", String, &element));
+    ASSERT_OK(bsonExtractTypedField(obj, "b", BSONType::string, &element));
     ASSERT_EQUALS(std::string("hello"), element.str());
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractTypedField(obj, "c", String, &element));
-    ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractTypedField(obj, "a", String, &element));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  bsonExtractTypedField(obj, "c", BSONType::string, &element));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
-                  bsonExtractTypedField(obj, "b", NumberDouble, &element));
+                  bsonExtractTypedField(obj, "a", BSONType::string, &element));
+    ASSERT_EQUALS(ErrorCodes::TypeMismatch,
+                  bsonExtractTypedField(obj, "b", BSONType::numberDouble, &element));
 }
 
 

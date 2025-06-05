@@ -65,13 +65,13 @@ Status CurrentDateNode::init(BSONElement modExpr,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() == BSONType::Bool) {
+    if (modExpr.type() == BSONType::boolean) {
         _typeIsDate = true;
-    } else if (modExpr.type() == BSONType::Object) {
+    } else if (modExpr.type() == BSONType::object) {
         auto foundValidType = false;
         for (auto&& elem : modExpr.Obj()) {
             if (elem.fieldNameStringData() == kType) {
-                if (elem.type() == BSONType::String) {
+                if (elem.type() == BSONType::string) {
                     if (elem.valueStringData() == kDate) {
                         _typeIsDate = true;
                         foundValidType = true;

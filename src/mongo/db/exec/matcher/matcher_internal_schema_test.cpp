@@ -1548,14 +1548,14 @@ TEST(InternalBinDataSubTypeMatchExpressionTest, SubTypeWithFloatParsesCorrectly)
 
 TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
     MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Date);
+    typeSet.bsonTypes.insert(BSONType::string);
+    typeSet.bsonTypes.insert(BSONType::date);
     InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
     auto binData = BSONBinData(
         reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
 
@@ -1569,14 +1569,14 @@ TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {
 
 TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotMatchShortBinData) {
     MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Date);
+    typeSet.bsonTypes.insert(BSONType::string);
+    typeSet.bsonTypes.insert(BSONType::date);
     InternalSchemaBinDataEncryptedTypeExpression expr("a"_sd, std::move(typeSet));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
     auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
                                sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
                                BinDataType::Encrypt);
@@ -1594,7 +1594,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
@@ -1604,13 +1604,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
@@ -1621,13 +1621,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesSingleType
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypesInArray) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << BSON_ARRAY(BSONType::Date << BSONType::String)));
+                                  << BSON_ARRAY(BSONType::date << BSONType::string)));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     BSONObj matchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                   sizeof(FleBlobHeader),
@@ -1637,13 +1637,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeMatchesOneOfTypes
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingleType) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
+    blob.originalBsonType = stdx::to_underlying(BSONType::numberInt);
 
     BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                      sizeof(FleBlobHeader),
@@ -1654,13 +1654,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchSingl
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeArray) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                  << BSON_ARRAY(BSONType::Date << BSONType::Bool)));
+                                  << BSON_ARRAY(BSONType::date << BSONType::boolean)));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
+    blob.originalBsonType = stdx::to_underlying(BSONType::numberInt);
 
     BSONObj notMatchingDoc = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                      sizeof(FleBlobHeader),
@@ -1670,13 +1670,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, BsonTypeDoesNotMatchTypeA
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoesNotMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kPlaceholder);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
     BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                sizeof(FleBlobHeader),
                                                BinDataType::Encrypt));
@@ -1686,13 +1686,13 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, IntentToEncryptFleBlobDoe
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNotMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = 6;
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
     BSONObj notMatch = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                sizeof(FleBlobHeader),
                                                BinDataType::Encrypt));
@@ -1705,7 +1705,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, UnknownFleBlobTypeDoesNot
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, EmptyFleBlobDoesNotMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Encrypt));
@@ -1714,7 +1714,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, EmptyFleBlobDoesNotMatch)
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeDoesNotMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONBinData("\x69\xb7", 2, BinDataGeneral));
@@ -1723,7 +1723,7 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonEncryptBinDataSubTypeD
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMatch) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::String));
+    auto query = BSON("a" << BSON("$_internalSchemaBinDataEncryptedType" << BSONType::string));
     auto expr = uassertStatusOK(MatchExpressionParser::parse(query, expCtx));
 
     BSONObj notMatch = BSON("a" << BSONArray());
@@ -1731,12 +1731,12 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMat
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     auto binData = BSONBinData(
         reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
@@ -1747,12 +1747,12 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotTraverseLeafArrays) {
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     auto binData = BSONBinData(reinterpret_cast<const void*>(&blob),
                                sizeof(FleBlobHeader) - sizeof(blob.originalBsonType),
@@ -1766,11 +1766,11 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchShortBinData) {
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::String);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression expr("a"_sd, BSONType::string);
 
     FleBlobHeader blob;
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     for (uint8_t i = 0; i < idlEnumCount<EncryptedBinDataType>; i++) {
         blob.fleBlobSubtype = i;
@@ -1792,20 +1792,20 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) 
 }
 
 TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, DoesNotMatchIncorrectBsonType) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn"_sd, BSONType::String);
-    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age"_sd, BSONType::NumberInt);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedString("ssn"_sd, BSONType::string);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression encryptedInt("age"_sd, BSONType::numberInt);
 
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     auto binData = BSONBinData(
         reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
     ASSERT_TRUE(exec::matcher::matchesBSON(&encryptedString, BSON("ssn" << binData)));
     ASSERT_FALSE(exec::matcher::matchesBSON(&encryptedInt, BSON("age" << binData)));
 
-    blob.originalBsonType = BSONType::NumberInt;
+    blob.originalBsonType = stdx::to_underlying(BSONType::numberInt);
     binData = BSONBinData(
         reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
     ASSERT_FALSE(exec::matcher::matchesBSON(&encryptedString, BSON("ssn" << binData)));

@@ -53,13 +53,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
     BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5858201,
             "literal documents specification must be an array",
-            arrayElem.type() == BSONType::Array);
+            arrayElem.type() == BSONType::array);
     auto queue = DocumentSourceQueue::create(expCtx);
     // arrayElem is an Array and can be iterated through by using .Obj() method
     for (const auto& elem : arrayElem.Obj()) {
         uassert(5858202,
                 "literal documents specification must be an array of objects",
-                elem.type() == BSONType::Object);
+                elem.type() == BSONType::object);
         queue->emplace_back(Document{elem.Obj()}.getOwned());
     }
     return queue;

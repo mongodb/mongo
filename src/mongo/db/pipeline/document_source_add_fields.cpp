@@ -101,7 +101,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     uassert(40272,
             str::stream() << specifiedName << " specification stage must be an object, got "
                           << typeName(elem.type()),
-            elem.type() == Object);
+            elem.type() == BSONType::object);
 
     return DocumentSourceAddFields::create(elem.Obj(), expCtx, specifiedName);
 }

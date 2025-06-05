@@ -96,7 +96,7 @@ SortPattern::SortPattern(const BSONObj& obj,
 
         SortPatternPart patternPart;
 
-        if (keyField.type() == BSONType::Object) {
+        if (keyField.type() == BSONType::object) {
             patternPart.expression = parseMetaExpression(keyField.Obj(), expCtx);
 
             // If sorting by any metadata, sort highest scores first. Note this is weird for

@@ -44,11 +44,11 @@ Value evaluate(const ExpressionInternalFindPositional& expr,
     uassert(51255,
             fmt::format("Positional operator pre-image can only be an object, but got {}",
                         typeName(preImage.getType())),
-            preImage.getType() == BSONType::Object);
+            preImage.getType() == BSONType::object);
     uassert(51258,
             fmt::format("Positional operator post-image can only be an object, but got {}",
                         typeName(postImage.getType())),
-            postImage.getType() == BSONType::Object);
+            postImage.getType() == BSONType::object);
     return Value{projection_executor_utils::applyFindPositionalProjection(preImage.getDocument(),
                                                                           postImage.getDocument(),
                                                                           *expr.getMatchExpr(),
@@ -62,7 +62,7 @@ Value evaluate(const ExpressionInternalFindSlice& expr,
     uassert(51256,
             fmt::format("$slice operator can only be applied to an object, but got {}",
                         typeName(postImage.getType())),
-            postImage.getType() == BSONType::Object);
+            postImage.getType() == BSONType::object);
     return Value{projection_executor_utils::applyFindSliceProjection(
         postImage.getDocument(), expr.getFieldPath(), expr.getSkip(), expr.getLimit())};
 }
@@ -71,7 +71,7 @@ Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
                Variables* variables) {
     auto input = expr.getChildren()[0]->evaluate(root, variables);
-    invariant(input.getType() == BSONType::Object);
+    invariant(input.getType() == BSONType::object);
     return projection_executor_utils::applyFindElemMatchProjection(
         input.getDocument(), *expr.getMatchExpr(), expr.getFieldPath());
 }

@@ -607,7 +607,7 @@ bool doesBucketsIndexIncludeMeasurement(OperationContext* opCtx,
     if (auto filterElem = bucketsIndex[kPartialFilterExpressionFieldName]) {
         tassert(5916302,
                 str::stream() << "Partial filter expression is not an object: " << filterElem,
-                filterElem.type() == BSONType::Object);
+                filterElem.type() == BSONType::object);
 
         auto expCtx = ExpressionContextBuilder{}.opCtx(opCtx).ns(bucketNs).build();
 

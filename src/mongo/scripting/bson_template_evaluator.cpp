@@ -100,7 +100,7 @@ void BsonTemplateEvaluator::setVariable(const std::string& name, const BSONEleme
 
 BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(const BSONElement in,
                                                                BSONObjBuilder& out) {
-    if (in.type() == Array) {
+    if (in.type() == BSONType::array) {
         BSONArrayBuilder arrayBuilder(out.subarrayStart(in.fieldName()));
         std::vector<BSONElement> arrElems = in.Array();
         for (unsigned int i = 0; i < arrElems.size(); i++) {
@@ -120,7 +120,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(const BSONElement
         return StatusSuccess;
     }
 
-    if (in.type() != Object) {
+    if (in.type() != BSONType::object) {
         out.append(in);
         return StatusSuccess;
     }
@@ -301,7 +301,7 @@ BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalConcat(BsonTemplateEval
         return StatusOpEvaluationError;
     StringBuilder stringBuilder;
     for (auto&& part : parts) {
-        if (part.type() == String)
+        if (part.type() == BSONType::string)
             stringBuilder << part.String();
         else
             part.toString(stringBuilder, false);

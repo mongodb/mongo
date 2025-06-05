@@ -1761,7 +1761,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_line("switch (variantType) {")
         if array_types:
-            self._writer.write_line("case Array:")
+            self._writer.write_line("case ::mongo::BSONType::array:")
             with self._block("{", "}"):
                 # If the array is empty, we can't infer its element type. Use the first
                 # array type as a fallback to cover that case.
@@ -1819,7 +1819,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line("break;")
 
         if field.type.variant_struct_types:
-            with self._block("case Object: {", "} break;"):
+            with self._block("case ::mongo::BSONType::object: {", "} break;"):
                 self._gen_variant_deserializer_from_obj(
                     field,
                     field_name=field_name,
@@ -1931,7 +1931,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             return
 
         if field_type.is_array:
-            predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
+            predicate = (
+                f"MONGO_likely(ctxt.checkAndAssertType({bson_element}, ::mongo::BSONType::array))"
+            )
             with self._predicate(predicate):
                 self._gen_usage_check(field, bson_element, field_usage_check)
                 self._gen_array_deserializer(

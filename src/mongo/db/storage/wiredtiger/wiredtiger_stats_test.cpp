@@ -188,11 +188,11 @@ TEST_F(WiredTigerStatsTest, SessionWithWrite) {
 
     auto statsObj = WiredTigerStats{*_session}.toBSON();
     auto dataSection = statsObj["data"];
-    ASSERT_EQ(dataSection.type(), BSONType::Object) << statsObj;
+    ASSERT_EQ(dataSection.type(), BSONType::object) << statsObj;
 
     ASSERT(dataSection["bytesWritten"]) << statsObj;
     for (auto&& [name, value] : dataSection.Obj()) {
-        ASSERT_EQ(value.type(), BSONType::NumberLong) << statsObj;
+        ASSERT_EQ(value.type(), BSONType::numberLong) << statsObj;
         ASSERT_GT(value.numberLong(), 0) << statsObj;
     }
 }
@@ -203,11 +203,11 @@ TEST_F(WiredTigerStatsTest, SessionWithRead) {
     auto statsObj = WiredTigerStats{*_session}.toBSON();
 
     auto dataSection = statsObj["data"];
-    ASSERT_EQ(dataSection.type(), BSONType::Object) << statsObj;
+    ASSERT_EQ(dataSection.type(), BSONType::object) << statsObj;
 
     ASSERT(dataSection["bytesRead"]) << statsObj;
     for (auto&& [name, value] : dataSection.Obj()) {
-        ASSERT_EQ(value.type(), BSONType::NumberLong) << statsObj;
+        ASSERT_EQ(value.type(), BSONType::numberLong) << statsObj;
         ASSERT_GT(value.numberLong(), 0) << statsObj;
     }
 }
@@ -250,7 +250,7 @@ TEST_F(WiredTigerStatsTest, OperationsAddToSessionStats) {
 
     auto addedObj = addedSessionStats.toBSON();
     auto dataSection = addedObj["data"];
-    ASSERT_EQ(dataSection.type(), BSONType::Object) << addedObj;
+    ASSERT_EQ(dataSection.type(), BSONType::object) << addedObj;
     ASSERT_EQ(dataSection["bytesWritten"].numberLong(), bytesWritten) << addedObj;
     ASSERT_EQ(dataSection["timeWritingMicros"].numberLong(), timeWritingMicros) << addedObj;
     ASSERT_EQ(dataSection["bytesRead"].numberLong(), bytesRead) << addedObj;
@@ -258,7 +258,7 @@ TEST_F(WiredTigerStatsTest, OperationsAddToSessionStats) {
 
     auto fetchedObj = fetchedSessionStats.toBSON();
     auto fetchedDataSection = fetchedObj["data"];
-    ASSERT_EQ(fetchedDataSection.type(), BSONType::Object) << fetchedObj;
+    ASSERT_EQ(fetchedDataSection.type(), BSONType::object) << fetchedObj;
     ASSERT_EQ(fetchedDataSection["bytesWritten"].numberLong(), bytesWritten) << fetchedObj;
     ASSERT_EQ(fetchedDataSection["timeWritingMicros"].numberLong(), timeWritingMicros)
         << fetchedObj;
@@ -289,7 +289,7 @@ TEST_F(WiredTigerStatsTest, OperationsSubtractToZero) {
     // We ignore the time statistics as those might still be 0 from time to time.
     auto preSubtractObj = fetchedSessionStats.toBSON();
     auto preSubtract = preSubtractObj["data"];
-    ASSERT_EQ(preSubtract.type(), BSONType::Object) << preSubtractObj;
+    ASSERT_EQ(preSubtract.type(), BSONType::object) << preSubtractObj;
     ASSERT_GT(preSubtract["bytesWritten"].numberLong(), 0) << preSubtractObj;
     ASSERT_GT(preSubtract["bytesRead"].numberLong(), 0) << preSubtractObj;
 

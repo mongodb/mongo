@@ -283,7 +283,7 @@ void ExecCommandClient::_epilogue() {
                 rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
                 result->getBodyBuilder().append(data["writeConcernError"]);
                 if (data.hasField(kErrorLabelsFieldName) &&
-                    data[kErrorLabelsFieldName].type() == Array) {
+                    data[kErrorLabelsFieldName].type() == BSONType::array) {
                     auto labels = data.getObjectField(kErrorLabelsFieldName).getOwned();
                     if (!labels.isEmpty()) {
                         result->getBodyBuilder().append(kErrorLabelsFieldName, BSONArray(labels));

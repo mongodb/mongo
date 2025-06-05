@@ -106,7 +106,7 @@ public:
             Reply::parse(ctx, resultObj.removeField(kRawFieldName));
             if (resultObj.hasField(kRawFieldName)) {
                 const auto& rawData = resultObj[kRawFieldName];
-                if (ctx.checkAndAssertType(rawData, Object)) {
+                if (ctx.checkAndAssertType(rawData, BSONType::object)) {
                     for (const auto& element : rawData.Obj()) {
                         const auto& shardReply = element.Obj();
                         if (!checkIsErrorStatus(shardReply, ctx)) {

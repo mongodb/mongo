@@ -122,49 +122,49 @@ Status validateRangeIndexTest(int trimFactor,
 
 TEST(FLEValidationUtils, ValidateTrimFactorRange) {
     // 2^1 == 2 values in domain, we can't trim
-    ASSERT_OK(validateRangeIndexTest(0, BSONType::NumberInt, Value(0), Value(1)));
-    ASSERT_NOT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(1)));
+    ASSERT_OK(validateRangeIndexTest(0, BSONType::numberInt, Value(0), Value(1)));
+    ASSERT_NOT_OK(validateRangeIndexTest(1, BSONType::numberInt, Value(0), Value(1)));
 
     // 2^2 > 3 values in domain, we can trim just the root
-    ASSERT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(2)));
-    ASSERT_NOT_OK(validateRangeIndexTest(2, BSONType::NumberInt, Value(0), Value(2)));
+    ASSERT_OK(validateRangeIndexTest(1, BSONType::numberInt, Value(0), Value(2)));
+    ASSERT_NOT_OK(validateRangeIndexTest(2, BSONType::numberInt, Value(0), Value(2)));
 
-    ASSERT_OK(validateRangeIndexTest(3, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
+    ASSERT_OK(validateRangeIndexTest(3, BSONType::numberInt, Value(INT32_MIN), Value(INT32_MAX)));
     ASSERT_NOT_OK(
-        validateRangeIndexTest(32, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
+        validateRangeIndexTest(32, BSONType::numberInt, Value(INT32_MIN), Value(INT32_MAX)));
 
     ASSERT_OK(validateRangeIndexTest(
-        3, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
+        3, BSONType::numberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
     ASSERT_NOT_OK(validateRangeIndexTest(
-        64, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
+        64, BSONType::numberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
 
     ASSERT_OK(
-        validateRangeIndexTest(3, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
+        validateRangeIndexTest(3, BSONType::date, Value(Date_t::min()), Value(Date_t::max())));
     ASSERT_NOT_OK(
-        validateRangeIndexTest(64, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
+        validateRangeIndexTest(64, BSONType::date, Value(Date_t::min()), Value(Date_t::max())));
 
     // (2^10 > ) 1000 values in domain, we can trim top 9 layers
     ASSERT_OK(validateRangeIndexTest(
-        9, BSONType::NumberDouble, Value(0.), Value(100.), 1 /* precision */));
+        9, BSONType::numberDouble, Value(0.), Value(100.), 1 /* precision */));
     ASSERT_NOT_OK(validateRangeIndexTest(
-        10, BSONType::NumberDouble, Value(0.), Value(100.), 1 /* precision */));
+        10, BSONType::numberDouble, Value(0.), Value(100.), 1 /* precision */));
 
-    ASSERT_OK(validateRangeIndexTest(3, BSONType::NumberDouble, boost::none, boost::none));
-    ASSERT_NOT_OK(validateRangeIndexTest(64, BSONType::NumberDouble, boost::none, boost::none));
+    ASSERT_OK(validateRangeIndexTest(3, BSONType::numberDouble, boost::none, boost::none));
+    ASSERT_NOT_OK(validateRangeIndexTest(64, BSONType::numberDouble, boost::none, boost::none));
 
     ASSERT_OK(validateRangeIndexTest(9,
-                                     BSONType::NumberDecimal,
+                                     BSONType::numberDecimal,
                                      Value(Decimal128(0)),
                                      Value(Decimal128(100)),
                                      1 /* precision */));
     ASSERT_NOT_OK(validateRangeIndexTest(10,
-                                         BSONType::NumberDecimal,
+                                         BSONType::numberDecimal,
                                          Value(Decimal128(0)),
                                          Value(Decimal128(100)),
                                          1 /* precision */));
 
-    ASSERT_OK(validateRangeIndexTest(7, BSONType::NumberDecimal, boost::none, boost::none));
-    ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::NumberDecimal, boost::none, boost::none));
+    ASSERT_OK(validateRangeIndexTest(7, BSONType::numberDecimal, boost::none, boost::none));
+    ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::numberDecimal, boost::none, boost::none));
 }
 
 TEST(FLEValidationUtils, ValidateTrimFactorRangeInt32) {
@@ -319,8 +319,8 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     qtc.setDiacriticSensitive(false);
     qtc.setContention(8);
 
-    validateTextSearchIndex(BSONType::String, field, qtc, boost::none, boost::none, boost::none);
-    validateTextSearchIndex(BSONType::String,
+    validateTextSearchIndex(BSONType::string, field, qtc, boost::none, boost::none, boost::none);
+    validateTextSearchIndex(BSONType::string,
                             field,
                             qtc,
                             qtc.getCaseSensitive(),
@@ -329,14 +329,14 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
 
     // Bad Type
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::Symbol, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::symbol, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783400);
 
     // Missing min query length
     qtc.setStrMinQueryLength(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783402);
     qtc.setStrMinQueryLength(kMin);
@@ -344,7 +344,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     // Missing max query length
     qtc.setStrMaxQueryLength(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783403);
     qtc.setStrMaxQueryLength(kMax);
@@ -352,7 +352,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     // Missing case sensitive
     qtc.setCaseSensitive(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783404);
     qtc.setCaseSensitive(true);
@@ -360,7 +360,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     // Missing diacritic sensitive
     qtc.setDiacriticSensitive(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783405);
     qtc.setDiacriticSensitive(false);
@@ -368,13 +368,13 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     // min > max
     qtc.setStrMinQueryLength(kMax + 1);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, field, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, field, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783406);
     qtc.setStrMinQueryLength(kMin);
 
     // Case sensitive does not match previous
-    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::String,
+    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::string,
                                                field,
                                                qtc,
                                                !qtc.getCaseSensitive().value(),
@@ -384,7 +384,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
                        9783409);
 
     // Diacritic sensitive does not match previous
-    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::String,
+    ASSERT_THROWS_CODE(validateTextSearchIndex(BSONType::string,
                                                field,
                                                qtc,
                                                boost::none,
@@ -396,7 +396,7 @@ QueryTypeConfig validateTextSearchIndexCommonTests(QueryTypeEnum qtype) {
     // Contention factor does not match previous
     ASSERT_THROWS_CODE(
         validateTextSearchIndex(
-            BSONType::String, field, qtc, boost::none, boost::none, qtc.getContention() + 1),
+            BSONType::string, field, qtc, boost::none, boost::none, qtc.getContention() + 1),
         AssertionException,
         9783411);
     return qtc;
@@ -408,7 +408,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
     // Missing max length
     qtc.setStrMaxLength(boost::none);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783407);
     // max query length > max length
@@ -416,7 +416,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexSubstring) {
     qtc.setStrMaxQueryLength(1000);
     qtc.setStrMinQueryLength(1);
     ASSERT_THROWS_CODE(validateTextSearchIndex(
-                           BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                           BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
                        AssertionException,
                        9783408);
 }
@@ -436,7 +436,7 @@ TEST(FLEValidationUtils, ValidateTextSearchIndexBadQueryType) {
         qtc.setQueryType(qtype);
         ASSERT_THROWS_CODE(
             validateTextSearchIndex(
-                BSONType::String, "foo"_sd, qtc, boost::none, boost::none, boost::none),
+                BSONType::string, "foo"_sd, qtc, boost::none, boost::none, boost::none),
             AssertionException,
             9783401);
     }

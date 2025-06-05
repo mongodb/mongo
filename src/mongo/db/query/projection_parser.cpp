@@ -136,11 +136,11 @@ ProjectType computeProjectionType(bool hasFindSlice,
  */
 bool isInclusionOrExclusionType(BSONType type) {
     switch (type) {
-        case BSONType::Bool:
-        case BSONType::NumberInt:
-        case BSONType::NumberLong:
-        case BSONType::NumberDouble:
-        case BSONType::NumberDecimal:
+        case BSONType::boolean:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal:
             return true;
         default:
             return false;
@@ -252,7 +252,7 @@ void attemptToParseFindSlice(ParseContext* parseCtx,
                       path,
                       std::make_unique<ProjectionSliceASTNode>(
                           boost::none, subObj.firstElement().safeNumberInt()));
-    } else if (subObj.firstElementType() == BSONType::Array) {
+    } else if (subObj.firstElementType() == BSONType::array) {
         BSONObj arr = subObj.firstElement().embeddedObject();
         uassert(31272, "$slice array argument should be of form [skip, limit]", arr.nFields() == 2);
 
@@ -355,7 +355,7 @@ bool parseSubObjectAsExpression(ParseContext* parseCtx,
             uassert(31274,
                     str::stream() << "elemMatch: Invalid argument, object required, but got "
                                   << subObj.firstElementType(),
-                    subObj.firstElementType() == BSONType::Object);
+                    subObj.firstElementType() == BSONType::object);
 
             uassert(31255,
                     "Cannot specify positional operator and $elemMatch.",
@@ -595,7 +595,7 @@ void parseElement(ParseContext* ctx,
             "results will be equivalent.",
             !str::contains(elem.fieldNameStringData(), ".$."));
 
-    if (elem.type() == BSONType::Object) {
+    if (elem.type() == BSONType::object) {
         BSONObj subObj = elem.embeddedObject();
         // Uninitialized 'ctx->type' is default treated as ProjectType::kInclusion.
         if (!ctx->type || *ctx->type != ProjectType::kAddition || !subObj.isEmpty()) {

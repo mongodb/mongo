@@ -68,7 +68,7 @@ FleBlobHeader makeFleHeader(const EncryptedField& field, EncryptedBinDataType su
     blob.fleBlobSubtype = static_cast<uint8_t>(subtype);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     ASSERT(field.getBsonType().has_value());
-    blob.originalBsonType = typeFromName(field.getBsonType().value());
+    blob.originalBsonType = stdx::to_underlying(typeFromName(field.getBsonType().value()));
     return blob;
 }
 

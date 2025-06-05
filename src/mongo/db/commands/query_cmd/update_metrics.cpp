@@ -60,7 +60,7 @@ void UpdateMetrics::incrementExecutedWithArrayFilters() {
 
 void UpdateMetrics::collectMetrics(const BSONObj& cmdObj) {
     // If this command is a pipeline-style update, record that it was used.
-    if (cmdObj.hasField("update") && (cmdObj.getField("update").type() == BSONType::Array)) {
+    if (cmdObj.hasField("update") && (cmdObj.getField("update").type() == BSONType::array)) {
         _commandsWithAggregationPipeline->increment();
     }
 

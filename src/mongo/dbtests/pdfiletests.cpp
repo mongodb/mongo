@@ -97,7 +97,7 @@ public:
     void run() {
         WriteUnitOfWork wunit(&_opCtx);
         BSONObj x = BSON("x" << 1);
-        ASSERT(x["_id"].type() == 0);
+        ASSERT(stdx::to_underlying(x["_id"].type()) == 0);
         CollectionPtr coll = CollectionPtr::CollectionPtr_UNSAFE(
             CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss()));
         if (!coll) {
@@ -111,7 +111,7 @@ public:
         StatusWith<BSONObj> fixed = fixDocumentForInsert(&_opCtx, x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
-        ASSERT(x["_id"].type() == jstOID);
+        ASSERT(x["_id"].type() == BSONType::oid);
         ASSERT_OK(collection_internal::insertDocument(
             &_opCtx, coll, InsertStatement(x), nullOpDebug, true));
         wunit.commit();
@@ -132,9 +132,9 @@ public:
         ASSERT(fixed.firstElement().number() == 1);
 
         BSONElement a = fixed["a"];
-        ASSERT(o["a"].type() == bsonTimestamp);
+        ASSERT(o["a"].type() == BSONType::timestamp);
         ASSERT(o["a"].timestampValue() == 0);
-        ASSERT(a.type() == bsonTimestamp);
+        ASSERT(a.type() == BSONType::timestamp);
         ASSERT(a.timestampValue() > 0);
     }
 };
@@ -157,15 +157,15 @@ public:
         ASSERT(fixed.firstElement().number() == 1);
 
         BSONElement a = fixed["a"];
-        ASSERT(o["a"].type() == bsonTimestamp);
+        ASSERT(o["a"].type() == BSONType::timestamp);
         ASSERT(o["a"].timestampValue() == 0);
-        ASSERT(a.type() == bsonTimestamp);
+        ASSERT(a.type() == BSONType::timestamp);
         ASSERT(a.timestampValue() > 0);
 
         BSONElement b = fixed["b"];
-        ASSERT(o["b"].type() == bsonTimestamp);
+        ASSERT(o["b"].type() == BSONType::timestamp);
         ASSERT(o["b"].timestampValue() == 0);
-        ASSERT(b.type() == bsonTimestamp);
+        ASSERT(b.type() == BSONType::timestamp);
         ASSERT(b.timestampValue() > 0);
     }
 };

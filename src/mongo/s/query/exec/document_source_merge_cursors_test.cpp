@@ -250,7 +250,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseSerializedARMParams) {
 
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     auto newSpec = serializationArray[0].getDocument().toBson();
-    ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
+    ASSERT(newSpec["$mergeCursors"].type() == BSONType::object);
     auto newParams = AsyncResultsMergerParams::parse(IDLParserContext("$mergeCursors test"),
                                                      newSpec["$mergeCursors"].Obj());
     checkSerializedAsyncResultsMergerParams(params, newParams, getTenantIdNss());
@@ -391,7 +391,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["killCursors"]);
         auto cursors = request.cmdObj["cursors"];
-        ASSERT_EQ(cursors.type(), BSONType::Array);
+        ASSERT_EQ(cursors.type(), BSONType::array);
         auto cursorsArray = cursors.Array();
         ASSERT_FALSE(cursorsArray.empty());
         auto cursorId = cursorsArray[0].Long();
@@ -505,7 +505,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerialized
 
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     const auto newSpec = serializationArray[0].getDocument().toBson();
-    ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
+    ASSERT(newSpec["$mergeCursors"].type() == BSONType::object);
     const auto vts = auth::ValidatedTenancyScopeFactory::create(
         tenantId,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,
@@ -564,7 +564,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,
 
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     const auto newSpec = serializationArray[0].getDocument().toBson();
-    ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
+    ASSERT(newSpec["$mergeCursors"].type() == BSONType::object);
     const auto vts = auth::ValidatedTenancyScopeFactory::create(
         tenantId,
         auth::ValidatedTenancyScope::TenantProtocol::kDefault,

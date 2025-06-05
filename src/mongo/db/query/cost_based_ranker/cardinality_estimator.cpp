@@ -211,7 +211,7 @@ bool isSargableLeaf(const MatchExpression* node) {
         case MatchExpression::INTERNAL_EXPR_LT:
         case MatchExpression::INTERNAL_EXPR_LTE:
             return static_cast<const ComparisonMatchExpression*>(node)->getData().type() !=
-                BSONType::Array;
+                BSONType::array;
         case MatchExpression::MATCH_IN:
             return !static_cast<const InMatchExpression*>(node)->hasArray();
         case MatchExpression::EXISTS:

@@ -86,7 +86,7 @@ mongo::StatusWith<mongo::SharedRestrictionDocument> mongo::parseAuthenticationRe
 
     document_type::sequence_type doc;
     for (const auto& elem : arr) {
-        if (elem.type() != Object) {
+        if (elem.type() != BSONType::object) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "restriction array sub-documents must be address restriction objects");
         }
@@ -108,7 +108,7 @@ mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
     BSONArrayBuilder builder;
 
     for (auto const& elem : arr) {
-        if (elem.type() != Object) {
+        if (elem.type() != BSONType::object) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "'authenticationRestrictions' array sub-documents must be address "
                           "restriction objects");

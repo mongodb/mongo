@@ -200,11 +200,11 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
             str::stream()
                 << "the $unionWith stage specification must be an object or string, but found "
                 << typeName(spec.type()),
-            spec.type() == BSONType::Object || spec.type() == BSONType::String);
+            spec.type() == BSONType::object || spec.type() == BSONType::string);
 
     NamespaceString unionNss;
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
-    if (spec.type() == BSONType::String) {
+    if (spec.type() == BSONType::string) {
         unionNss = NamespaceStringUtil::deserialize(nss.dbName(), spec.valueStringData());
     } else {
         auto unionWithSpec =
@@ -257,11 +257,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
             str::stream()
                 << "the $unionWith stage specification must be an object or string, but found "
                 << typeName(elem.type()),
-            elem.type() == BSONType::Object || elem.type() == BSONType::String);
+            elem.type() == BSONType::object || elem.type() == BSONType::string);
 
     NamespaceString unionNss;
     std::vector<BSONObj> pipeline;
-    if (elem.type() == BSONType::String) {
+    if (elem.type() == BSONType::string) {
         unionNss = NamespaceStringUtil::deserialize(expCtx->getNamespaceString().dbName(),
                                                     elem.valueStringData());
     } else {

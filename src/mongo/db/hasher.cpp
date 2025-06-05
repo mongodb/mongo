@@ -125,7 +125,7 @@ void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName) {
         // then each sub-element
         // then finish with the EOO element.
         BSONObj b;
-        if (e.type() == CodeWScope) {
+        if (e.type() == BSONType::codeWScope) {
             h->addData(e.codeWScopeCode(), e.codeWScopeCodeLen());
             b = e.codeWScopeObject();
         } else {

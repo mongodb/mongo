@@ -40,7 +40,7 @@ namespace mongo {
 
 Status bsonExtractOpTimeField(const BSONObj& object, StringData fieldName, repl::OpTime* out) {
     BSONElement element;
-    Status status = bsonExtractTypedField(object, fieldName, Object, &element);
+    Status status = bsonExtractTypedField(object, fieldName, BSONType::object, &element);
     if (!status.isOK())
         return status;
 

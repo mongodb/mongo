@@ -413,7 +413,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
         } else if (argName == distanceFieldStr) {
             uassert(16606,
                     "$geoNear requires that the 'distanceField' option is a String",
-                    argument.type() == String);
+                    argument.type() == BSONType::string);
             distanceField = FieldPath(argument.str());
         } else if (argName == "maxDistance") {
             maxDistance = Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
@@ -430,7 +430,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
         } else if (argName == "query") {
             uassert(ErrorCodes::TypeMismatch,
                     "query must be an object",
-                    argument.type() == BSONType::Object);
+                    argument.type() == BSONType::object);
             auto queryObj = argument.embeddedObject();
             if (!queryObj.isEmpty()) {
                 query = std::make_unique<Matcher>(queryObj.getOwned(), pExpCtx);
@@ -440,7 +440,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
         } else if (argName == "includeLocs") {
             uassert(16607,
                     "$geoNear requires that 'includeLocs' option is a String",
-                    argument.type() == String);
+                    argument.type() == BSONType::string);
             includeLocs = FieldPath(argument.str());
         } else if (argName == "uniqueDocs") {
             LOGV2_WARNING(23758,
@@ -450,7 +450,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
                     str::stream() << "$geoNear parameter '" << DocumentSourceGeoNear::kKeyFieldName
                                   << "' must be of type string but found type: "
                                   << typeName(argument.type()),
-                    argument.type() == BSONType::String);
+                    argument.type() == BSONType::string);
             const auto keyFieldStr = argument.valueStringData();
             uassert(ErrorCodes::BadValue,
                     str::stream() << "$geoNear parameter '" << DocumentSourceGeoNear::kKeyFieldName

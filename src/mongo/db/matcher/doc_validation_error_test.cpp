@@ -131,11 +131,11 @@ void verifyExpectedFieldsAreMissing(const BSONObj& obj,
     }
 
     for (auto&& elem : obj) {
-        if (elem.type() == BSONType::Object) {
+        if (elem.type() == BSONType::object) {
             verifyExpectedFieldsAreMissing(elem.Obj(), missingFields);
-        } else if (elem.type() == BSONType::Array) {
+        } else if (elem.type() == BSONType::array) {
             for (auto&& arrayElem : elem.embeddedObject()) {
-                if (arrayElem.type() == BSONType::Object) {
+                if (arrayElem.type() == BSONType::object) {
                     verifyExpectedFieldsAreMissing(arrayElem.embeddedObject(), missingFields);
                 }
             }
@@ -1860,7 +1860,7 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
         auto truncated = error.getField("truncated");
         ASSERT(reason);
         ASSERT_TRUE(truncated.Bool());
-        ASSERT_EQ(reason.type(), BSONType::String);
+        ASSERT_EQ(reason.type(), BSONType::string);
         ASSERT_EQ(reason.valueStringData(), "generated error was too deeply nested");
     };
 
@@ -1879,7 +1879,7 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
         generateValidationError(generateDeeplyNestedOr(depth), doc, false /* shouldThrow */);
     ASSERT_FALSE(error.hasField("reason"));
     ASSERT_FALSE(error.hasField("truncated"));
-    ASSERT_EQ(error.getField("details").type(), BSONType::Object);
+    ASSERT_EQ(error.getField("details").type(), BSONType::object);
 }
 
 TEST(DocValidationTruncationTest, TruncatedConsideredValuesArray) {
@@ -1988,7 +1988,7 @@ TEST(DocValidationTruncationTest, BasicSizeTruncation) {
         // Generated error should have a note field and a failingDocumentId field, but no details
         // field.
         auto note = error["note"];
-        ASSERT_EQ(note.type(), BSONType::String);
+        ASSERT_EQ(note.type(), BSONType::string);
         ASSERT_EQ(note.valueStringData(), "detailed error was too large");
         ASSERT_TRUE(error.hasField("failingDocumentId"));
         ASSERT_FALSE(error.hasField("details"));
@@ -2008,13 +2008,13 @@ TEST(DocValidationTruncationTest, DocValidationReportsProgrammingError) {
                                          internalQueryMaxDocValidationErrorConsideredValues.load());
     // There should be an error with 'note' and 'details' fields.
     auto note = error["note"];
-    ASSERT_EQ(note.type(), BSONType::String);
+    ASSERT_EQ(note.type(), BSONType::string);
     ASSERT_EQ(note.valueStringData(), "failed to generate document validation error");
     ASSERT_TRUE(error.hasField("failingDocumentId"));
     auto details = error["details"];
-    ASSERT_EQ(details.type(), BSONType::Object);
+    ASSERT_EQ(details.type(), BSONType::object);
     auto code = details.embeddedObject()["code"];
-    ASSERT_EQ(code.type(), BSONType::NumberInt);
+    ASSERT_EQ(code.type(), BSONType::numberInt);
     ASSERT_EQ(code.numberInt(), 4944300);
 }
 }  // namespace

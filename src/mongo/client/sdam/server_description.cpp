@@ -85,22 +85,22 @@ ServerDescription::ServerDescription(ClockSource* clockSource,
         saveElectionId(response.getField("electionId"));
 
         auto lsTimeoutField = response.getField("logicalSessionTimeoutMinutes");
-        if (lsTimeoutField.type() == BSONType::NumberInt) {
+        if (lsTimeoutField.type() == BSONType::numberInt) {
             _logicalSessionTimeoutMinutes = lsTimeoutField.numberInt();
         }
 
         auto setVersionField = response.getField("setVersion");
-        if (setVersionField.type() == BSONType::NumberInt) {
+        if (setVersionField.type() == BSONType::numberInt) {
             _setVersion = response["setVersion"].numberInt();
         }
 
         auto setNameField = response.getField("setName");
-        if (setNameField.type() == BSONType::String) {
+        if (setNameField.type() == BSONType::string) {
             _setName = response["setName"].str();
         }
 
         auto primaryField = response.getField("primary");
-        if (primaryField.type() == BSONType::String) {
+        if (primaryField.type() == BSONType::string) {
             _primary = HostAndPort(response.getStringField("primary"));
         }
     } else {
@@ -153,7 +153,7 @@ void ServerDescription::appendBsonTags(BSONObjBuilder& builder) const {
 }
 
 void ServerDescription::saveElectionId(BSONElement electionId) {
-    if (electionId.type() == jstOID) {
+    if (electionId.type() == BSONType::oid) {
         _electionId = electionId.OID();
     }
 }
@@ -196,7 +196,7 @@ void ServerDescription::calculateRtt(const boost::optional<HelloRTT> currentRtt,
 
 void ServerDescription::saveLastWriteInfo(BSONObj lastWriteBson) {
     const auto lastWriteDateField = lastWriteBson.getField("lastWriteDate");
-    if (lastWriteDateField.type() == BSONType::Date) {
+    if (lastWriteDateField.type() == BSONType::date) {
         _lastWriteDate = lastWriteDateField.date();
     }
 

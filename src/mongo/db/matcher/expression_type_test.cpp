@@ -44,9 +44,9 @@ namespace mongo {
 namespace {
 
 TEST(ExpressionTypeTest, Equivalent) {
-    TypeMatchExpression e1("a"_sd, BSONType::String);
-    TypeMatchExpression e2("a"_sd, BSONType::NumberDouble);
-    TypeMatchExpression e3("b"_sd, BSONType::String);
+    TypeMatchExpression e1("a"_sd, BSONType::string);
+    TypeMatchExpression e2("a"_sd, BSONType::numberDouble);
+    TypeMatchExpression e3("b"_sd, BSONType::string);
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));
@@ -54,7 +54,7 @@ TEST(ExpressionTypeTest, Equivalent) {
 }
 
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
-    TypeMatchExpression type(""_sd, String);
+    TypeMatchExpression type(""_sd, BSONType::string);
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$type":[2]})",

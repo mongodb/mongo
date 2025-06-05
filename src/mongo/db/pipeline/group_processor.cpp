@@ -65,7 +65,7 @@ boost::optional<Document> GroupProcessor::getNextSpilled() {
     // Call startNewGroup on every accumulator.
     Value expandedId = expandId(currentId);
     Document idDoc =
-        expandedId.getType() == BSONType::Object ? expandedId.getDocument() : Document();
+        expandedId.getType() == BSONType::object ? expandedId.getDocument() : Document();
     for (size_t i = 0; i < numAccumulators; ++i) {
         Value initializerValue =
             _accumulatedFields[i].expr.initializer->evaluate(idDoc, &_expCtx->variables);

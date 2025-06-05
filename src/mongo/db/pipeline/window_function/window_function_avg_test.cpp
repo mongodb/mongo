@@ -90,26 +90,26 @@ TEST_F(WindowFunctionAvgTest, FloatingPointAverage) {
 
 TEST_F(WindowFunctionAvgTest, NarrowestType) {
     avg.add(Value{1});
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDouble);
 
     avg.add(Value(Decimal128::kPositiveNaN));
     avg.add(Value(Decimal128::kPositiveInfinity));
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDecimal);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDecimal);
     // Returned type narrows after removing inf/nan.
     avg.remove(Value(Decimal128::kPositiveNaN));
     avg.remove(Value(Decimal128::kPositiveInfinity));
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDouble);
 
     avg.add(Value{1.5});
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDouble);
     avg.add(Value{Value(Decimal128("-100000000000000000000000000000"))});
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDecimal);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDecimal);
     // Returned type narrows after removing all Decimals in window.
     avg.add(Value{Value(Decimal128("1"))});
     avg.remove(Value{Value(Decimal128("-100000000000000000000000000000"))});
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDecimal);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDecimal);
     avg.remove(Value{Value(Decimal128("1"))});
-    ASSERT_EQUALS(avg.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(avg.getValue().getType(), BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionAvgTest, HandleNaNs) {

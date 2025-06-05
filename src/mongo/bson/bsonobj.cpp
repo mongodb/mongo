@@ -202,11 +202,11 @@ BSONObj BSONObj::redact(RedactLevel level,
                     tempString = fieldNameRedactor(e);
                     fieldNameString = {tempString};
                 }
-                if (e.type() == Object) {
+                if (e.type() == BSONType::object) {
                     BSONObjBuilder subBuilder = builder.subobjStart(fieldNameString);
                     operator()(subBuilder, e.Obj(), appendMask, level, fieldNameRedactor);
                     subBuilder.done();
-                } else if (e.type() == Array) {
+                } else if (e.type() == BSONType::array) {
                     BSONObjBuilder subBuilder = builder.subarrayStart(fieldNameString);
                     operator()(subBuilder, e.Obj(), appendMask, level, fieldNameRedactor);
                     subBuilder.done();
@@ -219,7 +219,7 @@ BSONObj BSONObj::redact(RedactLevel level,
                             break;
                         }
                         case RedactLevel::encryptedAndSensitive: {
-                            if (e.type() == BinData &&
+                            if (e.type() == BSONType::binData &&
                                 (e.binDataType() == BinDataType::Encrypt ||
                                  e.binDataType() == BinDataType::Sensitive)) {
                                 appendRedactedElem(builder, fieldNameString, appendMask);
@@ -229,7 +229,8 @@ BSONObj BSONObj::redact(RedactLevel level,
                             break;
                         }
                         case RedactLevel::sensitiveOnly: {
-                            if (e.type() == BinData && e.binDataType() == BinDataType::Sensitive) {
+                            if (e.type() == BSONType::binData &&
+                                e.binDataType() == BinDataType::Sensitive) {
                                 appendRedactedElem(builder, fieldNameString, appendMask);
                             } else {
                                 builder.append(e);
@@ -494,13 +495,13 @@ BSONObj BSONObj::clientReadable() const {
     while (i.more()) {
         BSONElement e = i.next();
         switch (e.type()) {
-            case MinKey: {
+            case BSONType::minKey: {
                 BSONObjBuilder m;
                 m.append("$minElement", 1);
                 b.append(e.fieldName(), m.done());
                 break;
             }
-            case MaxKey: {
+            case BSONType::maxKey: {
                 BSONObjBuilder m;
                 m.append("$maxElement", 1);
                 b.append(e.fieldName(), m.done());
@@ -562,7 +563,7 @@ Status BSONObj::storageValidEmbedded() const {
         if (name.starts_with("$")) {
             if (first &&
                 // $ref is a collection name and must be a String
-                (name == "$ref") && e.type() == String &&
+                (name == "$ref") && e.type() == BSONType::string &&
                 (i.next().fieldNameStringData() == "$id")) {
                 first = false;
                 // keep inspecting fields for optional "$db"
@@ -570,7 +571,7 @@ Status BSONObj::storageValidEmbedded() const {
                 name = e.fieldNameStringData();  // "" if eoo()
 
                 // optional $db field must be a String
-                if ((name == "$db") && e.type() == String) {
+                if ((name == "$db") && e.type() == BSONType::string) {
                     continue;  // this element is fine, so continue on to siblings (if any more)
                 }
 
@@ -588,14 +589,14 @@ Status BSONObj::storageValidEmbedded() const {
 
         if (e.mayEncapsulate()) {
             switch (e.type()) {
-                case Object:
-                case Array: {
+                case BSONType::object:
+                case BSONType::array: {
                     Status s = e.embeddedObject().storageValidEmbedded();
                     // TODO: combine field names for better error messages
                     if (!s.isOK())
                         return s;
                 } break;
-                case CodeWScope: {
+                case BSONType::codeWScope: {
                     Status s = e.codeWScopeObject().storageValidEmbedded();
                     // TODO: combine field names for better error messages
                     if (!s.isOK())
@@ -645,7 +646,7 @@ int BSONObj::getIntField(StringData name) const {
 
 bool BSONObj::getBoolField(StringData name) const {
     BSONElement e = getField(name);
-    return e.type() == Bool ? e.boolean() : false;
+    return e.type() == BSONType::boolean ? e.boolean() : false;
 }
 
 StringData BSONObj::getStringField(StringData name) const {
@@ -751,7 +752,7 @@ void BSONObj::elems(std::list<BSONElement>& v) const {
 BSONObj BSONObj::getObjectField(StringData name) const {
     BSONElement e = getField(name);
     BSONType t = e.type();
-    return t == Object || t == Array ? e.embeddedObject() : BSONObj();
+    return t == BSONType::object || t == BSONType::array ? e.embeddedObject() : BSONObj();
 }
 
 int BSONObj::nFields() const {

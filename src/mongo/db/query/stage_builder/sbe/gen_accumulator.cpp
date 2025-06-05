@@ -288,11 +288,11 @@ namespace {
 SbExpr nullMissingUndefinedToNothing(SbExpr arg, StageBuilderState& state) {
     SbExprBuilder b(state);
 
-    return b.makeFunction("fillType",
-                          std::move(arg),
-                          b.makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                              getBSONTypeMask(BSONType::Undefined)),
-                          b.makeNothingConstant());
+    return b.makeFunction(
+        "fillType",
+        std::move(arg),
+        b.makeInt32Constant(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined)),
+        b.makeNothingConstant());
 }
 
 /**
@@ -2002,7 +2002,7 @@ std::string AccumOp::getOpNameForAccStmt(const AccumulationStatement& accStmt) {
     // We pattern match for "{$sum: 1}" here to reverse the transform performed by the parser.
     if (auto constArg = dynamic_cast<ExpressionConstant*>(accStmt.expr.argument.get())) {
         mongo::Value value = constArg->getValue();
-        if (opName == AccumulatorSum::kName && value.getType() == BSONType::NumberInt &&
+        if (opName == AccumulatorSum::kName && value.getType() == BSONType::numberInt &&
             value.coerceToInt() == 1) {
             return kAccumulatorCountName.toString();
         }

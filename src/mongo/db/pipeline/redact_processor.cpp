@@ -52,7 +52,7 @@ boost::optional<Document> RedactProcessor::process(const Document& input) const 
 
 Value RedactProcessor::redactValue(const Value& in, const Document& root) const {
     const BSONType valueType = in.getType();
-    if (valueType == Object) {
+    if (valueType == BSONType::object) {
         _expCtx->variables.setValue(_currentId, in);
         const boost::optional<Document> result = redactObject(root);
         if (result) {
@@ -60,12 +60,12 @@ Value RedactProcessor::redactValue(const Value& in, const Document& root) const 
         } else {
             return Value();
         }
-    } else if (valueType == Array) {
+    } else if (valueType == BSONType::array) {
         // TODO dont copy if possible
         std::vector<Value> newArr;
         const std::vector<Value>& arr = in.getArray();
         for (size_t i = 0; i < arr.size(); i++) {
-            if (arr[i].getType() == Object || arr[i].getType() == Array) {
+            if (arr[i].getType() == BSONType::object || arr[i].getType() == BSONType::array) {
                 const Value toAdd = redactValue(arr[i], root);
                 if (!toAdd.missing()) {
                     newArr.push_back(toAdd);

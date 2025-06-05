@@ -47,7 +47,7 @@ namespace mongo {
 StatusWith<TextMatchExpressionBase::TextParams>
 ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     TextMatchExpressionBase::TextParams params;
-    if (text.type() != Object) {
+    if (text.type() != BSONType::object) {
         return {ErrorCodes::BadValue, "$text expects an object"};
     }
     BSONObj queryObj = text.Obj();
@@ -119,11 +119,11 @@ ExtensionsCallback::extractWhereMatchExpressionParams(BSONElement where) {
     WhereMatchExpressionBase::WhereParams params;
 
     switch (where.type()) {
-        case mongo::String:
-        case mongo::Code:
+        case BSONType::string:
+        case BSONType::code:
             params.code = where._asCode();
             break;
-        case mongo::CodeWScope:
+        case BSONType::codeWScope:
             uasserted(4649201, "$where no longer supports deprecated BSON type CodeWScope");
             break;
         default:

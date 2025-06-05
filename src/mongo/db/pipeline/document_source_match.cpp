@@ -212,13 +212,13 @@ bool isFieldnameRedactSafe(StringData fieldName) {
 }
 
 bool isTypeRedactSafeInComparison(BSONType type) {
-    if (type == Array)
+    if (type == BSONType::array)
         return false;
-    if (type == Object)
+    if (type == BSONType::object)
         return false;
-    if (type == jstNULL)
+    if (type == BSONType::null)
         return false;
-    if (type == Undefined)
+    if (type == BSONType::undefined)
         return false;  // Currently a parse error.
 
     return true;
@@ -383,14 +383,14 @@ Document redactSafePortionTopLevel(BSONObj query) {
             continue;
 
         switch (field.type()) {
-            case Array:
+            case BSONType::array:
                 continue;  // exact matches on arrays are never allowed
-            case jstNULL:
+            case BSONType::null:
                 continue;  // can't look for missing fields
-            case Undefined:
+            case BSONType::undefined:
                 continue;  // Currently a parse error.
 
-            case Object: {
+            case BSONType::object: {
                 Document sub = redactSafePortionDollarOps(field.Obj());
                 if (!sub.empty())
                     output[field.fieldNameStringData()] = Value(sub);
@@ -588,7 +588,9 @@ intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
 
 intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
+    uassert(15959,
+            "the match filter must be an expression in an object",
+            elem.type() == BSONType::object);
 
     return DocumentSourceMatch::create(elem.Obj(), pExpCtx);
 }

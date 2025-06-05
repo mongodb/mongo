@@ -77,7 +77,7 @@ bool evaluateComparisonExpressionSingleElement(const T* expr, const BSONElement&
                      expr->matchType() == MatchExpression::LTE ||
                      expr->matchType() == MatchExpression::GTE);
             }
-            if (rhs.type() == MaxKey || rhs.type() == MinKey) {
+            if (rhs.type() == BSONType::maxKey || rhs.type() == BSONType::minKey) {
                 switch (expr->matchType()) {
                     // LT and LTE need no distinction here because the two elements that we are
                     // comparing do not even have the same canonical type and are thus not equal
@@ -86,12 +86,12 @@ bool evaluateComparisonExpressionSingleElement(const T* expr, const BSONElement&
                     // distinction between GTE and GT.
                     case MatchExpression::LT:
                     case MatchExpression::LTE:
-                        return rhs.type() == MaxKey;
+                        return rhs.type() == BSONType::maxKey;
                     case MatchExpression::EQ:
                         return false;
                     case MatchExpression::GT:
                     case MatchExpression::GTE:
-                        return rhs.type() == MinKey;
+                        return rhs.type() == BSONType::minKey;
                     default:
                         // This is a comparison match expression, so it must be either
                         // a $lt, $lte, $gt, $gte, or equality expression.
@@ -103,7 +103,7 @@ bool evaluateComparisonExpressionSingleElement(const T* expr, const BSONElement&
     }
 
     if (expr->matchType() == MatchExpression::EQ) {
-        if (!expr->getCollator() && e.type() == String) {
+        if (!expr->getCollator() && e.type() == BSONType::string) {
             // We know from above that _rhs must also be a String (or Symbol which has the same
             // representation) so if they have different value sizes, they must be different
             // strings. We can only stop here with the default collator, since other collators may
@@ -115,11 +115,12 @@ bool evaluateComparisonExpressionSingleElement(const T* expr, const BSONElement&
         // Special case handling for NaN. NaN is equal to NaN but otherwise always compares to
         // false. This follows the normal comparison rules (where NaN is less than all numbers) for
         // EQ, so we only need to do this for other comparison types.
-        const bool lhsIsNan = (((e.type() == NumberDouble) && (std::isnan(e._numberDouble())))) ||
-            ((e.type() == NumberDecimal) && (e._numberDecimal().isNaN()));
+        const bool lhsIsNan =
+            (((e.type() == BSONType::numberDouble) && (std::isnan(e._numberDouble())))) ||
+            ((e.type() == BSONType::numberDecimal) && (e._numberDecimal().isNaN()));
         const bool rhsIsNan =
-            (((rhs.type() == NumberDouble) && (std::isnan(rhs._numberDouble()))) ||
-             ((rhs.type() == NumberDecimal) && (rhs._numberDecimal().isNaN())));
+            (((rhs.type() == BSONType::numberDouble) && (std::isnan(rhs._numberDouble()))) ||
+             ((rhs.type() == BSONType::numberDecimal) && (rhs._numberDecimal().isNaN())));
         if (lhsIsNan || rhsIsNan) {
             bool bothNaN = lhsIsNan && rhsIsNan;
             switch (expr->matchType()) {
@@ -180,11 +181,11 @@ void MatchesSingleElementEvaluator::visit(const LTMatchExpression* expr) {
 
 void MatchesSingleElementEvaluator::visit(const RegexMatchExpression* expr) {
     switch (_elem.type()) {
-        case String:
-        case Symbol:
+        case BSONType::string:
+        case BSONType::symbol:
             _result = !!expr->getRegex()->matchView(_elem.valueStringData());
             return;
-        case RegEx:
+        case BSONType::regEx:
             _result = expr->getString() == _elem.regex() && expr->getFlags() == _elem.regexFlags();
             return;
         default:
@@ -200,7 +201,7 @@ void MatchesSingleElementEvaluator::visit(const ModMatchExpression* expr) {
     }
 
     long long dividend;
-    if (_elem.type() == BSONType::NumberDouble) {
+    if (_elem.type() == BSONType::numberDouble) {
         auto dividendDouble = _elem.Double();
 
         // If dividend is NaN or Infinity, then there is no match.
@@ -216,7 +217,7 @@ void MatchesSingleElementEvaluator::visit(const ModMatchExpression* expr) {
             return;
         }
         dividend = *dividendLong;
-    } else if (_elem.type() == BSONType::NumberDecimal) {
+    } else if (_elem.type() == BSONType::numberDecimal) {
         auto dividendDecimal = _elem.Decimal();
 
         // If dividend is NaN or Infinity, then there is no match.
@@ -341,11 +342,11 @@ bool evaluateBitTestExpressionSingleElement(const T* expr,
                                             const BSONElement& e,
                                             MatchDetails* details) {
     // Validate 'e' is a number or a BinData.
-    if (!e.isNumber() && e.type() != BSONType::BinData) {
+    if (!e.isNumber() && e.type() != BSONType::binData) {
         return false;
     }
 
-    if (e.type() == BSONType::BinData) {
+    if (e.type() == BSONType::binData) {
         int eBinaryLen;  // Length of eBinary (in bytes).
         const char* eBinary = e.binData(eBinaryLen);
         return performBitTest(expr, eBinary, eBinaryLen);
@@ -353,7 +354,7 @@ bool evaluateBitTestExpressionSingleElement(const T* expr,
 
     invariant(e.isNumber());
 
-    if (e.type() == BSONType::NumberDouble) {
+    if (e.type() == BSONType::numberDouble) {
         double eDouble = e.numberDouble();
 
         // NaN doubles are rejected.
@@ -374,7 +375,7 @@ bool evaluateBitTestExpressionSingleElement(const T* expr,
         if (eDouble != static_cast<double>(static_cast<long long>(eDouble))) {
             return false;
         }
-    } else if (e.type() == BSONType::NumberDecimal) {
+    } else if (e.type() == BSONType::numberDecimal) {
         Decimal128 eDecimal = e.numberDecimal();
 
         // NaN NumberDecimals are rejected.
@@ -431,7 +432,7 @@ bool arrayMatchesSingleElement(const T* expr,
                                const BSONElement& elt,
                                MatchDetails* details,
                                ArrayMatchFunc& matchesArray) {
-    if (elt.type() != BSONType::Array) {
+    if (elt.type() != BSONType::array) {
         return false;
     }
 
@@ -586,7 +587,7 @@ bool evaluateInternalExprComparisonMatchExpression(const T* expr,
     // when an array is found anywhere along the patch we are matching against. When this
     // occurs, we return 'true' and depend on the corresponding ExprMatchExpression node to
     // filter properly.
-    if (elem.type() == BSONType::Array) {
+    if (elem.type() == BSONType::array) {
         return true;
     }
 
@@ -634,14 +635,14 @@ void MatchesSingleElementEvaluator::visit(const InternalExprLTEMatchExpression* 
 
 void MatchesSingleElementEvaluator::visit(const InternalEqHashedKey* expr) {
     const auto& rhs = expr->getData();
-    tassert(7281401, "hashed value must be a long", rhs.type() == BSONType::NumberLong);
+    tassert(7281401, "hashed value must be a long", rhs.type() == BSONType::numberLong);
     const auto hashVal = BSONElementHasher::hash64(_elem, BSONElementHasher::DEFAULT_HASH_SEED);
     _result = hashVal == rhs.numberLong();
 }
 
 void MatchesSingleElementEvaluator::visit(
     const InternalSchemaAllowedPropertiesMatchExpression* expr) {
-    if (_elem.type() != BSONType::Object) {
+    if (_elem.type() != BSONType::object) {
         _result = false;
         return;
     }
@@ -682,7 +683,7 @@ template <typename T>
 bool evaluateInternalSchemaStrLengthMatchExpressionSingleElement(const T* expr,
                                                                  const BSONElement& elem,
                                                                  MatchDetails* details) {
-    if (elem.type() != BSONType::String) {
+    if (elem.type() != BSONType::string) {
         return false;
     }
 
@@ -700,7 +701,7 @@ void MatchesSingleElementEvaluator::visit(const InternalSchemaMinLengthMatchExpr
 }
 
 void MatchesSingleElementEvaluator::visit(const InternalSchemaMaxPropertiesMatchExpression* expr) {
-    if (_elem.type() != BSONType::Object) {
+    if (_elem.type() != BSONType::object) {
         _result = false;
         return;
     }
@@ -708,7 +709,7 @@ void MatchesSingleElementEvaluator::visit(const InternalSchemaMaxPropertiesMatch
 }
 
 void MatchesSingleElementEvaluator::visit(const InternalSchemaMinPropertiesMatchExpression* expr) {
-    if (_elem.type() != BSONType::Object) {
+    if (_elem.type() != BSONType::object) {
         _result = false;
         return;
     }
@@ -716,7 +717,7 @@ void MatchesSingleElementEvaluator::visit(const InternalSchemaMinPropertiesMatch
 }
 
 void MatchesSingleElementEvaluator::visit(const InternalSchemaObjectMatchExpression* expr) {
-    if (_elem.type() != BSONType::Object) {
+    if (_elem.type() != BSONType::object) {
         _result = false;
         return;
     }
@@ -755,12 +756,12 @@ void MatchesSingleElementEvaluator::visit(const InternalSchemaTypeExpression* ex
 }
 
 void MatchesSingleElementEvaluator::visit(const InternalSchemaBinDataSubTypeExpression* expr) {
-    _result = _elem.type() == BSONType::BinData && _elem.binDataType() == expr->getBinDataSubType();
+    _result = _elem.type() == BSONType::binData && _elem.binDataType() == expr->getBinDataSubType();
 }
 
 void MatchesSingleElementEvaluator::visit(
     const InternalSchemaBinDataEncryptedTypeExpression* expr) {
-    if (_elem.type() != BSONType::BinData) {
+    if (_elem.type() != BSONType::binData) {
         _result = false;
         return;
     }
@@ -793,7 +794,7 @@ void MatchesSingleElementEvaluator::visit(
 
 void MatchesSingleElementEvaluator::visit(
     const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) {
-    if (_elem.type() != BSONType::BinData) {
+    if (_elem.type() != BSONType::binData) {
         _result = false;
         return;
     }

@@ -233,7 +233,7 @@ std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange
     }
 
     auto rawElem = static_cast<const ComparisonMatchExpression*>(me)->getData();
-    if (rawElem.type() != BSONType::bsonTimestamp) {
+    if (rawElem.type() != BSONType::timestamp) {
         return {min, max};
     }
 
@@ -270,10 +270,10 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
 // True if the element type is affected by a collator (i.e. it is or contains a String).
 bool affectedByCollator(const BSONElement& element) {
     switch (element.type()) {
-        case BSONType::String:
+        case BSONType::string:
             return true;
-        case BSONType::Array:
-        case BSONType::Object:
+        case BSONType::array:
+        case BSONType::object:
             for (const auto& sub : element.Obj()) {
                 if (affectedByCollator(sub))
                     return true;
@@ -411,11 +411,11 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
                 allEltsCollationCompatible = false;
 
                 BSONObjBuilder bMin;
-                bMin.appendMinForType("", element.type());
+                bMin.appendMinForType("", stdx::to_underlying(element.type()));
                 setLowestRecord(minBound, bMin.obj());
 
                 BSONObjBuilder bMax;
-                bMax.appendMaxForType("", element.type());
+                bMax.appendMaxForType("", stdx::to_underlying(element.type()));
                 setHighestRecord(maxBound, bMax.obj());
             }
         }
@@ -442,11 +442,11 @@ void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
         // For other comparisons which _do_ perform type bracketing, the RecordId bounds
         // may be tightened here.
         BSONObjBuilder minb;
-        minb.appendMinForType("", element.type());
+        minb.appendMinForType("", stdx::to_underlying(element.type()));
         recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
 
         BSONObjBuilder maxb;
-        maxb.appendMaxForType("", element.type());
+        maxb.appendMaxForType("", stdx::to_underlying(element.type()));
         recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
     }
 
@@ -705,7 +705,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         auto nearExpr = static_cast<const GeoNearMatchExpression*>(expr);
 
         BSONElement elt = index.keyPattern.firstElement();
-        bool indexIs2D = (String == elt.type() && "2d" == elt.String());
+        bool indexIs2D = (BSONType::string == elt.type() && "2d" == elt.String());
 
         if (indexIs2D) {
             auto ret = std::make_unique<GeoNear2DNode>(index);
@@ -735,7 +735,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         for (auto&& keyPatternElt : ret->index.keyPattern) {
             // We know that the only key pattern with a type of String is the _fts field
             // which is immediately after all prefix fields.
-            if (BSONType::String == keyPatternElt.type()) {
+            if (BSONType::string == keyPatternElt.type()) {
                 break;
             }
             ++(ret->numPrefixFields);

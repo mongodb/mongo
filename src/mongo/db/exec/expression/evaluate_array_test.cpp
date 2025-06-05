@@ -111,7 +111,7 @@ TEST(ExpressionSortArrayTest, SortsNormalArrayForwards) {
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
-    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_EQ(val.getType(), BSONType::array);
     ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1 << 2 << 3)));
 }
 
@@ -123,7 +123,7 @@ TEST(ExpressionSortArrayTest, SortsNormalArrayBackwards) {
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
-    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_EQ(val.getType(), BSONType::array);
     ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(3 << 2 << 1)));
 }
 
@@ -135,7 +135,7 @@ TEST(ExpressionSortArrayTest, SortsEmptyArray) {
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
-    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_EQ(val.getType(), BSONType::array);
     ASSERT_VALUE_EQ(val, Value(std::vector<Value>()));
 }
 
@@ -147,7 +147,7 @@ TEST(ExpressionSortArrayTest, SortsOneElementArray) {
         ExpressionSortArray::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
     Value val = expressionSortArray->evaluate(MutableDocument().freeze(), &expCtx.variables);
 
-    ASSERT_EQ(val.getType(), BSONType::Array);
+    ASSERT_EQ(val.getType(), BSONType::array);
     ASSERT_VALUE_EQ(val, Value(BSON_ARRAY(1)));
 }
 
@@ -196,7 +196,7 @@ void runTest(Document spec) {
             VariablesParseState vps = expCtx.variablesParseState;
             const intrusive_ptr<Expression> expr = Expression::parseExpression(&expCtx, obj, vps);
             Value result = expr->evaluate({}, &expCtx.variables);
-            if (result.getType() == Array) {
+            if (result.getType() == BSONType::array) {
                 result = sortSet(result);
             }
             if (ValueComparator().evaluate(result != expected)) {

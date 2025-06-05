@@ -326,9 +326,9 @@ TEST_F(GoldenSbeStageBuilderTest, TestCountScan) {
         BSON("a" << 1));
     // Build COUNT_SCAN node
     auto csn = std::make_unique<CountScanNode>(makeIndexEntry(BSON("a" << 1)));
-    csn->startKey = BSON("a" << MinKey);
+    csn->startKey = BSON("a" << BSONType::minKey);
     csn->startKeyInclusive = false;
-    csn->endKey = BSON("a" << MaxKey);
+    csn->endKey = BSON("a" << BSONType::maxKey);
     csn->endKeyInclusive = false;
     // Build GROUP node
     auto bson = fromjson("{count: {$count: {}}}");

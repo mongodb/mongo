@@ -1360,11 +1360,11 @@ TEST_F(NetworkInterfaceInternalClientTest,
     // Verify that the "hello" reply has the expected internalClient data.
     auto wireSpec = WireSpec::getWireSpec(getGlobalServiceContext()).get();
     auto internalClientElem = helloHandshake.request["internalClient"];
-    ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+    ASSERT_EQ(internalClientElem.type(), BSONType::object);
     auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
     auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
-    ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
-    ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+    ASSERT_EQ(minWireVersionElem.type(), BSONType::numberInt);
+    ASSERT_EQ(maxWireVersionElem.type(), BSONType::numberInt);
     ASSERT_EQ(minWireVersionElem.numberInt(), wireSpec->outgoing.minWireVersion);
     ASSERT_EQ(maxWireVersionElem.numberInt(), wireSpec->outgoing.maxWireVersion);
 

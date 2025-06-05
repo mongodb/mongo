@@ -672,10 +672,10 @@ TEST_F(BucketAutoTests, ShouldBeAbleToReParseSerializedStage) {
     vector<Value> serialization;
     bucketAuto->serializeToArray(serialization);
     ASSERT_EQUALS(serialization.size(), 1UL);
-    ASSERT_EQUALS(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQUALS(serialization[0].getType(), BSONType::object);
 
     ASSERT_EQUALS(serialization[0].getDocument().computeSize(), 1ULL);
-    ASSERT_EQUALS(serialization[0].getDocument()["$bucketAuto"].getType(), BSONType::Object);
+    ASSERT_EQUALS(serialization[0].getDocument()["$bucketAuto"].getType(), BSONType::object);
 
     auto serializedBson = serialization[0].getDocument().toBson();
     auto roundTripped = createBucketAuto(serializedBson);

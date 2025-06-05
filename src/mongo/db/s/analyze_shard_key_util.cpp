@@ -90,7 +90,7 @@ void uassertShardKeyValueNotContainArrays(const BSONObj& value) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The shard key contains an array field '" << element.fieldName()
                               << "'",
-                element.type() != BSONType::Array);
+                element.type() != BSONType::array);
     }
 }
 

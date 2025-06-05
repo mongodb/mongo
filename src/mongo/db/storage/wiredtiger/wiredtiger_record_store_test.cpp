@@ -367,7 +367,7 @@ TEST(WiredTigerRecordStoreTest, AppendCustomStatsMetadata) {
     ASSERT_TRUE(versionElement.isNumber());
 
     BSONElement creationStringElement = wiredTiger.getField("creationString");
-    ASSERT_EQUALS(creationStringElement.type(), String);
+    ASSERT_EQUALS(creationStringElement.type(), BSONType::string);
 }
 
 TEST(WiredTigerRecordStoreTest, AppendCustomNumericStats) {

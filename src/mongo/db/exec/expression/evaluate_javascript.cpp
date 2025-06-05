@@ -46,7 +46,7 @@ Value evaluate(const ExpressionFunction& expr, const Document& root, Variables* 
     uassert(31265, "The body function did not evaluate", func);
 
     auto argValue = expr.getPassedArgs()->evaluate(root, variables);
-    uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::Array);
+    uassert(31266, "The args field must be of type array", argValue.getType() == BSONType::array);
 
     // This logic exists to desugar $where into $expr + $function. In this case set the global obj
     // to this, to handle cases where the $where function references the current document through
@@ -127,7 +127,7 @@ BSONObj emitFromJS(const BSONObj& args, void* data) {
 
     auto emitState = static_cast<EmitState*>(data);
     uassert(9712400, "Misplaced call to 'emit'", emitState);
-    if (elts[0].type() == Undefined) {
+    if (elts[0].type() == BSONType::undefined) {
         MutableDocument md;
         // Note: Using MutableDocument::addField() is considerably faster than using
         // MutableDocument::setField() or building a document by hand with the DOC() macros.
@@ -146,7 +146,7 @@ BSONObj emitFromJS(const BSONObj& args, void* data) {
 
 Value evaluate(const ExpressionInternalJsEmit& expr, const Document& root, Variables* variables) {
     Value thisVal = expr.getThisRef()->evaluate(root, variables);
-    uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::Object);
+    uassert(31225, "'this' must be an object.", thisVal.getType() == BSONType::object);
 
     // If the scope does not exist and is created by the following call, then make sure to
     // re-bind emit() and the given function to the new scope.

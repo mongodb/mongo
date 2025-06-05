@@ -160,7 +160,7 @@ DocumentSourceChangeStreamCheckResumability::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467603,
             str::stream() << "the '" << kStageName << "' object spec must be an object",
-            spec.type() == Object);
+            spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamCheckResumabilitySpec::parse(
         IDLParserContext("DocumentSourceChangeStreamCheckResumabilitySpec"), spec.embeddedObject());

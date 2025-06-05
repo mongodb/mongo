@@ -114,6 +114,7 @@ extern "C" {
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
@@ -295,7 +296,7 @@ ConstDataRange binDataToCDR(const BSONBinData binData) {
 }
 
 ConstDataRange binDataToCDR(const Value& value) {
-    uassert(6334103, "Expected binData Value type", value.getType() == BinData);
+    uassert(6334103, "Expected binData Value type", value.getType() == BSONType::binData);
 
     return binDataToCDR(value.getBinData());
 }
@@ -751,7 +752,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2(
     auto swCipherText = KeyIdAndValue::serialize(userKey, value);
     uassertStatusOK(swCipherText);
     iupayload.setValue(swCipherText.getValue());
-    iupayload.setType(element.type());
+    iupayload.setType(stdx::to_underlying(element.type()));
     iupayload.setIndexKeyId(indexKey.keyId);
     iupayload.setContentionFactor(contentionFactor);
 
@@ -765,52 +766,52 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
     auto trimFactor = spec.getTrimFactor();
 
     switch (element.type()) {
-        case BSONType::NumberInt:
+        case BSONType::numberInt:
             uassert(6775501,
                     "min bound must be integer",
-                    !minBound.has_value() || minBound->type() == BSONType::NumberInt);
+                    !minBound.has_value() || minBound->type() == BSONType::numberInt);
             uassert(6775502,
                     "max bound must be integer",
-                    !maxBound.has_value() || maxBound->type() == BSONType::NumberInt);
+                    !maxBound.has_value() || maxBound->type() == BSONType::numberInt);
             return getEdgesInt32(element.Int(),
                                  minBound.map([](BSONElement m) { return m.Int(); }),
                                  maxBound.map([](BSONElement m) { return m.Int(); }),
                                  sparsity,
                                  trimFactor);
 
-        case BSONType::NumberLong:
+        case BSONType::numberLong:
             uassert(6775503,
                     "min bound must be long int",
-                    !minBound.has_value() || minBound->type() == BSONType::NumberLong);
+                    !minBound.has_value() || minBound->type() == BSONType::numberLong);
             uassert(6775504,
                     "max bound must be long int",
-                    !maxBound.has_value() || maxBound->type() == BSONType::NumberLong);
+                    !maxBound.has_value() || maxBound->type() == BSONType::numberLong);
             return getEdgesInt64(element.Long(),
                                  minBound.map([](BSONElement m) { return int64_t(m.Long()); }),
                                  maxBound.map([](BSONElement m) { return int64_t(m.Long()); }),
                                  sparsity,
                                  trimFactor);
 
-        case BSONType::Date:
+        case BSONType::date:
             uassert(6775505,
                     "min bound must be date",
-                    !minBound.has_value() || minBound->type() == BSONType::Date);
+                    !minBound.has_value() || minBound->type() == BSONType::date);
             uassert(6775506,
                     "max bound must be date",
-                    !maxBound.has_value() || maxBound->type() == BSONType::Date);
+                    !maxBound.has_value() || maxBound->type() == BSONType::date);
             return getEdgesInt64(element.Date().asInt64(),
                                  minBound.map([](BSONElement m) { return m.Date().asInt64(); }),
                                  maxBound.map([](BSONElement m) { return m.Date().asInt64(); }),
                                  sparsity,
                                  trimFactor);
 
-        case BSONType::NumberDouble:
+        case BSONType::numberDouble:
             uassert(6775507,
                     "min bound must be double",
-                    !minBound.has_value() || minBound->type() == BSONType::NumberDouble);
+                    !minBound.has_value() || minBound->type() == BSONType::numberDouble);
             uassert(6775508,
                     "max bound must be double",
-                    !maxBound.has_value() || maxBound->type() == BSONType::NumberDouble);
+                    !maxBound.has_value() || maxBound->type() == BSONType::numberDouble);
             return getEdgesDouble(
                 element.Double(),
                 minBound.map([](BSONElement m) { return m.Double(); }),
@@ -819,13 +820,13 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
                 sparsity,
                 trimFactor);
 
-        case BSONType::NumberDecimal:
+        case BSONType::numberDecimal:
             uassert(6775509,
                     "min bound must be decimal",
-                    !minBound.has_value() || minBound->type() == BSONType::NumberDecimal);
+                    !minBound.has_value() || minBound->type() == BSONType::numberDecimal);
             uassert(6775510,
                     "max bound must be decimal",
-                    !maxBound.has_value() || maxBound->type() == BSONType::NumberDecimal);
+                    !maxBound.has_value() || maxBound->type() == BSONType::numberDecimal);
             return getEdgesDecimal128(
                 element.numberDecimal(),
                 minBound.map([](BSONElement m) { return m.numberDecimal(); }),
@@ -924,7 +925,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     auto swCipherText = KeyIdAndValue::serialize(userKey, value);
     uassertStatusOK(swCipherText);
     iupayload.setValue(swCipherText.getValue());
-    iupayload.setType(element.type());
+    iupayload.setType(stdx::to_underlying(element.type()));
     iupayload.setIndexKeyId(indexKey.keyId);
     iupayload.setContentionFactor(contentionFactor);
 
@@ -1048,10 +1049,10 @@ BSONObj transformBSON(
         auto& [iterator, builder] = frameStack.top();
         if (iterator.more()) {
             BSONElement elem = iterator.next();
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 frameStack.push({BSONObjIterator(elem.Obj()),
                                  BSONObjBuilder(builder.subobjStart(elem.fieldNameStringData()))});
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 frameStack.push(
                     {BSONObjIterator(elem.Obj()),
                      BSONObjBuilder(builder.subarrayStart(elem.fieldNameStringData()))});
@@ -1097,11 +1098,11 @@ void visitEncryptedBSON(const BSONObj& object,
         auto& iterator = frameStack.top();
         if (iterator.second.more()) {
             BSONElement elem = iterator.second.next();
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 frameStack.emplace(
                     SinglyLinkedFieldPath(elem.fieldNameStringData(), &iterator.first),
                     BSONObjIterator(elem.Obj()));
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 frameStack.emplace(
                     SinglyLinkedFieldPath(elem.fieldNameStringData(), &iterator.first),
                     BSONObjIterator(elem.Obj()));
@@ -1281,7 +1282,7 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
         uassert(9783802,
                 str::stream() << "Type '" << typeName(bsonType)
                               << "' is not a valid type for Queryable Encryption Text Search",
-                isValidBSONType(payloadInfo.payload.getType()) && bsonType == BSONType::String);
+                isValidBSONType(payloadInfo.payload.getType()) && bsonType == BSONType::string);
     } else {
         uassert(6373504,
                 str::stream() << "Type '" << typeName(bsonType)
@@ -1925,7 +1926,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
 
     // TODO: Check on the implications of safeNumberInt() and safeNumberLong().
     switch (bsonType) {
-        case NumberInt:
+        case BSONType::numberInt:
             return minCoverInt32(lowerBound.safeNumberInt(),
                                  includeLowerBound,
                                  upperBound.safeNumberInt(),
@@ -1934,7 +1935,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  indexMax.Int(),
                                  sparsity,
                                  trimFactor);
-        case NumberLong:
+        case BSONType::numberLong:
             return minCoverInt64(lowerBound.safeNumberLong(),
                                  includeLowerBound,
                                  upperBound.safeNumberLong(),
@@ -1943,7 +1944,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  indexMax.Long(),
                                  sparsity,
                                  trimFactor);
-        case Date:
+        case BSONType::date:
             return minCoverInt64(lowerBound.Date().asInt64(),
                                  includeLowerBound,
                                  upperBound.Date().asInt64(),
@@ -1952,7 +1953,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  indexMax.Date().asInt64(),
                                  sparsity,
                                  trimFactor);
-        case NumberDouble:
+        case BSONType::numberDouble:
             return minCoverDouble(lowerBound.numberDouble(),
                                   includeLowerBound,
                                   upperBound.numberDouble(),
@@ -1963,7 +1964,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                       [](std::int32_t m) { return static_cast<uint32_t>(m); }),
                                   sparsity,
                                   trimFactor);
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return minCoverDecimal128(lowerBound.numberDecimal(),
                                       includeLowerBound,
                                       upperBound.numberDecimal(),
@@ -1982,7 +1983,7 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
 }
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value) {
-    uassert(6672416, "Expected binData with subtype Encrypt", value.getType() == BinData);
+    uassert(6672416, "Expected binData with subtype Encrypt", value.getType() == BSONType::binData);
 
     auto binData = value.getBinData();
 
@@ -1992,7 +1993,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value
 }
 
 boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const Value& value) {
-    if (value.getType() != BSONType::BinData) {
+    if (value.getType() != BSONType::binData) {
         return boost::none;
     }
     auto binData = value.getBinData();
@@ -2242,8 +2243,9 @@ void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
             str::stream() << "Found indexed encrypted fields but could not find " << kSafeContent,
             !safeContent.eoo());
 
-    uassert(
-        6371507, str::stream() << kSafeContent << " must be an array", safeContent.type() == Array);
+    uassert(6371507,
+            str::stream() << kSafeContent << " must be an array",
+            safeContent.type() == BSONType::array);
 }
 
 PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
@@ -2501,7 +2503,7 @@ StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(
 StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(
     const ESCTwiceDerivedValueToken& valueToken, BSONObj&& doc) {
     BSONElement encryptedValue;
-    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
+    auto status = bsonExtractTypedField(doc, kValue, BSONType::binData, &encryptedValue);
     if (!status.isOK()) {
         return status;
     }
@@ -2527,7 +2529,7 @@ template <class TagToken, class ValueToken>
 StatusWith<ESCDocument> ESCCollectionCommon<TagToken, ValueToken>::decryptDocument(
     const ValueToken& valueToken, BSONObj&& doc) {
     BSONElement encryptedValue;
-    auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
+    auto status = bsonExtractTypedField(doc, kValue, BSONType::binData, &encryptedValue);
     if (!status.isOK()) {
         return status;
     }
@@ -3032,7 +3034,7 @@ FLE2IndexedEqualityEncryptedValueV2 FLE2IndexedEqualityEncryptedValueV2::fromUne
     iev->type = kFLE2IEVTypeEqualityV2;
     iev->edge_count = 1;
     iev->fle_blob_subtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
-    iev->bson_value_type = typeParam;
+    iev->bson_value_type = stdx::to_underlying(typeParam);
 
     auto keyId = indexKeyIdParam.toCDR();
     if (!_mongocrypt_buffer_copy_from_data_and_size(
@@ -3179,7 +3181,7 @@ FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
             tags.size() == counters.size() && tags.size() > 0);
     uassert(7290901,
             "Invalid BSON Type in Queryable Encryption InsertUpdatePayloadV2",
-            isValidBSONType(bsonType));
+            isValidBSONType(stdx::to_underlying(bsonType)));
     uassert(7290902,
             "Invalid client encrypted value length in Queryable Encryption InsertUpdatePayloadV2",
             !clientEncryptedValue.empty());
@@ -3207,7 +3209,7 @@ FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
             metadataBlocks.size() > 0);
     uassert(7290904,
             "Invalid BSON Type in Queryable Encryption InsertUpdatePayloadV2",
-            isValidBSONType(bsonType));
+            isValidBSONType(stdx::to_underlying(bsonType)));
     uassert(7290905,
             "Invalid client encrypted value length in Queryable Encryption InsertUpdatePayloadV2",
             !clientEncryptedValue.empty());
@@ -3365,7 +3367,7 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::serialize(
     std::copy(cdrKeyId.data(), cdrKeyId.data() + cdrKeyId.length(), serializedServerValue.begin());
     offset += cdrKeyId.length();
 
-    uint8_t bsonTypeByte = bsonType;
+    uint8_t bsonTypeByte = stdx::to_underlying(bsonType);
     std::copy(&bsonTypeByte, (&bsonTypeByte) + 1, serializedServerValue.begin() + offset);
     offset++;
 
@@ -3429,7 +3431,7 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
             payload.getTextSearchTokenSets().has_value());
     uassert(9784103,
             "InsertUpdatePayload has bad BSON type for FLE2IndexedTextEncryptedValueV2",
-            static_cast<BSONType>(payload.getType()) == BSONType::String);
+            static_cast<BSONType>(payload.getType()) == BSONType::string);
 
     auto& tsts = payload.getTextSearchTokenSets().value();
 
@@ -3473,7 +3475,7 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
 
     iev->type = kFLE2IEVTypeText;
     iev->fle_blob_subtype = static_cast<int8_t>(EncryptedBinDataType::kFLE2TextIndexedValue);
-    iev->bson_value_type = static_cast<BSONType>(payload.getType());
+    iev->bson_value_type = stdx::to_underlying(static_cast<BSONType>(payload.getType()));
     iev->edge_count = totalTagCount;
     iev->substr_tag_count = substrTagCount;
     iev->suffix_tag_count = suffixTagCount;
@@ -3829,7 +3831,7 @@ BSONObj EDCServerCollection::finalizeForInsert(
         if (element.fieldNameStringData() == kSafeContent) {
             uassert(6373510,
                     str::stream() << "Field '" << kSafeContent << "' was found but not an array",
-                    element.type() == Array);
+                    element.type() == BSONType::array);
             BSONArrayBuilder subBuilder(builder.subarrayStart(kSafeContent));
 
             // Append existing array elements
@@ -3882,7 +3884,7 @@ BSONObj EDCServerCollection::finalizeForUpdate(
         if (tags.size() > 0 && element.fieldNameStringData() == kDollarPush) {
             uassert(6371511,
                     str::stream() << "Field '" << kDollarPush << "' was found but not an object",
-                    element.type() == Object);
+                    element.type() == BSONType::object);
             BSONObjBuilder subBuilder(builder.subobjStart(kDollarPush));
 
             // Append existing fields elements
@@ -4051,7 +4053,7 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
 
     uassert(6371205,
             "Expected an object for schema in EncryptionInformation",
-            !element.eoo() && element.type() == Object);
+            !element.eoo() && element.type() == BSONType::object);
 
     auto efc = EncryptedFieldConfig::parse(IDLParserContext("schema"), element.Obj());
 
@@ -4245,7 +4247,7 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
                 return CompactionToken{std::move(fieldName), std::move(ecoc), boost::none};
             }
 
-            if (token.type() == Object) {
+            if (token.type() == BSONType::object) {
                 auto doc =
                     CompactionTokenDoc::parse(IDLParserContext{"compactionToken"}, token.Obj());
                 return CompactionToken{
@@ -4284,7 +4286,7 @@ void CompactionHelpers::_validateTokens(const EncryptedFieldConfig& efc,
 }
 
 ConstDataRange binDataToCDR(BSONElement element) {
-    uassert(6338501, "Expected binData BSON element", element.type() == BinData);
+    uassert(6338501, "Expected binData BSON element", element.type() == BSONType::binData);
 
     int len;
     const char* data = element.binData(len);
@@ -4365,7 +4367,7 @@ bool EncryptedPredicateEvaluatorV2::evaluate(
     std::function<std::vector<FLE2TagAndEncryptedMetadataBlockView>(ConstDataRange)>
         extractMetadataBlocks) const {
 
-    if (fieldValue.getType() != BinData) {
+    if (fieldValue.getType() != BSONType::binData) {
         return false;
     }
 
@@ -4516,28 +4518,28 @@ std::uint64_t getEdgesLength(BSONType fieldType, StringData fieldPath, QueryType
         [](auto signedInt) -> uint32_t { return static_cast<uint32_t>(signedInt); });
 
     switch (fieldType) {
-        case NumberInt: {
+        case BSONType::numberInt: {
             auto min = config.getMin()->getInt();
             return getEdgesInt32(min, min, config.getMax()->getInt(), sparsity, trimFactor)->size();
         }
-        case NumberLong: {
+        case BSONType::numberLong: {
             auto min = config.getMin()->getLong();
             return getEdgesInt64(min, min, config.getMax()->getLong(), sparsity, trimFactor)
                 ->size();
         }
-        case NumberDouble: {
+        case BSONType::numberDouble: {
             auto min = config.getMin()->getDouble();
             return getEdgesDouble(
                        min, min, config.getMax()->getDouble(), precision, sparsity, trimFactor)
                 ->size();
         }
-        case NumberDecimal: {
+        case BSONType::numberDecimal: {
             auto min = config.getMin()->getDecimal();
             return getEdgesDecimal128(
                        min, min, config.getMax()->getDecimal(), precision, sparsity, trimFactor)
                 ->size();
         }
-        case Date: {
+        case BSONType::date: {
             auto min = config.getMin()->getDate().toMillisSinceEpoch();
             return getEdgesInt64(min,
                                  min,

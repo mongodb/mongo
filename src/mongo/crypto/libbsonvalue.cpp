@@ -48,14 +48,14 @@ LibBSONValue::LibBSONValue() : _value(new bson_value_t) {
 
 LibBSONValue::LibBSONValue(const BSONElement& elem) : LibBSONValue() {
     switch (elem.type()) {
-        case EOO:
+        case BSONType::eoo:
             // Do nothing. _value is already EOO.
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             _value->value.v_double = elem.Double();
             _value->value_type = BSON_TYPE_DOUBLE;
             break;
-        case String: {
+        case BSONType::string: {
             auto str = elem.valueStringData();
             _value->value.v_utf8.str = reinterpret_cast<char*>(bson_malloc(str.size() + 1));
             _value->value.v_utf8.len = str.size();
@@ -64,16 +64,17 @@ LibBSONValue::LibBSONValue(const BSONElement& elem) : LibBSONValue() {
             _value->value_type = BSON_TYPE_UTF8;
             break;
         }
-        case Object:
-        case Array: {
+        case BSONType::object:
+        case BSONType::array: {
             auto obj = elem.Obj();
             _value->value.v_doc.data = reinterpret_cast<std::uint8_t*>(bson_malloc(obj.objsize()));
             std::memcpy(_value->value.v_doc.data, obj.objdata(), obj.objsize());
             _value->value.v_doc.data_len = obj.objsize();
-            _value->value_type = (elem.type() == Object) ? BSON_TYPE_DOCUMENT : BSON_TYPE_ARRAY;
+            _value->value_type =
+                (elem.type() == BSONType::object) ? BSON_TYPE_DOCUMENT : BSON_TYPE_ARRAY;
             break;
         }
-        case BinData: {
+        case BSONType::binData: {
             int len = 0;
             const auto* data = reinterpret_cast<const std::uint8_t*>(elem.binData(len));
             _value->value.v_binary.subtype = static_cast<bson_subtype_t>(elem.binDataType());
@@ -83,29 +84,29 @@ LibBSONValue::LibBSONValue(const BSONElement& elem) : LibBSONValue() {
             _value->value_type = BSON_TYPE_BINARY;
             break;
         }
-        case jstOID: {
+        case BSONType::oid: {
             auto oid = elem.OID();
             bson_oid_init_from_string(&(_value->value.v_oid), oid.toString().c_str());
             _value->value_type = BSON_TYPE_OID;
             break;
         }
-        case Bool:
+        case BSONType::boolean:
             _value->value.v_bool = elem.Bool();
             _value->value_type = BSON_TYPE_BOOL;
             break;
-        case Date:
+        case BSONType::date:
             _value->value.v_datetime = elem.Date().toMillisSinceEpoch();
             _value->value_type = BSON_TYPE_DATE_TIME;
             break;
-        case jstNULL:
+        case BSONType::null:
             _value->value_type = BSON_TYPE_NULL;
             break;
-        case RegEx:
+        case BSONType::regEx:
             _value->value.v_regex.regex = bson_strdup(elem.regex());
             _value->value.v_regex.options = bson_strdup(elem.regexFlags());
             _value->value_type = BSON_TYPE_REGEX;
             break;
-        case Code: {
+        case BSONType::code: {
             auto str = elem._asCode();
             _value->value.v_code.code = reinterpret_cast<char*>(bson_malloc(str.size() + 1));
             std::memcpy(_value->value.v_code.code, str.c_str(), str.size());
@@ -114,22 +115,22 @@ LibBSONValue::LibBSONValue(const BSONElement& elem) : LibBSONValue() {
             _value->value_type = BSON_TYPE_CODE;
             break;
         }
-        case NumberInt:
+        case BSONType::numberInt:
             _value->value.v_int32 = elem.Int();
             _value->value_type = BSON_TYPE_INT32;
             break;
-        case bsonTimestamp: {
+        case BSONType::timestamp: {
             auto timestamp = elem.timestamp();
             _value->value.v_timestamp.timestamp = timestamp.getSecs();
             _value->value.v_timestamp.increment = timestamp.getInc();
             _value->value_type = BSON_TYPE_TIMESTAMP;
             break;
         }
-        case NumberLong:
+        case BSONType::numberLong:
             _value->value.v_int64 = elem.Long();
             _value->value_type = BSON_TYPE_INT64;
             break;
-        case NumberDecimal: {
+        case BSONType::numberDecimal: {
             auto dec128 = elem.Decimal().getValue();
             _value->value.v_decimal128.high = dec128.high64;
             _value->value.v_decimal128.low = dec128.low64;

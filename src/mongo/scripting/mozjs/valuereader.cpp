@@ -86,7 +86,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
     auto scope = getScope(_context);
 
     switch (elem.type()) {
-        case mongo::Code:
+        case BSONType::code:
             // javascriptProtection prevents Code and CodeWScope BSON types from
             // being automatically marshalled into executable functions.
             if (scope->isJavaScriptProtectionEnabled()) {
@@ -99,7 +99,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                 scope->newFunction(elem.valueStringData(), _value);
             }
             return;
-        case mongo::CodeWScope:
+        case BSONType::codeWScope:
             if (scope->isJavaScriptProtectionEnabled()) {
                 JS::RootedValueArray<2> args(_context);
 
@@ -115,42 +115,42 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
                                    _value);
             }
             return;
-        case mongo::Symbol:
-        case mongo::String:
+        case BSONType::symbol:
+        case BSONType::string:
             fromStringData(elem.valueStringData());
             return;
-        case mongo::jstOID: {
+        case BSONType::oid: {
             OIDInfo::make(_context, elem.OID(), _value);
             return;
         }
-        case mongo::NumberDouble:
+        case BSONType::numberDouble:
             fromDouble(elem.Number());
             return;
-        case mongo::NumberInt:
+        case BSONType::numberInt:
             _value.setInt32(elem.Int());
             return;
-        case mongo::Array: {
+        case BSONType::array: {
             fromBSONArray(elem.embeddedObject(), &parent, readOnly);
             return;
         }
-        case mongo::Object:
+        case BSONType::object:
             fromBSON(elem.embeddedObject(), &parent, readOnly);
             return;
-        case mongo::Date:
+        case BSONType::date:
             _value.setObjectOrNull(
                 JS::NewDateObject(_context, JS::TimeClip(elem.Date().toMillisSinceEpoch())));
             return;
-        case mongo::Bool:
+        case BSONType::boolean:
             _value.setBoolean(elem.Bool());
             return;
-        case mongo::jstNULL:
+        case BSONType::null:
             _value.setNull();
             return;
-        case mongo::EOO:
-        case mongo::Undefined:
+        case BSONType::eoo:
+        case BSONType::undefined:
             _value.setUndefined();
             return;
-        case mongo::RegEx: {
+        case BSONType::regEx: {
             JS::RootedValueArray<2> args(_context);
 
             ValueReader(_context, args[0]).fromStringData(elem.regex());
@@ -163,7 +163,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::BinData: {
+        case BSONType::binData: {
             int len;
             const char* data = elem.binData(len);
             std::stringstream ss;
@@ -178,7 +178,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             scope->getProto<BinDataInfo>().newInstance(args, _value);
             return;
         }
-        case mongo::bsonTimestamp: {
+        case BSONType::timestamp: {
             JS::RootedValueArray<2> args(_context);
 
             ValueReader(_context, args[0])
@@ -189,7 +189,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::NumberLong: {
+        case BSONType::numberLong: {
             JS::RootedObject thisv(_context);
             scope->getProto<NumberLongInfo>().newObject(&thisv);
             JS::SetReservedSlot(thisv,
@@ -198,7 +198,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             _value.setObjectOrNull(thisv);
             return;
         }
-        case mongo::NumberDecimal: {
+        case BSONType::numberDecimal: {
             Decimal128 decimal = elem.numberDecimal();
             JS::RootedValueArray<1> args(_context);
             ValueReader(_context, args[0]).fromDecimal128(decimal);
@@ -209,13 +209,13 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 
             return;
         }
-        case mongo::MinKey:
+        case BSONType::minKey:
             scope->getProto<MinKeyInfo>().newInstance(_value);
             return;
-        case mongo::MaxKey:
+        case BSONType::maxKey:
             scope->getProto<MaxKeyInfo>().newInstance(_value);
             return;
-        case mongo::DBRef: {
+        case BSONType::dbRef: {
             JS::RootedValueArray<1> oidArgs(_context);
             ValueReader(_context, oidArgs[0]).fromStringData(elem.dbrefOID().toString());
 
@@ -240,7 +240,8 @@ void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readO
     JS::RootedObject child(_context);
 
     bool filledDBRef = false;
-    if (obj.firstElementType() == String && (obj.firstElementFieldNameStringData() == "$ref")) {
+    if (obj.firstElementType() == BSONType::string &&
+        obj.firstElementFieldNameStringData() == "$ref") {
         BSONObjIterator it(obj);
         it.next();
         const BSONElement id = it.next();

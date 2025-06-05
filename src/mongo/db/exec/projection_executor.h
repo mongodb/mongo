@@ -151,7 +151,7 @@ private:
         uassert(51254,
                 fmt::format("Root-replacement expression must return a document, but got {}",
                             typeName(val.getType())),
-                val.getType() == BSONType::Object);
+                val.getType() == BSONType::object);
         return val.getDocument();
     }
 

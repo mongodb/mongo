@@ -195,9 +195,9 @@ private:
         auto el = frame.excludePaths.getField(key);
         if (!el)
             return {false, {}};
-        if (el.type() == Bool)
+        if (el.type() == BSONType::boolean)
             return {!el.boolean(), {}};
-        if (el.type() == Object && frame.inSubtreePhase)
+        if (el.type() == BSONType::object && frame.inSubtreePhase)
             return {false, el.embeddedObject()};
         uasserted(ErrorCodes::InvalidBSONType,
                   "Exclusion value must be a boolean for leaf nodes. "

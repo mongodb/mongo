@@ -62,9 +62,9 @@ TEST_F(IndexBoundsBuilderTest, TypeNumber) {
 
     // Build the expected interval.
     BSONObjBuilder bob;
-    BSONType type = BSONType::NumberInt;
-    bob.appendMinForType("", type);
-    bob.appendMaxForType("", type);
+    BSONType type = BSONType::numberInt;
+    bob.appendMinForType("", stdx::to_underlying(type));
+    bob.appendMaxForType("", stdx::to_underlying(type));
     BSONObj expectedInterval = bob.obj();
 
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,

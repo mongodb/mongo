@@ -1190,7 +1190,7 @@ TEST_F(LogV2JsonBsonTest, TypeWithBSONArray) {
     LOGV2(20046, "{name}", "name"_attr = t5);
     validate([&t5](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kAttributesFieldName).Obj().getField("name").type(),
-                      BSONType::Array);
+                      BSONType::array);
         ASSERT(obj.getField(kAttributesFieldName)
                    .Obj()
                    .getField("name")
@@ -1431,9 +1431,9 @@ TEST_F(LogV2ContainerTest, Uint32Sequence) {
         ASSERT_EQUALS(vectorUInt32s.size(), jsonVector.size());
         for (std::size_t i = 0; i < vectorUInt32s.size(); ++i) {
             const auto& jsonElem = jsonVector[i];
-            if (jsonElem.type() == NumberInt)
+            if (jsonElem.type() == BSONType::numberInt)
                 ASSERT_EQUALS(jsonElem.Int(), vectorUInt32s[i]);
-            else if (jsonElem.type() == NumberLong)
+            else if (jsonElem.type() == BSONType::numberLong)
                 ASSERT_EQUALS(jsonElem.Long(), vectorUInt32s[i]);
             else
                 ASSERT(false) << "Element type is " << typeName(jsonElem.type())
@@ -1597,9 +1597,9 @@ TEST_F(LogV2ContainerTest, StringMapUint32) {
             obj.getField(kAttributesFieldName).Obj().getField("mapOfUInt32s").Obj();
         for (const auto& mapElem : mapOfUInt32s) {
             auto elem = mappedValues.getField(mapElem.first);
-            if (elem.type() == NumberInt)
+            if (elem.type() == BSONType::numberInt)
                 ASSERT_EQUALS(elem.Int(), mapElem.second);
-            else if (elem.type() == NumberLong)
+            else if (elem.type() == BSONType::numberLong)
                 ASSERT_EQUALS(elem.Long(), mapElem.second);
             else
                 ASSERT(false) << "Element type is " << typeName(elem.type())
@@ -1737,7 +1737,7 @@ public:
             subobj1.append("lvl2_c", 1);
             subobj1.append("lvl2_d", 2);
         }
-        truncation.leafType = BSONType::String;
+        truncation.leafType = BSONType::string;
         truncation.path = {{"sub1", 0}, {"sub2", 2}, {"large", 2}};
         return TestCase{builder.obj(), std::move(truncation), "large string in subobject"};
     }
@@ -1746,7 +1746,7 @@ public:
         BSONObjBuilder builder;
         TruncationInfo truncation;
         builder.append("large", largeString);
-        truncation.leafType = BSONType::String;
+        truncation.leafType = BSONType::string;
         truncation.path = {{"large", 1}};
         return TestCase{builder.obj(), std::move(truncation), "single large string in object"};
     }
@@ -1757,7 +1757,7 @@ public:
         for (size_t i = 0; i < maxAttributeOutputSize; ++i) {
             builder.append("str");
         }
-        truncation.leafType = BSONType::String;
+        truncation.leafType = BSONType::string;
         truncation.path = {{"862", maxAttributeOutputSize - 862}};
         return TestCase{builder.arr(), std::move(truncation), "large array"};
     }
@@ -1766,7 +1766,7 @@ public:
         BSONArrayBuilder builder;
         TruncationInfo truncation;
         builder.append(largeString);
-        truncation.leafType = BSONType::String;
+        truncation.leafType = BSONType::string;
         truncation.path = {{"0", 1}};
         return TestCase{builder.arr(), std::move(truncation), "single large string in array"};
     }
@@ -1790,7 +1790,7 @@ public:
         // ["1_a", [["3_a", "3_b", "3_c", largeString, "3_d"]], "1_b"]
         auto array = builder.arr();
 
-        truncation.leafType = BSONType::String;
+        truncation.leafType = BSONType::string;
         truncation.path = {{"1", 1}, {"0", 0}, {"3", 2}};
         return TestCase{array, std::move(truncation), "large string in nested arrays"};
     }
@@ -2064,7 +2064,7 @@ TEST_F(LogV2Test, StringTruncation) {
             << context << " - string " << str << " does not end with " << suffix;
 
         auto trunc = obj[constants::kTruncatedFieldName]["name"];
-        ASSERT_EQUALS(trunc["type"].String(), typeName(BSONType::String)) << context;
+        ASSERT_EQUALS(trunc["type"].String(), typeName(BSONType::string)) << context;
         ASSERT_EQUALS(trunc["size"].numberLong(), str::escapeForJSON(input).size()) << context;
     }
 }

@@ -57,7 +57,7 @@ TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseLongAlias) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::NumberLong));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::numberLong));
 }
 
 TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseMultipleTypes) {
@@ -66,8 +66,8 @@ TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseMultipleTypes) {
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 2u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::Object));
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::object));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
 }
 
 TEST(MatcherTypeSetTest, ParseFromStringAliasesCanParseEmptySet) {
@@ -95,7 +95,7 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseLongAlias) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::NumberLong));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::numberLong));
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementFailsToParseUnknownAlias) {
@@ -145,7 +145,7 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseRoundDoubleTypeCode) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
 }
 
 TEST(MatcherTypeSetTest, ParseFailsWhenElementIsNonRoundDoubleTypeCode) {
@@ -160,7 +160,7 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseRoundDecimalTypeCode) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1U);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
 }
 
 TEST(MatcherTypeSetTest, ParseFailsWhenElementIsNonRoundDecimalTypeCode) {
@@ -244,7 +244,7 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseArrayWithSingleType) {
     ASSERT_OK(result.getStatus());
     ASSERT_FALSE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 1u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
 }
 
 TEST(MatcherTypeSetTest, ParseFromElementCanParseArrayWithMultipleTypes) {
@@ -253,8 +253,8 @@ TEST(MatcherTypeSetTest, ParseFromElementCanParseArrayWithMultipleTypes) {
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue().allNumbers);
     ASSERT_EQ(result.getValue().bsonTypes.size(), 2u);
-    ASSERT_TRUE(result.getValue().hasType(BSONType::String));
-    ASSERT_TRUE(result.getValue().hasType(BSONType::Object));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::string));
+    ASSERT_TRUE(result.getValue().hasType(BSONType::object));
 }
 
 TEST(MatcherTypeSetTest, IsSingleTypeTrueForTypeNumber) {
@@ -264,7 +264,7 @@ TEST(MatcherTypeSetTest, IsSingleTypeTrueForTypeNumber) {
 }
 
 TEST(MatcherTypeSetTest, IsSingleTypeTrueForSingleBSONType) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     ASSERT_TRUE(typeSet.isSingleType());
 }
 
@@ -274,7 +274,7 @@ TEST(MatcherTypeSetTest, IsSingleTypeFalseForEmpty) {
 }
 
 TEST(MatcherTypeSetTest, IsSingleTypeFalseForMultipleTypes) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     typeSet.allNumbers = true;
     ASSERT_FALSE(typeSet.isSingleType());
 }
@@ -291,27 +291,27 @@ TEST(MatcherTypeSetTest, IsEmptyFalseForAllNumbers) {
 }
 
 TEST(MatcherTypeSetTest, IsEmptyFalseForBSONTypeNumberLong) {
-    MatcherTypeSet typeSet{BSONType::NumberLong};
+    MatcherTypeSet typeSet{BSONType::numberLong};
     ASSERT_FALSE(typeSet.isEmpty());
 }
 
 TEST(MatcherTypeSetTest, HasTypeTrueForNumericalTypesWhenSetHasAllNumbersType) {
     MatcherTypeSet typeSet;
     typeSet.allNumbers = true;
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberInt));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberLong));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberDouble));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberDecimal));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberInt));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberLong));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberDouble));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberDecimal));
 }
 
 TEST(MatcherTypeSetTest, HasTypeTrueForSetOfTypes) {
     MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::NumberLong);
-    typeSet.bsonTypes.insert(BSONType::String);
-    ASSERT_FALSE(typeSet.hasType(BSONType::NumberInt));
-    ASSERT_TRUE(typeSet.hasType(BSONType::NumberLong));
-    ASSERT_FALSE(typeSet.hasType(BSONType::NumberDouble));
-    ASSERT_TRUE(typeSet.hasType(BSONType::String));
+    typeSet.bsonTypes.insert(BSONType::numberLong);
+    typeSet.bsonTypes.insert(BSONType::string);
+    ASSERT_FALSE(typeSet.hasType(BSONType::numberInt));
+    ASSERT_TRUE(typeSet.hasType(BSONType::numberLong));
+    ASSERT_FALSE(typeSet.hasType(BSONType::numberDouble));
+    ASSERT_TRUE(typeSet.hasType(BSONType::string));
 }
 
 }  // namespace

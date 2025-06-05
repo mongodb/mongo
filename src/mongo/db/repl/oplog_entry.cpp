@@ -899,7 +899,7 @@ repl::OpTypeEnum OplogEntryParserNonStrict::getOpType() const {
     uassert(8881100,
             str::stream() << "Invalid '" << repl::OplogEntry::kOpTypeFieldName
                           << "' field type (expected String)",
-            opTypeElement.type() == BSONType::String);
+            opTypeElement.type() == BSONType::string);
     return repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"),
                               opTypeElement.checkAndGetStringData());
 }

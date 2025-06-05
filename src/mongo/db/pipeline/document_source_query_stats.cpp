@@ -90,7 +90,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << DocumentSourceQueryStats::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
     BSONObj obj = spec.embeddedObject();
     TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone;
     std::string hmacKey;

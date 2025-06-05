@@ -46,6 +46,7 @@
 #include "mongo/bson/generator_legacy_strict.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
@@ -127,34 +128,34 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
     g.writePadding(buffer);
 
     switch (type()) {
-        case mongo::String:
+        case BSONType::string:
             g.writeString(buffer, valueStringData());
             break;
-        case Symbol:
+        case BSONType::symbol:
             g.writeSymbol(buffer, valueStringData());
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             g.writeInt64(buffer, _numberLong());
             break;
-        case NumberInt:
+        case BSONType::numberInt:
             g.writeInt32(buffer, _numberInt());
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             g.writeDouble(buffer, number());
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             g.writeDecimal128(buffer, numberDecimal());
             break;
-        case mongo::Bool:
+        case BSONType::boolean:
             g.writeBool(buffer, boolean());
             break;
-        case jstNULL:
+        case BSONType::null:
             g.writeNull(buffer);
             break;
-        case Undefined:
+        case BSONType::undefined:
             g.writeUndefined(buffer);
             break;
-        case Object: {
+        case BSONType::object: {
             BSONObj truncated =
                 embeddedObject().jsonStringGenerator(g, pretty, false, buffer, writeLimit);
             if (!truncated.isEmpty()) {
@@ -165,7 +166,7 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             // return to not check the write limit below, we're not in a leaf
             return truncated;
         }
-        case mongo::Array: {
+        case BSONType::array: {
             BSONObj truncated =
                 embeddedObject().jsonStringGenerator(g, pretty, true, buffer, writeLimit);
             if (!truncated.isEmpty()) {
@@ -176,14 +177,14 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             // return to not check the write limit below, we're not in a leaf
             return truncated;
         }
-        case DBRef:
+        case BSONType::dbRef:
             // valuestrsize() returns the size including the null terminator
             g.writeDBRef(buffer, valueStringData(), OID::from(valuestr() + valuestrsize()));
             break;
-        case jstOID:
+        case BSONType::oid:
             g.writeOID(buffer, __oid());
             break;
-        case BinData: {
+        case BSONType::binData: {
             ConstDataCursor reader(value());
             const int len = reader.readAndAdvance<LittleEndian<int>>();
             BinDataType type = static_cast<BinDataType>(reader.readAndAdvance<uint8_t>());
@@ -191,14 +192,14 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
         }
 
         break;
-        case mongo::Date:
+        case BSONType::date:
             g.writeDate(buffer, date());
             break;
-        case RegEx: {
+        case BSONType::regEx: {
             StringData pattern(regex());
             g.writeRegex(buffer, pattern, StringData(pattern.data() + pattern.size() + 1));
         } break;
-        case CodeWScope: {
+        case BSONType::codeWScope: {
             BSONObj scope = codeWScopeObject();
             if (!scope.isEmpty()) {
                 g.writeCodeWithScope(buffer, _asCode(), scope);
@@ -207,16 +208,16 @@ BSONObj BSONElement::_jsonStringGenerator(const Generator& g,
             // fall through if scope is empty
             [[fallthrough]];
         }
-        case Code:
+        case BSONType::code:
             g.writeCode(buffer, _asCode());
             break;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             g.writeTimestamp(buffer, timestamp());
             break;
-        case MinKey:
+        case BSONType::minKey:
             g.writeMinKey(buffer);
             break;
-        case MaxKey:
+        case BSONType::maxKey:
             g.writeMaxKey(buffer);
             break;
         default:
@@ -286,25 +287,25 @@ int BSONElement::compareElements(const BSONElement& l,
                                  ComparisonRulesSet rules,
                                  const StringDataComparator* comparator) {
     switch (l.type()) {
-        case BSONType::EOO:
-        case BSONType::Undefined:  // EOO and Undefined are same canonicalType
-        case BSONType::jstNULL:
-        case BSONType::MaxKey:
-        case BSONType::MinKey: {
+        case BSONType::eoo:
+        case BSONType::undefined:  // EOO and Undefined are same canonicalType
+        case BSONType::null:
+        case BSONType::maxKey:
+        case BSONType::minKey: {
             auto f = l.canonicalType() - r.canonicalType();
             if (f < 0)
                 return -1;
             return f == 0 ? 0 : 1;
         }
-        case BSONType::Bool:
+        case BSONType::boolean:
             return *l.value() - *r.value();
-        case BSONType::bsonTimestamp:
+        case BSONType::timestamp:
             // unsigned compare for timestamps - note they are not really dates but (ordinal +
             // time_t)
             if (l.timestamp() < r.timestamp())
                 return -1;
             return l.timestamp() == r.timestamp() ? 0 : 1;
-        case BSONType::Date:
+        case BSONType::date:
             // Signed comparisons for Dates.
             {
                 const Date_t a = l.Date();
@@ -314,109 +315,109 @@ int BSONElement::compareElements(const BSONElement& l,
                 return a == b ? 0 : 1;
             }
 
-        case BSONType::NumberInt: {
+        case BSONType::numberInt: {
             // All types can precisely represent all NumberInts, so it is safe to simply convert to
             // whatever rhs's type is.
             switch (r.type()) {
-                case NumberInt:
+                case BSONType::numberInt:
                     return compareInts(l._numberInt(), r._numberInt());
-                case NumberLong:
+                case BSONType::numberLong:
                     return compareLongs(l._numberInt(), r._numberLong());
-                case NumberDouble:
+                case BSONType::numberDouble:
                     return compareDoubles(l._numberInt(), r._numberDouble());
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     return compareIntToDecimal(l._numberInt(), r._numberDecimal());
                 default:
                     MONGO_UNREACHABLE;
             }
         }
 
-        case BSONType::NumberLong: {
+        case BSONType::numberLong: {
             switch (r.type()) {
-                case NumberLong:
+                case BSONType::numberLong:
                     return compareLongs(l._numberLong(), r._numberLong());
-                case NumberInt:
+                case BSONType::numberInt:
                     return compareLongs(l._numberLong(), r._numberInt());
-                case NumberDouble:
+                case BSONType::numberDouble:
                     return compareLongToDouble(l._numberLong(), r._numberDouble());
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     return compareLongToDecimal(l._numberLong(), r._numberDecimal());
                 default:
                     MONGO_UNREACHABLE;
             }
         }
 
-        case BSONType::NumberDouble: {
+        case BSONType::numberDouble: {
             switch (r.type()) {
-                case NumberDouble:
+                case BSONType::numberDouble:
                     return compareDoubles(l._numberDouble(), r._numberDouble());
-                case NumberInt:
+                case BSONType::numberInt:
                     return compareDoubles(l._numberDouble(), r._numberInt());
-                case NumberLong:
+                case BSONType::numberLong:
                     return compareDoubleToLong(l._numberDouble(), r._numberLong());
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
                 default:
                     MONGO_UNREACHABLE;
             }
         }
 
-        case BSONType::NumberDecimal: {
+        case BSONType::numberDecimal: {
             switch (r.type()) {
-                case NumberDecimal:
+                case BSONType::numberDecimal:
                     return compareDecimals(l._numberDecimal(), r._numberDecimal());
-                case NumberInt:
+                case BSONType::numberInt:
                     return compareDecimalToInt(l._numberDecimal(), r._numberInt());
-                case NumberLong:
+                case BSONType::numberLong:
                     return compareDecimalToLong(l._numberDecimal(), r._numberLong());
-                case NumberDouble:
+                case BSONType::numberDouble:
                     return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
                 default:
                     MONGO_UNREACHABLE;
             }
         }
 
-        case BSONType::jstOID:
+        case BSONType::oid:
             return memcmp(l.value(), r.value(), OID::kOIDSize);
-        case BSONType::Code:
+        case BSONType::code:
             return compareElementStringValues(l, r);
-        case BSONType::Symbol:
-        case BSONType::String: {
+        case BSONType::symbol:
+        case BSONType::string: {
             if (comparator) {
                 return comparator->compare(l.valueStringData(), r.valueStringData());
             } else {
                 return compareElementStringValues(l, r);
             }
         }
-        case BSONType::Object:
-        case BSONType::Array: {
+        case BSONType::object:
+        case BSONType::array: {
             return l.embeddedObject().woCompare(
                 r.embeddedObject(),
                 BSONObj(),
                 rules | BSONElement::ComparisonRules::kConsiderFieldName,
                 comparator);
         }
-        case BSONType::DBRef: {
+        case BSONType::dbRef: {
             int lsz = l.valuesize();
             int rsz = r.valuesize();
             if (lsz - rsz != 0)
                 return lsz - rsz;
             return memcmp(l.value(), r.value(), lsz);
         }
-        case BSONType::BinData: {
+        case BSONType::binData: {
             int lsz = l.objsize();  // our bin data size in bytes, not including the subtype byte
             int rsz = r.objsize();
             if (lsz - rsz != 0)
                 return lsz - rsz;
             return memcmp(l.value() + 4, r.value() + 4, lsz + 1 /*+1 for subtype byte*/);
         }
-        case BSONType::RegEx: {
+        case BSONType::regEx: {
             int c = strcmp(l.regex(), r.regex());
             if (c)
                 return c;
             return strcmp(l.regexFlags(), r.regexFlags());
         }
-        case BSONType::CodeWScope: {
+        case BSONType::codeWScope: {
             int cmp = StringData(l.codeWScopeCode(), l.codeWScopeCodeLen() - 1)
                           .compare(StringData(r.codeWScopeCode(), r.codeWScopeCodeLen() - 1));
             if (cmp)
@@ -436,7 +437,7 @@ int BSONElement::compareElements(const BSONElement& l,
 }
 
 std::vector<BSONElement> BSONElement::Array() const {
-    chk(mongo::Array);
+    chk(BSONType::array);
 
     std::vector<BSONElement> v;
     DecimalCounter<std::uint32_t> counter(0);
@@ -516,7 +517,7 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
     }
 
     long long number = 0;
-    if (type() == BSONType::NumberDouble) {
+    if (type() == BSONType::numberDouble) {
         auto eDouble = numberDouble();
 
         // NaN doubles are rejected.
@@ -543,7 +544,7 @@ StatusWith<long long> BSONElement::parseIntegerElementToLong() const {
         }
 
         number = numberLong();
-    } else if (type() == BSONType::NumberDecimal) {
+    } else if (type() == BSONType::numberDecimal) {
         uint32_t signalingFlags = Decimal128::kNoFlag;
         number = numberDecimal().toLongExact(&signalingFlags);
         if (signalingFlags != Decimal128::kNoFlag) {
@@ -601,7 +602,7 @@ BSONObj BSONElement::embeddedObject() const {
 }
 
 BSONObj BSONElement::codeWScopeObject() const {
-    MONGO_verify(type() == CodeWScope);
+    MONGO_verify(type() == BSONType::codeWScope);
     int strSizeWNull = ConstDataView(value() + 4).read<LittleEndian<int>>();
     return BSONObj(value() + 4 + 4 + strSizeWNull);
 }
@@ -635,10 +636,11 @@ BSONElement BSONElement::operator[](StringData field) const {
 int BSONElement::computeRegexSize(const char* elem, int fieldNameSize) {
     int8_t type = *elem;
     // The following code handles all special cases: MinKey, MaxKey, RegEx and invalid types.
-    if (type == MaxKey || type == MinKey)
+    if (type == stdx::to_underlying(BSONType::maxKey) ||
+        type == stdx::to_underlying(BSONType::minKey))
         return fieldNameSize + 1;
 
-    if (type != BSONType::RegEx) {
+    if (type != stdx::to_underlying(BSONType::regEx)) {
         int err = 10320;  // work around linter
         LOGV2_ERROR(err, "BSONElement: bad type", "type"_attr = zeroPaddedHex(type));
         uasserted(err, "BSONElement: bad type");
@@ -672,13 +674,13 @@ void BSONElement::toString(
         return;
     }
 
-    if (includeFieldName && type() != EOO)
+    if (includeFieldName && type() != BSONType::eoo)
         s << fieldName() << ": ";
 
     switch (type()) {
-        case Object:
+        case BSONType::object:
             return embeddedObject().toString(s, false, full, redactValues, depth + 1);
-        case mongo::Array:
+        case BSONType::array:
             return embeddedObject().toString(s, true, full, redactValues, depth + 1);
         default:
             break;
@@ -690,49 +692,49 @@ void BSONElement::toString(
     }
 
     switch (type()) {
-        case EOO:
+        case BSONType::eoo:
             s << "EOO";
             break;
-        case mongo::Date:
+        case BSONType::date:
             s << "new Date(" << date().toMillisSinceEpoch() << ')';
             break;
-        case RegEx: {
+        case BSONType::regEx: {
             s << "/" << regex() << '/';
             const char* p = regexFlags();
             if (p)
                 s << p;
         } break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             s.appendDoubleNice(number());
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             s << _numberLong();
             break;
-        case NumberInt:
+        case BSONType::numberInt:
             s << _numberInt();
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             s << _numberDecimal().toString();
             break;
-        case mongo::Bool:
+        case BSONType::boolean:
             s << (boolean() ? "true" : "false");
             break;
-        case Undefined:
+        case BSONType::undefined:
             s << "undefined";
             break;
-        case jstNULL:
+        case BSONType::null:
             s << "null";
             break;
-        case MaxKey:
+        case BSONType::maxKey:
             s << "MaxKey";
             break;
-        case MinKey:
+        case BSONType::minKey:
             s << "MinKey";
             break;
-        case CodeWScope:
+        case BSONType::codeWScope:
             s << "CodeWScope( " << codeWScopeCode() << ", " << codeWScopeObject().toString() << ")";
             break;
-        case Code:
+        case BSONType::code:
             if (!full && valuestrsize() > 80) {
                 s.write(valuestr(), 70);
                 s << "...";
@@ -740,8 +742,8 @@ void BSONElement::toString(
                 s.write(valuestr(), valuestrsize() - 1);
             }
             break;
-        case Symbol:
-        case mongo::String:
+        case BSONType::symbol:
+        case BSONType::string:
             s << '"';
             if (!full && valuestrsize() > 160) {
                 s.write(valuestr(), 150);
@@ -751,15 +753,15 @@ void BSONElement::toString(
                 s << '"';
             }
             break;
-        case DBRef:
+        case BSONType::dbRef:
             s << "DBRef('" << valuestr() << "',";
-            s << mongo::OID::from(valuestr() + valuestrsize()) << ')';
+            s << OID::from(valuestr() + valuestrsize()) << ')';
             break;
-        case jstOID:
+        case BSONType::oid:
             s << "ObjectId('";
             s << __oid() << "')";
             break;
-        case BinData: {
+        case BSONType::binData: {
             int len;
             const char* data = binDataClean(len);
             // If the BinData is a correctly sized newUUID, display it as such.
@@ -782,7 +784,7 @@ void BSONElement::toString(
             }
         } break;
 
-        case bsonTimestamp: {
+        case BSONType::timestamp: {
             // Convert from Milliseconds to Seconds for consistent Timestamp printing.
             auto secs = duration_cast<Seconds>(timestampTime().toDurationSinceEpoch());
             s << "Timestamp(" << secs.count() << ", " << timestampInc() << ")";
@@ -795,10 +797,10 @@ void BSONElement::toString(
 
 std::string BSONElement::_asCode() const {
     switch (type()) {
-        case mongo::String:
-        case Code:
+        case BSONType::string:
+        case BSONType::code:
             return valueStringData().toString();
-        case CodeWScope:
+        case BSONType::codeWScope:
             return std::string(codeWScopeCode(),
                                ConstDataView(valuestr()).read<LittleEndian<int>>() - 1);
         default:
@@ -818,7 +820,7 @@ StringBuilder& operator<<(StringBuilder& s, const BSONElement& e) {
 }
 
 bool BSONElement::coerce(std::string* out) const {
-    if (type() != mongo::String)
+    if (type() != BSONType::string)
         return false;
     *out = String();
     return true;
@@ -858,7 +860,7 @@ bool BSONElement::coerce(bool* out) const {
 }
 
 bool BSONElement::coerce(std::vector<std::string>* out) const {
-    if (type() != mongo::Array)
+    if (type() != BSONType::array)
         return false;
     return Obj().coerceVector<std::string>(out);
 }

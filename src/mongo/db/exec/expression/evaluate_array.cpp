@@ -131,7 +131,7 @@ Value evaluate(const ExpressionObjectToArray& expr, const Document& root, Variab
     uassert(40390,
             str::stream() << "$objectToArray requires a document input, found: "
                           << typeName(targetVal.getType()),
-            (targetVal.getType() == BSONType::Object));
+            (targetVal.getType() == BSONType::object));
 
     std::vector<Value> output;
 
@@ -171,7 +171,7 @@ Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variab
     bool inputArrayFormat;
     if (array[0].isArray()) {
         inputArrayFormat = true;
-    } else if (array[0].getType() == BSONType::Object) {
+    } else if (array[0].getType() == BSONType::object) {
         inputArrayFormat = false;
     } else {
         uasserted(40398,
@@ -200,7 +200,7 @@ Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variab
                     str::stream() << "$arrayToObject requires an array of key-value pairs, where "
                                      "the key must be of type string. Found key type: "
                                   << typeName(valArray[0].getType()),
-                    (valArray[0].getType() == BSONType::String));
+                    (valArray[0].getType() == BSONType::string));
 
             auto keyName = valArray[0].getStringData();
 
@@ -216,7 +216,7 @@ Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variab
                 str::stream() << "$arrayToObject requires a consistent input format. Elements must"
                                  "all be arrays or all be objects. Object was detected, now found: "
                               << typeName(elem.getType()),
-                (elem.getType() == BSONType::Object));
+                (elem.getType() == BSONType::object));
 
             uassert(40392,
                     str::stream() << "$arrayToObject requires an object keys of 'k' and 'v'. "
@@ -238,7 +238,7 @@ Value evaluate(const ExpressionArrayToObject& expr, const Document& root, Variab
                 str::stream() << "$arrayToObject requires an object with keys 'k' and 'v', where "
                                  "the value of 'k' must be of type string. Found type: "
                               << typeName(key.getType()),
-                (key.getType() == BSONType::String));
+                (key.getType() == BSONType::string));
 
             auto keyName = key.getStringData();
 

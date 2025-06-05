@@ -51,16 +51,16 @@ BSONElement getFieldDottedOrArray(const BSONObj& doc,
         res = curr.getField(path.getPart(partNum));
 
         switch (res.type()) {
-            case EOO:
+            case BSONType::eoo:
                 stop = true;
                 break;
 
-            case Object:
+            case BSONType::object:
                 curr = res.Obj();
                 ++partNum;
                 break;
 
-            case Array:
+            case BSONType::array:
                 stop = true;
                 break;
 

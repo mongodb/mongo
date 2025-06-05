@@ -170,8 +170,8 @@ public:
 
     void push_back(Document doc) {
         // Every entry we push into the oplog should have both 'ts' and 'ns' fields.
-        invariant(doc["ts"].getType() == BSONType::bsonTimestamp);
-        invariant(doc["ns"].getType() == BSONType::String);
+        invariant(doc["ts"].getType() == BSONType::timestamp);
+        invariant(doc["ns"].getType() == BSONType::string);
         // Events should always be added in ascending ts order.
         auto lastTs =
             _records.empty() ? Timestamp(0, 0) : _records.back().data.toBson()["ts"].timestamp();

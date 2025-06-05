@@ -71,7 +71,7 @@ TEST(Path, RootArray1) {
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
 
     ASSERT(!cursor.more());
 }
@@ -86,7 +86,7 @@ TEST(Path, RootArray2) {
 
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
-    ASSERT(e.element().type() == Array);
+    ASSERT(e.element().type() == BSONType::array);
 
     ASSERT(!cursor.more());
 }
@@ -119,7 +119,7 @@ TEST(Path, Nested1) {
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_EQUALS(2, e.element().Obj().nFields());
 
     ASSERT(cursor.more());
@@ -167,7 +167,7 @@ TEST(Path, NestedEmptyArray) {
 
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_EQUALS(0, e.element().Obj().nFields());
 
     ASSERT(!cursor.more());
@@ -194,7 +194,7 @@ TEST(Path, NestedNoLeaf1) {
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_EQUALS(2, e.element().Obj().nFields());
 
     ASSERT(cursor.more());
@@ -326,7 +326,7 @@ TEST(Path, ArrayIndex2) {
 
     ASSERT(cursor.more());
     BSONElementIterator::Context e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
 
     ASSERT(!cursor.more());
 }
@@ -412,37 +412,37 @@ TEST(Path, NestedArrayImplicitTraversal) {
 
     ASSERT(cursor.more());
     ElementIterator::Context e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(2, e.element().numberInt());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(3, e.element().numberInt());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(4, e.element().numberInt());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(5, e.element().numberInt());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_BSONOBJ_EQ(BSON("0" << 4 << "1" << 5), e.element().Obj());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
@@ -459,30 +459,30 @@ TEST(Path, ArrayOffsetWithImplicitAndExplicitTraversal) {
 
     ASSERT(cursor.more());
     ElementIterator::Context e = cursor.next();
-    ASSERT_EQUALS(EOO, e.element().type());
+    ASSERT_EQUALS(BSONType::eoo, e.element().type());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());  // First elt of outer array.
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(2, e.element().numberInt());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());  // First elt of inner array.
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(NumberInt, e.element().type());
+    ASSERT_EQUALS(BSONType::numberInt, e.element().type());
     ASSERT_EQUALS(3, e.element().numberInt());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());  // Second elt of inner array.
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
     ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT(e.arrayOffset().eoo());
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(EOO, e.element().type());
+    ASSERT_EQUALS(BSONType::eoo, e.element().type());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());  // Second elt of outer array.
 
     ASSERT(!cursor.more());
@@ -582,7 +582,7 @@ TEST(SimpleArrayElementIterator, SimpleArrayLast1) {
 
     ASSERT(i.more());
     e = i.next();
-    ASSERT_EQUALS(Array, e.element().type());
+    ASSERT_EQUALS(BSONType::array, e.element().type());
 
     ASSERT(!i.more());
 }

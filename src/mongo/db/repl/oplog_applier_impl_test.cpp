@@ -144,11 +144,11 @@ namespace {
 auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     BSONElement tsArray;
     Status status =
-        bsonExtractTypedField(obj, OpTime::kTimestampFieldName, BSONType::Array, &tsArray);
+        bsonExtractTypedField(obj, OpTime::kTimestampFieldName, BSONType::array, &tsArray);
     ASSERT_OK(status);
 
     BSONElement termArray;
-    status = bsonExtractTypedField(obj, OpTime::kTermFieldName, BSONType::Array, &termArray);
+    status = bsonExtractTypedField(obj, OpTime::kTermFieldName, BSONType::array, &termArray);
     ASSERT_OK(status);
 
     return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());

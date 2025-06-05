@@ -362,7 +362,8 @@ StatusWith<BalancerSettingsType> BalancerSettingsType::fromBSON(const BSONObj& o
 
     {
         BSONElement activeWindowElem;
-        Status status = bsonExtractTypedField(obj, kActiveWindow, Object, &activeWindowElem);
+        Status status =
+            bsonExtractTypedField(obj, kActiveWindow, BSONType::object, &activeWindowElem);
         if (status.isOK()) {
             const BSONObj balancingWindowObj = activeWindowElem.Obj();
             if (balancingWindowObj.isEmpty()) {

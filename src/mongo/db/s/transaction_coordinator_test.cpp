@@ -1533,7 +1533,7 @@ TEST_F(TransactionCoordinatorTest, RunCommitProducesEndOfTransactionOplogEntry) 
                                        BSON("op" << "n"
                                                  << "o.msg.endOfTransaction" << 1));
     auto o2 = oplogEntry.getField("o2");
-    ASSERT_EQ(o2.type(), BSONType::Object);
+    ASSERT_EQ(o2.type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(o2.Obj(), expectedO2);
 }
 

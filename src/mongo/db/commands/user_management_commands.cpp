@@ -1116,7 +1116,7 @@ void trimCredentials(OperationContext* opCtx,
     const auto& credsElem = userObj["credentials"];
     uassert(ErrorCodes::UnsupportedFormat,
             "Unable to trim credentials from a user document with no credentials",
-            credsElem.type() == Object);
+            credsElem.type() == BSONType::object);
 
     const auto& creds = credsElem.Obj();
     queryBuilder->append("credentials", creds);

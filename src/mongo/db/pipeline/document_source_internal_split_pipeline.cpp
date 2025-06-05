@@ -58,7 +58,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$_internalSplitPipeline must take a nested object but found: "
                           << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
 
@@ -68,7 +68,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
         if (elt.fieldNameStringData() == "mergeType"_sd) {
             const auto type = elt.type();
 
-            if (type == BSONType::String) {
+            if (type == BSONType::string) {
                 auto mergeTypeString = elt.valueStringData();
                 if ("localOnly"_sd == mergeTypeString) {
                     mergeType = HostTypeRequirement::kLocalOnly;
@@ -81,14 +81,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
                               str::stream() << "unrecognized field while parsing mergeType: '"
                                             << mergeTypeString << "'");
                 }
-            } else if (type == BSONType::Object) {
+            } else if (type == BSONType::object) {
                 auto specificShardObj = elt.Obj();
                 auto specificShardElem = specificShardObj.getField("specificShard"_sd);
                 uassert(7958300,
                         "Object argument to $_internalSplitPipeline must contain a single string "
                         "field named 'specificShard'",
                         specificShardObj.nFields() == 1 &&
-                            specificShardElem.type() == BSONType::String);
+                            specificShardElem.type() == BSONType::string);
 
                 auto* opCtx = expCtx->getOperationContext();
                 auto* grid = Grid::get(opCtx);

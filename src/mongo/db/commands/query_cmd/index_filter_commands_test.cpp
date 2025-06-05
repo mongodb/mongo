@@ -226,7 +226,7 @@ protected:
         ASSERT_OK(ListFilters::list(_querySettings, &bob));
         BSONObj resultObj = bob.obj();
         BSONElement filtersElt = resultObj.getField("filters");
-        ASSERT_EQUALS(filtersElt.type(), mongo::Array);
+        ASSERT_EQUALS(filtersElt.type(), mongo::BSONType::array);
         std::vector<BSONElement> filtersEltArray = filtersElt.Array();
         std::vector<BSONObj> filters;
         for (auto&& elt : filtersEltArray) {
@@ -254,7 +254,7 @@ protected:
 
             // indexes
             BSONElement indexesElt = obj.getField("indexes");
-            ASSERT_EQUALS(indexesElt.type(), mongo::Array);
+            ASSERT_EQUALS(indexesElt.type(), mongo::BSONType::array);
 
             // All fields OK. Append to vector.
             filters.push_back(obj.getOwned());
@@ -494,7 +494,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFilters) {
     ASSERT_EQ(expectedNumFilters, filters.size());
 
     auto filterIndexes = filters[0]["indexes"];
-    ASSERT(filterIndexes.type() == BSONType::Array);
+    ASSERT(filterIndexes.type() == BSONType::array);
     auto filterArray = filterIndexes.Array();
     ASSERT_EQ(filterArray.size(), 1U);
     ASSERT_BSONOBJ_EQ(filterArray[0].Obj(), fromjson("{a: 1, b: 1}"));

@@ -66,12 +66,12 @@ namespace {
 
 bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
     BSONElement opTypeElem = opObj["op"];
-    checkBSONType(BSONType::String, opTypeElem);
+    checkBSONType(BSONType::string, opTypeElem);
     const StringData opType = opTypeElem.checkAndGetStringData();
 
     if (opType == "c"_sd) {
         BSONElement oElem = opObj["o"];
-        checkBSONType(BSONType::Object, oElem);
+        checkBSONType(BSONType::object, oElem);
         BSONObj o = oElem.Obj();
 
         if (o.firstElement().fieldNameStringData() == opName) {
@@ -101,7 +101,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     auto operationContainsUUID = [](const BSONObj& opObj) {
         auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
             for (const BSONElement& opElement : opObj) {
-                if (opElement.type() == BSONType::BinData &&
+                if (opElement.type() == BSONType::binData &&
                     opElement.binDataType() == BinDataType::newUUID) {
                     return true;
                 }
@@ -113,12 +113,12 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         }
 
         BSONElement opTypeElem = opObj["op"];
-        checkBSONType(BSONType::String, opTypeElem);
+        checkBSONType(BSONType::string, opTypeElem);
         const StringData opType = opTypeElem.checkAndGetStringData();
 
         if (opType == "c"_sd) {
             BSONElement oElem = opObj["o"];
-            checkBSONType(BSONType::Object, oElem);
+            checkBSONType(BSONType::object, oElem);
             BSONObj o = oElem.Obj();
 
             if (anyTopLevelElementIsUUID(o)) {
@@ -144,7 +144,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         std::tie(depth, applyOpsObj) = toCheck.top();
         toCheck.pop();
 
-        checkBSONType(BSONType::Array, applyOpsObj.firstElement());
+        checkBSONType(BSONType::array, applyOpsObj.firstElement());
         // Check if the applyOps command is empty. This is probably not something that should
         // happen, so require a superuser to do this.
         if (applyOpsObj.firstElement().Array().empty()) {
@@ -157,7 +157,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         // of size greater than 1.
         if (applyOpsObj.firstElement().Array().size() > 1) {
             for (const BSONElement& e : applyOpsObj.firstElement().Array()) {
-                checkBSONType(BSONType::Object, e);
+                checkBSONType(BSONType::object, e);
                 auto oplogEntry = e.Obj();
                 if (checkCOperationType(oplogEntry, "create"_sd) ||
                     checkCOperationType(oplogEntry, "renameCollection"_sd)) {
@@ -169,7 +169,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
 
         // For each applyOps command, iterate the ops.
         for (BSONElement element : applyOpsObj.firstElement().Array()) {
-            checkBSONType(BSONType::Object, element);
+            checkBSONType(BSONType::object, element);
             BSONObj opObj = element.Obj();
 
             // Applying an entry with using a given FCV requires superuser privileges,
@@ -210,7 +210,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
 
                 // Otherwise, if the op contains an applyOps, but we haven't recursed too far:
                 // extract the applyOps command, and insert it into the stack.
-                checkBSONType(BSONType::Object, opObj["o"]);
+                checkBSONType(BSONType::object, opObj["o"]);
                 BSONObj oObj = opObj["o"].Obj();
                 toCheck.emplace(std::make_pair(depth + 1, std::move(oObj)));
             }

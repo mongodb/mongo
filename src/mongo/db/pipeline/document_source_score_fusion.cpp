@@ -678,7 +678,7 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
     uassert(ErrorCodes::FailedToParse,
             str::stream() << kStageName << " must take a nested object but found: " << spec,
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
     auto parsedSpec = ScoreFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
@@ -795,7 +795,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::creat
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 

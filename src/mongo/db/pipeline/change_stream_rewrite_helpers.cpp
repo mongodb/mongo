@@ -194,7 +194,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
         // does not exist for the specified operation type, then it is either handled elsewhere or
         // it's an invalid type. In either case, return $alwaysFalse so that this predicate is
         // ignored.
-        if (BSONType::String != opType.type() || !kOpTypeRewriteMap.count(opType.str())) {
+        if (BSONType::string != opType.type() || !kOpTypeRewriteMap.count(opType.str())) {
             return std::make_unique<AlwaysFalseMatchExpression>();
         }
         return MatchExpressionParser::parseAndNormalize(
@@ -228,7 +228,7 @@ std::unique_ptr<MatchExpression> matchRewriteOperationType(
             std::vector<StringData> operationTypes;
             for (const auto& elem : inME->getEqualities()) {
                 // Abandon the entire rewrite if any of the rewrites fails.
-                if (BSONType::String == elem.type() &&
+                if (BSONType::string == elem.type() &&
                     kOpTypeRewriteMap.contains(elem.valueStringData())) {
                     operationTypes.push_back(elem.valueStringData());
                 }
@@ -663,7 +663,7 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
             // Helper to rewrite an equality on "updateDescription.removedFields" into the oplog.
             auto rewriteEqOnRemovedFields = [](auto& rhsElem) -> std::unique_ptr<MatchExpression> {
                 // We can only rewrite equality matches on strings.
-                if (rhsElem.type() != BSONType::String) {
+                if (rhsElem.type() != BSONType::string) {
                     return nullptr;
                 }
                 // We can only rewrite top-level fields, i.e. no dotted subpaths.
@@ -788,7 +788,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
     // Performs a rewrite based on the type of argument specified in the MatchExpression.
     auto getRewrittenNamespace = [&](auto&& nsElem) -> std::unique_ptr<MatchExpression> {
         switch (nsElem.type()) {
-            case BSONType::Object: {
+            case BSONType::object: {
                 // Handles case with full namespace object, like '{ns: {db: "db", coll: "coll"}}'.
                 // There must be a single part to the field path, ie. 'ns'.
                 if (predicate->fieldRef()->numParts() > 1) {
@@ -816,13 +816,13 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
 
                 // Verify that the first field is 'db' and is of type string. We should always have
                 // a db entry no matter what oplog fields we are operating on.
-                if (dbElem.fieldNameStringData() != "db" || dbElem.type() != BSONType::String) {
+                if (dbElem.fieldNameStringData() != "db" || dbElem.type() != BSONType::string) {
                     return std::make_unique<AlwaysFalseMatchExpression>();
                 }
                 // Verify that the second field is 'coll' and is of type string, if it exists.
                 if (collElem &&
                     (collElem.fieldNameStringData() != "coll" ||
-                     collElem.type() != BSONType::String)) {
+                     collElem.type() != BSONType::string)) {
                     return std::make_unique<AlwaysFalseMatchExpression>();
                 }
 
@@ -847,7 +847,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                     Value(fmt::format(
                         "{}.{}", dbElem.valueStringDataSafe(), collElem.valueStringData())));
             }
-            case BSONType::String: {
+            case BSONType::string: {
                 // Handles case with field path, like '{"ns.coll": "coll"}'. There must be 2 parts
                 // to the field path, ie. 'ns' and '[db | coll]'.
                 if (predicate->fieldRef()->numParts() != 2) {
@@ -896,7 +896,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
 
                 return std::make_unique<RegexMatchExpression>(nsField, nsRegex, "");
             }
-            case BSONType::RegEx: {
+            case BSONType::regEx: {
                 // Handles case with field path having regex, like '{"ns.db": /^db$/}'. There must
                 // be 2 parts to the field path, ie. 'ns' and '[db | coll]'.
                 if (predicate->fieldRef()->numParts() != 2) {
@@ -968,7 +968,7 @@ std::unique_ptr<MatchExpression> matchRewriteGenericNamespace(
                                     << BSON("input" << value << "regex" << regex << "options"
                                                     << nsElem.regexFlags()));
                     };
-                    if (exprDbOrCollName.firstElement().type() == BSONType::String) {
+                    if (exprDbOrCollName.firstElement().type() == BSONType::string) {
                         return buildRegexMatch(exprDbOrCollName.firstElement());
                     }
                     return buildRegexMatch(exprDbOrCollName);

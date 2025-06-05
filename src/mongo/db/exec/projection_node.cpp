@@ -186,11 +186,11 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
 }
 
 Value ProjectionNode::applyProjectionsToValue(Value inputValue) const {
-    if (inputValue.getType() == BSONType::Object) {
+    if (inputValue.getType() == BSONType::object) {
         MutableDocument outputSubDoc{initializeOutputDocument(inputValue.getDocument())};
         applyProjections(inputValue.getDocument(), &outputSubDoc);
         return outputSubDoc.freezeToValue();
-    } else if (inputValue.getType() == BSONType::Array) {
+    } else if (inputValue.getType() == BSONType::array) {
         std::vector<Value> values;
         values.reserve(inputValue.getArrayLength());
         for (const auto& input : inputValue.getArray()) {
@@ -240,11 +240,11 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
 }
 
 Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputValue) const {
-    if (inputValue.getType() == BSONType::Object) {
+    if (inputValue.getType() == BSONType::object) {
         MutableDocument outputDoc(inputValue.getDocument());
         applyExpressions(root, &outputDoc);
         return outputDoc.freezeToValue();
-    } else if (inputValue.getType() == BSONType::Array) {
+    } else if (inputValue.getType() == BSONType::array) {
         std::vector<Value> values;
         values.reserve(inputValue.getArrayLength());
         for (const auto& input : inputValue.getArray()) {

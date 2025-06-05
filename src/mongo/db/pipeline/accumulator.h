@@ -368,8 +368,8 @@ private:
 
     // Tracks the original constant addend argument.
     boost::optional<Value> constantAddend = boost::none;
-    BSONType totalType = NumberInt;
-    BSONType nonDecimalTotalType = NumberInt;
+    BSONType totalType = BSONType::numberInt;
+    BSONType nonDecimalTotalType = BSONType::numberInt;
     std::variant<NonConstantSumState, ConstantSumState> sum =
         std::make_pair<>(DoubleDoubleSummation(), Decimal128());
 };
@@ -472,8 +472,8 @@ private:
      */
     Decimal128 _getDecimalTotal() const;
 
-    BSONType _totalType = NumberInt;
-    BSONType _nonDecimalTotalType = NumberInt;
+    BSONType _totalType = BSONType::numberInt;
+    BSONType _nonDecimalTotalType = BSONType::numberInt;
     DoubleDoubleSummation _nonDecimalTotal;
     Decimal128 _decimalTotal;
     long long _count;

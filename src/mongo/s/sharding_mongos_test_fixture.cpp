@@ -419,7 +419,7 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
                                            const Timestamp& expectedTS,
                                            long long expectedTerm) const {
     auto readConcernElem = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName];
-    ASSERT_EQ(Object, readConcernElem.type());
+    ASSERT_EQ(BSONType::object, readConcernElem.type());
 
     auto readConcernObj = readConcernElem.Obj();
     using namespace unittest::match;
@@ -428,9 +428,9 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
 
     auto afterOpTimeElem = readConcernObj[repl::ReadConcernArgs::kAfterOpTimeFieldName];
     auto afterClusterTimeElem = readConcernObj[repl::ReadConcernArgs::kAfterClusterTimeFieldName];
-    if (afterOpTimeElem.type() != EOO) {
-        ASSERT_EQ(EOO, afterClusterTimeElem.type());
-        ASSERT_EQ(Object, afterOpTimeElem.type());
+    if (afterOpTimeElem.type() != BSONType::eoo) {
+        ASSERT_EQ(BSONType::eoo, afterClusterTimeElem.type());
+        ASSERT_EQ(BSONType::object, afterOpTimeElem.type());
 
         auto afterOpTimeObj = afterOpTimeElem.Obj();
 
@@ -439,8 +439,8 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
         ASSERT_TRUE(afterOpTimeObj.hasField(repl::OpTime::kTermFieldName));
         ASSERT_EQ(expectedTerm, afterOpTimeObj[repl::OpTime::kTermFieldName].numberLong());
     } else {
-        ASSERT_EQ(EOO, afterOpTimeElem.type());
-        ASSERT_EQ(bsonTimestamp, afterClusterTimeElem.type());
+        ASSERT_EQ(BSONType::eoo, afterOpTimeElem.type());
+        ASSERT_EQ(BSONType::timestamp, afterClusterTimeElem.type());
 
         ASSERT_EQ(expectedTS, afterClusterTimeElem.timestamp());
     }

@@ -77,7 +77,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     BSONElement specElem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
+            specElem.type() == BSONType::object);
 
     const auto tenantId = pExpCtx->getNamespaceString().tenantId();
     const auto vts = tenantId

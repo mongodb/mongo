@@ -121,7 +121,7 @@ void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
     //
     if (getTags()) {
         for (auto&& tag : getTags().value()) {
-            if (tag.type() != String) {
+            if (tag.type() != BSONType::string) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream()
                               << "tags." << tag.fieldName()

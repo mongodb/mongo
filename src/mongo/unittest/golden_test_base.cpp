@@ -92,7 +92,7 @@ GoldenTestConfig GoldenTestConfig::parseFromBson(const BSONObj& obj) {
         if (elem.fieldNameStringData() == "relativePath"_sd) {
             uassert(6741504,
                     "GoldenTestConfig relativePath must be a string",
-                    elem.type() == BSONType::String);
+                    elem.type() == BSONType::string);
             relativePath = elem.String();
         }
     }

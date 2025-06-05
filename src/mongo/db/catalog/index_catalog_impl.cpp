@@ -932,7 +932,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
 
     // logical name of the index
     const BSONElement nameElem = spec["name"];
-    if (nameElem.type() != String)
+    if (nameElem.type() != BSONType::string)
         return Status(ErrorCodes::CannotCreateIndex, "index name must be specified as a string");
 
     const StringData name = nameElem.valueStringData();
@@ -954,7 +954,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     std::unique_ptr<CollatorInterface> collator;
     BSONElement collationElement = spec.getField("collation");
     if (collationElement) {
-        if (collationElement.type() != BSONType::Object) {
+        if (collationElement.type() != BSONType::object) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "\"collation\" for an index must be a document");
         }
@@ -1012,7 +1012,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                           "cannot mix \"partialFilterExpression\" and \"sparse\" options");
         }
 
-        if (filterElement.type() != Object) {
+        if (filterElement.type() != BSONType::object) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "\"partialFilterExpression\" for an index must be a document");
         }
@@ -1080,7 +1080,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     if (storageEngineElement.eoo()) {
         return Status::OK();
     }
-    if (storageEngineElement.type() != mongo::Object) {
+    if (storageEngineElement.type() != BSONType::object) {
         return Status(ErrorCodes::CannotCreateIndex,
                       "\"storageEngine\" options must be a document if present");
     }
@@ -1257,7 +1257,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(
 }
 
 BSONObj IndexCatalogImpl::getDefaultIdIndexSpec(const CollectionPtr& collection) const {
-    dassert(_idObj["_id"].type() == NumberInt);
+    dassert(_idObj["_id"].type() == BSONType::numberInt);
 
     const auto indexVersion = IndexDescriptor::getDefaultIndexVersion();
 
@@ -2089,7 +2089,7 @@ BSONObj IndexCatalogImpl::fixIndexKey(const BSONObj& key) const {
     if (IndexDescriptor::isIdIndexPattern(key)) {
         return _idObj;
     }
-    if (key["_id"].type() == Bool && key.nFields() == 1) {
+    if (key["_id"].type() == BSONType::boolean && key.nFields() == 1) {
         return _idObj;
     }
     return key;

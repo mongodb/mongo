@@ -112,7 +112,7 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
         case MatchExpression::GTE:
         case MatchExpression::LTE:
             return static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
-                BSONType::jstNULL;
+                BSONType::null;
 
         default:
             return false;
@@ -739,8 +739,9 @@ void encodeKeyForPipelineStage(DocumentSource* docSource,
     docSource->serializeToArray(serializedArray);
 
     for (const auto& value : serializedArray) {
-        tassert(
-            6443201, "Expected pipeline stage to serialize to objects", value.getType() == Object);
+        tassert(6443201,
+                "Expected pipeline stage to serialize to objects",
+                value.getType() == BSONType::object);
         const BSONObj bson = value.getDocument().toBson();
         bufBuilder->appendBuf(bson.objdata(), bson.objsize());
     }
@@ -1174,7 +1175,7 @@ private:
      */
     void encodeBsonValue(BSONElement elem) {
         _builder->appendChar(kEncodeConstantLiteralMarker);
-        _builder->appendChar(elem.type());
+        _builder->appendChar(stdx::to_underlying(elem.type()));
         _builder->appendBuf(elem.value(), elem.valuesize());
     }
 

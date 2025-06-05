@@ -171,7 +171,7 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
             // inconsistency.
             cq.getExpCtx()->variables.setReservedValue(
                 Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
-            if (varsObj.type() == BSONType::Object) {
+            if (varsObj.type() == BSONType::object) {
                 auto metaValObj = varsObj.embeddedObject();
                 if (metaValObj.hasField("count")) {
                     auto& opDebug = CurOp::get(cq.getOpCtx())->debug();
@@ -1485,7 +1485,7 @@ SbExpr SlotBasedStageBuilder::buildLimitSkipSumExpression(
     auto frameId = _frameIdGenerator.generate();
     auto sumVar = SbLocalVar{frameId, 0};
 
-    auto typeMask = b.makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask());
+    auto typeMask = b.makeInt32Constant(MatcherTypeSet{BSONType::numberLong}.getBSONTypeMask());
 
     auto resultExpr = b.makeIf(b.makeFunction("typeMatch", sumVar, std::move(typeMask)),
                                sumVar,

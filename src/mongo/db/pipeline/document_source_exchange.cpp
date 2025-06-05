@@ -245,7 +245,7 @@ Ordering Exchange::extractOrdering(const BSONObj& keyPattern) {
     bool hasOrderKey = false;
 
     for (const auto& element : keyPattern) {
-        if (element.type() == BSONType::String) {
+        if (element.type() == BSONType::string) {
             uassert(50895,
                     str::stream() << "Exchange key description is invalid: " << element,
                     element.valueStringData() == "hashed"_sd);
@@ -421,7 +421,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
             return 0;
         }
 
-        if (elem.type() == BSONType::String && elem.str() == "hashed") {
+        if (elem.type() == BSONType::string && elem.str() == "hashed") {
             kb << ""
                << BSONElementHasher::hash64(BSON("" << value).firstElement(),
                                             BSONElementHasher::DEFAULT_HASH_SEED);

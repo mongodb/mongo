@@ -100,7 +100,7 @@ const uint8_t kAdvanceTable alignas(64)[256] = {
 
 const char* advanceHelper(const char* be, size_t fieldNameSize) {
     auto type = static_cast<unsigned char>(*be);
-    uassert(4822804, "unsupported bson element", static_cast<BSONType>(type) == BSONType::RegEx);
+    uassert(4822804, "unsupported bson element", static_cast<BSONType>(type) == BSONType::regEx);
 
     size_t sizeOfTypeCodeAndFieldName =
         1 /*type*/ + fieldNameSize + 1 /*zero at the end of fieldname*/;
@@ -119,18 +119,18 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
     be += 1 + fieldNameSize + 1;
 
     switch (type) {
-        case BSONType::NumberDouble: {
+        case BSONType::numberDouble: {
             double dbl = ConstDataView(be).read<LittleEndian<double>>();
             return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(dbl)};
         }
-        case BSONType::NumberDecimal: {
+        case BSONType::numberDecimal: {
             if constexpr (View) {
                 return {value::TypeTags::NumberDecimal, value::bitcastFrom<const char*>(be)};
             }
 
             return value::makeCopyDecimal(value::readDecimal128FromMemory(ConstDataView{be}));
         }
-        case BSONType::String: {
+        case BSONType::string: {
             if constexpr (View) {
                 return {value::TypeTags::bsonString, value::bitcastFrom<const char*>(be)};
             }
@@ -150,7 +150,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                 return value::makeBigString({be, lenWithNull - 1});
             }
         }
-        case BSONType::Symbol: {
+        case BSONType::symbol: {
             auto value = value::bitcastFrom<const char*>(be);
             if constexpr (View) {
                 return {value::TypeTags::bsonSymbol, value};
@@ -158,7 +158,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             return value::makeNewBsonSymbol(
                 value::getStringOrSymbolView(value::TypeTags::bsonSymbol, value));
         }
-        case BSONType::BinData: {
+        case BSONType::binData: {
             if constexpr (View) {
                 return {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(be)};
             }
@@ -169,7 +169,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             memcpy(binData, be, size + metaSize);
             return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
         }
-        case BSONType::Object: {
+        case BSONType::object: {
             if constexpr (View) {
                 return {value::TypeTags::bsonObject, value::bitcastFrom<const char*>(be)};
             }
@@ -188,7 +188,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             }
             return {tag, val};
         }
-        case BSONType::Array: {
+        case BSONType::array: {
             if constexpr (View) {
                 return {value::TypeTags::bsonArray, value::bitcastFrom<const char*>(be)};
             }
@@ -208,7 +208,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             }
             return {tag, val};
         }
-        case BSONType::jstOID: {
+        case BSONType::oid: {
             if constexpr (View) {
                 return {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(be)};
             }
@@ -216,54 +216,54 @@ std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
             memcpy(value::getObjectIdView(val), be, sizeof(value::ObjectIdType));
             return {tag, val};
         }
-        case BSONType::Bool:
+        case BSONType::boolean:
             return {value::TypeTags::Boolean, value::bitcastFrom<bool>(*(be))};
-        case BSONType::Date: {
+        case BSONType::date: {
             int64_t integer = ConstDataView(be).read<LittleEndian<int64_t>>();
             return {value::TypeTags::Date, value::bitcastFrom<int64_t>(integer)};
         }
-        case BSONType::jstNULL:
+        case BSONType::null:
             return {value::TypeTags::Null, 0};
-        case BSONType::NumberInt: {
+        case BSONType::numberInt: {
             int32_t integer = ConstDataView(be).read<LittleEndian<int32_t>>();
             return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(integer)};
         }
-        case BSONType::bsonTimestamp: {
+        case BSONType::timestamp: {
             uint64_t val = ConstDataView(be).read<LittleEndian<uint64_t>>();
             return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(val)};
         }
-        case BSONType::NumberLong: {
+        case BSONType::numberLong: {
             int64_t val = ConstDataView(be).read<LittleEndian<int64_t>>();
             return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(val)};
         }
-        case BSONType::MinKey:
+        case BSONType::minKey:
             return {value::TypeTags::MinKey, 0};
-        case BSONType::MaxKey:
+        case BSONType::maxKey:
             return {value::TypeTags::MaxKey, 0};
-        case BSONType::Undefined:
+        case BSONType::undefined:
             return {value::TypeTags::bsonUndefined, 0};
-        case BSONType::RegEx: {
+        case BSONType::regEx: {
             auto value = value::bitcastFrom<const char*>(be);
             if constexpr (View) {
                 return {value::TypeTags::bsonRegex, value};
             }
             return value::makeCopyBsonRegex(value::getBsonRegexView(value));
         }
-        case BSONType::Code: {
+        case BSONType::code: {
             auto value = value::bitcastFrom<const char*>(be);
             if constexpr (View) {
                 return {value::TypeTags::bsonJavascript, value};
             }
             return value::makeCopyBsonJavascript(value::getBsonJavascriptView(value));
         }
-        case BSONType::DBRef: {
+        case BSONType::dbRef: {
             auto value = value::bitcastFrom<const char*>(be);
             if constexpr (View) {
                 return {value::TypeTags::bsonDBPointer, value};
             }
             return value::makeCopyBsonDBPointer(value::getBsonDBPointerView(value));
         }
-        case BSONType::CodeWScope: {
+        case BSONType::codeWScope: {
             auto value = value::bitcastFrom<const char*>(be);
             if constexpr (View) {
                 return {value::TypeTags::bsonCodeWScope, value};

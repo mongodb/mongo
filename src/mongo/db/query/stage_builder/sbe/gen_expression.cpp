@@ -2280,20 +2280,20 @@ public:
         switch (expr->getMetaType()) {
             case DocumentMetadataFields::MetaType::kSearchScore:
                 pushMetadataABT(_context->state.data->metadataSlots.searchScoreSlot,
-                                getBSONTypeMask(BSONType::NumberDouble) |
-                                    getBSONTypeMask(BSONType::NumberLong));
+                                getBSONTypeMask(BSONType::numberDouble) |
+                                    getBSONTypeMask(BSONType::numberLong));
                 break;
             case DocumentMetadataFields::MetaType::kSearchHighlights:
                 pushMetadataABT(_context->state.data->metadataSlots.searchHighlightsSlot,
-                                getBSONTypeMask(BSONType::Array));
+                                getBSONTypeMask(BSONType::array));
                 break;
             case DocumentMetadataFields::MetaType::kSearchScoreDetails:
                 pushMetadataABT(_context->state.data->metadataSlots.searchDetailsSlot,
-                                getBSONTypeMask(BSONType::Object));
+                                getBSONTypeMask(BSONType::object));
                 break;
             case DocumentMetadataFields::MetaType::kSearchSequenceToken:
                 pushMetadataABT(_context->state.data->metadataSlots.searchSequenceToken,
-                                getBSONTypeMask(BSONType::String));
+                                getBSONTypeMask(BSONType::string));
                 break;
             default:
                 unsupportedExpression("$meta");
@@ -4132,7 +4132,7 @@ private:
                 abt::make<abt::If>(
                     makeABTFunction("typeMatch"_sd,
                                     makeVariable(patternVar),
-                                    abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                                    abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
                     makeABTFunction("getRegexPattern"_sd, makeVariable(patternVar)),
                     makeError(5126601,
                               "regex pattern must have either string or BSON RegEx type")));
@@ -4143,7 +4143,7 @@ private:
                 auto optionsArgument = abt::make<abt::If>(
                     makeABTFunction("typeMatch"_sd,
                                     makeVariable(patternVar),
-                                    abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                                    abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
                     makeABTFunction("getRegexFlags"_sd, makeVariable(patternVar)),
                     makeABTConstant(""_sd));
                 auto compiledRegex = makeABTFunction(
@@ -4209,7 +4209,7 @@ private:
                     abt::make<abt::If>(
                         makeABTFunction("typeMatch"_sd,
                                         makeVariable(patternVar),
-                                        abt::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                                        abt::Constant::int32(getBSONTypeMask(BSONType::regEx))),
                         abt::make<abt::Let>(
                             bsonPatternVar,
                             makeABTFunction("getRegexFlags", makeVariable(patternVar)),
@@ -4517,7 +4517,7 @@ SbExpr generateExpressionCompare(StageBuilderState& state,
     // need to explicitly check for 'bsonUndefined' type because it is considered equal to
     // "Nothing" according to MQL semantics.
     auto generateExists = [&](SbLocalVar var) {
-        auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::Undefined));
+        auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::undefined));
         return b.makeBinaryOp(
             abt::Operations::And,
             b.makeFunction("exists"_sd, var),

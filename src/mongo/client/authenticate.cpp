@@ -227,14 +227,14 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                           request))
         .then([](BSONObj reply) -> Future<std::string> {
             auto mechsArrayObj = reply.getField("saslSupportedMechs");
-            if (mechsArrayObj.type() != Array) {
+            if (mechsArrayObj.type() != BSONType::array) {
                 return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
             }
 
             auto obj = mechsArrayObj.Obj();
             std::vector<std::string> availableMechanisms;
             for (const auto& elem : obj) {
-                if (elem.type() != String) {
+                if (elem.type() != BSONType::string) {
                     return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
                 }
                 availableMechanisms.push_back(elem.checkAndGetStringData().toString());
@@ -372,7 +372,7 @@ std::string getBSONString(BSONObj container, StringData field) {
     auto elem = container[field];
     uassert(ErrorCodes::BadValue,
             str::stream() << "Field '" << field << "' must be of type string",
-            elem.type() == String);
+            elem.type() == BSONType::string);
     return elem.String();
 }
 }  // namespace

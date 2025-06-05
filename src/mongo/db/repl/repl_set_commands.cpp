@@ -374,7 +374,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         BSONObj configObj;
-        if (cmdObj["replSetInitiate"].type() == Object) {
+        if (cmdObj["replSetInitiate"].type() == BSONType::object) {
             configObj = cmdObj["replSetInitiate"].Obj();
         }
 
@@ -467,7 +467,7 @@ public:
         const auto replCoord = ReplicationCoordinator::get(opCtx);
         uassertStatusOK(replCoord->checkReplEnabledForCommand(&result));
 
-        if (cmdObj["replSetReconfig"].type() != Object) {
+        if (cmdObj["replSetReconfig"].type() != BSONType::object) {
             result.append("errmsg", "no configuration specified");
             return false;
         }

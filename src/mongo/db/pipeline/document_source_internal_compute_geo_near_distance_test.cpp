@@ -70,7 +70,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenOverlappingPoin
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
-    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::numberDouble);
     ASSERT_EQUALS(doc["dist"].coerceToDouble(), 0);
 }
 
@@ -99,7 +99,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, SphericalDistanceBetweenTwoPoi
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
     const int meterToLatDegree = 111319;  // Each degree of latitude is approximately 111km.
-    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::numberDouble);
     ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), meterToLatDegree, 300);
 }
 
@@ -121,7 +121,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoLegacyPoints
     auto next = geoDistStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
-    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::numberDouble);
     ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), 1.41421, 0.01);
 }
 
@@ -147,7 +147,7 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
     ASSERT_TRUE(next.isAdvanced());
     auto doc = next.getDocument();
     const int meterToLatDegree = 111319;  // Each degree of latitude is approximately 111km.
-    ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
+    ASSERT_EQUALS(doc["dist"].getType(), BSONType::numberDouble);
     ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), meterToLatDegree, 300);
 }
 

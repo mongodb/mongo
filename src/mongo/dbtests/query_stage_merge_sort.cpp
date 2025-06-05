@@ -486,8 +486,8 @@ public:
 
         // b:51 (EOF)
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        params.bounds.startKey = BSON("" << 51 << "" << MinKey);
-        params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
+        params.bounds.startKey = BSON("" << 51 << "" << BSONType::minKey);
+        params.bounds.endKey = BSON("" << 51 << "" << BSONType::maxKey);
         ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
         std::unique_ptr<FetchStage> fetchStage =
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);

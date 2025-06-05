@@ -82,9 +82,9 @@ Status _parseNameFromBSONElement(const BSONElement& element,
                                  StringData nameFieldName,
                                  StringData sourceFieldName,
                                  Name* parsedName) {
-    if (element.type() == String) {
+    if (element.type() == BSONType::string) {
         *parsedName = Name(element.String(), dbname);
-    } else if (element.type() == Object) {
+    } else if (element.type() == BSONType::object) {
         BSONObj obj = element.Obj();
 
         std::string name;
@@ -153,7 +153,7 @@ Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
 Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
                                       PrivilegeVector* parsedPrivileges) try {
     for (const auto& element : privileges) {
-        if (element.type() != Object) {
+        if (element.type() != BSONType::object) {
             return Status(ErrorCodes::FailedToParse,
                           "Elements in privilege arrays must be objects");
         }

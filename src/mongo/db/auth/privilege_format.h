@@ -77,7 +77,7 @@ public:
         if (elem.isNumber() || elem.isBoolean()) {
             return ParsedPrivilegeFormat(elem.trueValue());
         }
-        if ((elem.type() == String) && (elem.String() == kAsUserFragment)) {
+        if ((elem.type() == BSONType::string) && (elem.String() == kAsUserFragment)) {
             return ParsedPrivilegeFormat(PrivilegeFormat::kShowAsUserFragment);
         }
         uasserted(ErrorCodes::BadValue,

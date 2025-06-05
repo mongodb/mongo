@@ -963,7 +963,8 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                 const std::string requestCmdName =
                     cmdState->request.cmdObj.firstElement().fieldName();
                 for (auto&& cmdName : data.getObjectField("cmdNames")) {
-                    if (cmdName.type() == String && cmdName.valueStringData() == requestCmdName) {
+                    if (cmdName.type() == BSONType::string &&
+                        cmdName.valueStringData() == requestCmdName) {
                         return true;
                     }
                 }

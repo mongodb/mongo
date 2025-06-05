@@ -501,7 +501,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
     BSONObj toParse = builder.obj();
 
     // If the dbCheck argument is a string, this is the per-collection form.
-    if (toParse["dbCheck"].type() == BSONType::String) {
+    if (toParse["dbCheck"].type() == BSONType::string) {
         return singleCollectionRun(
             opCtx,
             dbName,

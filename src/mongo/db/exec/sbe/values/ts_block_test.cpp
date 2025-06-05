@@ -74,10 +74,10 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
     const auto nFields = [&bucket]() -> size_t {
         // Use a dense field.
         const BSONElement timeField = bucket["data"]["time"];
-        if (timeField.type() == BSONType::Object) {
+        if (timeField.type() == BSONType::object) {
             return timeField.embeddedObject().nFields();
         } else {
-            invariant(timeField.type() == BSONType::BinData);
+            invariant(timeField.type() == BSONType::binData);
             BSONColumn col(timeField);
             return col.size();
         }
@@ -615,7 +615,7 @@ TEST_F(SbeValueTest, FillType) {
 
         {
             uint32_t nullUndefinedTypeMask = static_cast<uint32_t>(
-                getBSONTypeMask(BSONType::jstNULL) | getBSONTypeMask(BSONType::Undefined));
+                getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined));
 
             auto out = timeBlock->fillType(nullUndefinedTypeMask, fillTag, fillVal);
 
@@ -624,7 +624,7 @@ TEST_F(SbeValueTest, FillType) {
         }
 
         {
-            uint32_t dateTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::Date));
+            uint32_t dateTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::date));
 
             auto out = timeBlock->fillType(dateTypeMask, fillTag, fillVal);
             ASSERT_NE(out, nullptr);
@@ -645,8 +645,8 @@ TEST_F(SbeValueTest, FillType) {
         value::ValueGuard fillGuard{fillTag, fillVal};
 
         {
-            uint32_t arrayStringTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::Array) |
-                                                                 getBSONTypeMask(BSONType::String));
+            uint32_t arrayStringTypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::array) |
+                                                                 getBSONTypeMask(BSONType::string));
 
             auto out = numBlock->fillType(arrayStringTypeMask, fillTag, fillVal);
 
@@ -657,7 +657,7 @@ TEST_F(SbeValueTest, FillType) {
         {
             // The min and max won't match this tag since they are NumberLongs but there is a value
             // in the block that should match this tag.
-            uint32_t int32TypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::NumberInt));
+            uint32_t int32TypeMask = static_cast<uint32_t>(getBSONTypeMask(BSONType::numberInt));
 
             auto out = numBlock->fillType(int32TypeMask, fillTag, fillVal);
             ASSERT_NE(out, nullptr);

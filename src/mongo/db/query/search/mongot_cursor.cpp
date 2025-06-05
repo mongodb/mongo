@@ -403,7 +403,7 @@ BSONObj getExplainResponse(const ExpressionContext* expCtx,
     auto explain = responseData["explain"];
     uassert(4895000,
             "Response must contain an 'explain' field that is of type 'Object'",
-            explain.type() == BSONType::Object);
+            explain.type() == BSONType::object);
     return explain.embeddedObject().getOwned();
 }
 

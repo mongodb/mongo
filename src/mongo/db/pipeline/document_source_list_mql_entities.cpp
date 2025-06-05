@@ -50,7 +50,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBs
     uassert(9590101,
             str::stream() << "expected an object as specification for " << kStageName
                           << " stage, got " << typeName(elem.type()),
-            elem.type() == Object);
+            elem.type() == BSONType::object);
     const auto& nss = expCtx->getNamespaceString();
     uassert(ErrorCodes::InvalidNamespace,
             "$listMqlEntities must be run against the 'admin' database with {aggregate: 1}",

@@ -71,9 +71,9 @@ std::string toString(NaturalOrderHint::Direction dir) {
 }
 
 IndexHint IndexHint::parse(const BSONElement& element) {
-    if (element.type() == BSONType::String) {
+    if (element.type() == BSONType::string) {
         return IndexHint(element.String());
-    } else if (element.type() == BSONType::Object) {
+    } else if (element.type() == BSONType::object) {
         auto obj = element.Obj();
         if (obj.firstElementFieldName() == kNaturalFieldName) {
             uassert(ErrorCodes::FailedToParse,

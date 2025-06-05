@@ -555,7 +555,7 @@ TEST(MatchExpressionParserLeafTest, TypeDoubleOperatorFailsToParse) {
 
 TEST(MatchExpressionParserLeafTest, TypeBadType) {
     BSONObjBuilder b;
-    b.append("$type", (JSTypeMax + 1));
+    b.append("$type", (stdx::to_underlying(BSONType::jsTypeMax) + 1));
     BSONObj query = BSON("x" << b.obj());
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
@@ -588,8 +588,8 @@ TEST(MatchExpressionParserLeafTest, CanParseArrayOfTypes) {
     TypeMatchExpression* tme = static_cast<TypeMatchExpression*>(typeNumber.getValue().get());
     ASSERT_TRUE(tme->typeSet().allNumbers);
     ASSERT_EQ(tme->typeSet().bsonTypes.size(), 2u);
-    ASSERT_TRUE(tme->typeSet().hasType(BSONType::String));
-    ASSERT_TRUE(tme->typeSet().hasType(BSONType::Object));
+    ASSERT_TRUE(tme->typeSet().hasType(BSONType::string));
+    ASSERT_TRUE(tme->typeSet().hasType(BSONType::object));
 }
 
 TEST(MatchExpressionParserLeafTest, EmptyArrayFailsToParse) {
@@ -621,10 +621,13 @@ TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsTo
 }
 
 TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
-    std::vector<BSONType> validTypes{MinKey,     NumberDouble, String,        Object,     Array,
-                                     BinData,    Undefined,    jstOID,        Bool,       Date,
-                                     jstNULL,    RegEx,        DBRef,         Code,       Symbol,
-                                     CodeWScope, NumberInt,    bsonTimestamp, NumberLong, MaxKey};
+    std::vector<BSONType> validTypes{
+        BSONType::minKey,    BSONType::numberDouble, BSONType::string,     BSONType::object,
+        BSONType::array,     BSONType::binData,      BSONType::undefined,  BSONType::oid,
+        BSONType::boolean,   BSONType::date,         BSONType::null,       BSONType::regEx,
+        BSONType::dbRef,     BSONType::code,         BSONType::symbol,     BSONType::codeWScope,
+        BSONType::numberInt, BSONType::timestamp,    BSONType::numberLong, BSONType::maxKey,
+    };
 
     for (auto type : validTypes) {
         BSONObj predicate = BSON("a" << BSON("$type" << type));
@@ -692,10 +695,10 @@ TEST(MatchExpressionParserTest, BitTestMatchExpressionValidMask) {
 
 TEST(MatchExpressionParserTest, BitTestMatchExpressionValidArray) {
     BSONArray bsonArrayLongLong = BSON_ARRAY(0LL << 1LL << 2LL << 3LL);
-    ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[0].type());
-    ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[1].type());
-    ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[2].type());
-    ASSERT_EQ(BSONType::NumberLong, bsonArrayLongLong[3].type());
+    ASSERT_EQ(BSONType::numberLong, bsonArrayLongLong[0].type());
+    ASSERT_EQ(BSONType::numberLong, bsonArrayLongLong[1].type());
+    ASSERT_EQ(BSONType::numberLong, bsonArrayLongLong[2].type());
+    ASSERT_EQ(BSONType::numberLong, bsonArrayLongLong[3].type());
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ASSERT_OK(

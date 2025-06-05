@@ -101,8 +101,8 @@ public:
                 "typeMatch",
                 sbe::makeEs(sbe::makeE<EVariable>(inputSlot),
                             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                       getBSONTypeMask(BSONType::jstNULL) |
-                                                           getBSONTypeMask(BSONType::Undefined)))),
+                                                       getBSONTypeMask(BSONType::null) |
+                                                           getBSONTypeMask(BSONType::undefined)))),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, true));
 
         auto isNotNumberExpr = sbe::makeE<sbe::EPrimUnary>(

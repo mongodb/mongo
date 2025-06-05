@@ -116,7 +116,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
             accumulatorName = argName;
             uassert(ErrorCodes::FailedToParse,
                     "Argument to $shift must be an object",
-                    arg.type() == BSONType::Object);
+                    arg.type() == BSONType::object);
             shiftExpr = parseShiftArgs(arg.Obj(), argName, expCtx);
         } else {
             uasserted(ErrorCodes::FailedToParse,

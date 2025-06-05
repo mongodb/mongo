@@ -417,7 +417,7 @@ TEST(SplitHorizonTesting, toBSON) {
         }
 
         const auto& horizonsElement = output["horizons"];
-        ASSERT_EQUALS(horizonsElement.type(), Object);
+        ASSERT_EQUALS(horizonsElement.type(), BSONType::object);
         const auto& horizons = horizonsElement.Obj();
 
         std::vector<std::string> visitedHorizons;

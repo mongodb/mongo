@@ -231,13 +231,13 @@ boost::optional<std::vector<StringData>> parseBSON(BSONObj input) {
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "'compression' is not an array: " << elem,
-            elem.type() == Array);
+            elem.type() == BSONType::array);
 
     std::vector<StringData> ret;
     for (const auto& e : elem.Obj()) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "'compression' element is not a string: " << e,
-                e.type() == String);
+                e.type() == BSONType::string);
         ret.push_back(e.valueStringData());
     }
 

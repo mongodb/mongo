@@ -170,7 +170,7 @@ TEST(SHA512Block, BinDataRoundTrip) {
     auto newObj = builder.done();
 
     auto hashElem = newObj["hash"];
-    ASSERT_EQ(BinData, hashElem.type());
+    ASSERT_EQ(BSONType::binData, hashElem.type());
     ASSERT_EQ(BinDataGeneral, hashElem.binDataType());
 
     int binLen = 0;

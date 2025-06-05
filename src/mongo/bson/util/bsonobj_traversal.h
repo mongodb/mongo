@@ -196,8 +196,8 @@ private:
         [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
 
         return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
-            return elem.type() == Object
-                ? _traverseNoArrays(elem.fieldNameStringData(), elem.Obj(), Object)
+            return elem.type() == BSONType::object
+                ? _traverseNoArrays(elem.fieldNameStringData(), elem.Obj(), BSONType::object)
                 : _elemFunc(elem);
         });
     }
@@ -206,7 +206,7 @@ private:
         [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
 
         return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
-            return elem.type() == Object || elem.type() == Array
+            return elem.type() == BSONType::object || elem.type() == BSONType::array
                 ? _traverseIntoArrays(elem.fieldNameStringData(), elem.Obj(), elem.type())
                 : _elemFunc(elem);
         });
@@ -264,7 +264,7 @@ public:
         // Start the subobject, allocate space for the field in the parent which is BSON type byte +
         // field name + null terminator
         char* objdata = _allocator.allocate(2 + _fieldNameSize);
-        objdata[0] = type;
+        objdata[0] = stdx::to_underlying(type);
         if (_fieldNameSize > 0) {
             memcpy(objdata + 1, fieldName.data(), _fieldNameSize);
         }

@@ -113,7 +113,7 @@ BSONObj DefaultClonerImpl::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs)
     for (auto&& indexSpec : indexSpecs) {
         BSONElement indexName;
         uassertStatusOK(bsonExtractTypedField(
-            indexSpec, IndexDescriptor::kIndexNameFieldName, String, &indexName));
+            indexSpec, IndexDescriptor::kIndexNameFieldName, BSONType::string, &indexName));
         if (indexName.valueStringData() == IndexConstants::kIdIndexName) {
             return indexSpec;
         }

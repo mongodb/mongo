@@ -999,7 +999,7 @@ FLECompactESCDeleteSet readRandomESCNonAnchorIds(OperationContext* opCtx,
         do {
             const auto doc = cursor->nextSafe();
             BSONElement id;
-            auto status = bsonExtractTypedField(doc, kId, BinData, &id);
+            auto status = bsonExtractTypedField(doc, kId, BSONType::binData, &id);
             uassertStatusOK(status);
 
             uassert(7293604,

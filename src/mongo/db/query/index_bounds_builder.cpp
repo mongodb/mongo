@@ -163,7 +163,7 @@ bool isEqualityOrInNull(MatchExpression* me) {
     // Because of type-bracketing, {$gte: null} and {$lte: null} are equivalent to {$eq: null}.
     if (MatchExpression::EQ == me->matchType() || MatchExpression::GTE == me->matchType() ||
         MatchExpression::LTE == me->matchType()) {
-        return static_cast<ComparisonMatchExpression*>(me)->getData().type() == BSONType::jstNULL;
+        return static_cast<ComparisonMatchExpression*>(me)->getData().type() == BSONType::null;
     }
 
     if (me->matchType() == MatchExpression::MATCH_IN) {
@@ -394,24 +394,24 @@ IndexBoundsBuilder::BoundsTightness computeTightnessForTypeSet(const MatcherType
                                                                const IndexEntry& index) {
     // The Array case will not be handled because a typeSet with Array should not reach this
     // function
-    invariant(!typeSet.hasType(BSONType::Array));
+    invariant(!typeSet.hasType(BSONType::array));
 
     // The String and Object types with collation require an inexact fetch.
     if (index.collator != nullptr &&
-        (typeSet.hasType(BSONType::String) || typeSet.hasType(BSONType::Object))) {
+        (typeSet.hasType(BSONType::string) || typeSet.hasType(BSONType::object))) {
         return IndexBoundsBuilder::INEXACT_FETCH;
     }
 
     // Mark both null and undefined as inexact. Null and undefined must be differentiated, and
     // undefined and [] must be differentiated.
-    if (typeSet.hasType(BSONType::jstNULL) || typeSet.hasType(BSONType::Undefined)) {
+    if (typeSet.hasType(BSONType::null) || typeSet.hasType(BSONType::undefined)) {
         return IndexBoundsBuilder::INEXACT_FETCH;
     }
 
-    const auto numberTypesIncluded = static_cast<int>(typeSet.hasType(BSONType::NumberInt)) +
-        static_cast<int>(typeSet.hasType(BSONType::NumberLong)) +
-        static_cast<int>(typeSet.hasType(BSONType::NumberDecimal)) +
-        static_cast<int>(typeSet.hasType(BSONType::NumberDouble));
+    const auto numberTypesIncluded = static_cast<int>(typeSet.hasType(BSONType::numberInt)) +
+        static_cast<int>(typeSet.hasType(BSONType::numberLong)) +
+        static_cast<int>(typeSet.hasType(BSONType::numberDecimal)) +
+        static_cast<int>(typeSet.hasType(BSONType::numberDouble));
 
     // Checks that either all the number types are present or "number" is present in the type set.
     const bool hasAllNumbers = (numberTypesIncluded == 4) || typeSet.allNumbers;
@@ -421,9 +421,9 @@ IndexBoundsBuilder::BoundsTightness computeTightnessForTypeSet(const MatcherType
         return IndexBoundsBuilder::INEXACT_COVERED;
     }
 
-    // This check is effectively typeSet.hasType(BSONType::String) XOR
-    // typeSet.hasType(BSONType::Symbol).
-    if ((typeSet.hasType(BSONType::String) != typeSet.hasType(BSONType::Symbol))) {
+    // This check is effectively typeSet.hasType(BSONType::string) XOR
+    // typeSet.hasType(BSONType::symbol).
+    if ((typeSet.hasType(BSONType::string) != typeSet.hasType(BSONType::symbol))) {
         return IndexBoundsBuilder::INEXACT_COVERED;
     }
 
@@ -437,15 +437,15 @@ void buildBoundsForQueryElementForLT(BSONElement dataElt,
     // Use -infinity for one-sided numerical bounds
     if (dataElt.isNumber()) {
         bob->appendNumber("", -std::numeric_limits<double>::infinity());
-    } else if (dataElt.type() == BSONType::Array) {
+    } else if (dataElt.type() == BSONType::array) {
         // For comparison to an array, we do lexicographic comparisons. In a multikey index, the
         // index entries are the array elements themselves. We must therefore look at all types, and
         // all values between MinKey and the first element in the array.
         bob->appendMinKey("");
     } else {
-        bob->appendMinForType("", dataElt.type());
+        bob->appendMinForType("", stdx::to_underlying(dataElt.type()));
     }
-    if (dataElt.type() != BSONType::Array) {
+    if (dataElt.type() != BSONType::array) {
         CollationIndexKey::collationAwareIndexKeyAppend(dataElt, collator, bob);
         return;
     }
@@ -453,14 +453,14 @@ void buildBoundsForQueryElementForLT(BSONElement dataElt,
     auto eltArr = dataElt.Array();
     if (eltArr.empty()) {
         // The empty array is the lowest array.
-        bob->appendMinForType("", dataElt.type());
+        bob->appendMinForType("", stdx::to_underlying(dataElt.type()));
     } else {
         // If the type of the element is greater than the type of the array, the bounds have to
         // include that element. If it is an array itself, then we should use the larger of the
         // two. Otherwise the array type, and therefore `dataElt` is sufficiently large to include
         // all relevant keys.
         int firstElementCanonicalType = canonicalizeBSONType(eltArr[0].type());
-        int arrayCanonicalType = canonicalizeBSONType(BSONType::Array);
+        int arrayCanonicalType = canonicalizeBSONType(BSONType::array);
         if (firstElementCanonicalType > arrayCanonicalType ||
             (firstElementCanonicalType == arrayCanonicalType &&
              BSONElement::compareElements(
@@ -476,7 +476,7 @@ void buildBoundsForQueryElementForLT(BSONElement dataElt,
 void buildBoundsForQueryElementForGT(BSONElement dataElt,
                                      const mongo::CollatorInterface* collator,
                                      BSONObjBuilder* bob) {
-    if (dataElt.type() == BSONType::Array) {
+    if (dataElt.type() == BSONType::array) {
         auto eltArr = dataElt.Array();
         if (eltArr.empty()) {
             // If the array is empty, we need bounds that will match all arrays. Unfortunately,
@@ -489,7 +489,7 @@ void buildBoundsForQueryElementForGT(BSONElement dataElt,
             // of the two. Otherwise the array type, and therefore `dataElt` is sufficiently small
             // include all relevant keys.
             int firstElementCanonicalType = canonicalizeBSONType(eltArr[0].type());
-            int arrayCanonicalType = canonicalizeBSONType(BSONType::Array);
+            int arrayCanonicalType = canonicalizeBSONType(BSONType::array);
             if (firstElementCanonicalType < arrayCanonicalType ||
                 (firstElementCanonicalType == arrayCanonicalType &&
                  BSONElement::compareElements(eltArr[0],
@@ -510,10 +510,10 @@ void buildBoundsForQueryElementForGT(BSONElement dataElt,
         // For comparison to an array, we do lexicographic comparisons. In a multikey index, the
         // index entries are the array elements themselves. We must therefore look at all types,
         // and all values between the first element in the array and MaxKey.
-    } else if (dataElt.type() == BSONType::Array) {
+    } else if (dataElt.type() == BSONType::array) {
         bob->appendMaxKey("");
     } else {
-        bob->appendMaxForType("", dataElt.type());
+        bob->appendMaxForType("", stdx::to_underlying(dataElt.type()));
     }
 }
 
@@ -769,7 +769,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         // Everything is < MaxKey, except for MaxKey. However the bounds need to be inclusive to
         // find the array [MaxKey] which is smaller for a comparison but equal in a multikey index.
-        if (MaxKey == dataElt.type()) {
+        if (BSONType::maxKey == dataElt.type()) {
             oilOut->intervals.push_back(allValuesRespectingInclusion(
                 IndexBounds::makeBoundInclusionFromBoundBools(true, index.multikey)));
             *tightnessOut = index.collator || index.multikey ? IndexBoundsBuilder::INEXACT_FETCH
@@ -787,7 +787,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         buildBoundsForQueryElementForLT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
         MONGO_verify(dataObj.isOwned());
-        bool inclusiveBounds = dataElt.type() == BSONType::Array;
+        bool inclusiveBounds = dataElt.type() == BSONType::array;
         Interval interval =
             makeRangeInterval(dataObj,
                               IndexBounds::makeBoundInclusionFromBoundBools(
@@ -849,7 +849,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONElement dataElt = node->getData();
 
         // Everything is <= MaxKey.
-        if (MaxKey == dataElt.type()) {
+        if (BSONType::maxKey == dataElt.type()) {
             oilOut->intervals.push_back(allValues());
             *tightnessOut =
                 index.collator ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
@@ -864,7 +864,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             return;
         }
 
-        if (BSONType::jstNULL == dataElt.type()) {
+        if (BSONType::null == dataElt.type()) {
             // Because of type-bracketing, $lte null is equivalent to $eq null.
             makeNullEqualityBounds(node, index, isHashed, oilOut, tightnessOut);
             return;
@@ -875,7 +875,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONObj dataObj = bob.done().getOwned();
         MONGO_verify(dataObj.isOwned());
 
-        bool inclusiveBounds = dataElt.type() == BSONType::Array || typeMatch(dataObj);
+        bool inclusiveBounds = dataElt.type() == BSONType::array || typeMatch(dataObj);
         const Interval interval = makeRangeInterval(
             dataObj, IndexBounds::makeBoundInclusionFromBoundBools(inclusiveBounds, true));
         oilOut->intervals.push_back(interval);
@@ -928,7 +928,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         // Everything is > MinKey, except MinKey. However the bounds need to be inclusive to find
         // the array [MinKey], which is larger for a comparison but equal in a multikey index.
-        if (MinKey == dataElt.type()) {
+        if (BSONType::minKey == dataElt.type()) {
             oilOut->intervals.push_back(allValuesRespectingInclusion(
                 IndexBounds::makeBoundInclusionFromBoundBools(index.multikey, true)));
             *tightnessOut = index.collator || index.multikey ? IndexBoundsBuilder::INEXACT_FETCH
@@ -946,7 +946,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         buildBoundsForQueryElementForGT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
         MONGO_verify(dataObj.isOwned());
-        bool inclusiveBounds = dataElt.type() == BSONType::Array;
+        bool inclusiveBounds = dataElt.type() == BSONType::array;
         Interval interval =
             makeRangeInterval(dataObj,
                               IndexBounds::makeBoundInclusionFromBoundBools(
@@ -1010,7 +1010,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         BSONElement dataElt = node->getData();
 
         // Everything is >= MinKey.
-        if (MinKey == dataElt.type()) {
+        if (BSONType::minKey == dataElt.type()) {
             oilOut->intervals.push_back(allValues());
             *tightnessOut =
                 index.collator ? IndexBoundsBuilder::INEXACT_FETCH : IndexBoundsBuilder::EXACT;
@@ -1025,7 +1025,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
             return;
         }
 
-        if (BSONType::jstNULL == dataElt.type()) {
+        if (BSONType::null == dataElt.type()) {
             // Because of type-bracketing, $gte null is equivalent to $eq null.
             makeNullEqualityBounds(node, index, isHashed, oilOut, tightnessOut);
             return;
@@ -1034,7 +1034,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         buildBoundsForQueryElementForGT(dataElt, index.collator, &bob);
         BSONObj dataObj = bob.done().getOwned();
         MONGO_verify(dataObj.isOwned());
-        bool inclusiveBounds = dataElt.type() == BSONType::Array || typeMatch(dataObj);
+        bool inclusiveBounds = dataElt.type() == BSONType::array || typeMatch(dataObj);
         const Interval interval = makeRangeInterval(
             dataObj, IndexBounds::makeBoundInclusionFromBoundBools(true, inclusiveBounds));
         oilOut->intervals.push_back(interval);
@@ -1093,8 +1093,8 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         }
     } else if (MatchExpression::MOD == expr->matchType()) {
         BSONObjBuilder bob;
-        bob.appendMinForType("", NumberDouble);
-        bob.appendMaxForType("", NumberDouble);
+        bob.appendMinForType("", stdx::to_underlying(BSONType::numberDouble));
+        bob.appendMaxForType("", stdx::to_underlying(BSONType::numberDouble));
         BSONObj dataObj = bob.obj();
         MONGO_verify(dataObj.isOwned());
         oilOut->intervals.push_back(
@@ -1113,7 +1113,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
 
         const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
 
-        if (tme->typeSet().hasType(BSONType::Array)) {
+        if (tme->typeSet().hasType(BSONType::array)) {
             // We have $type:"array". Since arrays are indexed by creating a key for each element,
             // we have to fetch all indexed documents and check whether the full document contains
             // an array.
@@ -1126,16 +1126,16 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // also include all NumberDouble and NumberLong values.
         if (tme->typeSet().allNumbers) {
             BSONObjBuilder bob;
-            bob.appendMinForType("", BSONType::NumberInt);
-            bob.appendMaxForType("", BSONType::NumberInt);
+            bob.appendMinForType("", stdx::to_underlying(BSONType::numberInt));
+            bob.appendMaxForType("", stdx::to_underlying(BSONType::numberInt));
             oilOut->intervals.push_back(
                 makeRangeInterval(bob.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
         }
 
         for (auto type : tme->typeSet().bsonTypes) {
             BSONObjBuilder bob;
-            bob.appendMinForType("", type);
-            bob.appendMaxForType("", type);
+            bob.appendMinForType("", stdx::to_underlying(type));
+            bob.appendMaxForType("", stdx::to_underlying(type));
 
             // Types with variable width use the smallest value of the next type as their upper
             // bound, so the upper bound needs to be excluded.
@@ -1199,7 +1199,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
                                                   oilOut,
                                                   &tightness);
 
-            if (entireNullIntervalMatchesPredicate && BSONType::jstNULL == equality.type()) {
+            if (entireNullIntervalMatchesPredicate && BSONType::null == equality.type()) {
                 // We may have a covered null query. In this case, we update null interval
                 // tightness to EXACT_MAYBE_COVERED, as individually it would have a tightness of
                 // INEXACT_FETCH. However, we already know we will be able to cover this interval
@@ -1458,8 +1458,8 @@ void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
             makeRangeInterval(start, end, BoundInclusion::kIncludeStartKeyOnly));
     } else {
         BSONObjBuilder bob;
-        bob.appendMinForType("", String);
-        bob.appendMaxForType("", String);
+        bob.appendMinForType("", stdx::to_underlying(BSONType::string));
+        bob.appendMaxForType("", stdx::to_underlying(BSONType::string));
         BSONObj dataObj = bob.obj();
         MONGO_verify(dataObj.isOwned());
         oilOut->intervals.push_back(
@@ -1480,12 +1480,12 @@ void IndexBoundsBuilder::translateEquality(const PathMatchExpression* matchExpr,
                                            bool isHashed,
                                            OrderedIntervalList* oil,
                                            BoundsTightness* tightnessOut) {
-    if (BSONType::jstNULL == data.type()) {
+    if (BSONType::null == data.type()) {
         // An equality to null query is special. It has different tightness constraints.
         return makeNullEqualityBounds(matchExpr, index, isHashed, oil, tightnessOut);
     }
 
-    if (BSONType::Array != data.type()) {
+    if (BSONType::array != data.type()) {
         // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
         // A hashed index or collation means we have to create a copy to construct the bounds.
         if (!isHashed && index.collator == nullptr && holder.has_value()) {

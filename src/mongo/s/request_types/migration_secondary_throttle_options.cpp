@@ -148,7 +148,7 @@ MigrationSecondaryThrottleOptions::createFromBalancerConfig(const BSONObj& obj) 
 
     // Try to load it as a BSON document
     BSONElement elem;
-    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMongos, BSONType::Object, &elem);
+    Status status = bsonExtractTypedField(obj, kSecondaryThrottleMongos, BSONType::object, &elem);
     if (!status.isOK())
         return status;
 

@@ -156,7 +156,7 @@ std::unique_ptr<MatchExpression> makeRestriction(
     if (statedType && statedType->typeSet().isSingleType()) {
         // Use NumberInt in the "number" case as a stand-in.
         BSONType statedBSONType = statedType->typeSet().allNumbers
-            ? BSONType::NumberInt
+            ? BSONType::numberInt
             : *statedType->typeSet().bsonTypes.begin();
 
         if (restrictionType.hasType(statedBSONType)) {
@@ -329,7 +329,7 @@ StatusWithMatchExpression parsePattern(const boost::intrusive_ptr<ExpressionCont
                                        boost::optional<StringData> path,
                                        BSONElement pattern,
                                        InternalSchemaTypeExpression* typeExpr) {
-    if (pattern.type() != BSONType::String) {
+    if (pattern.type() != BSONType::string) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream()
                            << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaPatternKeyword
@@ -347,7 +347,7 @@ StatusWithMatchExpression parsePattern(const boost::intrusive_ptr<ExpressionCont
     auto expr = std::make_unique<RegexMatchExpression>(
         path, pattern.valueStringData(), emptyFlags, std::move(annotation));
 
-    return makeRestriction(expCtx, BSONType::String, path, std::move(expr), typeExpr);
+    return makeRestriction(expCtx, BSONType::string, path, std::move(expr), typeExpr);
 }
 
 StatusWithMatchExpression parseMultipleOf(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -387,7 +387,7 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
                                               BSONElement logicalElement,
                                               AllowedFeatureSet allowedFeatures,
                                               bool ignoreUnknownKeywords) {
-    if (logicalElement.type() != BSONType::Array) {
+    if (logicalElement.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
                               << "' must be an array"};
@@ -403,7 +403,7 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
     std::unique_ptr<T> listOfExpr = std::make_unique<T>(doc_validation_error::createAnnotation(
         expCtx, logicalElement.fieldNameStringData().toString(), BSONObj()));
     for (const auto& elem : logicalElementObj) {
-        if (elem.type() != BSONType::Object) {
+        if (elem.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "$jsonSchema keyword '" << logicalElement.fieldNameStringData()
                                   << "' must be an array of objects, but found an element of type "
@@ -425,7 +425,7 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
 StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     boost::optional<StringData> path,
                                     BSONElement enumElement) {
-    if (enumElement.type() != BSONType::Array) {
+    if (enumElement.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaEnumKeyword
                               << "' must be an array, but found an element of type "
@@ -455,7 +455,7 @@ StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext
         if (!path) {
             // Top-level non-object enum values can be safely ignored, since MongoDB only stores
             // objects, not scalars or arrays.
-            if (arrayElem.type() == BSONType::Object) {
+            if (arrayElem.type() == BSONType::object) {
                 auto rootDocEq = std::make_unique<InternalSchemaRootDocEqMatchExpression>(
                     arrayElem.embeddedObject(),
                     doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
@@ -485,7 +485,7 @@ StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext
  * status.
  */
 StatusWith<StringDataSet> parseRequired(BSONElement requiredElt) {
-    if (requiredElt.type() != BSONType::Array) {
+    if (requiredElt.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaRequiredKeyword
                               << "' must be an array, but found an element of type "
@@ -494,7 +494,7 @@ StatusWith<StringDataSet> parseRequired(BSONElement requiredElt) {
 
     StringDataSet properties;
     for (auto&& propertyName : requiredElt.embeddedObject()) {
-        if (propertyName.type() != BSONType::String) {
+        if (propertyName.type() != BSONType::string) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "$jsonSchema keyword '"
                                   << JSONSchemaParser::kSchemaRequiredKeyword
@@ -553,7 +553,7 @@ StatusWithMatchExpression translateRequired(const boost::intrusive_ptr<Expressio
         std::move(andExpr),
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
-    return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
+    return makeRestriction(expCtx, BSONType::object, path, std::move(objectMatch), typeExpr);
 }
 
 StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -563,7 +563,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
                                           const StringDataSet& requiredProperties,
                                           AllowedFeatureSet allowedFeatures,
                                           bool ignoreUnknownKeywords) {
-    if (propertiesElt.type() != BSONType::Object) {
+    if (propertiesElt.type() != BSONType::object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream()
                            << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaPropertiesKeyword
@@ -574,7 +574,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
     auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
         expCtx, propertiesElt.fieldNameStringData().toString(), BSONObj()));
     for (auto&& property : propertiesObj) {
-        if (property.type() != BSONType::Object) {
+        if (property.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "Nested schema for $jsonSchema property '"
                                   << property.fieldNameStringData() << "' must be an object"};
@@ -629,7 +629,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
         std::move(andExpr),
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
-    return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
+    return makeRestriction(expCtx, BSONType::object, path, std::move(objectMatch), typeExpr);
 }
 
 StatusWith<std::vector<PatternSchema>> parsePatternProperties(
@@ -642,7 +642,7 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(
         return {std::move(patternProperties)};
     }
 
-    if (patternPropertiesElt.type() != BSONType::Object) {
+    if (patternPropertiesElt.type() != BSONType::object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '"
                                      << JSONSchemaParser::kSchemaPatternPropertiesKeyword
@@ -650,7 +650,7 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(
     }
 
     for (auto&& patternSchema : patternPropertiesElt.embeddedObject()) {
-        if (patternSchema.type() != BSONType::Object) {
+        if (patternSchema.type() != BSONType::object) {
             return {Status(ErrorCodes::TypeMismatch,
                            str::stream()
                                << "$jsonSchema keyword '"
@@ -692,8 +692,8 @@ StatusWithMatchExpression parseAdditionalProperties(
             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore))};
     }
 
-    if (additionalPropertiesElt.type() != BSONType::Bool &&
-        additionalPropertiesElt.type() != BSONType::Object) {
+    if (additionalPropertiesElt.type() != BSONType::boolean &&
+        additionalPropertiesElt.type() != BSONType::object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '"
                                      << JSONSchemaParser::kSchemaAdditionalPropertiesKeyword
@@ -701,7 +701,7 @@ StatusWithMatchExpression parseAdditionalProperties(
     }
 
     auto annotation = doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore);
-    if (additionalPropertiesElt.type() == BSONType::Bool) {
+    if (additionalPropertiesElt.type() == BSONType::boolean) {
         if (additionalPropertiesElt.boolean()) {
             return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
         } else {
@@ -808,7 +808,7 @@ StatusWithMatchExpression parseAllowedProperties(
         std::move(allowedPropertiesExpr),
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
-    return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
+    return makeRestriction(expCtx, BSONType::object, path, std::move(objectMatch), typeExpr);
 }
 
 /**
@@ -839,7 +839,7 @@ StatusWithMatchExpression parseNumProperties(const boost::intrusive_ptr<Expressi
         std::move(expr),
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
-    return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
+    return makeRestriction(expCtx, BSONType::object, path, std::move(objectMatch), typeExpr);
 }
 
 StatusWithMatchExpression makeDependencyExistsClause(
@@ -869,7 +869,7 @@ StatusWithMatchExpression translateSchemaDependency(
     BSONElement dependency,
     AllowedFeatureSet allowedFeatures,
     bool ignoreUnknownKeywords) {
-    invariant(dependency.type() == BSONType::Object);
+    invariant(dependency.type() == BSONType::object);
 
     auto nestedSchemaMatch =
         _parse(expCtx, path, dependency.embeddedObject(), allowedFeatures, ignoreUnknownKeywords);
@@ -901,7 +901,7 @@ StatusWithMatchExpression translatePropertyDependency(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<StringData> path,
     BSONElement dependency) {
-    invariant(dependency.type() == BSONType::Array);
+    invariant(dependency.type() == BSONType::array);
 
     if (dependency.embeddedObject().isEmpty()) {
         return {ErrorCodes::FailedToParse,
@@ -917,7 +917,7 @@ StatusWithMatchExpression translatePropertyDependency(
         doc_validation_error::createAnnotation(expCtx, "_propertiesExistList", dependency.wrap()));
     std::set<StringData> propertyDependencyNames;
     for (auto&& propertyDependency : dependency.embeddedObject()) {
-        if (propertyDependency.type() != BSONType::String) {
+        if (propertyDependency.type() != BSONType::string) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "array '" << dependency.fieldNameStringData()
                                   << "' in $jsonSchema keyword '"
@@ -969,7 +969,7 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
                                             BSONElement dependencies,
                                             AllowedFeatureSet allowedFeatures,
                                             bool ignoreUnknownKeywords) {
-    if (dependencies.type() != BSONType::Object) {
+    if (dependencies.type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '"
                               << JSONSchemaParser::kSchemaDependenciesKeyword
@@ -979,12 +979,12 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
     auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
         expCtx, dependencies.fieldNameStringData().toString(), BSONObj(), dependencies.Obj()));
     for (auto&& dependency : dependencies.embeddedObject()) {
-        if (dependency.type() != BSONType::Object && dependency.type() != BSONType::Array) {
+        if (dependency.type() != BSONType::object && dependency.type() != BSONType::array) {
             // Allow JSON Schema annotations under "dependency" keyword.
             const auto isSchemaAnnotation =
                 dependency.fieldNameStringData() == JSONSchemaParser::kSchemaTitleKeyword ||
                 dependency.fieldNameStringData() == JSONSchemaParser::kSchemaDescriptionKeyword;
-            if (dependency.type() == BSONType::String && isSchemaAnnotation) {
+            if (dependency.type() == BSONType::string && isSchemaAnnotation) {
                 continue;
             }
 
@@ -995,7 +995,7 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
                                   << "' must be either an object or an array"};
         }
 
-        auto dependencyExpr = (dependency.type() == BSONType::Object)
+        auto dependencyExpr = (dependency.type() == BSONType::object)
             ? translateSchemaDependency(
                   expCtx, path, dependency, allowedFeatures, ignoreUnknownKeywords)
             : translatePropertyDependency(expCtx, path, dependency);
@@ -1025,7 +1025,7 @@ StatusWithMatchExpression parseUniqueItems(const boost::intrusive_ptr<Expression
     } else if (uniqueItemsElt.boolean()) {
         auto uniqueItemsExpr = std::make_unique<InternalSchemaUniqueItemsMatchExpression>(
             path, std::move(errorAnnotation));
-        return makeRestriction(expCtx, BSONType::Array, path, std::move(uniqueItemsExpr), typeExpr);
+        return makeRestriction(expCtx, BSONType::array, path, std::move(uniqueItemsExpr), typeExpr);
     }
 
     return {std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation))};
@@ -1044,7 +1044,7 @@ StatusWith<boost::optional<long long>> parseItems(
     InternalSchemaTypeExpression* typeExpr,
     AndMatchExpression* andExpr) {
     boost::optional<long long> startIndexForAdditionalItems;
-    if (itemsElt.type() == BSONType::Array) {
+    if (itemsElt.type() == BSONType::array) {
         // When "items" is an array, generate match expressions for each subschema for each position
         // in the array, which are bundled together in an AndMatchExpression. Annotate the
         // AndMatchExpression with the 'items' operator name, since it logically corresponds to the
@@ -1054,7 +1054,7 @@ StatusWith<boost::optional<long long>> parseItems(
                 expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap()));
         auto index = 0LL;
         for (auto subschema : itemsElt.embeddedObject()) {
-            if (subschema.type() != BSONType::Object) {
+            if (subschema.type() != BSONType::object) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
                             << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaItemsKeyword
@@ -1094,9 +1094,9 @@ StatusWith<boost::optional<long long>> parseItems(
                     expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap())));
         } else {
             andExpr->add(makeRestriction(
-                expCtx, BSONType::Array, path, std::move(andExprForSubschemas), typeExpr));
+                expCtx, BSONType::array, path, std::move(andExprForSubschemas), typeExpr));
         }
-    } else if (itemsElt.type() == BSONType::Object) {
+    } else if (itemsElt.type() == BSONType::object) {
         // When "items" is an object, generate a single AllElemMatchFromIndex that applies to every
         // element in the array to match. The parsed expression is intended for an
         // ExpressionWithPlaceholder, so we use the default placeholder as the path.
@@ -1124,7 +1124,7 @@ StatusWith<boost::optional<long long>> parseItems(
                     std::move(exprWithPlaceholder),
                     std::move(errorAnnotation));
             andExpr->add(
-                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr));
+                makeRestriction(expCtx, BSONType::array, path, std::move(allElemMatch), typeExpr));
         }
     } else {
         return {ErrorCodes::TypeMismatch,
@@ -1144,7 +1144,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
                             InternalSchemaTypeExpression* typeExpr,
                             AndMatchExpression* andExpr) {
     std::unique_ptr<ExpressionWithPlaceholder> otherwiseExpr;
-    if (additionalItemsElt.type() == BSONType::Bool) {
+    if (additionalItemsElt.type() == BSONType::boolean) {
         const auto emptyPlaceholder = boost::none;
         // Ignore the expression, since InternalSchemaAllElemMatchFromIndexMatchExpression reports
         // the details in this case.
@@ -1159,7 +1159,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
                 emptyPlaceholder,
                 std::make_unique<AlwaysFalseMatchExpression>(std::move(errorAnnotation)));
         }
-    } else if (additionalItemsElt.type() == BSONType::Object) {
+    } else if (additionalItemsElt.type() == BSONType::object) {
         auto parsedOtherwiseExpr = _parse(expCtx,
                                           kNamePlaceholder,
                                           additionalItemsElt.embeddedObject(),
@@ -1192,7 +1192,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
                     std::move(otherwiseExpr),
                     std::move(errorAnnotation));
             andExpr->add(
-                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr));
+                makeRestriction(expCtx, BSONType::array, path, std::move(allElemMatch), typeExpr));
         }
     }
     return Status::OK();
@@ -1273,7 +1273,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
     }
 
     if (auto notElt = keywordMap[JSONSchemaParser::kSchemaNotKeyword]) {
-        if (notElt.type() != BSONType::Object) {
+        if (notElt.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaNotKeyword
                                   << "' must be an object, but found an element of type "
@@ -1323,7 +1323,7 @@ Status translateArrayKeywords(StringMap<BSONElement>& keywordMap,
                               AndMatchExpression* andExpr) {
     if (auto minItemsElt = keywordMap[JSONSchemaParser::kSchemaMinItemsKeyword]) {
         auto minItemsExpr = parseLength<InternalSchemaMinItemsMatchExpression>(
-            expCtx, path, minItemsElt, typeExpr, BSONType::Array);
+            expCtx, path, minItemsElt, typeExpr, BSONType::array);
         if (!minItemsExpr.isOK()) {
             return minItemsExpr.getStatus();
         }
@@ -1332,7 +1332,7 @@ Status translateArrayKeywords(StringMap<BSONElement>& keywordMap,
 
     if (auto maxItemsElt = keywordMap[JSONSchemaParser::kSchemaMaxItemsKeyword]) {
         auto maxItemsExpr = parseLength<InternalSchemaMaxItemsMatchExpression>(
-            expCtx, path, maxItemsElt, typeExpr, BSONType::Array);
+            expCtx, path, maxItemsElt, typeExpr, BSONType::array);
         if (!maxItemsExpr.isOK()) {
             return maxItemsExpr.getStatus();
         }
@@ -1494,7 +1494,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
 
     if (auto maxLengthElt = keywordMap[JSONSchemaParser::kSchemaMaxLengthKeyword]) {
         auto maxLengthExpr = parseLength<InternalSchemaMaxLengthMatchExpression>(
-            expCtx, path, maxLengthElt, typeExpr, BSONType::String);
+            expCtx, path, maxLengthElt, typeExpr, BSONType::string);
         if (!maxLengthExpr.isOK()) {
             return maxLengthExpr.getStatus();
         }
@@ -1503,7 +1503,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
 
     if (auto minLengthElt = keywordMap[JSONSchemaParser::kSchemaMinLengthKeyword]) {
         auto minLengthExpr = parseLength<InternalSchemaMinLengthMatchExpression>(
-            expCtx, path, minLengthElt, typeExpr, BSONType::String);
+            expCtx, path, minLengthElt, typeExpr, BSONType::string);
         if (!minLengthExpr.isOK()) {
             return minLengthExpr.getStatus();
         }
@@ -1599,7 +1599,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
     }
 
     if (encryptMetadataElt) {
-        if (encryptMetadataElt.type() != BSONType::Object) {
+        if (encryptMetadataElt.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "$jsonSchema keyword '"
                                   << JSONSchemaParser::kSchemaEncryptMetadataKeyword
@@ -1621,7 +1621,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
     }
 
     if (encryptElt) {
-        if (encryptElt.type() != BSONType::Object) {
+        if (encryptElt.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << "$jsonSchema keyword '"
                                   << JSONSchemaParser::kSchemaEncryptKeyword
@@ -1662,7 +1662,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
  */
 Status validateMetadataKeywords(StringMap<BSONElement>& keywordMap) {
     if (auto descriptionElem = keywordMap[JSONSchemaParser::kSchemaDescriptionKeyword]) {
-        if (descriptionElem.type() != BSONType::String) {
+        if (descriptionElem.type() != BSONType::string) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream() << "$jsonSchema keyword '"
                                         << JSONSchemaParser::kSchemaDescriptionKeyword
@@ -1671,7 +1671,7 @@ Status validateMetadataKeywords(StringMap<BSONElement>& keywordMap) {
     }
 
     if (auto titleElem = keywordMap[JSONSchemaParser::kSchemaTitleKeyword]) {
-        if (titleElem.type() != BSONType::String) {
+        if (titleElem.type() != BSONType::string) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream()
                               << "$jsonSchema keyword '" << JSONSchemaParser::kSchemaTitleKeyword
@@ -1803,7 +1803,7 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
         // of type BinData.
         typeExpr = std::make_unique<InternalSchemaTypeExpression>(
             path,
-            MatcherTypeSet(BSONType::BinData),
+            MatcherTypeSet(BSONType::binData),
             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
     }
 
@@ -1854,7 +1854,7 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
         return translationStatus;
     }
 
-    if (!path && typeExpr && !typeExpr->typeSet().hasType(BSONType::Object)) {
+    if (!path && typeExpr && !typeExpr->typeSet().hasType(BSONType::object)) {
         // This is a top-level schema which requires that the type is something other than
         // "object". Since we only know how to store objects, this schema matches nothing.
         return {std::make_unique<AlwaysFalseMatchExpression>(doc_validation_error::createAnnotation(
@@ -1870,14 +1870,14 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
 
 StatusWith<MatcherTypeSet> JSONSchemaParser::parseTypeSet(
     BSONElement typeElt, const findBSONTypeAliasFun& aliasMapFind) {
-    if (typeElt.type() != BSONType::String && typeElt.type() != BSONType::Array) {
+    if (typeElt.type() != BSONType::string && typeElt.type() != BSONType::array) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << "$jsonSchema keyword '" << typeElt.fieldNameStringData()
                                      << "' must be either a string or an array of strings")};
     }
 
     std::set<StringData> aliases;
-    if (typeElt.type() == BSONType::String) {
+    if (typeElt.type() == BSONType::string) {
         if (typeElt.valueStringData() == JSONSchemaParser::kSchemaTypeInteger) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "$jsonSchema type '" << JSONSchemaParser::kSchemaTypeInteger
@@ -1886,7 +1886,7 @@ StatusWith<MatcherTypeSet> JSONSchemaParser::parseTypeSet(
         aliases.insert(typeElt.valueStringData());
     } else {
         for (auto&& typeArrayEntry : typeElt.embeddedObject()) {
-            if (typeArrayEntry.type() != BSONType::String) {
+            if (typeArrayEntry.type() != BSONType::string) {
                 return {Status(ErrorCodes::TypeMismatch,
                                str::stream()
                                    << "$jsonSchema keyword '" << typeElt.fieldNameStringData()

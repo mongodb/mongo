@@ -416,7 +416,9 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
 
     // Advance past the reference object to the compressed data of the first field.
     control += refObj.objsize() + 1;
-    uassert(8625732, "Invalid BSON Column encoding", control < _end && *control != EOO);
+    uassert(8625732,
+            "Invalid BSON Column encoding",
+            control < _end && *control != stdx::to_underlying(BSONType::eoo));
 
     using SOAlloc = BSONSubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
     using OptionalSOAlloc = boost::optional<SOAlloc>;
@@ -491,7 +493,9 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
             } else {
                 // If interleaved mode is ending, it means there were streams of different lengths,
                 // since moreData(), which checks the first field, must have returned true.
-                uassert(8884000, "Invalid BSON Column encoding", *control != EOO);
+                uassert(8884000,
+                        "Invalid BSON Column encoding",
+                        *control != stdx::to_underlying(BSONType::eoo));
 
                 // No more deltas for this scalar field. The next control byte is guaranteed
                 // to belong to this scalar field, since traversal order is fixed.
@@ -583,7 +587,8 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
         uassert(9215000, "Invalid BSON Column interleaved encoding", !moreData(*iter, control));
     }
 
-    invariant(*control == EOO, "expected EOO that ends interleaved mode");
+    invariant(*control == stdx::to_underlying(BSONType::eoo),
+              "expected EOO that ends interleaved mode");
 
     // Advance past the EOO that ends interleaved mode.
     ++control;
@@ -595,7 +600,7 @@ inline bool BlockBasedInterleavedDecompressor::moreData(DecodingState& ds, const
                                        if (!d64.pos.valid() || !d64.pos.more()) {
                                            // We need to load the next control byte. Is interleaved
                                            // mode continuing?
-                                           return *control != EOO;
+                                           return *control != stdx::to_underlying(BSONType::eoo);
                                        }
 
                                        return true;
@@ -604,7 +609,7 @@ inline bool BlockBasedInterleavedDecompressor::moreData(DecodingState& ds, const
                                        if (!d128.pos.valid() || !d128.pos.more()) {
                                            // We need to load the next control byte. Is interleaved
                                            // mode continuing?
-                                           return *control != EOO;
+                                           return *control != stdx::to_underlying(BSONType::eoo);
                                        }
 
                                        return true;
@@ -661,39 +666,39 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
         // Reset '_lastNonRLEBlock' when encountering a new uncompressed element.
         _lastNonRLEBlock = simple8b::kSingleZero;
         switch (_refElem.type()) {
-            case Bool:
+            case BSONType::boolean:
                 _lastValue.emplace<int64_t>(_refElem.boolean());
                 break;
-            case NumberInt:
+            case BSONType::numberInt:
                 _lastValue.emplace<int64_t>(_refElem._numberInt());
                 break;
-            case NumberLong:
+            case BSONType::numberLong:
                 _lastValue.emplace<int64_t>(_refElem._numberLong());
                 break;
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 _lastValue.emplace<int128_t>(
                     Simple8bTypeUtil::encodeDecimal128(_refElem._numberDecimal()));
                 break;
-            case NumberDouble:
+            case BSONType::numberDouble:
                 _lastValue.emplace<double>(_refElem._numberDouble());
                 break;
-            case bsonTimestamp:
+            case BSONType::timestamp:
                 _lastValue.emplace<std::pair<int64_t, int64_t>>(
                     std::pair{_refElem.timestampValue(), 0});
                 break;
-            case Date:
+            case BSONType::date:
                 _lastValue.emplace<std::pair<int64_t, int64_t>>(
                     std::pair{_refElem.date().toMillisSinceEpoch(), 0});
                 break;
-            case jstOID:
+            case BSONType::oid:
                 _lastValue.emplace<std::pair<int64_t, int64_t>>(
                     std::pair{Simple8bTypeUtil::encodeObjectId(_refElem.__oid()), 0});
                 break;
-            case String:
+            case BSONType::string:
                 _lastValue.emplace<int128_t>(
                     Simple8bTypeUtil::encodeString(_refElem.valueStringData()).value_or(0));
                 break;
-            case BinData: {
+            case BSONType::binData: {
                 // 'BinData' elements that are too large to be encoded should be treated as
                 // literals.
                 int size;
@@ -705,20 +710,20 @@ struct BlockBasedInterleavedDecompressor::FastDecodingState {
                     _lastValue.emplace<std::monostate>(std::monostate{});
                 }
             } break;
-            case Code:
+            case BSONType::code:
                 _lastValue.emplace<int128_t>(
                     Simple8bTypeUtil::encodeString(_refElem.valueStringData()).value_or(0));
                 break;
-            case Object:
-            case Array:
-            case Undefined:
-            case jstNULL:
-            case RegEx:
-            case DBRef:
-            case CodeWScope:
-            case Symbol:
-            case MinKey:
-            case MaxKey:
+            case BSONType::object:
+            case BSONType::array:
+            case BSONType::undefined:
+            case BSONType::null:
+            case BSONType::regEx:
+            case BSONType::dbRef:
+            case BSONType::codeWScope:
+            case BSONType::symbol:
+            case BSONType::minKey:
+            case BSONType::maxKey:
                 _lastValue.emplace<std::monostate>(std::monostate{});
                 break;
             default:
@@ -800,7 +805,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
     const char* end = control + size + 1;
 
     switch (state._refElem.type()) {
-        case Bool:
+        case BSONType::boolean:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDeltaPrimitive<bool, int64_t, Buffer>(
@@ -816,7 +821,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish64);
             }
             break;
-        case NumberInt:
+        case BSONType::numberInt:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDeltaPrimitive<int32_t, int64_t, Buffer>(
@@ -832,7 +837,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish64);
             }
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDeltaPrimitive<int64_t, int64_t, Buffer>(
@@ -848,7 +853,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish64);
             }
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDelta<Decimal128, int128_t, Buffer>(
@@ -864,7 +869,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish128);
             }
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::decompressAllDouble<Buffer>(
                     control,
@@ -875,7 +880,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                     finishDouble);
             }
             break;
-        case bsonTimestamp: {
+        case BSONType::timestamp: {
             auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
             for (auto&& buffer : state._buffers) {
                 ptr =
@@ -893,7 +898,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finishDeltaOfDelta);
             }
         } break;
-        case Date: {
+        case BSONType::date: {
             auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
             for (auto&& buffer : state._buffers) {
                 ptr =
@@ -911,7 +916,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finishDeltaOfDelta);
             }
         } break;
-        case jstOID: {
+        case BSONType::oid: {
             auto [last, lastlast] = std::get<std::pair<int64_t, int64_t>>(state._lastValue);
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::decompressAllDeltaOfDelta<OID, Buffer>(
@@ -929,7 +934,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                     finishDeltaOfDelta);
             }
         } break;
-        case String:
+        case BSONType::string:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDelta<StringData, int128_t, Buffer>(
@@ -946,7 +951,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish128);
             }
             break;
-        case BinData:
+        case BSONType::binData:
             // If the lastValue is not a 'int128_t', then the binData is too large to be decoded and
             // should be treated as a literal.
             if (auto lastValue = std::get_if<int128_t>(&state._lastValue)) {
@@ -974,7 +979,7 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                 }
             }
             break;
-        case Code:
+        case BSONType::code:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::
                     decompressAllDelta<BSONCode, int128_t, Buffer>(
@@ -992,16 +997,16 @@ void BlockBasedInterleavedDecompressor::dispatchDecompressionForType(
                         finish128);
             }
             break;
-        case Object:
-        case Array:
-        case Undefined:
-        case jstNULL:
-        case RegEx:
-        case DBRef:
-        case CodeWScope:
-        case Symbol:
-        case MinKey:
-        case MaxKey:
+        case BSONType::object:
+        case BSONType::array:
+        case BSONType::undefined:
+        case BSONType::null:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::codeWScope:
+        case BSONType::symbol:
+        case BSONType::minKey:
+        case BSONType::maxKey:
             for (auto&& buffer : state._buffers) {
                 ptr = BSONColumnBlockDecompressHelpers::decompressAllLiteral<int64_t>(
                     control, end, *buffer, state._lastNonRLEBlock, finishLiteral);
@@ -1027,7 +1032,9 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     // mode.
     BSONObj refObj{control + 1};
     control += refObj.objsize() + 1;
-    uassert(8625730, "Invalid BSON Column encoding", control < _end && *control != EOO);
+    uassert(8625730,
+            "Invalid BSON Column encoding",
+            control < _end && *control != stdx::to_underlying(BSONType::eoo));
 
     /**
      * The code below uses std::make_heap(), etc such that the element at the top of the heap always
@@ -1072,7 +1079,7 @@ const char* BlockBasedInterleavedDecompressor::decompressFast(
     std::make_heap(heap.begin(), heap.end(), std::greater<>());
 
     // Iterate over the control bytes that appear in this section of interleaved data.
-    while (*control != EOO) {
+    while (*control != stdx::to_underlying(BSONType::eoo)) {
         std::pop_heap(heap.begin(), heap.end(), std::greater<>());
         FastDecodingState<Buffer>& state = heap.back();
         if (isUncompressedLiteralControlByte(*control)) {
@@ -1141,28 +1148,28 @@ template <class Buffer>
 void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::appendToBuffers(
     BufferVector<Buffer*>& buffers, BSONType type, int64_t value, BSONElement lastLiteral) {
     switch (type) {
-        case Date:
+        case BSONType::date:
             appendEncodedToBuffers<Buffer, Date_t>(buffers, Date_t::fromMillisSinceEpoch(value));
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             appendEncodedToBuffers<Buffer, double>(
                 buffers, Simple8bTypeUtil::decodeDouble(value, scaleIndex));
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             appendEncodedToBuffers<Buffer, int64_t>(buffers, value);
             break;
-        case NumberInt:
+        case BSONType::numberInt:
             appendEncodedToBuffers<Buffer, int32_t>(buffers, value);
             break;
-        case Bool:
+        case BSONType::boolean:
             appendEncodedToBuffers<Buffer, bool>(buffers, value);
             break;
-        case jstOID:
+        case BSONType::oid:
             appendEncodedToBuffers<Buffer, OID>(
                 buffers,
                 Simple8bTypeUtil::decodeObjectId(value, lastLiteral.__oid().getInstanceUnique()));
             break;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             appendEncodedToBuffers<Buffer, Timestamp>(buffers, static_cast<Timestamp>(value));
             break;
         default:
@@ -1174,24 +1181,24 @@ template <class Buffer>
 void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::appendToBuffers(
     BufferVector<Buffer*>& buffers, BSONType type, int128_t value, BSONElement lastLiteral) {
     switch (type) {
-        case String: {
+        case BSONType::string: {
             auto string = Simple8bTypeUtil::decodeString(value);
             appendEncodedToBuffers<Buffer, StringData>(
                 buffers, StringData((const char*)string.str.data(), string.size));
         } break;
-        case Code: {
+        case BSONType::code: {
             auto string = Simple8bTypeUtil::decodeString(value);
             appendEncodedToBuffers<Buffer, BSONCode>(
                 buffers, BSONCode(StringData((const char*)string.str.data(), string.size)));
         } break;
-        case BinData: {
+        case BSONType::binData: {
             char data[16];
             size_t size = lastLiteral.valuestrsize();
             Simple8bTypeUtil::decodeBinary(value, data, size);
             appendEncodedToBuffers<Buffer, BSONBinData>(
                 buffers, BSONBinData(data, size, lastLiteral.binDataType()));
         } break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             appendEncodedToBuffers<Buffer, Decimal128>(buffers,
                                                        Simple8bTypeUtil::decodeDecimal128(value));
             break;

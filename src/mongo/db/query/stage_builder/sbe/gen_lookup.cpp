@@ -629,8 +629,8 @@ std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKe
             auto innerExpr =
                 b.makeIf(b.makeFunction("typeMatch"_sd,
                                         var,
-                                        b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
-                                                            getBSONTypeMask(BSONType::Object))),
+                                        b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                            getBSONTypeMask(BSONType::object))),
                          var,
                          b.makeNothingConstant());
 

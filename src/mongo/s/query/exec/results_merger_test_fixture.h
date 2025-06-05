@@ -96,7 +96,7 @@ public:
             ResumeToken::makeHighWaterMarkToken(clusterTime, ResumeTokenData::kDefaultTokenVersion)
                 .toDocument()
                 .toBson();
-        invariant(pbrt.firstElement().type() == BSONType::String);
+        invariant(pbrt.firstElement().type() == BSONType::string);
         return pbrt;
     }
 
@@ -415,11 +415,11 @@ protected:
 
     void assertKillCursorsCmdHasCursorId(const BSONObj& killCmd, CursorId cursorId) {
         ASSERT_TRUE(killCmd.hasElement("killCursors"));
-        ASSERT_EQ(killCmd["cursors"].type(), BSONType::Array);
+        ASSERT_EQ(killCmd["cursors"].type(), BSONType::array);
 
         size_t numCursors = 0;
         for (auto&& cursor : killCmd["cursors"].Obj()) {
-            ASSERT_EQ(cursor.type(), BSONType::NumberLong);
+            ASSERT_EQ(cursor.type(), BSONType::numberLong);
             ASSERT_EQ(cursor.numberLong(), cursorId);
             ++numCursors;
         }

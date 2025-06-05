@@ -157,7 +157,7 @@ std::unique_ptr<MatchExpression> attemptToRewriteEqHash(ExprMatchExpression& exp
 
                 // Matched "$a" in the example above! Now look for the constant long:
                 if (auto constant = dynamic_cast<ExpressionConstant*>(eqSecond);
-                    constant && constant->getValue().getType() == BSONType::NumberLong) {
+                    constant && constant->getValue().getType() == BSONType::numberLong) {
                     long long hashTarget = constant->getValue().getLong();
                     return std::make_unique<InternalEqHashedKey>(path.fullPath(), hashTarget);
                 }

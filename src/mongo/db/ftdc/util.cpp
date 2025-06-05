@@ -242,7 +242,7 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
             // NaN -> 0
             // Inf -> MAX
             // -Inf -> MIN
-            case NumberDouble: {
+            case BSONType::numberDouble: {
                 double value = currentElement.numberDouble();
                 long long newValue = 0;
                 if (std::isnan(value)) {
@@ -257,28 +257,28 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
                 metrics->emplace_back(newValue);
                 break;
             }
-            case NumberInt:
-            case NumberLong:
-            case NumberDecimal:
+            case BSONType::numberInt:
+            case BSONType::numberLong:
+            case BSONType::numberDecimal:
                 metrics->emplace_back(currentElement.numberLong());
                 break;
 
-            case Bool:
+            case BSONType::boolean:
                 metrics->emplace_back(currentElement.Bool());
                 break;
 
-            case Date:
+            case BSONType::date:
                 metrics->emplace_back(currentElement.Date().toMillisSinceEpoch());
                 break;
 
-            case bsonTimestamp:
+            case BSONType::timestamp:
                 // very slightly more space efficient to treat these as two separate metrics
                 metrics->emplace_back(currentElement.timestamp().getSecs());
                 metrics->emplace_back(currentElement.timestamp().getInc());
                 break;
 
-            case Object:
-            case Array: {
+            case BSONType::object:
+            case BSONType::array: {
                 // Maximum recursion is controlled by the documents we collect. Maximum is 5 in the
                 // current implementation.
                 auto sw = extractMetricsFromDocument(matches ? referenceElement.Obj() : BSONObj(),
@@ -313,15 +313,15 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
 
 bool isFTDCType(BSONType type) {
     switch (type) {
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
-        case NumberDecimal:
-        case Bool:
-        case Date:
-        case bsonTimestamp:
-        case Object:
-        case Array:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+        case BSONType::boolean:
+        case BSONType::date:
+        case BSONType::timestamp:
+        case BSONType::object:
+        case BSONType::array:
             return true;
 
         default:
@@ -350,10 +350,10 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
         BSONElement currentElement = iterator.next();
 
         switch (currentElement.type()) {
-            case NumberDouble:
-            case NumberInt:
-            case NumberLong:
-            case NumberDecimal:
+            case BSONType::numberDouble:
+            case BSONType::numberInt:
+            case BSONType::numberLong:
+            case BSONType::numberDecimal:
                 if (*pos >= metrics.size()) {
                     return Status(
                         ErrorCodes::BadValue,
@@ -364,7 +364,7 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
                                static_cast<long long int>(metrics[(*pos)++]));
                 break;
 
-            case Bool:
+            case BSONType::boolean:
                 if (*pos >= metrics.size()) {
                     return Status(
                         ErrorCodes::BadValue,
@@ -374,7 +374,7 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
                 builder.append(currentElement.fieldName(), static_cast<bool>(metrics[(*pos)++]));
                 break;
 
-            case Date:
+            case BSONType::date:
                 if (*pos >= metrics.size()) {
                     return Status(
                         ErrorCodes::BadValue,
@@ -386,7 +386,7 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
                     Date_t::fromMillisSinceEpoch(static_cast<std::uint64_t>(metrics[(*pos)++])));
                 break;
 
-            case bsonTimestamp: {
+            case BSONType::timestamp: {
                 if (*pos + 1 >= metrics.size()) {
                     return Status(
                         ErrorCodes::BadValue,
@@ -399,7 +399,7 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
                 break;
             }
 
-            case Object: {
+            case BSONType::object: {
                 BSONObjBuilder sub(builder.subobjStart(currentElement.fieldName()));
                 auto s = constructDocumentFromMetrics(
                     currentElement.Obj(), sub, metrics, pos, recursion + 1);
@@ -409,7 +409,7 @@ Status constructDocumentFromMetrics(const BSONObj& referenceDocument,
                 break;
             }
 
-            case Array: {
+            case BSONType::array: {
                 BSONObjBuilder sub(builder.subarrayStart(currentElement.fieldName()));
                 auto s = constructDocumentFromMetrics(
                     currentElement.Obj(), sub, metrics, pos, recursion + 1);
@@ -475,7 +475,7 @@ BSONObj createBSONPeriodicMetadataDocument(const BSONObj& deltaDoc,
 StatusWith<Date_t> getBSONDocumentId(const BSONObj& obj) {
     BSONElement element;
 
-    Status status = bsonExtractTypedField(obj, kFTDCIdField, BSONType::Date, &element);
+    Status status = bsonExtractTypedField(obj, kFTDCIdField, BSONType::date, &element);
     if (!status.isOK()) {
         return {status};
     }
@@ -510,7 +510,7 @@ StatusWith<BSONObj> getBSONDocumentFromMetadataDoc(const BSONObj& obj) {
 
     BSONElement element;
 
-    Status status = bsonExtractTypedField(obj, kFTDCDocField, BSONType::Object, &element);
+    Status status = bsonExtractTypedField(obj, kFTDCDocField, BSONType::object, &element);
     if (!status.isOK()) {
         return {status};
     }
@@ -527,7 +527,7 @@ StatusWith<std::vector<BSONObj>> getMetricsFromMetricDoc(const BSONObj& obj,
 
     BSONElement element;
 
-    Status status = bsonExtractTypedField(obj, kFTDCDataField, BSONType::BinData, &element);
+    Status status = bsonExtractTypedField(obj, kFTDCDataField, BSONType::binData, &element);
     if (!status.isOK()) {
         return {status};
     }
@@ -556,7 +556,7 @@ StatusWith<std::pair<long long, BSONObj>> getDeltasFromPeriodicMetadataDoc(const
         return {status};
     }
 
-    status = bsonExtractTypedField(obj, kFTDCDocField, BSONType::Object, &element);
+    status = bsonExtractTypedField(obj, kFTDCDocField, BSONType::object, &element);
     if (!status.isOK()) {
         return {status};
     }

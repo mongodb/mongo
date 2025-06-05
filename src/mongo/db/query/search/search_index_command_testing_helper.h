@@ -352,7 +352,8 @@ inline void _replicateSearchIndexCommandOnAllMongodsForTesting(OperationContext*
             idxCmdType.compare(kUpdateCommand.toString()) == 0) {
             listSearchIndexesCmd = createWrappedListSearchIndexesCmd(resolvedNss, userCmd, view);
             if (idxCmdType.compare(kUpdateCommand.toString()) == 0) {
-                if (userCmd.hasField("definition") && userCmd["definition"].type() == Object) {
+                if (userCmd.hasField("definition") &&
+                    userCmd["definition"].type() == BSONType::object) {
                     searchIdxLatestDefinition = boost::make_optional(userCmd["definition"].Obj());
                 }
             }

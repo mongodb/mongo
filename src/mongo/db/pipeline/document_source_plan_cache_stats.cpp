@@ -56,7 +56,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
     uassert(ErrorCodes::FailedToParse,
             str::stream() << kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
     bool allHosts = false;
     BSONObjIterator specIt(spec.embeddedObject());

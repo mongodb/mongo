@@ -313,7 +313,7 @@ public:
                 str::stream() << "DocumentSource " << getSourceName()
                               << " should have serialized to exactly one document. This stage may "
                                  "need a custom clone() implementation",
-                serializedDoc.size() == 1 && serializedDoc[0].getType() == BSONType::Object);
+                serializedDoc.size() == 1 && serializedDoc[0].getType() == BSONType::object);
         auto dsList = parse(expCtx, Document(serializedDoc[0].getDocument()).toBson());
         // Cloning should only happen once the pipeline has been fully built, after desugaring from
         // one stage to multiple stages has occurred. When cloning desugared stages we expect each

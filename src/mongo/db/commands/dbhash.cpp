@@ -196,13 +196,13 @@ public:
         OperationShardingState::get(opCtx).setShouldSkipDirectShardConnectionChecks();
 
         std::set<std::string> desiredCollections;
-        if (cmdObj["collections"].type() == Array) {
+        if (cmdObj["collections"].type() == BSONType::array) {
             BSONObjIterator i(cmdObj["collections"].Obj());
             while (i.more()) {
                 BSONElement e = i.next();
                 uassert(ErrorCodes::BadValue,
                         "collections entries have to be strings",
-                        e.type() == String);
+                        e.type() == BSONType::string);
                 desiredCollections.insert(e.String());
             }
         }
@@ -221,7 +221,7 @@ public:
 
         uassert(ErrorCodes::InvalidNamespace,
                 "Cannot pass empty string for 'dbHash' field",
-                !(cmdObj.firstElement().type() == mongo::String &&
+                !(cmdObj.firstElement().type() == BSONType::string &&
                   cmdObj.firstElement().valueStringData().empty()));
 
         const bool isPointInTimeRead =

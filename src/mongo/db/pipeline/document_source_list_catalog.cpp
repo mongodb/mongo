@@ -119,7 +119,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(6200600,
             "The $listCatalog stage specification must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
 
     const NamespaceString& nss = pExpCtx->getNamespaceString();
 

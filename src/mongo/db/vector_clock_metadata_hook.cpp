@@ -74,7 +74,7 @@ Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
         if (!operationTime.eoo()) {
             tassert(4457010,
                     "operationTime must be a timestamp if present",
-                    operationTime.type() == BSONType::bsonTimestamp);
+                    operationTime.type() == BSONType::timestamp);
             timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
         }
     }

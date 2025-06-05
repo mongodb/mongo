@@ -356,7 +356,7 @@ bool isSubset(BSONObj haystack, BSONObj needle) {
         }
 
         // Only validate if an element exists if it is marked as undefined.
-        if (element.type() == Undefined) {
+        if (element.type() == BSONType::undefined) {
             continue;
         }
 
@@ -365,12 +365,12 @@ bool isSubset(BSONObj haystack, BSONObj needle) {
         }
 
         switch (element.type()) {
-            case Object:
+            case BSONType::object:
                 if (!isSubset(foundElement.Obj(), element.Obj())) {
                     return false;
                 }
                 return true;
-            case Array:
+            case BSONType::array:
                 // not supported
                 invariant(false);
                 // This annotation shouldn't really be needed because

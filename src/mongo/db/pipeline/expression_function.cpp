@@ -84,7 +84,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
     uassert(31260,
             str::stream() << kExpressionName
                           << " requires an object as an argument, found: " << expr.type(),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement bodyField = expr["body"];
 
@@ -98,7 +98,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
     auto bodyValue = bodyConst->getValue();
     uassert(31262,
             "The body function must evaluate to type string or code",
-            bodyValue.getType() == BSONType::String || bodyValue.getType() == BSONType::Code);
+            bodyValue.getType() == BSONType::string || bodyValue.getType() == BSONType::code);
 
     BSONElement argsField = expr["args"];
     uassert(31263, "The args field must be specified.", argsField);
@@ -111,7 +111,7 @@ boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* co
     uassert(31418, "The lang field must be specified.", langField);
     uassert(31419,
             "Currently the only supported language specifier is 'js'.",
-            langField.type() == BSONType::String && langField.str() == kJavaScript);
+            langField.type() == BSONType::string && langField.str() == kJavaScript);
 
     return new ExpressionFunction(expCtx,
                                   argsExpr,

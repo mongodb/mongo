@@ -167,11 +167,11 @@ public:
 // Would be a namespace, but want to keep it closed rather than open.
 // Some of these may move to the BasicCommand shim if they are only for legacy implementations.
 struct CommandHelpers {
-    // The type of the first field in 'cmdObj' must be mongo::String. The first field is
+    // The type of the first field in 'cmdObj' must be BSONType::string. The first field is
     // interpreted as a collection name.
     static std::string parseNsFullyQualified(const BSONObj& cmdObj);
 
-    // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
+    // The type of the first field in 'cmdObj' must be BSONType::string or Symbol.
     // The first field is interpreted as a collection name.
     static NamespaceString parseNsCollectionRequired(const DatabaseName& dbName,
                                                      const BSONObj& cmdObj);
@@ -186,8 +186,9 @@ struct CommandHelpers {
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type
-     * mongo::String, then that field is interpreted as the collection name.
-     * If the first field is not of type mongo::String, then the namespace only has database name.
+     * BSONType::string, then that field is interpreted as the collection name.
+     * If the first field is not of type BSONType::string, then the namespace only has database
+     * name.
      */
     static NamespaceString parseNsFromCommand(const DatabaseName& dbName, const BSONObj& cmdObj);
 

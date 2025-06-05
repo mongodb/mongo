@@ -88,7 +88,7 @@ Status PullAllNode::init(BSONElement modExpr,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() != Array) {
+    if (modExpr.type() != BSONType::array) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "$pullAll requires an array argument but was given a "
                                     << typeName(modExpr.type()));

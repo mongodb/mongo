@@ -764,8 +764,8 @@ TEST(SerializeInternalSchema, RootDocEqRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
     MatcherTypeSet typeSet;
-    typeSet.bsonTypes.insert(BSONType::String);
-    typeSet.bsonTypes.insert(BSONType::Date);
+    typeSet.bsonTypes.insert(BSONType::string);
+    typeSet.bsonTypes.insert(BSONType::date);
     InternalSchemaBinDataEncryptedTypeExpression e("a"_sd, std::move(typeSet));
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -774,7 +774,7 @@ TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
 }
 
 TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
-    InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"_sd, BSONType::String);
+    InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"_sd, BSONType::string);
     auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataFLE2EncryptedType":[2]})",

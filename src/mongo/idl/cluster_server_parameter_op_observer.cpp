@@ -125,7 +125,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
     }
 
     auto elem = doc[kIdField];
-    if (elem.type() != BSONType::String) {
+    if (elem.type() != BSONType::string) {
         // This delete makes no sense, but it's safe to ignore since the insert/update
         // would not have resulted in an in-memory update anyway.
         LOGV2_DEBUG(6226304,

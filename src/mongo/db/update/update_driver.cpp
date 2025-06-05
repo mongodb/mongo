@@ -82,7 +82,7 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
             str::stream() << "Modifiers operate on fields but we found type "
                           << typeName(mod.type()) << " instead. For example: {$mod: {<field>: ...}}"
                           << " not {" << mod << "}",
-            mod.type() == BSONType::Object);
+            mod.type() == BSONType::object);
 
     return modType;
 }

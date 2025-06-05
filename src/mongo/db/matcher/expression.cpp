@@ -306,12 +306,12 @@ bool MatchExpression::isInternalNodeWithPath(MatchType m) {
 MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
     const BSONObj& jsonSchemaElement) {
     auto title = jsonSchemaElement[JSONSchemaParser::kSchemaTitleKeyword];
-    if (title.type() == BSONType::String) {
+    if (title.type() == BSONType::string) {
         this->title = {title.String()};
     }
 
     auto description = jsonSchemaElement[JSONSchemaParser::kSchemaDescriptionKeyword];
-    if (description.type() == BSONType::String) {
+    if (description.type() == BSONType::string) {
         this->description = {description.String()};
     }
 }

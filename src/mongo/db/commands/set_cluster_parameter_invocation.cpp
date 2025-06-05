@@ -123,7 +123,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONElement commandElement = cmdParamObj.firstElement();
     uassert(ErrorCodes::BadValue,
             "Cluster parameter value must be an object",
-            BSONType::Object == commandElement.type());
+            BSONType::object == commandElement.type());
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",

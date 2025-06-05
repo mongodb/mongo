@@ -312,7 +312,7 @@ TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
@@ -374,7 +374,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["batchSize"].number(), 2);
     ASSERT(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
@@ -397,7 +397,7 @@ TEST_F(DBClientCursorTest, DBClientCursorResendsGetMoreIfMoreToComeFlagIsOmitted
     ASSERT(!m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
@@ -636,7 +636,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
     ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
@@ -656,7 +656,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_FALSE(cursor.moreInCurrentBatch());
     // But the cursor should be still valid.
@@ -674,7 +674,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailable) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
     ASSERT_FALSE(cursor.moreInCurrentBatch());
@@ -735,7 +735,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitData) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     // Make sure the correct awaitData timeout is sent.
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000);
@@ -804,7 +804,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000);
     ASSERT_TRUE(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
@@ -876,7 +876,7 @@ TEST_F(DBClientCursorTest, DBClientCursorTailableAwaitDataExhaust) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore");
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong);
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong);
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId);
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000);
     ASSERT_BSONOBJ_EQ(docObj(5), cursor.next());
@@ -957,7 +957,7 @@ TEST_F(DBClientCursorTest, DBClientCursorOplogQuery) {
     ASSERT_FALSE(m.empty());
     msg = OpMsg::parse(m);
     ASSERT_EQ(StringData(msg.body.firstElement().fieldName()), "getMore") << msg.body;
-    ASSERT_EQ(msg.body["getMore"].type(), BSONType::NumberLong) << msg.body;
+    ASSERT_EQ(msg.body["getMore"].type(), BSONType::numberLong) << msg.body;
     ASSERT_EQ(msg.body["getMore"].numberLong(), cursorId) << msg.body;
     // Make sure the correct awaitData timeout is sent.
     ASSERT_EQ(msg.body["maxTimeMS"].number(), 5000) << msg.body;

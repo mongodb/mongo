@@ -658,8 +658,8 @@ std::vector<Interval> makeAllValuesForPath() {
     // Generating a all-value index bounds for only string type, because "$_path" with a string
     // value tracks the wildcard path.
     BSONObjBuilder allStringBob;
-    allStringBob.appendMinForType("", BSONType::String);
-    allStringBob.appendMaxForType("", BSONType::String);
+    allStringBob.appendMinForType("", stdx::to_underlying(BSONType::string));
+    allStringBob.appendMaxForType("", stdx::to_underlying(BSONType::string));
     intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
         allStringBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
 

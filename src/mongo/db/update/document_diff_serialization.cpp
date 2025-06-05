@@ -152,11 +152,11 @@ void appendElementToBuilder(std::variant<mutablebson::Element, BSONElement> elem
     visit(OverloadedVisitor{[&](const mutablebson::Element& element) {
                                 if (element.hasValue()) {
                                     builder->appendAs(element.getValue(), fieldName);
-                                } else if (element.getType() == BSONType::Object) {
+                                } else if (element.getType() == BSONType::object) {
                                     BSONObjBuilder subBuilder(builder->subobjStart(fieldName));
                                     element.writeChildrenTo(&subBuilder);
                                 } else {
-                                    invariant(element.getType() == BSONType::Array);
+                                    invariant(element.getType() == BSONType::array);
                                     BSONArrayBuilder subBuilder(builder->subarrayStart(fieldName));
                                     element.writeArrayTo(&subBuilder);
                                 }
@@ -507,14 +507,14 @@ ArrayDiffReader::ArrayDiffReader(const Diff& diff) : _diff(diff), _it(_diff) {
             field.fieldNameStringData() == kArrayHeader);
     uassert(4770519,
             str::stream() << "Expected array header to be bool but got " << (*_it),
-            field.type() == BSONType::Bool);
+            field.type() == BSONType::boolean);
     uassert(4770520,
             str::stream() << "Expected array header to be value true but got " << (*_it),
             field.Bool());
     ++_it;
     field = *_it;
     if (_it.more() && field.fieldNameStringData() == kResizeSectionFieldName) {
-        checkSection(field, kResizeSectionFieldName[0], BSONType::NumberInt);
+        checkSection(field, kResizeSectionFieldName[0], BSONType::numberInt);
         _newSize.emplace(field.numberInt());
         ++_it;
     }
@@ -541,7 +541,7 @@ boost::optional<std::pair<size_t, ArrayDiffReader::ArrayModification>> ArrayDiff
         // It's a sub diff...But which type?
         uassert(4770501,
                 str::stream() << "expected sub diff at index " << idx << " but got " << next,
-                next.type() == BSONType::Object);
+                next.type() == BSONType::object);
 
         auto modification = visit(OverloadedVisitor{[](const auto& reader) -> ArrayModification {
                                       return {reader};
@@ -592,7 +592,7 @@ DocumentDiffReader::DocumentDiffReader(const Diff& diff) : _diff(diff) {
         const auto sectionName = field.fieldNameStringData()[0];
         auto section = sections.find(sectionName);
         if ((section != sections.end()) && (section->second.order > prev)) {
-            checkSection(field, sectionName, BSONType::Object);
+            checkSection(field, sectionName, BSONType::object);
 
             // Once we encounter a sub-diff section, we break and save the iterator for later use.
             if (sectionName == kSubDiffSectionFieldPrefix) {
@@ -660,7 +660,7 @@ DocumentDiffReader::nextSubDiff() {
 
     uassert(470510,
             str::stream() << "Subdiffs should be objects, got " << next,
-            next.type() == BSONType::Object);
+            next.type() == BSONType::object);
 
     return {{fieldName.substr(1, fieldName.size()), getReader(next.embeddedObject())}};
 }

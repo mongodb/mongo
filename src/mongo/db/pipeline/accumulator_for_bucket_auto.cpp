@@ -494,7 +494,7 @@ void AccumulatorMergeObjectsForBucketAuto::processInternal(const Value& compound
     uassert(8745900,
             str::stream() << "$mergeObjects requires object inputs, but input " << input.toString()
                           << " is of type " << typeName(input.getType()),
-            (input.getType() == BSONType::Object));
+            (input.getType() == BSONType::object));
 
     FieldIterator iter = input.getDocument().fieldIterator();
     while (iter.more()) {
@@ -533,7 +533,7 @@ void AccumulatorPushConcatArraysCommonForBucketAuto::processInternal(const Value
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        assertMergingInputType(compoundInput, Array);
+        assertMergingInputType(compoundInput, BSONType::array);
 
         const std::vector<Value>& vec = compoundInput.getArray();
         for (auto&& val : vec) {

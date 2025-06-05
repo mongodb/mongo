@@ -317,7 +317,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     // contents.
     auto result = next.releaseDocument();
     ASSERT_VALUE_EQ(result["startPoint"], Value(0));
-    ASSERT_EQ(result["results"].getType(), BSONType::Array);
+    ASSERT_EQ(result["results"].getType(), BSONType::array);
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),
@@ -331,7 +331,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
     ASSERT_TRUE(next.isAdvanced());
     result = next.releaseDocument();
     ASSERT_VALUE_EQ(result["startPoint"], Value(0));
-    ASSERT_EQ(result["results"].getType(), BSONType::Array);
+    ASSERT_EQ(result["results"].getType(), BSONType::array);
     ASSERT_EQ(result["results"].getArray().size(), 2UL);
     ASSERT_TRUE(arrayContains(expCtx,
                               result["results"].getArray(),

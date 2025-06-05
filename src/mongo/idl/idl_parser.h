@@ -355,7 +355,7 @@ public:
      * Throws an exception if the BSON element's type is wrong.
      */
     bool checkAndAssertBinDataType(const BSONElement& element, BinDataType type) const {
-        if (MONGO_likely(element.type() == BinData && element.binDataType() == type)) {
+        if (MONGO_likely(element.type() == BSONType::binData && element.binDataType() == type)) {
             return true;
         }
 

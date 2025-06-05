@@ -60,7 +60,7 @@ public:
     }
 
     ChunkRange nonJumboChunk() {
-        return ChunkRange(BSON("x" << 0), BSON("x" << MaxKey));
+        return ChunkRange(BSON("x" << 0), BSON("x" << BSONType::maxKey));
     }
 
 protected:

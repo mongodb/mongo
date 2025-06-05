@@ -88,8 +88,8 @@ public:
             // Use lower_bound() / upper_bound() to find the beginning of the range that should be
             // used for binary search.
             _elementsSearchBegin = (!_collator && !_hasLargeStrings)
-                ? std::upper_bound(_elementsBegin, _elementsEnd, BSONType::String, _elemLt)
-                : std::lower_bound(_elementsBegin, _elementsEnd, BSONType::String, _elemLt);
+                ? std::upper_bound(_elementsBegin, _elementsEnd, BSONType::string, _elemLt)
+                : std::lower_bound(_elementsBegin, _elementsEnd, BSONType::string, _elemLt);
         }
 
         // Populate '_hashSet' if there are any elements that are eligible to use the hash.
@@ -98,7 +98,7 @@ public:
                 auto [tag, val] = bson::convertFrom<true>(elem);
 
                 if (isNonStringShallowType(tag) || tag == value::TypeTags::NumberDecimal ||
-                    ((elem.type() == BSONType::String || elem.type() == BSONType::Symbol) &&
+                    ((elem.type() == BSONType::string || elem.type() == BSONType::symbol) &&
                      !_collator && elem.valueStringData().size() <= kLargeStringThreshold)) {
                     // If 'tag' is a non-string shallow type, -OR- if 'tag' is NumberDecimal,
                     // -OR- if '_collator' is null and '{tag, val}' is a string/symbol whose

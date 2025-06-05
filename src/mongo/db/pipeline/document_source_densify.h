@@ -125,7 +125,7 @@ public:
     static DensifyValue getFromValue(const Value& val) {
         uassert(5733201,
                 "Densify field type must be numeric or a date",
-                val.numeric() || val.getType() == BSONType::Date);
+                val.numeric() || val.getType() == BSONType::date);
         if (!val.numeric()) {
             return val.getDate();
         }

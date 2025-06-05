@@ -185,7 +185,7 @@ void putMetaData(OperationContext* opCtx,
 
             // fix ident map
             BSONElement e = oldIdentMap[name];
-            if (e.type() == String) {
+            if (e.type() == BSONType::string) {
                 newIdentMap.append(e);
                 continue;
             }

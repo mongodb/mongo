@@ -63,7 +63,7 @@ void dropCollections(DBClientConnection* const conn,
 std::string formatResultSet(const BSONObj& obj) {
     auto oss = std::ostringstream{};
     const auto arrayElt = obj.hasField("res") ? obj.getField("res") : obj.firstElement();
-    if (arrayElt.type() == Array) {
+    if (arrayElt.type() == BSONType::array) {
         oss << ArrayResult<BSONElement>{arrayElt.Array()};
     } else {
         uasserted(9670433,

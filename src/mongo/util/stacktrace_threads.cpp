@@ -532,7 +532,7 @@ void State::printToEmitter(AbstractEmitter& emitter) {
                 StringData key = be.fieldNameStringData();
 
                 // Handle 'somap' specially. Pass everything else through.
-                if (be.type() == BSONType::Array && key == "somap"_sd) {
+                if (be.type() == BSONType::array && key == "somap"_sd) {
                     BSONArrayBuilder soMapArr(procInfo.subarrayStart(key));
                     for (const BSONElement& ae : be.Array()) {
                         BSONObj bRec = ae.embeddedObject();

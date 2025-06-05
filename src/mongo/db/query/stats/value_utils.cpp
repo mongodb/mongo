@@ -500,7 +500,7 @@ std::vector<sbe::value::TypeTags> sortTypeTags() {
         auto tag = static_cast<sbe::value::TypeTags>(tagValue);
 
         // Skips unsupported types.
-        if (sbe::value::tagToType(tag) == BSONType::EOO) {
+        if (sbe::value::tagToType(tag) == BSONType::eoo) {
             continue;
         }
         typeTagsOrder.push_back(tag);

@@ -91,8 +91,9 @@ StatusWith<OIDorTimestamp> getCurrentCacheGeneration(OperationContext* opCtx) {
         if (cacheGenerationElem)
             return OIDorTimestamp(cacheGenerationElem.OID());
 
-        uassert(
-            4664501, "Must include 'authInfoOpTime'", authInfoOpTimeElem.type() == bsonTimestamp);
+        uassert(4664501,
+                "Must include 'authInfoOpTime'",
+                authInfoOpTimeElem.type() == BSONType::timestamp);
         return authInfoOpTimeElem.timestamp();
     } catch (const DBException& e) {
         return e.toStatus();

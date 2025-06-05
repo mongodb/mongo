@@ -58,7 +58,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(6789100,
             "The $shardedDataDistribution stage specification must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
 
     uassert(6789101,
             "The $shardedDataDistribution stage can only be run on router",

@@ -111,7 +111,9 @@ const BSONObj randSortSpec = BSON("$rand" << BSON("$meta" << "randVal"));
 
 intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
     BSONElement specElem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(28745, "the $sample stage specification must be an object", specElem.type() == Object);
+    uassert(28745,
+            "the $sample stage specification must be an object",
+            specElem.type() == BSONType::object);
 
     bool sizeSpecified = false;
     long long size;

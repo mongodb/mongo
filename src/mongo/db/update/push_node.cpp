@@ -78,7 +78,7 @@ long long safeApproximateAbs(long long val) {
 Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() == BSONType::Object && modExpr[kEachClauseName]) {
+    if (modExpr.type() == BSONType::object && modExpr[kEachClauseName]) {
         const StringDataSet validClauseNames{
             kEachClauseName,
             kSliceClauseName,
@@ -107,7 +107,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         auto eachIt = clausesFound.find(kEachClauseName);
         invariant(eachIt != clausesFound.end());  // We already checked for a $each clause.
         const auto& eachClause = eachIt->second;
-        if (eachClause.type() != BSONType::Array) {
+        if (eachClause.type() != BSONType::array) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The argument to $each in $push must be"
                                            " an array but it was of type: "
@@ -138,7 +138,7 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
         if (sortIt != clausesFound.end()) {
             auto sortClause = sortIt->second;
 
-            if (sortClause.type() == BSONType::Object) {
+            if (sortClause.type() == BSONType::object) {
                 auto status = pattern_cmp::checkSortClause(sortClause.embeddedObject());
 
                 if (status.isOK()) {
@@ -269,7 +269,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
 
 ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
                                                  const FieldRef* elementPath) const {
-    if (element->getType() != BSONType::Array) {
+    if (element->getType() != BSONType::array) {
         invariant(elementPath);  // We can only hit this error if we are updating an existing path.
         auto idElem = mutablebson::findFirstChildNamed(element->getDocument().root(), "_id");
         uasserted(ErrorCodes::BadValue,

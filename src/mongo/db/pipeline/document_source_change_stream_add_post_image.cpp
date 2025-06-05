@@ -87,7 +87,7 @@ DocumentSourceChangeStreamAddPostImage::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467608,
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto parsedSpec = DocumentSourceChangeStreamAddPostImageSpec::parse(
         IDLParserContext("DocumentSourceChangeStreamAddPostImageSpec"), elem.Obj());
     return new DocumentSourceChangeStreamAddPostImage(expCtx, parsedSpec.getFullDocument());
@@ -99,7 +99,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext(
         return input;
     }
     auto opTypeVal = assertFieldHasType(
-        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::String);
+        input.getDocument(), DocumentSourceChangeStream::kOperationTypeField, BSONType::string);
     if (opTypeVal.getString() != DocumentSourceChangeStream::kUpdateOpType) {
         return input;
     }
@@ -127,10 +127,10 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext(
 NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
     const Document& inputDoc) const {
     auto namespaceObject =
-        assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::Object)
+        assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::object)
             .getDocument();
-    auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::String);
-    auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::String);
+    auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::string);
+    auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::string);
     NamespaceString nss(NamespaceStringUtil::deserialize(pExpCtx->getNamespaceString().tenantId(),
                                                          dbName.getString(),
                                                          collectionName.getString(),
@@ -153,7 +153,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::generatePostIm
     const Document& updateOp) const {
     // If the 'fullDocumentBeforeChange' is present and null, then we already tried and failed to
     // look up a pre-image. We can't compute the post-image without it, so return early.
-    if (updateOp[kFullDocumentBeforeChangeFieldName].getType() == BSONType::jstNULL) {
+    if (updateOp[kFullDocumentBeforeChangeFieldName].getType() == BSONType::null) {
         return boost::none;
     }
 
@@ -212,7 +212,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
 
     auto documentKey = assertFieldHasType(updateOp,
                                           DocumentSourceChangeStream::kDocumentKeyField,
-                                          BSONType::Object)
+                                          BSONType::object)
                            .getDocument();
 
     // Extract the resume token data from the input event.

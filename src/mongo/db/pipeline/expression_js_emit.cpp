@@ -62,14 +62,14 @@ boost::intrusive_ptr<Expression> ExpressionInternalJsEmit::parse(ExpressionConte
     uassert(31221,
             str::stream() << kExpressionName
                           << " requires an object as an argument, found: " << typeName(expr.type()),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement evalField = expr["eval"];
 
     uassert(31222, str::stream() << "The map function must be specified.", evalField);
     uassert(31224,
             "The map function must be of type string or code",
-            evalField.type() == BSONType::String || evalField.type() == BSONType::Code);
+            evalField.type() == BSONType::string || evalField.type() == BSONType::code);
 
     std::string funcSourceString = evalField._asCode();
     BSONElement thisField = expr["this"];

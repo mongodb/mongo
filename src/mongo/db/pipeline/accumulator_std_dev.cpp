@@ -85,7 +85,7 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
         }
     } else {
         // This is what getValue(true) produced below.
-        assertMergingInputType(input, Object);
+        assertMergingInputType(input, BSONType::object);
         const double m2 = input["m2"].getDouble();
         const double mean = input["mean"].getDouble();
         const long long count = input["count"].getLong();

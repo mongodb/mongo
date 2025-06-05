@@ -129,7 +129,7 @@ DocumentSourceChangeStreamInjectControlEvents::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(10384000,
             str::stream() << "the '" << kStageName << "' object spec must be an object",
-            spec.type() == Object);
+            spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamInjectControlEventsSpec::parse(
         IDLParserContext("DocumentSourceChangeStreamInjectControlEventsSpec"),
@@ -166,7 +166,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamInjectControlEvents::doG
     auto opType = nextDoc[DocumentSourceChangeStream::kOperationTypeField];
 
     // The value of 'operationType' must be a string. We cannot handle anything else.
-    if (opType.getType() == BSONType::String) {
+    if (opType.getType() == BSONType::string) {
         // Check if we have an action registered for the specific event type.
         if (auto itAction = _actions.find(opType.getStringData()); itAction != _actions.end()) {
             // We have an action registered for the specific event type!

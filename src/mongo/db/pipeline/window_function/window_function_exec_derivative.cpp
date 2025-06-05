@@ -55,7 +55,7 @@ Value WindowFunctionExecDerivative::getNext(boost::optional<Document> current) {
     // a time. The result has dimension 1/time, which doesn't correspond to any BSON type, so
     // 'unit' tells us how to express the result as a dimensionless BSON number.
     //
-    // However, BSON also can't represent a time (duration) directly. BSONType::Date represents
+    // However, BSON also can't represent a time (duration) directly. BSONType::date represents
     // a point in time, but there is no type that represents an amount of time. Subtracting two
     // Date values implicitly converts them to milliseconds.
 
@@ -75,12 +75,12 @@ Value WindowFunctionExecDerivative::getNext(boost::optional<Document> current) {
         // 'millisecond/unit', then the final answer would be wrong by a factor of 1000.
         uassert(5624900,
                 "$derivative with 'unit' expects the sortBy field to be a Date",
-                leftTime.getType() == BSONType::Date && rightTime.getType() == BSONType::Date);
+                leftTime.getType() == BSONType::date && rightTime.getType() == BSONType::date);
     } else {
         // Without unit, we require both time values to be numeric.
         uassert(5624901,
                 "$derivative where the sortBy is a Date requires an 'unit'",
-                leftTime.getType() != BSONType::Date && rightTime.getType() != BSONType::Date);
+                leftTime.getType() != BSONType::date && rightTime.getType() != BSONType::date);
         uassert(5624902,
                 "$derivative (with no 'unit') expects the sortBy field to be numeric",
                 leftTime.numeric() && rightTime.numeric());

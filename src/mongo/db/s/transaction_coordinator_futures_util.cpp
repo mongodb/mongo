@@ -82,7 +82,7 @@ bool shouldActivateFailpoint(BSONObj commandObj, BSONObj data) {
           "data"_attr = data);
     BSONElement twoPhaseCommitStage = data["twoPhaseCommitStage"];
     invariant(!twoPhaseCommitStage.eoo());
-    invariant(twoPhaseCommitStage.type() == BSONType::String);
+    invariant(twoPhaseCommitStage.type() == BSONType::string);
     StringData twoPhaseCommitStageValue = twoPhaseCommitStage.valueStringData();
     constexpr std::array<StringData, 3> fieldNames{
         "prepareTransaction"_sd, "commitTransaction"_sd, "abortTransaction"_sd};

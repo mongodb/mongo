@@ -110,7 +110,7 @@ Status bsonCheckOnlyHasFieldsForCommand(StringData objectName,
  * Throws a uassert if the type of the elem does not match that provided in expectedType
  */
 inline void checkBSONType(BSONType expectedType, const BSONElement& elem) {
-    uassert(elem.type() == BSONType::EOO ? ErrorCodes::NoSuchKey : ErrorCodes::TypeMismatch,
+    uassert(elem.type() == BSONType::eoo ? ErrorCodes::NoSuchKey : ErrorCodes::TypeMismatch,
             str::stream() << "Wrong type for '" << elem.fieldNameStringData() << "'. Expected a "
                           << typeName(expectedType) << ", got a " << typeName(elem.type()) << '.',
             elem.type() == expectedType);

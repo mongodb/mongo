@@ -117,14 +117,15 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
     BSONObjBuilder bob;
     for (BSONObjIterator itr(obj); itr.more(); itr.next()) {
         BSONElement elem = *itr;
-        if (elem.type() == Object) {
+        if (elem.type() == BSONType::object) {
             bob << elem.fieldName() << constify(elem.Obj(), false);
-        } else if (elem.type() == Array && !parentIsArray) {
+        } else if (elem.type() == BSONType::array && !parentIsArray) {
             // arrays within arrays are treated as constant values by the real
             // parser
             bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
         } else if (elem.fieldNameStringData() == "$const" ||
-                   (elem.type() == mongo::String && elem.valueStringDataSafe().starts_with("$"))) {
+                   (elem.type() == BSONType::string &&
+                    elem.valueStringDataSafe().starts_with("$"))) {
             bob.append(elem);
         } else {
             bob.append(elem.fieldName(), BSON("$const" << elem));

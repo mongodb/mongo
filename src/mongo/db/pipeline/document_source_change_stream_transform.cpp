@@ -70,7 +70,7 @@ DocumentSourceChangeStreamTransform::createFromBson(
     BSONElement rawSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467601,
             "the '$_internalChangeStreamTransform' object spec must be an object",
-            rawSpec.type() == BSONType::Object);
+            rawSpec.type() == BSONType::object);
     auto spec =
         DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"), rawSpec.Obj());
 

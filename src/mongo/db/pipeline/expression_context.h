@@ -419,7 +419,7 @@ public:
                 getGlobalScriptEngine());
         const auto isMapReduce =
             (variables.hasValue(Variables::kIsMapReduceId) &&
-             variables.getValue(Variables::kIsMapReduceId).getType() == BSONType::Bool &&
+             variables.getValue(Variables::kIsMapReduceId).getType() == BSONType::boolean &&
              variables.getValue(Variables::kIsMapReduceId).coerceToBool());
         if (_params.inRouter) {
             invariant(!forceLoadOfStoredProcedures);

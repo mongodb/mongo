@@ -134,7 +134,7 @@ protected:
 
     template <typename T>
     void _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        BSONType type = String,
+        BSONType type = BSONType::string,
         std::vector<T> metaValues = {_metaValue, _metaValue2, _metaValue3}) const;
 
     void _testBuildBatchedInsertContextWithoutMetaField(
@@ -3561,25 +3561,26 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithMetafield
 
     // Test with BSONTypes that don't have a StringData type metaValue.
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        bsonTimestamp, std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3), Timestamp(3, 4)});
+        BSONType::timestamp,
+        std::vector<Timestamp>{Timestamp(1, 2), Timestamp(2, 3), Timestamp(3, 4)});
     StatusWith<Date_t> date1 = dateFromISOString("2022-06-06T15:34:00.000Z");
     StatusWith<Date_t> date2 = dateFromISOString("2022-06-06T16:34:00.000Z");
     StatusWith<Date_t> date3 = dateFromISOString("2022-06-06T17:34:00.000Z");
     ASSERT(date1.isOK() && date2.isOK() && date3.isOK());
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        Date, std::vector<Date_t>{date1.getValue(), date2.getValue(), date3.getValue()});
+        BSONType::date, std::vector<Date_t>{date1.getValue(), date2.getValue(), date3.getValue()});
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        NumberInt, std::vector<int>{365, 10, 4});
+        BSONType::numberInt, std::vector<int>{365, 10, 4});
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        NumberLong,
+        BSONType::numberLong,
         std::vector<long long>{0x0123456789aacdeff, 0x0fedcba987654321, 0x0123456789abcdefll});
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        NumberDecimal,
+        BSONType::numberDecimal,
         std::vector<Decimal128>{Decimal128("0.490"), Decimal128("0.30"), Decimal128("1.50")});
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        NumberDouble, std::vector<double>{1.5, 1.4, 1.3});
+        BSONType::numberDouble, std::vector<double>{1.5, 1.4, 1.3});
     _testBuildBatchedInsertContextMultipleBatchesWithSameMetaFieldType(
-        jstOID,
+        BSONType::oid,
         std::vector<OID>{OID("00000000ff00000000000002"),
                          OID("000000000000000000000002"),
                          OID("0000000000fff00000000002")});
@@ -3592,20 +3593,20 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithMetafield
 
 TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes1) {
     std::vector<BSONObj> userMeasurementsBatch{
-        _generateMeasurement(jstOID, Date_t::fromMillisSinceEpoch(113)).obj(),
-        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(105)).obj(),
-        _generateMeasurement(Code, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(BSONType::oid, Date_t::fromMillisSinceEpoch(113)).obj(),
+        _generateMeasurement(BSONType::code, Date_t::fromMillisSinceEpoch(105)).obj(),
+        _generateMeasurement(BSONType::code, Date_t::fromMillisSinceEpoch(107)).obj(),
         _generateMeasurement(
             BSON(_metaField << BSONDBRef(_metaValue2, OID("dbdbdbdbdbdbdbdbdbdbdbdb"))),
             Date_t::fromMillisSinceEpoch(103))
             .obj(),
-        _generateMeasurement(jstOID, Date_t::fromMillisSinceEpoch(104)).obj(),
+        _generateMeasurement(BSONType::oid, Date_t::fromMillisSinceEpoch(104)).obj(),
         _generateMeasurement(BSON(_metaField << _metaValue3), Date_t::fromMillisSinceEpoch(102))
             .obj(),
-        _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(109)).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(108)).obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(111)).obj(),
-        _generateMeasurement(BinData, Date_t::fromMillisSinceEpoch(204)).obj(),
+        _generateMeasurement(BSONType::eoo, Date_t::fromMillisSinceEpoch(109)).obj(),
+        _generateMeasurement(BSONType::string, Date_t::fromMillisSinceEpoch(108)).obj(),
+        _generateMeasurement(BSONType::string, Date_t::fromMillisSinceEpoch(111)).obj(),
+        _generateMeasurement(BSONType::binData, Date_t::fromMillisSinceEpoch(204)).obj(),
         _generateMeasurement(BSON(_metaField << BSONCode(_metaValue2)),
                              Date_t::fromMillisSinceEpoch(200))
             .obj(),
@@ -3613,15 +3614,15 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithDifferent
             .obj(),
         _generateMeasurement(BSON(_metaField << _metaValue3), Date_t::fromMillisSinceEpoch(121))
             .obj(),
-        _generateMeasurement(String, Date_t::fromMillisSinceEpoch(65)).obj(),
+        _generateMeasurement(BSONType::string, Date_t::fromMillisSinceEpoch(65)).obj(),
         _generateMeasurement(
             BSON(_metaField << BSONDBRef(_metaValue2, OID("dbdbdbdbdbdbdbdbdbdbdbdb"))),
             Date_t::fromMillisSinceEpoch(400))
             .obj(),
-        _generateMeasurement(MinKey, Date_t::fromMillisSinceEpoch(250)).obj(),
-        _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(108)).obj(),
-        _generateMeasurement(MaxKey, Date_t::fromMillisSinceEpoch(231)).obj(),
-        _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(BSONType::minKey, Date_t::fromMillisSinceEpoch(250)).obj(),
+        _generateMeasurement(BSONType::eoo, Date_t::fromMillisSinceEpoch(108)).obj(),
+        _generateMeasurement(BSONType::maxKey, Date_t::fromMillisSinceEpoch(231)).obj(),
+        _generateMeasurement(BSONType::eoo, Date_t::fromMillisSinceEpoch(107)).obj(),
         _generateMeasurement(BSON(_metaField << BSONBinData("", 1, BinDataGeneral)),
                              Date_t::fromMillisSinceEpoch(204))
             .obj(),
@@ -3674,31 +3675,31 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithDifferent
         _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue2, BSON("x" << 1))),
                              Date_t::fromMillisSinceEpoch(493))
             .obj(),
-        _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(212)).obj(),
+        _generateMeasurement(BSONType::object, Date_t::fromMillisSinceEpoch(212)).obj(),
         _generateMeasurement(BSON(_metaField << BSONSymbol(_metaValue2)),
                              Date_t::fromMillisSinceEpoch(284))
             .obj(),
         _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue2, BSON("x" << 1))),
                              Date_t::fromMillisSinceEpoch(958))
             .obj(),
-        _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(103)).obj(),
+        _generateMeasurement(BSONType::object, Date_t::fromMillisSinceEpoch(103)).obj(),
         _generateMeasurement(BSON(_metaField << BSON("0" << _metaValue2)),
                              Date_t::fromMillisSinceEpoch(492))
             .obj(),
-        _generateMeasurement(Object, Date_t::fromMillisSinceEpoch(365)).obj(),
-        _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(590)).obj(),
-        _generateMeasurement(Array, Date_t::fromMillisSinceEpoch(204)).obj(),
-        _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(58)).obj(),
+        _generateMeasurement(BSONType::object, Date_t::fromMillisSinceEpoch(365)).obj(),
+        _generateMeasurement(BSONType::null, Date_t::fromMillisSinceEpoch(590)).obj(),
+        _generateMeasurement(BSONType::array, Date_t::fromMillisSinceEpoch(204)).obj(),
+        _generateMeasurement(BSONType::null, Date_t::fromMillisSinceEpoch(58)).obj(),
         _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue3, BSON("x" << 1))),
                              Date_t::fromMillisSinceEpoch(93))
             .obj(),
         _generateMeasurement(BSON(_metaField << BSONCodeWScope(_metaValue3, BSON("x" << 1))),
                              Date_t::fromMillisSinceEpoch(304))
             .obj(),
-        _generateMeasurement(jstNULL, Date_t::fromMillisSinceEpoch(384)).obj(),
-        _generateMeasurement(CodeWScope, Date_t::fromMillisSinceEpoch(888)).obj(),
-        _generateMeasurement(Array, Date_t::fromMillisSinceEpoch(764)).obj(),
-        _generateMeasurement(Array, Date_t::fromMillisSinceEpoch(593)).obj(),
+        _generateMeasurement(BSONType::null, Date_t::fromMillisSinceEpoch(384)).obj(),
+        _generateMeasurement(BSONType::codeWScope, Date_t::fromMillisSinceEpoch(888)).obj(),
+        _generateMeasurement(BSONType::array, Date_t::fromMillisSinceEpoch(764)).obj(),
+        _generateMeasurement(BSONType::array, Date_t::fromMillisSinceEpoch(593)).obj(),
     };
 
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
@@ -3734,32 +3735,32 @@ TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithDifferent
 
 TEST_F(BucketCatalogTest, BuildBatchedInsertContextsMultipleBatchesWithDifferentMetafieldTypes3) {
     std::vector<BSONObj> userMeasurementsBatch{
-        _generateMeasurement(Date, Date_t::fromMillisSinceEpoch(113)).obj(),
-        _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(105)).obj(),
-        _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(107)).obj(),
-        _generateMeasurement(Undefined, Date_t::fromMillisSinceEpoch(103)).obj(),
+        _generateMeasurement(BSONType::date, Date_t::fromMillisSinceEpoch(113)).obj(),
+        _generateMeasurement(BSONType::regEx, Date_t::fromMillisSinceEpoch(105)).obj(),
+        _generateMeasurement(BSONType::regEx, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(BSONType::undefined, Date_t::fromMillisSinceEpoch(103)).obj(),
         _generateMeasurement(BSON(_metaField << true), Date_t::fromMillisSinceEpoch(104)).obj(),
         _generateMeasurement(BSON(_metaField << true), Date_t::fromMillisSinceEpoch(102)).obj(),
         _generateMeasurement(BSON(_metaField << false), Date_t::fromMillisSinceEpoch(104)).obj(),
         _generateMeasurement(BSON(_metaField << false), Date_t::fromMillisSinceEpoch(102)).obj(),
-        _generateMeasurement(Undefined, Date_t::fromMillisSinceEpoch(102)).obj(),
-        _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(109)).obj(),
-        _generateMeasurement(NumberInt, Date_t::fromMillisSinceEpoch(108)).obj(),
-        _generateMeasurement(NumberInt, Date_t::fromMillisSinceEpoch(111)).obj(),
+        _generateMeasurement(BSONType::undefined, Date_t::fromMillisSinceEpoch(102)).obj(),
+        _generateMeasurement(BSONType::eoo, Date_t::fromMillisSinceEpoch(109)).obj(),
+        _generateMeasurement(BSONType::numberInt, Date_t::fromMillisSinceEpoch(108)).obj(),
+        _generateMeasurement(BSONType::numberInt, Date_t::fromMillisSinceEpoch(111)).obj(),
         _generateMeasurement(BSON(_metaField << 2.3), Date_t::fromMillisSinceEpoch(204)).obj(),
-        _generateMeasurement(NumberLong, Date_t::fromMillisSinceEpoch(200)).obj(),
+        _generateMeasurement(BSONType::numberLong, Date_t::fromMillisSinceEpoch(200)).obj(),
         _generateMeasurement(BSON(_metaField << 2.1), Date_t::fromMillisSinceEpoch(101)).obj(),
         _generateMeasurement(BSON(_metaField << 2.3), Date_t::fromMillisSinceEpoch(121)).obj(),
-        _generateMeasurement(Date, Date_t::fromMillisSinceEpoch(65)).obj(),
+        _generateMeasurement(BSONType::date, Date_t::fromMillisSinceEpoch(65)).obj(),
         _generateMeasurement(BSON(_metaField << Decimal128("0.4")),
                              Date_t::fromMillisSinceEpoch(400))
             .obj(),
         _generateMeasurement(BSON(_metaField << Decimal128("0.3")),
                              Date_t::fromMillisSinceEpoch(400))
             .obj(),
-        _generateMeasurement(RegEx, Date_t::fromMillisSinceEpoch(108)).obj(),
-        _generateMeasurement(bsonTimestamp, Date_t::fromMillisSinceEpoch(231)).obj(),
-        _generateMeasurement(EOO, Date_t::fromMillisSinceEpoch(107)).obj(),
+        _generateMeasurement(BSONType::regEx, Date_t::fromMillisSinceEpoch(108)).obj(),
+        _generateMeasurement(BSONType::timestamp, Date_t::fromMillisSinceEpoch(231)).obj(),
+        _generateMeasurement(BSONType::eoo, Date_t::fromMillisSinceEpoch(107)).obj(),
     };
     stdx::unordered_map<bucket_catalog::BucketMetadata, std::vector<size_t>>
         metaFieldMetadataToCorrectIndexOrderMap;
@@ -3839,29 +3840,31 @@ TEST_F(BucketCatalogTest,
        BuildBatchedInsertContextsWithNonConstantBSONTypeMetaReportsMalformedMeasurements) {
     // For non-string component meta field types, we directly have to declare two meta values.
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        bsonTimestamp,
+        BSONType::timestamp,
         std::vector<BSONObj>{BSON(_metaField << Timestamp(1, 2)),
                              BSON(_metaField << Timestamp(2, 3))});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberInt, std::vector<BSONObj>{BSON(_metaField << 1), BSON(_metaField << 2)});
+        BSONType::numberInt, std::vector<BSONObj>{BSON(_metaField << 1), BSON(_metaField << 2)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberLong,
+        BSONType::numberLong,
         std::vector<BSONObj>{BSON(_metaField << 0x0123456789abcdefll),
                              BSON(_metaField << 0x0123456789abcdeell)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberDecimal,
+        BSONType::numberDecimal,
         std::vector<BSONObj>{BSON(_metaField << Decimal128("1.45")),
                              BSON(_metaField << Decimal128("0.987"))});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        NumberDouble, std::vector<BSONObj>{BSON(_metaField << 1.4), BSON(_metaField << 8.6)});
+        BSONType::numberDouble,
+        std::vector<BSONObj>{BSON(_metaField << 1.4), BSON(_metaField << 8.6)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        jstOID,
+        BSONType::oid,
         std::vector<BSONObj>{BSON(_metaField << OID("649f0704230f18da067519c4")),
                              BSON(_metaField << OID("64a33d9cdf56a62781061048"))});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        Bool, std::vector<BSONObj>{BSON(_metaField << true), BSON(_metaField << false)});
+        BSONType::boolean,
+        std::vector<BSONObj>{BSON(_metaField << true), BSON(_metaField << false)});
     _testBuildBatchedInsertContextWithMalformedMeasurementsWithMetaField(
-        BinData,
+        BSONType::binData,
         std::vector<BSONObj>{BSON(_metaField << BSONBinData("", 0, BinDataGeneral)),
                              BSON(_metaField << BSONBinData("\x69\xb7", 2, BinDataGeneral))});
 

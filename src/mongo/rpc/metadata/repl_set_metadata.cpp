@@ -86,7 +86,7 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     BSONElement replMetadataElement;
 
     Status status = bsonExtractTypedField(
-        metadataObj, rpc::kReplSetMetadataFieldName, Object, &replMetadataElement);
+        metadataObj, rpc::kReplSetMetadataFieldName, BSONType::object, &replMetadataElement);
     if (!status.isOK())
         return status;
     BSONObj replMetadataObj = replMetadataElement.Obj();
@@ -143,7 +143,7 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 
     BSONElement wallClockTimeElement;
     status = bsonExtractTypedField(
-        replMetadataObj, kLastCommittedWallFieldName, BSONType::Date, &wallClockTimeElement);
+        replMetadataObj, kLastCommittedWallFieldName, BSONType::date, &wallClockTimeElement);
 
     if (!status.isOK()) {
         return status;

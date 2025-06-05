@@ -105,7 +105,7 @@ public:
         BSONElement first = cmdObj.firstElement();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "namespace has invalid type " << typeName(first.type()),
-                first.canonicalType() == canonicalizeBSONType(mongo::String));
+                first.canonicalType() == canonicalizeBSONType(BSONType::string));
         return NamespaceStringUtil::deserialize(
             dbName.tenantId(), first.valueStringData(), SerializationContext::stateDefault());
     }

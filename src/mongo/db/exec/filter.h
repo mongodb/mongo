@@ -73,7 +73,7 @@ public:
                 BSONElement keyDataElt = keyDataIt.next();
 
                 if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
-                    if (Array == keyDataElt.type()) {
+                    if (BSONType::array == keyDataElt.type()) {
                         return new SimpleArrayElementIterator(keyDataElt, true);
                     } else {
                         return new SingleElementElementIterator(keyDataElt);
@@ -118,7 +118,7 @@ public:
             BSONElement keyDataElt = keyDataIt.next();
 
             if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
-                if (Array == keyDataElt.type()) {
+                if (BSONType::array == keyDataElt.type()) {
                     return new SimpleArrayElementIterator(keyDataElt, true);
                 } else {
                     return new SingleElementElementIterator(keyDataElt);

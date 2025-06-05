@@ -172,12 +172,12 @@ static StatusWith<std::vector<BSONObj>> attemptToParsePipelineFromBSON(
     const BSONElement& pipelineElem) {
     std::vector<BSONObj> pipeline;
 
-    if (pipelineElem.eoo() || pipelineElem.type() != BSONType::Array) {
+    if (pipelineElem.eoo() || pipelineElem.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch, "A pipeline must be an array of objects"};
     }
 
     for (auto elem : pipelineElem.Obj()) {
-        if (elem.type() != BSONType::Object) {
+        if (elem.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     "Each element of the 'pipeline' array must be an object"};
         }

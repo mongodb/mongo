@@ -79,7 +79,7 @@ protected:
     auto jsonToPipeline(StringData jsonArray) {
         const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
 
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         NamespaceString testNss =
             NamespaceString::createNamespaceString_forTest("test", "collection");

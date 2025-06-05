@@ -88,7 +88,7 @@ T& append(T& s, int family, const std::array<uint8_t, 16> ip, int len) {
 }  // namespace
 
 StatusWith<CIDR> CIDR::parse(BSONElement from) {
-    if (from.type() != String) {
+    if (from.type() != BSONType::string) {
         return {ErrorCodes::UnsupportedFormat, "CIDR range must be a string"};
     }
     return parse(from.valueStringData());

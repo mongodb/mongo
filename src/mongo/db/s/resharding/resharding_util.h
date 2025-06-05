@@ -224,7 +224,7 @@ Status getStatusFromAbortReason(ClassWithAbortReason& c) {
     BSONElement errmsgElement = abortReasonObj["errmsg"];
     int code = codeElement.numberInt();
     std::string errmsg;
-    if (errmsgElement.type() == String) {
+    if (errmsgElement.type() == BSONType::string) {
         errmsg = errmsgElement.String();
     } else if (!errmsgElement.eoo()) {
         errmsg = errmsgElement.toString();

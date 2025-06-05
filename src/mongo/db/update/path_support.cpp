@@ -50,7 +50,7 @@ namespace pathsupport {
 namespace {
 
 Status maybePadTo(mutablebson::Element* elemArray, size_t sizeRequired) {
-    dassert(elemArray->getType() == Array);
+    dassert(elemArray->getType() == BSONType::array);
 
     size_t currSize = mutablebson::countChildren(*elemArray);
     if (sizeRequired > currSize) {
@@ -98,11 +98,11 @@ StatusWith<bool> findLongestPrefix(const FieldRef& prefix,
         StringData prefixPart = prefix.getPart(i);
         prev = curr;
         switch (curr.getType()) {
-            case Object:
+            case BSONType::object:
                 curr = prev[prefixPart];
                 break;
 
-            case Array:
+            case BSONType::array:
                 numericPart = str::parseUnsignedBase10Integer(prefixPart);
                 if (!numericPart) {
                     viable = false;
@@ -153,7 +153,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     Status status = Status::OK();
     auto firstNewElem = elemFound.getDocument().end();
 
-    if (elemFound.getType() != BSONType::Object && elemFound.getType() != BSONType::Array) {
+    if (elemFound.getType() != BSONType::object && elemFound.getType() != BSONType::array) {
         return Status(ErrorCodes::PathNotViable,
                       str::stream() << "Cannot create field '" << prefix.getPart(idxFound)
                                     << "' in element {" << elemFound.toString() << "}");
@@ -171,7 +171,7 @@ StatusWith<mutablebson::Element> createPathAt(const FieldRef& prefix,
     // we need padding.
     FieldIndex i = idxFound;
     bool inArray = false;
-    if (elemFound.getType() == mongo::Array) {
+    if (elemFound.getType() == BSONType::array) {
         boost::optional<size_t> newIdx = str::parseUnsignedBase10Integer(prefix.getPart(idxFound));
         if (!newIdx) {
             return Status(ErrorCodes::PathNotViable,

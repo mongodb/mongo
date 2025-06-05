@@ -181,7 +181,7 @@ void appendProcessInfoTrimmed(const BSONObj& bsonProcInfo,
                               BSONObjBuilder* bob) {
     for (const BSONElement& be : bsonProcInfo) {
         StringData key = be.fieldNameStringData();
-        if (be.type() != BSONType::Array || key != "somap"_sd) {
+        if (be.type() != BSONType::array || key != "somap"_sd) {
             bob->append(be);
             continue;
         }

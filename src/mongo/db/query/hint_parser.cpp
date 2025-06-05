@@ -42,9 +42,9 @@ namespace mongo {
  * break because of it.
  */
 BSONObj parseHint(const BSONElement& element) {
-    if (element.type() == BSONType::String) {
+    if (element.type() == BSONType::string) {
         return BSON("$hint" << element.valueStringData());
-    } else if (element.type() == BSONType::Object) {
+    } else if (element.type() == BSONType::object) {
         return element.Obj().getOwned();
     } else {
         uasserted(ErrorCodes::FailedToParse, "Hint must be a string or an object");

@@ -70,7 +70,7 @@ TEST_F(SBEFillTypeTest, FillType) {
     {
         // Test valid type mask.
         auto [typeMaskTag, typeMaskVal] =
-            makeInt32(getBSONTypeMask(BSONType::jstNULL) | getBSONTypeMask(BSONType::Undefined));
+            makeInt32(getBSONTypeMask(BSONType::null) | getBSONTypeMask(BSONType::undefined));
         typeMaskAccessor.reset(typeMaskTag, typeMaskVal);
 
         {

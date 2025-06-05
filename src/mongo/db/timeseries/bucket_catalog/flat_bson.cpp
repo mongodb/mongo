@@ -407,7 +407,7 @@ FlatBSON<Derived, Element, Value>::_update(typename FlatBSONStore<Element, Value
                                            const StringDataComparator* stringComparator) {
     UpdateStatus status{UpdateStatus::Updated};
 
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         std::tie(status, updateValues) = Derived::_shouldUpdateObj(obj, elem, updateValues);
         // Compare objects element-wise if the stored data may need to be updated.
         if (status == UpdateStatus::Updated) {
@@ -416,7 +416,7 @@ FlatBSON<Derived, Element, Value>::_update(typename FlatBSONStore<Element, Value
                     return false;
                 });
         }
-    } else if (elem.type() == Array) {
+    } else if (elem.type() == BSONType::array) {
         std::tie(status, updateValues) = Derived::_shouldUpdateArr(obj, elem, updateValues);
         // Compare objects element-wise if the stored data may need to be updated.
         if (status == UpdateStatus::Updated) {
@@ -731,7 +731,7 @@ void BSONElementValueBuffer::set(const BSONElement& elem) {
     }
     auto buffer = _buffer.data();
     // Store element as BSONElement buffer but strip out the field name.
-    buffer[0] = elem.type();
+    buffer[0] = stdx::to_underlying(elem.type());
     buffer[1] = '\0';
     memcpy(buffer + 2, elem.value(), elem.valuesize());
 }
@@ -813,7 +813,8 @@ std::pair<MinMax::UpdateStatus, MinMaxElement::UpdateContext> MinMax::_shouldUpd
     auto shouldUpdateObject = [&](MinMaxStore::Data& data, auto comp) {
         return data.type() == MinMaxStore::Type::kObject ||
             data.type() == MinMaxStore::Type::kUnset ||
-            (data.type() == MinMaxStore::Type::kArray && comp(typeComp(elem, Array), 0)) ||
+            (data.type() == MinMaxStore::Type::kArray &&
+             comp(typeComp(elem, BSONType::array), 0)) ||
             (data.type() == MinMaxStore::Type::kValue &&
              comp(typeComp(elem, data.value().type()), 0));
     };
@@ -838,7 +839,8 @@ std::pair<MinMax::UpdateStatus, MinMaxElement::UpdateContext> MinMax::_shouldUpd
     auto shouldUpdateArray = [&](MinMaxStore::Data& data, auto comp) {
         return data.type() == MinMaxStore::Type::kArray ||
             data.type() == MinMaxStore::Type::kUnset ||
-            (data.type() == MinMaxStore::Type::kObject && comp(typeComp(elem, Object), 0)) ||
+            (data.type() == MinMaxStore::Type::kObject &&
+             comp(typeComp(elem, BSONType::object), 0)) ||
             (data.type() == MinMaxStore::Type::kValue &&
              comp(typeComp(elem, data.value().type()), 0));
     };
@@ -864,8 +866,10 @@ MinMax::UpdateStatus MinMax::_maybeUpdateValue(MinMaxStore::Obj& obj,
                                                const StringDataComparator* stringComparator) {
     auto maybeUpdateValue = [&](MinMaxStore::Data& data, auto comp) {
         if (data.type() == MinMaxStore::Type::kUnset ||
-            (data.type() == MinMaxStore::Type::kObject && comp(typeComp(elem, Object), 0)) ||
-            (data.type() == MinMaxStore::Type::kArray && comp(typeComp(elem, Array), 0)) ||
+            (data.type() == MinMaxStore::Type::kObject &&
+             comp(typeComp(elem, BSONType::object), 0)) ||
+            (data.type() == MinMaxStore::Type::kArray &&
+             comp(typeComp(elem, BSONType::array), 0)) ||
             (data.type() == MinMaxStore::Type::kValue &&
              comp(elem.woCompare(data.value().get(), false, stringComparator), 0))) {
             data.setValue(elem);

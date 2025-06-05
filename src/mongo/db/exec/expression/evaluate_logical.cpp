@@ -83,9 +83,9 @@ Value evaluate(const ExpressionIn& expr, const Document& root, Variables* variab
 namespace {
 StatusWith<SafeNum> safeNumFromValue(const Value& val, const char* opName) {
     switch (val.getType()) {
-        case NumberInt:
+        case BSONType::numberInt:
             return val.getInt();
-        case NumberLong:
+        case BSONType::numberLong:
             return (int64_t)val.getLong();
         default:
             return Status(ErrorCodes::TypeMismatch,

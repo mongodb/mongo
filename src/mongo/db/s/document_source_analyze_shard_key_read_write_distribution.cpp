@@ -351,7 +351,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
     BSONElement specElem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(6875701,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
+            specElem.type() == BSONType::object);
     auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(
         IDLParserContext(kStageName), specElem.embeddedObject());
 
@@ -418,7 +418,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse(
             !gMultitenancySupport);
     uassert(6875700,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
+            specElem.type() == BSONType::object);
     uassertStatusOK(validateNamespace(nss));
 
     auto spec = DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec::parse(

@@ -162,7 +162,7 @@ std::pair<GroupProcessorBase::GroupsMap::iterator, bool> GroupProcessorBase::fin
         // Initialize and add the accumulators
         Value expandedId = expandId(key);
         Document idDoc =
-            expandedId.getType() == BSONType::Object ? expandedId.getDocument() : Document();
+            expandedId.getType() == BSONType::object ? expandedId.getDocument() : Document();
         group.reserve(numAccumulators);
         for (size_t i = 0; i < numAccumulators; i++) {
             const auto& accumulatedField = _accumulatedFields[i];

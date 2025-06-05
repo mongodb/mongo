@@ -55,7 +55,7 @@ Value convertNonFiniteInputValue(Value value) {
     for (const auto& val : value.getArray()) {
         if (val.isNaN()) {
             nanCnt++;
-        } else if (val.getType() == NumberDecimal) {
+        } else if (val.getType() == BSONType::numberDecimal) {
             if (val.isInfinite())
                 val.coerceToDecimal().isNegative() ? negCnt++ : posCnt++;
             isDecimal = true;
@@ -97,7 +97,7 @@ Value WindowFunctionCovariance::getValue(boost::optional<Value> current) const {
         return kDefault;  // Covariance not well defined in this case.
 
     auto output = _cXY.getValue();
-    if (output.getType() == NumberDecimal) {
+    if (output.getType() == BSONType::numberDecimal) {
         output = uassertStatusOK(exec::expression::evaluateDivide(output, Value(adjustedCount)));
     } else if (output.numeric()) {
         output = Value(output.coerceToDouble() / adjustedCount);

@@ -839,7 +839,7 @@ TEST_F(ChangeStreamStageTest, CreatingChangeStreamSucceedsWithValidVersions) {
                 stage->serializeToArray(serialization);
 
                 ASSERT_EQ(serialization.size(), 1UL);
-                ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+                ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
                 if (version.has_value()) {
                     ASSERT_EQ(version,
@@ -2838,7 +2838,7 @@ TEST_F(ChangeStreamStageTest, DocumentSourceChangeStreamTransformParseValidSuppo
         std::vector<Value> serialization;
         stage->serializeToArray(serialization);
         ASSERT_EQ(serialization.size(), 1UL);
-        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+        ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
         auto actualSupportedEvents = serialization[0]
                                          .getDocument()
@@ -3046,7 +3046,7 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     auto serializedDoc = serialization[0].getDocument();
     ASSERT_BSONOBJ_EQ(
         serializedDoc[DocumentSourceChangeStreamTransform::kStageName].getDocument().toBson(),
@@ -3092,7 +3092,7 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageEmptySpecSerializeResumeAfter) {
     vector<Value> serialization;
     transformStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT(!serialization[0]
                 .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
                 .getDocument()[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
@@ -3121,7 +3121,7 @@ TEST_F(ChangeStreamStageTest, DSCSTransformStageWithResumeTokenSerialize) {
     vector<Value> serialization;
     stage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT_BSONOBJ_EQ(serialization[0]
                           .getDocument()[DocumentSourceChangeStreamTransform::kStageName]
                           .getDocument()
@@ -3137,7 +3137,7 @@ void validateDocumentSourceStageSerialization(
     stage->serializeToArray(serialization);
 
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
                       BSON(Stage::kStageName << spec.toBSON()));
 }
@@ -3178,7 +3178,7 @@ TEST_F(ChangeStreamStageTest, DSCSInjectControlEventsStageSerialization) {
         stage->serializeToArray(serialization, options);
 
         ASSERT_EQ(serialization.size(), 1UL);
-        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+        ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
         ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
                           BSON("$changeStream"
@@ -5510,13 +5510,13 @@ void assertRedactedMatchExpressionContainsOperatorsAndRedactedFieldPaths(BSONEle
     auto opCount = 0;
     auto redactedFieldPaths = 0;
     while (true) {
-        if (el.type() == mongo::Array) {
+        if (el.type() == BSONType::array) {
             auto array = el.Array();
             if (array.empty()) {
                 break;
             }
             el = array[0];
-        } else if (el.type() == mongo::Object) {
+        } else if (el.type() == BSONType::object) {
             auto obj = el.Obj();
             if (obj.begin() == obj.end()) {
                 break;

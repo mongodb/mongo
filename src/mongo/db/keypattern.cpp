@@ -66,7 +66,7 @@ StringBuilder& KeyPattern::addToStringBuilder(StringBuilder& sb, const BSONObj& 
             sb << ", ";
         }
 
-        if (mongo::String == elem.type()) {
+        if (BSONType::string == elem.type()) {
             sb << elem;
         } else if (elem.number() >= 0) {
             // The canonical check as to whether a key pattern element is "ascending" or

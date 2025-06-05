@@ -583,12 +583,12 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, InvalidNumericalArgumentD
 
 TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBsonTypeArgumentDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    ASSERT_EQ(
-        MatchExpressionParser::parse(BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
-                                                      << BSON_ARRAY(BSONType::JSTypeMax + 1))),
-                                     expCtx)
-            .getStatus(),
-        ErrorCodes::BadValue);
+    ASSERT_EQ(MatchExpressionParser::parse(
+                  BSON("a" << BSON("$_internalSchemaBinDataEncryptedType"
+                                   << BSON_ARRAY(stdx::to_underlying(BSONType::jsTypeMax) + 1))),
+                  expCtx)
+                  .getStatus(),
+              ErrorCodes::BadValue);
 }
 
 }  // namespace mongo

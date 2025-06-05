@@ -96,7 +96,8 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
 
     {
         BSONElement changeLogTimeElem;
-        Status status = bsonExtractTypedField(source, time.name(), Date, &changeLogTimeElem);
+        Status status =
+            bsonExtractTypedField(source, time.name(), BSONType::date, &changeLogTimeElem);
         if (!status.isOK())
             return status;
         changeLog._time = changeLogTimeElem.date();
@@ -133,7 +134,7 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
     {
         BSONElement changeLogDetailsElem;
         Status status =
-            bsonExtractTypedField(source, details.name(), Object, &changeLogDetailsElem);
+            bsonExtractTypedField(source, details.name(), BSONType::object, &changeLogDetailsElem);
         if (!status.isOK())
             return status;
         changeLog._details = changeLogDetailsElem.Obj().getOwned();

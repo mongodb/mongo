@@ -1159,7 +1159,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     options.stayTemp = cmd["stayTemp"].trueValue();
 
     boost::optional<UUID> uuidToDrop;
-    if (cmd["dropTarget"].type() == BinData) {
+    if (cmd["dropTarget"].type() == BSONType::binData) {
         auto uuid = uassertStatusOK(UUID::parse(cmd["dropTarget"]));
         uuidToDrop = uuid;
     }

@@ -129,41 +129,42 @@ bool areNodesCompatible(const std::vector<const QuerySolutionNode*>& nodes) {
  */
 bool isLowerBound(const BSONElement& value, bool isInclusive) {
     switch (value.type()) {
-        case NumberInt:
-        case NumberDouble:
-        case NumberLong:
-        case NumberDecimal:
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
             // Lower bound value for numbers.
             return (std::isinf(value.numberDouble()) || std::isnan(value.numberDouble())) &&
                 isInclusive == true;
-        case String:
+        case BSONType::string:
             // Lower bound value for strings.
             return value.str().empty() && isInclusive == true;
-        case Date:
+        case BSONType::date:
             // Lower bound value for dates.
             return value.date() == Date_t::min() && isInclusive == true;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             // Lower bound value for timestamps.
             return value.timestamp() == Timestamp::min() && isInclusive == true;
-        case jstOID:
+        case BSONType::oid:
             // Lower bound value for ObjectID.
             return value.OID() == OID() && isInclusive == true;
-        case Object:
-        case Array:
+        case BSONType::object:
+        case BSONType::array:
             // Lower bound value for Object and Array.
             return value.Obj().isEmpty() && isInclusive == true;
-        case BinData:
-        case EOO:
-        case MinKey:
-        case MaxKey:
-        case Bool:  // Boolean bounds are considered always open since they are non-selective.
-        case jstNULL:
-        case Undefined:
-        case Symbol:
-        case RegEx:
-        case DBRef:
-        case Code:
-        case CodeWScope:
+        case BSONType::binData:
+        case BSONType::eoo:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::boolean:  // Boolean bounds are considered always open since they are
+                                 // non-selective.
+        case BSONType::null:
+        case BSONType::undefined:
+        case BSONType::symbol:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::code:
+        case BSONType::codeWScope:
             return true;
     }
 
@@ -179,44 +180,45 @@ bool isLowerBound(const BSONElement& value, bool isInclusive) {
  */
 bool isUpperBound(const BSONElement& value, bool isInclusive) {
     switch (value.type()) {
-        case NumberInt:
-        case NumberDouble:
-        case NumberLong:
-        case NumberDecimal:
+        case BSONType::numberInt:
+        case BSONType::numberDouble:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
             // Upper bound value for numbers.
             return std::isinf(value.numberDouble()) && isInclusive == true;
-        case String:
+        case BSONType::string:
             // A string value cannot be an upper bound value.
             return false;
-        case Date:
+        case BSONType::date:
             // Upper bound value for Date.
             return value.date() == Date_t::max() && isInclusive == true;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             // Upper bound value for Timestamp.
             return value.timestamp() == Timestamp::max() && isInclusive == true;
-        case jstOID:
+        case BSONType::oid:
             // Upper bound value for ObjectID.
             return value.OID() == OID::max() && isInclusive == true;
-        case Object:
+        case BSONType::object:
             // Upper bound value for String.
             return value.Obj().isEmpty() && isInclusive == false;
-        case Array:
+        case BSONType::array:
             // Upper bound value for Object.
             return value.Obj().isEmpty() && isInclusive == false;
-        case BinData:
+        case BSONType::binData:
             // Upper bound value for Array.
             return value.valuesize() == 0 && isInclusive == false;
-        case EOO:
-        case MinKey:
-        case MaxKey:
-        case Bool:  // Boolean bounds are considered always open since they are non-selective.
-        case jstNULL:
-        case Undefined:
-        case Symbol:
-        case RegEx:
-        case DBRef:
-        case Code:
-        case CodeWScope:
+        case BSONType::eoo:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::boolean:  // Boolean bounds are considered always open since they are
+                                 // non-selective.
+        case BSONType::null:
+        case BSONType::undefined:
+        case BSONType::symbol:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::code:
+        case BSONType::codeWScope:
             return true;
     }
 

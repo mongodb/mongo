@@ -60,9 +60,9 @@ RoleName RoleNameOrString::getRoleName(const DatabaseName& dbname) const {
 }
 
 RoleNameOrString RoleNameOrString::parseFromBSON(const BSONElement& elem) {
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         return RoleNameOrString(RoleName::parseFromBSON(elem));
-    } else if (elem.type() == String) {
+    } else if (elem.type() == BSONType::string) {
         return RoleNameOrString(elem.checkAndGetStringData());
     } else {
         uasserted(ErrorCodes::BadValue, "Role name must be either a document or string");

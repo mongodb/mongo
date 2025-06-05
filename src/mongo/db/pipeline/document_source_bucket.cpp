@@ -76,7 +76,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
     uassert(40201,
             str::stream() << "Argument to $bucket stage must be an object, but found type: "
                           << typeName(elem.type()) << ".",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     const BSONObj bucketObj = elem.embeddedObject();
     BSONObjBuilder groupObjBuilder;
@@ -94,10 +94,10 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
         if ("groupBy" == argName) {
             groupByField = argument;
 
-            const bool groupByIsExpressionInObject = groupByField.type() == BSONType::Object &&
+            const bool groupByIsExpressionInObject = groupByField.type() == BSONType::object &&
                 groupByField.embeddedObject().firstElementFieldNameStringData().starts_with('$');
 
-            const bool groupByIsPrefixedPath = groupByField.type() == BSONType::String &&
+            const bool groupByIsPrefixedPath = groupByField.type() == BSONType::string &&
                 groupByField.valueStringData().starts_with('$');
             uassert(40202,
                     str::stream() << "The $bucket 'groupBy' field must be defined as a $-prefixed "
@@ -109,7 +109,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                 40200,
                 str::stream() << "The $bucket 'boundaries' field must be an array, but found type: "
                               << typeName(argument.type()) << ".",
-                argument.type() == BSONType::Array);
+                argument.type() == BSONType::array);
 
             for (auto&& boundaryElem : argument.embeddedObject()) {
                 auto exprConst = getExpressionConstant(pExpCtx.get(), boundaryElem, vps);
@@ -166,7 +166,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                 40196,
                 str::stream() << "The $bucket 'output' field must be an object, but found type: "
                               << typeName(argument.type()) << ".",
-                argument.type() == BSONType::Object);
+                argument.type() == BSONType::object);
 
             for (auto&& outputElem : argument.embeddedObject()) {
                 groupObjBuilder.append(outputElem);

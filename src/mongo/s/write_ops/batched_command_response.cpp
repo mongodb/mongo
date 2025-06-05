@@ -196,11 +196,11 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, std::string* errMs
     _isLastOpSet = true;
     if (opTimeElement.eoo()) {
         _isLastOpSet = false;
-    } else if (opTimeElement.type() == bsonTimestamp) {
+    } else if (opTimeElement.type() == BSONType::timestamp) {
         _lastOp = repl::OpTime(opTimeElement.timestamp(), repl::OpTime::kUninitializedTerm);
-    } else if (opTimeElement.type() == Date) {
+    } else if (opTimeElement.type() == BSONType::date) {
         _lastOp = repl::OpTime(Timestamp(opTimeElement.date()), repl::OpTime::kUninitializedTerm);
-    } else if (opTimeElement.type() == Object) {
+    } else if (opTimeElement.type() == BSONType::object) {
         Status status = bsonExtractOpTimeField(source, "opTime", &_lastOp);
         if (!status.isOK()) {
             return false;

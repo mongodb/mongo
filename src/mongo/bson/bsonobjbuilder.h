@@ -197,7 +197,7 @@ public:
 
     /** add a subobject as a member */
     Derived& append(StringData fieldName, BSONObj subObj) {
-        _b.appendNum((char)Object);
+        _b.appendNum((char)BSONType::object);
         _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
         return asDerived();
@@ -212,7 +212,7 @@ public:
 
         MONGO_verify(size > 4 && size < 100000000);
 
-        _b.appendNum((char)Object);
+        _b.appendNum((char)BSONType::object);
         _b.appendCStr(fieldName);
         _b.appendBuf((void*)objdata, size);
         return asDerived();
@@ -230,7 +230,7 @@ public:
      *  // use b and convert to object
      */
     B& subobjStart(StringData fieldName) {
-        _b.appendNum((char)Object);
+        _b.appendNum((char)BSONType::object);
         _b.appendCStr(fieldName);
         return _b;
     }
@@ -239,7 +239,7 @@ public:
         style fields in it.
     */
     Derived& appendArray(StringData fieldName, const BSONObj& subObj) {
-        _b.appendNum((char)Array);
+        _b.appendNum((char)BSONType::array);
         _b.appendCStr(fieldName);
         _b.appendBuf((void*)subObj.objdata(), subObj.objsize());
         return asDerived();
@@ -251,14 +251,14 @@ public:
     /** add header for a new subarray and return bufbuilder for writing to
         the subarray's body */
     B& subarrayStart(StringData fieldName) {
-        _b.appendNum((char)Array);
+        _b.appendNum((char)BSONType::array);
         _b.appendCStr(fieldName);
         return _b;
     }
 
     /** Append a boolean element */
     Derived& appendBool(StringData fieldName, int val) {
-        _b.appendNum((char)Bool);
+        _b.appendNum((char)BSONType::boolean);
         _b.appendCStr(fieldName);
         _b.appendNum((char)(val ? 1 : 0));
         return asDerived();
@@ -270,9 +270,9 @@ public:
         constexpr BSONType type = BSONObjAppendFormat<T>::value;
         _b.appendNum(static_cast<char>(type));
         _b.appendCStr(fieldName);
-        if constexpr (type == Bool) {
+        if constexpr (type == BSONType::boolean) {
             _b.appendNum(static_cast<char>(n));
-        } else if constexpr (type == NumberInt) {
+        } else if constexpr (type == BSONType::numberInt) {
             _b.appendNum(static_cast<int>(n));
         } else {
             _b.appendNum(n);
@@ -318,7 +318,7 @@ public:
         method for this.
     */
     Derived& appendOID(StringData fieldName, OID* oid = nullptr, bool generateIfBlank = false) {
-        _b.appendNum((char)jstOID);
+        _b.appendNum((char)BSONType::oid);
         _b.appendCStr(fieldName);
         if (oid)
             _b.appendBuf(oid->view().view(), OID::kOIDSize);
@@ -339,7 +339,7 @@ public:
     @returns the builder object
     */
     Derived& append(StringData fieldName, OID oid) {
-        _b.appendNum((char)jstOID);
+        _b.appendNum((char)BSONType::oid);
         _b.appendCStr(fieldName);
         _b.appendBuf(oid.view().view(), OID::kOIDSize);
         return asDerived();
@@ -358,7 +358,7 @@ public:
         the number of seconds since January 1, 1970, 00:00:00 GMT
     */
     Derived& appendTimeT(StringData fieldName, time_t dt) {
-        _b.appendNum((char)Date);
+        _b.appendNum((char)BSONType::date);
         _b.appendCStr(fieldName);
         _b.appendNum(static_cast<unsigned long long>(dt) * 1000);
         return asDerived();
@@ -377,7 +377,7 @@ public:
         @param regex options such as "i" or "g"
     */
     Derived& appendRegex(StringData fieldName, StringData regex, StringData options = "") {
-        _b.appendNum((char)RegEx);
+        _b.appendNum((char)BSONType::regEx);
         _b.appendCStr(fieldName);
         _b.appendCStr(regex);
         _b.appendCStr(options);
@@ -389,7 +389,7 @@ public:
     }
 
     Derived& appendCode(StringData fieldName, StringData code) {
-        _b.appendNum((char)Code);
+        _b.appendNum((char)BSONType::code);
         _b.appendCStr(fieldName);
         _b.appendNum((int)code.size() + 1);
         _b.appendStrBytesAndNul(code);
@@ -403,7 +403,7 @@ public:
     /** Append a string element.
         @param sz size includes terminating null character */
     Derived& append(StringData fieldName, const char* str, int sz) {
-        _b.appendNum((char)String);
+        _b.appendNum((char)BSONType::string);
         _b.appendCStr(fieldName);
         _b.appendNum((int)sz);
         _b.appendBuf(str, sz);
@@ -415,7 +415,7 @@ public:
     }
     /** Append a string element */
     Derived& append(StringData fieldName, StringData str) {
-        _b.appendNum((char)String);
+        _b.appendNum((char)BSONType::string);
         _b.appendCStr(fieldName);
         _b.appendNum((int)str.size() + 1);
         _b.appendStrBytesAndNul(str);
@@ -423,7 +423,7 @@ public:
     }
 
     Derived& appendSymbol(StringData fieldName, StringData symbol) {
-        _b.appendNum((char)Symbol);
+        _b.appendNum((char)BSONType::symbol);
         _b.appendCStr(fieldName);
         _b.appendNum((int)symbol.size() + 1);
         _b.appendStrBytesAndNul(symbol);
@@ -436,20 +436,20 @@ public:
 
     /** Append a Null element to the object */
     Derived& appendNull(StringData fieldName) {
-        _b.appendNum((char)jstNULL);
+        _b.appendNum((char)BSONType::null);
         _b.appendCStr(fieldName);
         return asDerived();
     }
 
     // Append an element that is less than all other keys.
     Derived& appendMinKey(StringData fieldName) {
-        _b.appendNum((char)MinKey);
+        _b.appendNum((char)BSONType::minKey);
         _b.appendCStr(fieldName);
         return asDerived();
     }
     // Append an element that is greater than all other keys.
     Derived& appendMaxKey(StringData fieldName) {
-        _b.appendNum((char)MaxKey);
+        _b.appendNum((char)BSONType::maxKey);
         _b.appendCStr(fieldName);
         return asDerived();
     }
@@ -477,7 +477,7 @@ public:
     @deprecated
     */
     Derived& appendDBRef(StringData fieldName, StringData ns, const OID& oid) {
-        _b.appendNum((char)DBRef);
+        _b.appendNum((char)BSONType::dbRef);
         _b.appendCStr(fieldName);
         _b.appendNum((int)ns.size() + 1);
         _b.appendStrBytesAndNul(ns);
@@ -498,7 +498,7 @@ public:
         @param data the byte array
     */
     Derived& appendBinData(StringData fieldName, int len, BinDataType type, const void* data) {
-        _b.appendNum((char)BinData);
+        _b.appendNum((char)BSONType::binData);
         _b.appendCStr(fieldName);
         _b.appendNum(len);
         _b.appendNum((char)type);
@@ -518,7 +518,7 @@ public:
     @param len the length of data
     */
     Derived& appendBinDataArrayDeprecated(const char* fieldName, const void* data, int len) {
-        _b.appendNum((char)BinData);
+        _b.appendNum((char)BSONType::binData);
         _b.appendCStr(fieldName);
         _b.appendNum(len + 4);
         _b.appendNum((char)0x2);
@@ -532,7 +532,7 @@ public:
         fragment accompanied by some scope that goes with it.
     */
     Derived& appendCodeWScope(StringData fieldName, StringData code, const BSONObj& scope) {
-        _b.appendNum((char)CodeWScope);
+        _b.appendNum((char)BSONType::codeWScope);
         _b.appendCStr(fieldName);
         _b.appendNum((int)(4 + 4 + code.size() + 1 + scope.objsize()));
         _b.appendNum((int)code.size() + 1);
@@ -547,7 +547,7 @@ public:
     }
 
     Derived& appendUndefined(StringData fieldName) {
-        _b.appendNum((char)Undefined);
+        _b.appendNum((char)BSONType::undefined);
         _b.appendCStr(fieldName);
         return asDerived();
     }
@@ -701,7 +701,7 @@ protected:
             _streamListener->onDone();
 
         _b.claimReservedBytes(1);  // Prevents adding EOO from failing.
-        _b.appendNum((char)EOO);
+        _b.appendNum((char)BSONType::eoo);
 
         char* data = _b.buf() + _offset;
         int size = _b.len() - _offset;

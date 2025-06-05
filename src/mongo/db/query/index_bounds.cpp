@@ -278,8 +278,8 @@ bool OrderedIntervalList::boundsOverlapObjectTypeBracket() const {
     // both ends of the bracket because $** indexes support queries on empty objects and arrays.
     static const Interval objectTypeBracketBounds = []() {
         BSONObjBuilder objBracketBounds;
-        objBracketBounds.appendMinForType("", BSONType::Object);
-        objBracketBounds.appendMaxForType("", BSONType::Object);
+        objBracketBounds.appendMinForType("", stdx::to_underlying(BSONType::object));
+        objBracketBounds.appendMaxForType("", stdx::to_underlying(BSONType::object));
         return Interval(objBracketBounds.obj(), false /*startIncluded*/, false /*endIncluded*/);
     }();
 

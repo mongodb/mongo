@@ -128,7 +128,7 @@ private:
 Status RenameNode::init(BSONElement modExpr,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
-    invariant(BSONType::String == modExpr.type());
+    invariant(BSONType::string == modExpr.type());
 
     FieldRef fromFieldRef(modExpr.fieldName());
     FieldRef toFieldRef(modExpr.String());
@@ -212,7 +212,7 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
     for (auto currentElement = fromElement.parent(); currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
-        if (BSONType::Array == currentElement.getType()) {
+        if (BSONType::array == currentElement.getType()) {
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The source field cannot be an array element, '"
@@ -232,7 +232,7 @@ UpdateExecutor::ApplyResult RenameNode::apply(ApplyParams applyParams,
          currentElement != document.root();
          currentElement = currentElement.parent()) {
         invariant(currentElement.ok());
-        if (BSONType::Array == currentElement.getType()) {
+        if (BSONType::array == currentElement.getType()) {
             auto idElem = mutablebson::findFirstChildNamed(document.root(), "_id");
             uasserted(ErrorCodes::BadValue,
                       str::stream() << "The destination field cannot be an array element, '"

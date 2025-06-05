@@ -370,7 +370,7 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
 
     // The high water mark is stored in sort-key format: {"": <high watermark>}. We only return
     // the <high watermark> part of of the sort key, which looks like {_data: ..., _typeBits: ...}.
-    invariant(_highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::Object);
+    invariant(_highWaterMark.isEmpty() || _highWaterMark.firstElement().type() == BSONType::object);
     return _highWaterMark.isEmpty() ? BSONObj() : _highWaterMark.firstElement().Obj().getOwned();
 }
 
@@ -1395,7 +1395,7 @@ BSONObj AsyncResultsMerger::extractSortKey(const BSONObj& obj, bool compareWhole
     if (compareWholeSortKey) {
         return key.wrap();
     }
-    tassert(10359106, "expecting BSON type Array for sort keys", key.type() == BSONType::Array);
+    tassert(10359106, "expecting BSON type Array for sort keys", key.type() == BSONType::array);
     return key.embeddedObject();
 }
 

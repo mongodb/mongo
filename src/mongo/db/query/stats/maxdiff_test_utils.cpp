@@ -85,7 +85,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
 
     std::vector<BSONObj> rawPipeline;
     for (auto&& stageElem : inputBson["pipeline"].Array()) {
-        ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+        ASSERT_EQUALS(stageElem.type(), BSONType::object);
         rawPipeline.push_back(stageElem.embeddedObject());
     }
     return parsePipeline(rawPipeline, std::move(nss), opCtx);

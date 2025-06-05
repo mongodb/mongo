@@ -109,7 +109,7 @@ std::unique_ptr<Node> buildTreeFromEncryptedFieldPaths(
             }
         }
     }
-    root->type = BSONType::Object;
+    root->type = BSONType::object;
     return root;
 }
 
@@ -144,7 +144,7 @@ std::unique_ptr<MatchExpression> createObjectExpression(
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
     auto orExpr = std::make_unique<OrMatchExpression>(
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
-    orExpr->add(createNotTypeExpression(expCtx, BSONType::Object, path));
+    orExpr->add(createNotTypeExpression(expCtx, BSONType::object, path));
     orExpr->add(std::move(objectMatch));
     return orExpr;
 }
@@ -215,7 +215,7 @@ std::unique_ptr<MatchExpression> treeToMatchExpression(
         expCtx, "_property", BSON("propertyName" << node.name)));
     andExpr->add(createObjectExpression(expCtx, node.name, std::move(subschema)));
     andExpr->add(
-        createNotTypeExpression(expCtx, BSONType::Array, node.name, false /* ignoreError */));
+        createNotTypeExpression(expCtx, BSONType::array, node.name, false /* ignoreError */));
     return andExpr;
 }
 

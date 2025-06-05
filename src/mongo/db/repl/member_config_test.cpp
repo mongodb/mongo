@@ -817,7 +817,7 @@ TEST(MemberConfig, ParseEmptyTags) {
     ASSERT_FALSE(mc.hasTags());
     BSONObj obj = mc.toBSON();
     BSONElement tagField = obj.getField("tags");
-    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.type() == BSONType::object);
     ASSERT_TRUE(tagField.Obj().isEmpty());
 }
 
@@ -828,7 +828,7 @@ TEST(MemberConfig, TagsSerializedWhenMissing) {
                     &tagConfig);
     BSONObj obj = mc.toBSON();
     BSONElement tagField = obj.getField("tags");
-    ASSERT_TRUE(tagField.type() == Object);
+    ASSERT_TRUE(tagField.type() == BSONType::object);
     ASSERT_TRUE(tagField.Obj().isEmpty());
 }
 

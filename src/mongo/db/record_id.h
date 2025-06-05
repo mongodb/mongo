@@ -431,7 +431,7 @@ public:
             return RecordId();
         } else if (elem.isNumber()) {
             return RecordId(elem.numberLong());
-        } else if (elem.type() == BSONType::BinData) {
+        } else if (elem.type() == BSONType::binData) {
             int size;
             auto str = elem.binData(size);
             return RecordId(std::span(str, size));

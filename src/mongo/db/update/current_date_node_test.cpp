@@ -48,7 +48,7 @@ namespace {
 
 void assertOplogEntryIsUpdateOfExpectedType(const BSONObj& obj,
                                             StringData fieldName,
-                                            BSONType expectedType = BSONType::Date) {
+                                            BSONType expectedType = BSONType::date) {
     ASSERT_EQUALS(obj.nFields(), 2);
     ASSERT_EQUALS(obj["$v"].numberInt(), 2);
     ASSERT_EQUALS(obj["diff"]["u"][fieldName].type(), expectedType);
@@ -150,7 +150,7 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
     assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
@@ -170,7 +170,7 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
     assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
@@ -190,7 +190,7 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
     assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
@@ -210,9 +210,9 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::bsonTimestamp);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::timestamp);
 
-    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a", BSONType::bsonTimestamp);
+    assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a", BSONType::timestamp);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
@@ -230,11 +230,11 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 
     ASSERT_EQUALS(getOplogEntry().nFields(), 2);
     ASSERT_EQUALS(getOplogEntry()["$v"].numberInt(), 2);
-    ASSERT_EQUALS(getOplogEntry()["diff"]["i"]["a"].type(), BSONType::Date);
+    ASSERT_EQUALS(getOplogEntry()["diff"]["i"]["a"].type(), BSONType::date);
 }
 
 TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
@@ -268,7 +268,7 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
-    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::Date);
+    ASSERT_EQUALS(doc.root()["a"].getType(), BSONType::date);
 }
 
 }  // namespace

@@ -129,23 +129,23 @@ public:
         // Increments the pointer to the actual element value.
         BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
-            case BSONType::Undefined:
-            case BSONType::DBRef:
-            case BSONType::Symbol:
-            case BSONType::CodeWScope:
+            case stdx::to_underlying(BSONType::undefined):
+            case stdx::to_underlying(BSONType::dbRef):
+            case stdx::to_underlying(BSONType::symbol):
+            case stdx::to_underlying(BSONType::codeWScope):
                 uasserted(NonConformantBSON, fmt::format("Use of deprecated BSON type {}", type));
                 break;
-            case BSONType::Array:
+            case stdx::to_underlying(BSONType::array):
                 addIndexLevel(true /* isArr */);
                 break;
-            case BSONType::Object:
+            case stdx::to_underlying(BSONType::object):
                 addIndexLevel(false /* isArr */);
                 break;
-            case BSONType::RegEx: {
+            case stdx::to_underlying(BSONType::regEx): {
                 _checkRegexOptions(bsonElemVal);
                 break;
             }
-            case BSONType::BinData: {
+            case stdx::to_underlying(BSONType::binData): {
                 auto binData = bsonElemVal.BinData();
                 auto subtype = binData.type;
                 switch (subtype) {
@@ -324,15 +324,15 @@ public:
         // Increments the pointer to the actual element value.
         BSONElementValue bsonElemVal(ptr + offsetToValue);
         switch (type) {
-            case BSONType::Array: {
+            case stdx::to_underlying(BSONType::array): {
                 objFrames.push_back({std::vector<StringData>(), false});
                 break;
             }
-            case BSONType::Object: {
+            case stdx::to_underlying(BSONType::object): {
                 objFrames.push_back({std::vector<StringData>(), true});
                 break;
             };
-            case BSONType::BinData: {
+            case stdx::to_underlying(BSONType::binData): {
                 auto subtype = bsonElemVal.BinData().type;
                 switch (subtype) {
                     case BinDataType::Column: {
@@ -354,7 +354,7 @@ public:
                 }
                 break;
             }
-            case BSONType::String: {
+            case stdx::to_underlying(BSONType::string): {
                 // Increment pointer to actual value and then four more to skip size.
                 checkUTF8Char(bsonElemVal.String());
             }
@@ -579,7 +579,7 @@ private:
 
     const char* _validateSpecial(Cursor cursor, uint8_t type) {
         switch (type) {
-            case BSONType::BinData: {
+            case stdx::to_underlying(BSONType::binData): {
                 auto count = cursor.template read<uint32_t>();
                 auto subtype = cursor.template read<uint8_t>();
                 const char* columnStart = cursor.ptr;
@@ -594,21 +594,22 @@ private:
                 }
                 break;
             }
-            case BSONType::Bool:
+            case stdx::to_underlying(BSONType::boolean):
                 if (auto value = cursor.template read<uint8_t>())  // If not 0, must be 1.
                     uassert(InvalidBSON, "BSON bool is neither false nor true", value == 1);
                 break;
-            case BSONType::RegEx:
+            case stdx::to_underlying(BSONType::regEx):
                 cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
                 cursor.skip(cursor.strlen() + 1);  // Skip regular expression cstring.
                 cursor.skip(cursor.strlen() + 1);  // Skip options cstring.
                 break;
-            case BSONType::DBRef:
+            case stdx::to_underlying(BSONType::dbRef):
                 cursor.skipString();  // Like String, but...
                 cursor.skip(12);      // ...also skip the 12-byte ObjectId.
                 break;
-            case static_cast<uint8_t>(BSONType::MinKey):  // Need to cast, as MinKey is negative.
-            case BSONType::MaxKey:
+            case static_cast<uint8_t>(
+                stdx::to_underlying(BSONType::minKey)):  // Need to cast, as MinKey is negative.
+            case stdx::to_underlying(BSONType::maxKey):
                 cursor.skip(0);  // Force validation of the ptr after skipping past the field name.
                 break;
             default:
@@ -632,7 +633,8 @@ private:
     void _maybePopCodeWithScope(Cursor cursor) {
         if constexpr (precise) {
             // When ending the scope of a CodeWScope, pop the extra dummy frame and check its size.
-            if (_currFrame != _frames.begin() && (_currFrame - 1)->elem.type() == CodeWScope) {
+            if (_currFrame != _frames.begin() &&
+                (_currFrame - 1)->elem.type() == BSONType::codeWScope) {
                 invariant(_popFrame());
                 uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
             }
@@ -641,7 +643,7 @@ private:
 
     template <bool nestedFrame>
     const char* _validateElem(Cursor cursor, uint8_t type) {
-        if (MONGO_unlikely(type > JSTypeMax))
+        if (MONGO_unlikely(type > stdx::to_underlying(BSONType::jsTypeMax)))
             return _validateSpecial(cursor, type);
 
         auto style = kTypeInfoTable[type];
@@ -656,7 +658,7 @@ private:
                 cursor.ptr = _updateFrame(cursor);
                 _firstFrameUpdated = true;
             }
-        } else if (MONGO_unlikely(precise && type == CodeWScope)) {
+        } else if (MONGO_unlikely(precise && type == stdx::to_underlying(BSONType::codeWScope))) {
             cursor.ptr = _pushCodeWithScope<nestedFrame>(cursor);
             if constexpr (!nestedFrame)
                 _firstFrameUpdated = true;
@@ -774,11 +776,11 @@ public:
             // Check this beforehand to ensure we cannot overflow the buffer with any strlen
             uassert(NonConformantBSON,
                     "BSON column is missing EOO termination",
-                    ptr < end && *(end - 1) == EOO);
+                    ptr < end && *(end - 1) == stdx::to_underlying(BSONType::eoo));
 
             while (ptr < end) {
                 uint8_t control = *ptr;
-                if (control == EOO) {
+                if (control == stdx::to_underlying(BSONType::eoo)) {
                     ptr++;
                     if (interleavedMode) {
                         interleavedMode = false;

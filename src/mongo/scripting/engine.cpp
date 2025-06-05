@@ -107,59 +107,59 @@ Scope::~Scope() {}
 void Scope::append(BSONObjBuilder& builder, const char* fieldName, const char* scopeName) {
     int t = type(scopeName);
     switch (t) {
-        case Object:
+        case stdx::to_underlying(BSONType::object):
             builder.append(fieldName, getObject(scopeName));
             break;
-        case Array:
+        case stdx::to_underlying(BSONType::array):
             builder.appendArray(fieldName, getObject(scopeName));
             break;
-        case NumberDouble:
+        case stdx::to_underlying(BSONType::numberDouble):
             builder.append(fieldName, getNumber(scopeName));
             break;
-        case NumberInt:
+        case stdx::to_underlying(BSONType::numberInt):
             builder.append(fieldName, getNumberInt(scopeName));
             break;
-        case NumberLong:
+        case stdx::to_underlying(BSONType::numberLong):
             builder.append(fieldName, getNumberLongLong(scopeName));
             break;
-        case NumberDecimal:
+        case stdx::to_underlying(BSONType::numberDecimal):
             builder.append(fieldName, getNumberDecimal(scopeName));
             break;
-        case String:
+        case stdx::to_underlying(BSONType::string):
             builder.append(fieldName, getString(scopeName));
             break;
-        case Bool:
+        case stdx::to_underlying(BSONType::boolean):
             builder.appendBool(fieldName, getBoolean(scopeName));
             break;
-        case jstNULL:
-        case Undefined:
+        case stdx::to_underlying(BSONType::null):
+        case stdx::to_underlying(BSONType::undefined):
             builder.appendNull(fieldName);
             break;
-        case Date:
+        case stdx::to_underlying(BSONType::date):
             builder.appendDate(fieldName,
                                Date_t::fromMillisSinceEpoch(getNumberLongLong(scopeName)));
             break;
-        case Code:
+        case stdx::to_underlying(BSONType::code):
             builder.appendCode(fieldName, getString(scopeName));
             break;
-        case jstOID:
+        case stdx::to_underlying(BSONType::oid):
             builder.append(fieldName, getOID(scopeName));
             break;
-        case BinData:
+        case stdx::to_underlying(BSONType::binData):
             getBinData(scopeName, [&fieldName, &builder](const BSONBinData& binData) {
                 builder.append(fieldName, binData);
             });
             break;
-        case bsonTimestamp:
+        case stdx::to_underlying(BSONType::timestamp):
             builder.append(fieldName, getTimestamp(scopeName));
             break;
-        case MinKey:
+        case stdx::to_underlying(BSONType::minKey):
             builder.appendMinKey(fieldName);
             break;
-        case MaxKey:
+        case stdx::to_underlying(BSONType::maxKey):
             builder.appendMaxKey(fieldName);
             break;
-        case RegEx: {
+        case stdx::to_underlying(BSONType::regEx): {
             auto regEx = getRegEx(scopeName);
             builder.append(fieldName, BSONRegEx{regEx.pattern, regEx.flags});
             break;
@@ -277,14 +277,14 @@ void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
         BSONElement v = o["value"];
 
         uassert(
-            10209, str::stream() << "name has to be a string: " << n, n.type() == BSONType::String);
-        uassert(10210, "value has to be set", v.type() != BSONType::EOO);
+            10209, str::stream() << "name has to be a string: " << n, n.type() == BSONType::string);
+        uassert(10210, "value has to be set", v.type() != BSONType::eoo);
 
         uassert(4546000,
                 str::stream() << "BSON type 'CodeWithScope' not supported in system.js scripts. As "
                                  "an alternative use 'Code'. Script _id value: '"
                               << n.String() << "'",
-                v.type() != BSONType::CodeWScope);
+                v.type() != BSONType::codeWScope);
 
         if (MONGO_unlikely(mr_killop_test_fp.shouldFail())) {
             LOGV2(5062200, "Pausing mr_killop_test_fp for system.js entry", "entryName"_attr = n);

@@ -166,15 +166,15 @@ void ServerParameterSet::add(std::unique_ptr<ServerParameter> sp) {
 
 StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& element) {
     switch (element.type()) {
-        case NumberDouble:
+        case BSONType::numberDouble:
             return std::to_string(element.Double());
-        case String:
+        case BSONType::string:
             return element.String();
-        case NumberInt:
+        case BSONType::numberInt:
             return std::to_string(element.Int());
-        case NumberLong:
+        case BSONType::numberLong:
             return std::to_string(element.Long());
-        case Date:
+        case BSONType::date:
             return dateToISOStringLocal(element.Date());
         default:
             std::string diag;

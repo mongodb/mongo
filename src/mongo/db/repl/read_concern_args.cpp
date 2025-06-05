@@ -195,7 +195,7 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
 
     dassert(readConcernElem.fieldNameStringData() == kReadConcernFieldName);
 
-    if (readConcernElem.type() != Object) {
+    if (readConcernElem.type() != BSONType::object) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << kReadConcernFieldName << " field should be an object");
     }

@@ -275,7 +275,7 @@ StatusWith<BSONObj> ReplicaSetNodeProcessInterface::_executeCommandOnPrimary(
     // primary's response.
     auto operationTime = rcr.response.data[kOperationTimeFieldName];
     if (operationTime) {
-        invariant(operationTime.type() == BSONType::bsonTimestamp);
+        invariant(operationTime.type() == BSONType::timestamp);
         LogicalTime logicalTime(operationTime.timestamp());
         auto operationTimeTracker = OperationTimeTracker::get(opCtx);
         operationTimeTracker->updateOperationTime(logicalTime);

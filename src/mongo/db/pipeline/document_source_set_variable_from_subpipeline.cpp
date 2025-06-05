@@ -87,7 +87,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
         str::stream()
             << "the $setVariableFromSubPipeline stage specification must be an object, but found "
             << typeName(elem.type()),
-        elem.type() == BSONType::Object);
+        elem.type() == BSONType::object);
 
     auto spec =
         SetVariableFromSubPipelineSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());

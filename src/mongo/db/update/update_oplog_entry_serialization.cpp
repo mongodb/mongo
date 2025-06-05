@@ -55,7 +55,7 @@ boost::optional<BSONObj> extractDiffFromOplogEntry(const BSONObj& opLog) {
     if (version.ok() &&
         version.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
         auto diff = opLog[kDiffObjectFieldName];
-        if (diff.type() == BSONType::Object) {
+        if (diff.type() == BSONType::object) {
             return diff.embeddedObject();
         }
     }
@@ -67,7 +67,7 @@ BSONElement extractNewValueForFieldFromV2Entry(const BSONObj& oField, StringData
     auto diffField = oField[kDiffObjectFieldName];
 
     // Every $v:2 oplog entry should have a 'diff' field that is an object.
-    invariant(diffField.type() == BSONType::Object);
+    invariant(diffField.type() == BSONType::object);
     doc_diff::DocumentDiffReader reader(diffField.embeddedObject());
 
     boost::optional<BSONElement> nextMod;
@@ -85,7 +85,7 @@ FieldRemovedStatus isFieldRemovedByV2Update(const BSONObj& oField, StringData fi
     auto diffField = oField[kDiffObjectFieldName];
 
     // Every $v:2 oplog entry should have a 'diff' field that is an object.
-    invariant(diffField.type() == BSONType::Object);
+    invariant(diffField.type() == BSONType::object);
     doc_diff::DocumentDiffReader reader(diffField.embeddedObject());
 
     boost::optional<StringData> nextDelete;

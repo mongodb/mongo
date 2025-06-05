@@ -692,20 +692,20 @@ TEST(ExpressionSubtractTest, OverflowLong) {
     BSONObj obj = BSON("$subtract" << BSON_ARRAY(maxLong << minLong));
     auto expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     Value result = expression->evaluate({}, &expCtx.variables);
-    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(result.getType(), BSONType::numberDouble);
     ASSERT_EQ(result.getDouble(), static_cast<double>(maxLong) - minLong);
 
     obj = BSON("$subtract" << BSON_ARRAY(minLong << maxLong));
     expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     result = expression->evaluate({}, &expCtx.variables);
-    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(result.getType(), BSONType::numberDouble);
     ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) - static_cast<double>(maxLong));
 
     // minLong = -1 - maxLong. The below subtraction should fit into long long data type.
     obj = BSON("$subtract" << BSON_ARRAY(-1 << maxLong));
     expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     result = expression->evaluate({}, &expCtx.variables);
-    ASSERT_EQ(result.getType(), BSONType::NumberLong);
+    ASSERT_EQ(result.getType(), BSONType::numberLong);
     ASSERT_EQ(result.getLong(), -1LL - maxLong);
 
     // The minLong's negation does not fit into long long, hence it should be converted to double
@@ -713,7 +713,7 @@ TEST(ExpressionSubtractTest, OverflowLong) {
     obj = BSON("$subtract" << BSON_ARRAY(0 << minLong));
     expression = Expression::parseExpression(&expCtx, obj, expCtx.variablesParseState);
     result = expression->evaluate({}, &expCtx.variables);
-    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(result.getType(), BSONType::numberDouble);
     ASSERT_EQ(result.getDouble(), static_cast<double>(minLong) * -1);
 }
 
@@ -774,10 +774,10 @@ double randomDouble() {
  */
 void verifyStringDoubleConvertRoundtripsCorrectly(double doubleToConvert) {
     Value doubleConvertedToString = evaluateExpression("$toString", {doubleToConvert});
-    ASSERT_EQ(doubleConvertedToString.getType(), BSONType::String);
+    ASSERT_EQ(doubleConvertedToString.getType(), BSONType::string);
 
     Value stringConvertedToDouble = evaluateExpression("$toDouble", {doubleConvertedToString});
-    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(stringConvertedToDouble.getType(), BSONType::numberDouble);
 
     // Verify the conversion round-trips correctly.
     ASSERT_VALUE_EQ(stringConvertedToDouble, Value(doubleToConvert));

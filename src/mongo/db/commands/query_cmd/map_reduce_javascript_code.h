@@ -48,7 +48,7 @@ public:
         uassert(ErrorCodes::BadValue,
                 str::stream() << "'" << element.fieldNameStringData()
                               << "' must be of string or code type",
-                element.type() == String || element.type() == Code);
+                element.type() == BSONType::string || element.type() == BSONType::code);
         return MapReduceJavascriptCode(element._asCode());
     }
 
@@ -74,13 +74,13 @@ private:
 class MapReduceJavascriptCodeOrNull {
 public:
     static MapReduceJavascriptCodeOrNull parseFromBSON(const BSONElement& element) {
-        if (element.type() == jstNULL) {
+        if (element.type() == BSONType::null) {
             return MapReduceJavascriptCodeOrNull(boost::none);
         }
         uassert(ErrorCodes::BadValue,
                 str::stream() << "'" << element.fieldNameStringData()
                               << "' must be of string or code type",
-                element.type() == String || element.type() == Code);
+                element.type() == BSONType::string || element.type() == BSONType::code);
         return MapReduceJavascriptCodeOrNull(boost::make_optional(element._asCode()));
     }
 

@@ -617,7 +617,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
 
     while (ptr < end) {
         control = *ptr;
-        if (control == EOO) {
+        if (control == stdx::to_underlying(BSONType::eoo)) {
             uassert(
                 8517800, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
             break;
@@ -629,7 +629,7 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> a
             BSONType type = literal.type();
             ptr += literal.size();
             switch (type) {
-                case Object: {
+                case BSONType::object: {
                     const auto obj = literal.Obj();
                     // TODO(SERVER-88217) Remove when we can evaluate paths in arbitrary objects.
                     invariant(obj.isEmpty() ||

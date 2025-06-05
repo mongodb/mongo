@@ -630,14 +630,14 @@ BSONObj ReadTestPipes(const BSONObj& args, void* unused) {
 
     do {
         pipePathElem = BSONElement(args.getField(std::to_string(fieldNum)));
-        if (pipePathElem.type() == BSONType::String) {
+        if (pipePathElem.type() == BSONType::string) {
             pipeRelativePaths.emplace_back(pipePathElem.str());
-        } else if (pipePathElem.type() != BSONType::EOO) {
+        } else if (pipePathElem.type() != BSONType::eoo) {
             uasserted(ErrorCodes::FailedToParse,
                       fmt::format("Argument {} (pipe path) must be a string", fieldNum));
         }
         ++fieldNum;
-    } while (pipePathElem.type() != BSONType::EOO);
+    } while (pipePathElem.type() != BSONType::eoo);
 
     if (pipeRelativePaths.size() > 0) {
         return NamedPipeHelper::readFromPipes(pipeRelativePaths);
@@ -671,7 +671,7 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
 
     uassert(ErrorCodes::FailedToParse,
             "First argument (pipe path) must be a string",
-            pipePathElem.type() == BSONType::String);
+            pipePathElem.type() == BSONType::string);
     uassert(ErrorCodes::FailedToParse,
             "Second argument (number of objects) must be a number",
             objectsElem.isNumber());
@@ -702,7 +702,7 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
             BSONElement pipeDirElem(args.getField("4"));
             uassert(ErrorCodes::FailedToParse,
                     "Fifth argument (pipe dir) must be a string",
-                    pipeDirElem.type() == BSONType::String);
+                    pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
             return kDefaultPipePath.toString();
@@ -757,20 +757,20 @@ BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
 
     uassert(ErrorCodes::FailedToParse,
             "First argument (pipe path) must be a string",
-            pipePathElem.type() == BSONType::String);
+            pipePathElem.type() == BSONType::string);
     uassert(ErrorCodes::FailedToParse,
             "Second argument (number of objects) must be a number",
             objectsElem.isNumber());
     uassert(ErrorCodes::FailedToParse,
             "Third argument (BSON file path) must be a string",
-            bsonFilePathElem.type() == BSONType::String);
+            bsonFilePathElem.type() == BSONType::string);
 
     std::string pipeDir = [&] {
         if (nFields == 4) {
             BSONElement pipeDirElem(args.getField("3"));
             uassert(ErrorCodes::FailedToParse,
                     "Fourth argument (pipe dir) must be a string",
-                    pipeDirElem.type() == BSONType::String);
+                    pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
             return kDefaultPipePath.toString();
@@ -868,20 +868,20 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
 
     uassert(ErrorCodes::FailedToParse,
             "First argument (pipe path) must be a string",
-            pipePathElem.type() == BSONType::String);
+            pipePathElem.type() == BSONType::string);
     uassert(ErrorCodes::FailedToParse,
             "Second argument (number of objects) must be a number",
             objectsElem.isNumber());
     uassert(ErrorCodes::FailedToParse,
             "Third argument must be an array of objects to round-robin over",
-            bsonElems.type() == mongo::Array);
+            bsonElems.type() == BSONType::array);
 
     std::string pipeDir = [&] {
         if (nFields >= 4) {
             BSONElement pipeDirElem(args.getField("3"));
             uassert(ErrorCodes::FailedToParse,
                     "Fourth argument (pipe dir) must be a string",
-                    pipeDirElem.type() == BSONType::String);
+                    pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
             return kDefaultPipePath.toString();
@@ -893,7 +893,7 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
             BSONElement persistPipeElem(args.getField("4"));
             uassert(ErrorCodes::FailedToParse,
                     "Fifth argument (persistPipe) must be a bool",
-                    persistPipeElem.type() == BSONType::Bool);
+                    persistPipeElem.type() == BSONType::boolean);
             return persistPipeElem.boolean();
         } else {
             return false;

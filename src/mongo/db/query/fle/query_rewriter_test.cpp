@@ -939,7 +939,7 @@ public:
                         StringData jsonArray) {
         const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
 
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
+        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         expCtx->setNamespaceString(nss);
         return Pipeline::parse(rawPipeline, expCtx);

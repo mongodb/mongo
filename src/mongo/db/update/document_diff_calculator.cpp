@@ -89,7 +89,7 @@ std::unique_ptr<diff_tree::ArrayNode> computeArrayDiff(const BSONObj& pre,
             // If both are arrays or objects, then recursively compute the diff of the respective
             // array or object.
             if (preVal.type() == postVal.type() &&
-                (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
+                (preVal.type() == BSONType::object || preVal.type() == BSONType::array)) {
                 calculateSubDiffHelper(
                     preVal, postVal, nFieldsInPostArray, diffNode.get(), ignoreSizeLimit);
             } else {
@@ -153,7 +153,7 @@ std::unique_ptr<diff_tree::DocumentSubDiffNode> computeDocDiff(const BSONObj& pr
         auto postVal = *postItr;
         if (preVal.fieldNameStringData() == postVal.fieldNameStringData()) {
             if (preVal.type() == postVal.type() &&
-                (preVal.type() == BSONType::Object || preVal.type() == BSONType::Array)) {
+                (preVal.type() == BSONType::object || preVal.type() == BSONType::array)) {
                 // Both are either arrays or objects, recursively compute the diff of the respective
                 // array or object.
                 calculateSubDiffHelper(
@@ -205,7 +205,7 @@ void calculateSubDiffHelper(const BSONElement& preVal,
                             T fieldIdentifier,
                             Node* diffNode,
                             bool ignoreSizeLimit) {
-    auto subDiff = (preVal.type() == BSONType::Object)
+    auto subDiff = (preVal.type() == BSONType::object)
         ? std::unique_ptr<diff_tree::InternalNode>(
               computeDocDiff(preVal.embeddedObject(), postVal.embeddedObject(), ignoreSizeLimit))
         : std::unique_ptr<diff_tree::InternalNode>(
@@ -245,7 +245,7 @@ void appendFieldNested(std::variant<mutablebson::Element, BSONElement> elt,
     visit(OverloadedVisitor{
               [&](const mutablebson::Element& element) {
                   auto fieldName = element.getFieldName();
-                  if (element.getType() == BSONType::Object) {
+                  if (element.getType() == BSONType::object) {
                       auto elementObj = element.getValueObject();
                       if (!elementObj.isEmpty()) {
                           BSONObjBuilder subBob(bob->subobjStart(fieldName));
@@ -259,7 +259,7 @@ void appendFieldNested(std::variant<mutablebson::Element, BSONElement> elt,
               },
               [&](BSONElement element) {
                   auto fieldName = element.fieldNameStringData();
-                  if (element.type() == BSONType::Object) {
+                  if (element.type() == BSONType::object) {
                       auto elementObj = element.Obj();
                       if (!elementObj.isEmpty()) {
                           BSONObjBuilder subBob(bob->subobjStart(fieldName));

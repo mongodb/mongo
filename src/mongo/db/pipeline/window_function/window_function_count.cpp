@@ -67,7 +67,7 @@ boost::intrusive_ptr<window_function::Expression> parseCountWindowFunction(
                     !accumulatorName);
             uassert(ErrorCodes::FailedToParse,
                     "$count only accepts an empty object as input",
-                    arg.type() == BSONType::Object && arg.Obj().isEmpty());
+                    arg.type() == BSONType::object && arg.Obj().isEmpty());
 
             accumulatorName = argName;
         } else {

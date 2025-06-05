@@ -518,7 +518,7 @@ private:
 
     /// Used by MutableDocument(MutableValue)
     const RefCountable*& getDocPtr() {
-        if (_val.getType() != Object || _val._storage.genericRCPtr == nullptr) {
+        if (_val.getType() != BSONType::object || _val._storage.genericRCPtr == nullptr) {
             // If the current value isn't an object we replace it with a Object-typed Value.
             // Note that we can't just use Document() here because that is a NULL pointer and
             // Value doesn't refcount NULL pointers. This led to a memory leak (SERVER-10554)

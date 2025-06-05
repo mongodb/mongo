@@ -83,7 +83,7 @@ DocumentSourceChangeStreamSplitLargeEvent::createFromBson(
     // We expect an empty object spec for this stage.
     uassert(7182800,
             "$changeStreamSplitLargeEvent spec should be an empty object",
-            rawSpec.type() == BSONType::Object && rawSpec.Obj().isEmpty());
+            rawSpec.type() == BSONType::object && rawSpec.Obj().isEmpty());
 
     // If there is no change stream spec set on the expression context, then this cannot be a change
     // stream pipeline. Pipeline validation will catch this issue later during parsing.

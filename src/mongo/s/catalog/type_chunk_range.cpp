@@ -50,7 +50,7 @@ namespace {
 
 bool allElementsAreMaxKey(const BSONObj& obj) {
     for (auto&& elem : obj) {
-        if (elem.type() != MaxKey) {
+        if (elem.type() != BSONType::maxKey) {
             return false;
         }
     }

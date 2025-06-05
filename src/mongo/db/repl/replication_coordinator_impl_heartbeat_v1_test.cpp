@@ -1395,7 +1395,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     auto statusObj = statusBuilder.obj();
     LOGV2(21495, "replica set status = {statusObj}", "statusObj"_attr = statusObj);
 
-    ASSERT_EQ(mongo::Array, statusObj["members"].type());
+    ASSERT_EQ(mongo::BSONType::array, statusObj["members"].type());
     auto members = statusObj["members"].Array();
     ASSERT_EQ(2U, members.size());
     ASSERT_TRUE(members[1].isABSONObj());

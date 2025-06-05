@@ -234,7 +234,7 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
                                                     VariablesParseState vps) {
     uassert(ErrorCodes::TypeMismatch,
             "$count takes no arguments, i.e. $count:{}",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     const Value constantAddend = Value(1);
     auto argument = ExpressionConstant::create(expCtx, constantAddend);

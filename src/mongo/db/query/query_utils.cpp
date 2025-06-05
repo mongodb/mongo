@@ -96,7 +96,7 @@ bool isSimpleIdQuery(const BSONObj& query) {
             // Verify that the query on _id is a simple equality.
             hasID = true;
 
-            if (elt.type() == Object) {
+            if (elt.type() == BSONType::object) {
                 // If the value is an object, it can only have one field and that field can only be
                 // a query operator if the operator is $eq.
                 if (elt.Obj().firstElementFieldNameStringData().starts_with('$')) {

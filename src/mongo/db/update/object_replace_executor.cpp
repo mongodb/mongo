@@ -75,7 +75,7 @@ ObjectReplaceExecutor::ObjectReplaceExecutor(BSONObj replacement, bool bypassEmp
         // exactly as it was recorded (even if it contains zero-valued timestamps). Therefore,
         // we should only replace zero-valued timestamps with the current time when
         // '_bypassEmptyTsReplacement' is false.
-        if (!_bypassEmptyTsReplacement && elem.type() == BSONType::bsonTimestamp) {
+        if (!_bypassEmptyTsReplacement && elem.type() == BSONType::timestamp) {
             auto timestampView = DataView(const_cast<char*>(elem.value()));
 
             // We don't need to do an endian-safe read here, because 0 is 0 either way.
@@ -148,7 +148,7 @@ UpdateExecutor::ApplyResult ObjectReplaceExecutor::applyReplacementUpdate(
                         << "After applying the update to the document, the (immutable) field '"
                         << (*path)->dottedField()
                         << "' was found to be an array or array descendant.",
-                    newElem.getType() != BSONType::Array);
+                    newElem.getType() != BSONType::array);
         }
 
         auto oldElem = bson::extractElementAtDottedPath(originalDoc, (*path)->dottedField());

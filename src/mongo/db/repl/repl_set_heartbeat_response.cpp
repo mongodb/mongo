@@ -130,7 +130,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement replSetNameElement = doc[kReplSetFieldName];
     if (replSetNameElement.eoo()) {
         _setName.clear();
-    } else if (replSetNameElement.type() != String) {
+    } else if (replSetNameElement.type() != BSONType::string) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kReplSetFieldName
                                     << "\" field in response to replSetHeartbeat to have "
@@ -143,7 +143,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement electionTimeElement = doc[kElectionTimeFieldName];
     if (electionTimeElement.eoo()) {
         _electionTimeSet = false;
-    } else if (electionTimeElement.type() == Date) {
+    } else if (electionTimeElement.type() == BSONType::date) {
         _electionTimeSet = true;
         _electionTime = Timestamp(electionTimeElement.date());
     } else {
@@ -167,7 +167,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     BSONElement durableWallTimeElement;
     _durableWallTime = Date_t();
     status = bsonExtractTypedField(
-        doc, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
+        doc, kDurableWallTimeFieldName, BSONType::date, &durableWallTimeElement);
     if (!status.isOK()) {
         return status;
     }
@@ -190,7 +190,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     BSONElement appliedWallTimeElement;
     _appliedWallTime = Date_t();
     status = bsonExtractTypedField(
-        doc, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
+        doc, kAppliedWallTimeFieldName, BSONType::date, &appliedWallTimeElement);
     if (!status.isOK()) {
         return status;
     }
@@ -209,7 +209,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     BSONElement writtenWallTimeElement;
     _writtenWallTime = Date_t();
     status = bsonExtractTypedField(
-        doc, kWrittenWallTimeFieldName, BSONType::Date, &writtenWallTimeElement);
+        doc, kWrittenWallTimeFieldName, BSONType::date, &writtenWallTimeElement);
     if (!status.isOK()) {
         if (status.code() == ErrorCodes::NoSuchKey) {
             _writtenWallTime = _appliedWallTime;
@@ -224,7 +224,8 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement memberStateElement = doc[kMemberStateFieldName];
     if (memberStateElement.eoo()) {
         _stateSet = false;
-    } else if (memberStateElement.type() != NumberInt && memberStateElement.type() != NumberLong) {
+    } else if (memberStateElement.type() != BSONType::numberInt &&
+               memberStateElement.type() != BSONType::numberLong) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream()
                           << "Expected \"" << kMemberStateFieldName
@@ -251,7 +252,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
                       str::stream() << "Response to replSetHeartbeat missing required \""
                                     << kConfigVersionFieldName << "\" field");
     }
-    if (configVersionElement.type() != NumberInt) {
+    if (configVersionElement.type() != BSONType::numberInt) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kConfigVersionFieldName
                                     << "\" field in response to replSetHeartbeat to have "
@@ -262,14 +263,14 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
 
     // Allow a missing term field for backward compatibility.
     const BSONElement configTermElement = doc[kConfigTermFieldName];
-    if (!configTermElement.eoo() && configVersionElement.type() == NumberInt) {
+    if (!configTermElement.eoo() && configVersionElement.type() == BSONType::numberInt) {
         _configTerm = configTermElement.numberInt();
     }
 
     const BSONElement syncingToElement = doc[kSyncSourceFieldName];
     if (syncingToElement.eoo()) {
         _syncingTo = HostAndPort();
-    } else if (syncingToElement.type() != String) {
+    } else if (syncingToElement.type() != BSONType::string) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kSyncSourceFieldName
                                     << "\" field in response to replSetHeartbeat to "
@@ -284,7 +285,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _configSet = false;
         _config = ReplSetConfig();
         return Status::OK();
-    } else if (rsConfigElement.type() != Object) {
+    } else if (rsConfigElement.type() != BSONType::object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "Expected \"" << kConfigFieldName
                                     << "\" in response to replSetHeartbeat to have type "

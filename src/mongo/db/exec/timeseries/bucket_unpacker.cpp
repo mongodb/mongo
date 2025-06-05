@@ -522,7 +522,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
         uassert(5369600,
                 "The $_internalUnpackBucket stage allows metadata to be absent or otherwise, it "
                 "must not be the deprecated undefined bson type",
-                _metaValue.missing() || _metaValue.getType() != BSONType::Undefined);
+                _metaValue.missing() || _metaValue.getType() != BSONType::undefined);
     } else {
         // If the spec indicates that the time series collection has no metadata field, then we
         // should not find a metadata region in the underlying bucket documents.
@@ -535,7 +535,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     auto&& controlField = _bucket[kBucketControlFieldName];
     uassert(5857902,
             "The $_internalUnpackBucket stage requires 'control' object to be present",
-            controlField && controlField.type() == BSONType::Object);
+            controlField && controlField.type() == BSONType::object);
 
     auto&& controlFieldObj = controlField.Obj();
     auto&& controlClosed = controlFieldObj[kBucketControlClosedFieldName];
@@ -546,14 +546,14 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
         uassert(6460203,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMinFieldNamePrefix << "' object to be present",
-                controlMin && controlMin.type() == BSONType::Object);
+                controlMin && controlMin.type() == BSONType::object);
         auto&& controlMinObj = controlMin.Obj();
         auto&& minTime = controlMinObj[_spec.timeField()];
         uassert(6460204,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMinFieldNamePrefix << "." << _spec.timeField()
                               << "' to be a date",
-                minTime && minTime.type() == BSONType::Date);
+                minTime && minTime.type() == BSONType::date);
         _minTime = minTime.date();
     }
 
@@ -562,14 +562,14 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
         uassert(6460205,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMaxFieldNamePrefix << "' object to be present",
-                controlMax && controlMax.type() == BSONType::Object);
+                controlMax && controlMax.type() == BSONType::object);
         auto&& controlMaxObj = controlMax.Obj();
         auto&& maxTime = controlMaxObj[_spec.timeField()];
         uassert(6460206,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
                               << kControlMaxFieldNamePrefix << "." << _spec.timeField()
                               << "' to be a date",
-                maxTime && maxTime.type() == BSONType::Date);
+                maxTime && maxTime.type() == BSONType::date);
         _maxTime = maxTime.date();
     }
 

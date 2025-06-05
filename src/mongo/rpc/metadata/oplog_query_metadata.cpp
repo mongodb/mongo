@@ -83,7 +83,7 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
     BSONElement oqMetadataElement;
 
     Status status = bsonExtractTypedField(
-        metadataObj, rpc::kOplogQueryMetadataFieldName, Object, &oqMetadataElement);
+        metadataObj, rpc::kOplogQueryMetadataFieldName, BSONType::object, &oqMetadataElement);
     if (!status.isOK())
         return status;
     BSONObj oqMetadataObj = oqMetadataElement.Obj();
@@ -116,7 +116,7 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
 
     BSONElement wallClockTimeElement;
     status = bsonExtractTypedField(
-        oqMetadataObj, kLastCommittedWallFieldName, BSONType::Date, &wallClockTimeElement);
+        oqMetadataObj, kLastCommittedWallFieldName, BSONType::date, &wallClockTimeElement);
     if (!status.isOK()) {
         return status;
     }

@@ -82,11 +82,11 @@ void _handleIntermediateElementForExtractAllElementsOnBucketPath(
     bool expandArrayOnTrailingField,
     BSONDepthIndex depth,
     MultikeyComponents* arrayComponents) {
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         BSONObj embedded = elem.embeddedObject();
         _handleElementForExtractAllElementsOnBucketPath(
             embedded, path, elements, expandArrayOnTrailingField, depth + 1, arrayComponents);
-    } else if (elem.type() == Array) {
+    } else if (elem.type() == BSONType::array) {
         bool allDigits = false;
         if (path.size() > 0 && ctype::isDigit(path[0])) {
             unsigned temp = 1;
@@ -102,7 +102,7 @@ void _handleIntermediateElementForExtractAllElementsOnBucketPath(
             BSONObjIterator i(elem.embeddedObject());
             while (i.more()) {
                 BSONElement e2 = i.next();
-                if (e2.type() == Object || e2.type() == Array) {
+                if (e2.type() == BSONType::object || e2.type() == BSONType::array) {
                     BSONObj embedded = e2.embeddedObject();
                     _handleElementForExtractAllElementsOnBucketPath(embedded,
                                                                     path,
@@ -126,7 +126,7 @@ void _handleTerminalElementForExtractAllElementsOnBucketPath(BSONElement elem,
                                                              bool expandArrayOnTrailingField,
                                                              BSONDepthIndex depth,
                                                              MultikeyComponents* arrayComponents) {
-    if (elem.type() == Array && expandArrayOnTrailingField) {
+    if (elem.type() == BSONType::array && expandArrayOnTrailingField) {
         BSONObjIterator i(elem.embeddedObject());
         while (i.more()) {
             elements.insert(i.next());
@@ -177,7 +177,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                 auto& [left, next] = *res;
                 BSONElement e = obj.getField(left);
                 if (depth > 0 || left == timeseries::kBucketDataFieldName) {
-                    if (e.type() == Object) {
+                    if (e.type() == BSONType::object) {
                         return _extractAllElementsAlongBucketPath(e.embeddedObject(),
                                                                   next,
                                                                   elements,
@@ -185,7 +185,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                                                                   isCompressed,
                                                                   depth + 1,
                                                                   arrayComponents);
-                    } else if (isCompressed && e.type() == BinData) {
+                    } else if (isCompressed && e.type() == BSONType::binData) {
                         // Unbucketing happens here for nested measurement fields (i.e. data.a.b) in
                         // compressed buckets. We know that 'e' corresponds to the top-level
                         // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -215,7 +215,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                 }
             } else {
                 BSONElement e = obj.getField(path);
-                if (Object == e.type()) {
+                if (BSONType::object == e.type()) {
                     _extractAllElementsAlongBucketPath(e.embeddedObject(),
                                                        StringData(),
                                                        elements,
@@ -223,7 +223,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                                                        isCompressed,
                                                        depth + 1,
                                                        arrayComponents);
-                } else if (isCompressed && BinData == e.type()) {
+                } else if (isCompressed && BSONType::binData == e.type()) {
                     // Unbucketing happens here for top-level measurement fields (i.e. data.a) in
                     // compressed buckets. We know that 'e' corresponds to the top-level
                     // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -286,10 +286,10 @@ bool _handleElementForHaveArrayAlongBucketDataPath(const BSONObj& obj,
 bool _handleIntermediateElementForHaveArrayAlongBucketDataPath(BSONElement elem,
                                                                StringData path,
                                                                BSONDepthIndex depth) {
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         auto embedded = elem.embeddedObject();
         return _handleElementForHaveArrayAlongBucketDataPath(embedded, path, depth + 1);
-    } else if (elem.type() == Array) {
+    } else if (elem.type() == BSONType::array) {
         return true;
     }
     // no match
@@ -297,7 +297,7 @@ bool _handleIntermediateElementForHaveArrayAlongBucketDataPath(BSONElement elem,
 }
 
 bool _handleTerminalElementForHaveArrayAlongBucketDataPath(BSONElement elem) {
-    return (elem.type() == Array);
+    return (elem.type() == BSONType::array);
 }
 
 
@@ -329,10 +329,10 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                 auto& [left, next] = *res;
                 BSONElement e = obj.getField(left);
                 if (depth > 0 || left == timeseries::kBucketDataFieldName) {
-                    if (e.type() == Object) {
+                    if (e.type() == BSONType::object) {
                         return _haveArrayAlongBucketDataPath(
                             e.embeddedObject(), next, isCompressed, depth + 1);
-                    } else if (isCompressed && BinData == e.type()) {
+                    } else if (isCompressed && BSONType::binData == e.type()) {
                         // Unbucketing happens here for nested measurement fields (i.e. data.a.b) in
                         // compressed buckets. We know that 'e' corresponds to the top-level
                         // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -356,10 +356,10 @@ bool _haveArrayAlongBucketDataPath(const BSONObj& obj,
                 }
             } else {
                 BSONElement e = obj.getField(path);
-                if (Object == e.type()) {
+                if (BSONType::object == e.type()) {
                     return _haveArrayAlongBucketDataPath(
                         e.embeddedObject(), StringData(), isCompressed, depth + 1);
-                } else if (BinData == e.type()) {
+                } else if (BSONType::binData == e.type()) {
                     // Unbucketing happens here for top-level measurement fields (i.e. data.a) in
                     // compressed buckets. We know that 'e' corresponds to the top-level
                     // measurement field (i.e. data.a) and we need to iterate over each of the
@@ -421,12 +421,12 @@ std::pair<BSONElement, BSONElement> _getLiteralFields(const BSONObj& min,
 Decision _controlTypesIndicateArrayData(const BSONElement& min,
                                         const BSONElement& max,
                                         bool terminal) {
-    if (min.type() <= BSONType::Array && max.type() >= BSONType::Array) {
-        return (min.type() == BSONType::Array || max.type() == BSONType::Array) ? Decision::Yes
+    if (min.type() <= BSONType::array && max.type() >= BSONType::array) {
+        return (min.type() == BSONType::array || max.type() == BSONType::array) ? Decision::Yes
                                                                                 : Decision::Maybe;
     }
 
-    if (!terminal && (min.type() == BSONType::Object || max.type() == BSONType::Object)) {
+    if (!terminal && (min.type() == BSONType::object || max.type() == BSONType::object)) {
         return Decision::Undecided;
     }
 
@@ -449,9 +449,9 @@ Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
 
     if (std::string::npos == field.find('.')) {
         auto e = maxObj.getField(field);
-        if (e.type() == BSONType::Array) {
+        if (e.type() == BSONType::array) {
             return Decision::Yes;
-        } else if (e.type() > BSONType::Array) {
+        } else if (e.type() > BSONType::array) {
             return Decision::Maybe;
         }
         return Decision::No;
@@ -461,9 +461,9 @@ Decision _fieldContainsArrayData(const BSONObj& maxObj, StringData field) {
         auto& [left, next] = *res;
         auto e = maxObj.getField(left);
 
-        if (e.type() >= BSONType::Array) {
-            return e.type() == BSONType::Array ? Decision::Yes : Decision::Maybe;
-        } else if (e.type() < BSONType::Object) {
+        if (e.type() >= BSONType::array) {
+            return e.type() == BSONType::array ? Decision::Yes : Decision::Maybe;
+        } else if (e.type() < BSONType::object) {
             return Decision::No;
         }
         tassert(5993301, "Expecting a sub-object.", e.isABSONObj());

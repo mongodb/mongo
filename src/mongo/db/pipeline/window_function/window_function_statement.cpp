@@ -37,7 +37,7 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
     // 'elem' is a statement like 'v: {$sum: {...}}', whereas the expression is '$sum: {...}'.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The field '" << elem.fieldName() << "' must be an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     return WindowFunctionStatement(
         elem.fieldName(),
         window_function::Expression::parse(elem.embeddedObject(), sortBy, expCtx));

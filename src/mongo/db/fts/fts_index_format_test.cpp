@@ -77,7 +77,7 @@ TEST(FTSIndexFormat, Simple1) {
     for (auto& keyString : keys) {
         auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ASSERT_EQUALS(2, key.nFields());
-        ASSERT_EQUALS(String, key.firstElement().type());
+        ASSERT_EQUALS(BSONType::string, key.firstElement().type());
     }
 }
 
@@ -156,7 +156,7 @@ void assertEqualsIndexKeys(std::set<std::string>& expectedKeys, const KeyStringS
     for (auto& keyString : keys) {
         auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ASSERT_EQUALS(2, key.nFields());
-        ASSERT_EQUALS(String, key.firstElement().type());
+        ASSERT_EQUALS(BSONType::string, key.firstElement().type());
         string s = key.firstElement().String();
         std::set<string>::const_iterator j = expectedKeys.find(s);
         if (j == expectedKeys.end()) {

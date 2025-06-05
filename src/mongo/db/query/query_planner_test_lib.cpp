@@ -155,7 +155,7 @@ Status columnIxScanFiltersByPathMatch(
 
     for (auto&& expectedElem : expectedFiltersByPath) {
         const auto expectedPath = expectedElem.fieldNameStringData();
-        if (expectedElem.type() != BSONType::Object)
+        if (expectedElem.type() != BSONType::object)
             return {ErrorCodes::Error{6412405},
                     str::stream() << "invalid filter for path '" << expectedPath
                                   << "' given to 'filtersByPath' argument to 'column_scan' "
@@ -193,7 +193,7 @@ Status columnIxScanFiltersByPathMatch(
 }
 
 Status indexNamesMatch(BSONElement expectedIndexName, std::string actualIndexName) {
-    if (expectedIndexName.type() != BSONType::String) {
+    if (expectedIndexName.type() != BSONType::string) {
         return {ErrorCodes::Error{5619234},
                 str::stream() << "Provided JSON gave a 'ixscan' with a 'name', but the name "
                                  "was not an string: "
@@ -234,7 +234,7 @@ Status stringSetsMatch(BSONElement expectedStringArrElem,
 }
 
 void appendIntervalBound(BSONObjBuilder& bob, BSONElement& el) {
-    if (el.type() == String) {
+    if (el.type() == BSONType::string) {
         std::string data = el.String();
         if (data == "MaxKey") {
             bob.appendMaxKey("");
@@ -399,7 +399,7 @@ Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
 
         {
             auto minElt = it.next();
-            if (minElt.type() != BSONType::Object) {
+            if (minElt.type() != BSONType::object) {
                 return {ErrorCodes::Error{5920205}, str::stream() << "Expected min obj"};
             }
 
@@ -413,7 +413,7 @@ Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
 
         {
             auto maxElt = it.next();
-            if (maxElt.type() != BSONType::Object) {
+            if (maxElt.type() != BSONType::object) {
                 return {ErrorCodes::Error{5920204}, str::stream() << "Expected max obj"};
             }
 
@@ -440,7 +440,7 @@ Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
                                   << "' but found '" << trueBounds.getFieldName(fieldItCount)
                                   << "'"};
         }
-        if (arrEl.type() != Array) {
+        if (arrEl.type() != BSONType::array) {
             return {ErrorCodes::Error{5619223},
                     str::stream() << "bounds are expected to be arrays. Found: " << arrEl
                                   << " (type " << arrEl.type() << ")"};
@@ -450,7 +450,7 @@ Status QueryPlannerTestLib::boundsMatch(const BSONObj& testBounds,
         size_t oilItCount = 0;
         while (oilIt.more()) {
             BSONElement intervalEl = oilIt.next();
-            if (intervalEl.type() != Array) {
+            if (intervalEl.type() != BSONType::array) {
                 return {ErrorCodes::Error{5619224},
                         str::stream()
                             << "intervals within bounds are expected to be arrays. Found: "
@@ -1150,7 +1150,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
 
         BSONElement sortType = sortObj["type"];
         if (sortType) {
-            if (sortType.type() != BSONType::String) {
+            if (sortType.type() != BSONType::string) {
                 return {ErrorCodes::Error{5619283},
                         str::stream()
                             << "found a sort stage in the solution but 'type' was not a string: "
@@ -1417,7 +1417,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         auto expectedEqLookupSoln = expectedElem.Obj();
         auto expectedForeignCollection = expectedEqLookupSoln["foreignCollection"];
         if (expectedForeignCollection.eoo() ||
-            expectedForeignCollection.type() != BSONType::String) {
+            expectedForeignCollection.type() != BSONType::string) {
             return {ErrorCodes::Error{6267501},
                     str::stream() << "Test solution for eq_lookup should have a "
                                      "'foreignCollection' field that is "
@@ -1436,7 +1436,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         auto expectedLocalField = expectedEqLookupSoln["joinFieldLocal"];
-        if (expectedLocalField.eoo() || expectedLocalField.type() != BSONType::String) {
+        if (expectedLocalField.eoo() || expectedLocalField.type() != BSONType::string) {
             return {
                 ErrorCodes::Error{6267503},
                 str::stream()
@@ -1455,7 +1455,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         auto expectedForeignField = expectedEqLookupSoln["joinFieldForeign"];
-        if (expectedForeignField.eoo() || expectedForeignField.type() != BSONType::String) {
+        if (expectedForeignField.eoo() || expectedForeignField.type() != BSONType::string) {
             return {
                 ErrorCodes::Error{6267505},
                 str::stream()
@@ -1473,7 +1473,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         auto expectedAsField = expectedEqLookupSoln["joinField"];
-        if (expectedAsField.eoo() || expectedAsField.type() != BSONType::String) {
+        if (expectedAsField.eoo() || expectedAsField.type() != BSONType::string) {
             return {ErrorCodes::Error{6267507},
                     str::stream()
                         << "Test solution for eq_lookup should have a 'joinField' field that is "
@@ -1490,7 +1490,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         auto expectedStrategy = expectedEqLookupSoln["strategy"];
-        if (expectedStrategy.eoo() || expectedStrategy.type() != BSONType::String) {
+        if (expectedStrategy.eoo() || expectedStrategy.type() != BSONType::string) {
             return {ErrorCodes::Error{6267509},
                     str::stream()
                         << "Test solution for eq_lookup should have a 'strategy' field that is "

@@ -112,7 +112,7 @@ static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
     BSONObjIterator iter(entry.key);
     while (iter.more()) {
         const auto elem = iter.next();
-        if (elem.type() != BSONType::MinKey) {
+        if (elem.type() != BSONType::minKey) {
             tassert(7354603,
                     "An int value must follow MinKey values in a metadata key of a wildcard "
                     "index.",
@@ -127,7 +127,7 @@ static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
             const auto nextElem = iter.next();
             tassert(7354606,
                     "A string value must follow an int value in a metadata key of a wildcard index",
-                    nextElem.type() == BSONType::String);
+                    nextElem.type() == BSONType::string);
             return FieldRef(nextElem.valueStringData());
         }
     }

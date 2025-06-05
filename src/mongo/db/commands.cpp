@@ -371,7 +371,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
 NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
                                                     const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
+    if (first.type() == BSONType::binData && first.binDataType() == BinDataType::newUUID) {
         return {dbName, uassertStatusOK(UUID::parse(first))};
     } else {
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
@@ -391,7 +391,7 @@ void CommandHelpers::ensureValidCollectionName(const NamespaceString& nss) {
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
-    if (first.type() != mongo::String)
+    if (first.type() != BSONType::string)
         return NamespaceString(dbName);
     return NamespaceStringUtil::deserialize(dbName, cmdObj.firstElement().valueStringData());
 }
@@ -726,7 +726,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     for (auto&& failCommand : data.getObjectField("failCommands")) {
-        if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
+        if (failCommand.type() == BSONType::string &&
+            cmd->hasAlias(failCommand.valueStringData())) {
             LOGV2(4898500,
                   "Activating 'failCommand' failpoint",
                   "data"_attr = data,
@@ -758,7 +759,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
             rpc::RewriteStateChangeErrors::onActiveFailCommand(opCtx, data);
 
             if (data.hasField(kErrorLabelsFieldName) &&
-                data[kErrorLabelsFieldName].type() == Array) {
+                data[kErrorLabelsFieldName].type() == BSONType::array) {
                 // Propagate error labels specified in the failCommand failpoint to the
                 // OperationContext decoration to override getErrorLabels() behaviors.
                 invariant(!errorLabelsOverride(opCtx));
@@ -823,7 +824,7 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
 
             auto errorExtraInfo = [&]() -> boost::optional<BSONObj> {
                 BSONElement e;
-                Status st = bsonExtractTypedField(data, "errorExtraInfo", BSONType::Object, &e);
+                Status st = bsonExtractTypedField(data, "errorExtraInfo", BSONType::object, &e);
                 if (st == ErrorCodes::NoSuchKey)
                     return {};  // It's optional. Missing is allowed. Other errors aren't.
                 uassertStatusOK(st);

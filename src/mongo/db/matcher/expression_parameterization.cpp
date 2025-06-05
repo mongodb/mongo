@@ -106,55 +106,55 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
     ComparisonMatchExpressionBase* expr) {
     auto type = expr->getData().type();
     switch (type) {
-        case BSONType::MinKey:
-        case BSONType::EOO:
-        case BSONType::jstNULL:
-        case BSONType::Array:
-        case BSONType::DBRef:
-        case BSONType::MaxKey:
-        case BSONType::Undefined:
-        case BSONType::Object:
-        case BSONType::Bool:
+        case BSONType::minKey:
+        case BSONType::eoo:
+        case BSONType::null:
+        case BSONType::array:
+        case BSONType::dbRef:
+        case BSONType::maxKey:
+        case BSONType::undefined:
+        case BSONType::object:
+        case BSONType::boolean:
             break;
 
-        case BSONType::String:
+        case BSONType::string:
             if (!expr->getData().str().empty()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
-        case BSONType::BinData:
-        case BSONType::jstOID:
-        case BSONType::RegEx:
-        case BSONType::Code:
-        case BSONType::Symbol:
-        case BSONType::CodeWScope:
+        case BSONType::binData:
+        case BSONType::oid:
+        case BSONType::regEx:
+        case BSONType::code:
+        case BSONType::symbol:
+        case BSONType::codeWScope:
             expr->setInputParamId(_context->nextReusableInputParamId(expr));
             break;
-        case BSONType::bsonTimestamp:
+        case BSONType::timestamp:
             if (expr->getData().timestamp() != Timestamp::max() &&
                 expr->getData().timestamp() != Timestamp::min()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
-        case BSONType::Date:
+        case BSONType::date:
             if (expr->getData().Date() != Date_t::max() &&
                 expr->getData().Date() != Date_t::min()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
-        case BSONType::NumberInt:
+        case BSONType::numberInt:
             if (expr->getData().numberInt() != std::numeric_limits<int>::max() &&
                 expr->getData().numberInt() != std::numeric_limits<int>::min()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
-        case BSONType::NumberLong:
+        case BSONType::numberLong:
             if (expr->getData().numberLong() != std::numeric_limits<long long>::max() &&
                 expr->getData().numberLong() != std::numeric_limits<long long>::min()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));
             }
             break;
-        case BSONType::NumberDouble: {
+        case BSONType::numberDouble: {
             auto doubleVal = expr->getData().numberDouble();
             if (!std::isnan(doubleVal) && doubleVal != std::numeric_limits<double>::max() &&
                 doubleVal != std::numeric_limits<double>::min() &&
@@ -164,7 +164,7 @@ void MatchExpressionParameterizationVisitor::visitComparisonMatchExpression(
             }
             break;
         }
-        case BSONType::NumberDecimal:
+        case BSONType::numberDecimal:
             if (!expr->getData().numberDecimal().isNaN() &&
                 !expr->getData().numberDecimal().isInfinite()) {
                 expr->setInputParamId(_context->nextReusableInputParamId(expr));

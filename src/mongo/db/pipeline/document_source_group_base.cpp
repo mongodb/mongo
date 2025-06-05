@@ -276,7 +276,7 @@ boost::intrusive_ptr<Expression> parseIdExpression(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement groupField,
     const VariablesParseState& vps) {
-    if (groupField.type() == Object) {
+    if (groupField.type() == BSONType::object) {
         // {_id: {}} is treated as grouping on a constant, not an expression
         if (groupField.Obj().isEmpty()) {
             return ExpressionConstant::create(expCtx.get(), Value(groupField));
@@ -290,7 +290,7 @@ boost::intrusive_ptr<Expression> parseIdExpression(
             for (auto&& field : idKeyObj) {
                 uassert(17390,
                         "$group does not support inclusion-style expressions",
-                        !field.isNumber() && field.type() != Bool);
+                        !field.isNumber() && field.type() != BSONType::boolean);
             }
             return ExpressionObject::parse(expCtx.get(), idKeyObj, vps);
         }
@@ -306,7 +306,8 @@ boost::intrusive_ptr<Expression> DocumentSourceGroupBase::getIdExpression() cons
 }
 
 void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
-    uassert(15947, "a group's fields must be specified in an object", elem.type() == Object);
+    uassert(
+        15947, "a group's fields must be specified in an object", elem.type() == BSONType::object);
 
     const auto& idExpressions = _groupProcessor.getIdExpressions();
     BSONObj groupObj(elem.Obj());

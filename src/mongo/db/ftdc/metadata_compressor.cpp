@@ -152,7 +152,7 @@ boost::optional<bool> compareAndBuildDeltaFinal(BSONObj reference,
         auto fieldName = sampleElement.fieldNameStringData();
 
         if (fieldName == "start"_sd || fieldName == "end"_sd) {
-            dassert(sampleElement.type() == BSONType::Date);
+            dassert(sampleElement.type() == BSONType::date);
             builder->stashOrAppend(sampleElement);
             continue;
         }
@@ -192,13 +192,13 @@ boost::optional<bool> compareAndBuildDelta(BSONObj reference,
         auto fieldName = sampleElement.fieldNameStringData();
 
         if (fieldName == "start"_sd || fieldName == "end"_sd) {
-            dassert(sampleElement.type() == BSONType::Date);
+            dassert(sampleElement.type() == BSONType::date);
             builder->stashOrAppend(sampleElement);
             continue;
         }
 
-        dassert(sampleElement.type() == BSONType::Object);
-        dassert(refElement.type() == BSONType::Object);
+        dassert(sampleElement.type() == BSONType::object);
+        dassert(refElement.type() == BSONType::object);
         auto sampleSubObj = sampleElement.Obj();
         auto refSubObj = refElement.Obj();
 

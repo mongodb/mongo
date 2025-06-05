@@ -266,7 +266,7 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
                                  &simpleStringDataComparator);
     if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
         FAIL(str::stream() << "element " << elA << " not equal to " << elB);
-    } else if (elA.type() == mongo::Array) {
+    } else if (elA.type() == BSONType::array) {
         std::vector<BSONElement> elsA = elA.Array();
         std::vector<BSONElement> elsB = elB.Array();
         if (elsA.size() != elsB.size())
@@ -277,7 +277,7 @@ static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
         for (; arrItA != elsA.end(); ++arrItA, ++arrItB) {
             assertSameElements(*arrItA, *arrItB);
         }
-    } else if (elA.type() == mongo::Object) {
+    } else if (elA.type() == BSONType::object) {
         assertSameFields(elA.Obj(), elB.Obj());
     }
 }

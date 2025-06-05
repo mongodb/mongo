@@ -414,7 +414,7 @@ TEST_F(AutoSplitVectorTestInvalidKey, OnlySplitAtValidKey) {
                         10 * 1024 * 1024 /* max chunk size in bytes*/);
 
     ASSERT_EQ(1, splitKey.size());
-    ASSERT_NE(RegEx, splitKey.front().getField(kPattern_x).type());
+    ASSERT_NE(BSONType::regEx, splitKey.front().getField(kPattern_x).type());
     ASSERT_FALSE(continuation);
 }
 

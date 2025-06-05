@@ -174,7 +174,7 @@ BSONElementStorage::Element BSONElementStorage::allocate(BSONType type,
     auto block = allocate(size);
 
     // Write type and null terminator in the first two bytes
-    block[0] = type;
+    block[0] = stdx::to_underlying(type);
     if (fieldNameSize != 0) {
         memcpy(block + 1, fieldName.data(), fieldNameSize);
     }
@@ -195,7 +195,8 @@ BSONColumn::Iterator::Iterator(boost::intrusive_ptr<BSONElementStorage> allocato
 void BSONColumn::Iterator::_initializeInterleaving() {
     Interleaved& interleaved = _mode.emplace<Interleaved>(
         BSONObj(_control + 1),
-        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? Array : Object,
+        *_control == bsoncolumn::kInterleavedStartArrayRootControlByte ? BSONType::array
+                                                                       : BSONType::object,
         *_control == bsoncolumn::kInterleavedStartControlByte ||
             *_control == bsoncolumn::kInterleavedStartArrayRootControlByte);
 
@@ -214,8 +215,9 @@ void BSONColumn::Iterator::_initializeInterleaving() {
     _control += interleaved.referenceObj.objsize() + 1;
 
     // Interleaved mode should contain at least one object
-    uassert(
-        9232700, "Invalid BSON Column interleaved encoding", _control < _end && *_control != EOO);
+    uassert(9232700,
+            "Invalid BSON Column interleaved encoding",
+            _control < _end && *_control != stdx::to_underlying(BSONType::eoo));
     _incrementInterleaved(interleaved);
 }
 
@@ -253,7 +255,7 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
     uassert(6067602, "Invalid BSON Column encoding", _control < _end);
 
     // Decoders are exhausted, load next control byte. If we are at EOO then decoding is done.
-    if (*_control == EOO) {
+    if (*_control == stdx::to_underlying(BSONType::eoo)) {
         _handleEOO();
         return;
     }
@@ -311,7 +313,7 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
             } else if (auto d128 = get_if<DecodingState::Decoder128>(&state.decoder);
                        d128 && d128->pos.valid() && (++d128->pos).more()) {
                 elem = state.loadDelta(*_allocator, *d128);
-            } else if (*_control == EOO) {
+            } else if (*_control == stdx::to_underlying(BSONType::eoo)) {
                 // Decoders are exhausted and the next control byte was EOO then we should exit
                 // interleaved mode. Return false to end the recursion early.
                 ++_control;
@@ -412,18 +414,18 @@ void BSONColumn::Iterator::DecodingState::loadUncompressed(const BSONElement& el
     if (uses128bit(type)) {
         auto& d128 = decoder.emplace<Decoder128>();
         switch (type) {
-            case String:
-            case Code:
+            case BSONType::string:
+            case BSONType::code:
                 d128.lastEncodedValue =
                     Simple8bTypeUtil::encodeString(elem.valueStringData()).value_or(0);
                 break;
-            case BinData: {
+            case BSONType::binData: {
                 int size;
                 const char* binary = elem.binData(size);
                 d128.lastEncodedValue = Simple8bTypeUtil::encodeBinary(binary, size).value_or(0);
                 break;
             }
-            case NumberDecimal:
+            case BSONType::numberDecimal:
                 d128.lastEncodedValue = Simple8bTypeUtil::encodeDecimal128(elem._numberDecimal());
                 break;
             default:
@@ -433,22 +435,22 @@ void BSONColumn::Iterator::DecodingState::loadUncompressed(const BSONElement& el
         auto& d64 = decoder.emplace<Decoder64>();
         d64.deltaOfDelta = usesDeltaOfDelta(type);
         switch (type) {
-            case jstOID:
+            case BSONType::oid:
                 d64.lastEncodedValue = Simple8bTypeUtil::encodeObjectId(elem.__oid());
                 break;
-            case Date:
+            case BSONType::date:
                 d64.lastEncodedValue = elem.date().toMillisSinceEpoch();
                 break;
-            case Bool:
+            case BSONType::boolean:
                 d64.lastEncodedValue = elem.boolean();
                 break;
-            case NumberInt:
+            case BSONType::numberInt:
                 d64.lastEncodedValue = elem._numberInt();
                 break;
-            case NumberLong:
+            case BSONType::numberLong:
                 d64.lastEncodedValue = elem._numberLong();
                 break;
-            case bsonTimestamp:
+            case BSONType::timestamp:
                 d64.lastEncodedValue = elem.timestampValue();
                 break;
             default:
@@ -495,7 +497,7 @@ BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
 
                   // If Double, scale last value according to this scale factor
                   auto type = lastValue.type();
-                  if (type == NumberDouble) {
+                  if (type == BSONType::numberDouble) {
                       auto encoded =
                           Simple8bTypeUtil::encodeDouble(lastValue._numberDouble(), d64.scaleIndex);
                       uassert(6067607, "Invalid double encoding in BSON Column", encoded);
@@ -589,36 +591,36 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
     // Write value depending on type
     int64_t valueToWrite = deltaOfDelta ? lastEncodedValueForDeltaOfDelta : lastEncodedValue;
     switch (type) {
-        case NumberDouble:
+        case BSONType::numberDouble:
             DataView(elem.value())
                 .write<LittleEndian<double>>(
                     Simple8bTypeUtil::decodeDouble(valueToWrite, scaleIndex));
             break;
-        case jstOID: {
+        case BSONType::oid: {
             Simple8bTypeUtil::decodeObjectIdInto(
                 elem.value(), valueToWrite, last.__oid().getInstanceUnique());
         } break;
-        case Date:
-        case NumberLong:
+        case BSONType::date:
+        case BSONType::numberLong:
             DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
             break;
-        case Bool:
+        case BSONType::boolean:
             DataView(elem.value()).write<LittleEndian<char>>(static_cast<bool>(valueToWrite));
             break;
-        case NumberInt:
+        case BSONType::numberInt:
             DataView(elem.value()).write<LittleEndian<int>>(valueToWrite);
             break;
-        case bsonTimestamp: {
+        case BSONType::timestamp: {
             DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
         } break;
-        case RegEx:
-        case DBRef:
-        case CodeWScope:
-        case Symbol:
-        case Object:
-        case Array:
-        case EOO:  // EOO indicates the end of an interleaved object.
-        default:   // Unsupported type for deltas should throw an assertion
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::codeWScope:
+        case BSONType::symbol:
+        case BSONType::object:
+        case BSONType::array:
+        case BSONType::eoo:  // EOO indicates the end of an interleaved object.
+        default:             // Unsupported type for deltas should throw an assertion
             uasserted(6785500, "Invalid delta in BSON Column encoding");
     }
 
@@ -631,8 +633,8 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
     return [&]() -> BSONElementStorage::Element {
         BSONType type = last.type();
         switch (type) {
-            case String:
-            case Code: {
+            case BSONType::string:
+            case BSONType::code: {
                 Simple8bTypeUtil::SmallString ss = Simple8bTypeUtil::decodeString(lastEncodedValue);
                 // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null
                 // terminator
@@ -645,7 +647,7 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
                 DataView(elem.value()).write<char>('\0', ss.size + sizeof(int32_t));
                 return elem;
             }
-            case BinData: {
+            case BSONType::binData: {
                 auto elem = allocator.allocate(type, fieldName, last.valuesize());
                 // The first 5 bytes in binData is a count and subType, copy them from previous
                 memcpy(elem.value(), last.value(), 5);
@@ -656,7 +658,7 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
                     lastEncodedValue, elem.value() + 5, last.valuestrsize());
                 return elem;
             }
-            case NumberDecimal: {
+            case BSONType::numberDecimal: {
                 auto elem = allocator.allocate(type, fieldName, last.valuesize());
                 Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(lastEncodedValue);
                 Decimal128::Value dec128Val = dec128.getValue();
@@ -688,7 +690,7 @@ BSONColumn::BSONColumn(const char* buffer, size_t size)
 BSONColumn::BSONColumn(BSONElement bin) {
     tassert(5857700,
             "Invalid BSON type for column",
-            bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
+            bin.type() == BSONType::binData && bin.binDataType() == BinDataType::Column);
 
     _binary = bin.binData(_size);
     _allocator = new BSONElementStorage();
@@ -740,9 +742,9 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
         control = static_cast<uint8_t>(*byteIter);
         if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
             BSONElement literalElem(byteIter, 1, BSONElement::TrustedInitTag{});
-            if (control == elementType) {
+            if (control == stdx::to_underlying(elementType)) {
                 return true;
-            } else if (control == BSONType::EOO) {
+            } else if (control == stdx::to_underlying(BSONType::eoo)) {
                 // TODO: check for valid encoding
                 // reached end of column
                 return false;
@@ -805,32 +807,32 @@ bool BSONColumnBlockBased::contains(BSONType type) const {
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, bool val) {
-    BSONElementStorage::Element e = allocator.allocate(Bool, "", sizeof(uint8_t));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::boolean, "", sizeof(uint8_t));
     DataView(e.value()).write<uint8_t>(val);
     return e.element();
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, int32_t val) {
-    BSONElementStorage::Element e = allocator.allocate(NumberInt, "", sizeof(int32_t));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::numberInt, "", sizeof(int32_t));
     DataView(e.value()).write<LittleEndian<int32_t>>(val);
     return e.element();
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, int64_t val) {
-    BSONElementStorage::Element e = allocator.allocate(NumberLong, "", sizeof(int64_t));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::numberLong, "", sizeof(int64_t));
     DataView(e.value()).write<LittleEndian<int64_t>>(val);
     return e.element();
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, double val) {
-    BSONElementStorage::Element e = allocator.allocate(NumberDouble, "", sizeof(double));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::numberDouble, "", sizeof(double));
     DataView(e.value()).write<LittleEndian<double>>(val);
     return e.element();
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
                                                  const Decimal128& val) {
-    auto elem = allocator.allocate(NumberDecimal, "", 16);
+    auto elem = allocator.allocate(BSONType::numberDecimal, "", 16);
     Decimal128::Value dec128Val = val.getValue();
     DataView(elem.value()).write<LittleEndian<uint64_t>>(dec128Val.low64);
     DataView(elem.value()).write<LittleEndian<uint64_t>>(dec128Val.high64, sizeof(uint64_t));
@@ -838,14 +840,14 @@ BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, const Date_t& val) {
-    BSONElementStorage::Element e = allocator.allocate(Date, "", sizeof(int64_t));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::date, "", sizeof(int64_t));
     DataView(e.value()).write<LittleEndian<int64_t>>(val.toMillisSinceEpoch());
     return e.element();
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
                                                  const Timestamp& val) {
-    BSONElementStorage::Element e = allocator.allocate(bsonTimestamp, "", sizeof(uint64_t));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::timestamp, "", sizeof(uint64_t));
     DataView(e.value()).write<LittleEndian<uint64_t>>(val.asULL());
     return e.element();
 }
@@ -869,7 +871,7 @@ BSONElement BSONElementMaterializer::writeStringData(BSONElementStorage& allocat
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, StringData val) {
-    return writeStringData(allocator, String, val);
+    return writeStringData(allocator, BSONType::string, val);
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
@@ -879,7 +881,7 @@ BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
     // - 1-byte binary subtype
     // - The binary data
     constexpr auto binPrefixLen = sizeof(int32_t) + sizeof(uint8_t);
-    auto elem = allocator.allocate(BinData, "", binPrefixLen + val.length);
+    auto elem = allocator.allocate(BSONType::binData, "", binPrefixLen + val.length);
     DataView(elem.value()).write<LittleEndian<int32_t>>(val.length);
     DataView(elem.value()).write<uint8_t>(val.type, sizeof(int32_t));
     memcpy(elem.value() + binPrefixLen, val.data, val.length);
@@ -888,11 +890,11 @@ BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
                                                  const BSONCode& val) {
-    return writeStringData(allocator, Code, val.code);
+    return writeStringData(allocator, BSONType::code, val.code);
 }
 
 BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, const OID& val) {
-    BSONElementStorage::Element e = allocator.allocate(jstOID, "", sizeof(OID));
+    BSONElementStorage::Element e = allocator.allocate(BSONType::oid, "", sizeof(OID));
     DataView(e.value()).write<OID>(val);
     return e.element();
 }

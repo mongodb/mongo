@@ -610,7 +610,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
 
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
-            if (bsonElem.type() == String) {
+            if (bsonElem.type() == BSONType::string) {
                 colls.push_back(NamespaceStringUtil::deserialize(
                     boost::none, bsonElem.String(), SerializationContext::stateDefault()));
             }

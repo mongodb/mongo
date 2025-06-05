@@ -170,7 +170,7 @@ TEST(BSONElement, ExtractLargeSubObject) {
     BSONObj bigObj = bigObjectBuilder.obj<BSONObj::LargeSizeTrait>();
 
     BSONElement element = bigObj["a"];
-    ASSERT_EQ(BSONType::Object, element.type());
+    ASSERT_EQ(BSONType::object, element.type());
 
     BSONObj subObj = element.Obj();
 }
@@ -446,29 +446,30 @@ TEST(BSONElementTryCoeceToLongLongTest, CoerceFails) {
 }
 
 TEST(BSONElementTrustedInitTag, EOOElement) {
-    const char buffer[] = {BSONType::EOO};
+    const char buffer[] = {stdx::to_underlying(BSONType::eoo)};
 
     BSONElement eoo(buffer, 0, BSONElement::TrustedInitTag{});
-    ASSERT_EQ(BSONType::EOO, eoo.type());
+    ASSERT_EQ(BSONType::eoo, eoo.type());
     ASSERT_EQ(0, eoo.fieldNameSize());
     ASSERT_EQ(""_sd, eoo.fieldNameStringData());
 }
 
 TEST(BSONElementTrustedInitTag, EmptyFieldName) {
-    const char buffer[] = {BSONType::String, '\0', 'x', '\0'};
+    const char buffer[] = {stdx::to_underlying(BSONType::string), '\0', 'x', '\0'};
 
     BSONElement elem(buffer, 1, BSONElement::TrustedInitTag{});
-    ASSERT_EQ(BSONType::String, elem.type());
+    ASSERT_EQ(BSONType::string, elem.type());
     // 'fieldNameSize()' includes the NUL-terminator.
     ASSERT_EQ(1, elem.fieldNameSize());
     ASSERT_EQ(""_sd, elem.fieldNameStringData());
 }
 
 TEST(BSONElementTrustedInitTag, NonEmptyFieldName) {
-    const char buffer[] = {BSONType::String, 'f', 'o', 'x', 'x', '\0', 'x', '\0'};
+    const char buffer[] = {
+        stdx::to_underlying(BSONType::string), 'f', 'o', 'x', 'x', '\0', 'x', '\0'};
 
     BSONElement elem(buffer, 5, BSONElement::TrustedInitTag{});
-    ASSERT_EQ(BSONType::String, elem.type());
+    ASSERT_EQ(BSONType::string, elem.type());
     // 'fieldNameSize()' includes the NUL-terminator.
     ASSERT_EQ(5, elem.fieldNameSize());
     ASSERT_EQ("foxx"_sd, elem.fieldNameStringData());

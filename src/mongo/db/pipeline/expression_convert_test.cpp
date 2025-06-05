@@ -249,7 +249,7 @@ TEST_F(ExpressionConvertTest, ConvertOptimizesToExpressionConstant) {
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
-    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), 0.0, BSONType::NumberDouble);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), 0.0, BSONType::numberDouble);
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithFormatOptimizesToExpressionConstant) {
@@ -268,7 +268,7 @@ TEST_F(ExpressionConvertTest, ConvertWithFormatOptimizesToExpressionConstant) {
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
-    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), result, BSONType::BinData);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), result, BSONType::binData);
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
@@ -283,7 +283,7 @@ TEST_F(ExpressionConvertTest, ConvertWithOnErrorOptimizesToExpressionConstant) {
 
     auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
     ASSERT(constResult);
-    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), "X"_sd, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), "X"_sd, BSONType::string);
 }
 
 TEST_F(ExpressionConvertTest, ConvertBinDataToIntFeatureFlagOffFails) {

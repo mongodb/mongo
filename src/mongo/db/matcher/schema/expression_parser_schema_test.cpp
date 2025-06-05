@@ -299,7 +299,7 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongAlias) {
     auto typeExpr = static_cast<const InternalSchemaTypeExpression*>(result.getValue().get());
     ASSERT_FALSE(typeExpr->typeSet().allNumbers);
     ASSERT_EQ(typeExpr->typeSet().bsonTypes.size(), 1u);
-    ASSERT_TRUE(typeExpr->typeSet().hasType(BSONType::NumberLong));
+    ASSERT_TRUE(typeExpr->typeSet().hasType(BSONType::numberLong));
 }
 
 TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongCode) {
@@ -312,7 +312,7 @@ TEST(MatchExpressionParserSchemaTest, InternalTypeCanParseLongCode) {
     auto typeExpr = static_cast<const InternalSchemaTypeExpression*>(result.getValue().get());
     ASSERT_FALSE(typeExpr->typeSet().allNumbers);
     ASSERT_EQ(typeExpr->typeSet().bsonTypes.size(), 1u);
-    ASSERT_TRUE(typeExpr->typeSet().hasType(BSONType::NumberLong));
+    ASSERT_TRUE(typeExpr->typeSet().hasType(BSONType::numberLong));
 }
 
 TEST(MatchExpressionParserSchemaTest, AllowedPropertiesFailsParsingIfAFieldIsMissing) {

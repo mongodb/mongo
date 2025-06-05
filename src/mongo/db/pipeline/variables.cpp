@@ -117,34 +117,34 @@ const std::map<StringData, std::function<void(const Value&)>> Variables::kSystem
          uassert(ErrorCodes::TypeMismatch,
                  str::stream() << "$$NOW must have a date value, found "
                                << typeName(value.getType()),
-                 value.getType() == BSONType::Date);
+                 value.getType() == BSONType::date);
      }},
     {kClusterTimeName,
      [](const auto& value) {
          uassert(ErrorCodes::TypeMismatch,
                  str::stream() << "$$CLUSTER_TIME must have a timestamp value, found "
                                << typeName(value.getType()),
-                 value.getType() == BSONType::bsonTimestamp);
+                 value.getType() == BSONType::timestamp);
      }},
     {kJsScopeName,
      [](const auto& value) {
          uassert(ErrorCodes::TypeMismatch,
                  str::stream() << "$$JS_SCOPE must have an object value, found "
                                << typeName(value.getType()),
-                 value.getType() == BSONType::Object);
+                 value.getType() == BSONType::object);
      }},
     {kIsMapReduceName,
      [](const auto& value) {
          uassert(ErrorCodes::TypeMismatch,
                  str::stream() << "$$IS_MR must have a bool value, found "
                                << typeName(value.getType()),
-                 value.getType() == BSONType::Bool);
+                 value.getType() == BSONType::boolean);
      }},
     {kUserRolesName, [](const auto& value) {
          uassert(ErrorCodes::TypeMismatch,
                  str::stream() << "$$USER_ROLES must have an array value, found "
                                << typeName(value.getType()),
-                 value.getType() == BSONType::Array);
+                 value.getType() == BSONType::array);
      }}};
 
 void Variables::setValue(Id id, const Value& value, bool isConstant) {
@@ -235,7 +235,7 @@ Document Variables::getDocument(Id id, const Document& root) const {
     }
 
     const Value var = getValue(id, root);
-    if (var.getType() == Object)
+    if (var.getType() == BSONType::object)
         return var.getDocument();
 
     return Document();
@@ -388,30 +388,30 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
             const auto& [value, unusedIsConstant] = it->second;
             switch (builtinId) {
                 case kNowId: {
-                    invariant(value.getType() == BSONType::Date);
+                    invariant(value.getType() == BSONType::date);
                     extracted.setLocalNow(value.getDate());
                     break;
                 }
                 case kClusterTimeId: {
-                    invariant(value.getType() == BSONType::bsonTimestamp);
+                    invariant(value.getType() == BSONType::timestamp);
                     extracted.setClusterTime(value.getTimestamp());
                     break;
                 }
                 case kJsScopeId: {
-                    invariant(value.getType() == BSONType::Object);
+                    invariant(value.getType() == BSONType::object);
                     extracted.setJsScope(value.getDocument().toBson());
                     break;
                 }
                 case kIsMapReduceId: {
-                    invariant(value.getType() == BSONType::Bool);
+                    invariant(value.getType() == BSONType::boolean);
                     extracted.setIsMapReduce(value.getBool());
                     break;
                 }
                 case kUserRolesId: {
-                    invariant(value.getType() == BSONType::Array);
+                    invariant(value.getType() == BSONType::array);
                     BSONArrayBuilder bab;
                     for (const auto& val : value.getArray()) {
-                        invariant(val.getType() == BSONType::Object);
+                        invariant(val.getType() == BSONType::object);
                         bab.append(val.getDocument().toBson());
                     }
                     extracted.setUserRoles(bab.arr());

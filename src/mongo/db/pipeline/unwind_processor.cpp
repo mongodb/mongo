@@ -65,9 +65,10 @@ boost::optional<Document> UnwindProcessor::getNext() {
     // this index in the output document, or null if the value didn't come from an array.
     boost::optional<long long> indexForOutput;
 
-    uassert(
-        5858203, "an array is expected", (_strict && _inputArray.getType() == Array) || !_strict);
-    if (_inputArray.getType() == Array) {
+    uassert(5858203,
+            "an array is expected",
+            (_strict && _inputArray.getType() == BSONType::array) || !_strict);
+    if (_inputArray.getType() == BSONType::array) {
         const size_t length = _inputArray.getArrayLength();
         invariant(_index == 0 || _index < length);
 

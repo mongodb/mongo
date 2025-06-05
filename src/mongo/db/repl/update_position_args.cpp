@@ -70,7 +70,8 @@ UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
 Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
     // grab the array of changes
     BSONElement updateArray;
-    Status status = bsonExtractTypedField(argsObj, kUpdateArrayFieldName, Array, &updateArray);
+    Status status =
+        bsonExtractTypedField(argsObj, kUpdateArrayFieldName, BSONType::array, &updateArray);
     if (!status.isOK())
         return status;
 
@@ -87,7 +88,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         Date_t appliedWallTime = Date_t();
         BSONElement appliedWallTimeElement;
         status = bsonExtractTypedField(
-            entry, kAppliedWallTimeFieldName, BSONType::Date, &appliedWallTimeElement);
+            entry, kAppliedWallTimeFieldName, BSONType::date, &appliedWallTimeElement);
         if (!status.isOK()) {
             return status;
         }
@@ -104,7 +105,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         Date_t writtenWallTime = Date_t();
         BSONElement writtenWallTimeElement;
         status = bsonExtractTypedField(
-            entry, kWrittenWallTimeFieldName, BSONType::Date, &writtenWallTimeElement);
+            entry, kWrittenWallTimeFieldName, BSONType::date, &writtenWallTimeElement);
         if (status.code() == ErrorCodes::NoSuchKey) {
             writtenWallTime = appliedWallTime;
         } else if (!status.isOK()) {
@@ -116,7 +117,7 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         Date_t durableWallTime = Date_t();
         BSONElement durableWallTimeElement;
         status = bsonExtractTypedField(
-            entry, kDurableWallTimeFieldName, BSONType::Date, &durableWallTimeElement);
+            entry, kDurableWallTimeFieldName, BSONType::date, &durableWallTimeElement);
         if (!status.isOK()) {
             return status;
         }

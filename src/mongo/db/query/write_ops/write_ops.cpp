@@ -229,15 +229,15 @@ void opTimeSerializerWithTermCheck(repl::OpTime opTime, StringData fieldName, BS
 }
 
 repl::OpTime opTimeParser(BSONElement elem) {
-    if (elem.type() == BSONType::Object) {
+    if (elem.type() == BSONType::object) {
         return repl::OpTime::parse(elem.Obj());
-    } else if (elem.type() == BSONType::bsonTimestamp) {
+    } else if (elem.type() == BSONType::timestamp) {
         return repl::OpTime(elem.timestamp(), repl::OpTime::kUninitializedTerm);
     }
 
     uasserted(ErrorCodes::TypeMismatch,
-              str::stream() << "Expected BSON type " << BSONType::Object << " or "
-                            << BSONType::bsonTimestamp << ", but found " << elem.type());
+              str::stream() << "Expected BSON type " << BSONType::object << " or "
+                            << BSONType::timestamp << ", but found " << elem.type());
 }
 
 int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, size_t writePos) {
@@ -699,7 +699,7 @@ UpdateModification UpdateModification::parseFromOplogEntry(const BSONObj& oField
         uassert(4772601,
                 str::stream() << "Expected 'diff' field to be an object, instead got type: "
                               << diff.type(),
-                diff.type() == BSONType::Object);
+                diff.type() == BSONType::object);
 
         return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, DeltaTag{}, options);
     } else {
@@ -716,14 +716,14 @@ UpdateModification::UpdateModification(TransformFunc transform)
 
 UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
-    if (type == BSONType::Object) {
+    if (type == BSONType::object) {
         _update = UpdateModification(update.Obj())._update;
         return;
     }
 
     uassert(ErrorCodes::FailedToParse,
             "Update argument must be either an object or an array",
-            type == BSONType::Array);
+            type == BSONType::array);
 
     _update = PipelineUpdate{parsePipelineFromBSON(update)};
 }

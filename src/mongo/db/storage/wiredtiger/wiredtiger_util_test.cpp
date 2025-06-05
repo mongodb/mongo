@@ -231,7 +231,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
     const BSONObj& obj = result.getValue();
 
     BSONElement stringElement = obj.getField("stringkey");
-    ASSERT_EQUALS(mongo::String, stringElement.type());
+    ASSERT_EQUALS(BSONType::string, stringElement.type());
     ASSERT_EQUALS("abc", stringElement.String());
 
     BSONElement boolElement1 = obj.getField("boolkey1");
@@ -243,7 +243,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
     ASSERT_FALSE(boolElement2.boolean());
 
     BSONElement identifierElement = obj.getField("idkey");
-    ASSERT_EQUALS(mongo::String, identifierElement.type());
+    ASSERT_EQUALS(BSONType::string, identifierElement.type());
     ASSERT_EQUALS("def", identifierElement.String());
 
     BSONElement numberElement = obj.getField("numkey");
@@ -251,7 +251,7 @@ TEST_F(WiredTigerUtilMetadataTest, GetApplicationMetadataTypes) {
     ASSERT_EQUALS(123, numberElement.numberInt());
 
     BSONElement structElement = obj.getField("structkey");
-    ASSERT_EQUALS(mongo::String, structElement.type());
+    ASSERT_EQUALS(BSONType::string, structElement.type());
     ASSERT_EQUALS("(k1=v2,k2=v2)", structElement.String());
 }
 

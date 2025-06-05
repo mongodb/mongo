@@ -83,9 +83,9 @@ BSONElement extractElementAtOrArrayAlongDottedPath(const BSONObj& obj, const cha
 
     if (sub.eoo())
         return BSONElement();
-    else if (sub.type() == Array || path[0] == '\0')
+    else if (sub.type() == BSONType::array || path[0] == '\0')
         return sub;
-    else if (sub.type() == Object)
+    else if (sub.type() == BSONType::object)
         return extractElementAtOrArrayAlongDottedPath(sub.embeddedObject(), path);
     else
         return BSONElement();

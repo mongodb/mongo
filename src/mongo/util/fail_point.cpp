@@ -173,7 +173,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
     const BSONElement modeElem(obj["mode"]);
     if (modeElem.eoo()) {
         return {ErrorCodes::IllegalOperation, "When setting a failpoint, you must supply a 'mode'"};
-    } else if (modeElem.type() == String) {
+    } else if (modeElem.type() == BSONType::string) {
         const std::string modeStr(modeElem.str());
         if (modeStr == "off") {
             mode = FailPoint::off;
@@ -182,7 +182,7 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
         } else {
             return {ErrorCodes::BadValue, fmt::format("unknown mode: {}", modeStr)};
         }
-    } else if (modeElem.type() == Object) {
+    } else if (modeElem.type() == BSONType::object) {
         const BSONObj modeObj(modeElem.Obj());
 
         if (modeObj.hasField("times")) {

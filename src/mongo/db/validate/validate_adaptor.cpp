@@ -258,14 +258,14 @@ Status _validateTimeseriesControlField(const CollectionPtr& collection,
  */
 Status _validateTimeseriesDataFieldTypes(const BSONElement& dataField, int bucketVersion) {
     auto dataType = (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion)
-        ? BSONType::Object
-        : BSONType::BinData;
+        ? BSONType::object
+        : BSONType::binData;
     // Checks that open buckets have 'Object' type and closed buckets have 'BinData Column' type.
     auto isCorrectType = [&](BSONElement el) {
         if (bucketVersion == timeseries::kTimeseriesControlUncompressedVersion) {
-            return el.type() == BSONType::Object;
+            return el.type() == BSONType::object;
         } else {
-            return el.type() == BSONType::BinData && el.binDataType() == BinDataType::Column;
+            return el.type() == BSONType::binData && el.binDataType() == BinDataType::Column;
         }
     };
 
@@ -436,7 +436,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
     timeseries::bucket_catalog::MinMax minmax{trackingContext};
     if (version == timeseries::kTimeseriesControlUncompressedVersion) {
         for (const auto& metric : timeField.Obj()) {
-            if (metric.type() != BSONType::Date) {
+            if (metric.type() != BSONType::date) {
                 return Status(ErrorCodes::BadValue,
                               fmt::format("Time-series bucket {} field is not a Date", fieldName));
             }
@@ -462,7 +462,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
             bool detectedOutOfOrder = false;
             for (const auto& metric : col) {
                 if (!metric.eoo()) {
-                    if (metric.type() != BSONType::Date) {
+                    if (metric.type() != BSONType::date) {
                         return Status(
                             ErrorCodes::BadValue,
                             fmt::format("Time-series bucket '{}' field is not a Date", fieldName));

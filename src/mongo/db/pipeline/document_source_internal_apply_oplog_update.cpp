@@ -65,7 +65,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::cre
     uassert(6315901,
             str::stream() << "Argument to " << kStageName
                           << " stage must be an object, but found type: " << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec =
         InternalApplyOplogUpdateSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());

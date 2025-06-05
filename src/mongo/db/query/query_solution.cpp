@@ -85,20 +85,20 @@ OrderedIntervalList buildStringBoundsOil(const std::string& keyName) {
     ret.name = keyName;
 
     BSONObjBuilder strBob;
-    strBob.appendMinForType("", BSONType::String);
-    strBob.appendMaxForType("", BSONType::String);
+    strBob.appendMinForType("", stdx::to_underlying(BSONType::string));
+    strBob.appendMaxForType("", stdx::to_underlying(BSONType::string));
     ret.intervals.push_back(
         IndexBoundsBuilder::makeRangeInterval(strBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
 
     BSONObjBuilder objBob;
-    objBob.appendMinForType("", BSONType::Object);
-    objBob.appendMaxForType("", BSONType::Object);
+    objBob.appendMinForType("", stdx::to_underlying(BSONType::object));
+    objBob.appendMaxForType("", stdx::to_underlying(BSONType::object));
     ret.intervals.push_back(
         IndexBoundsBuilder::makeRangeInterval(objBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
 
     BSONObjBuilder arrBob;
-    arrBob.appendMinForType("", BSONType::Array);
-    arrBob.appendMaxForType("", BSONType::Array);
+    arrBob.appendMinForType("", stdx::to_underlying(BSONType::array));
+    arrBob.appendMaxForType("", stdx::to_underlying(BSONType::array));
     ret.intervals.push_back(
         IndexBoundsBuilder::makeRangeInterval(arrBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
 
@@ -1159,7 +1159,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
 
         // "Hashed" fields (or other special kinds of index) prohibit sorts on the later fields,
         // unless there is an equality on the hashed field (handled above).
-        if (elt.type() == mongo::String) {
+        if (elt.type() == BSONType::string) {
             break;
         }
 

@@ -82,9 +82,9 @@ ClusteredCollectionInfo makeCanonicalClusteredInfo(ClusteredIndexSpec indexSpec)
 boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& elem) {
     uassert(5979702,
             "'clusteredIndex' has to be a boolean or object.",
-            elem.type() == mongo::Bool || elem.type() == mongo::Object);
+            elem.type() == BSONType::boolean || elem.type() == BSONType::object);
 
-    bool isLegacyFormat = elem.type() == mongo::Bool;
+    bool isLegacyFormat = elem.type() == BSONType::boolean;
     if (isLegacyFormat) {
         // Legacy format implies the collection was created with format {clusteredIndex: <bool>}.
         // The legacy format is maintained for backward compatibility with time series buckets

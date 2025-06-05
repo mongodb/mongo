@@ -81,7 +81,7 @@ DocumentSourceReshardingOwnershipMatch::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(8423307,
             str::stream() << "Argument to " << kStageName << " must be an object",
-            elem.type() == Object);
+            elem.type() == BSONType::object);
 
     auto parsed = DocumentSourceReshardingOwnershipMatchSpec::parse(
         IDLParserContext{"DocumentSourceReshardingOwnershipMatchSpec"}, elem.embeddedObject());

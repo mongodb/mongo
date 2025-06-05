@@ -127,45 +127,45 @@ StringData debugTypeString(BSONType t) {
     // This is tightly coupled with 'canonicalizeBSONType' and therefore also with
     // sorting/comparison semantics.
     switch (t) {
-        case EOO:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::undefined:
             return kUndefinedTypeString;
-        case Symbol:
-        case String:
+        case BSONType::symbol:
+        case BSONType::string:
             return kStringTypeString;
-        case NumberInt:
-        case NumberLong:
-        case NumberDouble:
-        case NumberDecimal:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal:
             return kNumberTypeString;
-        case MinKey:
+        case BSONType::minKey:
             return kMinKeyTypeString;
-        case Object:
+        case BSONType::object:
             return kObjectTypeString;
-        case Array:
+        case BSONType::array:
             // This case should only happen if we have an array within an array.
             return kArrayTypeString;
-        case BinData:
+        case BSONType::binData:
             return kBinDataTypeString;
-        case jstOID:
+        case BSONType::oid:
             return kObjectIdTypeString;
-        case Bool:
+        case BSONType::boolean:
             return kBoolTypeString;
-        case Date:
+        case BSONType::date:
             return kDateTypeString;
-        case jstNULL:
+        case BSONType::null:
             return kNullTypeString;
-        case RegEx:
+        case BSONType::regEx:
             return kRegexTypeString;
-        case DBRef:
+        case BSONType::dbRef:
             return kDbPointerTypeString;
-        case Code:
+        case BSONType::code:
             return kJavascriptTypeString;
-        case CodeWScope:
+        case BSONType::codeWScope:
             return kJavascriptWithScopeTypeString;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             return kTimestampTypeString;
-        case MaxKey:
+        case BSONType::maxKey:
             return kMaxKeyTypeString;
         default:
             MONGO_UNREACHABLE_TASSERT(7539806);
@@ -181,45 +181,45 @@ ImplicitValue defaultLiteralOfType(BSONType t) {
     // This is tightly coupled with 'canonicalizeBSONType' and therefore also with
     // sorting/comparison semantics.
     switch (t) {
-        case EOO:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::undefined:
             return BSONUndefined;
-        case Symbol:
-        case String:
+        case BSONType::symbol:
+        case BSONType::string:
             return kRepresentativeString;
-        case NumberInt:
-        case NumberLong:
-        case NumberDouble:
-        case NumberDecimal:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal:
             return kRepresentativeNumber;
-        case MinKey:
+        case BSONType::minKey:
             return MINKEY;
-        case Object:
+        case BSONType::object:
             return kRepresentativeObject;
-        case Array:
+        case BSONType::array:
             // This case should only happen if we have an array within an array.
             return kRepresentativeArray;
-        case BinData:
+        case BSONType::binData:
             return kRepresentativeBinData;
-        case jstOID:
+        case BSONType::oid:
             return kRepresentativeObjectId;
-        case Bool:
+        case BSONType::boolean:
             return kRepresentativeBool;
-        case Date:
+        case BSONType::date:
             return kRepresentativeDate;
-        case jstNULL:
+        case BSONType::null:
             return BSONNULL;
-        case RegEx:
+        case BSONType::regEx:
             return kRepresentativeRegex;
-        case DBRef:
+        case BSONType::dbRef:
             return kRepresentativeDbPointer;
-        case Code:
+        case BSONType::code:
             return kRepresentativeJavascript;
-        case CodeWScope:
+        case BSONType::codeWScope:
             return kRepresentativeJavascriptWithScope;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             return kRepresentativeTimestamp;
-        case MaxKey:
+        case BSONType::maxKey:
             return MAXKEY;
         default:
             MONGO_UNREACHABLE_TASSERT(7539803);
@@ -285,7 +285,7 @@ StringData debugTypeString(
     const ValueType& v,
     GetTypeFn<ValueType> getTypeCallback,
     std::function<ArraySubtypeInfo(ValueType)> determineArraySubTypeCallback) {
-    if (getTypeCallback(v) == BSONType::Array) {
+    if (getTypeCallback(v) == BSONType::array) {
         // Iterating the array as .Obj(), as if it were a BSONObj (with field names '0', '1', etc.)
         // is faster than converting the whole thing to an array which would force a copy.
         auto typeInfo = determineArraySubTypeCallback(v);
@@ -308,7 +308,7 @@ ImplicitValue defaultLiteralOfType(
     const ValueType& v,
     GetTypeFn<ValueType> getTypeCallback,
     std::function<ArraySubtypeInfo(ValueType)> determineArraySubTypeCallback) {
-    if (getTypeCallback(v) == BSONType::Array) {
+    if (getTypeCallback(v) == BSONType::array) {
         auto typeInfo = determineArraySubTypeCallback(v);
         switch (typeInfo.nTypes) {
             case ArraySubtypeInfo::NTypes::kEmpty:
@@ -340,60 +340,60 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 void appendDefaultOfNonArrayType(BSONObjBuilder* bob, StringData name, const BSONElement& e) {
     switch (e.type()) {
-        case EOO:
-        case Undefined:
+        case BSONType::eoo:
+        case BSONType::undefined:
             bob->appendUndefined(name);
             return;
-        case Symbol:
-        case String:
+        case BSONType::symbol:
+        case BSONType::string:
             bob->append(name, kRepresentativeString);
             return;
-        case NumberInt:
-        case NumberLong:
-        case NumberDouble:
-        case NumberDecimal:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal:
             bob->append(name, kRepresentativeNumber);
             return;
-        case MinKey:
+        case BSONType::minKey:
             bob->appendMinKey(name);
             return;
-        case Object:
+        case BSONType::object:
             bob->append(name, kRepresentativeObject);
             return;
-        case Array:
+        case BSONType::array:
             // This case is more complicated and callers should use a more generic helper.
             MONGO_UNREACHABLE_TASSERT(8094100);
-        case BinData:
+        case BSONType::binData:
             bob->append(name, kRepresentativeBinData);
             return;
-        case jstOID:
+        case BSONType::oid:
             bob->append(name, kRepresentativeObjectId);
             return;
-        case Bool:
+        case BSONType::boolean:
             bob->append(name, kRepresentativeBool);
             return;
-        case Date:
+        case BSONType::date:
             bob->append(name, kRepresentativeDate);
             return;
-        case jstNULL:
+        case BSONType::null:
             bob->appendNull(name);
             return;
-        case RegEx:
+        case BSONType::regEx:
             bob->append(name, kRepresentativeRegex);
             return;
-        case DBRef:
+        case BSONType::dbRef:
             bob->append(name, kRepresentativeDbPointer);
             return;
-        case Code:
+        case BSONType::code:
             bob->append(name, kRepresentativeJavascript);
             return;
-        case CodeWScope:
+        case BSONType::codeWScope:
             bob->append(name, kRepresentativeJavascriptWithScope);
             return;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             bob->append(name, kRepresentativeTimestamp);
             return;
-        case MaxKey:
+        case BSONType::maxKey:
             bob->appendMaxKey(name);
             return;
         default:
@@ -450,7 +450,7 @@ void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
             bob->appendAs(e, name);
             return;
         case LiteralSerializationPolicy::kToRepresentativeParseableValue: {
-            if (e.type() != BSONType::Array) {
+            if (e.type() != BSONType::array) {
                 appendDefaultOfNonArrayType(bob, name, e);
                 return;
             }

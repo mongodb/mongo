@@ -253,12 +253,12 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
             5429513,
             str::stream() << "Invalid range: Expected the sortBy field to be a Date, but it was "
                           << base.getType(),
-            base.getType() == BSONType::Date);
+            base.getType() == BSONType::date);
     } else {
         uassert(
             5429413,
             "Invalid range: For windows that involve date or time ranges, a unit must be provided.",
-            base.getType() != BSONType::Date);
+            base.getType() != BSONType::date);
         uassert(
             5429414,
             str::stream() << "Invalid range: Expected the sortBy field to be a number, but it was "
@@ -271,7 +271,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                 dateAdd(base.coerceToDate(), *range.unit, delta.coerceToInt(), TimeZone())};
         } else {
             tassert(5429406, "Range-based bounds are specified as a number", delta.numeric());
-            if (base.getType() == BSONType::NumberDouble) {
+            if (base.getType() == BSONType::numberDouble) {
                 // When we compare a double and a Decimal128, we convert the Decimal128 to double
                 // and compare two double values. Since converting a double to Decimal128 is
                 // expensive and since during the comparison we will convert the Decimal128 to
@@ -287,7 +287,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
     };
     auto hasExpectedType = [&](const Value& v) -> bool {
         if (range.unit) {
-            return v.getType() == BSONType::Date;
+            return v.getType() == BSONType::date;
         } else {
             return v.numeric();
         }

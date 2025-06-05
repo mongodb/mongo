@@ -98,22 +98,22 @@ void translateElement(StringData fieldName,
                       BSONObjBuilder* out,
                       TranslateStack* ctxStack) {
     switch (element.type()) {
-        case BSONType::String: {
+        case BSONType::string: {
             out->append(fieldName,
                         collator->getComparisonKey(element.valueStringData()).getKeyData());
             return;
         }
-        case BSONType::Object: {
+        case BSONType::object: {
             invariant(ctxStack);
             ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subobjStart(fieldName));
             return;
         }
-        case BSONType::Array: {
+        case BSONType::array: {
             invariant(ctxStack);
             ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subarrayStart(fieldName));
             return;
         }
-        case BSONType::Symbol: {
+        case BSONType::symbol: {
             uasserted(ErrorCodes::CannotBuildIndexKeys,
                       str::stream()
                           << "Cannot index type Symbol with a collation. Failed to index element: "
@@ -159,7 +159,7 @@ void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
     if (elt.isABSONObj()) {
         translate(elt.Obj(),
                   collator,
-                  elt.type() == BSONType::Array ? &out->subarrayStart("") : &out->subobjStart(""));
+                  elt.type() == BSONType::array ? &out->subarrayStart("") : &out->subobjStart(""));
     } else {
         translateElement("", elt, collator, out, nullptr);
     }

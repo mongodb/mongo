@@ -79,17 +79,17 @@ public:
         }
         Value sum = RemovableSum::getValue(current);
         switch (sum.getType()) {
-            case NumberInt:
-            case NumberLong:
+            case BSONType::numberInt:
+            case BSONType::numberLong:
                 return Value(sum.coerceToDouble() / static_cast<double>(_count));
-            case NumberDouble: {
+            case BSONType::numberDouble: {
                 double internalSum = sum.getDouble();
                 if (std::isnan(internalSum) || std::isinf(internalSum)) {
                     return sum;
                 }
                 return Value(internalSum / static_cast<double>(_count));
             }
-            case NumberDecimal: {
+            case BSONType::numberDecimal: {
                 Decimal128 internalSum = sum.getDecimal();
                 if (internalSum.isNaN() || internalSum.isInfinite()) {
                     return sum;

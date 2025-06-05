@@ -117,7 +117,7 @@ BSONObj RouterStagePipeline::_validateAndConvertToBSON(const Document& event) {
                              "Expected: "
                           << BSON("_id" << resumeToken) << " but found: "
                           << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
-            (resumeToken.getType() == BSONType::Object) &&
+            (resumeToken.getType() == BSONType::object) &&
                 idField.binaryEqual(resumeToken.getDocument().toBson()));
 
     // Return the event in BSONObj form, minus the $sortKey metadata.

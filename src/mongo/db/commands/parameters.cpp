@@ -213,10 +213,10 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 }
 
 GetParameterOptions parseGetParameterOptions(BSONElement elem) {
-    if (elem.type() == BSONType::Object) {
+    if (elem.type() == BSONType::object) {
         return GetParameterOptions::parse(IDLParserContext{"getParameter"}, elem.Obj());
     }
-    if ((elem.type() == BSONType::String) && (elem.valueStringDataSafe() == "*"_sd)) {
+    if ((elem.type() == BSONType::string) && (elem.valueStringDataSafe() == "*"_sd)) {
         GetParameterOptions ret;
         ret.setAllParameters(true);
         return ret;
@@ -576,7 +576,7 @@ void AutomationServiceDescriptorServerParameter::append(OperationContext*,
 
 Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement,
                                                        const boost::optional<TenantId>&) {
-    if (newValueElement.type() != String) {
+    if (newValueElement.type() != BSONType::string) {
         return {ErrorCodes::TypeMismatch,
                 "Value for parameter automationServiceDescriptor must be of type 'string'"};
     }

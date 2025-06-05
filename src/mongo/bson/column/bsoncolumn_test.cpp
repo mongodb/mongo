@@ -409,7 +409,7 @@ public:
 
     static void appendLiteral(BufBuilder& builder, BSONElement elem) {
         // BSON Type byte
-        builder.appendChar(elem.type());
+        builder.appendChar(stdx::to_underlying(elem.type()));
 
         // Null terminator for field name
         builder.appendChar('\0');
@@ -505,7 +505,7 @@ public:
     }
 
     static void appendEOO(BufBuilder& builder) {
-        builder.appendChar(EOO);
+        builder.appendChar(stdx::to_underlying(BSONType::eoo));
     }
 
     static void convertAndAssertSBEEquals(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
@@ -566,7 +566,7 @@ public:
                 if (last.eoo()) {
                     // Only skips have been encountered, last() should continue to return EOO
                     ASSERT_TRUE(cb.last().eoo());
-                } else if (last.type() != Object && last.type() != Array) {
+                } else if (last.type() != BSONType::object && last.type() != BSONType::array) {
                     // Empty objects and arrays _may_ be encoded as scalar depending on what else
                     // has been added to the builder. This makes this case difficult to test and we
                     // just test the scalar types instead.
@@ -802,7 +802,7 @@ public:
                 if (iter == _fields.end()) {
                     return {elem.value()};
                 }
-                if (elem.type() != Object) {
+                if (elem.type() != BSONType::object) {
                     return {};
                 }
                 obj = elem.Obj();
@@ -1381,15 +1381,15 @@ TEST_F(BSONColumnTest, ContainsScalarInt32SimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1415,15 +1415,15 @@ TEST_F(BSONColumnTest, ContainsScalarInt64SimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1450,15 +1450,15 @@ TEST_F(BSONColumnTest, ContainsScalarDoubleSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1485,15 +1485,15 @@ TEST_F(BSONColumnTest, ContainsScalarTimestampSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1516,15 +1516,15 @@ TEST_F(BSONColumnTest, ContainsScalarStringSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1556,15 +1556,15 @@ TEST_F(BSONColumnTest, ContainsScalarObjectIDSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), true);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), false);
 
     verifyBinary(binData, colBuf);
 }
@@ -1590,15 +1590,15 @@ TEST_F(BSONColumnTest, ContainsScalarBoolSimpleCompressed) {
     appendEOO(colBuf);
     BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
 
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
-    ASSERT_EQ(col.contains_forTest(BSONType::Bool), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::numberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::timestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::string), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::oid), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::boolean), true);
 
     verifyBinary(binData, colBuf);
 }

@@ -130,7 +130,7 @@ ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
                                     std::move(annotation),
                                     collator) {
     uassert(
-        ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::Undefined);
+        ErrorCodes::BadValue, "cannot compare to undefined", _rhs.type() != BSONType::undefined);
 
     switch (matchType()) {
         case LT:

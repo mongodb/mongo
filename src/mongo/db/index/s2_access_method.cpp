@@ -75,7 +75,7 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     BSONObjIterator i(descriptor->keyPattern());
     while (i.more()) {
         BSONElement e = i.next();
-        if (e.type() == String && indexName == e.String()) {
+        if (e.type() == BSONType::string && indexName == e.String()) {
             ++geoFields;
         } else {
             // We check for numeric in 2d, so that's the check here
@@ -126,7 +126,7 @@ StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
         return cannotCreateIndexStatus(indexVersionElt, "Invalid type for geo index version");
     }
 
-    if (indexVersionElt.type() == BSONType::NumberDouble &&
+    if (indexVersionElt.type() == BSONType::numberDouble &&
         !std::isnormal(indexVersionElt.numberDouble())) {
         return cannotCreateIndexStatus(indexVersionElt, "Invalid value for geo index version");
     }

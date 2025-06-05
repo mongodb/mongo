@@ -66,7 +66,7 @@ const vector<string> preferredNumberSeries{
  * we check to see if the values are approximately equal with tolerance 'delta'.
  */
 void testEquals(Value actual, Value expected, double delta = DELTA) {
-    if (actual.getType() == BSONType::NumberDouble || actual.getType() == BSONType::NumberDouble) {
+    if (actual.getType() == BSONType::numberDouble || actual.getType() == BSONType::numberDouble) {
         ASSERT_APPROX_EQUAL(actual.coerceToDouble(), expected.coerceToDouble(), delta);
     } else {
         ASSERT_VALUE_EQ(actual, expected);
@@ -144,7 +144,7 @@ void testRoundingUpInSeriesDecimal(intrusive_ptr<GranularityRounder> rounder) {
             Value input = Value(series[i - 1].multiply(multiplier));
             Value expectedValue = Value(series[i].multiply(multiplier));
             Value roundedValue = rounder->roundUp(input);
-            ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+            ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
             try {
                 testEquals(roundedValue, expectedValue);
@@ -208,7 +208,7 @@ void testRoundingUpBetweenSeriesDecimal(intrusive_ptr<GranularityRounder> rounde
             // Make sure a number in between two numbers in the series rounds up correctly.
             Value expectedValue = Value(upper);
             Value roundedValue = rounder->roundUp(Value(middle));
-            ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+            ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
             try {
                 testEquals(roundedValue, expectedValue);
@@ -266,7 +266,7 @@ void testRoundingDownInSeriesDecimal(intrusive_ptr<GranularityRounder> rounder) 
             Value input = Value(series[i].multiply(multiplier));
             Value expectedValue = Value(series[i - 1].multiply(multiplier));
             Value roundedValue = rounder->roundDown(input);
-            ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+            ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
             try {
                 testEquals(roundedValue, expectedValue);
@@ -330,7 +330,7 @@ void testRoundingDownBetweenSeriesDecimal(intrusive_ptr<GranularityRounder> roun
             // Make sure a number in between two numbers in the series rounds down correctly.
             Value expectedValue = Value(lower);
             Value roundedValue = rounder->roundDown(Value(middle));
-            ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+            ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
             try {
                 testEquals(roundedValue, expectedValue);
@@ -398,7 +398,7 @@ void testSeriesWrappingAroundDecimal(intrusive_ptr<GranularityRounder> rounder) 
         Value input = Value(series.back().multiply(multiplier));
         Value expectedValue = Value(series.front().multiply(multiplier).multiply(Decimal128(10)));
         Value roundedValue = rounder->roundUp(input);
-        ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+        ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
         try {
             testEquals(roundedValue, expectedValue);
@@ -414,7 +414,7 @@ void testSeriesWrappingAroundDecimal(intrusive_ptr<GranularityRounder> rounder) 
         input = Value(series.front().multiply(multiplier));
         expectedValue = Value(series.back().multiply(multiplier).divide(Decimal128(10)));
         roundedValue = rounder->roundDown(input);
-        ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+        ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
 
         try {
             testEquals(roundedValue, expectedValue);

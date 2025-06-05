@@ -185,7 +185,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 
     BSONElement writeConcernElement;
     Status wcStatus =
-        bsonExtractTypedField(cmdObj, kWriteConcernField, Object, &writeConcernElement);
+        bsonExtractTypedField(cmdObj, kWriteConcernField, BSONType::object, &writeConcernElement);
     if (!wcStatus.isOK()) {
         return wcStatus;
     }

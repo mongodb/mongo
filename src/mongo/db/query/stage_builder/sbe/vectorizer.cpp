@@ -854,15 +854,15 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
 
         static const stdx::unordered_map<std::string, uint32_t> kTypeMask = {
             {"isNumber",
-             getBSONTypeMask(BSONType::NumberInt) | getBSONTypeMask(BSONType::NumberLong) |
-                 getBSONTypeMask(BSONType::NumberDouble) |
-                 getBSONTypeMask(BSONType::NumberDecimal)},
-            {"isDate", getBSONTypeMask(BSONType::Date)},
-            {"isString", getBSONTypeMask(BSONType::String)},
-            {"isTimestamp", getBSONTypeMask(BSONType::bsonTimestamp)},
-            {"isArray", getBSONTypeMask(BSONType::Array)},
-            {"isObject", getBSONTypeMask(BSONType::Object)},
-            {"isNull", getBSONTypeMask(BSONType::jstNULL)},
+             getBSONTypeMask(BSONType::numberInt) | getBSONTypeMask(BSONType::numberLong) |
+                 getBSONTypeMask(BSONType::numberDouble) |
+                 getBSONTypeMask(BSONType::numberDecimal)},
+            {"isDate", getBSONTypeMask(BSONType::date)},
+            {"isString", getBSONTypeMask(BSONType::string)},
+            {"isTimestamp", getBSONTypeMask(BSONType::timestamp)},
+            {"isArray", getBSONTypeMask(BSONType::array)},
+            {"isObject", getBSONTypeMask(BSONType::object)},
+            {"isNull", getBSONTypeMask(BSONType::null)},
         };
 
         if (arity == 1 && kTypeMask.count(op.name()) > 0 &&

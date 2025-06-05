@@ -59,7 +59,7 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(28803,
             "The $indexStats stage specification must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
 
     // Get the index stats for the current shard and map them over a deferred queue. The queue won't
     // be populated until reaching the shards due to the host type requirement.

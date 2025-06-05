@@ -193,10 +193,10 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
-    if (elem.type() != mongo::Object) {
+    if (elem.type() != BSONType::object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "$readPreference has incorrect type: expected "
-                                    << mongo::Object << " but got " << elem.type());
+                                    << BSONType::object << " but got " << elem.type());
     }
     return fromInnerBSON(elem.Obj());
 }

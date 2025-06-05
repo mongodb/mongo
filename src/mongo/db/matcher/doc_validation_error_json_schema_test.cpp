@@ -1406,7 +1406,7 @@ TEST(JSONSchemaValidation, EncryptWithSubtypeFailsDueToMismatchedSubtype) {
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::String;
+    blob.originalBsonType = stdx::to_underlying(BSONType::string);
 
     BSONObj document = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                sizeof(FleBlobHeader),
@@ -1430,7 +1430,7 @@ TEST(JSONSchemaValidation, EncryptWithSubtypeInvertedValueIsEncrypted) {
     FleBlobHeader blob;
     blob.fleBlobSubtype = static_cast<int8_t>(EncryptedBinDataType::kDeterministic);
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
-    blob.originalBsonType = BSONType::NumberInt;
+    blob.originalBsonType = stdx::to_underlying(BSONType::numberInt);
 
     BSONObj document = BSON("a" << BSONBinData(reinterpret_cast<const void*>(&blob),
                                                sizeof(FleBlobHeader),

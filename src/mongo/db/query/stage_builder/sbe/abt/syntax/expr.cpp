@@ -131,8 +131,8 @@ bool Constant::operator==(const Constant& other) const {
     }
 
     // Extended types cannot be used directly with compareValue().
-    if (sbe::value::tagToType(_tag) == BSONType::EOO &&
-        sbe::value::tagToType(other._tag) == BSONType::EOO) {
+    if (sbe::value::tagToType(_tag) == BSONType::eoo &&
+        sbe::value::tagToType(other._tag) == BSONType::eoo) {
         if (_tag != other._tag) {
             return false;
         } else if (_tag == sbe::value::TypeTags::makeObjSpec) {

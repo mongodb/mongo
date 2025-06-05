@@ -103,7 +103,7 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     const BSONElement elem = obj["ts"];
     if (elem.eoo())
         return {ErrorCodes::BadValue, "no ts field"};
-    if (elem.type() != bsonTimestamp)
+    if (elem.type() != BSONType::timestamp)
         return {ErrorCodes::BadValue, "ts must be a Timestamp"};
 
     return keyForOptime(elem.timestamp(), KeyFormat::Long);

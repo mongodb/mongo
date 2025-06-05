@@ -165,11 +165,11 @@ StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) 
 DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
     const BSONElement& spec, const DatabaseName& defaultDB) {
     DocumentSourceOutSpec outSpec;
-    if (spec.type() == BSONType::String) {
+    if (spec.type() == BSONType::string) {
         outSpec.setColl(spec.valueStringData());
         // TODO SERVER-77000: access a SerializationContext object to serialize properly
         outSpec.setDb(defaultDB.serializeWithoutTenantPrefix_UNSAFE());
-    } else if (spec.type() == BSONType::Object) {
+    } else if (spec.type() == BSONType::object) {
         // TODO SERVER-77000: access a SerializationContext object to pass into the IDLParserContext
         outSpec = mongo::DocumentSourceOutSpec::parse(IDLParserContext(kStageName),
                                                       spec.embeddedObject());
@@ -178,7 +178,7 @@ DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
                 fmt::format("{} only supports a string or object argument, but found {}",
                             kStageName,
                             typeName(spec.type())),
-                spec.type() == BSONType::String);
+                spec.type() == BSONType::string);
     }
 
     return outSpec;

@@ -56,18 +56,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
         auto newArr = value::getArrayView(val);
 
         DoubleDoubleSummation res;
-        BSONType resType = BSONType::NumberInt;
+        BSONType resType = BSONType::numberInt;
         switch (fieldTag) {
             case value::TypeTags::NumberInt32:
                 res.addInt(value::bitcastTo<int32_t>(fieldValue));
                 break;
             case value::TypeTags::NumberInt64:
                 res.addLong(value::bitcastTo<long long>(fieldValue));
-                resType = BSONType::NumberLong;
+                resType = BSONType::numberLong;
                 break;
             case value::TypeTags::NumberDouble:
                 res.addDouble(value::bitcastTo<double>(fieldValue));
-                resType = BSONType::NumberDouble;
+                resType = BSONType::numberDouble;
                 break;
             default:
                 MONGO_UNREACHABLE_TASSERT(6546500);
@@ -75,7 +75,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
         auto [sum, addend] = res.getDoubleDouble();
 
         // The merge-side expects that the first element is the BSON type, not internal slot type.
-        newArr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int>(resType));
+        newArr->push_back(value::TypeTags::NumberInt32,
+                          value::bitcastFrom<int>(stdx::to_underlying(resType)));
         newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(sum));
         newArr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(addend));
 
@@ -99,11 +100,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
     auto bsonType = [=]() -> int {
         switch (arr->getAt(AggSumValueElems::kNonDecimalTotalTag).first) {
             case value::TypeTags::NumberInt32:
-                return static_cast<int>(BSONType::NumberInt);
+                return static_cast<int>(BSONType::numberInt);
             case value::TypeTags::NumberInt64:
-                return static_cast<int>(BSONType::NumberLong);
+                return static_cast<int>(BSONType::numberLong);
             case value::TypeTags::NumberDouble:
-                return static_cast<int>(BSONType::NumberDouble);
+                return static_cast<int>(BSONType::numberDouble);
             default:
                 MONGO_UNREACHABLE_TASSERT(6294001);
                 return 0;

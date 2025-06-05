@@ -84,7 +84,7 @@ public:
                                                  const LiteParserOptions& options) {
             uassert(6188500,
                     str::stream() << "$changeStream must take a nested object but found: " << spec,
-                    spec.type() == BSONType::Object);
+                    spec.type() == BSONType::object);
             return std::make_unique<LiteParsed>(spec.fieldName(), nss, spec);
         }
 

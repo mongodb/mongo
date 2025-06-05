@@ -861,7 +861,7 @@ TEST_F(CursorResponseBuilderTest, buildInitialResponseEmptyBatch) {
     // This doesn't appear in the parsed response, so check it directly in the BSON
     auto cursorElt = responseBson["cursor"];
     ASSERT_FALSE(cursorElt.eoo());
-    ASSERT_EQ(cursorElt.type(), BSONType::Object);
+    ASSERT_EQ(cursorElt.type(), BSONType::object);
     auto cursorObj = cursorElt.Obj();
     ASSERT_TRUE(cursorObj.hasField("firstBatch"));
     ASSERT_FALSE(cursorObj.hasField("nextBatch"));
@@ -883,7 +883,7 @@ TEST_F(CursorResponseBuilderTest, buildSubsequentResponseEmptyBatch) {
     // This doesn't appear in the parsed response, so check it directly in the BSON
     auto cursorElt = responseObj["cursor"];
     ASSERT_FALSE(cursorElt.eoo());
-    ASSERT_EQ(cursorElt.type(), BSONType::Object);
+    ASSERT_EQ(cursorElt.type(), BSONType::object);
     auto cursorObj = cursorElt.Obj();
     ASSERT_FALSE(cursorObj.hasField("firstBatch"));
     ASSERT_TRUE(cursorObj.hasField("nextBatch"));

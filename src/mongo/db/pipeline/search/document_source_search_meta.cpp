@@ -217,7 +217,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearchMeta::createFromBso
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$searchMeta value must be an object. Found: "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto specObj = elem.embeddedObject();
     auto view = search_helpers::getViewFromBSONObj(expCtx, specObj);

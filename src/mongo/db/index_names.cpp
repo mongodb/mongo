@@ -74,10 +74,10 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
     while (i.more()) {
         BSONElement e = i.next();
         StringData fieldName(e.fieldNameStringData());
-        if (String == e.type()) {
+        if (e.type() == BSONType::string) {
             indexTypeStr = e.String();
         } else if (WildcardNames::isWildcardFieldName(fieldName)) {
-            if (keyPattern.firstElement().type() == String &&
+            if (keyPattern.firstElement().type() == BSONType::string &&
                 keyPattern.firstElement().fieldNameStringData() == "columnstore"_sd) {
                 return IndexNames::COLUMN;
             } else {

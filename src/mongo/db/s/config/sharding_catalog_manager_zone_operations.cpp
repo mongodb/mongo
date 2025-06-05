@@ -223,8 +223,8 @@ Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData t
         timeseries::kControlMinFieldNamePrefix.toString() + timeField;
     const BSONElement minRangeControlTimeField = range.getMin().getField(controlTimeField);
     const BSONElement maxRangeControlTimeField = range.getMax().getField(controlTimeField);
-    if ((minRangeControlTimeField && minRangeControlTimeField.type() != MinKey) ||
-        (maxRangeControlTimeField && maxRangeControlTimeField.type() != MinKey)) {
+    if ((minRangeControlTimeField && minRangeControlTimeField.type() != BSONType::minKey) ||
+        (maxRangeControlTimeField && maxRangeControlTimeField.type() != BSONType::minKey)) {
         return {
             ErrorCodes::InvalidOptions,
             str::stream()

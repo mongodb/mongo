@@ -721,7 +721,7 @@ void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vect
                                           0LL, NamespaceString::kRsOplogNamespace, docs)));
     ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
     ASSERT_TRUE(request.cmdObj.hasField("sort"));
-    ASSERT_EQUALS(mongo::BSONType::Object, request.cmdObj["sort"].type());
+    ASSERT_EQUALS(mongo::BSONType::object, request.cmdObj["sort"].type());
     ASSERT_BSONOBJ_EQ(BSON("$natural" << -1), request.cmdObj.getObjectField("sort"));
     net->runReadyNetworkOperations();
 }
@@ -4503,10 +4503,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberInt) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), BSONType::numberInt)
+            << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
-        ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+        ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
@@ -4571,10 +4572,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberInt) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), BSONType::numberInt)
+            << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
-        ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+        ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
@@ -4592,7 +4594,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                           .substr(0, expectedlistDatabaseFailure.length()),
                       expectedlistDatabaseFailure)
             << attempt0;
-        ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+        ASSERT_EQUALS(attempt0["durationMillis"].type(), BSONType::numberInt) << attempt0;
         ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
             << attempt0;
         ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
@@ -4672,12 +4674,13 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.nFields(), 14) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberInt) << progress;
+    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), BSONType::numberInt)
+        << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 10) << progress;
     ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
     ASSERT_EQUALS(progress.getIntField("remainingInitialSyncEstimatedMillis"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
@@ -4710,7 +4713,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                       .substr(0, expectedlistDatabaseFailure.length()),
                   expectedlistDatabaseFailure)
         << attempt0;
-    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+    ASSERT_EQUALS(attempt0["durationMillis"].type(), BSONType::numberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
@@ -4749,8 +4752,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(progress.nFields(), 15) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
-    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
-    ASSERT_EQUALS(progress["initialSyncEnd"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
+    ASSERT_EQUALS(progress["initialSyncEnd"].type(), BSONType::date) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     const auto initialSyncEnd = progress["initialSyncEnd"].Date();
@@ -4775,7 +4778,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                       .substr(0, expectedlistDatabaseFailure.length()),
                   expectedlistDatabaseFailure)
         << attempt0;
-    ASSERT_EQUALS(attempt0["durationMillis"].type(), NumberInt) << attempt0;
+    ASSERT_EQUALS(attempt0["durationMillis"].type(), BSONType::numberInt) << attempt0;
     ASSERT_EQUALS(attempt0.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt0;
     ASSERT_EQUALS(attempt0.getIntField("rollBackId"), 1) << attempt0;
@@ -4785,7 +4788,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     BSONObj attempt1 = attempts["1"].Obj();
     ASSERT_EQUALS(attempt1.nFields(), 6) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("status"), std::string("OK")) << attempt1;
-    ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt) << attempt1;
+    ASSERT_EQUALS(attempt1["durationMillis"].type(), BSONType::numberInt) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt1;
     ASSERT_EQUALS(attempt1.getIntField("rollBackId"), 1) << attempt1;
@@ -5031,7 +5034,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
         // This returns a valid document because we omit the cloner stats when they do not fit in a
         // BSON document.
         auto progress = initialSyncer->getInitialSyncProgress();
-        ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+        ASSERT_EQUALS(progress["initialSyncStart"].type(), BSONType::date) << progress;
         ASSERT_FALSE(progress.hasField("databases")) << progress;
 
         // Initial sync will attempt to log stats again at shutdown in a callback, where it should

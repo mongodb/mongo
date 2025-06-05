@@ -77,7 +77,7 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
 
     BSONObjBuilder keyValueBuilder{bob->subobjStart("keyValue")};
     for (const auto& keyValueElem : _keyValue) {
-        const bool shouldHexEncode = keyValueElem.type() == BSONType::String &&
+        const bool shouldHexEncode = keyValueElem.type() == BSONType::string &&
             (!_collation.isEmpty() || !isValidUTF8(keyValueElem.valueStringData()));
 
         hexEncodedComponents.push_back(shouldHexEncode);

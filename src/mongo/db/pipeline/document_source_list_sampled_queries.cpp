@@ -67,7 +67,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
     uassert(6876001,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
+            specElem.type() == BSONType::object);
     auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
                                                             specElem.embeddedObject());
 
@@ -129,7 +129,7 @@ DocumentSourceListSampledQueries::LiteParsed::parse(const NamespaceString& nss,
                                                     const LiteParserOptions& options) {
     uassert(6876000,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
-            specElem.type() == BSONType::Object);
+            specElem.type() == BSONType::object);
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << kStageName << " is not supported on a standalone mongod",
             serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||

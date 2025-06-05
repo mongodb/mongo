@@ -180,12 +180,12 @@ std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     BSONElement cursorsElt = cmdResponse[kCursorsField];
 
     // If there is not "cursors" array then treat it as a single cursor response
-    if (cursorsElt.type() != BSONType::Array) {
+    if (cursorsElt.type() != BSONType::array) {
         cursors.push_back(parseFromBSON(cmdResponse));
     } else {
         BSONObj cursorsObj = cursorsElt.embeddedObject();
         for (BSONElement elt : cursorsObj) {
-            if (elt.type() != BSONType::Object) {
+            if (elt.type() != BSONType::object) {
                 cursors.push_back({ErrorCodes::BadValue,
                                    str::stream()
                                        << "Cursors array element contains non-object element: "

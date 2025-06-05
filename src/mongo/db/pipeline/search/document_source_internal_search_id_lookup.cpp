@@ -69,7 +69,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto searchIdLookupSpec =
         DocumentSourceIdLookupSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());

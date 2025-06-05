@@ -312,7 +312,7 @@ SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
                                      std::move(expr),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::null))),
                         makeBoolConstant(true));
 }
 
@@ -320,8 +320,8 @@ SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
     return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
                         makeFunction("typeMatch",
                                      std::move(expr),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                                       getBSONTypeMask(BSONType::Undefined))),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::null) |
+                                                       getBSONTypeMask(BSONType::undefined))),
                         makeBoolConstant(true));
 }
 

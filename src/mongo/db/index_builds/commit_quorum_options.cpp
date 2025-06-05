@@ -78,7 +78,7 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
                     << repl::ReplSetConfig::kMaxMembers);
         }
         numNodes = static_cast<decltype(numNodes)>(cNumNodes);
-    } else if (commitQuorumElement.type() == String) {
+    } else if (commitQuorumElement.type() == BSONType::string) {
         mode = commitQuorumElement.str();
         if (mode.empty()) {
             return Status(ErrorCodes::FailedToParse,

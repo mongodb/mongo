@@ -56,7 +56,7 @@ public:
         }
     }
     void appendAs(const BSONElement& e, std::string name) {
-        if (e.type() == Object &&
+        if (e.type() == BSONType::object &&
             e.valuesize() == 5) {  // empty object -- this way we can add to it later
             std::string dummyName = name + ".foo";
             prepareContext(dummyName);

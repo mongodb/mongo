@@ -308,7 +308,7 @@ protected:
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT(request.cmdObj["killCursors"]);
             auto cursors = request.cmdObj["cursors"];
-            ASSERT_EQ(cursors.type(), BSONType::Array);
+            ASSERT_EQ(cursors.type(), BSONType::array);
             auto cursorsArray = cursors.Array();
             ASSERT_FALSE(cursorsArray.empty());
             ASSERT_EQ(cursorsArray[0].Long(), cursorId);

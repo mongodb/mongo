@@ -215,7 +215,7 @@ boost::optional<StringData> extractGeoNearFieldFromIndexesByType(OperationContex
 
     if (idxToUse) {
         for (auto&& elem : idxToUse->keyPattern()) {
-            if (elem.type() == BSONType::String && elem.valueStringData() == indexType) {
+            if (elem.type() == BSONType::string && elem.valueStringData() == indexType) {
                 return elem.fieldNameStringData();
             }
         }

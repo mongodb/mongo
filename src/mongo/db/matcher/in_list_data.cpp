@@ -146,7 +146,7 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
                 }
             }
 
-            if (type == BSONType::RegEx) {
+            if (type == BSONType::regEx) {
                 if (errorOnRegex) {
                     return Status(ErrorCodes::BadValue, "Cannot insert regex into InListData");
                 } else {
@@ -154,7 +154,7 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
                 }
             }
 
-            if (type == BSONType::Undefined) {
+            if (type == BSONType::undefined) {
                 return Status(ErrorCodes::BadValue, "Cannot insert undefined into InListData");
             }
 
@@ -172,15 +172,15 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
                 typeMask |= bsonTypeMask;
             }
 
-            if (type == BSONType::String || type == BSONType::Symbol) {
+            if (type == BSONType::string || type == BSONType::symbol) {
                 uint32_t len = e.valuestrsize() - 1;
                 bool isLargeString = len > kLargeStringThreshold;
                 hasLargeStrings |= isLargeString;
-            } else if (type == BSONType::Array) {
+            } else if (type == BSONType::array) {
                 // If 'e' is an array, update 'hasEmptyArray' and 'hasNonEmptyArray'.
                 hasEmptyArray |= e.Obj().isEmpty();
                 hasNonEmptyArray |= !e.Obj().isEmpty();
-            } else if (type == BSONType::Object) {
+            } else if (type == BSONType::object) {
                 // If 'e' is an object, update 'hasEmptyObject' and 'hasNonEmptyObject'.
                 hasEmptyObject |= e.Obj().isEmpty();
                 hasNonEmptyObject |= !e.Obj().isEmpty();
@@ -224,16 +224,16 @@ Status InListData::setElementsImpl(boost::optional<BSONObj> arr,
     }
 
     // If 'typeMask' contains any numeric type, update 'typeMask' to contain all numeric types.
-    uint32_t numberMask = getBSONTypeMask(BSONType::NumberInt) |
-        getBSONTypeMask(BSONType::NumberLong) | getBSONTypeMask(BSONType::NumberDouble) |
-        getBSONTypeMask(BSONType::NumberDecimal);
+    uint32_t numberMask = getBSONTypeMask(BSONType::numberInt) |
+        getBSONTypeMask(BSONType::numberLong) | getBSONTypeMask(BSONType::numberDouble) |
+        getBSONTypeMask(BSONType::numberDecimal);
     if (typeMask & numberMask) {
         typeMask |= numberMask;
     }
 
     // If 'typeMask' contains any string-like type (string or symbol), update 'typeMask' to contain
     // all string-like types.
-    uint32_t stringLikeMask = getBSONTypeMask(BSONType::String) | getBSONTypeMask(BSONType::Symbol);
+    uint32_t stringLikeMask = getBSONTypeMask(BSONType::string) | getBSONTypeMask(BSONType::symbol);
     if (typeMask & stringLikeMask) {
         typeMask |= stringLikeMask;
     }
@@ -292,7 +292,7 @@ void InListData::updateSbeTagMasks() {
         auto tag = static_cast<sbe::value::TypeTags>(tagValue);
         BSONType type = sbe::value::tagToType(tag);
 
-        if (type != BSONType::EOO && (_typeMask & getBSONTypeMask(type))) {
+        if (type != BSONType::eoo && (_typeMask & getBSONTypeMask(type))) {
             _sbeTagMask |= (1ull << tagValue);
 
             if ((sbe::value::isShallowType(tag) && !sbe::value::isStringOrSymbol(tag)) ||
@@ -320,9 +320,9 @@ void InListData::setCollator(const CollatorInterface* coll) {
         return;
     }
 
-    const uint32_t collatableTypesMask = getBSONTypeMask(BSONType::String) |
-        getBSONTypeMask(BSONType::Symbol) | getBSONTypeMask(BSONType::Array) |
-        getBSONTypeMask(BSONType::Object);
+    const uint32_t collatableTypesMask = getBSONTypeMask(BSONType::string) |
+        getBSONTypeMask(BSONType::symbol) | getBSONTypeMask(BSONType::array) |
+        getBSONTypeMask(BSONType::object);
 
     // If _originalElements contains at least one collatable type, then we call setElementsImpl()
     // passing in the same BSON array or the same std::vector<BSONElement>. This will cause
@@ -419,6 +419,6 @@ void InListData::makeArrOwned() {
 }
 
 std::size_t InListData::getNormalizedCanonicalType(BSONType type) {
-    return canonicalizeBSONType(type) - kCanonicalTypeMinValue;
+    return canonicalizeBSONType(type) - stdx::to_underlying(kCanonicalTypeMinValue);
 }
 }  // namespace mongo

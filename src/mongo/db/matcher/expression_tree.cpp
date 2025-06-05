@@ -297,7 +297,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             std::vector<std::unique_ptr<MatchExpression>> nonEligibleForIn;
 
             auto isRegEx = [](const BSONElement& elm) {
-                return elm.type() == BSONType::RegEx;
+                return elm.type() == BSONType::regEx;
             };
 
             // Group the children together that have equality conditions or regular expressions on

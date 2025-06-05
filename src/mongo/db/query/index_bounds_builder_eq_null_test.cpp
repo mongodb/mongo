@@ -178,12 +178,12 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildOneIntervalForHas
     {
         const BSONObj nullElementObj = BSON("" << BSONNULL);
         const BSONObj hashedNullInterval = ExpressionMapping::hash(nullElementObj.firstElement());
-        ASSERT_EQ(hashedNullInterval.firstElement().type(), BSONType::NumberLong);
+        ASSERT_EQ(hashedNullInterval.firstElement().type(), BSONType::numberLong);
 
         const auto& secondInterval = oil.intervals[0];
         ASSERT_TRUE(secondInterval.startInclusive);
         ASSERT_TRUE(secondInterval.endInclusive);
-        ASSERT_EQ(secondInterval.start.type(), BSONType::NumberLong);
+        ASSERT_EQ(secondInterval.start.type(), BSONType::numberLong);
         ASSERT_EQ(secondInterval.start.numberLong(),
                   hashedNullInterval.firstElement().numberLong());
     }

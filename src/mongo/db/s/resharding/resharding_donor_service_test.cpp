@@ -460,7 +460,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();
     ASSERT_EQ(*op.getUuid(), doc.getSourceUUID()) << op.getEntry();
-    ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+    ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
     ASSERT_EQ(receivedChangeEvent, expectedChangeEvent);
     ASSERT_TRUE(op.getFromMigrate());
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
@@ -496,7 +496,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();
     ASSERT_FALSE(op.getUuid()) << op.getEntry();
-    ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+    ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
     ASSERT_FALSE(bool(op.getObject2())) << op.getEntry();
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
 }
@@ -545,7 +545,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
             << op.getEntry();
         ASSERT_EQ(op.getUuid(), doc.getSourceUUID()) << op.getEntry();
         ASSERT_EQ(op.getDestinedRecipient(), recipientShardId) << op.getEntry();
-        ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+        ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
         ASSERT_TRUE(bool(op.getObject2())) << op.getEntry();
         ASSERT_EQ(receivedChangeEvent, expectedChangeEvent);
     }

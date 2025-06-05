@@ -456,13 +456,13 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
                     uassert(ErrorCodes::InvalidOptions,
                             str::stream() << "time field cannot be specified in the zone range for "
                                              "time-series collections",
-                            tagMinKeyElement.type() == MinKey);
+                            tagMinKeyElement.type() == BSONType::minKey);
                 }
                 if (tagMaxKeyElement.fieldNameStringData() == controlTimeField) {
                     uassert(ErrorCodes::InvalidOptions,
                             str::stream() << "time field cannot be specified in the zone range for "
                                              "time-series collections",
-                            tagMaxKeyElement.type() == MinKey);
+                            tagMaxKeyElement.type() == BSONType::minKey);
                 }
             }
         }

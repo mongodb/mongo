@@ -57,7 +57,7 @@ std::string NameExpression::evaluate(ExpressionContext* expCtx, const Document& 
     auto value = _expr->evaluate(doc, &expCtx->variables);
     uassert(8117101,
             fmt::format("Expected string, but got {}", typeName(value.getType())),
-            value.getType() == BSONType::String);
+            value.getType() == BSONType::string);
 
     return value.getStringData().toString();
 }

@@ -304,7 +304,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(
 Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
     invariant(configElem.fieldNameStringData() == WiredTigerUtil::kConfigStringField);
 
-    if (configElem.type() != String) {
+    if (configElem.type() != BSONType::string) {
         return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
     }
 
@@ -1143,7 +1143,7 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
                                     << redact(storageMetadata));
     }
 
-    if (storageMetadata.getField(ident).type() != BSONType::Object) {
+    if (storageMetadata.getField(ident).type() != BSONType::object) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "The storage metadata for ident " << ident
                                     << " is not of type object but is of type "
@@ -1163,7 +1163,7 @@ StatusWith<std::string> WiredTigerUtil::generateImportString(StringData ident,
     const BSONElement tableMetadata = identMd.getField("tableMetadata");
     const BSONElement fileMetadata = identMd.getField("fileMetadata");
 
-    if (tableMetadata.type() != BSONType::String || fileMetadata.type() != BSONType::String) {
+    if (tableMetadata.type() != BSONType::string || fileMetadata.type() != BSONType::string) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "The storage metadata for ident " << ident
                                     << " is not of type string for either the 'tableMetadata' or "

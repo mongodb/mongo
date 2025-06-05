@@ -222,7 +222,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
         //
         // If the string in the key is invalid UTF-8, then we hex encode it before adding it to the
         // error message so that the driver can assume valid UTF-8 when reading the reply.
-        const bool shouldHexEncode = keyValueElem.type() == BSONType::String &&
+        const bool shouldHexEncode = keyValueElem.type() == BSONType::string &&
             (hasCollation || !isValidUTF8(keyValueElem.valueStringData()));
 
         if (shouldHexEncode) {

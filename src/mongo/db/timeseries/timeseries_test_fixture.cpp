@@ -221,47 +221,47 @@ BSONObjBuilder TimeseriesTestFixture::_generateMeasurement(
         return builder;
     }
     switch (*type) {
-        case (Undefined):
+        case BSONType::undefined:
             return _generateMeasurement(_undefinedMeta, timeValue);
-        case (MinKey):
+        case BSONType::minKey:
             return _generateMeasurement(_minKeyMeta, timeValue);
-        case (MaxKey):
+        case BSONType::maxKey:
             return _generateMeasurement(_maxKeyMeta, timeValue);
-        case (jstNULL):
+        case BSONType::null:
             return _generateMeasurement(_nullMeta, timeValue);
-        case (EOO):
+        case BSONType::eoo:
             return _generateMeasurement(_eooMeta, timeValue);
-        case (Date):
+        case BSONType::date:
             return _generateMeasurement(_dateMeta, timeValue);
-        case (bsonTimestamp):
+        case BSONType::timestamp:
             return _generateMeasurement(_bsonTimestampMeta, timeValue);
-        case (NumberInt):
+        case BSONType::numberInt:
             return _generateMeasurement(_intMeta, timeValue);
-        case (NumberLong):
+        case BSONType::numberLong:
             return _generateMeasurement(_longMeta, timeValue);
-        case (NumberDecimal):
+        case BSONType::numberDecimal:
             return _generateMeasurement(_decimalMeta, timeValue);
-        case (NumberDouble):
+        case BSONType::numberDouble:
             return _generateMeasurement(_doubleMeta, timeValue);
-        case (jstOID):
+        case BSONType::oid:
             return _generateMeasurement(_oidMeta, timeValue);
-        case (Bool):
+        case BSONType::boolean:
             return _generateMeasurement(_boolMeta, timeValue);
-        case (BinData):
+        case BSONType::binData:
             return _generateMeasurement(_binDataMeta, timeValue);
-        case (Object):
+        case BSONType::object:
             return _generateMeasurement(_objMeta, timeValue);
-        case (Array):
+        case BSONType::array:
             return _generateMeasurement(_arrayMeta, timeValue);
-        case (RegEx):
+        case BSONType::regEx:
             return _generateMeasurement(_regexMeta, timeValue);
-        case (DBRef):
+        case BSONType::dbRef:
             return _generateMeasurement(_dbRefMeta, timeValue);
-        case (Code):
+        case BSONType::code:
             return _generateMeasurement(_codeMeta, timeValue);
-        case (Symbol):
+        case BSONType::symbol:
             return _generateMeasurement(_symbolMeta, timeValue);
-        case (CodeWScope):
+        case BSONType::codeWScope:
             return _generateMeasurement(_codeWScopeMeta, timeValue);
         default:
             return _generateMeasurement(_stringMeta, timeValue);
@@ -571,7 +571,7 @@ absl::InlinedVector<bucket_catalog::Bucket*, 8> TimeseriesTestFixture::_createFu
     const UUID& collectionUUID,
     size_t numBuckets,
     boost::optional<BSONObj> metaValue = boost::none,
-    boost::optional<BSONType> metaValueType = String) {
+    boost::optional<BSONType> metaValueType = BSONType::string) {
     auto measurements =
         _generateMeasurementsWithRolloverReason({.reason = bucket_catalog::RolloverReason::kCount,
                                                  .metaValue = metaValue,

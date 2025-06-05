@@ -46,59 +46,59 @@ namespace {
 bool localTimeZoneForDate = false;
 }
 
-const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
+const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(BSONType::maxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
 
-const char kMinKeyData[] = {7, 0, 0, 0, static_cast<char>(MinKey), 0, 0};
+const char kMinKeyData[] = {7, 0, 0, 0, static_cast<char>(BSONType::minKey), 0, 0};
 const BSONObj kMinBSONKey(kMinKeyData);
 
 /* take a BSONType and return the name of that type as a char* */
 const char* typeName(BSONType type) {
     switch (type) {
-        case MinKey:
+        case BSONType::minKey:
             return "minKey";
-        case EOO:
+        case BSONType::eoo:
             return "missing";
-        case NumberDouble:
+        case BSONType::numberDouble:
             return "double";
-        case String:
+        case BSONType::string:
             return "string";
-        case Object:
+        case BSONType::object:
             return "object";
-        case Array:
+        case BSONType::array:
             return "array";
-        case BinData:
+        case BSONType::binData:
             return "binData";
-        case Undefined:
+        case BSONType::undefined:
             return "undefined";
-        case jstOID:
+        case BSONType::oid:
             return "objectId";
-        case Bool:
+        case BSONType::boolean:
             return "bool";
-        case Date:
+        case BSONType::date:
             return "date";
-        case jstNULL:
+        case BSONType::null:
             return "null";
-        case RegEx:
+        case BSONType::regEx:
             return "regex";
-        case DBRef:
+        case BSONType::dbRef:
             return "dbPointer";
-        case Code:
+        case BSONType::code:
             return "javascript";
-        case Symbol:
+        case BSONType::symbol:
             return "symbol";
-        case CodeWScope:
+        case BSONType::codeWScope:
             return "javascriptWithScope";
-        case NumberInt:
+        case BSONType::numberInt:
             return "int";
-        case bsonTimestamp:
+        case BSONType::timestamp:
             return "timestamp";
-        case NumberLong:
+        case BSONType::numberLong:
             return "long";
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return "decimal";
         // JSTypeMax doesn't make sense to turn into a string; overlaps with highest-valued type
-        case MaxKey:
+        case BSONType::maxKey:
             return "maxKey";
         default:
             return "invalid";
@@ -108,27 +108,27 @@ const char* typeName(BSONType type) {
 boost::optional<BSONType> findBSONTypeAlias(StringData key) {
     // intentionally leaked
     static const auto& typeAliasMap =
-        *new StringMap<BSONType>{{typeName(BSONType::NumberDouble), BSONType::NumberDouble},
-                                 {typeName(BSONType::String), BSONType::String},
-                                 {typeName(BSONType::Object), BSONType::Object},
-                                 {typeName(BSONType::Array), BSONType::Array},
-                                 {typeName(BSONType::BinData), BSONType::BinData},
-                                 {typeName(BSONType::Undefined), BSONType::Undefined},
-                                 {typeName(BSONType::jstOID), BSONType::jstOID},
-                                 {typeName(BSONType::Bool), BSONType::Bool},
-                                 {typeName(BSONType::Date), BSONType::Date},
-                                 {typeName(BSONType::jstNULL), BSONType::jstNULL},
-                                 {typeName(BSONType::RegEx), BSONType::RegEx},
-                                 {typeName(BSONType::DBRef), BSONType::DBRef},
-                                 {typeName(BSONType::Code), BSONType::Code},
-                                 {typeName(BSONType::Symbol), BSONType::Symbol},
-                                 {typeName(BSONType::CodeWScope), BSONType::CodeWScope},
-                                 {typeName(BSONType::NumberInt), BSONType::NumberInt},
-                                 {typeName(BSONType::bsonTimestamp), BSONType::bsonTimestamp},
-                                 {typeName(BSONType::NumberLong), BSONType::NumberLong},
-                                 {typeName(BSONType::NumberDecimal), BSONType::NumberDecimal},
-                                 {typeName(BSONType::MaxKey), BSONType::MaxKey},
-                                 {typeName(BSONType::MinKey), BSONType::MinKey}};
+        *new StringMap<BSONType>{{typeName(BSONType::numberDouble), BSONType::numberDouble},
+                                 {typeName(BSONType::string), BSONType::string},
+                                 {typeName(BSONType::object), BSONType::object},
+                                 {typeName(BSONType::array), BSONType::array},
+                                 {typeName(BSONType::binData), BSONType::binData},
+                                 {typeName(BSONType::undefined), BSONType::undefined},
+                                 {typeName(BSONType::oid), BSONType::oid},
+                                 {typeName(BSONType::boolean), BSONType::boolean},
+                                 {typeName(BSONType::date), BSONType::date},
+                                 {typeName(BSONType::null), BSONType::null},
+                                 {typeName(BSONType::regEx), BSONType::regEx},
+                                 {typeName(BSONType::dbRef), BSONType::dbRef},
+                                 {typeName(BSONType::code), BSONType::code},
+                                 {typeName(BSONType::symbol), BSONType::symbol},
+                                 {typeName(BSONType::codeWScope), BSONType::codeWScope},
+                                 {typeName(BSONType::numberInt), BSONType::numberInt},
+                                 {typeName(BSONType::timestamp), BSONType::timestamp},
+                                 {typeName(BSONType::numberLong), BSONType::numberLong},
+                                 {typeName(BSONType::numberDecimal), BSONType::numberDecimal},
+                                 {typeName(BSONType::maxKey), BSONType::maxKey},
+                                 {typeName(BSONType::minKey), BSONType::minKey}};
 
     auto it = typeAliasMap.find(key);
     if (it == typeAliasMap.end())
@@ -158,28 +158,28 @@ std::ostream& operator<<(std::ostream& stream, BSONType type) {
 
 bool isValidBSONType(int type) {
     switch (type) {
-        case MinKey:
-        case EOO:
-        case NumberDouble:
-        case String:
-        case Object:
-        case Array:
-        case BinData:
-        case Undefined:
-        case jstOID:
-        case Bool:
-        case Date:
-        case jstNULL:
-        case RegEx:
-        case DBRef:
-        case Code:
-        case Symbol:
-        case CodeWScope:
-        case NumberInt:
-        case bsonTimestamp:
-        case NumberLong:
-        case NumberDecimal:
-        case MaxKey:
+        case stdx::to_underlying(BSONType::minKey):
+        case stdx::to_underlying(BSONType::eoo):
+        case stdx::to_underlying(BSONType::numberDouble):
+        case stdx::to_underlying(BSONType::string):
+        case stdx::to_underlying(BSONType::object):
+        case stdx::to_underlying(BSONType::array):
+        case stdx::to_underlying(BSONType::binData):
+        case stdx::to_underlying(BSONType::undefined):
+        case stdx::to_underlying(BSONType::oid):
+        case stdx::to_underlying(BSONType::boolean):
+        case stdx::to_underlying(BSONType::date):
+        case stdx::to_underlying(BSONType::null):
+        case stdx::to_underlying(BSONType::regEx):
+        case stdx::to_underlying(BSONType::dbRef):
+        case stdx::to_underlying(BSONType::code):
+        case stdx::to_underlying(BSONType::symbol):
+        case stdx::to_underlying(BSONType::codeWScope):
+        case stdx::to_underlying(BSONType::numberInt):
+        case stdx::to_underlying(BSONType::timestamp):
+        case stdx::to_underlying(BSONType::numberLong):
+        case stdx::to_underlying(BSONType::numberDecimal):
+        case stdx::to_underlying(BSONType::maxKey):
             return true;
         default:
             return false;

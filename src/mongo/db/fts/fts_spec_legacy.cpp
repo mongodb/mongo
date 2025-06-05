@@ -69,7 +69,7 @@ void _addFTSStuff(BSONObjBuilder* b) {
 
 const FTSLanguage& FTSSpec::_getLanguageToUseV1(const BSONObj& userDoc) const {
     BSONElement e = userDoc[_languageOverrideField];
-    if (e.type() == String) {
+    if (e.type() == BSONType::string) {
         StringData x = e.valueStringData();
         if (e.size() > 0) {
             // make() w/ TEXT_INDEX_VERSION_1 guaranteed to not fail.
@@ -158,7 +158,7 @@ void FTSSpec::_scoreRecurseV1(const Tools& tools,
         if (languageOverrideField() == x.fieldName())
             continue;
 
-        if (x.type() == String) {
+        if (x.type() == BSONType::string) {
             double w = 1;
             _weightV1(x.fieldName(), &w);
             _scoreStringV1(tools, x.valueStringData(), term_freqs, w);
@@ -191,16 +191,16 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
 
         if (e.eoo()) {
             // do nothing
-        } else if (e.type() == Array) {
+        } else if (e.type() == BSONType::array) {
             BSONObjIterator j(e.Obj());
             while (j.more()) {
                 BSONElement x = j.next();
                 if (leftOverName[0] && x.isABSONObj())
                     x = ::mongo::bson::extractElementAtDottedPath(x.Obj(), leftOverName);
-                if (x.type() == String)
+                if (x.type() == BSONType::string)
                     _scoreStringV1(tools, x.valueStringData(), term_freqs, weight);
             }
-        } else if (e.type() == String) {
+        } else if (e.type() == BSONType::string) {
             _scoreStringV1(tools, e.valueStringData(), term_freqs, weight);
         }
     }
@@ -220,7 +220,7 @@ StatusWith<BSONObj> FTSSpec::_fixSpecV1(const BSONObj& spec) {
             if ((e.fieldNameStringData() == "_fts") || (e.fieldNameStringData() == "_ftsx")) {
                 addedFtsStuff = true;
                 b.append(e);
-            } else if (e.type() == String &&
+            } else if (e.type() == BSONType::string &&
                        (e.valueStringData() == "fts" || e.valueStringData() == "text")) {
                 if (!addedFtsStuff) {
                     _addFTSStuff(&b);

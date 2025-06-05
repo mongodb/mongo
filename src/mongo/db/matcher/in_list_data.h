@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/lazily_initialized.h"
 
 #include <vector>
@@ -150,13 +151,13 @@ public:
     }
 
     bool hasNull() const {
-        return _typeMask & getBSONTypeMask(BSONType::jstNULL);
+        return _typeMask & getBSONTypeMask(BSONType::null);
     }
     bool hasArray() const {
-        return _typeMask & getBSONTypeMask(BSONType::Array);
+        return _typeMask & getBSONTypeMask(BSONType::array);
     }
     bool hasObject() const {
-        return _typeMask & getBSONTypeMask(BSONType::Object);
+        return _typeMask & getBSONTypeMask(BSONType::object);
     }
     bool hasEmptyArray() const {
         return _hasEmptyArray;
@@ -289,10 +290,11 @@ public:
     }
 
 private:
-    static constexpr auto kCanonicalTypeMinValue = BSONType::MinKey;
-    static constexpr auto kCanonicalTypeMaxValue = BSONType::MaxKey;
+    static constexpr auto kCanonicalTypeMinValue = BSONType::minKey;
+    static constexpr auto kCanonicalTypeMaxValue = BSONType::maxKey;
     static constexpr std::size_t kCanonicalTypeCardinality =
-        kCanonicalTypeMaxValue - kCanonicalTypeMinValue + 1;
+        stdx::to_underlying(kCanonicalTypeMaxValue) - stdx::to_underlying(kCanonicalTypeMinValue) +
+        1;
     struct CloneCtorTag {};
     using SmallBSONElementVector = absl::InlinedVector<BSONElement, 1>;
     using CanonicalTypeMask = std::bitset<kCanonicalTypeCardinality>;

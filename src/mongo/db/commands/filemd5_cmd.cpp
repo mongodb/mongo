@@ -95,7 +95,7 @@ public:
         if (const auto rootElt = cmdObj["root"]) {
             uassert(ErrorCodes::InvalidNamespace,
                     "'root' must be of type String",
-                    rootElt.type() == BSONType::String);
+                    rootElt.type() == BSONType::string);
             collectionName = rootElt.str();
         }
         if (collectionName.empty())
@@ -144,7 +144,7 @@ public:
                         str::stream() << "The element that calls binDataClean() must be type of "
                                          "BinData, but type of "
                                       << typeName(stateElem.type()) << " found.",
-                        (stateElem.type() == BSONType::BinData));
+                        (stateElem.type() == BSONType::binData));
 
                 int len;
                 const char* data = stateElem.binDataClean(len);
@@ -211,7 +211,7 @@ public:
                             str::stream() << "The element that calls binDataClean() must be type "
                                              "of BinData, but type of "
                                           << owned["data"].type() << " found.",
-                            owned["data"].type() == BSONType::BinData);
+                            owned["data"].type() == BSONType::binData);
 
                     exec->saveState();
                     // UNLOCKED

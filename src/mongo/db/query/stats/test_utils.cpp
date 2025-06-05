@@ -42,11 +42,11 @@ bool sameTypeClassByComparingMin(sbe::value::TypeTags tag1, sbe::value::TypeTags
     // one-to-one match, the implementation ensures correctness by converting to BSONType with
     // tagToType() and then comparing with the values from BSONObjBuilder::appendMinForType.
     BSONObjBuilder minb1;
-    minb1.appendMinForType(kTempFieldName, sbe::value::tagToType(tag1));
+    minb1.appendMinForType(kTempFieldName, stdx::to_underlying(sbe::value::tagToType(tag1)));
     const BSONObj min1 = minb1.obj();
 
     BSONObjBuilder minb2;
-    minb2.appendMinForType(kTempFieldName, sbe::value::tagToType(tag2));
+    minb2.appendMinForType(kTempFieldName, stdx::to_underlying(sbe::value::tagToType(tag2)));
     const BSONObj min2 = minb2.obj();
 
     return min1.woCompare(min2) == 0;
@@ -62,7 +62,7 @@ TypeTagPairs generateTypeTagPairs(size_t start, size_t end) {
         for (size_t second = start; second < end; ++second) {
             auto firstTag = static_cast<sbe::value::TypeTags>(first);
             auto secondTag = static_cast<sbe::value::TypeTags>(second);
-            if (tagToType(firstTag) == BSONType::EOO || tagToType(secondTag) == BSONType::EOO) {
+            if (tagToType(firstTag) == BSONType::eoo || tagToType(secondTag) == BSONType::eoo) {
                 continue;
             }
             allTypeTagPairs.emplace_back(firstTag, secondTag);

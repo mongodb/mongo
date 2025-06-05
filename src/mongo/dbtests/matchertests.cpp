@@ -125,7 +125,8 @@ public:
     void run() {
         BSONObj query = fromjson("{ a : { $in : [4,6] } }");
         ASSERT_EQUALS(4, query["a"].embeddedObject()["$in"].embeddedObject()["0"].number());
-        ASSERT_EQUALS(NumberInt, query["a"].embeddedObject()["$in"].embeddedObject()["0"].type());
+        ASSERT_EQUALS(BSONType::numberInt,
+                      query["a"].embeddedObject()["$in"].embeddedObject()["0"].type());
 
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
         M m(query, expCtx);

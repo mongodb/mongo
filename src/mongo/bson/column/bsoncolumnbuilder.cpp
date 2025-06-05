@@ -134,7 +134,7 @@ bool objectIdDeltaPossible(const OID& elem, const OID& prev) {
 template <typename ElementFunc>
 bool _traverseUntilEmptyObj(const BSONObj& obj, const ElementFunc& elemFunc) {
     for (const auto& elem : obj) {
-        if (elem.type() == Object || elem.type() == Array) {
+        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
             if (_traverseUntilEmptyObj(elem.Obj(), elemFunc)) {
                 return true;
             }
@@ -154,7 +154,7 @@ bool _hasEmptyObj(const BSONObj& obj) {
 // Helper function to determine if provided Object contains any scalar subfields
 bool _containsScalars(const BSONObj& reference) {
     for (const auto& elem : reference) {
-        if (elem.type() == Object || elem.type() == Array) {
+        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
             if (_containsScalars(elem.Obj())) {
                 return true;
             }
@@ -173,7 +173,7 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
     auto it = obj.begin();
     auto end = obj.end();
     for (const auto& elem : reference) {
-        if (elem.type() == Object || elem.type() == Array) {
+        if (elem.type() == BSONType::object || elem.type() == BSONType::array) {
             BSONObj refObj = elem.Obj();
             bool elemMatch = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
             if (elemMatch) {
@@ -206,7 +206,7 @@ std::pair<BSONObj::iterator, bool> _traverseLockStep(const BSONObj& reference,
             bool sameField = it != end && elem.fieldNameStringData() == it->fieldNameStringData();
 
             // Going from scalar to object is not allowed, this would compress inefficiently
-            if (sameField && (it->type() == Object || it->type() == Array)) {
+            if (sameField && (it->type() == BSONType::object || it->type() == BSONType::array)) {
                 return {it, false};
             }
 
@@ -253,8 +253,9 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
     while (refIt != refEnd && it != end) {
         StringData name = refIt->fieldNameStringData();
         if (name == it->fieldNameStringData()) {
-            bool refIsObjOrArray = refIt->type() == Object || refIt->type() == Array;
-            bool itIsObjOrArray = it->type() == Object || it->type() == Array;
+            bool refIsObjOrArray =
+                refIt->type() == BSONType::object || refIt->type() == BSONType::array;
+            bool itIsObjOrArray = it->type() == BSONType::object || it->type() == BSONType::array;
 
             // We can merge this sub-obj/array if both sides are Object or both are Array
             if (refIsObjOrArray && itIsObjOrArray && refIt->type() == it->type()) {
@@ -269,7 +270,7 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
                     return false;
                 }
                 auto subBuilder = [&] {
-                    if (refIt->type() == Object) {
+                    if (refIt->type() == BSONType::object) {
                         return allocator_aware::BSONObjBuilder<Allocator>{
                             builder->subobjStart(name)};
                     }
@@ -304,7 +305,8 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
             // Reference element does not exist in 'obj' so add it and continue merging with just
             // this iterator incremented. Unless it is an empty object or contains an empty object
             // which is incompatible.
-            if ((refIt->type() == Object || refIt->type() == Array) && _hasEmptyObj(refIt->Obj())) {
+            if ((refIt->type() == BSONType::object || refIt->type() == BSONType::array) &&
+                _hasEmptyObj(refIt->Obj())) {
                 return false;
             }
 
@@ -317,7 +319,8 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
             // Reference element does exist later in 'obj'. Add element in 'it' if it is the first
             // time we see it, fail otherwise (incompatible ordering). Unless 'it' is or contains an
             // empty object which is incompatible.
-            if ((it->type() == Object || it->type() == Array) && _hasEmptyObj(it->Obj())) {
+            if ((it->type() == BSONType::object || it->type() == BSONType::array) &&
+                _hasEmptyObj(it->Obj())) {
                 return false;
             }
             if (builder->hasField(it->fieldNameStringData())) {
@@ -330,7 +333,8 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
     // Add remaining reference elements when we reached end in 'obj'.
     for (; refIt != refEnd; ++refIt) {
         // We cannot allow empty object/array mismatch
-        if ((refIt->type() == Object || refIt->type() == Array) && _hasEmptyObj(refIt->Obj())) {
+        if ((refIt->type() == BSONType::object || refIt->type() == BSONType::array) &&
+            _hasEmptyObj(refIt->Obj())) {
             return false;
         }
         if (builder->hasField(refIt->fieldNameStringData())) {
@@ -342,7 +346,8 @@ bool _mergeObj(allocator_aware::BSONObjBuilder<Allocator>* builder,
     // Add remaining 'obj' elements when we reached end in 'reference'.
     for (; it != end; ++it) {
         // We cannot allow empty object/array mismatch
-        if ((it->type() == Object || it->type() == Array) && _hasEmptyObj(it->Obj())) {
+        if ((it->type() == BSONType::object || it->type() == BSONType::array) &&
+            _hasEmptyObj(it->Obj())) {
             return false;
         }
 
@@ -525,7 +530,7 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
             if (!uses128bit(lastUncompressed.type())) {
                 auto& d64 = std::get<BSONColumn::Iterator::DecodingState::Decoder64>(state.decoder);
                 lastUncompressedEncoded64 = d64.lastEncodedValue;
-                if (element.type() == NumberDouble) {
+                if (element.type() == BSONType::numberDouble) {
                     current.lastAtEndOfBlock = lastUncompressed._numberDouble();
                 }
             } else {
@@ -534,7 +539,8 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
                 lastUncompressedEncoded128 = d128.lastEncodedValue;
 
                 // Check if the string literal is encodable or not.
-                if (lastUncompressed.type() == String || lastUncompressed.type() == Code) {
+                if (lastUncompressed.type() == BSONType::string ||
+                    lastUncompressed.type() == BSONType::code) {
                     lastLiteralUnencodable =
                         !Simple8bTypeUtil::encodeString(lastUncompressed.valueStringData())
                              .has_value();
@@ -557,12 +563,12 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
             uassert(8288100,
                     "Invalid control byte in BSON Column",
                     d64.scaleIndex == Simple8bTypeUtil::kMemoryAsInteger ||
-                        (lastUncompressed.type() == NumberDouble &&
+                        (lastUncompressed.type() == BSONType::numberDouble &&
                          d64.scaleIndex != kInvalidScaleIndex));
 
             // For doubles we need to remember the last value from the previous block (as
             // the scaling can change between blocks).
-            if (lastUncompressed.type() == NumberDouble) {
+            if (lastUncompressed.type() == BSONType::numberDouble) {
                 auto encoded =
                     Simple8bTypeUtil::encodeDouble(current.lastAtEndOfBlock, d64.scaleIndex);
                 uassert(8288101, "Invalid double encoding in BSON Column", encoded);
@@ -586,7 +592,7 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
                 d64.lastEncodedValue = expandDelta(
                     d64.lastEncodedValue, simple8b::sum<int64_t>(pos + 1, blocksSize, lastNonRLE));
 
-                if (lastUncompressed.type() == NumberDouble) {
+                if (lastUncompressed.type() == BSONType::numberDouble) {
                     current.lastAtEndOfBlock =
                         Simple8bTypeUtil::decodeDouble(d64.lastEncodedValue, d64.scaleIndex);
                 }
@@ -599,7 +605,7 @@ bool BSONColumnBuilder<Allocator>::BinaryReopen::scan(const char* binary, int si
                     scaleIndexForControlByte(control) == Simple8bTypeUtil::kMemoryAsInteger);
             // Helper to determine if we may only encode zero deltas
             auto zeroDeltaOnly = [&]() {
-                if (lastUncompressed.type() == BinData) {
+                if (lastUncompressed.type() == BSONType::binData) {
                     int len;
                     lastUncompressed.binData(len);
                     if (len > 16) {
@@ -953,7 +959,7 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
         // Zero delta is repeat of last uncompressed literal, no need to materialize. We can't
         // do this for doubles as the scaling may change along the way.
         if (!deltaOfDelta && d64.lastEncodedValue == lastUncompressedEncoded64 &&
-            type != NumberDouble) {
+            type != BSONType::numberDouble) {
             return lastUncompressed;
         }
 
@@ -962,12 +968,12 @@ void BSONColumnBuilder<Allocator>::BinaryReopen::_reopen64BitTypes(
     // _prevEncoded64 is just set for a few types. We don't use Encoder64::initialize() as it
     // overwrites more members already set by this function.
     if (deltaOfDelta) {
-        if (type == jstOID) {
+        if (type == BSONType::oid) {
             encoder.prevEncoded64 = d64.lastEncodedValueForDeltaOfDelta;
         }
         encoder.prevDelta = d64.lastEncodedValue;
     } else {
-        if (type == NumberDouble) {
+        if (type == BSONType::numberDouble) {
             encoder.prevEncoded64 = d64.lastEncodedValue;
 
             // Calculate last double in previous block by reversing the final pending state and
@@ -1412,7 +1418,7 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement e
         return skip();
     }
 
-    if ((type != Object && type != Array) || elem.Obj().isEmpty()) {
+    if ((type != BSONType::object && type != BSONType::array) || elem.Obj().isEmpty()) {
         // Flush previous sub-object compression when non-object is appended
         if (std::holds_alternative<typename InternalState::Interleaved>(_is.state)) {
             _flushSubObjMode();
@@ -1427,12 +1433,12 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(BSONElement e
 
 template <class Allocator>
 BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(const BSONObj& obj) {
-    return _appendObj({obj, Object});
+    return _appendObj({obj, BSONType::object});
 }
 
 template <class Allocator>
 BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::append(const BSONArray& arr) {
-    return _appendObj({arr, Array});
+    return _appendObj({arr, BSONType::array});
 }
 
 template <class Allocator>
@@ -1677,7 +1683,7 @@ BSONBinData BSONColumnBuilder<Allocator>::finalize() {
     }
 
     // Write EOO at the end
-    _bufBuilder.appendChar(EOO);
+    _bufBuilder.appendChar(stdx::to_underlying(BSONType::eoo));
 
     _is.offset = kFinalizedOffset;
 
@@ -1723,11 +1729,11 @@ EncodingState<Allocator>::Encoder64::Encoder64(const Allocator& allocator)
 template <class Allocator>
 void EncodingState<Allocator>::Encoder64::initialize(Element elem) {
     switch (elem.type) {
-        case NumberDouble: {
+        case BSONType::numberDouble: {
             lastValueInPrevBlock = elem.value.Double();
             std::tie(prevEncoded64, scaleIndex) = scaleAndEncodeDouble(lastValueInPrevBlock, 0);
         } break;
-        case jstOID: {
+        case BSONType::oid: {
             prevEncoded64 = Simple8bTypeUtil::encodeObjectId(elem.value.ObjectID());
         } break;
         default:
@@ -1764,20 +1770,20 @@ bool EncodingState<Allocator>::Encoder64::appendDelta(
     // Value to store in Simple8b if encoding is possible.
     int64_t value = 0;
     switch (elem.type) {
-        case NumberDouble:
+        case BSONType::numberDouble:
             return _appendDouble(elem.value.Double(),
                                  previous.value.Double(),
                                  buffer,
                                  controlByteOffset,
                                  controlBlockWriter,
                                  allocator);
-        case NumberInt:
+        case BSONType::numberInt:
             value = calcDelta(elem.value.Int32(), previous.value.Int32());
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             value = calcDelta(elem.value.Int64(), previous.value.Int64());
             break;
-        case jstOID: {
+        case BSONType::oid: {
             auto oid = elem.value.ObjectID();
             auto prevOid = previous.value.ObjectID();
             encodingPossible = objectIdDeltaPossible(oid, prevOid);
@@ -1789,27 +1795,27 @@ bool EncodingState<Allocator>::Encoder64::appendDelta(
             prevEncoded64 = curEncoded;
             break;
         }
-        case bsonTimestamp: {
+        case BSONType::timestamp: {
             value = calcDelta(elem.value.TimestampValue(), previous.value.TimestampValue());
             break;
         }
-        case Date:
+        case BSONType::date:
             value = calcDelta(elem.value.Date().toMillisSinceEpoch(),
                               previous.value.Date().toMillisSinceEpoch());
             break;
-        case Bool:
+        case BSONType::boolean:
             value = calcDelta(elem.value.Boolean(), previous.value.Boolean());
             break;
-        case Undefined:
-        case jstNULL:
+        case BSONType::undefined:
+        case BSONType::null:
             value = 0;
             break;
-        case RegEx:
-        case DBRef:
-        case CodeWScope:
-        case Symbol:
-        case Object:
-        case Array:
+        case BSONType::regEx:
+        case BSONType::dbRef:
+        case BSONType::codeWScope:
+        case BSONType::symbol:
+        case BSONType::object:
+        case BSONType::array:
             encodingPossible = false;
             break;
         default:
@@ -1869,16 +1875,16 @@ EncodingState<Allocator>::Encoder128::Encoder128(const Allocator& allocator)
 template <class Allocator>
 void EncodingState<Allocator>::Encoder128::initialize(Element elem) {
     switch (elem.type) {
-        case String:
-        case Code: {
+        case BSONType::string:
+        case BSONType::code: {
             prevEncoded128 = Simple8bTypeUtil::encodeString(elem.value.String());
         } break;
-        case BinData: {
+        case BSONType::binData: {
             auto binData = elem.value.BinData();
             prevEncoded128 = Simple8bTypeUtil::encodeBinary(static_cast<const char*>(binData.data),
                                                             binData.length);
         } break;
-        case NumberDecimal: {
+        case BSONType::numberDecimal: {
             prevEncoded128 = Simple8bTypeUtil::encodeDecimal128(elem.value.Decimal());
         } break;
         default:
@@ -1923,13 +1929,13 @@ bool EncodingState<Allocator>::Encoder128::appendDelta(
     };
 
     switch (elem.type) {
-        case String:
-        case Code:
+        case BSONType::string:
+        case BSONType::code:
             if (auto encoded = Simple8bTypeUtil::encodeString(elem.value.String())) {
                 return appendEncoded(*encoded);
             }
             break;
-        case BinData: {
+        case BSONType::binData: {
             auto binData = elem.value.BinData();
             auto prevBinData = previous.value.BinData();
             // We only do delta encoding of binary if the binary type and size are
@@ -1944,7 +1950,7 @@ bool EncodingState<Allocator>::Encoder128::appendDelta(
                 return appendEncoded(*encoded);
             }
         } break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return appendEncoded(Simple8bTypeUtil::encodeDecimal128(elem.value.Decimal()));
             break;
         default:
@@ -2065,7 +2071,7 @@ void EncodingState<Allocator>::skip(allocator_aware::BufBuilder<Allocator>& buff
     // skip only. This is typically the case, but if the simple8b builder was in pending RLE there
     // can be non-skipped values in pending if the values written does not evenly fill simple8b
     // blocks.
-    if (before != buffer.len() && _previous().type == NumberDouble) {
+    if (before != buffer.len() && _previous().type == BSONType::numberDouble) {
         auto& encoder = std::get<Encoder64>(_encoder);
 
         bool pendingSkipOnly = std::none_of(
@@ -2187,7 +2193,7 @@ bool EncodingState<Allocator>::Encoder64::_appendDouble(
         }
 
         // Re-scale not possible, flush and start new block with the higher scale factor
-        flush(NumberDouble, buffer, controlByteOffset, controlBlockWriter);
+        flush(BSONType::numberDouble, buffer, controlByteOffset, controlBlockWriter);
         if (controlByteOffset != kNoSimple8bControl) {
             controlBlockWriter(controlByteOffset, buffer.len() - controlByteOffset);
         }
@@ -2208,7 +2214,7 @@ bool EncodingState<Allocator>::Encoder64::_appendDouble(
     // Append delta and check if we wrote a Simple8b block. If we did we may be able to reduce the
     // scale factor when starting a new block
     auto before = buffer.len();
-    if (!append(NumberDouble,
+    if (!append(BSONType::numberDouble,
                 Simple8bTypeUtil::encodeInt64(calcDelta(encoded, prevEncoded64)),
                 buffer,
                 controlByteOffset,
@@ -2242,7 +2248,7 @@ bool EncodingState<Allocator>::Encoder64::_appendDouble(
             _appendDouble(val, prev, buffer, controlByteOffset, controlBlockWriter, allocator);
             prev = val;
         } else {
-            skip(NumberDouble, buffer, controlByteOffset, controlBlockWriter);
+            skip(BSONType::numberDouble, buffer, controlByteOffset, controlBlockWriter);
         }
     }
     return true;
@@ -2263,7 +2269,7 @@ void EncodingState<Allocator>::_storePrevious(Element elem) {
     _prev.resize(size);
 
     // Copy element into buffer for previous. Omit field name.
-    _prev[0] = elem.type;
+    _prev[0] = stdx::to_underlying(elem.type);
     // Store null terminator, this byte will never change
     _prev[1] = '\0';
     memcpy(_prev.data() + 2, elem.value.value(), elem.size);
@@ -2379,7 +2385,7 @@ void EncodingState<Allocator>::Simple8bBlockWriter64<F>::operator()(uint64_t blo
     // If we are double we need to remember the last value written in the block. There could
     // be multiple values pending still so we need to loop backwards and re-construct the
     // value before the first value in pending.
-    if (_type != NumberDouble)
+    if (_type != BSONType::numberDouble)
         return;
 
     auto current = _encoder.prevEncoded64;
@@ -2500,7 +2506,7 @@ void BSONColumnBuilder<Allocator>::_finishDetermineSubObjReference() {
 
     // Done determining reference sub-object. Write this control byte and object to stream.
     const char interleavedStartControlByte = [&] {
-        return interleaved.referenceSubObjType == Object
+        return interleaved.referenceSubObjType == BSONType::object
             ? bsoncolumn::kInterleavedStartControlByte
             : bsoncolumn::kInterleavedStartArrayRootControlByte;
     }();
@@ -2612,7 +2618,7 @@ void BSONColumnBuilder<Allocator>::_flushSubObjMode() {
         std::push_heap(heap.begin(), heap.end(), std::greater<>{});
     }
     // All control blocks written, write EOO to end the interleaving and cleanup.
-    _bufBuilder.appendChar(EOO);
+    _bufBuilder.appendChar(stdx::to_underlying(BSONType::eoo));
     _is.state.template emplace<typename InternalState::Regular>(_is.allocator);
 }
 

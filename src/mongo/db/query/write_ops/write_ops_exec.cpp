@@ -2248,8 +2248,8 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
 
         // If the index have collation and we are comparing strings, we need to compare
         // ComparisonStrings instead of the raw value to respect collation.
-        if (!indexHasSimpleCollator && equalityElem.type() == mongo::String) {
-            if (keyValueElem.type() != BSONType::String) {
+        if (!indexHasSimpleCollator && equalityElem.type() == BSONType::string) {
+            if (keyValueElem.type() != BSONType::string) {
                 return false;
             }
             auto equalityComparisonString =

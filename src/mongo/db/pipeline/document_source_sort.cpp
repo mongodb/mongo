@@ -478,7 +478,8 @@ void DocumentSourceSort::addVariableRefs(std::set<Variables::Id>* refs) const {
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15973, "the $sort key specification must be an object", spec.type() == Object);
+    uassert(
+        15973, "the $sort key specification must be an object", spec.type() == BSONType::object);
 
     auto specObj = spec.Obj();
     // Reconstruct the sort order without these internal fields.
@@ -568,11 +569,12 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(6369905,
             "the $_internalBoundedSort key specification must be an object",
-            elem.type() == Object);
+            elem.type() == BSONType::object);
     BSONObj args = elem.embeddedObject();
 
     BSONElement key = args["sortKey"];
-    uassert(6369904, "$_internalBoundedSort sortKey must be an object", key.type() == Object);
+    uassert(
+        6369904, "$_internalBoundedSort sortKey must be an object", key.type() == BSONType::object);
 
     // Empty sort pattern is not allowed for the bounded sort.
     uassert(6900501,
@@ -593,8 +595,9 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     }
 
     BSONElement bound = args["bound"];
-    uassert(
-        6460200, "$_internalBoundedSort bound must be an object", bound && bound.type() == Object);
+    uassert(6460200,
+            "$_internalBoundedSort bound must be an object",
+            bound && bound.type() == BSONType::object);
 
     BSONElement boundOffsetElem = bound.Obj()[DocumentSourceSort::kOffset];
     long long boundOffset = 0;
@@ -606,7 +609,7 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     BSONElement boundBaseElem = bound.Obj()["base"];
     uassert(6460201,
             "$_internalBoundedSort bound.base must be a string",
-            boundBaseElem && boundBaseElem.type() == String);
+            boundBaseElem && boundBaseElem.type() == BSONType::string);
     StringData boundBase = boundBaseElem.valueStringData();
     uassert(6460202,
             str::stream() << "$_internalBoundedSort bound.base must be '" << kMin << "' or '"
@@ -712,7 +715,9 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
 std::pair<Date_t, Document> DocumentSourceSort::extractTime(Document&& doc) const {
     const auto& fullPath = _sortExecutor->sortPattern().back().fieldPath->fullPath();
     auto time = doc.getField(StringData{fullPath});
-    uassert(6369909, "$_internalBoundedSort only handles Date values", time.getType() == Date);
+    uassert(6369909,
+            "$_internalBoundedSort only handles BSONType::date values",
+            time.getType() == BSONType::date);
     auto date = time.getDate();
 
     if (shouldSetSortKeyMetadata()) {

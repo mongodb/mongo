@@ -378,11 +378,11 @@ TEST_F(WindowFunctionCovariancePopTest, NonDecimalNumericResultShouldBeCoercedTo
     ASSERT_VALUE_EQ(covariance.getValue(), Value(BSONNULL));
     covariance.add(Value(std::vector<Value>({Value(0), Value(1)})));
 
-    ASSERT_EQUALS(covariance.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(covariance.getValue().getType(), BSONType::numberDouble);
     ASSERT_VALUE_EQ(covariance.getValue(), Value(0.0));
 
     covariance.add(Value(std::vector<Value>({Value(1), Value(2)})));
-    ASSERT_EQUALS(covariance.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(covariance.getValue().getType(), BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionCovariancePopTest, WidenTypeToDecimalOnlyIfNeeded) {
@@ -392,11 +392,11 @@ TEST_F(WindowFunctionCovariancePopTest, WidenTypeToDecimalOnlyIfNeeded) {
     };
     addToWindowCovariance(&covariance, values);
 
-    ASSERT_EQUALS(covariance.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(covariance.getValue().getType(), BSONType::numberDouble);
     ASSERT_LTE(fabs(covariance.getValue().coerceToDouble() - 0.350000), 1e-5);
 
     covariance.add(Value(std::vector<Value>({Value(Decimal128(4.7)), Value(Decimal128(3.6))})));
-    ASSERT_EQUALS(covariance.getValue().getType(), NumberDecimal);
+    ASSERT_EQUALS(covariance.getValue().getType(), BSONType::numberDecimal);
     ASSERT_LTE(fabs(covariance.getValue().coerceToDouble() - 1.655556), 1e-5);
 }
 

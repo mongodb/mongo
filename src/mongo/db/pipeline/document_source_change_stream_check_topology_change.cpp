@@ -68,7 +68,7 @@ DocumentSourceChangeStreamCheckTopologyChange::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5669601,
             str::stream() << "the '" << kStageName << "' spec must be an object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     return new DocumentSourceChangeStreamCheckTopologyChange(expCtx);
 }
 

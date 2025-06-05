@@ -487,13 +487,13 @@ TEST_F(ArithmeticNodeTest, OverflowIntToLong) {
 
     const int initialValue = std::numeric_limits<int>::max();
     mutablebson::Document doc(BSON("a" << initialValue));
-    ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+    ASSERT_EQUALS(mongo::BSONType::numberInt, doc.root()["a"].getType());
     setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    ASSERT_EQUALS(mongo::BSONType::numberLong, doc.root()["a"].getType());
     ASSERT_EQUALS(BSON("a" << static_cast<long long>(initialValue) + 1), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(getModifiedPaths(), "{a}");
@@ -507,13 +507,13 @@ TEST_F(ArithmeticNodeTest, UnderflowIntToLong) {
 
     const int initialValue = std::numeric_limits<int>::min();
     mutablebson::Document doc(BSON("a" << initialValue));
-    ASSERT_EQUALS(mongo::NumberInt, doc.root()["a"].getType());
+    ASSERT_EQUALS(mongo::BSONType::numberInt, doc.root()["a"].getType());
     setPathTaken(makeRuntimeUpdatePathForTest("a"));
     addIndexedPath("a");
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(getIndexAffectedFromLogEntry());
-    ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    ASSERT_EQUALS(mongo::BSONType::numberLong, doc.root()["a"].getType());
     ASSERT_EQUALS(BSON("a" << static_cast<long long>(initialValue) - 1), doc);
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
     ASSERT_EQUALS(getModifiedPaths(), "{a}");

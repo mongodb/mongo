@@ -56,7 +56,7 @@ AccumulationExpression AccumulatorInternalJsReduce::parseInternalJsReduce(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     uassert(31326,
             str::stream() << kName << " requires a document argument, but found " << elem.type(),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     BSONObj obj = elem.embeddedObject();
 
     expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
@@ -100,7 +100,7 @@ std::string AccumulatorInternalJsReduce::parseReduceFunction(BSONElement func) {
         str::stream() << kName
                       << " requires the 'eval' argument to be of type string, or code but found "
                       << func.type(),
-        func.type() == BSONType::String || func.type() == BSONType::Code);
+        func.type() == BSONType::string || func.type() == BSONType::code);
     return func._asCode();
 }
 
@@ -111,7 +111,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
     uassert(31242,
             str::stream() << kName << " requires a document argument, but found "
                           << input.getType(),
-            input.getType() == BSONType::Object);
+            input.getType() == BSONType::object);
     Document data = input.getDocument();
 
     // Avoid too many lookups into the Document cache.
@@ -226,7 +226,7 @@ std::string parseFunction(StringData fieldName,
     Value v = ec->getValue();
     uassert(4544702,
             str::stream() << "$accumulator '" << fieldName << "' must be a String or Code",
-            v.getType() == BSONType::String || v.getType() == BSONType::Code);
+            v.getType() == BSONType::string || v.getType() == BSONType::code);
     return v.coerceToString();
 }
 }  // namespace
@@ -270,7 +270,7 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
     uassert(4544703,
             str::stream() << "$accumulator expects an object as an argument; found: "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     BSONObj obj = elem.embeddedObject();
 
     expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
@@ -296,7 +296,7 @@ AccumulationExpression AccumulatorJs::parse(ExpressionContext* const expCtx,
             uassert(4544704,
                     str::stream() << "$accumulator lang must be a string; found: "
                                   << element.type(),
-                    element.type() == BSONType::String);
+                    element.type() == BSONType::string);
             uassert(4544705,
                     "$accumulator only supports lang: 'js'",
                     element.valueStringData() == "js");
@@ -379,7 +379,7 @@ void AccumulatorJs::startNewGroup(Value const& input) {
     uassert(4544711,
             str::stream() << "$accumulator initArgs must evaluate to an array: "
                           << input.toString(),
-            input.getType() == BSONType::Array);
+            input.getType() == BSONType::array);
 
     size_t index = 0;
     BSONArrayBuilder bob;
@@ -410,7 +410,7 @@ void AccumulatorJs::processInternal(const Value& input, bool merging) {
         uassert(4544712,
                 str::stream() << "$accumulator accumulateArgs must evaluate to an array: "
                               << input.toString(),
-                input.getType() == BSONType::Array);
+                input.getType() == BSONType::array);
     }
 
     _pendingCalls.emplace_back(input);

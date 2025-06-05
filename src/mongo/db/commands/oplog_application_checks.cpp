@@ -73,7 +73,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                                            const BSONObj& oplogEntry,
                                                            AuthorizationSession* authSession) {
     BSONElement opTypeElem = oplogEntry["op"];
-    checkBSONType(BSONType::String, opTypeElem);
+    checkBSONType(BSONType::string, opTypeElem);
     const StringData opType = opTypeElem.checkAndGetStringData();
 
     if (opType == "n"_sd) {
@@ -87,7 +87,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     }
 
     const BSONElement nsElem = oplogEntry["ns"];
-    checkBSONType(BSONType::String, nsElem);
+    checkBSONType(BSONType::string, nsElem);
     const auto tid = repl::OplogEntry::parseTid(oplogEntry);
     NamespaceString nss = NamespaceStringUtil::deserialize(
         tid, nsElem.checkAndGetStringData(), SerializationContext::stateDefault());
@@ -103,7 +103,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     }
 
     BSONElement oElem = oplogEntry["o"];
-    checkBSONType(BSONType::Object, oElem);
+    checkBSONType(BSONType::object, oElem);
     BSONObj o = oElem.Obj();
 
     if (opType == "c"_sd) {
@@ -147,12 +147,12 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         return auth::checkAuthForInsert(authSession, opCtx, nss);
     } else if (opType == "u"_sd) {
         BSONElement o2Elem = oplogEntry["o2"];
-        checkBSONType(BSONType::Object, o2Elem);
+        checkBSONType(BSONType::object, o2Elem);
         BSONObj o2 = o2Elem.Obj();
 
         BSONElement bElem = oplogEntry["b"];
         if (!bElem.eoo()) {
-            checkBSONType(BSONType::Bool, bElem);
+            checkBSONType(BSONType::boolean, bElem);
         }
         bool b = bElem.trueValue();
 
@@ -183,7 +183,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 }
 
 Status OplogApplicationChecks::checkOperationArray(const BSONElement& opsElement) {
-    if (opsElement.type() != Array) {
+    if (opsElement.type() != BSONType::array) {
         return {ErrorCodes::FailedToParse, "ops has to be an array"};
     }
     const auto& ops = opsElement.Obj();
@@ -200,7 +200,7 @@ Status OplogApplicationChecks::checkOperationArray(const BSONElement& opsElement
 }
 
 Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
-    if (e.type() != Object) {
+    if (e.type() != BSONType::object) {
         return {ErrorCodes::FailedToParse, str::stream() << "op not an object: " << e.fieldName()};
     }
     BSONObj obj = e.Obj();
@@ -210,7 +210,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "op does not contain required \"op\" field: " << e.fieldName()};
     }
-    if (opElement.type() != mongo::String) {
+    if (opElement.type() != BSONType::string) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"op\" field is not a string: " << e.fieldName()};
     }
@@ -228,7 +228,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "op does not contain required \"ns\" field: " << e.fieldName()};
     }
-    if (nsElement.type() != mongo::String) {
+    if (nsElement.type() != BSONType::string) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << "\"ns\" field is not a string: " << e.fieldName()};
     }
@@ -283,9 +283,9 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
     if (shouldBypassDocumentValidationForCommand(cmdObj))
         maybeDisableValidation.emplace(opCtx);
 
-    checkBSONType(BSONType::Array, cmdObj.firstElement());
+    checkBSONType(BSONType::array, cmdObj.firstElement());
     for (const BSONElement& e : cmdObj.firstElement().Array()) {
-        checkBSONType(BSONType::Object, e);
+        checkBSONType(BSONType::object, e);
         Status status = OplogApplicationChecks::checkOperationAuthorization(
             opCtx, dbName, e.Obj(), authSession);
         if (!status.isOK()) {

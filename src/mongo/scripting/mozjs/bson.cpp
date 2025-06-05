@@ -150,7 +150,7 @@ void definePropertyFromBSONElement(JSContext* cx,
     ObjectWrapper o(cx, obj);
     o.defineProperty(id, vp, JSPROP_ENUMERATE);
 
-    if (!holder._readOnly && (elem.type() == mongo::Object || elem.type() == mongo::Array)) {
+    if (!holder._readOnly && (elem.type() == BSONType::object || elem.type() == BSONType::array)) {
         // if accessing a subobject, we have no way to know if
         // modifications are being made on writable objects
 

@@ -194,7 +194,7 @@ Status StorageEngineMetadata::read() {
     // Validate 'storage.engine' field.
     BSONElement storageEngineElement =
         ::mongo::bson::extractElementAtDottedPath(obj, "storage.engine");
-    if (storageEngineElement.type() != mongo::String) {
+    if (storageEngineElement.type() != BSONType::string) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "The 'storage.engine' field in metadata must be a string: "
                                     << storageEngineElement.toString());

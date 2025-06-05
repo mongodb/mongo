@@ -83,7 +83,7 @@ bool isComparisonWithArrayPred(const MatchExpression* me) {
     if (type == MatchExpression::EQ || type == MatchExpression::LT || type == MatchExpression::GT ||
         type == MatchExpression::LTE || type == MatchExpression::GTE) {
         return static_cast<const ComparisonMatchExpression*>(me)->getData().type() ==
-            BSONType::Array;
+            BSONType::array;
     } else if (type == MatchExpression::MATCH_IN) {
         return static_cast<const InMatchExpression*>(me)->hasArray();
     }
@@ -95,7 +95,7 @@ std::size_t numPathComponents(StringData path) {
 }
 
 bool canUseWildcardIndex(BSONElement elt, MatchExpression::MatchType matchType) {
-    if (elt.type() == BSONType::Object) {
+    if (elt.type() == BSONType::object) {
         // $** indices break nested objects into separate keys, which means we can't naturally
         // support comparison-to-object predicates. However, there is an exception: empty objects
         // are indexed like regular leaf values. This means that equality-to-empty-object can be
@@ -106,7 +106,7 @@ bool canUseWildcardIndex(BSONElement elt, MatchExpression::MatchType matchType) 
             (matchType == MatchExpression::EQ || matchType == MatchExpression::LTE);
     }
 
-    if (elt.type() == BSONType::Array) {
+    if (elt.type() == BSONType::array) {
         // We only support equality to empty array.
         return elt.embeddedObject().isEmpty() && matchType == MatchExpression::EQ;
     }
@@ -282,7 +282,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
     std::vector<IndexEntry> out;
     BSONElement firstHintElt = hintedIndex.firstElement();
     if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
-        firstHintElt.type() == BSONType::String) {
+        firstHintElt.type() == BSONType::string) {
         auto hintName = firstHintElt.valueStringData();
         for (auto&& entry : allIndices) {
             if (entry.identifier.catalogName == hintName) {
@@ -373,9 +373,9 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                                        StringData fullPathToNode,
                                        const QueryContext& queryContext,
                                        bool nodeIsNotChild) {
-    if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) ||
-         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array) ||
-         boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object)) &&
+    if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::string) ||
+         boundsGeneratingNodeContainsComparisonToType(node, BSONType::array) ||
+         boundsGeneratingNodeContainsComparisonToType(node, BSONType::object)) &&
         !CollatorInterface::collatorsMatch(queryContext.collator, index.collator)) {
         return false;
     }
@@ -411,7 +411,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     // be treated as a btree index by an ancient version of MongoDB.  To try to run
     // 2dsphere queries over it would be folly.
     string indexedFieldType;
-    if (String != keyPatternElt.type() || (INDEX_BTREE == index.type)) {
+    if (BSONType::string != keyPatternElt.type() || (INDEX_BTREE == index.type)) {
         indexedFieldType = "";
     } else {
         indexedFieldType = keyPatternElt.String();
@@ -598,7 +598,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             // We hit the dividing mark between prefix and suffix, so whatever field we're
             // looking at is a suffix, since it appears *after* the dividing mark between the
             // two.  As such, we can use the index.
-            if (String == elt.type()) {
+            if (BSONType::string == elt.type()) {
                 return true;
             }
 
@@ -715,7 +715,7 @@ bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* q
         const bool isNotEqualsNull =
             (childtype == MatchExpression::EQ &&
              static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
-                 BSONType::jstNULL);
+                 BSONType::null);
 
         // Prevent negated predicates from using sparse indices. Doing so would cause us to
         // miss documents which do not contain the indexed fields. The only case where we may
@@ -1339,7 +1339,7 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(MatchExpression*
 
         // We stop when we see the first string in the key pattern.  We know that
         // the prefix precedes "text".
-        for (BSONElement elt = it.next(); elt.type() != String; elt = it.next()) {
+        for (BSONElement elt = it.next(); elt.type() != BSONType::string; elt = it.next()) {
             textIndexPrefixPaths.insert(elt.fieldName());
             MONGO_verify(it.more());
         }
@@ -1456,7 +1456,7 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsTo2dsphereIndices(
         BSONObjIterator it(index.keyPattern);
         while (it.more()) {
             BSONElement elt = it.next();
-            if (String != elt.type()) {
+            if (BSONType::string != elt.type()) {
                 allFieldsGeo = false;
                 break;
             }

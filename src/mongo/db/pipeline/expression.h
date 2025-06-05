@@ -3232,7 +3232,7 @@ public:
 
         uassert(9567004,
                 str::stream() << getOpName() << " requires argument to be a string",
-                constVal.getType() == BSONType::String);
+                constVal.getType() == BSONType::string);
 
         return FieldPath(constVal.getString());
     }

@@ -97,7 +97,7 @@ DocumentSourceChangeStreamCheckInvalidate::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(5467602,
             str::stream() << "the '" << kStageName << "' object spec must be an object",
-            spec.type() == Object);
+            spec.type() == BSONType::object);
 
     auto parsed = DocumentSourceChangeStreamCheckInvalidateSpec::parse(
         IDLParserContext("DocumentSourceChangeStreamCheckInvalidateSpec"), spec.embeddedObject());
@@ -128,7 +128,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
 
     auto doc = nextInput.getDocument();
     const auto& kOperationTypeField = DSCS::kOperationTypeField;
-    DSCS::checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
+    DSCS::checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::string);
     auto operationType = doc[kOperationTypeField].getString();
 
     // If this command should invalidate the stream, generate an invalidate entry and queue it up

@@ -141,9 +141,9 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$lookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::String || elem.type() == BSONType::Object);
+            elem.type() == BSONType::string || elem.type() == BSONType::object);
 
-    if (elem.type() == BSONType::String) {
+    if (elem.type() == BSONType::string) {
         return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
 
@@ -183,7 +183,7 @@ static BSONObj createMatchStageJoinObj(const Document& input,
     bool containsRegex = false;
     document_path_support::visitAllValuesAtPath(input, localFieldPath, [&](const Value& nextValue) {
         arrBuilder << nextValue;
-        if (!containsRegex && nextValue.getType() == BSONType::RegEx) {
+        if (!containsRegex && nextValue.getType() == BSONType::regEx) {
             containsRegex = true;
         }
     });
@@ -462,7 +462,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $lookup stage specification must be an object, but found "
                           << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
     auto specObj = spec.Obj();
     auto fromElement = specObj["from"];
@@ -1486,7 +1486,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(ErrorCodes::FailedToParse,
             "the $lookup specification must be an Object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     NamespaceString fromNs;
     std::string as;
@@ -1513,7 +1513,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "$lookup argument '" << argument
                                   << "' must be an object, is type " << argument.type(),
-                    argument.type() == BSONType::Object);
+                    argument.type() == BSONType::object);
             letVariables = argument.Obj();
             hasLet = true;
             continue;
@@ -1529,7 +1529,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         if (argName == "$_internalUnwind"_sd) {
             tassert(8725002,
                     "Invalid BSON type for $_internalUnwind.",
-                    argument.type() == BSONType::Object);
+                    argument.type() == BSONType::object);
             unwindSpec = argument.Obj();
             continue;
         }
@@ -1537,7 +1537,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "$lookup argument '" << argName << "' must be a string, found "
                               << argument << ": " << argument.type(),
-                argument.type() == BSONType::String);
+                argument.type() == BSONType::string);
 
         if (argName == kAsField) {
             as = argument.String();

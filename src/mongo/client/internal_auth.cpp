@@ -132,7 +132,7 @@ std::string getBSONString(const BSONObj& container, StringData field) {
     auto elem = container[field];
     uassert(ErrorCodes::BadValue,
             str::stream() << "Field '" << field << "' must be of type string",
-            elem.type() == String);
+            elem.type() == BSONType::string);
     return elem.String();
 }
 

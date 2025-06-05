@@ -44,7 +44,7 @@ namespace mongo {
 Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    if (modExpr.type() != mongo::Object) {
+    if (modExpr.type() != BSONType::object) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "The $bit modifier is not compatible with a "
                                     << typeName(modExpr.type())
@@ -70,7 +70,7 @@ Status BitNode::init(BSONElement modExpr, const boost::intrusive_ptr<ExpressionC
                               << "}");
         }
 
-        if ((curOp.type() != mongo::NumberInt) && (curOp.type() != mongo::NumberLong)) {
+        if ((curOp.type() != BSONType::numberInt) && (curOp.type() != BSONType::numberLong)) {
             return Status(ErrorCodes::BadValue,
                           str::stream()
                               << "The $bit modifier field must be an Integer(32/64 bit); a '"

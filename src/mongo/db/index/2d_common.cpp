@@ -35,7 +35,7 @@ void parse2dParams(const BSONObj& infoObj, TwoDIndexingParams* out) {
 
     while (i.more()) {
         BSONElement e = i.next();
-        if (e.type() == String && IndexNames::GEO_2D == e.str()) {
+        if (e.type() == BSONType::string && IndexNames::GEO_2D == e.str()) {
             uassert(16800, "can't have 2 geo fields", out->geo.empty());
             uassert(16801, "2d has to be first in index", out->other.empty());
             out->geo = e.fieldName();

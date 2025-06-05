@@ -445,7 +445,7 @@ public:
     }
 
     bool isLTMaxKey() const final {
-        return _rhs.type() == BSONType::MaxKey;
+        return _rhs.type() == BSONType::maxKey;
     }
 };
 
@@ -494,7 +494,7 @@ public:
     }
 
     bool isGTMinKey() const final {
-        return _rhs.type() == BSONType::MinKey;
+        return _rhs.type() == BSONType::minKey;
     }
 };
 

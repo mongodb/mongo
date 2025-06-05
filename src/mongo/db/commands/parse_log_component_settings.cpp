@@ -127,7 +127,7 @@ StatusWith<std::vector<LogComponentSetting>> parseLogComponentSettings(const BSO
             levelsToSet.push_back((LogComponentSetting(curr, swVerbosity.getValue())));
             continue;
         }
-        if (elem.type() != Object) {
+        if (elem.type() != BSONType::object) {
             return StatusWith<Result>(
                 ErrorCodes::BadValue,
                 str::stream() << "Invalid type " << typeName(elem.type()) << "for component "

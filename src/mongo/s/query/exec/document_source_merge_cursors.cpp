@@ -183,7 +183,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(17026,
             "$mergeCursors stage expected an object as argument",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto ownedObj = elem.embeddedObject().getOwned();
     auto armParams = AsyncResultsMergerParams::parse(
         IDLParserContext(kStageName,

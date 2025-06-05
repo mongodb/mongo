@@ -208,12 +208,12 @@ StatusWith<bool> doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj
 
         if (minIt->canonicalType() != maxIt->canonicalType()) {
             return true;
-        } else if (minIt->type() == Object) {
+        } else if (minIt->type() == BSONType::object) {
             auto result = doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj());
             if (!result.isOK() || result.getValue()) {
                 return result;
             }
-        } else if (minIt->type() == Array) {
+        } else if (minIt->type() == BSONType::array) {
             auto result = doesMinMaxHaveMixedSchemaData(minIt->Obj(), maxIt->Obj());
             if (!result.isOK() || result.getValue()) {
                 return result;

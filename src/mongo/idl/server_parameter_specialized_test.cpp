@@ -79,10 +79,10 @@ void ASSERT_APPENDED_VALUE(ServerParameter* sp, Validator validator) {
 
 void ASSERT_APPENDED_INT(ServerParameter* sp, long exp) {
     ASSERT_APPENDED_VALUE(sp, [&exp](const BSONElement& elem) {
-        if (elem.type() == NumberInt) {
+        if (elem.type() == BSONType::numberInt) {
             ASSERT_EQ(elem.Int(), exp);
         } else {
-            ASSERT_EQ(elem.type(), NumberLong);
+            ASSERT_EQ(elem.type(), BSONType::numberLong);
             ASSERT_EQ(elem.Long(), exp);
         }
     });
@@ -90,14 +90,14 @@ void ASSERT_APPENDED_INT(ServerParameter* sp, long exp) {
 
 void ASSERT_APPENDED_STRING(ServerParameter* sp, StringData exp) {
     ASSERT_APPENDED_VALUE(sp, [&exp](const BSONElement& elem) {
-        ASSERT_EQ(elem.type(), String);
+        ASSERT_EQ(elem.type(), BSONType::string);
         ASSERT_EQ(elem.String(), exp);
     });
 }
 
 void ASSERT_APPENDED_OBJECT(ServerParameter* sp, const BSONObj& exp) {
     ASSERT_APPENDED_VALUE(sp, [&exp](const BSONElement& elem) {
-        ASSERT_EQ(elem.type(), Object);
+        ASSERT_EQ(elem.type(), BSONType::object);
 
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT(comparator.evaluate(elem.Obj() == exp));
@@ -380,7 +380,7 @@ TEST(SpecializedServerParameter, SpecializedRedactedSettable) {
     };
 
     ASSERT_OK(store("", "hello"));
-    ASSERT_THAT(load(), BSONObjHas(BSONElementIs(Eq(sp->name()), Eq(String), Eq("###"))))
+    ASSERT_THAT(load(), BSONObjHas(BSONElementIs(Eq(sp->name()), Eq(BSONType::string), Eq("###"))))
         << "value redacted by append";
     ASSERT_THAT(dataMember, Eq("hello")) << "value preseved in _data member";
 

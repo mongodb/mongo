@@ -274,7 +274,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(50808,
             "$changeStream stage expects a document as argument",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"),
                                                       elem.embeddedObject());

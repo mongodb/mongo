@@ -51,7 +51,7 @@ namespace {
 const double DELTA = 0.0001;
 
 void testEquals(Value actual, Value expected, double delta = DELTA) {
-    if (actual.getType() == BSONType::NumberDouble || actual.getType() == BSONType::NumberDouble) {
+    if (actual.getType() == BSONType::numberDouble || actual.getType() == BSONType::numberDouble) {
         ASSERT_APPROX_EQUAL(actual.coerceToDouble(), expected.coerceToDouble(), delta);
     } else {
         ASSERT_VALUE_EQ(actual, expected);
@@ -81,10 +81,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnDoubleIfExceedsNumberLong) {
     double output = 9223372036854775808.0;  // 2^63
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberLong);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberLong);
 
     Value roundedValue = rounder->roundUp(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberDouble);
     testEquals(roundedValue, Value(output));
 }
 
@@ -96,10 +96,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfExceedsNumberInt
     long long output = 2147483648;  // 2^31
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberInt);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberInt);
 
     Value roundedValue = rounder->roundUp(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberLong);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberLong);
     testEquals(roundedValue, Value(output));
 }
 
@@ -111,10 +111,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfRoundedDownDoubl
     long long output = 4611686018427387904;  // 2^62
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberDouble);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberDouble);
 
     Value roundedValue = rounder->roundDown(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberLong);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberLong);
     testEquals(roundedValue, Value(output));
 }
 
@@ -126,10 +126,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberIntIfRoundedDownNumber
     int output = 1073741824;       // 2^30
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberLong);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberLong);
 
     Value roundedValue = rounder->roundDown(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberInt);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberInt);
     testEquals(roundedValue, Value(output));
 }
 
@@ -141,10 +141,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingUpN
     Decimal128 output = Decimal128(0.125);
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberDecimal);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberDecimal);
 
     Value roundedValue = rounder->roundUp(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
     testEquals(roundedValue, Value(output));
 }
 
@@ -156,10 +156,10 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingDow
     Decimal128 output = Decimal128(0.125);
 
     Value inputValue = Value(input);
-    ASSERT_EQ(inputValue.getType(), BSONType::NumberDecimal);
+    ASSERT_EQ(inputValue.getType(), BSONType::numberDecimal);
 
     Value roundedValue = rounder->roundDown(inputValue);
-    ASSERT_EQ(roundedValue.getType(), BSONType::NumberDecimal);
+    ASSERT_EQ(roundedValue.getType(), BSONType::numberDecimal);
     testEquals(roundedValue, Value(output));
 }
 

@@ -828,8 +828,8 @@ boost::optional<IndexEntry> getIndexForExpressEquality(const CanonicalQuery& cq,
     auto cmpExpr = dynamic_cast<ComparisonMatchExpressionBase*>(cq.getPrimaryMatchExpression());
     tassert(10269304, "Invalid match expression", cmpExpr);
     const auto& data = cmpExpr->getData();
-    const bool collationRelevant = data.type() == BSONType::String ||
-        data.type() == BSONType::Object || data.type() == BSONType::Array;
+    const bool collationRelevant = data.type() == BSONType::string ||
+        data.type() == BSONType::object || data.type() == BSONType::array;
 
     RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(cq.getPrimaryMatchExpression(), &fields);

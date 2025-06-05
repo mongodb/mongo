@@ -40,7 +40,7 @@ namespace mongo {
 namespace auth {
 
 SaslPayload SaslPayload::parseFromBSON(const BSONElement& elem) {
-    if (elem.type() == String) {
+    if (elem.type() == BSONType::string) {
         try {
             SaslPayload ret(base64::decode(elem.valueStringDataSafe()));
             ret.serializeAsBase64(true);
@@ -50,7 +50,7 @@ SaslPayload SaslPayload::parseFromBSON(const BSONElement& elem) {
             uasserted(status.code(),
                       str::stream() << "Failed decoding SASL payload: " << status.reason());
         }
-    } else if (elem.type() == BinData) {
+    } else if (elem.type() == BSONType::binData) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Invalid SASLPayload subtype. Expected BinDataGeneral, got: "
                               << typeName(elem.binDataType()),

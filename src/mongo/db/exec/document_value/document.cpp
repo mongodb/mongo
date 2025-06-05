@@ -79,9 +79,9 @@ boost::optional<BSONElement> getNestedFieldHelperBSON(BSONElement elt,
         return elt;
     }
 
-    if (elt.type() == BSONType::Array) {
+    if (elt.type() == BSONType::array) {
         return boost::none;
-    } else if (elt.type() == BSONType::Object) {
+    } else if (elt.type() == BSONType::object) {
         auto subFieldElt = elt.embeddedObject()[fp.getFieldName(level)];
         return getNestedFieldHelperBSON(subFieldElt, fp, level + 1);
     }
@@ -501,10 +501,10 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setGeoNearDistance(elem.Double());
             } else if (fieldName == Document::metaFieldGeoNearPoint) {
                 Value val;
-                if (elem.type() == BSONType::Array) {
+                if (elem.type() == BSONType::array) {
                     val = Value(BSONArray(elem.embeddedObject()));
                 } else {
-                    invariant(elem.type() == BSONType::Object);
+                    invariant(elem.type() == BSONType::object);
                     val = Value(elem.embeddedObject());
                 }
 
@@ -727,14 +727,14 @@ boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const Fiel
         if (auto val = _storage->getFieldCacheOnly(fieldName); val) {
             // Whether landing on an array (level + 1 == dottedField.getPathLength) or traversing an
             // array, return boost::none.
-            if (val->getType() == BSONType::Array)
+            if (val->getType() == BSONType::array)
                 return boost::none;
 
             if (level + 1 == dottedField.getPathLength()) {
                 return val;
             }
 
-            if (val->getType() == BSONType::Object) {
+            if (val->getType() == BSONType::object) {
                 return val->getDocument().getNestedScalarFieldNonCachingHelper(dottedField,
                                                                                level + 1);
             }
@@ -755,7 +755,7 @@ boost::optional<Value> Document::getNestedScalarFieldNonCachingHelper(const Fiel
         // 3. BSONElement::eoo --> path does not exist, so return an empty Value via
         // Value(BSONElement::eoo).
         // 4. boost::none --> encountered an array along the path, return boost::none.
-        if (maybeBsonElt && maybeBsonElt->type() != BSONType::Array)
+        if (maybeBsonElt && maybeBsonElt->type() != BSONType::array)
             return Value(*maybeBsonElt);
         return boost::none;
     }
@@ -786,7 +786,7 @@ static Value getNestedFieldHelper(const Document& doc,
         return doc.getField(pos);
 
     Value val = doc.getField(pos);
-    if (val.getType() != Object)
+    if (val.getType() != BSONType::object)
         return Value();
 
     return getNestedFieldHelper(val.getDocument(), fieldNames, positions, level + 1);

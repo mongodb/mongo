@@ -531,7 +531,7 @@ BSONObj truncateBSONObj(const BSONObj& obj, int maxSize, int depth = 0) {
             bob.append(element);
         } else {
             auto fieldName = element.fieldName();
-            if (element.type() == BSONType::Object && depth == 0) {
+            if (element.type() == BSONType::object && depth == 0) {
                 auto fieldValue = truncateBSONObj(element.Obj(), remainingSize, depth + 1);
                 bob.append(fieldName, fieldValue);
             } else {

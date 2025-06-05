@@ -89,7 +89,7 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$graphLookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
-            elem.type() == String);
+            elem.type() == BSONType::string);
 
     NamespaceString fromNss(NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData()));
     uassert(ErrorCodes::InvalidNamespace,
@@ -107,7 +107,7 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "the $graphLookup stage specification must be an object, but found "
                           << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
     auto specObj = spec.Obj();
     auto fromElement = specObj["from"];
@@ -507,7 +507,7 @@ auto DocumentSourceGraphLookUp::makeQueryFromQueue() -> Query {
                             }
 
                             needToQuery = true;
-                            if (value.getType() == BSONType::jstNULL) {
+                            if (value.getType() == BSONType::null) {
                                 matchNull = true;
                             } else if (value.missing()) {
                                 seenMissing = true;
@@ -916,7 +916,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             uassert(40185,
                     str::stream() << "restrictSearchWithMatch must be an object, found "
                                   << typeName(argument.type()),
-                    argument.type() == Object);
+                    argument.type() == BSONType::object);
 
             // We don't need to keep ahold of the MatchExpression, but we do need to ensure
             // that the specified object is parseable and does not contain extensions.
@@ -934,7 +934,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
             uassert(40103,
                     str::stream() << "expected string as argument for " << argName
                                   << ", found: " << typeName(argument.type()),
-                    argument.type() == String);
+                    argument.type() == BSONType::string);
         }
 
         if (argName == "from") {

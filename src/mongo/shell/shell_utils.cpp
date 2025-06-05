@@ -412,14 +412,14 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
 
     BSONObjBuilder bob;
     switch (ele.type()) {
-        case BinData: {
+        case BSONType::binData: {
             int len;
             const char* ptr = ele.binData(len);
             SHA256Block::computeHash({ConstDataRange(ptr, len)}).appendAsBinData(bob, ""_sd);
 
             break;
         }
-        case String: {
+        case BSONType::string: {
             auto str = ele.valueStringData();
             SHA256Block::computeHash({ConstDataRange(str.data(), str.size())})
                 .appendAsBinData(bob, ""_sd);
@@ -467,8 +467,8 @@ BSONObj _createSecurityToken(const BSONObj& args, void* data) {
     args.elems(argv);
     uassert(6161500,
             "_createSecurityToken requires two arguments, an object and a non-empty string",
-            (argv.size() == 2) && (argv[0].type() == Object) && (argv[1].type() == String) &&
-                !argv[1].valueStringData().empty());
+            (argv.size() == 2) && (argv[0].type() == BSONType::object) &&
+                (argv[1].type() == BSONType::string) && !argv[1].valueStringData().empty());
 
     auto token = auth::ValidatedTenancyScopeFactory::create(
         UserName::parseFromBSON(argv[0]),
@@ -490,7 +490,7 @@ BSONObj _createTenantToken(const BSONObj& args, void* data) {
     const auto obj = args.firstElement().Obj();
     uassert(8154401,
             "_createTenantToken requires field `tenant` of type ObjectId",
-            obj.hasField("tenant"_sd) && obj["tenant"_sd].type() == jstOID);
+            obj.hasField("tenant"_sd) && obj["tenant"_sd].type() == BSONType::oid);
     const auto tenant = TenantId::parseFromBSON(obj["tenant"_sd]);
     const auto expectPrefix = obj["expectPrefix"].booleanSafe();
     const auto token = auth::ValidatedTenancyScopeFactory::create(
@@ -504,7 +504,7 @@ BSONObj _createTenantToken(const BSONObj& args, void* data) {
 BSONObj replMonitorStats(const BSONObj& a, void* data) {
     uassert(17134,
             "replMonitorStats requires a single string argument (the ReplSet name)",
-            a.nFields() == 1 && a.firstElement().type() == String);
+            a.nFields() == 1 && a.firstElement().type() == BSONType::string);
 
     auto name = a.firstElement().valueStringDataSafe();
     auto rsm = ReplicaSetMonitor::get(name.toString());
@@ -540,7 +540,7 @@ BSONObj interpreterVersion(const BSONObj& a, void* data) {
 BSONObj fileExistsJS(const BSONObj& a, void*) {
     uassert(40678,
             "fileExists expects one string argument",
-            a.nFields() == 1 && a.firstElement().type() == String);
+            a.nFields() == 1 && a.firstElement().type() == BSONType::string);
     return BSON("" << fileExists(a.firstElement().str()));
 }
 
@@ -556,7 +556,7 @@ BSONObj numberDecimalsEqual(const BSONObj& input, void*) {
     auto second = i.next();
     uassert(5760501,
             "Both the arguments of numberDecimalsEqual should be of type 'NumberDecimal'",
-            first.type() == BSONType::NumberDecimal && second.type() == BSONType::NumberDecimal);
+            first.type() == BSONType::numberDecimal && second.type() == BSONType::numberDecimal);
 
     return BSON("" << first.numberDecimal().isEqual(second.numberDecimal()));
 }
@@ -575,7 +575,7 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
     auto third = i.next();
 
     // Type-check arguments before performing any calculations.
-    if (!(first.type() == BSONType::NumberDecimal && second.type() == BSONType::NumberDecimal &&
+    if (!(first.type() == BSONType::numberDecimal && second.type() == BSONType::numberDecimal &&
           third.isNumber())) {
         return BSON("" << false);
     }
@@ -672,12 +672,12 @@ BSONObj _openGoldenData(const BSONObj& input, void*) {
 
     uassert(6741512,
             "_openGoldenData 'testPath' must be a string",
-            testPathArg.type() == BSONType::String);
+            testPathArg.type() == BSONType::string);
     auto testPath = testPathArg.valueStringData();
 
     uassert(6741511,
             "_openGoldenData 'config' must be an object",
-            configArg.type() == BSONType::Object);
+            configArg.type() == BSONType::object);
     auto config = configArg.Obj();
     goldenTestConfig = unittest::GoldenTestConfig::parseFromBson(config);
 
@@ -696,7 +696,7 @@ BSONObj _writeGoldenData(const BSONObj& input, void*) {
 
     uassert(6741509,
             "_writeGoldenData 'content' must be a string",
-            contentArg.type() == BSONType::String);
+            contentArg.type() == BSONType::string);
     auto content = contentArg.valueStringData();
 
     uassert(6741508, "_writeGoldenData() requires _openGoldenData() first", goldenTestContext);
@@ -743,7 +743,7 @@ BSONObj _buildBsonObj(const BSONObj& args, void*) {
     do {
         name = args.getField(std::to_string(fieldNum++));
         value = args.getField(std::to_string(fieldNum++));
-        if (name.type() == BSONType::EOO) {
+        if (name.type() == BSONType::eoo) {
             break;
         }
 
@@ -752,12 +752,12 @@ BSONObj _buildBsonObj(const BSONObj& args, void*) {
                 std::string::npos == name.str().find('\0'));
         uassert(7587900,
                 str::stream() << "BSON field name must be a string: " << name,
-                name.type() == BSONType::String);
+                name.type() == BSONType::string);
         uassert(7587901,
                 str::stream() << "Missing BSON field value: " << value,
-                value.type() != BSONType::EOO);
+                value.type() != BSONType::eoo);
         builder << name.str() << value;
-    } while (name.type() != BSONType::EOO);
+    } while (name.type() != BSONType::eoo);
     return BSON("" << builder.obj());
 }
 
@@ -781,7 +781,7 @@ static inline uint64_t fnv_64a_buf(const void* buf, size_t len, uint64_t hval) {
 BSONObj _fnvHashToHexString(const BSONObj& args, void*) {
     uassert(8423397,
             "_fnvHashToHexString expects one string argument",
-            args.nFields() == 1 && args.firstElement().type() == String);
+            args.nFields() == 1 && args.firstElement().type() == BSONType::string);
 
     auto input = args.firstElement().str();
     auto hashed = fnv_64a_buf(input.c_str(), input.size(), FNV1A_64_INIT);
@@ -803,7 +803,7 @@ void sortBSONObjectInternallyHelper(const BSONObj& input,
 void sortBSONElementInternally(const BSONElement& el,
                                BSONObjBuilder& bob,
                                NormalizationOptsSet opts) {
-    if (el.type() == BSONType::Array) {
+    if (el.type() == BSONType::array) {
         std::vector<BSONElement> arr = el.Array();
 
         if (isSet(opts, NormalizationOpts::kSortArrays)) {
@@ -834,7 +834,7 @@ void sortBSONElementInternally(const BSONElement& el,
             }
             sub.doneFast();
         }
-    } else if (el.type() == BSONType::Object) {
+    } else if (el.type() == BSONType::object) {
         BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
         sortBSONObjectInternallyHelper(el.Obj(), sub, opts);
         sub.doneFast();
@@ -872,14 +872,14 @@ void normalizeNumericElementsHelper(const BSONObj& input, BSONObjBuilder& bob);
 
 void normalizeNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
     switch (el.type()) {
-        case NumberInt:
-        case NumberLong:
-        case NumberDouble:
-        case NumberDecimal: {
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDouble:
+        case BSONType::numberDecimal: {
             bob.append(el.fieldName(), el.numberDecimal().normalize());
             break;
         }
-        case Array: {
+        case BSONType::array: {
             BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
             for (const auto& child : el.Array()) {
                 normalizeNumericElements(child, sub);
@@ -887,7 +887,7 @@ void normalizeNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
             sub.doneFast();
             break;
         }
-        case Object: {
+        case BSONType::object: {
             BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
             normalizeNumericElementsHelper(el.Obj(), sub);
             sub.doneFast();
@@ -921,13 +921,13 @@ void roundFloatingPointNumericElementsHelper(const BSONObj& input, BSONObjBuilde
 
 void roundFloatingPointNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
     switch (el.type()) {
-        case NumberDouble: {
+        case BSONType::numberDouble: {
             // Take advantage of Decimal128's ability to round to 15 digits at construction time.
             bob.append(el.fieldName(),
                        Decimal128(el.numberDouble(), Decimal128::kRoundTo15Digits).toDouble());
             break;
         }
-        case Array: {
+        case BSONType::array: {
             BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
             for (const auto& child : el.Array()) {
                 roundFloatingPointNumericElements(child, sub);
@@ -935,7 +935,7 @@ void roundFloatingPointNumericElements(const BSONElement& el, BSONObjBuilder& bo
             sub.doneFast();
             break;
         }
-        case Object: {
+        case BSONType::object: {
             BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
             roundFloatingPointNumericElementsHelper(el.Obj(), sub);
             sub.doneFast();
@@ -970,11 +970,11 @@ void removeNullAndUndefinedElementsHelper(const BSONObj& input, BSONObjBuilder& 
 template <typename Builder>
 void removeNullAndUndefinedElements(const BSONElement& el, Builder& bob) {
     switch (el.type()) {
-        case Undefined:
-        case jstNULL:
+        case BSONType::undefined:
+        case BSONType::null:
             // Don't append the element if it's null or undefined.
             break;
-        case Array: {
+        case BSONType::array: {
             auto appendArrayElements = [&](auto& sub) {
                 for (const auto& child : el.Array()) {
                     removeNullAndUndefinedElements(child, sub);
@@ -991,7 +991,7 @@ void removeNullAndUndefinedElements(const BSONElement& el, Builder& bob) {
             }
             break;
         }
-        case Object: {
+        case BSONType::object: {
             if constexpr (std::is_same_v<Builder, BSONObjBuilder>) {
                 BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
                 removeNullAndUndefinedElementsHelper(el.Obj(), sub);
@@ -1059,7 +1059,7 @@ bool compareNormalizedResultSets(const BSONObj& input, NormalizationOptsSet opts
     uassert(9193201,
             str::stream() << "expected two arrays containing objects as input received "
                           << first.type() << " and " << second.type(),
-            first.type() == BSONType::Array && second.type() == BSONType::Array);
+            first.type() == BSONType::array && second.type() == BSONType::array);
 
     auto firstAsBson = first.Array();
     auto secondAsBson = second.Array();
@@ -1068,13 +1068,13 @@ bool compareNormalizedResultSets(const BSONObj& input, NormalizationOptsSet opts
         uassert(9193202,
                 str::stream() << "expected all elements of input arrays to be objects, received "
                               << el.type(),
-                el.type() == BSONType::Object);
+                el.type() == BSONType::object);
     }
     for (const auto& el : secondAsBson) {
         uassert(9193203,
                 str::stream() << "expected all elements of input arrays to be objects, received "
                               << el.type(),
-                el.type() == BSONType::Object);
+                el.type() == BSONType::object);
     }
 
     if (firstAsBson.size() != secondAsBson.size()) {
@@ -1145,15 +1145,15 @@ BSONObj _compareStringsWithCollation(const BSONObj& input, void*) {
 
     uassert(9367800, "Expected left argument", i.more());
     auto left = i.next();
-    uassert(9367801, "Left argument should be a string", left.type() == BSONType::String);
+    uassert(9367801, "Left argument should be a string", left.type() == BSONType::string);
 
     uassert(9367802, "Expected right argument", i.more());
     auto right = i.next();
-    uassert(9367803, "Right argument should be string", right.type() == BSONType::String);
+    uassert(9367803, "Right argument should be string", right.type() == BSONType::string);
 
     uassert(9367804, "Expected collation argument", i.more());
     auto collatorSpec = i.next();
-    uassert(9367805, "Expected a collation object", collatorSpec.type() == BSONType::Object);
+    uassert(9367805, "Expected a collation object", collatorSpec.type() == BSONType::object);
 
     CollatorFactoryICU collationFactory;
     auto collator = uassertStatusOK(collationFactory.makeFromBSON(collatorSpec.Obj()));
@@ -1296,7 +1296,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
             std::string client;
             if (auto elem = op["client"]) {
                 // mongod currentOp client
-                if (elem.type() != String) {
+                if (elem.type() != BSONType::string) {
                     std::cout << "Ignoring operation " << op["opid"].toString(false)
                               << "; expected 'client' field in currentOp response to have type "
                                  "string, but found "
@@ -1306,7 +1306,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
                 client = elem.str();
             } else if (auto elem = op["client_s"]) {
                 // mongos currentOp client
-                if (elem.type() != String) {
+                if (elem.type() != BSONType::string) {
                     std::cout << "Ignoring operation " << op["opid"].toString(false)
                               << "; expected 'client_s' field in currentOp response to have type "
                                  "string, but found "

@@ -307,10 +307,10 @@ OutputOptions parseOutputOptions(const DatabaseName& dbName, const BSONObj& cmdO
     OutputOptions outputOptions;
 
     outputOptions.outNonAtomic = true;
-    if (cmdObj["out"].type() == String) {
+    if (cmdObj["out"].type() == BSONType::string) {
         outputOptions.collectionName = cmdObj["out"].String();
         outputOptions.outType = OutputType::Replace;
-    } else if (cmdObj["out"].type() == Object) {
+    } else if (cmdObj["out"].type() == BSONType::object) {
         BSONObj o = cmdObj["out"].embeddedObject();
 
         if (o.hasElement("normal")) {
@@ -386,7 +386,7 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
 
     auto mapReduceField = cmdObj.firstElement();
     const auto emptyNss =
-        mapReduceField.type() == mongo::String && mapReduceField.valueStringData().empty();
+        mapReduceField.type() == BSONType::string && mapReduceField.valueStringData().empty();
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid input namespace "
                           << inputResource.dbNameToMatch().toStringForErrorMsg() << "."
@@ -430,7 +430,7 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
 bool mrSupportsWriteConcern(const BSONObj& cmd) {
     if (!cmd.hasField("out")) {
         return false;
-    } else if (cmd["out"].type() == Object && cmd["out"].Obj().hasField("inline")) {
+    } else if (cmd["out"].type() == BSONType::object && cmd["out"].Obj().hasField("inline")) {
         return false;
     } else {
         return true;

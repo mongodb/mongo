@@ -118,10 +118,10 @@ TEST(BatchedCommandRequest, InsertCloneWithIds) {
     const auto& insertDocs = clonedRequest.getInsertRequest().getDocuments();
     ASSERT_EQ(2u, insertDocs.size());
 
-    ASSERT_EQ(jstOID, insertDocs[0]["_id"].type());
+    ASSERT_EQ(BSONType::oid, insertDocs[0]["_id"].type());
     ASSERT_EQ(1, insertDocs[0]["x"].numberLong());
 
-    ASSERT_EQ(jstOID, insertDocs[1]["_id"].type());
+    ASSERT_EQ(BSONType::oid, insertDocs[1]["_id"].type());
     ASSERT_EQ(2, insertDocs[1]["x"].numberLong());
 }
 

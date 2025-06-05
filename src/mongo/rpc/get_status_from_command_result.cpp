@@ -65,7 +65,7 @@ Status getErrorStatusFromCommandResult(const BSONObj& result) {
         code = ErrorCodes::UnknownError;
     }
     std::string errmsg;
-    if (errmsgElement.type() == String) {
+    if (errmsgElement.type() == BSONType::string) {
         errmsg = errmsgElement.String();
     } else if (!errmsgElement.eoo()) {
         errmsg = errmsgElement.toString();

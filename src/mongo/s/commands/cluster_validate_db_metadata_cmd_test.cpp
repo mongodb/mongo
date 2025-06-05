@@ -107,7 +107,7 @@ TEST_F(ClusterValidateDBMetadataTest, AppendsErrorsFromShards) {
     auto res = runCommandSuccessful(kCommand, false);
 
     const auto outputFromMongos = OpMsg::parse(res.response).body;
-    ASSERT(outputFromMongos.getField("apiVersionErrors").type() == Array);
+    ASSERT(outputFromMongos.getField("apiVersionErrors").type() == BSONType::array);
     ASSERT_EQ(outputFromMongos.getField("apiVersionErrors").Array().size(), 3);
     ASSERT_FALSE(outputFromMongos.hasField("hasMoreErrors"));
 }
@@ -133,7 +133,7 @@ TEST_F(ClusterValidateDBMetadataTest, MaxBSONSizeAfterAccumulation) {
     auto res = runCommandSuccessful(kCommand, false);
 
     const auto outputFromMongos = OpMsg::parse(res.response).body;
-    ASSERT(outputFromMongos.getField("apiVersionErrors").type() == Array);
+    ASSERT(outputFromMongos.getField("apiVersionErrors").type() == BSONType::array);
     ASSERT(outputFromMongos.getField("apiVersionErrors").Array().size() <
            2 * apiVersionErrorsShard1.size());
     ASSERT(outputFromMongos.hasField("hasMoreErrors"));

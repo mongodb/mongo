@@ -426,12 +426,12 @@ TEST(DumpUtils, BasicDumpWriteRead) {
     BSONObj result =
         writeBsonArrayToFile(BSON("a" << tempDir.path() + "/test.bson" << "b" << dump), nullptr);
     ASSERT_EQ(1, result.nFields());
-    ASSERT_EQ(BSONType::Undefined, result.firstElement().type());
+    ASSERT_EQ(BSONType::undefined, result.firstElement().type());
 
     // Check bulk read
     result = readDumpFile(BSON("a" << tempDir.path() + "/test.bson"), nullptr);
     ASSERT_EQ(1, result.nFields());
-    ASSERT_EQ(BSONType::Array, result.firstElement().type());
+    ASSERT_EQ(BSONType::array, result.firstElement().type());
     ASSERT_EQ(3, result.firstElement().Array().size());
     ASSERT_TRUE(one.binaryEqual(result.firstElement().Array().at(0).Obj()));
     ASSERT_TRUE(two.binaryEqual(result.firstElement().Array().at(1).Obj()));

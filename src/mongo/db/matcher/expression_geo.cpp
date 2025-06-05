@@ -85,7 +85,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
     }
 
     // Parse geometry after predicates.
-    if (Object != queryElt.type())
+    if (BSONType::object != queryElt.type())
         return Status(ErrorCodes::BadValue, "geometry must be an object");
     BSONObj geoObj = queryElt.Obj();
 

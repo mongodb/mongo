@@ -333,13 +333,13 @@ bool isCSFLE1Validator(BSONObj doc) {
         auto& iterator = frameStack.top();
         if (iterator.more()) {
             BSONElement elem = iterator.next();
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 if (elem.fieldNameStringData() == "encrypt"_sd) {
                     return true;
                 }
 
                 frameStack.emplace(BSONObjIterator(elem.Obj()));
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 frameStack.emplace(BSONObjIterator(elem.Obj()));
             }
         } else {

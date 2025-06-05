@@ -313,7 +313,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
         const ComparisonMatchExpression* cme = static_cast<const ComparisonMatchExpression*>(lhs);
         // The CompareMatchExpression constructor prohibits creating a match expression with EOO or
         // Undefined types, so only need to ensure that the value is not of type jstNULL.
-        return cme->getData().type() != jstNULL;
+        return cme->getData().type() != BSONType::null;
     }
 
     switch (lhs->matchType()) {
@@ -341,7 +341,7 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
                 case MatchExpression::EQ: {
                     const ComparisonMatchExpression* cme =
                         static_cast<const ComparisonMatchExpression*>(lhs->getChild(0));
-                    return cme->getData().type() == jstNULL;
+                    return cme->getData().type() == BSONType::null;
                 }
                 case MatchExpression::MATCH_IN: {
                     const InMatchExpression* ime =
@@ -534,11 +534,11 @@ std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
  */
 bool canCompareWith(const BSONElement& elem, bool isEQ) {
     const auto type = elem.type();
-    if (type == BSONType::MinKey || type == BSONType::MaxKey) {
+    if (type == BSONType::minKey || type == BSONType::maxKey) {
         // MinKey and MaxKey have special semantics for comparison to objects.
         return false;
     }
-    if (type == BSONType::Array || type == BSONType::Object) {
+    if (type == BSONType::array || type == BSONType::object) {
         return isEQ && elem.Obj().isEmpty();
     }
 
@@ -593,7 +593,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
             auto sub = checked_cast<const TypeMatchExpression*>(me);
             tassert(6430600,
                     "Not expecting to find EOO in a $type expression",
-                    !sub->typeSet().hasType(BSONType::EOO));
+                    !sub->typeSet().hasType(BSONType::eoo));
             return tryAddExpr(sub->path(), me, out);
         }
 

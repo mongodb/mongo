@@ -174,7 +174,7 @@ boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
     uassert(ErrorCodes::FailedToParse,
             "$expMovingAvg must have exactly one argument that is an object",
             obj.nFields() == 1 && obj.hasField(kAccName) &&
-                obj[kAccName].type() == BSONType::Object);
+                obj[kAccName].type() == BSONType::object);
     auto subObj = obj[kAccName].embeddedObject();
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$expMovingAvg sub object must have exactly two fields: An '"
@@ -535,7 +535,7 @@ boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN, AccumulatorNType>:
                         str::stream()
                             << "expected 'sortBy' to already be an object in the arguments to "
                             << AccumulatorNType::getName(),
-                        innerSortByBson.type() == BSONType::Object);
+                        innerSortByBson.type() == BSONType::object);
                 innerSortPattern.emplace(innerSortByBson.embeddedObject(), expCtx);
             }
         } else if (fieldName == kWindowArg) {

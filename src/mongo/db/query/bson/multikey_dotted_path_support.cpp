@@ -66,14 +66,14 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
 
         BSONElement e = obj.getField(left);
 
-        if (e.type() == Object) {
+        if (e.type() == BSONType::object) {
             _extractAllElementsAlongPath(e.embeddedObject(),
                                          next,
                                          elements,
                                          expandArrayOnTrailingField,
                                          depth + 1,
                                          arrayComponents);
-        } else if (e.type() == Array) {
+        } else if (e.type() == BSONType::array) {
             bool allDigits = false;
             if (next.size() > 0 && ctype::isDigit(next[0])) {
                 unsigned temp = 1;
@@ -92,7 +92,7 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                 BSONObjIterator i(e.embeddedObject());
                 while (i.more()) {
                     BSONElement e2 = i.next();
-                    if (e2.type() == Object || e2.type() == Array)
+                    if (e2.type() == BSONType::object || e2.type() == BSONType::array)
                         _extractAllElementsAlongPath(e2.embeddedObject(),
                                                      next,
                                                      elements,
@@ -111,7 +111,7 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
         BSONElement e = obj.getField(path);
 
         if (e.ok()) {
-            if (e.type() == Array && expandArrayOnTrailingField) {
+            if (e.type() == BSONType::array && expandArrayOnTrailingField) {
                 BSONObjIterator i(e.embeddedObject());
                 while (i.more()) {
                     elements.insert(i.next());

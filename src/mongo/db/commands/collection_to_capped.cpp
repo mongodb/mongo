@@ -83,7 +83,7 @@ public:
         const auto nssElt = cmdObj["toCollection"];
         uassert(ErrorCodes::TypeMismatch,
                 "'toCollection' must be of type String",
-                nssElt.type() == BSONType::String);
+                nssElt.type() == BSONType::string);
         const NamespaceString nss(
             NamespaceStringUtil::deserialize(dbName, nssElt.valueStringData()));
         uassert(ErrorCodes::InvalidNamespace,
@@ -108,10 +108,10 @@ public:
 
         uassert(ErrorCodes::TypeMismatch,
                 "'cloneCollectionAsCapped' must be of type String",
-                fromElt.type() == BSONType::String);
+                fromElt.type() == BSONType::string);
         uassert(ErrorCodes::TypeMismatch,
                 "'toCollection' must be of type String",
-                toElt.type() == BSONType::String);
+                toElt.type() == BSONType::string);
 
         const StringData from(fromElt.valueStringData());
         const StringData to(toElt.valueStringData());

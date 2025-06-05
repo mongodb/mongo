@@ -670,79 +670,79 @@ inline Element Element::operator[](StringData name) const {
 }
 
 inline double Element::getValueDouble() const {
-    dassert(hasValue() && isType(mongo::NumberDouble));
+    dassert(hasValue() && isType(BSONType::numberDouble));
     return getValue()._numberDouble();
 }
 
 inline StringData Element::getValueString() const {
-    dassert(hasValue() && isType(mongo::String));
+    dassert(hasValue() && isType(BSONType::string));
     return getValueStringOrSymbol();
 }
 
 inline BSONObj Element::getValueObject() const {
-    dassert(hasValue() && isType(mongo::Object));
+    dassert(hasValue() && isType(BSONType::object));
     return getValue().Obj();
 }
 
 inline BSONArray Element::getValueArray() const {
-    dassert(hasValue() && isType(mongo::Array));
+    dassert(hasValue() && isType(BSONType::array));
     return BSONArray(getValue().Obj());
 }
 
 inline bool Element::isValueUndefined() const {
-    return isType(mongo::Undefined);
+    return isType(BSONType::undefined);
 }
 
 inline OID Element::getValueOID() const {
-    dassert(hasValue() && isType(mongo::jstOID));
+    dassert(hasValue() && isType(BSONType::oid));
     return getValue().__oid();
 }
 
 inline bool Element::getValueBool() const {
-    dassert(hasValue() && isType(mongo::Bool));
+    dassert(hasValue() && isType(BSONType::boolean));
     return getValue().boolean();
 }
 
 inline Date_t Element::getValueDate() const {
-    dassert(hasValue() && isType(mongo::Date));
+    dassert(hasValue() && isType(BSONType::date));
     return getValue().date();
 }
 
 inline bool Element::isValueNull() const {
-    return isType(mongo::jstNULL);
+    return isType(BSONType::null);
 }
 
 inline StringData Element::getValueSymbol() const {
-    dassert(hasValue() && isType(mongo::Symbol));
+    dassert(hasValue() && isType(BSONType::symbol));
     return getValueStringOrSymbol();
 }
 
 inline int32_t Element::getValueInt() const {
-    dassert(hasValue() && isType(mongo::NumberInt));
+    dassert(hasValue() && isType(BSONType::numberInt));
     return getValue()._numberInt();
 }
 
 inline Timestamp Element::getValueTimestamp() const {
-    dassert(hasValue() && isType(mongo::bsonTimestamp));
+    dassert(hasValue() && isType(BSONType::timestamp));
     return getValue().timestamp();
 }
 
 inline int64_t Element::getValueLong() const {
-    dassert(hasValue() && isType(mongo::NumberLong));
+    dassert(hasValue() && isType(BSONType::numberLong));
     return getValue()._numberLong();
 }
 
 inline Decimal128 Element::getValueDecimal() const {
-    dassert(hasValue() && isType(mongo::NumberDecimal));
+    dassert(hasValue() && isType(BSONType::numberDecimal));
     return getValue()._numberDecimal();
 }
 
 inline bool Element::isValueMinKey() const {
-    return isType(mongo::MinKey);
+    return isType(BSONType::minKey);
 }
 
 inline bool Element::isValueMaxKey() const {
-    return isType(mongo::MaxKey);
+    return isType(BSONType::maxKey);
 }
 
 inline bool Element::ok() const {

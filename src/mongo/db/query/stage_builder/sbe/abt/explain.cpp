@@ -422,7 +422,7 @@ public:
     }
 
     ExplainPrinterImpl& print(const std::pair<sbe::value::TypeTags, sbe::value::Value> v) {
-        if (sbe::value::tagToType(v.first) == BSONType::EOO &&
+        if (sbe::value::tagToType(v.first) == BSONType::eoo &&
             v.first != sbe::value::TypeTags::Nothing) {
             if (v.first == sbe::value::TypeTags::makeObjSpec) {
                 // We want to append a stringified version of MakeObjSpec to explain here.

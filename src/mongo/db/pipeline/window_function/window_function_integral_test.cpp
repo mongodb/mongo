@@ -197,7 +197,7 @@ TEST_F(WindowFunctionIntegralTest, ShouldWidenToDecimalOnlyIfNeeded) {
     auto val = integral->getValue();
     double expectedIntegral = (7 + 2) * (5.0 - 1.0) / 2.0;
     ASSERT_VALUE_EQ(val, Value(expectedIntegral));
-    ASSERT_TRUE(val.getType() == NumberDecimal);
+    ASSERT_TRUE(val.getType() == BSONType::numberDecimal);
 
     integral->reset();
 
@@ -208,7 +208,7 @@ TEST_F(WindowFunctionIntegralTest, ShouldWidenToDecimalOnlyIfNeeded) {
 
     val = integral->getValue();
     ASSERT_VALUE_EQ(val, Value(expectedIntegral));
-    ASSERT_TRUE(val.getType() == NumberDouble);
+    ASSERT_TRUE(val.getType() == BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionIntegralTest, CanHandleDateTypeWithUnit) {

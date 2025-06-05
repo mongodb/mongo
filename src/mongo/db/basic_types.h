@@ -58,7 +58,7 @@ public:
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << element.fieldNameStringData()
                               << "' should be a boolean value, but found: " << element.type(),
-                !element || element.type() == BSONType::Bool);
+                !element || element.type() == BSONType::boolean);
         return element ? OptionalBool{element.boolean()} : OptionalBool{};
     }
 

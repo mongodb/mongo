@@ -965,7 +965,7 @@ TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
     payload.setServerEncryptionToken({{}});
     payload.setEncryptedTokens(bogusEncryptedTokens);
     payload.setValue(buf);
-    payload.setType(BSONType::String);
+    payload.setType(stdx::to_underlying(BSONType::string));
 
     std::vector<EDCServerPayloadInfo> serverPayload(1);
     serverPayload.front().fieldPathName = "encrypted";
@@ -995,7 +995,7 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
     payload.setServerEncryptionToken({{}});
     payload.setEncryptedTokens(bogusEncryptedTokens);
     payload.setValue(std::vector<uint8_t>{64});
-    payload.setType(BSONType::String);
+    payload.setType(stdx::to_underlying(BSONType::string));
     payload.setContentionFactor(0);
     payload.setIndexKeyId(indexKeyId);
     auto iup = payload.toBSON();
@@ -1034,8 +1034,15 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
 // search token sets ('b') is rejected.
 TEST_F(FleCrudTest, InsertPayloadIsBothRangeAndTextSearch) {
     auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
-    FLE2InsertUpdatePayloadV2 payload(
-        {}, {}, bogusEncryptedTokens, indexKeyId, BSONType::String, {}, {}, {}, 0);
+    FLE2InsertUpdatePayloadV2 payload({},
+                                      {},
+                                      bogusEncryptedTokens,
+                                      indexKeyId,
+                                      stdx::to_underlying(BSONType::string),
+                                      {},
+                                      {},
+                                      {},
+                                      0);
     payload.setEdgeTokenSet(std::vector<EdgeTokenSetV2>{{{}, {}, {}, bogusEncryptedTokens}});
     payload.setTextSearchTokenSets(
         TextSearchTokenSets{{{}, {}, {}, bogusEncryptedTokens}, {}, {}, {}});
@@ -1439,8 +1446,15 @@ TEST_F(FleCrudTest, FindAndModify_SetSafeContent) {
 BSONObj makeInsertUpdatePayload(StringData path, const UUID& uuid) {
     // Actual values don't matter for these tests (apart from indexKeyId).
     auto encryptedTokens = StateCollectionTokensV2({{}}, boost::none).encrypt({{}});
-    auto bson = FLE2InsertUpdatePayloadV2(
-                    {}, {}, std::move(encryptedTokens), uuid, BSONType::String, {}, {}, {}, 0)
+    auto bson = FLE2InsertUpdatePayloadV2({},
+                                          {},
+                                          std::move(encryptedTokens),
+                                          uuid,
+                                          stdx::to_underlying(BSONType::string),
+                                          {},
+                                          {},
+                                          {},
+                                          0)
                     .toBSON();
     std::vector<std::uint8_t> bindata;
     bindata.resize(bson.objsize() + 1);

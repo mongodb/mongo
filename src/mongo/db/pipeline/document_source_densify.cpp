@@ -91,7 +91,7 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
     Bounds bounds = [&]() {
         BSONElement bounds = spec.getBounds().getElement();
         switch (bounds.type()) {
-            case mongo::Array: {
+            case BSONType::array: {
                 std::vector<BSONElement> array = bounds.Array();
 
                 uassert(5733403,
@@ -113,10 +113,10 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
                             array[0].type() == array[1].type() &&
                                 array[0].type() == step.getType());
                     return Bounds(std::pair<Value, Value>(Value(array[0]), Value(array[1])));
-                } else if (array[0].type() == mongo::Date) {
+                } else if (array[0].type() == BSONType::date) {
                     uassert(5733405,
                             "A bounding array must contain either both dates or both numeric types",
-                            array[1].type() == mongo::Date);
+                            array[1].type() == BSONType::date);
                     uassert(5733410, "A bounding array of dates must specify a unit", unit);
                     return Bounds(std::pair<Date_t, Date_t>(array[0].date(), array[1].date()));
                 } else {
@@ -124,7 +124,7 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
                 }
                 MONGO_UNREACHABLE_TASSERT(5946801);
             }
-            case mongo::String: {
+            case BSONType::string: {
                 if (bounds.str() == kValFull)
                     return Bounds(Full());
                 else if (bounds.str() == kValPartition)
@@ -167,7 +167,7 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The " << stageName << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = DensifySpec::parse(IDLParserContext(stageName), elem.embeddedObject());
     auto rangeStatement = RangeStatement::parse(spec.getRange());

@@ -484,7 +484,8 @@ boost::optional<TenantId> AuthorizationSessionImpl::getUserTenantId() const {
 }
 
 bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONElement& element) {
-    const bool isUUID = element.type() == BinData && element.binDataType() == BinDataType::newUUID;
+    const bool isUUID =
+        element.type() == BSONType::binData && element.binDataType() == BinDataType::newUUID;
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
     if (isUUID) {

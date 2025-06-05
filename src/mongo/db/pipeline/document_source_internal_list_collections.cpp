@@ -101,7 +101,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalListCollections::createFromB
     uassert(9525805,
             str::stream() << kStageNameInternal
                           << " must take a nested empty object but found: " << elem,
-            elem.type() == BSONType::Object && elem.embeddedObject().isEmpty());
+            elem.type() == BSONType::object && elem.embeddedObject().isEmpty());
 
     uassert(9525806,
             str::stream() << "The " << kStageNameInternal

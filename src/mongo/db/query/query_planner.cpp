@@ -159,7 +159,7 @@ bool hintMatchesNameOrPattern(const BSONObj& hintObj,
 
     BSONElement firstHintElt = hintObj.firstElement();
     if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
-        firstHintElt.type() == BSONType::String) {
+        firstHintElt.type() == BSONType::string) {
         // An index name is provided by the hint.
         return indexName == firstHintElt.valueStringData();
     }
@@ -273,7 +273,7 @@ static bool is2DIndex(const BSONObj& pattern) {
     BSONObjIterator it(pattern);
     while (it.more()) {
         BSONElement e = it.next();
-        if (String == e.type() && (e.valueStringData() == "2d")) {
+        if (BSONType::string == e.type() && (e.valueStringData() == "2d")) {
             return true;
         }
     }

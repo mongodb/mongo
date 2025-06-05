@@ -79,8 +79,8 @@ bool checkDocNoOrderingImpl(ConstElement lhs, ConstElement rhs) {
     const BSONType lhsType = lhs.getType();
     const BSONType rhsType = rhs.getType();
 
-    if (lhsType == mongo::Object) {
-        if (rhsType != mongo::Object)
+    if (lhsType == BSONType::object) {
+        if (rhsType != BSONType::object)
             return false;
 
         // For objects, sort the children by field name, then compare in that order.
@@ -115,8 +115,8 @@ bool checkDocNoOrderingImpl(ConstElement lhs, ConstElement rhs) {
 
         return true;
 
-    } else if (lhsType == mongo::Array) {
-        if (rhsType != mongo::Array)
+    } else if (lhsType == BSONType::array) {
+        if (rhsType != BSONType::array)
             return false;
 
         // For arrays, since they are ordered, we don't need the sorting step.

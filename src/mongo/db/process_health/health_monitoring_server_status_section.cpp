@@ -58,7 +58,7 @@ public:
         BSONObjBuilder result;
 
         bool appendDetails = false;
-        if (configElement.type() == BSONType::Object && configElement.Obj().hasElement("details")) {
+        if (configElement.type() == BSONType::object && configElement.Obj().hasElement("details")) {
             appendDetails = configElement.Obj()["details"].trueValue();
         }
 

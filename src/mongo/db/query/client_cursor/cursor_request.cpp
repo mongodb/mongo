@@ -54,7 +54,7 @@ Status CursorRequest::parseCommandCursorOptions(const BSONObj& cmdObj,
         return Status::OK();
     }
 
-    if (cursorElem.type() != mongo::Object) {
+    if (cursorElem.type() != BSONType::object) {
         return Status(ErrorCodes::TypeMismatch, "cursor field must be missing or an object");
     }
 

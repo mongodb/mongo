@@ -139,7 +139,7 @@ BSONObj stripWriteConcern(const BSONObj& cmdObj) {
 
 BSONObj getCollation(const BSONObj& cmdObj) {
     BSONElement collationElement;
-    auto status = bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElement);
+    auto status = bsonExtractTypedField(cmdObj, "collation", BSONType::object, &collationElement);
     if (status.isOK()) {
         return collationElement.Obj();
     } else if (status != ErrorCodes::NoSuchKey) {
@@ -150,7 +150,7 @@ BSONObj getCollation(const BSONObj& cmdObj) {
 }
 
 boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
-    if (auto letElem = cmdObj.getField("let"_sd); letElem.type() == BSONType::Object) {
+    if (auto letElem = cmdObj.getField("let"_sd); letElem.type() == BSONType::object) {
         auto bob = BSONObjBuilder();
         bob.appendElementsUnique(letElem.embeddedObject());
         return bob.obj();
@@ -159,7 +159,7 @@ boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
 }
 
 boost::optional<LegacyRuntimeConstants> getLegacyRuntimeConstants(const BSONObj& cmdObj) {
-    if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::Object) {
+    if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::object) {
         IDLParserContext ctx("internalLegacyRuntimeConstants");
         return LegacyRuntimeConstants::parse(ctx, rcElem.embeddedObject());
     }

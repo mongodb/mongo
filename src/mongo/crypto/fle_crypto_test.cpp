@@ -523,7 +523,7 @@ TEST_F(ServiceContextTest, FLETokens_TestVectorUnindexedValueDecryption) {
             "10ABCDEFAB1234987612341234567890120274E15D9477DA66394DF17BBA08FBEBB76A8BAFA63E6A7E7DCDDF9415B39877CE537469BB98A6B2B57E89AAC2CBBB5D5184DDE0111CD325E409739EF1C5C53AA917149FCF2EA2F6CB6BC8E11A7783E142FECC1570448837E6A295FCE6F16730B3"_sd);
         auto [uxBsonType, uxPlaintext] =
             FLE2UnindexedEncryptedValueV2::deserialize(&keyVault, ConstDataRange(uxCiphertext));
-        ASSERT_EQUALS(uxBsonType, BSONType::String);
+        ASSERT_EQUALS(uxBsonType, BSONType::string);
         ASSERT_EQUALS(
             hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
             "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
@@ -1161,23 +1161,23 @@ std::vector<char> generatePlaceholder(
     // Set a default lower and upper bound
     BSONObj lowerDoc, upperDoc;
     switch (value.type()) {
-        case BSONType::NumberInt:
+        case BSONType::numberInt:
             lowerDoc = BSON("lb" << 0);
             upperDoc = BSON("ub" << 1234567);
             break;
-        case BSONType::NumberLong:
+        case BSONType::numberLong:
             lowerDoc = BSON("lb" << 0LL);
             upperDoc = BSON("ub" << 1234567890123456789LL);
             break;
-        case BSONType::NumberDouble:
+        case BSONType::numberDouble:
             lowerDoc = BSON("lb" << 0.0);
             upperDoc = BSON("ub" << 1234567890123456789.0);
             break;
-        case BSONType::Date:
+        case BSONType::date:
             lowerDoc = BSON("lb" << Date_t::fromMillisSinceEpoch(0));
             upperDoc = BSON("ub" << Date_t::fromMillisSinceEpoch(1234567890123456789LL));
             break;
-        case BSONType::NumberDecimal:
+        case BSONType::numberDecimal:
             lowerDoc = BSON("lb" << Decimal128(0));
             upperDoc = BSON("ub" << Decimal128(1234567890123456789LL));
             break;
@@ -1191,7 +1191,7 @@ std::vector<char> generatePlaceholder(
             break;
     }
     insertSpec.setValue(value);
-    if (value.type() == BSONType::NumberDouble || value.type() == BSONType::NumberDecimal) {
+    if (value.type() == BSONType::numberDouble || value.type() == BSONType::numberDecimal) {
         insertSpec.setMinBound(boost::none);
         insertSpec.setMaxBound(boost::none);
     } else {
@@ -1265,7 +1265,7 @@ BSONObj encryptDocument(BSONObj obj,
 
     // Finalize document for insert
     auto finalDoc = EDCServerCollection::finalizeForInsert(result, serverPayload);
-    ASSERT_EQ(finalDoc[kSafeContent].type(), Array);
+    ASSERT_EQ(finalDoc[kSafeContent].type(), BSONType::array);
     return finalDoc;
 }
 
@@ -1304,8 +1304,8 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
 
     auto finalDoc = encryptDocument(builder.obj(), &keyVault);
 
-    ASSERT_EQ(finalDoc["plainText"].type(), String);
-    ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
+    ASSERT_EQ(finalDoc["plainText"].type(), BSONType::string);
+    ASSERT_EQ(finalDoc["encrypted"].type(), BSONType::binData);
     ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
 
     // Decrypt document
@@ -1351,10 +1351,10 @@ void roundTripMultiencrypted(BSONObj doc1,
 
     auto finalDoc = encryptDocument(builder.obj(), &keyVault);
 
-    ASSERT_EQ(finalDoc["encrypted1"].type(), BinData);
+    ASSERT_EQ(finalDoc["encrypted1"].type(), BSONType::binData);
     ASSERT_TRUE(finalDoc["encrypted1"].isBinData(BinDataType::Encrypt));
 
-    ASSERT_EQ(finalDoc["encrypted2"].type(), BinData);
+    ASSERT_EQ(finalDoc["encrypted2"].type(), BSONType::binData);
     ASSERT_TRUE(finalDoc["encrypted2"].isBinData(BinDataType::Encrypt));
 
     assertPayload(finalDoc["encrypted1"], operation1);
@@ -1397,28 +1397,29 @@ TEST_F(ServiceContextTest, FLE_EDC_PrintTest) {
 
 TEST_F(ServiceContextTest, FLE_EDC_Allowed_Types) {
     const std::vector<std::pair<BSONObj, BSONType>> universallyAllowedObjects{
-        {BSON("sample" << "value123"), String},
+        {BSON("sample" << "value123"), BSONType::string},
         {BSON("sample" << BSONBinData(
                   testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
-         BinData},
-        {BSON("sample" << OID()), jstOID},
-        {BSON("sample" << false), Bool},
-        {BSON("sample" << true), Bool},
-        {BSON("sample" << Date_t()), Date},
-        {BSON("sample" << BSONRegEx("value1", "lu")), RegEx},
-        {BSON("sample" << 123456), NumberInt},
-        {BSON("sample" << Timestamp()), bsonTimestamp},
-        {BSON("sample" << 12345678901234567LL), NumberLong},
-        {BSON("sample" << BSONCode("value")), Code}};
+         BSONType::binData},
+        {BSON("sample" << OID()), BSONType::oid},
+        {BSON("sample" << false), BSONType::boolean},
+        {BSON("sample" << true), BSONType::boolean},
+        {BSON("sample" << Date_t()), BSONType::date},
+        {BSON("sample" << BSONRegEx("value1", "lu")), BSONType::regEx},
+        {BSON("sample" << 123456), BSONType::numberInt},
+        {BSON("sample" << Timestamp()), BSONType::timestamp},
+        {BSON("sample" << 12345678901234567LL), BSONType::numberLong},
+        {BSON("sample" << BSONCode("value")), BSONType::code}};
 
     const std::vector<std::pair<BSONObj, BSONType>> unindexedAllowedObjects{
-        {BSON("sample" << 123.456), NumberDouble},
-        {BSON("sample" << Decimal128()), NumberDecimal},
-        {BSON("sample" << BSON("nested" << "value")), Object},
-        {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
-        {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
-        {BSON("sample" << BSONSymbol("value")), Symbol},
-        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))), CodeWScope},
+        {BSON("sample" << 123.456), BSONType::numberDouble},
+        {BSON("sample" << Decimal128()), BSONType::numberDecimal},
+        {BSON("sample" << BSON("nested" << "value")), BSONType::object},
+        {BSON("sample" << BSON_ARRAY(1 << 23)), BSONType::array},
+        {BSON("sample" << BSONDBRef("value1", OID())), BSONType::dbRef},
+        {BSON("sample" << BSONSymbol("value")), BSONType::symbol},
+        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))),
+         BSONType::codeWScope},
     };
 
 
@@ -1450,11 +1451,11 @@ TEST_F(ServiceContextTest, FLE_EDC_Allowed_Types) {
 TEST_F(ServiceContextTest, FLE_EDC_Range_Allowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> rangeAllowedObjects{
-        {BSON("sample" << 123.456), NumberDouble},
-        {BSON("sample" << Decimal128()), NumberDecimal},
-        {BSON("sample" << 123456), NumberInt},
-        {BSON("sample" << 12345678901234567LL), NumberLong},
-        {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), Date},
+        {BSON("sample" << 123.456), BSONType::numberDouble},
+        {BSON("sample" << Decimal128()), BSONType::numberDecimal},
+        {BSON("sample" << 123456), BSONType::numberInt},
+        {BSON("sample" << 12345678901234567LL), BSONType::numberLong},
+        {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), BSONType::date},
     };
 
     std::vector<Operation> opTypes{Operation::kInsert, Operation::kFind};
@@ -1488,24 +1489,28 @@ void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm) {
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types) {
-    illegalBSONType(BSON("sample" << 123.456), NumberDouble, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << Decimal128()), NumberDecimal, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << 123.456), BSONType::numberDouble, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(
+        BSON("sample" << Decimal128()), BSONType::numberDecimal, Fle2AlgorithmInt::kEquality);
 
-    illegalBSONType(BSON("sample" << MINKEY), MinKey, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << MINKEY), BSONType::minKey, Fle2AlgorithmInt::kEquality);
 
     illegalBSONType(
-        BSON("sample" << BSON("nested" << "value")), Object, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << BSON_ARRAY(1 << 23)), Array, Fle2AlgorithmInt::kEquality);
+        BSON("sample" << BSON("nested" << "value")), BSONType::object, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(
+        BSON("sample" << BSON_ARRAY(1 << 23)), BSONType::array, Fle2AlgorithmInt::kEquality);
 
-    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kUnindexed);
-    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kUnindexed);
+    illegalBSONType(
+        BSON("sample" << BSONUndefined), BSONType::undefined, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(
+        BSON("sample" << BSONUndefined), BSONType::undefined, Fle2AlgorithmInt::kUnindexed);
+    illegalBSONType(BSON("sample" << BSONNULL), BSONType::null, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << BSONNULL), BSONType::null, Fle2AlgorithmInt::kUnindexed);
     illegalBSONType(BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))),
-                    CodeWScope,
+                    BSONType::codeWScope,
                     Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kEquality);
-    illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kUnindexed);
+    illegalBSONType(BSON("sample" << MAXKEY), BSONType::maxKey, Fle2AlgorithmInt::kEquality);
+    illegalBSONType(BSON("sample" << MAXKEY), BSONType::maxKey, Fle2AlgorithmInt::kUnindexed);
 }
 
 void illegalRangeBSONType(BSONObj doc, BSONType type) {
@@ -1515,23 +1520,24 @@ void illegalRangeBSONType(BSONObj doc, BSONType type) {
 TEST_F(ServiceContextTest, FLE_EDC_Range_Disallowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> disallowedObjects{
-        {BSON("sample" << "value123"), String},
+        {BSON("sample" << "value123"), BSONType::string},
         {BSON("sample" << BSONBinData(
                   testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
-         BinData},
-        {BSON("sample" << OID()), jstOID},
-        {BSON("sample" << false), Bool},
-        {BSON("sample" << true), Bool},
-        {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
-        {BSON("sample" << Timestamp()), bsonTimestamp},
-        {BSON("sample" << BSONCode("value")), Code},
-        {BSON("sample" << BSON("nested" << "value")), Object},
-        {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
-        {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
-        {BSON("sample" << BSONSymbol("value")), Symbol},
-        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))), CodeWScope},
-        {BSON("sample" << MINKEY), MinKey},
-        {BSON("sample" << MAXKEY), MaxKey},
+         BSONType::binData},
+        {BSON("sample" << OID()), BSONType::oid},
+        {BSON("sample" << false), BSONType::boolean},
+        {BSON("sample" << true), BSONType::boolean},
+        {BSON("sample" << BSONRegEx("value1", "value2")), BSONType::regEx},
+        {BSON("sample" << Timestamp()), BSONType::timestamp},
+        {BSON("sample" << BSONCode("value")), BSONType::code},
+        {BSON("sample" << BSON("nested" << "value")), BSONType::object},
+        {BSON("sample" << BSON_ARRAY(1 << 23)), BSONType::array},
+        {BSON("sample" << BSONDBRef("value1", OID())), BSONType::dbRef},
+        {BSON("sample" << BSONSymbol("value")), BSONType::symbol},
+        {BSON("sample" << BSONCodeWScope("value", BSON("code" << "something"))),
+         BSONType::codeWScope},
+        {BSON("sample" << MINKEY), BSONType::minKey},
+        {BSON("sample" << MAXKEY), BSONType::maxKey},
     };
 
     for (const auto& typePair : disallowedObjects) {
@@ -1539,11 +1545,11 @@ TEST_F(ServiceContextTest, FLE_EDC_Range_Disallowed_Types) {
     }
 
     illegalBSONType(BSON("sample" << BSONNULL),
-                    jstNULL,
+                    BSONType::null,
                     Fle2AlgorithmInt::kRange,
                     ErrorCodes::IDLFailedToParse);
     illegalBSONType(BSON("sample" << BSONUndefined),
-                    Undefined,
+                    BSONType::undefined,
                     Fle2AlgorithmInt::kRange,
                     ErrorCodes::IDLFailedToParse);
 }
@@ -1571,10 +1577,10 @@ BSONObj transformBSON(
         auto& [iterator, builder] = frameStack.top();
         if (iterator.more()) {
             BSONElement elem = iterator.next();
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 frameStack.push({BSONObjIterator(elem.Obj()),
                                  BSONObjBuilder(builder.subobjStart(elem.fieldNameStringData()))});
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 frameStack.push(
                     {BSONObjIterator(elem.Obj()),
                      BSONObjBuilder(builder.subarrayStart(elem.fieldNameStringData()))});
@@ -1650,7 +1656,7 @@ void disallowedEqualityPayloadType(BSONType type) {
 
             auto iup = parseFromCDR<FLE2InsertUpdatePayloadV2>(subCdr);
 
-            iup.setType(type);
+            iup.setType(stdx::to_underlying(type));
             toEncryptedBinData(fieldNameToSerialize,
                                EncryptedBinDataType::kFLE2InsertUpdatePayloadV2,
                                iup,
@@ -1663,19 +1669,19 @@ void disallowedEqualityPayloadType(BSONType type) {
 }
 
 TEST_F(ServiceContextTest, FLE_EDC_Disallowed_Types_FLE2InsertUpdatePayload) {
-    disallowedEqualityPayloadType(NumberDouble);
-    disallowedEqualityPayloadType(NumberDecimal);
+    disallowedEqualityPayloadType(BSONType::numberDouble);
+    disallowedEqualityPayloadType(BSONType::numberDecimal);
 
-    disallowedEqualityPayloadType(MinKey);
+    disallowedEqualityPayloadType(BSONType::minKey);
 
-    disallowedEqualityPayloadType(Object);
-    disallowedEqualityPayloadType(Array);
+    disallowedEqualityPayloadType(BSONType::object);
+    disallowedEqualityPayloadType(BSONType::array);
 
-    disallowedEqualityPayloadType(Undefined);
-    disallowedEqualityPayloadType(jstNULL);
-    disallowedEqualityPayloadType(CodeWScope);
+    disallowedEqualityPayloadType(BSONType::undefined);
+    disallowedEqualityPayloadType(BSONType::null);
+    disallowedEqualityPayloadType(BSONType::codeWScope);
 
-    disallowedEqualityPayloadType(MaxKey);
+    disallowedEqualityPayloadType(BSONType::maxKey);
 
     uint8_t fakeBSONType = 42;
     ASSERT_FALSE(isValidBSONType(fakeBSONType));
@@ -1722,7 +1728,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     iupayload.setIndexKeyId(indexKeyId);
 
     iupayload.setValue(value);
-    iupayload.setType(element.type());
+    iupayload.setType(stdx::to_underlying(element.type()));
 
     iupayload.setContentionFactor(counter);
 
@@ -1737,7 +1743,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Equality_Payloads_V2) {
     auto buf = uassertStatusOK(serverPayload.serialize());
 
     auto parsedType = serverPayload.getBsonType();
-    ASSERT_EQ(parsedType, iupayload.getType());
+    ASSERT_EQ(stdx::to_underlying(parsedType), iupayload.getType());
 
     auto parsedUuid = serverPayload.getKeyId();
     ASSERT_EQ(parsedUuid, iupayload.getIndexKeyId());
@@ -1768,7 +1774,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
     auto bogusEncryptedTokens = StateCollectionTokensV2({{}}, false).encrypt({{}});
 
     iupayload.setValue(value);
-    iupayload.setType(BSONType::NumberLong);
+    iupayload.setType(stdx::to_underlying(BSONType::numberLong));
     iupayload.setContentionFactor(0);
     iupayload.setIndexKeyId(indexKeyId);
     iupayload.setEdcDerivedToken({{}});
@@ -1796,7 +1802,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_InvalidArgs) {
         ErrorCodes::LibmongocryptError);
 
     ASSERT_THROWS_CODE(FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-                           BSONType::NumberLong,
+                           BSONType::numberLong,
                            indexKeyId,
                            std::vector<uint8_t>(),
                            FLE2TagAndEncryptedMetadataBlock(0, 0, bogusTag),
@@ -1839,7 +1845,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     constexpr size_t edgeCountOffset = typeOffset + 1;
 
     std::vector<uint8_t> shortInput(edgeCountOffset + 1);
-    shortInput.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    shortInput.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
     shortInput.at(edgeCountOffset) = 1;
 
     // test short input for equality payload
@@ -1899,7 +1905,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     // test invalid ciphertext length for equality payload fails to decrypt
     std::vector<uint8_t> emptyEqualityCipherText(
         typeOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
-    emptyEqualityCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    emptyEqualityCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
     auto swDecryptedData = IndexedEqualityEncryptedValueV2Helpers::parseAndDecryptCiphertext(
         serverToken, emptyEqualityCipherText);
     ASSERT_NOT_OK(swDecryptedData.getStatus());
@@ -1907,7 +1913,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Payloads_V2_ParseInvalidInput) {
     // test invalid ciphertext length for range payload fails to decrypt
     std::vector<uint8_t> emptyRangeCipherText(
         edgeCountOffset + 1 + sizeof(FLE2TagAndEncryptedMetadataBlock::SerializedBlob));
-    emptyRangeCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::Bool);
+    emptyRangeCipherText.at(typeOffset) = static_cast<uint8_t>(BSONType::boolean);
     emptyRangeCipherText.at(edgeCountOffset) = 1;
     swDecryptedData = FLE2IndexedRangeEncryptedValueV2::parseAndDecryptCiphertext(
         serverToken, emptyRangeCipherText);
@@ -1986,7 +1992,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     iupayload.setIndexKeyId(indexKeyId);
 
     iupayload.setValue(value);
-    iupayload.setType(element.type());
+    iupayload.setType(stdx::to_underlying(element.type()));
 
     iupayload.setContentionFactor(counter);
 
@@ -2051,7 +2057,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_Range_Payloads_V2) {
     ASSERT_OK(swBlocks.getStatus());
     auto& metadataBlocks = swBlocks.getValue();
 
-    ASSERT_EQ(swBsonType.getValue(), iupayload.getType());
+    ASSERT_EQ(stdx::to_underlying(swBsonType.getValue()), iupayload.getType());
     ASSERT(swIndexKeyId.getValue() == iupayload.getIndexKeyId());
 
     ASSERT_EQ(metadataBlocks.size(), 2);
@@ -2095,7 +2101,7 @@ static FLE2InsertUpdatePayloadV2 generateTestIUPV2ForTextSearch(BSONElement elem
         StateCollectionTokensV2(iupayload.getEscDerivedToken(), boost::none).encrypt(ecocToken));
     // u, t, v, e, k
     iupayload.setIndexKeyId(indexKeyId);
-    iupayload.setType(element.type());
+    iupayload.setType(stdx::to_underlying(element.type()));
     iupayload.setValue(value);
     iupayload.setServerEncryptionToken(serverEncryptToken);
     iupayload.setContentionFactor(contention);
@@ -2276,7 +2282,7 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads) {
 
     FLE2IndexedTextEncryptedValue parsed(buf);
 
-    ASSERT_EQ(parsed.getBsonType(), iupayload.getType());
+    ASSERT_EQ(stdx::to_underlying(parsed.getBsonType()), iupayload.getType());
     ASSERT_EQ(parsed.getKeyId(), iupayload.getIndexKeyId());
     ASSERT_EQ(parsed.getTagCount(), tagCount);
     ASSERT_EQ(parsed.getSubstringTagCount(), substrs.size());
@@ -2393,12 +2399,12 @@ TEST_F(ServiceContextTest, FLE_EDC_ServerSide_TextSearch_Payloads_InvalidArgs) {
 
     // test wrong BSON type
     {
-        iupayload.setType(BSONType::NumberInt);
+        iupayload.setType(stdx::to_underlying(BSONType::numberInt));
         ASSERT_THROWS_CODE(
             FLE2IndexedTextEncryptedValue::fromUnencrypted(iupayload, tags, payload.counts),
             DBException,
             9784103);
-        iupayload.setType(BSONType::String);
+        iupayload.setType(stdx::to_underlying(BSONType::string));
     }
 
     // test substr/suffix/prefix token sets too large
@@ -2469,8 +2475,8 @@ TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
 
     auto finalDoc = encryptDocument(builder.obj(), &keyVault);
 
-    ASSERT_EQ(finalDoc[kSafeContent].type(), Array);
-    ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
+    ASSERT_EQ(finalDoc[kSafeContent].type(), BSONType::array);
+    ASSERT_EQ(finalDoc["encrypted"].type(), BSONType::binData);
     ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
 
     // Decrypt document
@@ -2483,7 +2489,7 @@ TEST_F(ServiceContextTest, FLE_EDC_DuplicateSafeContent_CompatibleType) {
     ASSERT_EQ(elements[0].safeNumberInt(), 1);
     ASSERT_EQ(elements[1].safeNumberInt(), 2);
     ASSERT_EQ(elements[2].safeNumberInt(), 4);
-    ASSERT(elements[3].type() == BinData);
+    ASSERT(elements[3].type() == BSONType::binData);
 }
 
 
@@ -3130,7 +3136,7 @@ TEST_F(ServiceContextTest, FLE_Update_Basic) {
     std::cout << finalDoc << std::endl;
 
     ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
-    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == BSONType::array);
     ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
     ASSERT_TRUE(
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
@@ -3145,7 +3151,7 @@ TEST_F(ServiceContextTest, FLE_Update_Empty) {
 
     std::cout << finalDoc << std::endl;
 
-    ASSERT_EQ(finalDoc["$set"]["count"].type(), NumberInt);
+    ASSERT_EQ(finalDoc["$set"]["count"].type(), BSONType::numberInt);
     ASSERT(finalDoc["$push"].eoo());
 }
 
@@ -3189,8 +3195,8 @@ TEST_F(ServiceContextTest, FLE_Update_PushToOtherfield) {
     std::cout << finalDoc << std::endl;
 
     ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
-    ASSERT_TRUE(finalDoc["$push"]["abc"].type() == NumberInt);
-    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
+    ASSERT_TRUE(finalDoc["$push"]["abc"].type() == BSONType::numberInt);
+    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == BSONType::array);
     ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
     ASSERT_TRUE(
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
@@ -3207,14 +3213,14 @@ TEST_F(ServiceContextTest, FLE_Update_GetRemovedTags) {
     std::vector<uint8_t> clientBlob(64);
 
     auto value1 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-        BSONType::String,
+        BSONType::string,
         indexKeyId,
         clientBlob,
         FLE2TagAndEncryptedMetadataBlock(1, 0, tag1),
         serverToken,
         serverDerivedFromDataToken);
     auto value2 = FLE2IndexedEqualityEncryptedValueV2::fromUnencrypted(
-        BSONType::String,
+        BSONType::string,
         indexKeyId,
         clientBlob,
         FLE2TagAndEncryptedMetadataBlock(1, 0, tag2),
@@ -3305,9 +3311,9 @@ TEST_F(ServiceContextTest, FLE_Update_GenerateUpdateToRemoveTags) {
 
     std::cout << "PULL: " << pullUpdate << std::endl;
 
-    ASSERT_EQ(pullUpdate["$pull"].type(), Object);
-    ASSERT_EQ(pullUpdate["$pull"][kSafeContent].type(), Object);
-    ASSERT_EQ(pullUpdate["$pull"][kSafeContent]["$in"].type(), Array);
+    ASSERT_EQ(pullUpdate["$pull"].type(), BSONType::object);
+    ASSERT_EQ(pullUpdate["$pull"][kSafeContent].type(), BSONType::object);
+    ASSERT_EQ(pullUpdate["$pull"][kSafeContent]["$in"].type(), BSONType::array);
     auto tagsArray = pullUpdate["$pull"][kSafeContent]["$in"].Array();
 
     ASSERT_EQ(tagsArray.size(), removedTags.size());
@@ -5158,7 +5164,7 @@ public:
                             // by the test.
                             try {
                                 auto qtc = makeRangeQueryTypeConfig(lb, ub, precision, sparsity);
-                                validateRangeIndex(BSONType::NumberDouble, "rangeField"_sd, qtc);
+                                validateRangeIndex(BSONType::numberDouble, "rangeField"_sd, qtc);
                             } catch (DBException& e) {
                                 if (e.code() == 6966805 || e.code() == 6966806 ||
                                     e.code() == 9157100 || e.code() == 9178801 ||
@@ -5190,15 +5196,15 @@ public:
 };
 
 TEST_F(EdgeTestFixture, getEdgesLengthInt32) {
-    runEdgesLengthTestForFunamentalType<int32_t>(getEdgesInt32, BSONType::NumberInt);
+    runEdgesLengthTestForFunamentalType<int32_t>(getEdgesInt32, BSONType::numberInt);
 }
 
 TEST_F(EdgeTestFixture, getEdgesLengthInt64) {
-    runEdgesLengthTestForFunamentalType<int64_t>(getEdgesInt64, BSONType::NumberLong);
+    runEdgesLengthTestForFunamentalType<int64_t>(getEdgesInt64, BSONType::numberLong);
 }
 
 TEST_F(EdgeTestFixture, getEdgesLengthDouble) {
-    runEdgesLengthTestForFunamentalType<double>(getEdgesDouble, BSONType::NumberDouble);
+    runEdgesLengthTestForFunamentalType<double>(getEdgesDouble, BSONType::numberDouble);
 }
 
 // Decimal128 is less well templated than the fundamental types,
@@ -5232,14 +5238,14 @@ TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
                                                    precision,
                                                    sparsity,
                                                    getEdgesDecimal128,
-                                                   BSONType::NumberDecimal);
+                                                   BSONType::numberDecimal);
                         } else {
                             ASSERT_THROWS_CODE(assertEdgesLengthMatch(lb,
                                                                       ub,
                                                                       precision,
                                                                       sparsity,
                                                                       getEdgesDecimal128,
-                                                                      BSONType::NumberDecimal),
+                                                                      BSONType::numberDecimal),
                                                DBException,
                                                9157101);
                         }
@@ -5378,7 +5384,7 @@ TEST_F(EdgeTestFixture, getEdgesLengthDate) {
                     continue;
                 }
                 assertEdgesLengthMatch(
-                    lb, ub, boost::none, sparsity, getEdgesInt64, BSONType::Date);
+                    lb, ub, boost::none, sparsity, getEdgesInt64, BSONType::date);
             }
         }
     }
@@ -5407,7 +5413,7 @@ TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
         auto expectId = decodePrf(kHashOf042);
 
         auto idElem = doc["_id"_sd];
-        ASSERT_EQ(idElem.type(), BinData);
+        ASSERT_EQ(idElem.type(), BSONType::binData);
         ASSERT_EQ(idElem.binDataType(), BinDataGeneral);
 
         int actualIdLen = 0;
@@ -5421,7 +5427,7 @@ TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
     // value := Enc(0 || 0)
     {
         auto valueElem = doc["value"_sd];
-        ASSERT_EQ(valueElem.type(), BinData);
+        ASSERT_EQ(valueElem.type(), BSONType::binData);
         ASSERT_EQ(valueElem.binDataType(), BinDataGeneral);
         int len = 0;
         const char* value = valueElem.binData(len);

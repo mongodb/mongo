@@ -548,11 +548,11 @@ TEST_F(DocumentSourceFacetTest, ShouldBeAbleToReParseSerializedStage) {
     vector<Value> serialization;
     facetStage->serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
     // The fields are in no guaranteed order, so we can't make a simple Document comparison.
     ASSERT_EQ(serialization[0].getDocument().computeSize(), 1ULL);
-    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getDocument()["$facet"].getType(), BSONType::object);
 
     // Should have two fields: "skippedOne" and "skippedTwo".
     auto serializedStage = serialization[0].getDocument()["$facet"].getDocument();

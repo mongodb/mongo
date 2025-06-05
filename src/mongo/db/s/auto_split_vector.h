@@ -138,13 +138,13 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
 static std::vector<BSONObj> parseSplitKeys(const BSONElement& splitKeysArray) {
     uassert(ErrorCodes::TypeMismatch,
             "The split keys vector must be represented as a BSON array",
-            !splitKeysArray.eoo() && splitKeysArray.type() == BSONType::Array);
+            !splitKeysArray.eoo() && splitKeysArray.type() == BSONType::array);
 
     std::vector<BSONObj> splitKeys;
     for (const auto& elem : splitKeysArray.Obj()) {
         uassert(ErrorCodes::TypeMismatch,
                 "Each element of the split keys array must be an object",
-                elem.type() == BSONType::Object);
+                elem.type() == BSONType::object);
         splitKeys.push_back(elem.embeddedObject().getOwned());
     }
 

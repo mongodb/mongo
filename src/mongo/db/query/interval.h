@@ -76,7 +76,7 @@ struct Interval {
             ss << "(";
         }
         auto boundToString = [&](BSONElement bound) {
-            if (bound.type() == BSONType::String && hasNonSimpleCollation) {
+            if (bound.type() == BSONType::string && hasNonSimpleCollation) {
                 ss << "CollationKey(";
                 // False means omit the field name.
                 ss << "0x" << hexblob::encodeLower(bound.valueStringData());

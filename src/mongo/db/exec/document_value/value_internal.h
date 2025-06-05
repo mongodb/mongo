@@ -37,6 +37,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
@@ -149,86 +150,86 @@ public:
     // constructor. Much code relies on every byte being predictably initialized to zero.
 
     // This is a "missing" Value
-    ValueStorage() : ValueStorage(EOO) {}
+    ValueStorage() : ValueStorage(BSONType::eoo) {}
 
     explicit ValueStorage(BSONType t) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
     }
     ValueStorage(BSONType t, int i) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         intValue = i;
     }
     ValueStorage(BSONType t, long long l) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         longValue = l;
     }
     ValueStorage(BSONType t, double d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         doubleValue = d;
     }
     ValueStorage(BSONType t, const Decimal128& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDecimal(d);
     }
     ValueStorage(BSONType t, Timestamp r) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         timestampValue = r.asULL();
     }
     ValueStorage(BSONType t, bool b) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         boolValue = b;
     }
     ValueStorage(BSONType t, const Document& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDocument(d);
     }
     ValueStorage(BSONType t, Document&& d) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDocument(std::move(d));
     }
     ValueStorage(BSONType t, boost::intrusive_ptr<RCVector<Value>>&& a) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putVector(std::move(a));
     }
     ValueStorage(BSONType t, StringData s) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putString(s);
     }
     ValueStorage(BSONType t, const BSONBinData& bd) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putBinData(bd);
     }
     ValueStorage(BSONType t, const BSONRegEx& re) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putRegEx(re);
     }
     ValueStorage(BSONType t, const BSONCodeWScope& cs) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putCodeWScope(cs);
     }
     ValueStorage(BSONType t, const BSONDBRef& dbref) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         putDBRef(dbref);
     }
 
     ValueStorage(BSONType t, const OID& o) {
         zero();
-        type = t;
+        type = stdx::to_underlying(t);
         memcpy(&oid, o.view().view(), OID::kOIDSize);
     }
 
@@ -369,7 +370,7 @@ public:
     }
 
     BinDataType binDataType() const {
-        dassert(type == BinData);
+        dassert(type == stdx::to_underlying(BSONType::binData));
         return BinDataType(binSubType);
     }
 
@@ -379,26 +380,26 @@ public:
 
     void verifyRefCountingIfShould() const {
         switch (type) {
-            case MinKey:
-            case MaxKey:
-            case jstOID:
-            case Date:
-            case bsonTimestamp:
-            case EOO:
-            case jstNULL:
-            case Undefined:
-            case Bool:
-            case NumberInt:
-            case NumberLong:
-            case NumberDouble:
+            case stdx::to_underlying(BSONType::minKey):
+            case stdx::to_underlying(BSONType::maxKey):
+            case stdx::to_underlying(BSONType::oid):
+            case stdx::to_underlying(BSONType::date):
+            case stdx::to_underlying(BSONType::timestamp):
+            case stdx::to_underlying(BSONType::eoo):
+            case stdx::to_underlying(BSONType::null):
+            case stdx::to_underlying(BSONType::undefined):
+            case stdx::to_underlying(BSONType::boolean):
+            case stdx::to_underlying(BSONType::numberInt):
+            case stdx::to_underlying(BSONType::numberLong):
+            case stdx::to_underlying(BSONType::numberDouble):
                 // the above types never reference external data
                 MONGO_verify(!refCounter);
                 break;
 
-            case String:
-            case RegEx:
-            case Code:
-            case Symbol:
+            case stdx::to_underlying(BSONType::string):
+            case stdx::to_underlying(BSONType::regEx):
+            case stdx::to_underlying(BSONType::code):
+            case stdx::to_underlying(BSONType::symbol):
                 // If this is using the short-string optimization, it must not have a ref-counted
                 // pointer.
                 invariant(!shortStr || !refCounter);
@@ -411,17 +412,19 @@ public:
                 invariant(shortStr || (refCounter || !genericRCPtr));
                 break;
 
-            case NumberDecimal:
-            case BinData:  // TODO this should probably support short-string optimization
-            case Array:    // TODO this should probably support empty-is-NULL optimization
-            case DBRef:
-            case CodeWScope:
+            case stdx::to_underlying(BSONType::numberDecimal):
+            case stdx::to_underlying(
+                BSONType::binData):  // TODO this should probably support short-string optimization
+            case stdx::to_underlying(
+                BSONType::array):  // TODO this should probably support empty-is-NULL optimization
+            case stdx::to_underlying(BSONType::dbRef):
+            case stdx::to_underlying(BSONType::codeWScope):
                 // the above types always reference external data.
                 invariant(refCounter);
                 invariant(bool(genericRCPtr));
                 break;
 
-            case Object:
+            case stdx::to_underlying(BSONType::object):
                 // Objects either hold a NULL ptr or should be ref-counting
                 invariant(refCounter == bool(genericRCPtr));
                 break;

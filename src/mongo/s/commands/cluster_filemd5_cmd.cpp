@@ -94,7 +94,7 @@ public:
         if (const auto rootElt = cmdObj["root"]) {
             uassert(ErrorCodes::InvalidNamespace,
                     "'root' must be of type String",
-                    rootElt.type() == BSONType::String);
+                    rootElt.type() == BSONType::string);
             collectionName = rootElt.str();
         }
         if (collectionName.empty())

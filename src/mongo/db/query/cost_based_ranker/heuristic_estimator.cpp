@@ -231,7 +231,7 @@ SelectivityEstimate estimateInterval(const Interval& interval, CardinalityEstima
     // At this point, we know this interval is a range.
 
     // We use different heuristic based on whether this range is open or closed.
-    if (interval.start.type() == MinKey || interval.end.type() == MaxKey ||
+    if (interval.start.type() == BSONType::minKey || interval.end.type() == BSONType::maxKey ||
         !interval.startInclusive || !interval.endInclusive) {
         return heuristicOpenRangeSel(inputCard);
     }

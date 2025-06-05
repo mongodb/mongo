@@ -44,7 +44,7 @@ Value evaluateAccumulator(const ExpressionFromAccumulator<AccumulatorState>& exp
     // If a single, non-array arg is given, pass it directly to the accumulator.
     if (n == 1) {
         Value singleVal = expr.getChildren()[0]->evaluate(root, variables);
-        if (singleVal.getType() == Array) {
+        if (singleVal.getType() == BSONType::array) {
             for (const Value& val : singleVal.getArray()) {
                 accum.process(val, false);
             }

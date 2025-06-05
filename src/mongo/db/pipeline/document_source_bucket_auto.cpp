@@ -73,10 +73,10 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONElement& groupByField,
     const VariablesParseState& vps) {
-    if (groupByField.type() == BSONType::Object &&
+    if (groupByField.type() == BSONType::object &&
         groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
         return Expression::parseObject(expCtx.get(), groupByField.embeddedObject(), vps);
-    } else if (groupByField.type() == BSONType::String &&
+    } else if (groupByField.type() == BSONType::string &&
                // Lager than 2 because we need a '$', at least one char for the field name and
                // the final terminating 0.
                groupByField.valuestrsize() > 2 && groupByField.valueStringData()[0] == '$') {
@@ -539,7 +539,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     uassert(40240,
             str::stream() << "The argument to $bucketAuto must be an object, but found type: "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     VariablesParseState vps = pExpCtx->variablesParseState;
     vector<AccumulationStatement> accumulationStatements;
@@ -574,7 +574,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                     str::stream()
                         << "The $bucketAuto 'output' field must be an object, but found type: "
                         << typeName(argument.type()),
-                    argument.type() == BSONType::Object);
+                    argument.type() == BSONType::object);
 
             for (auto&& outputField : argument.embeddedObject()) {
                 auto parsedStmt = AccumulationStatement::parseAccumulationStatement(
@@ -592,7 +592,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                     str::stream()
                         << "The $bucketAuto 'granularity' field must be a string, but found type: "
                         << typeName(argument.type()),
-                    argument.type() == BSONType::String);
+                    argument.type() == BSONType::string);
             granularityRounder = GranularityRounder::getGranularityRounder(pExpCtx, argument.str());
         } else {
             uasserted(40245, str::stream() << "Unrecognized option to $bucketAuto: " << argName);

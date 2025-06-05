@@ -132,8 +132,8 @@ FTSIteratorValue FTSElementIterator::advance() {
         // weight that could possibly match or be a prefix of dottedName.  And if this
         // element fails to match, then no subsequent weight can match, since the weights
         // are lexicographically ordered.
-        Weights::const_iterator i =
-            _spec.weights().lower_bound(elem.type() == Object ? dottedName + '.' : dottedName);
+        Weights::const_iterator i = _spec.weights().lower_bound(
+            elem.type() == BSONType::object ? dottedName + '.' : dottedName);
 
         // possibleWeightMatch is set if the weight map contains either a match or some item
         // lexicographically larger than fieldName.  This boolean acts as a guard on
@@ -156,7 +156,7 @@ FTSIteratorValue FTSElementIterator::advance() {
         double weight = (exactMatch ? i->second : DEFAULT_WEIGHT);
 
         switch (elem.type()) {
-            case String:
+            case BSONType::string:
                 // Only index strings on exact match or wildcard.
                 if (exactMatch || _spec.wildcard()) {
                     return FTSIteratorValue(
@@ -164,7 +164,7 @@ FTSIteratorValue FTSElementIterator::advance() {
                 }
                 break;
 
-            case Object:
+            case BSONType::object:
                 // Only descend into a sub-document on proper prefix or wildcard.  Note that
                 // !exactMatch is a sufficient test for proper prefix match, because of
                 //   if ( !matchPrefix( dottedName, i->first ) ) continue;
@@ -176,7 +176,7 @@ FTSIteratorValue FTSElementIterator::advance() {
                 }
                 break;
 
-            case Array:
+            case BSONType::array:
                 // Only descend into arrays from non-array parents or on wildcard.
                 if (!_frame._isArray || _spec.wildcard()) {
                     _frameStack.push(_frame);

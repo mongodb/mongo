@@ -289,7 +289,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
                              const BSONObj& o,
                              bool fromMigrate) {
     BSONElement e = o["_id"];
-    MONGO_verify(e.type());
+    MONGO_verify(stdx::to_underlying(e.type()));
     BSONObj id = e.wrap();
     return upsert(opCtx, coll, id, o, fromMigrate);
 }

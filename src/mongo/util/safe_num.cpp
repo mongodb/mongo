@@ -41,43 +41,43 @@ using std::ostringstream;
 
 SafeNum::SafeNum(const BSONElement& element) {
     switch (element.type()) {
-        case NumberInt:
-            _type = NumberInt;
+        case BSONType::numberInt:
+            _type = BSONType::numberInt;
             _value.int32Val = element.Int();
             break;
-        case NumberLong:
-            _type = NumberLong;
+        case BSONType::numberLong:
+            _type = BSONType::numberLong;
             _value.int64Val = element.Long();
             break;
-        case NumberDouble:
-            _type = NumberDouble;
+        case BSONType::numberDouble:
+            _type = BSONType::numberDouble;
             _value.doubleVal = element.Double();
             break;
-        case NumberDecimal:
-            _type = NumberDecimal;
+        case BSONType::numberDecimal:
+            _type = BSONType::numberDecimal;
             _value.decimalVal = element.Decimal().getValue();
             break;
         default:
-            _type = EOO;
+            _type = BSONType::eoo;
     }
 }
 
 std::string SafeNum::debugString() const {
     ostringstream os;
     switch (_type) {
-        case NumberInt:
+        case BSONType::numberInt:
             os << "(NumberInt)" << _value.int32Val;
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             os << "(NumberLong)" << _value.int64Val;
             break;
-        case NumberDouble:
+        case BSONType::numberDouble:
             os << "(NumberDouble)" << _value.doubleVal;
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             os << "(NumberDecimal)" << getDecimal(*this).toString();
             break;
-        case EOO:
+        case BSONType::eoo:
             os << "(EOO)";
             break;
         default:
@@ -109,7 +109,7 @@ bool SafeNum::isEquivalent(const SafeNum& rhs) const {
     // can upconvert to that would not sacrifice the accuracy in the process.
 
     // If one side is a decimal, compare both sides as decimals.
-    if (_type == NumberDecimal || rhs._type == NumberDecimal) {
+    if (_type == BSONType::numberDecimal || rhs._type == BSONType::numberDecimal) {
         // Note: isEqual is faster than using compareDecimals, however it does not handle
         // comparing NaN as equal (differing from BSONElement::woCompare).  This case
         // is not handled for double comparison above eihter.
@@ -117,12 +117,12 @@ bool SafeNum::isEquivalent(const SafeNum& rhs) const {
     }
 
     // If none of the sides is a double, compare them as long's.
-    if (_type != NumberDouble && rhs._type != NumberDouble) {
+    if (_type != BSONType::numberDouble && rhs._type != BSONType::numberDouble) {
         return getInt64(*this) == getInt64(rhs);
     }
 
     // If both sides are doubles, compare them as so.
-    if (_type == NumberDouble && rhs._type == NumberDouble) {
+    if (_type == BSONType::numberDouble && rhs._type == BSONType::numberDouble) {
         return _value.doubleVal == rhs._value.doubleVal;
     }
 
@@ -145,15 +145,15 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
     }
 
     switch (_type) {
-        case NumberInt:
+        case BSONType::numberInt:
             return _value.int32Val == rhs._value.int32Val;
-        case NumberLong:
+        case BSONType::numberLong:
             return _value.int64Val == rhs._value.int64Val;
-        case NumberDouble:
+        case BSONType::numberDouble:
             return _value.doubleVal == rhs._value.doubleVal;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return Decimal128(_value.decimalVal).isEqual(Decimal128(rhs._value.decimalVal));
-        case EOO:
+        case BSONType::eoo:
         // EOO doesn't match anything, including itself.
         default:
             return false;
@@ -162,16 +162,16 @@ bool SafeNum::isIdentical(const SafeNum& rhs) const {
 
 void SafeNum::toBSON(StringData fieldName, BSONObjBuilder* bob) const {
     switch (_type) {
-        case BSONType::NumberInt:
+        case BSONType::numberInt:
             bob->append(fieldName, _value.int32Val);
             return;
-        case BSONType::NumberLong:
+        case BSONType::numberLong:
             bob->append(fieldName, _value.int64Val);
             return;
-        case BSONType::NumberDouble:
+        case BSONType::numberDouble:
             bob->append(fieldName, _value.doubleVal);
             return;
-        case BSONType::NumberDecimal:
+        case BSONType::numberDecimal:
             bob->append(fieldName, Decimal128(_value.decimalVal));
             return;
         default:
@@ -181,9 +181,9 @@ void SafeNum::toBSON(StringData fieldName, BSONObjBuilder* bob) const {
 
 int64_t SafeNum::getInt64(const SafeNum& snum) {
     switch (snum._type) {
-        case NumberInt:
+        case BSONType::numberInt:
             return snum._value.int32Val;
-        case NumberLong:
+        case BSONType::numberLong:
             return snum._value.int64Val;
         default:
             return 0;
@@ -192,13 +192,13 @@ int64_t SafeNum::getInt64(const SafeNum& snum) {
 
 double SafeNum::getDouble(const SafeNum& snum) {
     switch (snum._type) {
-        case NumberInt:
+        case BSONType::numberInt:
             return snum._value.int32Val;
-        case NumberLong:
+        case BSONType::numberLong:
             return snum._value.int64Val;
-        case NumberDouble:
+        case BSONType::numberDouble:
             return snum._value.doubleVal;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return Decimal128(snum._value.decimalVal).toDouble();
         default:
             return 0.0;
@@ -207,13 +207,13 @@ double SafeNum::getDouble(const SafeNum& snum) {
 
 Decimal128 SafeNum::getDecimal(const SafeNum& snum) {
     switch (snum._type) {
-        case NumberInt:
+        case BSONType::numberInt:
             return Decimal128(snum._value.int32Val);
-        case NumberLong:
+        case BSONType::numberLong:
             return Decimal128(snum._value.int64Val);
-        case NumberDouble:
+        case BSONType::numberDouble:
             return Decimal128(snum._value.doubleVal, Decimal128::kRoundTo15Digits);
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             return Decimal128(snum._value.decimalVal);
         default:
             return Decimal128::kNormalizedZero;
@@ -335,28 +335,30 @@ SafeNum SafeNum::addInternal(const SafeNum& lhs, const SafeNum& rhs) {
     BSONType lType = lhs._type;
     BSONType rType = rhs._type;
 
-    if (lType == NumberInt && rType == NumberInt) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberInt) {
         return addInt32Int32(lhs._value.int32Val, rhs._value.int32Val);
     }
 
-    if (lType == NumberInt && rType == NumberLong) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberLong) {
         return addInt64Int64(lhs._value.int32Val, rhs._value.int64Val);
     }
 
-    if (lType == NumberLong && rType == NumberInt) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberInt) {
         return addInt64Int64(lhs._value.int64Val, rhs._value.int32Val);
     }
 
-    if (lType == NumberLong && rType == NumberLong) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberLong) {
         return addInt64Int64(lhs._value.int64Val, rhs._value.int64Val);
     }
 
-    if (lType == NumberDecimal || rType == NumberDecimal) {
+    if (lType == BSONType::numberDecimal || rType == BSONType::numberDecimal) {
         return addDecimals(getDecimal(lhs), getDecimal(rhs));
     }
 
-    if ((lType == NumberInt || lType == NumberLong || lType == NumberDouble) &&
-        (rType == NumberInt || rType == NumberLong || rType == NumberDouble)) {
+    if ((lType == BSONType::numberInt || lType == BSONType::numberLong ||
+         lType == BSONType::numberDouble) &&
+        (rType == BSONType::numberInt || rType == BSONType::numberLong ||
+         rType == BSONType::numberDouble)) {
         return addFloats(getDouble(lhs), getDouble(rhs));
     }
 
@@ -367,28 +369,30 @@ SafeNum SafeNum::mulInternal(const SafeNum& lhs, const SafeNum& rhs) {
     BSONType lType = lhs._type;
     BSONType rType = rhs._type;
 
-    if (lType == NumberInt && rType == NumberInt) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberInt) {
         return mulInt32Int32(lhs._value.int32Val, rhs._value.int32Val);
     }
 
-    if (lType == NumberInt && rType == NumberLong) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberLong) {
         return mulInt64Int64(lhs._value.int32Val, rhs._value.int64Val);
     }
 
-    if (lType == NumberLong && rType == NumberInt) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberInt) {
         return mulInt64Int64(lhs._value.int64Val, rhs._value.int32Val);
     }
 
-    if (lType == NumberLong && rType == NumberLong) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberLong) {
         return mulInt64Int64(lhs._value.int64Val, rhs._value.int64Val);
     }
 
-    if (lType == NumberDecimal || rType == NumberDecimal) {
+    if (lType == BSONType::numberDecimal || rType == BSONType::numberDecimal) {
         return mulDecimals(getDecimal(lhs), getDecimal(rhs));
     }
 
-    if ((lType == NumberInt || lType == NumberLong || lType == NumberDouble) &&
-        (rType == NumberInt || rType == NumberLong || rType == NumberDouble)) {
+    if ((lType == BSONType::numberInt || lType == BSONType::numberLong ||
+         lType == BSONType::numberDouble) &&
+        (rType == BSONType::numberInt || rType == BSONType::numberLong ||
+         rType == BSONType::numberDouble)) {
         return mulFloats(getDouble(lhs), getDouble(rhs));
     }
 
@@ -399,19 +403,19 @@ SafeNum SafeNum::andInternal(const SafeNum& lhs, const SafeNum& rhs) {
     const BSONType lType = lhs._type;
     const BSONType rType = rhs._type;
 
-    if (lType == NumberInt && rType == NumberInt) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberInt) {
         return (lhs._value.int32Val & rhs._value.int32Val);
     }
 
-    if (lType == NumberInt && rType == NumberLong) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberLong) {
         return (static_cast<int64_t>(lhs._value.int32Val) & rhs._value.int64Val);
     }
 
-    if (lType == NumberLong && rType == NumberInt) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberInt) {
         return (lhs._value.int64Val & static_cast<int64_t>(rhs._value.int32Val));
     }
 
-    if (lType == NumberLong && rType == NumberLong) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberLong) {
         return (lhs._value.int64Val & rhs._value.int64Val);
     }
 
@@ -422,19 +426,19 @@ SafeNum SafeNum::orInternal(const SafeNum& lhs, const SafeNum& rhs) {
     const BSONType lType = lhs._type;
     const BSONType rType = rhs._type;
 
-    if (lType == NumberInt && rType == NumberInt) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberInt) {
         return (lhs._value.int32Val | rhs._value.int32Val);
     }
 
-    if (lType == NumberInt && rType == NumberLong) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberLong) {
         return (static_cast<int64_t>(lhs._value.int32Val) | rhs._value.int64Val);
     }
 
-    if (lType == NumberLong && rType == NumberInt) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberInt) {
         return (lhs._value.int64Val | static_cast<int64_t>(rhs._value.int32Val));
     }
 
-    if (lType == NumberLong && rType == NumberLong) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberLong) {
         return (lhs._value.int64Val | rhs._value.int64Val);
     }
 
@@ -445,19 +449,19 @@ SafeNum SafeNum::xorInternal(const SafeNum& lhs, const SafeNum& rhs) {
     const BSONType lType = lhs._type;
     const BSONType rType = rhs._type;
 
-    if (lType == NumberInt && rType == NumberInt) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberInt) {
         return (lhs._value.int32Val ^ rhs._value.int32Val);
     }
 
-    if (lType == NumberInt && rType == NumberLong) {
+    if (lType == BSONType::numberInt && rType == BSONType::numberLong) {
         return (static_cast<int64_t>(lhs._value.int32Val) ^ rhs._value.int64Val);
     }
 
-    if (lType == NumberLong && rType == NumberInt) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberInt) {
         return (lhs._value.int64Val ^ static_cast<int64_t>(rhs._value.int32Val));
     }
 
-    if (lType == NumberLong && rType == NumberLong) {
+    if (lType == BSONType::numberLong && rType == BSONType::numberLong) {
         return (lhs._value.int64Val ^ rhs._value.int64Val);
     }
 

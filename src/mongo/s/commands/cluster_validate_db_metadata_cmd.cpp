@@ -118,11 +118,11 @@ public:
                     shardOutput[ValidateDBMetadataCommandReply::kApiVersionErrorsFieldName];
                 tassert(5287400,
                         "The 'apiVersionErrors' field returned from shards should be an array ",
-                        apiVersionErrors && apiVersionErrors.type() == Array);
+                        apiVersionErrors && apiVersionErrors.type() == BSONType::array);
                 for (auto&& error : apiVersionErrors.Array()) {
                     tassert(5287401,
                             "The array element in 'apiVersionErrors' should be object",
-                            error.type() == Object);
+                            error.type() == BSONType::object);
                     ErrorReplyElement apiVersionError = ErrorReplyElement::parse(
                         IDLParserContext("ErrorReplyElement"), error.Obj());
 

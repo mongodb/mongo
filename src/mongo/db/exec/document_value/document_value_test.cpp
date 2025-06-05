@@ -245,10 +245,11 @@ TEST(DocumentGetFieldNonCaching, ModifiedTopLevelFields) {
     // caching accessor.
     {
         ASSERT_EQ(document.getNestedScalarFieldNonCaching("val1")->getBool(), true);
-        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val1.val1")->getType(), EOO);
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val1.val1")->getType(), BSONType::eoo);
 
         ASSERT_EQ(document.getNestedScalarFieldNonCaching("val2.val2")->getBool(), true);
-        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val2.val2.val2")->getType(), EOO);
+        ASSERT_EQ(document.getNestedScalarFieldNonCaching("val2.val2.val2")->getType(),
+                  BSONType::eoo);
     }
 }
 
@@ -1359,7 +1360,7 @@ public:
         ASSERT_EQUALS(5, value.getInt());
         ASSERT_EQUALS(5, value.getLong());
         ASSERT_EQUALS(5, value.getDouble());
-        ASSERT_EQUALS(NumberInt, value.getType());
+        ASSERT_EQUALS(BSONType::numberInt, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1371,7 +1372,7 @@ public:
         Value value = Value(99LL);
         ASSERT_EQUALS(99, value.getLong());
         ASSERT_EQUALS(99, value.getDouble());
-        ASSERT_EQUALS(NumberLong, value.getType());
+        ASSERT_EQUALS(BSONType::numberLong, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1382,7 +1383,7 @@ public:
     void run() {
         Value value = Value(5.5);
         ASSERT_EQUALS(5.5, value.getDouble());
-        ASSERT_EQUALS(NumberDouble, value.getType());
+        ASSERT_EQUALS(BSONType::numberDouble, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1393,7 +1394,7 @@ public:
     void run() {
         Value value = Value("foo"_sd);
         ASSERT_EQUALS("foo", value.getString());
-        ASSERT_EQUALS(mongo::String, value.getType());
+        ASSERT_EQUALS(BSONType::string, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1436,7 +1437,7 @@ public:
     void run() {
         Value value = Value(Date_t::fromMillisSinceEpoch(999));
         ASSERT_EQUALS(999, value.getDate().toMillisSinceEpoch());
-        ASSERT_EQUALS(mongo::Date, value.getType());
+        ASSERT_EQUALS(mongo::BSONType::date, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1447,12 +1448,12 @@ public:
     void run() {
         Value value = Value(Timestamp(777));
         ASSERT(Timestamp(777) == value.getTimestamp());
-        ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
+        ASSERT_EQUALS(mongo::BSONType::timestamp, value.getType());
         assertRoundTrips(value);
 
         value = Value(Timestamp(~0U, 3));
         ASSERT(Timestamp(~0U, 3) == value.getTimestamp());
-        ASSERT_EQUALS(mongo::bsonTimestamp, value.getType());
+        ASSERT_EQUALS(mongo::BSONType::timestamp, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1464,7 +1465,7 @@ public:
         mongo::Document document = mongo::Document();
         Value value = Value(document);
         ASSERT_EQUALS(document.getPtr(), value.getDocument().getPtr());
-        ASSERT_EQUALS(Object, value.getType());
+        ASSERT_EQUALS(BSONType::object, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1486,7 +1487,7 @@ public:
         ASSERT_EQUALS(5, document["a"].getInt());
         ASSERT_EQUALS("rrr", document["apple"].getString());
         ASSERT_EQUALS(-.3, document["banana"].getDouble());
-        ASSERT_EQUALS(Object, value.getType());
+        ASSERT_EQUALS(BSONType::object, value.getType());
         assertRoundTrips(value);
 
         MutableDocument md1;
@@ -1511,7 +1512,7 @@ public:
         const std::vector<Value>& array2 = value.getArray();
 
         ASSERT(array2.empty());
-        ASSERT_EQUALS(Array, value.getType());
+        ASSERT_EQUALS(BSONType::array, value.getType());
         ASSERT_EQUALS(0U, value.getArrayLength());
         assertRoundTrips(value);
     }
@@ -1533,7 +1534,7 @@ public:
         ASSERT_EQUALS(5, array2[0].getInt());
         ASSERT_EQUALS("lala", array2[1].getString());
         ASSERT_EQUALS(3.14, array2[2].getDouble());
-        ASSERT_EQUALS(mongo::Array, value.getType());
+        ASSERT_EQUALS(mongo::BSONType::array, value.getType());
         ASSERT_EQUALS(3U, value.getArrayLength());
         assertRoundTrips(value);
     }
@@ -1545,7 +1546,7 @@ public:
     void run() {
         Value value = fromBson(BSON("" << OID("abcdefabcdefabcdefabcdef")));
         ASSERT_EQUALS(OID("abcdefabcdefabcdefabcdef"), value.getOid());
-        ASSERT_EQUALS(jstOID, value.getType());
+        ASSERT_EQUALS(BSONType::oid, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1556,7 +1557,7 @@ public:
     void run() {
         Value value = fromBson(BSON("" << true));
         ASSERT_EQUALS(true, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(BSONType::boolean, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1567,7 +1568,7 @@ public:
     void run() {
         Value value = fromBson(fromjson("{'':/abc/}"));
         ASSERT_EQUALS(std::string("abc"), value.getRegex());
-        ASSERT_EQUALS(RegEx, value.getType());
+        ASSERT_EQUALS(BSONType::regEx, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1578,7 +1579,7 @@ public:
     void run() {
         Value value(BSONSymbol("FOOBAR"));
         ASSERT_EQUALS("FOOBAR", value.getSymbol());
-        ASSERT_EQUALS(mongo::Symbol, value.getType());
+        ASSERT_EQUALS(BSONType::symbol, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1588,7 +1589,7 @@ class Undefined {
 public:
     void run() {
         Value value = Value(BSONUndefined);
-        ASSERT_EQUALS(mongo::Undefined, value.getType());
+        ASSERT_EQUALS(BSONType::undefined, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1598,7 +1599,7 @@ class Null {
 public:
     void run() {
         Value value = Value(BSONNULL);
-        ASSERT_EQUALS(jstNULL, value.getType());
+        ASSERT_EQUALS(BSONType::null, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1609,7 +1610,7 @@ public:
     void run() {
         Value value = Value(true);
         ASSERT_EQUALS(true, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(BSONType::boolean, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1620,7 +1621,7 @@ public:
     void run() {
         Value value = Value(false);
         ASSERT_EQUALS(false, value.getBool());
-        ASSERT_EQUALS(mongo::Bool, value.getType());
+        ASSERT_EQUALS(BSONType::boolean, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1631,7 +1632,7 @@ public:
     void run() {
         Value value = Value(-1);
         ASSERT_EQUALS(-1, value.getInt());
-        ASSERT_EQUALS(NumberInt, value.getType());
+        ASSERT_EQUALS(BSONType::numberInt, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1642,7 +1643,7 @@ public:
     void run() {
         Value value = Value(0);
         ASSERT_EQUALS(0, value.getInt());
-        ASSERT_EQUALS(NumberInt, value.getType());
+        ASSERT_EQUALS(BSONType::numberInt, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -1653,7 +1654,7 @@ public:
     void run() {
         Value value = Value(1);
         ASSERT_EQUALS(1, value.getInt());
-        ASSERT_EQUALS(NumberInt, value.getType());
+        ASSERT_EQUALS(BSONType::numberInt, value.getType());
         assertRoundTrips(value);
     }
 };
@@ -2278,32 +2279,30 @@ public:
 class GetWidestNumeric {
 public:
     void run() {
-        using mongo::Undefined;
-
         // Numeric types.
-        assertWidest(NumberInt, NumberInt, NumberInt);
-        assertWidest(NumberLong, NumberInt, NumberLong);
-        assertWidest(NumberDouble, NumberInt, NumberDouble);
-        assertWidest(NumberLong, NumberLong, NumberLong);
-        assertWidest(NumberDouble, NumberLong, NumberDouble);
-        assertWidest(NumberDouble, NumberDouble, NumberDouble);
+        assertWidest(BSONType::numberInt, BSONType::numberInt, BSONType::numberInt);
+        assertWidest(BSONType::numberLong, BSONType::numberInt, BSONType::numberLong);
+        assertWidest(BSONType::numberDouble, BSONType::numberInt, BSONType::numberDouble);
+        assertWidest(BSONType::numberLong, BSONType::numberLong, BSONType::numberLong);
+        assertWidest(BSONType::numberDouble, BSONType::numberLong, BSONType::numberDouble);
+        assertWidest(BSONType::numberDouble, BSONType::numberDouble, BSONType::numberDouble);
 
         // Missing value and numeric types (result Undefined).
-        assertWidest(Undefined, NumberInt, Undefined);
-        assertWidest(Undefined, NumberInt, Undefined);
-        assertWidest(Undefined, NumberLong, jstNULL);
-        assertWidest(Undefined, NumberLong, Undefined);
-        assertWidest(Undefined, NumberDouble, jstNULL);
-        assertWidest(Undefined, NumberDouble, Undefined);
+        assertWidest(BSONType::undefined, BSONType::numberInt, BSONType::undefined);
+        assertWidest(BSONType::undefined, BSONType::numberInt, BSONType::undefined);
+        assertWidest(BSONType::undefined, BSONType::numberLong, BSONType::null);
+        assertWidest(BSONType::undefined, BSONType::numberLong, BSONType::undefined);
+        assertWidest(BSONType::undefined, BSONType::numberDouble, BSONType::null);
+        assertWidest(BSONType::undefined, BSONType::numberDouble, BSONType::undefined);
 
         // Missing value types (result Undefined).
-        assertWidest(Undefined, jstNULL, jstNULL);
-        assertWidest(Undefined, jstNULL, Undefined);
-        assertWidest(Undefined, Undefined, Undefined);
+        assertWidest(BSONType::undefined, BSONType::null, BSONType::null);
+        assertWidest(BSONType::undefined, BSONType::null, BSONType::undefined);
+        assertWidest(BSONType::undefined, BSONType::undefined, BSONType::undefined);
 
         // Other types (result Undefined).
-        assertWidest(Undefined, NumberInt, mongo::Bool);
-        assertWidest(Undefined, mongo::String, NumberDouble);
+        assertWidest(BSONType::undefined, BSONType::numberInt, BSONType::boolean);
+        assertWidest(BSONType::undefined, BSONType::string, BSONType::numberDouble);
     }
 
 private:
@@ -2514,27 +2513,27 @@ public:
         const Value val = fromBson(fromjson("{'': {a: [{x:1, b:[1, {y:1, c:1234, z:1}, 1]}]}}"));
         // ^ this outer object is removed by fromBson
 
-        ASSERT(val.getType() == BSONType::Object);
+        ASSERT(val.getType() == BSONType::object);
 
         ASSERT(val[999].missing());
         ASSERT(val["missing"].missing());
-        ASSERT(val["a"].getType() == BSONType::Array);
+        ASSERT(val["a"].getType() == BSONType::array);
 
         ASSERT(val["a"][999].missing());
         ASSERT(val["a"]["missing"].missing());
-        ASSERT(val["a"][0].getType() == BSONType::Object);
+        ASSERT(val["a"][0].getType() == BSONType::object);
 
         ASSERT(val["a"][0][999].missing());
         ASSERT(val["a"][0]["missing"].missing());
-        ASSERT(val["a"][0]["b"].getType() == BSONType::Array);
+        ASSERT(val["a"][0]["b"].getType() == BSONType::array);
 
         ASSERT(val["a"][0]["b"][999].missing());
         ASSERT(val["a"][0]["b"]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1].getType() == BSONType::Object);
+        ASSERT(val["a"][0]["b"][1].getType() == BSONType::object);
 
         ASSERT(val["a"][0]["b"][1][999].missing());
         ASSERT(val["a"][0]["b"][1]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1]["c"].getType() == BSONType::NumberInt);
+        ASSERT(val["a"][0]["b"][1]["c"].getType() == BSONType::numberInt);
         ASSERT_EQUALS(val["a"][0]["b"][1]["c"].getInt(), 1234);
     }
 };

@@ -177,13 +177,13 @@ void TLSCATrustsSetParameter::append(OperationContext*,
  */
 Status TLSCATrustsSetParameter::set(const BSONElement& element,
                                     const boost::optional<TenantId>&) try {
-    if ((element.type() != Object) || !element.Obj().couldBeArray()) {
+    if ((element.type() != BSONType::object) || !element.Obj().couldBeArray()) {
         return {ErrorCodes::BadValue, "Value must be an array"};
     }
 
     SSLParams::TLSCATrusts trusts;
     for (const auto& trustElement : BSONArray(element.Obj())) {
-        if (trustElement.type() != Object) {
+        if (trustElement.type() != BSONType::object) {
             return {ErrorCodes::BadValue, "Value must be an array of trust definitions"};
         }
 
@@ -231,7 +231,7 @@ void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
 
 Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
                                              const boost::optional<TenantId>&) try {
-    if ((element.type() != Object)) {
+    if ((element.type() != BSONType::object)) {
         return {ErrorCodes::BadValue, "Value must be an object"};
     }
 

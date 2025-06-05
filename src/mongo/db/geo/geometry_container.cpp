@@ -1061,7 +1061,7 @@ Status GeometryContainer::parseFromQuery(const BSONElement& elem) {
         status = GeoParser::parseCenterSphere(obj, _cap.get());
     } else if (GeoParser::GEOMETRY == specifier) {
         // GeoJSON geometry or legacy point
-        if (Array == elem.type() || obj.firstElement().isNumber()) {
+        if (BSONType::array == elem.type() || obj.firstElement().isNumber()) {
             // legacy point
             _point.reset(new PointWithCRS());
             status = GeoParser::parseQueryPoint(elem, _point.get());
@@ -1097,7 +1097,7 @@ Status GeometryContainer::parseFromStorage(const BSONElement& elem, bool skipVal
 
     _geoElm = elem;
     Status status = Status::OK();
-    if (Object == elem.type()) {
+    if (BSONType::object == elem.type()) {
         // GeoJSON
         // { location: { type: “Point”, coordinates: [...] } }
         status = parseFromGeoJSON(skipValidation);
@@ -1408,7 +1408,7 @@ void StoredGeometry::extractGeometries(const BSONObj& doc,
         if (stored.get()) {
             // Valid geometry element
             geometries->push_back(std::move(stored));
-        } else if (el.type() == Array) {
+        } else if (el.type() == BSONType::array) {
             // Many geometries may be in an array
             BSONObjIterator arrIt(el.Obj());
             while (arrIt.more()) {

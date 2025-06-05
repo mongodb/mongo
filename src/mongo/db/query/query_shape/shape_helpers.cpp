@@ -48,9 +48,9 @@ BSONObj shapifyFlatObj(const BSONObj& obj,
     BSONObjBuilder bob;
     for (BSONElement elem : obj) {
         if (hintSpecialField == elem.fieldNameStringData()) {
-            if (elem.type() == BSONType::String) {
+            if (elem.type() == BSONType::string) {
                 bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
-            } else if (elem.type() == BSONType::Object) {
+            } else if (elem.type() == BSONType::object) {
                 opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
             } else {
                 // SERVER-85500: $hint syntax will not be validated if the collection does not

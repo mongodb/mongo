@@ -431,7 +431,7 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
             if (!timeseriesElement.eoo()) {
                 uassert(10455501,
                         "Timeseries options must be a document",
-                        timeseriesElement.type() == mongo::Object);
+                        timeseriesElement.type() == mongo::BSONType::object);
                 recordStoreOptions.customBlockCompressor = "zstd"_sd.toString();
                 recordStoreOptions.forceUpdateWithFullDocument = true;
             }
@@ -442,12 +442,12 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
             if (!storageEngineElement.eoo()) {
                 uassert(10455502,
                         "StorageEngine must be a document",
-                        storageEngineElement.type() == mongo::Object);
+                        storageEngineElement.type() == mongo::BSONType::object);
                 for (auto&& elem : storageEngineElement.Obj()) {
                     uassert(10455503,
                             str::stream() << "StorageEngine." << elem.fieldName()
                                           << " must be an embedded document",
-                            elem.type() == mongo::Object);
+                            elem.type() == mongo::BSONType::object);
                 }
                 recordStoreOptions.storageEngineCollectionOptions =
                     storageEngineElement.Obj().getOwned();

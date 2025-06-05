@@ -270,17 +270,17 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kHostsFieldName)) {
         BSONElement hostsElement;
-        status = bsonExtractTypedField(doc, kHostsFieldName, Array, &hostsElement);
+        status = bsonExtractTypedField(doc, kHostsFieldName, BSONType::array, &hostsElement);
         if (!status.isOK()) {
             return status;
         }
         for (BSONObjIterator it(hostsElement.Obj()); it.more();) {
             BSONElement hostElement = it.next();
-            if (hostElement.type() != String) {
+            if (hostElement.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kHostsFieldName
                                             << "\" array of hello response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(BSONType::string) << " but found type "
                                             << typeName(hostElement.type()));
             }
             _hosts.push_back(HostAndPort(hostElement.String()));
@@ -290,17 +290,17 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kPassivesFieldName)) {
         BSONElement passivesElement;
-        status = bsonExtractTypedField(doc, kPassivesFieldName, Array, &passivesElement);
+        status = bsonExtractTypedField(doc, kPassivesFieldName, BSONType::array, &passivesElement);
         if (!status.isOK()) {
             return status;
         }
         for (BSONObjIterator it(passivesElement.Obj()); it.more();) {
             BSONElement passiveElement = it.next();
-            if (passiveElement.type() != String) {
+            if (passiveElement.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kPassivesFieldName
                                             << "\" array of hello response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(BSONType::string) << " but found type "
                                             << typeName(passiveElement.type()));
             }
             _passives.push_back(HostAndPort(passiveElement.String()));
@@ -310,17 +310,17 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kArbitersFieldName)) {
         BSONElement arbitersElement;
-        status = bsonExtractTypedField(doc, kArbitersFieldName, Array, &arbitersElement);
+        status = bsonExtractTypedField(doc, kArbitersFieldName, BSONType::array, &arbitersElement);
         if (!status.isOK()) {
             return status;
         }
         for (BSONObjIterator it(arbitersElement.Obj()); it.more();) {
             BSONElement arbiterElement = it.next();
-            if (arbiterElement.type() != String) {
+            if (arbiterElement.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kArbitersFieldName
                                             << "\" array of hello response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(BSONType::string) << " but found type "
                                             << typeName(arbiterElement.type()));
             }
             _arbiters.push_back(HostAndPort(arbiterElement.String()));
@@ -382,18 +382,18 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kTagsFieldName)) {
         BSONElement tagsElement;
-        status = bsonExtractTypedField(doc, kTagsFieldName, Object, &tagsElement);
+        status = bsonExtractTypedField(doc, kTagsFieldName, BSONType::object, &tagsElement);
         if (!status.isOK()) {
             return status;
         }
         for (BSONObjIterator it(tagsElement.Obj()); it.more();) {
             BSONElement tagElement = it.next();
-            if (tagElement.type() != String) {
+            if (tagElement.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kTagsFieldName
                                             << "\" obj "
                                                "of hello response must be of type "
-                                            << typeName(String) << " but found type "
+                                            << typeName(BSONType::string) << " but found type "
                                             << typeName(tagsElement.type()));
             }
             _tags[tagElement.fieldNameStringData().toString()] = tagElement.String();
@@ -403,7 +403,7 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kElectionIdFieldName)) {
         BSONElement electionIdElem;
-        status = bsonExtractTypedField(doc, kElectionIdFieldName, jstOID, &electionIdElem);
+        status = bsonExtractTypedField(doc, kElectionIdFieldName, BSONType::oid, &electionIdElem);
         if (!status.isOK()) {
             return status;
         }
@@ -412,7 +412,8 @@ Status HelloResponse::initialize(const BSONObj& doc) {
 
     if (doc.hasField(kLastWriteFieldName)) {
         BSONElement lastWriteElement;
-        status = bsonExtractTypedField(doc, kLastWriteFieldName, Object, &lastWriteElement);
+        status =
+            bsonExtractTypedField(doc, kLastWriteFieldName, BSONType::object, &lastWriteElement);
         if (!status.isOK()) {
             return status;
         }
@@ -420,12 +421,12 @@ Status HelloResponse::initialize(const BSONObj& doc) {
         bool lastWriteOpTimeSet = false;
         bool lastWriteDateSet = false;
         if (auto lastWriteOpTimeElement = lastWriteObj[kLastWriteOpTimeFieldName]) {
-            if (lastWriteOpTimeElement.type() != Object) {
+            if (lastWriteOpTimeElement.type() != BSONType::object) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastWriteOpTimeFieldName
                                             << "\" obj "
                                                "of hello response must be of type "
-                                            << typeName(Object) << " but found type "
+                                            << typeName(BSONType::object) << " but found type "
                                             << typeName(lastWriteOpTimeElement.type()));
             }
             auto lastWriteOpTime = OpTime::parseFromOplogEntry(lastWriteOpTimeElement.Obj());
@@ -440,12 +441,12 @@ Status HelloResponse::initialize(const BSONObj& doc) {
             lastWriteOpTimeSet = true;
         }
         if (auto lastWriteDateElement = lastWriteObj[kLastWriteDateFieldName]) {
-            if (lastWriteDateElement.type() != Date) {
+            if (lastWriteDateElement.type() != BSONType::date) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastWriteDateFieldName
                                             << "\" obj "
                                                "of hello response must be of type "
-                                            << typeName(Date) << " but found type "
+                                            << typeName(BSONType::date) << " but found type "
                                             << typeName(lastWriteDateElement.type()));
             }
             if (_lastWrite) {
@@ -460,12 +461,12 @@ Status HelloResponse::initialize(const BSONObj& doc) {
         bool lastMajorityWriteOpTimeSet = false;
         bool lastMajorityWriteDateSet = false;
         if (auto lastMajorityWriteOpTimeElement = lastWriteObj[kLastMajorityWriteOpTimeFieldName]) {
-            if (lastMajorityWriteOpTimeElement.type() != Object) {
+            if (lastMajorityWriteOpTimeElement.type() != BSONType::object) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastMajorityWriteOpTimeFieldName
                                             << "\" obj "
                                                "of hello response must be of type "
-                                            << typeName(Object) << " but found type "
+                                            << typeName(BSONType::object) << " but found type "
                                             << typeName(lastMajorityWriteOpTimeElement.type()));
             }
             auto lastMajorityWriteOpTime =
@@ -481,12 +482,12 @@ Status HelloResponse::initialize(const BSONObj& doc) {
             lastMajorityWriteOpTimeSet = true;
         }
         if (auto lastMajorityWriteDateElement = lastWriteObj[kLastMajorityWriteDateFieldName]) {
-            if (lastMajorityWriteDateElement.type() != Date) {
+            if (lastMajorityWriteDateElement.type() != BSONType::date) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastMajorityWriteDateFieldName
                                             << "\" obj "
                                                "of hello response must be of type "
-                                            << typeName(Date) << " but found type "
+                                            << typeName(BSONType::date) << " but found type "
                                             << typeName(lastMajorityWriteDateElement.type()));
             }
             if (_lastMajorityWrite) {

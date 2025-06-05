@@ -99,9 +99,9 @@ BSONObj canonicalizeBSONObjForDataHash(const BSONObj& obj);
 BSONArray canonicalizeArrayForDataHash(const BSONObj& arr) {
     BSONArrayBuilder arrBuilder;
     for (auto&& elem : arr) {
-        if (elem.type() == mongo::Array) {
+        if (elem.type() == BSONType::array) {
             arrBuilder.append(canonicalizeArrayForDataHash(elem.embeddedObject()));
-        } else if (elem.type() == mongo::Object) {
+        } else if (elem.type() == BSONType::object) {
             arrBuilder.append(canonicalizeBSONObjForDataHash(elem.embeddedObject()));
         } else {
             arrBuilder.append(elem);
@@ -116,7 +116,7 @@ BSONObj canonicalizeBSONObjForDataHash(const BSONObj& obj) {
     while (iter.more()) {
         auto elem = iter.next();
         if (elem.isABSONObj()) {
-            if (elem.type() == mongo::Array) {
+            if (elem.type() == BSONType::array) {
                 objBuilder.append(elem.fieldName(),
                                   canonicalizeArrayForDataHash(elem.embeddedObject()));
             } else {

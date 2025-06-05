@@ -178,7 +178,7 @@ BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRe
     if (parentPathPart == static_cast<int>(path.numParts()))
         return parentEl;
 
-    if (parentEl.type() != Object)
+    if (parentEl.type() != BSONType::object)
         return BSONElement();
 
     StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
@@ -598,8 +598,8 @@ void getShardIdsAndChunksForCanonicalQuery(const CanonicalQuery& query,
                 if (SimpleBSONObjComparator::kInstance.evaluate(min == max)) {
                     return QueryTargetingInfo::Description::kSingleKey;
                 }
-                if (ChunkMap::allElementsAreOfType(MinKey, min) &&
-                    ChunkMap::allElementsAreOfType(MaxKey, max)) {
+                if (ChunkMap::allElementsAreOfType(BSONType::minKey, min) &&
+                    ChunkMap::allElementsAreOfType(BSONType::maxKey, max)) {
                     return QueryTargetingInfo::Description::kMinKeyToMaxKey;
                 }
             }

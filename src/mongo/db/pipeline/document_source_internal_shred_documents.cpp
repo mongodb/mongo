@@ -63,7 +63,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShredDocuments::creat
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(7997500,
             "$_internalShredDocuments specification must be an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     uassert(7997501, "$_internalShredDocuments specification must be empty", elem.Obj().isEmpty());
     return DocumentSourceInternalShredDocuments::create(expCtx);
 }

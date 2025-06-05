@@ -148,7 +148,7 @@ public:
     void append(Builder& builder, StringData fieldName) const {
         // No endian conversions needed, since we store in-memory representation
         // in little endian format, regardless of target endian.
-        builder.appendNum(static_cast<char>(bsonTimestamp));
+        builder.appendNum(static_cast<char>(BSONType::timestamp));
         builder.appendCStr(fieldName);
         builder.appendNum(asULL());
     }

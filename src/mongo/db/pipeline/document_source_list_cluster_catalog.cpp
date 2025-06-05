@@ -98,7 +98,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFrom
 
     uassert(9621302,
             str::stream() << kStageName << " must take an object but found: " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     /**
      * Compose the pipeline to generate an entry for each existing collection and its related
      * sharding informations.

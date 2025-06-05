@@ -182,13 +182,13 @@ public:
         }
 
         const auto& rawData = resultObj[kRawFieldName];
-        if (!ctx.checkAndAssertType(rawData, Object)) {
+        if (!ctx.checkAndAssertType(rawData, BSONType::object)) {
             return;
         }
 
         auto rawCtx = IDLParserContext(kRawFieldName, &ctx);
         for (const auto& element : rawData.Obj()) {
-            if (!rawCtx.checkAndAssertType(element, Object)) {
+            if (!rawCtx.checkAndAssertType(element, BSONType::object)) {
                 return;
             }
 

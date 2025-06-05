@@ -147,7 +147,7 @@ public:
         // Individual section 'includeByDefault()' settings will be bypassed if the caller specified
         // {all: 1}.
         const auto& allElem = cmdObj["all"];
-        bool includeAllSections = allElem.type() ? allElem.trueValue() : false;
+        bool includeAllSections = stdx::to_underlying(allElem.type()) ? allElem.trueValue() : false;
 
         // --- all sections
         auto registry = ServerStatusSectionRegistry::instance();
@@ -160,7 +160,7 @@ public:
 
             bool include = section->includeByDefault();
             const auto& elem = cmdObj[section->getSectionName()];
-            if (elem.type()) {
+            if (stdx::to_underlying(elem.type())) {
                 include = elem.trueValue();
             }
 
@@ -197,7 +197,7 @@ public:
             if (auto svc = opCtx->getService())
                 metricTrees.push_back(&treeSet[svc->role()]);
             BSONObj excludePaths;
-            if (metricsEl.type() == BSONType::Object)
+            if (metricsEl.type() == BSONType::object)
                 excludePaths = BSON("metrics" << metricsEl.embeddedObject());
             appendMergedTrees(metricTrees, result, excludePaths);
         }

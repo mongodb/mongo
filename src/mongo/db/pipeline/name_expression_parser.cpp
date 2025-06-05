@@ -45,9 +45,9 @@ NameExpression::NameExpression(const BSONElement& nameElem) : _name(nameElem) {
     auto type = nameElem.type();
     uassert(8117100,
             fmt::format("Invalid name expression: {}", nameElem.toString()),
-            type == BSONType::String || type == BSONType::Object);
+            type == BSONType::string || type == BSONType::object);
 
-    _isLiteral = (type == BSONType::String && !nameElem.str().starts_with('$'));
+    _isLiteral = (type == BSONType::string && !nameElem.str().starts_with('$'));
 }
 
 std::string NameExpression::toString() const {

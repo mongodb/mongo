@@ -522,7 +522,7 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
         << "Did not round trip: " << oplogEntryWithOneStmtId << " should be equal to "
         << rtOplogEntryWithOneStmtId;
     // Statement id should be NumberInt, not NumberLong or some other numeric.
-    ASSERT_EQ(rtOplogEntryWithOneStmtId["stmtId"].type(), NumberInt);
+    ASSERT_EQ(rtOplogEntryWithOneStmtId["stmtId"].type(), BSONType::numberInt);
 
     const BSONObj oplogEntryWithMultiStmtId =
         BSON("op" << "c"
@@ -537,7 +537,7 @@ TEST(OplogEntryTest, StatementIDParseAndSerialization) {
         << "Did not round trip: " << oplogEntryWithMultiStmtId << " should be equal to "
         << rtOplogEntryWithMultiStmtId;
     // Array entries should be NumberInt, not NumberLong or some other numeric.
-    ASSERT_EQ(rtOplogEntryWithMultiStmtId["stmtId"]["0"].type(), NumberInt);
+    ASSERT_EQ(rtOplogEntryWithMultiStmtId["stmtId"]["0"].type(), BSONType::numberInt);
 
     // A non-canonical entry with an empty stmtId array.
     const BSONObj oplogEntryWithEmptyStmtId = BSON(

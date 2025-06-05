@@ -108,7 +108,7 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(
     // value specifies a target collection name. Since it is not possible to specify a target
     // database name using the shortcut syntax (to match the semantics of the $out stage), the
     // target database will use the default name provided.
-    if (spec.type() == BSONType::String) {
+    if (spec.type() == BSONType::string) {
         targetNss = NamespaceStringUtil::deserialize(defaultDb, spec.valueStringData());
     } else {
         const auto tenantId = defaultDb.tenantId();
@@ -175,7 +175,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
             fmt::format("{} requires a string or object argument, but found {}",
                         kStageName,
                         typeName(spec.type())),
-            spec.type() == BSONType::String || spec.type() == BSONType::Object);
+            spec.type() == BSONType::string || spec.type() == BSONType::object);
 
     auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, nss.dbName());
     auto targetNss = mergeSpec.getTargetNss();
@@ -318,7 +318,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     uassert(51182,
             fmt::format(
                 "{} only supports a string or object argument, not {}", kStageName, spec.type()),
-            spec.type() == BSONType::String || spec.type() == BSONType::Object);
+            spec.type() == BSONType::string || spec.type() == BSONType::object);
 
     auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(
         spec, expCtx->getNamespaceString().dbName(), expCtx->getSerializationContext());

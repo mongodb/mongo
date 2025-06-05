@@ -302,13 +302,13 @@ int main(int argc, char* argv[]) {
                     if (writingIndex > 0)
                         outputStream << ",";
                     switch (ele.type()) {
-                        case NumberLong:
+                        case BSONType::numberLong:
                             outputStream << ele.numberLong();
                             break;
-                        case NumberInt:
+                        case BSONType::numberInt:
                             outputStream << ele.numberInt();
                             break;
-                        case NumberDouble:
+                        case BSONType::numberDouble:
                             outputStream << ele.numberDouble();
                             break;
                         default:

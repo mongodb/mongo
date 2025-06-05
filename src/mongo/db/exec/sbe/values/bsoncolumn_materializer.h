@@ -178,49 +178,54 @@ private:
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<bool>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Bool, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::boolean, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.boolean());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<int32_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberInt, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberInt,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int32_t)val._numberInt());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<int64_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberLong, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberLong,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int64_t)val._numberLong());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<double>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberDouble, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberDouble,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val._numberDouble());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Decimal128>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberDecimal, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberDecimal,
+            "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::NumberDecimal, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Date_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Date, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::date, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.date());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timestamp>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == bsonTimestamp, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::timestamp,
+            "materialize invoked with incorrect BSONElement type");
     uint64_t u = ConstDataView(val.value()).read<LittleEndian<uint64_t>>();
     return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(u)};
 }
@@ -228,7 +233,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timesta
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<StringData>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == String, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::string, "materialize invoked with incorrect BSONElement type");
 
     auto sd = val.valueStringData();
     if (value::canUseSmallString(sd)) {
@@ -241,21 +246,21 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<StringD
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<BSONBinData>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == BinData, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::binData, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<BSONCode>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Code, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::code, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonJavascript, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<OID>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == jstOID, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::oid, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(val.value())};
 }
 

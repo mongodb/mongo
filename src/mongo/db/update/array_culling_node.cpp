@@ -43,7 +43,7 @@ ModifierNode::ModifyResult ArrayCullingNode::updateExistingElement(
     invariant(element->ok());
     uassert(ErrorCodes::BadValue,
             "Cannot apply $pull to a non-array value",
-            element->getType() == mongo::Array);
+            element->getType() == BSONType::array);
 
     size_t numRemoved = 0;
     auto cursor = element->leftChild();

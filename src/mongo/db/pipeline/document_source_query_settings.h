@@ -70,7 +70,7 @@ public:
                                                  const LiteParserOptions& options) {
             uassert(7746800,
                     "$querySettings stage expects a document as argument",
-                    spec.type() == BSONType::Object);
+                    spec.type() == BSONType::object);
             return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
         }
 

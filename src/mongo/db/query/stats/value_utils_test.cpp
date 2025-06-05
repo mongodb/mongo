@@ -247,13 +247,13 @@ TEST_F(ValueUtilsTest, GetMinBoundAlignsWithAppendMinForType) {
 
         // Excludes all the extended types which are unsupported.
         auto bsonType = sbe::value::tagToType(tag);
-        if (bsonType == BSONType::EOO) {
+        if (bsonType == BSONType::eoo) {
             continue;
         }
         auto [actual, inclusive] = getMinBound(tag);
 
         BSONObjBuilder builder;
-        builder.appendMinForType("", bsonType);
+        builder.appendMinForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
         auto expected = sbe::bson::convertFrom<false>(elem);
@@ -275,13 +275,13 @@ TEST_F(ValueUtilsTest, GetMaxBoundAlignsWithAppendMaxForType) {
 
         // Excludes all the extended types which are unsupported.
         auto bsonType = sbe::value::tagToType(tag);
-        if (bsonType == BSONType::EOO) {
+        if (bsonType == BSONType::eoo) {
             continue;
         }
         auto [actual, inclusive] = getMaxBound(tag);
 
         BSONObjBuilder builder;
-        builder.appendMaxForType("", bsonType);
+        builder.appendMaxForType("", stdx::to_underlying(bsonType));
         auto obj = builder.obj();
         auto elem = obj.firstElement();
         auto expected = sbe::bson::convertFrom<false>(elem);
@@ -303,7 +303,7 @@ TEST_F(ValueUtilsTest, CanEstimateTypeViaTypeCounts) {
 
         // Excludes all the extended types which are unsupported.
         auto bsonType = sbe::value::tagToType(tag);
-        if (bsonType == BSONType::EOO) {
+        if (bsonType == BSONType::eoo) {
             ASSERT_FALSE(stats::canEstimateTypeViaTypeCounts(tag));
             continue;
         }
@@ -320,8 +320,9 @@ TEST_F(ValueUtilsTest, CanEstimateTypeViaTypeCounts) {
 TEST_F(ValueUtilsTest, ReturnsTrueForFullBracketIntervals) {
     // Asserts that isFullBracketInterval() returns true for all full bracket intervals of each
     // BSONType.
-    for (int t = -1; t < BSONType::MaxKey; ++t) {
-        if (!isValidBSONType(t) || t == BSONType::EOO || t == BSONType::Array) {
+    for (int t = -1; t < stdx::to_underlying(BSONType::maxKey); ++t) {
+        if (!isValidBSONType(t) || t == stdx::to_underlying(BSONType::eoo) ||
+            t == stdx::to_underlying(BSONType::array)) {
             continue;
         }
         BSONObj obj = BSON("a" << BSON("$type" << t));

@@ -105,7 +105,7 @@ bool DBClientBase::isOk(const BSONObj& o) {
 }
 
 bool DBClientBase::isNotPrimaryErrorString(const BSONElement& e) {
-    return e.type() == String &&
+    return e.type() == BSONType::string &&
         (str::contains(e.valueStringData(), "not primary") ||
          str::contains(e.valueStringData(), "not master"));
 }

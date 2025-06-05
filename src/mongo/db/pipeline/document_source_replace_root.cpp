@@ -70,7 +70,7 @@ Document ReplaceRootTransformation::applyTransformation(const Document& input) c
                         newRoot.toString(),
                         typeName(newRoot.getType()),
                         input.toString()),
-            newRoot.getType() == BSONType::Object);
+            newRoot.getType() == BSONType::object);
 
     // Turn the value into a document.
     MutableDocument newDoc(newRoot.getDocument());
@@ -95,14 +95,14 @@ boost::intrusive_ptr<DocumentSourceMatch> ReplaceRootTransformation::createTypeN
     auto matchExpr = std::make_unique<OrMatchExpression>();
     {
         MatcherTypeSet typeSet;
-        typeSet.bsonTypes.insert(BSONType::Array);
+        typeSet.bsonTypes.insert(BSONType::array);
         auto typeIsArrayExpr =
             std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
         matchExpr->add(std::move(typeIsArrayExpr));
     }
     {
         MatcherTypeSet typeSet;
-        typeSet.bsonTypes.insert(BSONType::Object);
+        typeSet.bsonTypes.insert(BSONType::object);
         auto typeIsObjectExpr =
             std::make_unique<TypeMatchExpression>(StringData(expression), typeSet);
         auto typeIsNotObjectExpr =
@@ -235,7 +235,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
         uassert(40229,
                 str::stream() << "expected an object as specification for " << kStageName
                               << " stage, got " << typeName(elem.type()),
-                elem.type() == Object);
+                elem.type() == BSONType::object);
 
         auto spec = ReplaceRootSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 

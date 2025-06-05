@@ -53,9 +53,9 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
         }
 
         return WriteConcernW{wNum};
-    } else if (wEl.type() == BSONType::String) {
+    } else if (wEl.type() == BSONType::string) {
         return WriteConcernW{wEl.str()};
-    } else if (wEl.type() == BSONType::Object) {
+    } else if (wEl.type() == BSONType::object) {
         auto wTags = wEl.Obj();
         uassert(ErrorCodes::FailedToParse, "tagged write concern requires tags", !wTags.isEmpty());
 
@@ -71,7 +71,7 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
         }
 
         return WriteConcernW{std::move(tags)};
-    } else if (wEl.eoo() || wEl.type() == BSONType::jstNULL || wEl.type() == BSONType::Undefined) {
+    } else if (wEl.eoo() || wEl.type() == BSONType::null || wEl.type() == BSONType::undefined) {
         return WriteConcernW{};
     }
     uasserted(
@@ -93,8 +93,8 @@ void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONOb
 std::int64_t parseWTimeoutFromBSON(BSONElement element) {
     // Store wTimeout as a 64-bit value but functionally limit it to int32 as values larger than
     // than that do not make much sense to use and were not previously supported.
-    constexpr std::array<mongo::BSONType, 4> validTypes{
-        NumberLong, NumberInt, NumberDecimal, NumberDouble};
+    constexpr std::array validTypes{
+        BSONType::numberLong, BSONType::numberInt, BSONType::numberDecimal, BSONType::numberDouble};
     bool isValidType = std::any_of(
         validTypes.begin(), validTypes.end(), [&](auto type) { return element.type() == type; });
 

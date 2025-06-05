@@ -91,8 +91,10 @@ bool PatternElementCmp::operator()(const mutablebson::Element& lhs,
 
         return (reversed ? comparedValue > 0 : comparedValue < 0);
     } else {
-        BSONObj lhsObj = lhs.getType() == Object ? lhs.getValueObject() : lhs.getValue().wrap("");
-        BSONObj rhsObj = rhs.getType() == Object ? rhs.getValueObject() : rhs.getValue().wrap("");
+        BSONObj lhsObj =
+            lhs.getType() == BSONType::object ? lhs.getValueObject() : lhs.getValue().wrap("");
+        BSONObj rhsObj =
+            rhs.getType() == BSONType::object ? rhs.getValueObject() : rhs.getValue().wrap("");
 
         BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
         BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);

@@ -75,11 +75,12 @@ public:
         if (elem.isNumber() && (elem.safeNumberLong() == 1)) {
             return UMCInfoCommandArg(AllOnCurrentDB{});
         }
-        if (enableForAllDBs && (elem.type() == Object) && (elem.Obj()[kForAllDBs].trueValue())) {
+        if (enableForAllDBs && (elem.type() == BSONType::object) &&
+            (elem.Obj()[kForAllDBs].trueValue())) {
             return UMCInfoCommandArg(AllForAllDBs{});
         }
 
-        if (elem.type() == Array) {
+        if (elem.type() == BSONType::array) {
             Multiple values;
             for (const auto& v : elem.Obj()) {
                 values.push_back(parseNamedElement(v, tenantId));
@@ -175,7 +176,7 @@ private:
 
     static Single parseNamedElement(const BSONElement& elem,
                                     const boost::optional<TenantId> tenantId) {
-        if (elem.type() == String) {
+        if (elem.type() == BSONType::string) {
             return elem.String();
         }
         return T::parseFromBSON(elem, tenantId);

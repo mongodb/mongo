@@ -282,7 +282,7 @@ public:
             _saslMechsForInternalAuth.push_back("MONGODB-X509");
         } else {
             const auto saslMechsElem = reply.getField("saslSupportedMechs");
-            if (saslMechsElem.type() == Array) {
+            if (saslMechsElem.type() == BSONType::array) {
                 auto array = saslMechsElem.Array();
                 for (const auto& elem : array) {
                     _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
@@ -291,7 +291,7 @@ public:
         }
 
         const auto specAuth = reply.getField(auth::kSpeculativeAuthenticate);
-        if (specAuth.type() == Object) {
+        if (specAuth.type() == BSONType::object) {
             _speculativeAuthenticate = specAuth.Obj().getOwned();
         }
 

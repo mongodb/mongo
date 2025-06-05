@@ -167,7 +167,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
     vector<Value> serialization;
     idLookupStage.serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
-    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_EQ(serialization[0].getType(), BSONType::object);
 
     BSONObj spec = BSON("$_internalSearchIdLookup" << BSONObj());
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(), spec);

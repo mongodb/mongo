@@ -262,7 +262,8 @@ public:
         } else {
             // There is some fancy serialization logic to get the above BSONObjBuilder append to
             // work. We just want to make sure we're doing the same thing here.
-            static_assert(BSONObjAppendFormat<decltype(_binDataSubType)>::value == NumberInt,
+            static_assert(BSONObjAppendFormat<decltype(_binDataSubType)>::value ==
+                              BSONType::numberInt,
                           "Expecting that the BinData sub type should be specified and serialized "
                           "as an int.");
             opts.appendLiteral(bob, name(), static_cast<int>(_binDataSubType));

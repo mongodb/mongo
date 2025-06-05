@@ -58,7 +58,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::parse(ExpressionCon
                                                                    const VariablesParseState& vps) {
     uassert(6868506,
             str::stream() << opName << " supports an object as its argument",
-            bsonExpr.type() == BSONType::Object);
+            bsonExpr.type() == BSONType::object);
 
     BSONElement docElement;
     BSONElement specElement;
@@ -69,7 +69,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::parse(ExpressionCon
         } else if (bsonArgs.fieldNameStringData() == kSpecField) {
             uassert(6868507,
                     str::stream() << opName << " requires 'spec' argument to be an object",
-                    bsonArgs.type() == BSONType::Object);
+                    bsonArgs.type() == BSONType::object);
             specElement = bsonArgs;
         } else {
             uasserted(6868508,

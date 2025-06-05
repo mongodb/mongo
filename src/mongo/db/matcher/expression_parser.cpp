@@ -270,7 +270,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
 StatusWithMatchExpression parseRegexElement(boost::optional<StringData> name,
                                             BSONElement e,
                                             const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (e.type() != BSONType::RegEx)
+    if (e.type() != BSONType::regEx)
         return {Status(ErrorCodes::BadValue, "not a regex")};
 
     expCtx->incrementMatchExprCounter("$regex");
@@ -289,7 +289,7 @@ StatusWithMatchExpression parseComparison(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     // Non-equality comparison match expressions cannot have a regular expression as the argument.
     // (e.g. {a: {$gt: /b/}} is illegal).
-    if (MatchExpression::EQ != cmp->matchType() && BSONType::RegEx == e.type()) {
+    if (MatchExpression::EQ != cmp->matchType() && BSONType::regEx == e.type()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Can't have RegEx as arg to non-equality predicate over field '"
                               << name << "'."};
@@ -355,7 +355,7 @@ bool isDBRefDocument(const BSONObj& obj, bool allowIncompleteDBRef) {
  * { $db : "mydb" } = false (if incomplete DBRef is allowed)
  */
 bool isExpressionDocument(BSONElement e, bool allowIncompleteDBRef) {
-    if (e.type() != BSONType::Object)
+    if (e.type() != BSONType::object)
         return false;
 
     auto o = e.Obj();
@@ -443,7 +443,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             continue;
         }
 
-        if (e.type() == BSONType::RegEx) {
+        if (e.type() == BSONType::regEx) {
             auto result = parseRegexElement(e.fieldNameStringData(), e, expCtx);
             if (!result.isOK())
                 return result;
@@ -622,7 +622,7 @@ StatusWithMatchExpression parseJSONSchema(StringData name,
                       "$jsonSchema is not allowed in this context");
     }
 
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {Status(ErrorCodes::TypeMismatch, "$jsonSchema must be an object")};
     }
 
@@ -673,7 +673,7 @@ StatusWithMatchExpression parseExpr(StringData name,
 StatusWithMatchExpression parseMOD(boost::optional<StringData> name,
                                    BSONElement elem,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (elem.type() != BSONType::Array)
+    if (elem.type() != BSONType::array)
         return {Status(ErrorCodes::BadValue, "malformed mod, needs to be an array")};
 
     BSONObjIterator iter(elem.Obj());
@@ -724,9 +724,9 @@ StatusWithMatchExpression parseRegexDocument(
 
         switch (*matchType) {
             case PathAcceptingKeyword::REGEX:
-                if (e.type() == BSONType::String) {
+                if (e.type() == BSONType::string) {
                     regex = e.valueStringData();
-                } else if (e.type() == BSONType::RegEx) {
+                } else if (e.type() == BSONType::regEx) {
                     regex = e.regex();
                     if (!StringData{e.regexFlags()}.empty()) {
                         if (!regexOptions.empty()) {
@@ -741,7 +741,7 @@ StatusWithMatchExpression parseRegexDocument(
 
                 break;
             case PathAcceptingKeyword::OPTIONS:
-                if (e.type() != BSONType::String) {
+                if (e.type() != BSONType::string) {
                     return {Status(ErrorCodes::BadValue, "$options has to be a string")};
                 }
 
@@ -772,7 +772,7 @@ Status parseInExpression(InMatchExpression* inExpression,
             return Status(ErrorCodes::BadValue, "cannot nest $ under $in");
         }
 
-        if (e.type() == BSONType::RegEx) {
+        if (e.type() == BSONType::regEx) {
             auto status = inExpression->addRegex(std::make_unique<RegexMatchExpression>(""_sd, e));
             if (!status.isOK()) {
                 return status;
@@ -836,7 +836,7 @@ StatusWithMatchExpression parseBitTest(boost::optional<StringData> name,
     std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression;
     auto annotation = createAnnotation(expCtx, e.fieldNameStringData(), name, e);
 
-    if (e.type() == BSONType::Array) {
+    if (e.type() == BSONType::array) {
         // Array of bit positions provided as value.
         auto bitPositions = parseBitPositionsArray(e.Obj());
         if (!bitPositions.isOK()) {
@@ -852,7 +852,7 @@ StatusWithMatchExpression parseBitTest(boost::optional<StringData> name,
         }
         bitTestMatchExpression =
             std::make_unique<T>(name, bitMask.getValue(), std::move(annotation));
-    } else if (e.type() == BSONType::BinData) {
+    } else if (e.type() == BSONType::binData) {
         // Binary bitmask provided as value.
         int eBinaryLen;
         auto eBinary = e.binData(eBinaryLen);
@@ -872,7 +872,7 @@ StatusWithMatchExpression parseInternalSchemaFmod(
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     StringData path(name ? *name : "");
-    if (elem.type() != BSONType::Array)
+    if (elem.type() != BSONType::array)
         return {ErrorCodes::BadValue,
                 str::stream() << path << " must be an array, but got type " << elem.type()};
 
@@ -917,7 +917,7 @@ StatusWithMatchExpression parseInternalSchemaRootDocEq(
                                      << " can only be applied to the top level document")};
     }
 
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {Status(ErrorCodes::TypeMismatch,
                        str::stream() << InternalSchemaRootDocEqMatchExpression::kName
                                      << " must be an object, found type " << elem.type())};
@@ -979,7 +979,7 @@ StatusWith<StringData> parseNamePlaceholder(const BSONObj& containingObject,
         return {ErrorCodes::FailedToParse,
                 str::stream() << expressionName << " requires a '" << namePlaceholderFieldName
                               << "'"};
-    } else if (namePlaceholderElem.type() != BSONType::String) {
+    } else if (namePlaceholderElem.type() != BSONType::string) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << expressionName << " requires '" << namePlaceholderFieldName
                               << "' to be a string, not " << namePlaceholderElem.type()};
@@ -1008,7 +1008,7 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> parseExprWithPlaceholder(
         return {ErrorCodes::FailedToParse,
                 str::stream() << expressionName << " requires '" << exprWithPlaceholderFieldName
                               << "'"};
-    } else if (exprWithPlaceholderElem.type() != BSONType::Object) {
+    } else if (exprWithPlaceholderElem.type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << expressionName << " found '" << exprWithPlaceholderFieldName
                               << "', which is an incompatible type: "
@@ -1052,7 +1052,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
         return {ErrorCodes::FailedToParse,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " requires 'patternProperties'"};
-    } else if (patternPropertiesElem.type() != BSONType::Array) {
+    } else if (patternPropertiesElem.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " requires 'patternProperties' to be an array, not "
@@ -1061,7 +1061,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
 
     std::vector<InternalSchemaAllowedPropertiesMatchExpression::PatternSchema> patternProperties;
     for (auto constraintElem : patternPropertiesElem.embeddedObject()) {
-        if (constraintElem.type() != BSONType::Object) {
+        if (constraintElem.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                                   << " requires 'patternProperties' to be an array of objects"};
@@ -1095,7 +1095,7 @@ parsePatternProperties(BSONElement patternPropertiesElem,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " requires each object in 'patternProperties' to have a 'regex'"};
         }
-        if (regexElem.type() != BSONType::RegEx) {
+        if (regexElem.type() != BSONType::regEx) {
             return {ErrorCodes::TypeMismatch,
                     str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                                   << " requires 'patternProperties' to be an array of objects, "
@@ -1121,7 +1121,7 @@ StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " requires 'properties' to be present"};
-    } else if (propertiesElem.type() != BSONType::Array) {
+    } else if (propertiesElem.type() != BSONType::array) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " requires 'properties' to be an array, not "
@@ -1130,7 +1130,7 @@ StatusWith<StringDataSet> parseProperties(BSONElement propertiesElem) {
 
     StringDataSet properties;
     for (auto property : propertiesElem.embeddedObject()) {
-        if (property.type() != BSONType::String) {
+        if (property.type() != BSONType::string) {
             return {
                 ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
@@ -1150,7 +1150,7 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalBucketGeoWithinMatchExpression::kName
                               << " must be an object"};
@@ -1170,7 +1170,7 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
                               << " requires both 'withinRegion' and 'field' field"};
     }
 
-    if (subobj["withinRegion"].type() != BSONType::Object) {
+    if (subobj["withinRegion"].type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalBucketGeoWithinMatchExpression::kName
                               << "'s 'withinRegion' field must be an object"};
@@ -1192,7 +1192,7 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
                                     << "'s 'withinRegion' can't be an empty object");
     }
 
-    if (subobj["field"].type() != BSONType::String) {
+    if (subobj["field"].type() != BSONType::string) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalBucketGeoWithinMatchExpression::kName
                               << "'s 'field' field must be a string"};
@@ -1212,7 +1212,7 @@ StatusWithMatchExpression parseInternalSchemaAllowedProperties(
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaAllowedPropertiesMatchExpression::kName
                               << " must be an object"};
@@ -1277,7 +1277,7 @@ StatusWithMatchExpression parseInternalSchemaMatchArrayIndex(
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << InternalSchemaMatchArrayIndexMatchExpression::kName
                               << " must be an object"};
@@ -1367,7 +1367,7 @@ StatusWithMatchExpression parseTreeTopLevel(
     const ExtensionsCallback* extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
-    if (elem.type() != BSONType::Array) {
+    if (elem.type() != BSONType::array) {
         return {Status(ErrorCodes::BadValue,
                        str::stream() << T::kName << " argument must be an array")};
     }
@@ -1380,7 +1380,7 @@ StatusWithMatchExpression parseTreeTopLevel(
     }
 
     for (auto e : arr) {
-        if (e.type() != BSONType::Object)
+        if (e.type() != BSONType::object)
             return Status(ErrorCodes::BadValue,
                           str::stream() << T::kName << " argument's entries must be objects");
 
@@ -1402,7 +1402,7 @@ StatusWithMatchExpression parseElemMatch(boost::optional<StringData> name,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const ExtensionsCallback* extensionsCallback,
                                          MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
-    if (e.type() != BSONType::Object)
+    if (e.type() != BSONType::object)
         return {Status(ErrorCodes::BadValue, "$elemMatch needs an Object")};
 
     auto obj = e.Obj();
@@ -1512,7 +1512,7 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const ExtensionsCallback* extensionsCallback,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
-    if (e.type() != BSONType::Array)
+    if (e.type() != BSONType::array)
         return {Status(ErrorCodes::BadValue, "$all needs an array")};
 
     auto arr = e.Obj();
@@ -1520,14 +1520,14 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
         createAnnotation(expCtx, e.fieldNameStringData(), name, e));
     BSONObjIterator i(arr);
 
-    if (arr.firstElement().type() == BSONType::Object &&
+    if (arr.firstElement().type() == BSONType::object &&
         "$elemMatch"_sd == arr.firstElement().Obj().firstElement().fieldNameStringData()) {
         // $all : [ { $elemMatch : {} } ... ]
 
         while (i.more()) {
             auto hopefullyElemMatchElement = i.next();
 
-            if (hopefullyElemMatchElement.type() != BSONType::Object) {
+            if (hopefullyElemMatchElement.type() != BSONType::object) {
                 // $all : [ { $elemMatch : ... }, 5 ]
                 return {Status(ErrorCodes::BadValue, "$all/$elemMatch has to be consistent")};
             }
@@ -1557,11 +1557,11 @@ StatusWithMatchExpression parseAll(boost::optional<StringData> name,
     while (i.more()) {
         auto e = i.next();
 
-        if (e.type() == BSONType::RegEx) {
+        if (e.type() == BSONType::regEx) {
             auto expr = std::make_unique<RegexMatchExpression>(
                 name, e, createAnnotation(expCtx, AnnotationMode::kIgnore));
             addExpressionToRoot(expCtx, myAnd.get(), std::move(expr));
-        } else if (e.type() == BSONType::Object &&
+        } else if (e.type() == BSONType::object &&
                    MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement())) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
         } else {
@@ -1592,7 +1592,7 @@ StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
     constexpr auto arity = T::arity();
-    if (elem.type() != BSONType::Array) {
+    if (elem.type() != BSONType::array) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << elem.fieldNameStringData() << " must be an array of " << arity
                               << " MatchExpressions"};
@@ -1611,7 +1611,7 @@ StatusWithMatchExpression parseInternalSchemaFixedArityArgument(
     auto position = expressions.begin();
 
     for (auto obj : inputObj) {
-        if (obj.type() != BSONType::Object) {
+        if (obj.type() != BSONType::object) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << elem.fieldNameStringData()
                                   << " must be an array of objects, but found an element of type "
@@ -1637,7 +1637,7 @@ StatusWithMatchExpression parseNot(boost::optional<StringData> name,
                                    const ExtensionsCallback* extensionsCallback,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                    DocumentParseLevel currentLevel) {
-    if (elem.type() == BSONType::RegEx) {
+    if (elem.type() == BSONType::regEx) {
         auto regex = parseRegexElement(name, elem, expCtx);
         if (!regex.isOK()) {
             return regex;
@@ -1646,7 +1646,7 @@ StatusWithMatchExpression parseNot(boost::optional<StringData> name,
                                                      createAnnotation(expCtx, "$not", BSONObj()))};
     }
 
-    if (elem.type() != BSONType::Object) {
+    if (elem.type() != BSONType::object) {
         return {ErrorCodes::BadValue, "$not argument must be a regex or an object"};
     }
 
@@ -1765,7 +1765,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 expCtx,
                 allowedFeatures);
         case PathAcceptingKeyword::NOT_EQUAL: {
-            if (BSONType::RegEx == e.type()) {
+            if (BSONType::regEx == e.type()) {
                 // Just because $ne can be rewritten as the negation of an equality does not mean
                 // that $ne of a regex is allowed. See SERVER-1705.
                 return {Status(ErrorCodes::BadValue, "Can't have regex as arg to $ne.")};
@@ -1792,7 +1792,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 allowedFeatures);
 
         case PathAcceptingKeyword::IN_EXPR: {
-            if (e.type() != BSONType::Array) {
+            if (e.type() != BSONType::array) {
                 return {Status(ErrorCodes::BadValue, "$in needs an array")};
             }
             auto temp = std::make_unique<InMatchExpression>(
@@ -1805,7 +1805,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::NOT_IN: {
-            if (e.type() != Array) {
+            if (e.type() != BSONType::array) {
                 return {Status(ErrorCodes::BadValue, "$nin needs an array")};
             }
             auto temp = std::make_unique<InMatchExpression>(
@@ -1883,7 +1883,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {Status(ErrorCodes::BadValue,
                            str::stream() << "near must be first in: " << context)};
         case PathAcceptingKeyword::INTERNAL_EXPR_EQ: {
-            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+            if (e.type() == BSONType::undefined || e.type() == BSONType::array) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << InternalExprEqMatchExpression::kName
                                              << " cannot be used to compare to type: "
@@ -1896,7 +1896,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_EXPR_GT: {
-            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+            if (e.type() == BSONType::undefined || e.type() == BSONType::array) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << InternalExprGTMatchExpression::kName
                                              << " cannot be used to compare to type: "
@@ -1908,7 +1908,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {std::move(exprGtExpr)};
         }
         case PathAcceptingKeyword::INTERNAL_EXPR_GTE: {
-            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+            if (e.type() == BSONType::undefined || e.type() == BSONType::array) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << InternalExprGTEMatchExpression::kName
                                              << " cannot be used to compare to type: "
@@ -1920,7 +1920,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {std::move(exprGteExpr)};
         }
         case PathAcceptingKeyword::INTERNAL_EXPR_LT: {
-            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+            if (e.type() == BSONType::undefined || e.type() == BSONType::array) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << InternalExprLTMatchExpression::kName
                                              << " cannot be used to compare to type: "
@@ -1932,7 +1932,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {std::move(exprLtExpr)};
         }
         case PathAcceptingKeyword::INTERNAL_EXPR_LTE: {
-            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+            if (e.type() == BSONType::undefined || e.type() == BSONType::array) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream() << InternalExprLTEMatchExpression::kName
                                              << " cannot be used to compare to type: "
@@ -1945,7 +1945,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_EQ_HASHED_KEY: {
-            if (e.type() != BSONType::NumberLong) {
+            if (e.type() != BSONType::numberLong) {
                 return {Status(ErrorCodes::BadValue,
                                str::stream()
                                    << InternalEqHashedKey::kName
@@ -1990,7 +1990,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_OBJECT_MATCH: {
-            if (e.type() != BSONType::Object) {
+            if (e.type() != BSONType::object) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "$_internalSchemaObjectMatch must be an object");
             }
@@ -2037,7 +2037,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
         }
 
         case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX: {
-            if (e.type() != BSONType::Array) {
+            if (e.type() != BSONType::array) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream()
                                   << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
@@ -2073,7 +2073,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                   << InternalSchemaAllElemMatchFromIndexMatchExpression::kName
                                   << " has too many elements, must be an array of size 2");
             }
-            if (second.type() != BSONType::Object) {
+            if (second.type() != BSONType::object) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "second element of "

@@ -124,7 +124,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
             str::stream() << "the " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = SetWindowFieldsSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     auto partitionBy = [&]() -> boost::optional<boost::intrusive_ptr<Expression>> {
@@ -401,7 +401,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
             str::stream() << "the " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = SetWindowFieldsSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     auto partitionBy = [&]() -> boost::optional<boost::intrusive_ptr<Expression>> {

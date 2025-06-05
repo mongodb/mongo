@@ -90,7 +90,7 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
     uassert(40169,
             str::stream() << "the $facet specification must be a non-empty object, but found: "
                           << elem,
-            elem.type() == BSONType::Object && !elem.embeddedObject().isEmpty());
+            elem.type() == BSONType::object && !elem.embeddedObject().isEmpty());
 
     vector<pair<string, vector<BSONObj>>> rawFacetPipelines;
     for (auto&& facetElem : elem.embeddedObject()) {
@@ -101,7 +101,7 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
         uassert(40170,
                 str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
                               << typeName(facetElem.type()),
-                facetElem.type() == BSONType::Array);
+                facetElem.type() == BSONType::array);
 
         vector<BSONObj> rawPipeline;
         for (auto&& subPipeElem : facetElem.Obj()) {
@@ -109,7 +109,7 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
                     str::stream() << "elements of arrays in $facet spec must be non-empty objects, "
                                   << facetName << " argument contained an element of type "
                                   << typeName(subPipeElem.type()) << ": " << subPipeElem,
-                    subPipeElem.type() == BSONType::Object);
+                    subPipeElem.type() == BSONType::object);
             rawPipeline.push_back(subPipeElem.embeddedObject());
         }
 

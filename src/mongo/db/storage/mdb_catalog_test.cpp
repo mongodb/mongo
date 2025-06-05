@@ -45,8 +45,8 @@ public:
     bool possessesAllRelevantElements(const BSONObj& expected, const BSONObj& actual) {
         for (BSONElement elem : expected) {
             BSONElement actualElem = actual[elem.fieldName()];
-            if (elem.type() == mongo::Object) {
-                if (actualElem.type() != mongo::Object ||
+            if (elem.type() == mongo::BSONType::object) {
+                if (actualElem.type() != mongo::BSONType::object ||
                     !possessesAllRelevantElements(elem.Obj(), actualElem.Obj()))
                     return false;
             } else {

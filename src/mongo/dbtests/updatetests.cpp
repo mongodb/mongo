@@ -1729,7 +1729,7 @@ public:
     void run() {
         _client.insert(nss(), BSON("a" << 5));
         _client.update(nss(), BSON("a" << 5), fromjson("{$set:{b:null}}"));
-        ASSERT_EQUALS(jstNULL, _client.findOne(nss(), BSON("a" << 5)).getField("b").type());
+        ASSERT_EQUALS(BSONType::null, _client.findOne(nss(), BSON("a" << 5)).getField("b").type());
     }
 };
 
@@ -1927,7 +1927,7 @@ class inc6 : public Base {
         long long max = std::numeric_limits<int>::max() + 5ll;
 
         _client.insert(nss(), BSON("x" << (int)start));
-        ASSERT(findOne()["x"].type() == NumberInt);
+        ASSERT(findOne()["x"].type() == BSONType::numberInt);
 
         while (start < max) {
             update(BSON("$inc" << BSON("x" << 1)));
@@ -1935,7 +1935,7 @@ class inc6 : public Base {
             ASSERT_EQUALS(start, findOne()["x"].numberLong());  // SERVER-2005
         }
 
-        ASSERT(findOne()["x"].type() == NumberLong);
+        ASSERT(findOne()["x"].type() == BSONType::numberLong);
     }
 };
 

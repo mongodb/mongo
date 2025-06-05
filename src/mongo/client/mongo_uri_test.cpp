@@ -632,10 +632,10 @@ BSONObj getBsonFromJsonFile(std::string fileName) {
 // Helper method to take a BSONElement and either extract its string or return an empty string
 std::string returnStringFromElementOrNull(BSONElement element) {
     ASSERT_TRUE(!element.eoo());
-    if (element.type() == jstNULL) {
+    if (element.type() == BSONType::null) {
         return std::string();
     }
-    ASSERT_EQ(element.type(), String);
+    ASSERT_EQ(element.type(), BSONType::string);
     return element.String();
 }
 
@@ -737,7 +737,7 @@ TEST(MongoURI, specTests) {
         const auto testBson = getBsonFromJsonFile(file);
 
         for (const auto& testElement : testBson) {
-            ASSERT_EQ(testElement.type(), Object);
+            ASSERT_EQ(testElement.type(), BSONType::object);
             const auto test = testElement.Obj();
 
             // First extract the valid field and the uri field
@@ -748,7 +748,7 @@ TEST(MongoURI, specTests) {
 
             const auto uriDoc = test.getField("uri");
             ASSERT_FALSE(uriDoc.eoo());
-            ASSERT_EQ(uriDoc.type(), String);
+            ASSERT_EQ(uriDoc.type(), BSONType::string);
             const auto uri = uriDoc.String();
 
             if (!valid) {
@@ -765,8 +765,8 @@ TEST(MongoURI, specTests) {
 
                 const auto auth = test.getField("auth");
                 ASSERT_FALSE(auth.eoo());
-                if (auth.type() != jstNULL) {
-                    ASSERT_EQ(auth.type(), Object);
+                if (auth.type() != BSONType::null) {
+                    ASSERT_EQ(auth.type(), BSONType::object);
                     const auto authObj = auth.embeddedObject();
                     database = returnStringFromElementOrNull(authObj.getField("db"));
                     username = returnStringFromElementOrNull(authObj.getField("username"));
@@ -776,7 +776,7 @@ TEST(MongoURI, specTests) {
                 // parse the hosts
                 const auto hosts = test.getField("hosts");
                 ASSERT_FALSE(hosts.eoo());
-                ASSERT_EQ(hosts.type(), Array);
+                ASSERT_EQ(hosts.type(), BSONType::array);
                 const auto numHosts = static_cast<size_t>(hosts.Obj().nFields());
 
                 // parse the options
@@ -785,18 +785,18 @@ TEST(MongoURI, specTests) {
                 const auto optionsElement = test.getField("options");
                 ASSERT_FALSE(optionsElement.eoo());
                 MongoURI::OptionsMap options;
-                if (optionsElement.type() != jstNULL) {
-                    ASSERT_EQ(optionsElement.type(), Object);
+                if (optionsElement.type() != BSONType::null) {
+                    ASSERT_EQ(optionsElement.type(), BSONType::object);
                     const auto optionsObj = optionsElement.Obj();
                     const auto replsetElement = optionsObj.getField("replicaSet");
                     if (!replsetElement.eoo()) {
-                        ASSERT_EQ(replsetElement.type(), String);
+                        ASSERT_EQ(replsetElement.type(), BSONType::string);
                         setName = replsetElement.String();
                         connectionType = kReplicaSet;
                     }
 
                     for (auto&& field : optionsElement.Obj()) {
-                        if (field.type() == String) {
+                        if (field.type() == BSONType::string) {
                             options[field.fieldNameStringData()] = field.String();
                         } else if (field.isNumber()) {
                             options[field.fieldNameStringData()] = std::to_string(field.Int());

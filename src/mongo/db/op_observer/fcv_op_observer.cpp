@@ -168,7 +168,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
 
 void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc) {
     auto idElement = doc["_id"];
-    if (idElement.type() != BSONType::String ||
+    if (idElement.type() != BSONType::string ||
         idElement.String() != multiversion::kParameterName) {
         return;
     }
@@ -231,7 +231,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
                              OpStateAccumulator* opAccumulator) {
     if (coll->ns().isServerConfigurationCollection()) {
         auto id = documentKey.getId().firstElement();
-        if (id.type() == BSONType::String && id.String() == multiversion::kParameterName) {
+        if (id.type() == BSONType::string && id.String() == multiversion::kParameterName) {
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
         }
     }

@@ -260,7 +260,7 @@ void SdamServerSelector::filterTags(std::vector<ServerDescriptionPtr>* servers,
     }
 
     for (const auto& tagSetElem : tagSetList) {
-        if (tagSetElem.type() != BSONType::Object) {
+        if (tagSetElem.type() != BSONType::object) {
             LOGV2_WARNING(4671202,
                           "Invalid tag set specified for server selection; tag sets should be"
                           " specified as a BSON object",

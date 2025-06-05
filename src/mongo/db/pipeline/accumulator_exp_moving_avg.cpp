@@ -48,7 +48,7 @@ void AccumulatorExpMovingAvg::processInternal(const Value& input, bool merging) 
     if (!input.numeric()) {
         return;
     }
-    if (input.getType() == BSONType::NumberDecimal) {
+    if (input.getType() == BSONType::numberDecimal) {
         _isDecimal = true;
     }
     auto decimalVal = input.coerceToDecimal();

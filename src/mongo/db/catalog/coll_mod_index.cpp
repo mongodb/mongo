@@ -146,8 +146,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
     *oldExpireSecs = oldExpireSecsElement.safeNumberLong();
     bool equivalentAsTypeLong = **oldExpireSecs == indexExpireAfterSeconds;
     bool shouldUpdateCatalog = !equivalentAsTypeLong ||
-        (oldExpireSecsElement.type() != BSONType::NumberInt &&
-         oldExpireSecsElement.type() != BSONType::NumberLong);
+        (oldExpireSecsElement.type() != BSONType::numberInt &&
+         oldExpireSecsElement.type() != BSONType::numberLong);
     if (shouldUpdateCatalog) {
         // Change the value of "expireAfterSeconds" on disk.
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());

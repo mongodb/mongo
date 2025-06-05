@@ -237,7 +237,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceVectorSearch::createFromB
     uassert(ErrorCodes::FailedToParse,
             str::stream() << kStageName
                           << " value must be an object. Found: " << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = elem.embeddedObject();
 

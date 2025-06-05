@@ -389,7 +389,7 @@ void assertTxnMetadata(BSONObj obj,
                        boost::optional<BSONObj> readConcern = boost::none,
                        boost::optional<BSONObj> writeConcern = boost::none,
                        boost::optional<int> maxTimeMS = boost::none) {
-    ASSERT_EQ(obj["lsid"].type(), BSONType::Object) << obj;
+    ASSERT_EQ(obj["lsid"].type(), BSONType::object) << obj;
     ASSERT_EQ(obj["autocommit"].Bool(), false) << obj;
     ASSERT_EQ(obj["txnNumber"].Long(), txnNumber) << obj;
 

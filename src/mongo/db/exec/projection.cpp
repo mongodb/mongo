@@ -117,7 +117,7 @@ auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) 
         // Rehydrating of hashed field value is pointless on its own. The query planner dependency
         // analysis should make sure that a covered projection can only be generated for non-hashed
         // fields.
-        if (keyElt.type() == mongo::String && keyElt.valueStringData() == IndexNames::HASHED) {
+        if (keyElt.type() == BSONType::string && keyElt.valueStringData() == IndexNames::HASHED) {
             continue;
         }
 

@@ -110,7 +110,7 @@ StatusWith<bool> completeSpeculativeAuth(DBClientSession* conn,
                 str::stream() << "Unexpected hello." << auth::kSpeculativeAuthenticate << " reply"};
     }
 
-    if (specAuthElem.type() != Object) {
+    if (specAuthElem.type() != BSONType::object) {
         return {ErrorCodes::BadValue,
                 str::stream() << "hello." << auth::kSpeculativeAuthenticate
                               << " reply must be an object"};
@@ -216,7 +216,8 @@ executor::RemoteCommandResponse initWireVersion(
                               replyWireVersion.getValue().maxWireVersion);
     }
 
-    if (helloObj.hasField("saslSupportedMechs") && helloObj["saslSupportedMechs"].type() == Array) {
+    if (helloObj.hasField("saslSupportedMechs") &&
+        helloObj["saslSupportedMechs"].type() == BSONType::array) {
         auto array = helloObj["saslSupportedMechs"].Array();
         for (const auto& elem : array) {
             saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());

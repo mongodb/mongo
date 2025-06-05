@@ -210,27 +210,27 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
     string prefixedPathString;
     bool preserveNullAndEmptyArrays = false;
     boost::optional<string> indexPath;
-    if (elem.type() == Object) {
+    if (elem.type() == BSONType::object) {
         for (auto&& subElem : elem.Obj()) {
             if (subElem.fieldNameStringData() == "path") {
                 uassert(28808,
                         str::stream() << "expected a string as the path for $unwind stage, got "
                                       << typeName(subElem.type()),
-                        subElem.type() == String);
+                        subElem.type() == BSONType::string);
                 prefixedPathString = subElem.str();
             } else if (subElem.fieldNameStringData() == "preserveNullAndEmptyArrays") {
                 uassert(28809,
                         str::stream() << "expected a boolean for the preserveNullAndEmptyArrays "
                                          "option to $unwind stage, got "
                                       << typeName(subElem.type()),
-                        subElem.type() == Bool);
+                        subElem.type() == BSONType::boolean);
                 preserveNullAndEmptyArrays = subElem.Bool();
             } else if (subElem.fieldNameStringData() == "includeArrayIndex") {
                 uassert(28810,
                         str::stream() << "expected a non-empty string for the includeArrayIndex "
                                          " option to $unwind stage, got "
                                       << typeName(subElem.type()),
-                        subElem.type() == String && !subElem.String().empty());
+                        subElem.type() == BSONType::string && !subElem.String().empty());
                 indexPath = subElem.String();
                 uassert(28822,
                         str::stream() << "includeArrayIndex option to $unwind stage should not be "
@@ -243,7 +243,7 @@ intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
                                         << subElem.fieldNameStringData());
             }
         }
-    } else if (elem.type() == String) {
+    } else if (elem.type() == BSONType::string) {
         prefixedPathString = elem.str();
     } else {
         uasserted(

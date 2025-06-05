@@ -78,8 +78,8 @@ public:
                                         Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
                                         ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
-        invariant(_rhs.type() != BSONType::Undefined);
-        invariant(_rhs.type() != BSONType::Array);
+        invariant(_rhs.type() != BSONType::undefined);
+        invariant(_rhs.type() != BSONType::array);
     }
 
     ~InternalExprComparisonMatchExpression() override = default;

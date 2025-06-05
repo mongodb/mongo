@@ -210,11 +210,11 @@ BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
 
     // We inspect 'info' to infer the collection default collation.
     BSONObj collationToReturn = CollationSpec::kSimpleSpec;
-    if (collectionInfo["options"].type() == BSONType::Object) {
+    if (collectionInfo["options"].type() == BSONType::object) {
         BSONObj collectionOptions = collectionInfo["options"].Obj();
         BSONElement collationElement;
         auto status = bsonExtractTypedField(
-            collectionOptions, "collation", BSONType::Object, &collationElement);
+            collectionOptions, "collation", BSONType::object, &collationElement);
         if (status.isOK()) {
             collationToReturn = collationElement.Obj().getOwned();
             uassert(ErrorCodes::BadValue,

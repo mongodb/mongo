@@ -341,7 +341,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
     }
 
     BSONElement bucketIdElem = bucketDoc.getField(kBucketIdFieldName);
-    if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::jstOID) {
+    if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::oid) {
         stats.incNumBucketReopeningsFailedDueToMalformedIdField();
         return {ErrorCodes::BadValue,
                 str::stream() << kBucketIdFieldName << " is missing or not an ObjectId"};
@@ -441,7 +441,7 @@ StatusWith<tracking::unique_ptr<Bucket>> rehydrateBucket(BucketCatalog& catalog,
 
     // This check accounts for if a user performs a direct bucket write on the timeColumnElem and we
     // attempt to rehydrate the bucket as part of query-based reopening.
-    if (timeColumnElem.type() != BSONType::BinData) {
+    if (timeColumnElem.type() != BSONType::binData) {
         stats.incNumBucketReopeningsFailedDueToUncompressedTimeColumn();
         return {ErrorCodes::BadValue,
                 "Bucket data field is malformed (time column is not compressed)"};

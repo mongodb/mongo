@@ -191,21 +191,21 @@ public:
      */
     static bool isExactBoundsGenerating(BSONElement elt) {
         switch (elt.type()) {
-            case BSONType::NumberLong:
-            case BSONType::NumberDouble:
-            case BSONType::NumberInt:
-            case BSONType::NumberDecimal:
-            case BSONType::String:
-            case BSONType::Bool:
-            case BSONType::Date:
-            case BSONType::bsonTimestamp:
-            case BSONType::jstOID:
-            case BSONType::BinData:
-            case BSONType::Object:
-            case BSONType::Code:
-            case BSONType::CodeWScope:
-            case BSONType::MinKey:
-            case BSONType::MaxKey:
+            case BSONType::numberLong:
+            case BSONType::numberDouble:
+            case BSONType::numberInt:
+            case BSONType::numberDecimal:
+            case BSONType::string:
+            case BSONType::boolean:
+            case BSONType::date:
+            case BSONType::timestamp:
+            case BSONType::oid:
+            case BSONType::binData:
+            case BSONType::object:
+            case BSONType::code:
+            case BSONType::codeWScope:
+            case BSONType::minKey:
+            case BSONType::maxKey:
                 return true;
             default:
                 return false;

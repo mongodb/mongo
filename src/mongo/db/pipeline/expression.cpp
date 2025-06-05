@@ -230,7 +230,7 @@ Expression::ExpressionVector ExpressionNary::parseArguments(ExpressionContext* c
                                                             BSONElement exprElement,
                                                             const VariablesParseState& vps) {
     ExpressionVector out;
-    if (exprElement.type() == Array) {
+    if (exprElement.type() == BSONType::array) {
         for (auto&& elem : exprElement.Obj()) {
             out.push_back(Expression::parseOperand(expCtx, elem, vps));
         }
@@ -246,12 +246,12 @@ intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expC
                                                    const VariablesParseState& vps) {
     BSONType type = exprElement.type();
 
-    if (type == String && exprElement.valueStringData().starts_with('$')) {
+    if (type == BSONType::string && exprElement.valueStringData().starts_with('$')) {
         /* if we got here, this is a field path expression */
         return ExpressionFieldPath::parse(expCtx, exprElement.str(), vps);
-    } else if (type == Object) {
+    } else if (type == BSONType::object) {
         return Expression::parseObject(expCtx, exprElement.Obj(), vps);
-    } else if (type == Array) {
+    } else if (type == BSONType::array) {
         return ExpressionArray::parse(expCtx, exprElement, vps);
     } else {
         return ExpressionConstant::parse(expCtx, exprElement, vps);
@@ -271,7 +271,7 @@ boost::intrusive_ptr<Expression> parseDateExpressionAcceptingTimeZone(
     ExpressionContext* const expCtx,
     BSONElement operatorElem,
     const VariablesParseState& variablesParseState) {
-    if (operatorElem.type() == BSONType::Object) {
+    if (operatorElem.type() == BSONType::object) {
         if (operatorElem.embeddedObject().firstElementFieldName()[0] == '$') {
             // Assume this is an expression specification representing the date argument
             // like {$add: [<date>, 1000]}.
@@ -302,7 +302,7 @@ boost::intrusive_ptr<Expression> parseDateExpressionAcceptingTimeZone(
                     date);
             return new SubClass(expCtx, std::move(date), std::move(timeZone));
         }
-    } else if (operatorElem.type() == BSONType::Array) {
+    } else if (operatorElem.type() == BSONType::array) {
         auto elems = operatorElem.Array();
         uassert(40536,
                 str::stream() << operatorElem.fieldNameStringData()
@@ -759,7 +759,7 @@ boost::intrusive_ptr<Expression> ExpressionCond::create(ExpressionContext* const
 intrusive_ptr<Expression> ExpressionCond::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vps) {
-    if (expr.type() != Object) {
+    if (expr.type() != BSONType::object) {
         return Base::parse(expCtx, expr, vps);
     }
     MONGO_verify(expr.fieldNameStringData() == "$cond");
@@ -842,7 +842,7 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(ExpressionContext* cons
 
     uassert(40519,
             "$dateFromParts only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement yearElem;
     BSONElement monthElem;
@@ -1041,7 +1041,7 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(ExpressionContext* con
     uassert(40540,
             str::stream() << "$dateFromString only supports an object as an argument, found: "
                           << typeName(expr.type()),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement dateStringElem, timeZoneElem, formatElem, onNullElem, onErrorElem;
 
@@ -1153,7 +1153,7 @@ intrusive_ptr<Expression> ExpressionDateToParts::parse(ExpressionContext* const 
 
     uassert(40524,
             "$dateToParts only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement dateElem;
     BSONElement timeZoneElem;
@@ -1244,7 +1244,7 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(ExpressionContext* const
 
     uassert(18629,
             "$dateToString only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     BSONElement formatElem, dateElem, timeZoneElem, onNullElem;
     for (auto&& arg : expr.embeddedObject()) {
@@ -1353,7 +1353,7 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     invariant(expr.fieldNameStringData() == "$dateDiff");
     uassert(5166301,
             "$dateDiff only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
     BSONElement startDateElement, endDateElement, unitElement, timezoneElement, startOfWeekElement;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
@@ -1829,7 +1829,8 @@ intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* const expCt
                                                   const VariablesParseState& vpsIn) {
     MONGO_verify(expr.fieldNameStringData() == "$filter");
 
-    uassert(28646, "$filter only supports an object as its argument", expr.type() == Object);
+    uassert(
+        28646, "$filter only supports an object as its argument", expr.type() == BSONType::object);
 
     // "cond" must be parsed after "as" regardless of BSON order.
     BSONElement inputElem;
@@ -1944,7 +1945,7 @@ intrusive_ptr<Expression> ExpressionMap::parse(ExpressionContext* const expCtx,
                                                const VariablesParseState& vpsIn) {
     MONGO_verify(expr.fieldNameStringData() == "$map");
 
-    uassert(16878, "$map only supports an object as its argument", expr.type() == Object);
+    uassert(16878, "$map only supports an object as its argument", expr.type() == BSONType::object);
 
     // "in" must be parsed after "as" regardless of BSON order
     BSONElement inputElem;
@@ -2123,7 +2124,7 @@ ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionCon
 intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
                                                 BSONElement expr,
                                                 const VariablesParseState& vpsIn) {
-    uassert(17307, "$meta only supports string arguments", expr.type() == String);
+    uassert(17307, "$meta only supports string arguments", expr.type() == BSONType::string);
     const auto [metaType, typeName, optionalPath] = _parseMetaType(expCtx, expr.valueStringData());
 
     _assertMetaFieldCompatibleWithStrictAPI(expCtx, metaType);
@@ -2165,7 +2166,7 @@ intrusive_ptr<Expression> ExpressionInternalRawSortKey::parse(ExpressionContext*
                                                               const VariablesParseState& vpsIn) {
     uassert(9182101,
             "No known arguments - must be an empty object",
-            expr.type() == BSONType::Object && expr.Obj().isEmpty());
+            expr.type() == BSONType::object && expr.Obj().isEmpty());
     return make_intrusive<ExpressionInternalRawSortKey>(expCtx);
 }
 
@@ -2722,7 +2723,7 @@ intrusive_ptr<Expression> ExpressionReduce::parse(ExpressionContext* const expCt
     uassert(40075,
             str::stream() << "$reduce requires an object as an argument, found: "
                           << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::object);
 
 
     // vpsSub is used only to parse 'in', which must have access to $$this and $$value.
@@ -2793,7 +2794,7 @@ parseExpressionReplaceBase(const char* opName,
     uassert(51751,
             str::stream() << opName
                           << " requires an object as an argument, found: " << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::object);
 
     intrusive_ptr<Expression> input;
     intrusive_ptr<Expression> find;
@@ -2876,7 +2877,7 @@ const char* ExpressionReverseArray::getOpName() const {
 namespace {
 
 BSONObj createSortSpecObject(const BSONElement& sortClause) {
-    if (sortClause.type() == BSONType::Object) {
+    if (sortClause.type() == BSONType::object) {
         auto status = pattern_cmp::checkSortClause(sortClause.embeddedObject());
         uassert(2942505, status.toString(), status.isOK());
 
@@ -2903,7 +2904,7 @@ intrusive_ptr<Expression> ExpressionSortArray::parse(ExpressionContext* const ex
     uassert(2942500,
             str::stream() << "$sortArray requires an object as an argument, found: "
                           << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::object);
 
     boost::intrusive_ptr<Expression> input;
     boost::optional<PatternValueCmp> sortBy;
@@ -3112,7 +3113,8 @@ intrusive_ptr<Expression> ExpressionSigmoid::parseExpressionSigmoid(
     BSONType type = expr.type();
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$sigmoid only supports numeric types, not " << typeName(type),
-            (type != String ? true : expr.valueStringData().starts_with('$')) && type != Array);
+            (type != BSONType::string ? true : expr.valueStringData().starts_with('$')) &&
+                type != BSONType::array);
 
     auto inputExpression = Expression::parseOperand(expCtx, expr, vps);
 
@@ -3281,7 +3283,7 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
     uassert(40060,
             str::stream() << "$switch requires an object as an argument, found: "
                           << typeName(expr.type()),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     boost::intrusive_ptr<Expression> expDefault;
     std::vector<boost::intrusive_ptr<Expression>> children;
@@ -3293,13 +3295,13 @@ boost::intrusive_ptr<Expression> ExpressionSwitch::parse(ExpressionContext* cons
             uassert(40061,
                     str::stream() << "$switch expected an array for 'branches', found: "
                                   << typeName(elem.type()),
-                    elem.type() == BSONType::Array);
+                    elem.type() == BSONType::array);
 
             for (auto&& branch : elem.Array()) {
                 uassert(40062,
                         str::stream() << "$switch expected each branch to be an object, found: "
                                       << typeName(branch.type()),
-                        branch.type() == BSONType::Object);
+                        branch.type() == BSONType::object);
 
                 boost::intrusive_ptr<Expression> switchCase, switchThen;
 
@@ -3460,7 +3462,7 @@ intrusive_ptr<Expression> ExpressionTrim::parse(ExpressionContext* const expCtx,
     uassert(50696,
             str::stream() << name << " only supports an object as an argument, found "
                           << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::object);
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> characters;
@@ -3558,7 +3560,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
     uassert(34460,
             str::stream() << "$zip only supports an object as an argument, found "
                           << typeName(expr.type()),
-            expr.type() == Object);
+            expr.type() == BSONType::object);
 
     auto useLongestLength = false;
     std::vector<boost::intrusive_ptr<Expression>> children;
@@ -3572,7 +3574,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
             uassert(34461,
                     str::stream() << "inputs must be an array of expressions, found "
                                   << typeName(elem.type()),
-                    elem.type() == Array);
+                    elem.type() == BSONType::array);
             for (auto&& subExpr : elem.Array()) {
                 children.push_back(parseOperand(expCtx, subExpr, vps));
             }
@@ -3580,7 +3582,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
             uassert(34462,
                     str::stream() << "defaults must be an array of expressions, found "
                                   << typeName(elem.type()),
-                    elem.type() == Array);
+                    elem.type() == BSONType::array);
             for (auto&& subExpr : elem.Array()) {
                 tempDefaultChildren.push_back(parseOperand(expCtx, subExpr, vps));
             }
@@ -3588,7 +3590,7 @@ intrusive_ptr<Expression> ExpressionZip::parse(ExpressionContext* const expCtx,
             uassert(34463,
                     str::stream() << "useLongestLength must be a bool, found "
                                   << typeName(expr.type()),
-                    elem.type() == Bool);
+                    elem.type() == BSONType::boolean);
             useLongestLength = elem.Bool();
         } else {
             uasserted(34464,
@@ -3692,18 +3694,18 @@ REGISTER_STABLE_EXPRESSION(convert, ExpressionConvert::parse);
 // Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
 // for $convert without an 'onNull' or 'onError'.
 REGISTER_STABLE_EXPRESSION(
-    toString, makeConversionAlias("$toString"_sd, BSONType::String, BinDataFormat::kAuto));
-REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::jstOID));
-REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::Date));
-REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble));
-REGISTER_STABLE_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::NumberInt));
-REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::NumberLong));
+    toString, makeConversionAlias("$toString"_sd, BSONType::string, BinDataFormat::kAuto));
+REGISTER_STABLE_EXPRESSION(toObjectId, makeConversionAlias("$toObjectId"_sd, BSONType::oid));
+REGISTER_STABLE_EXPRESSION(toDate, makeConversionAlias("$toDate"_sd, BSONType::date));
+REGISTER_STABLE_EXPRESSION(toDouble, makeConversionAlias("$toDouble"_sd, BSONType::numberDouble));
+REGISTER_STABLE_EXPRESSION(toInt, makeConversionAlias("$toInt"_sd, BSONType::numberInt));
+REGISTER_STABLE_EXPRESSION(toLong, makeConversionAlias("$toLong"_sd, BSONType::numberLong));
 REGISTER_STABLE_EXPRESSION(toDecimal,
-                           makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal));
-REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::Bool));
+                           makeConversionAlias("$toDecimal"_sd, BSONType::numberDecimal));
+REGISTER_STABLE_EXPRESSION(toBool, makeConversionAlias("$toBool"_sd, BSONType::boolean));
 REGISTER_EXPRESSION_WITH_FEATURE_FLAG(toUUID,
                                       makeConversionAlias("$toUUID"_sd,
-                                                          BSONType::BinData,
+                                                          BSONType::binData,
                                                           BinDataFormat::kUuid,
                                                           BinDataType::newUUID),
                                       AllowedWithApiStrict::kAlways,
@@ -3761,7 +3763,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$convert expects an object of named arguments but found: "
                           << typeName(expr.type()),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     const bool allowBinDataConvert = checkBinDataConvertAllowed();
     const bool allowBinDataConvertNumeric = checkBinDataConvertNumericAllowed(expCtx);
@@ -3919,11 +3921,11 @@ Value ExpressionConvert::serialize(const SerializationOptions& options) const {
 
 BSONType ExpressionConvert::computeTargetType(Value targetTypeName) {
     BSONType targetType;
-    if (targetTypeName.getType() == BSONType::String) {
+    if (targetTypeName.getType() == BSONType::string) {
         // typeFromName() does not consider "missing" to be a valid type, but we want to accept it,
         // because it is a possible result of the $type aggregation operator.
         if (targetTypeName.getStringData() == "missing"_sd) {
-            return BSONType::EOO;
+            return BSONType::eoo;
         }
 
         // This will throw if the type name is invalid.
@@ -3970,7 +3972,7 @@ auto CommonRegexParse(ExpressionContext* const expCtx,
     uassert(51103,
             str::stream() << opName
                           << " expects an object of named arguments but found: " << expr.type(),
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     struct {
         boost::intrusive_ptr<Expression> input;
@@ -4037,10 +4039,10 @@ ExpressionRegex::getConstantPatternAndOptions() const {
     auto patternValue = static_cast<ExpressionConstant*>(_children[_kRegex].get())->getValue();
     uassert(5073405,
             str::stream() << _opName << " needs 'regex' to be of type string or regex",
-            patternValue.nullish() || patternValue.getType() == BSONType::RegEx ||
-                patternValue.getType() == BSONType::String);
+            patternValue.nullish() || patternValue.getType() == BSONType::regEx ||
+                patternValue.getType() == BSONType::string);
     auto patternStr = [&]() -> boost::optional<std::string> {
-        if (patternValue.getType() == BSONType::RegEx) {
+        if (patternValue.getType() == BSONType::regEx) {
             StringData flags = patternValue.getRegexFlags();
             uassert(5073406,
                     str::stream()
@@ -4048,7 +4050,7 @@ ExpressionRegex::getConstantPatternAndOptions() const {
                         << ": found regex options specified in both 'regex' and 'options' fields",
                     _children[_kOptions].get() == nullptr || flags.empty());
             return std::string(patternValue.getRegex());
-        } else if (patternValue.getType() == BSONType::String) {
+        } else if (patternValue.getType() == BSONType::string) {
             return patternValue.getString();
         } else {
             return boost::none;
@@ -4061,12 +4063,12 @@ ExpressionRegex::getConstantPatternAndOptions() const {
                 static_cast<ExpressionConstant*>(_children[_kOptions].get())->getValue();
             uassert(5126607,
                     str::stream() << _opName << " needs 'options' to be of type string",
-                    optValue.nullish() || optValue.getType() == BSONType::String);
-            if (optValue.getType() == BSONType::String) {
+                    optValue.nullish() || optValue.getType() == BSONType::string);
+            if (optValue.getType() == BSONType::string) {
                 return optValue.getString();
             }
         }
-        if (patternValue.getType() == BSONType::RegEx) {
+        if (patternValue.getType() == BSONType::regEx) {
             StringData flags = patternValue.getRegexFlags();
             if (!flags.empty()) {
                 return flags.toString();
@@ -4232,7 +4234,7 @@ auto commonDateArithmeticsParse(ExpressionContext* const expCtx,
                                 StringData opName) {
     uassert(5166400,
             str::stream() << opName << " expects an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     struct {
         boost::intrusive_ptr<Expression> startDate;
@@ -4401,7 +4403,7 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::parse(ExpressionContext* c
     tassert(5439011, "Invalid expression passed", expr.fieldNameStringData() == "$dateTrunc");
     uassert(5439007,
             "$dateTrunc only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
     BSONElement dateElement, unitElement, binSizeElement, timezoneElement, startOfWeekElement;
     for (auto&& element : expr.embeddedObject()) {
         auto field = element.fieldNameStringData();
@@ -4534,7 +4536,7 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
     boost::intrusive_ptr<Expression> fieldExpr;
     boost::intrusive_ptr<Expression> inputExpr;
 
-    if (expr.type() == BSONType::Object) {
+    if (expr.type() == BSONType::object) {
         for (auto&& elem : expr.embeddedObject()) {
             const auto fieldName = elem.fieldNameStringData();
             if (!fieldExpr && !inputExpr && fieldName[0] == '$') {
@@ -4579,7 +4581,7 @@ Value ExpressionGetField::serialize(const SerializationOptions& options) const {
     Value fieldValue;
 
     if (auto fieldExprConst = dynamic_cast<ExpressionConstant*>(_children[_kField].get());
-        fieldExprConst && fieldExprConst->getValue().getType() == BSONType::String) {
+        fieldExprConst && fieldExprConst->getValue().getType() == BSONType::string) {
         auto strPath = fieldExprConst->getValue().getString();
 
         Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
@@ -4618,7 +4620,7 @@ intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const exp
 
     uassert(4161100,
             str::stream() << name << " only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     boost::intrusive_ptr<Expression> fieldExpr;
     boost::intrusive_ptr<Expression> inputExpr;
@@ -4709,7 +4711,7 @@ std::string ExpressionSetField::getValidFieldName(boost::intrusive_ptr<Expressio
                           << " requires 'field' to evaluate to type String, "
                              "but got "
                           << typeName(constFieldExpr->getValue().getType()),
-            constFieldExpr->getValue().getType() == BSONType::String);
+            constFieldExpr->getValue().getType() == BSONType::string);
     uassert(9534700,
             str::stream() << kExpressionName << ": 'field' cannot contain an embedded null byte",
             constFieldExpr->getValue().getStringData().find('\0') == std::string::npos);
@@ -4777,7 +4779,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
         8281500,
         str::stream() << "$_internalKeyStringValue only supports an object as its argument, not "
                       << typeName(expr.type()),
-        expr.type() == BSONType::Object);
+        expr.type() == BSONType::object);
 
     boost::intrusive_ptr<Expression> inputExpr;
     boost::intrusive_ptr<Expression> collationExpr;
@@ -4897,7 +4899,7 @@ ExpressionEncTextSearch::ExpressionEncTextSearch(ExpressionContext* const expCtx
         uassert(10111802,
                 "Unexpected value type found on encrypted text search on field '" +
                     fieldPathExpression.getFieldPathWithoutCurrentPrefix().fullPath() + "'.",
-                value.getType() == String);
+                value.getType() == BSONType::string);
     }
 
     expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);

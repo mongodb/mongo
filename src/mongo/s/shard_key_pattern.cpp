@@ -120,11 +120,11 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
 }
 
 bool isValidShardKeyElementForExtractionFromDocument(const BSONElement& element) {
-    return element.type() != Array;
+    return element.type() != BSONType::array;
 }
 
 bool isValidShardKeyElement(const BSONElement& element) {
-    return !element.eoo() && element.type() != Array;
+    return !element.eoo() && element.type() != BSONType::array;
 }
 
 BSONElement extractKeyElementFromDoc(const BSONObj& obj, StringData pathStr) {
@@ -204,7 +204,7 @@ ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}
 
 bool ShardKeyPattern::isHashedPatternEl(const BSONElement& el) {
-    return el.type() == String && el.String() == IndexNames::HASHED;
+    return el.type() == BSONType::string && el.String() == IndexNames::HASHED;
 }
 
 bool ShardKeyPattern::isHashedPattern() const {
@@ -217,9 +217,9 @@ bool ShardKeyPattern::isHashedOnField(StringData fieldName) const {
 
 bool ShardKeyPattern::isValidHashedValue(const BSONElement& el) {
     switch (el.type()) {
-        case MinKey:
-        case MaxKey:
-        case NumberLong:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::numberLong:
             return true;
         default:
             return false;
@@ -448,10 +448,11 @@ bool ShardKeyPattern::isValidShardKeyElementForStorage(const BSONElement& elemen
     if (!isValidShardKeyElement(element))
         return false;
 
-    if (element.type() == RegEx)
+    if (element.type() == BSONType::regEx)
         return false;
 
-    if (element.type() == Object && !element.embeddedObject().storageValidEmbedded().isOK())
+    if (element.type() == BSONType::object &&
+        !element.embeddedObject().storageValidEmbedded().isOK())
         return false;
 
     return true;

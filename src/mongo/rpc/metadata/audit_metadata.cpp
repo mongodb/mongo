@@ -156,7 +156,7 @@ std::size_t estimateAuditMetadataSize(
     // BSONArrayType + "impersonatedRoles" + NULL + BSONArray Length
     ret += 1 + AuditMetadata::kRolesFieldName.size() + 1 + 4;
     for (std::size_t i = 0; i < roleNames.size(); i++) {
-        // BSONType::Object + strlen(indexId) + NULL byte
+        // BSONType::object + strlen(indexId) + NULL byte
         // to_string(i).size() will be log10(i) plus some rounding and fuzzing.
         // Increment prior to taking the log so that we never take log10(0) which is NAN.
         // This estimates one extra byte every time we reach (i % 10) == 9.
@@ -179,7 +179,7 @@ std::size_t estimateAuditMetadataSize(
 
         const auto& hosts = clientMetadata->getHosts();
         for (std::size_t i = 0; i < hosts.size(); ++i) {
-            // BSONType::String + strlen(indexId) + NULL byte
+            // BSONType::string + strlen(indexId) + NULL byte
             ret += 1 + static_cast<std::size_t>(1.1 + log10(i + 1)) + 1;
             // String size + string content + NULL terminator
             ret += 4 + hosts[i].toString().size() + 1;

@@ -188,7 +188,7 @@ Status ParsedUpdateBase::parseRequest() {
                 str::stream() << "the parameter '"
                               << write_ops::UpdateOpEntry::kUpsertSuppliedFieldName
                               << "' is set to 'true', but no document was supplied",
-                constants && (*constants)["new"_sd].type() == BSONType::Object);
+                constants && (*constants)["new"_sd].type() == BSONType::object);
     }
 
     // It is invalid to request that a ProjectionStage be applied to the UpdateStage if the

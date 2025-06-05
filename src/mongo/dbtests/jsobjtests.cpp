@@ -130,7 +130,7 @@ void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const std::string& bas
     BSONObjIterator it(obj);
     while (it.more()) {
         BSONElement e = it.next();
-        if (e.type() == Object) {
+        if (e.type() == BSONType::object) {
             std::string newbase = base + e.fieldName() + ".";
             nested2dotted(b, e.embeddedObject(), newbase);
         } else {
@@ -556,12 +556,12 @@ struct AppendNumber {
 
         BSONObj o = b.obj();
 
-        ASSERT(o["a"].type() == NumberInt);
-        ASSERT(o["b"].type() == NumberDouble);
-        ASSERT(o["c"].type() == NumberInt);
-        ASSERT(o["d"].type() == NumberLong);
-        ASSERT(o["e"].type() == NumberLong);
-        ASSERT(o["f"].type() == NumberDecimal);
+        ASSERT(o["a"].type() == BSONType::numberInt);
+        ASSERT(o["b"].type() == BSONType::numberDouble);
+        ASSERT(o["c"].type() == BSONType::numberInt);
+        ASSERT(o["d"].type() == BSONType::numberLong);
+        ASSERT(o["e"].type() == BSONType::numberLong);
+        ASSERT(o["f"].type() == BSONType::numberDecimal);
     }
 };
 
@@ -788,7 +788,7 @@ public:
         BSONObjBuilder b;
         b.appendNull("a");
         BSONObj o = b.done();
-        set(o, 4, mongo::Undefined);
+        set(o, 4, stdx::to_underlying(mongo::BSONType::undefined));
         ASSERT(validateBSON(o).isOK());
     }
 };
@@ -964,7 +964,7 @@ class CodeWScopeSmallObjSize : public CodeWScopeBase {
 
 class CodeWScopeBadObject : public CodeWScopeBase {
     void modify(BSONObj& o) const override {
-        set(o, 21, JSTypeMax + 1);
+        set(o, 21, stdx::to_underlying(BSONType::jsTypeMax) + 1);
     }
 };
 
@@ -1194,8 +1194,8 @@ public:
     void run() {
         BSONObj a = BSON("a" << 17);
         BSONObj b = BSON("b" << a["a"]);
-        ASSERT_EQUALS(NumberInt, a["a"].type());
-        ASSERT_EQUALS(NumberInt, b["b"].type());
+        ASSERT_EQUALS(BSONType::numberInt, a["a"].type());
+        ASSERT_EQUALS(BSONType::numberInt, b["b"].type());
         ASSERT_EQUALS(17, b["b"].number());
 
         // Append an element onto a label.
@@ -1209,74 +1209,74 @@ public:
     void run() {
         // These are listed in order of BSONType
 
-        ASSERT_EQUALS(objTypeOf(MINKEY), MinKey);
-        ASSERT_EQUALS(arrTypeOf(MINKEY), MinKey);
+        ASSERT_EQUALS(objTypeOf(MINKEY), BSONType::minKey);
+        ASSERT_EQUALS(arrTypeOf(MINKEY), BSONType::minKey);
 
         // EOO not valid in middle of BSONObj
 
-        ASSERT_EQUALS(objTypeOf(1.0), NumberDouble);
-        ASSERT_EQUALS(arrTypeOf(1.0), NumberDouble);
+        ASSERT_EQUALS(objTypeOf(1.0), BSONType::numberDouble);
+        ASSERT_EQUALS(arrTypeOf(1.0), BSONType::numberDouble);
 
-        ASSERT_EQUALS(objTypeOf(""), String);
-        ASSERT_EQUALS(arrTypeOf(""), String);
-        ASSERT_EQUALS(objTypeOf(std::string()), String);
-        ASSERT_EQUALS(arrTypeOf(std::string()), String);
-        ASSERT_EQUALS(objTypeOf(StringData("")), String);
-        ASSERT_EQUALS(arrTypeOf(StringData("")), String);
+        ASSERT_EQUALS(objTypeOf(""), BSONType::string);
+        ASSERT_EQUALS(arrTypeOf(""), BSONType::string);
+        ASSERT_EQUALS(objTypeOf(std::string()), BSONType::string);
+        ASSERT_EQUALS(arrTypeOf(std::string()), BSONType::string);
+        ASSERT_EQUALS(objTypeOf(StringData("")), BSONType::string);
+        ASSERT_EQUALS(arrTypeOf(StringData("")), BSONType::string);
 
-        ASSERT_EQUALS(objTypeOf(BSONObj()), Object);
-        ASSERT_EQUALS(arrTypeOf(BSONObj()), Object);
+        ASSERT_EQUALS(objTypeOf(BSONObj()), BSONType::object);
+        ASSERT_EQUALS(arrTypeOf(BSONObj()), BSONType::object);
 
-        ASSERT_EQUALS(objTypeOf(BSONArray()), Array);
-        ASSERT_EQUALS(arrTypeOf(BSONArray()), Array);
+        ASSERT_EQUALS(objTypeOf(BSONArray()), BSONType::array);
+        ASSERT_EQUALS(arrTypeOf(BSONArray()), BSONType::array);
 
-        ASSERT_EQUALS(objTypeOf(BSONBinData("", 0, BinDataGeneral)), BinData);
-        ASSERT_EQUALS(arrTypeOf(BSONBinData("", 0, BinDataGeneral)), BinData);
+        ASSERT_EQUALS(objTypeOf(BSONBinData("", 0, BinDataGeneral)), BSONType::binData);
+        ASSERT_EQUALS(arrTypeOf(BSONBinData("", 0, BinDataGeneral)), BSONType::binData);
 
-        ASSERT_EQUALS(objTypeOf(BSONUndefined), Undefined);
-        ASSERT_EQUALS(arrTypeOf(BSONUndefined), Undefined);
+        ASSERT_EQUALS(objTypeOf(BSONUndefined), BSONType::undefined);
+        ASSERT_EQUALS(arrTypeOf(BSONUndefined), BSONType::undefined);
 
-        ASSERT_EQUALS(objTypeOf(OID()), jstOID);
-        ASSERT_EQUALS(arrTypeOf(OID()), jstOID);
+        ASSERT_EQUALS(objTypeOf(OID()), BSONType::oid);
+        ASSERT_EQUALS(arrTypeOf(OID()), BSONType::oid);
 
-        ASSERT_EQUALS(objTypeOf(true), Bool);
-        ASSERT_EQUALS(arrTypeOf(true), Bool);
+        ASSERT_EQUALS(objTypeOf(true), BSONType::boolean);
+        ASSERT_EQUALS(arrTypeOf(true), BSONType::boolean);
 
-        ASSERT_EQUALS(objTypeOf(Date_t()), Date);
-        ASSERT_EQUALS(arrTypeOf(Date_t()), Date);
+        ASSERT_EQUALS(objTypeOf(Date_t()), BSONType::date);
+        ASSERT_EQUALS(arrTypeOf(Date_t()), BSONType::date);
 
-        ASSERT_EQUALS(objTypeOf(BSONNULL), jstNULL);
-        ASSERT_EQUALS(arrTypeOf(BSONNULL), jstNULL);
+        ASSERT_EQUALS(objTypeOf(BSONNULL), BSONType::null);
+        ASSERT_EQUALS(arrTypeOf(BSONNULL), BSONType::null);
 
-        ASSERT_EQUALS(objTypeOf(BSONRegEx("", "")), RegEx);
-        ASSERT_EQUALS(arrTypeOf(BSONRegEx("", "")), RegEx);
+        ASSERT_EQUALS(objTypeOf(BSONRegEx("", "")), BSONType::regEx);
+        ASSERT_EQUALS(arrTypeOf(BSONRegEx("", "")), BSONType::regEx);
 
-        ASSERT_EQUALS(objTypeOf(BSONDBRef("", OID())), DBRef);
-        ASSERT_EQUALS(arrTypeOf(BSONDBRef("", OID())), DBRef);
+        ASSERT_EQUALS(objTypeOf(BSONDBRef("", OID())), BSONType::dbRef);
+        ASSERT_EQUALS(arrTypeOf(BSONDBRef("", OID())), BSONType::dbRef);
 
-        ASSERT_EQUALS(objTypeOf(BSONCode("")), Code);
-        ASSERT_EQUALS(arrTypeOf(BSONCode("")), Code);
+        ASSERT_EQUALS(objTypeOf(BSONCode("")), BSONType::code);
+        ASSERT_EQUALS(arrTypeOf(BSONCode("")), BSONType::code);
 
-        ASSERT_EQUALS(objTypeOf(BSONSymbol("")), Symbol);
-        ASSERT_EQUALS(arrTypeOf(BSONSymbol("")), Symbol);
+        ASSERT_EQUALS(objTypeOf(BSONSymbol("")), BSONType::symbol);
+        ASSERT_EQUALS(arrTypeOf(BSONSymbol("")), BSONType::symbol);
 
-        ASSERT_EQUALS(objTypeOf(BSONCodeWScope("", BSONObj())), CodeWScope);
-        ASSERT_EQUALS(arrTypeOf(BSONCodeWScope("", BSONObj())), CodeWScope);
+        ASSERT_EQUALS(objTypeOf(BSONCodeWScope("", BSONObj())), BSONType::codeWScope);
+        ASSERT_EQUALS(arrTypeOf(BSONCodeWScope("", BSONObj())), BSONType::codeWScope);
 
-        ASSERT_EQUALS(objTypeOf(1), NumberInt);
-        ASSERT_EQUALS(arrTypeOf(1), NumberInt);
+        ASSERT_EQUALS(objTypeOf(1), BSONType::numberInt);
+        ASSERT_EQUALS(arrTypeOf(1), BSONType::numberInt);
 
-        ASSERT_EQUALS(objTypeOf(Timestamp()), bsonTimestamp);
-        ASSERT_EQUALS(arrTypeOf(Timestamp()), bsonTimestamp);
+        ASSERT_EQUALS(objTypeOf(Timestamp()), BSONType::timestamp);
+        ASSERT_EQUALS(arrTypeOf(Timestamp()), BSONType::timestamp);
 
-        ASSERT_EQUALS(objTypeOf(1LL), NumberLong);
-        ASSERT_EQUALS(arrTypeOf(1LL), NumberLong);
+        ASSERT_EQUALS(objTypeOf(1LL), BSONType::numberLong);
+        ASSERT_EQUALS(arrTypeOf(1LL), BSONType::numberLong);
 
-        ASSERT_EQUALS(objTypeOf(mongo::Decimal128("1")), NumberDecimal);
-        ASSERT_EQUALS(arrTypeOf(mongo::Decimal128("1")), NumberDecimal);
+        ASSERT_EQUALS(objTypeOf(mongo::Decimal128("1")), BSONType::numberDecimal);
+        ASSERT_EQUALS(arrTypeOf(mongo::Decimal128("1")), BSONType::numberDecimal);
 
-        ASSERT_EQUALS(objTypeOf(MAXKEY), MaxKey);
-        ASSERT_EQUALS(arrTypeOf(MAXKEY), MaxKey);
+        ASSERT_EQUALS(objTypeOf(MAXKEY), BSONType::maxKey);
+        ASSERT_EQUALS(arrTypeOf(MAXKEY), BSONType::maxKey);
     }
 
     template <typename T>
@@ -1310,7 +1310,7 @@ class DateBuilder {
 public:
     void run() {
         BSONObj o = BSON("" << Date_t::fromMillisSinceEpoch(1234567890));
-        ASSERT(o.firstElement().type() == Date);
+        ASSERT(o.firstElement().type() == BSONType::date);
         ASSERT(o.firstElement().date() == Date_t::fromMillisSinceEpoch(1234567890));
     }
 };
@@ -1325,7 +1325,7 @@ public:
         ASSERT(validateBSON(o).isOK());
 
         BSONElement e = o["now"];
-        ASSERT(e.type() == Date);
+        ASSERT(e.type() == BSONType::date);
         ASSERT(e.date() >= before);
         ASSERT(e.date() <= after);
     }
@@ -1343,7 +1343,7 @@ public:
         ASSERT(validateBSON(o).isOK());
 
         BSONElement e = o["now"];
-        ASSERT_EQUALS(Date, e.type());
+        ASSERT_EQUALS(BSONType::date, e.type());
         ASSERT_EQUALS(aTime, e.date().toTimeT());
     }
 };
@@ -1359,8 +1359,8 @@ public:
 
         BSONElement minElement = min["a"];
         BSONElement maxElement = max["b"];
-        ASSERT(minElement.type() == MinKey);
-        ASSERT(maxElement.type() == MaxKey);
+        ASSERT_EQ(minElement.type(), BSONType::minKey);
+        ASSERT_EQ(maxElement.type(), BSONType::maxKey);
     }
 };
 
@@ -1379,7 +1379,7 @@ public:
     }
 
     void run() {
-        for (int t = 1; t < JSTypeMax; t++) {
+        for (int t = 1; t < stdx::to_underlying(BSONType::jsTypeMax); t++) {
             std::stringstream ss;
             ss << "type: " << t;
             std::string s = ss.str();
@@ -1588,10 +1588,10 @@ struct BSONArrayBuilderTest {
 
         BSONObj o = BSON("obj" << obj << "arr" << arr << "arr2" << BSONArray(obj) << "regex"
                                << BSONRegEx("reg", "x"));
-        ASSERT_EQUALS(o["obj"].type(), Object);
-        ASSERT_EQUALS(o["arr"].type(), Array);
-        ASSERT_EQUALS(o["arr2"].type(), Array);
-        ASSERT_EQUALS(o["regex"].type(), RegEx);
+        ASSERT_EQUALS(o["obj"].type(), BSONType::object);
+        ASSERT_EQUALS(o["arr"].type(), BSONType::array);
+        ASSERT_EQUALS(o["arr2"].type(), BSONType::array);
+        ASSERT_EQUALS(o["regex"].type(), BSONType::regEx);
     }
 };
 
@@ -1606,8 +1606,8 @@ struct ArrayMacroTest {
                                                                  << "qux")));
 
         ASSERT_BSONOBJ_EQ(arr, obj);
-        ASSERT_EQUALS(arr["2"].type(), Object);
-        ASSERT_EQUALS(arr["2"].embeddedObject()["foo"].type(), Array);
+        ASSERT_EQUALS(arr["2"].type(), BSONType::object);
+        ASSERT_EQUALS(arr["2"].embeddedObject()["foo"].type(), BSONType::array);
     }
 };
 
@@ -1953,14 +1953,14 @@ public:
         add<BSONObjTests::Validation::CodeWScopeNoSizeForObj>();
         add<BSONObjTests::Validation::CodeWScopeSmallObjSize>();
         add<BSONObjTests::Validation::CodeWScopeBadObject>();
-        add<BSONObjTests::Validation::NoSize>(Symbol);
-        add<BSONObjTests::Validation::NoSize>(Code);
-        add<BSONObjTests::Validation::NoSize>(String);
-        add<BSONObjTests::Validation::NoSize>(CodeWScope);
-        add<BSONObjTests::Validation::NoSize>(DBRef);
-        add<BSONObjTests::Validation::NoSize>(Object);
-        add<BSONObjTests::Validation::NoSize>(Array);
-        add<BSONObjTests::Validation::NoSize>(BinData);
+        add<BSONObjTests::Validation::NoSize>(BSONType::symbol);
+        add<BSONObjTests::Validation::NoSize>(BSONType::code);
+        add<BSONObjTests::Validation::NoSize>(BSONType::string);
+        add<BSONObjTests::Validation::NoSize>(BSONType::codeWScope);
+        add<BSONObjTests::Validation::NoSize>(BSONType::dbRef);
+        add<BSONObjTests::Validation::NoSize>(BSONType::object);
+        add<BSONObjTests::Validation::NoSize>(BSONType::array);
+        add<BSONObjTests::Validation::NoSize>(BSONType::binData);
         add<OIDTests::init1>();
         add<OIDTests::initParse1>();
         add<OIDTests::append>();

@@ -110,11 +110,11 @@ void visitAllValuesAtPathHelper(const Document& doc,
         // Note we do not expand arrays within arrays this way. For example, {a: [[{b: 1}]]} has no
         // values on the path "a.b", but {a: [{b: 1}]} does.
         for (auto&& subValue : nextValue.getArray()) {
-            if (subValue.getType() == BSONType::Object) {
+            if (subValue.getType() == BSONType::object) {
                 visitAllValuesAtPathHelper(subValue.getDocument(), path, fieldPathIndex, callback);
             }
         }
-    } else if (nextValue.getType() == BSONType::Object) {
+    } else if (nextValue.getType() == BSONType::object) {
         visitAllValuesAtPathHelper(nextValue.getDocument(), path, fieldPathIndex, callback);
     }
 }
@@ -130,13 +130,13 @@ void visitAllValuesAtPath(const Document& doc,
 StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path) {
     invariant(path.getPathLength() > 0);
     Value curValue = doc.getField(path.getFieldName(0));
-    if (curValue.getType() == BSONType::Array) {
+    if (curValue.getType() == BSONType::array) {
         return {ErrorCodes::InternalError, "array along path"};
     }
 
     for (size_t i = 1; i < path.getPathLength(); i++) {
         curValue = curValue[path.getFieldName(i)];
-        if (curValue.getType() == BSONType::Array) {
+        if (curValue.getType() == BSONType::array) {
             return {ErrorCodes::InternalError, "array along path"};
         }
     }

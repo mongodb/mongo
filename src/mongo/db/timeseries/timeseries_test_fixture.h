@@ -161,7 +161,7 @@ protected:
         size_t idxWithDiffMeasurement = static_cast<size_t>(numMeasurements - 1);
         Date_t timeValue = Date_t::now();
         boost::optional<BSONObj> metaValue = boost::none;
-        boost::optional<BSONType> metaValueType = String;
+        boost::optional<BSONType> metaValueType = BSONType::string;
     };
 
     // _generateMeasurementsWithRolloverReason enables us to easily get measurement vectors that
@@ -229,22 +229,29 @@ protected:
     static constexpr StringData _metaValue3 = "c";
     uint64_t _storageCacheSizeBytes = kDefaultStorageCacheSizeBytes;
 
-    const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {bsonTimestamp,
-                                                                        Date,
-                                                                        NumberInt,
-                                                                        NumberLong,
-                                                                        NumberDecimal,
-                                                                        NumberDouble,
-                                                                        jstOID,
-                                                                        Bool,
-                                                                        BinData};
+    const std::vector<BSONType> _nonStringComponentVariableBSONTypes = {BSONType::timestamp,
+                                                                        BSONType::date,
+                                                                        BSONType::numberInt,
+                                                                        BSONType::numberLong,
+                                                                        BSONType::numberDecimal,
+                                                                        BSONType::numberDouble,
+                                                                        BSONType::oid,
+                                                                        BSONType::boolean,
+                                                                        BSONType::binData};
 
-    const std::vector<BSONType> _stringComponentBSONTypes = {
-        Object, Array, RegEx, DBRef, Code, Symbol, CodeWScope, String};
+    const std::vector<BSONType> _stringComponentBSONTypes = {BSONType::object,
+                                                             BSONType::array,
+                                                             BSONType::regEx,
+                                                             BSONType::dbRef,
+                                                             BSONType::code,
+                                                             BSONType::symbol,
+                                                             BSONType::codeWScope,
+                                                             BSONType::string};
 
     // These BSONTypes will always return the same meta value when passed in as the BSONType in
     // _generateMeasurement.
-    const std::vector<BSONType> _constantBSONTypes = {Undefined, MinKey, MaxKey, jstNULL, EOO};
+    const std::vector<BSONType> _constantBSONTypes = {
+        BSONType::undefined, BSONType::minKey, BSONType::maxKey, BSONType::null, BSONType::eoo};
 
     // Strings used to simulate kSize/kCachePressure rollover reason.
     std::string _bigStr = std::string(1000, 'a');

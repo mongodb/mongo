@@ -79,7 +79,7 @@ public:
                                                  const LiteParserOptions& options) {
             uassert(5447000,
                     str::stream() << "$collStats must take a nested object but found: " << specElem,
-                    specElem.type() == BSONType::Object);
+                    specElem.type() == BSONType::object);
             auto spec = DocumentSourceCollStatsSpec::parse(IDLParserContext(kStageName),
                                                            specElem.embeddedObject());
             return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));

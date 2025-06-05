@@ -145,7 +145,7 @@ Value applyFindSliceProjectionToArray(const std::vector<Value>& array,
 
     for (const auto& elem : array) {
         output.push_back(
-            elem.getType() == BSONType::Object
+            elem.getType() == BSONType::object
                 ? applyFindSliceProjectionHelper(elem.getDocument(), params, fieldPathIndex)
                 : elem);
     }
@@ -177,12 +177,12 @@ Value applyFindSliceProjectionHelper(const Document& input,
     Value val{input[fieldName]};
 
     switch (val.getType()) {
-        case BSONType::Array:
+        case BSONType::array:
             val = (fieldPathIndex == params.path.getPathLength())
                 ? sliceArray(val.getArray(), params.skip, params.limit)
                 : applyFindSliceProjectionToArray(val.getArray(), params, fieldPathIndex);
             break;
-        case BSONType::Object:
+        case BSONType::object:
             if (fieldPathIndex < params.path.getPathLength()) {
                 val = applyFindSliceProjectionHelper(val.getDocument(), params, fieldPathIndex);
             }
@@ -231,7 +231,7 @@ Document applyFindPositionalProjection(const Document& preImage,
     // document untouched.
     for (auto [ind, subDoc] = std::pair{0ULL, postImage}; ind < path.getPathLength(); ind++) {
         switch (auto val = subDoc[path.getFieldName(ind)]; val.getType()) {
-            case BSONType::Array: {
+            case BSONType::array: {
                 // Raise an error if we found the first array on the 'path', but the matching array
                 // element index wasn't recorded in the 'details' object. This can happen when the
                 // match expression doesn't conform to the positional projection requirements. E.g.,
@@ -251,7 +251,7 @@ Document applyFindPositionalProjection(const Document& preImage,
                                       Value{std::vector<Value>{matchingElem}});
                 return output.freeze();
             }
-            case BSONType::Object:
+            case BSONType::object:
                 subDoc = val.getDocument();
                 break;
             default:
@@ -284,7 +284,7 @@ Value applyFindElemMatchProjection(const Document& input,
             str::stream()
                 << "$elemMatch projection operator requires an array field, found field of type:"
                 << typeName(val.getType()),
-            val.getType() == BSONType::Array);
+            val.getType() == BSONType::array);
     auto elemMatchKey = details.elemMatchKey();
     tassert(7241708,
             "$elemMatch projection operator couldn't find a matching element in the array",
@@ -303,7 +303,7 @@ Document applyFindSliceProjection(const Document& input,
     auto val = applyFindSliceProjectionHelper(input, params, 0);
     tassert(7241710,
             "output of the slice projection must be an Object",
-            val.getType() == BSONType::Object);
+            val.getType() == BSONType::object);
     return val.getDocument();
 }
 }  // namespace mongo::projection_executor_utils

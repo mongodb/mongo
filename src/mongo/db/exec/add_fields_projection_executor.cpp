@@ -139,7 +139,7 @@ void ProjectionSpecValidator::validate() {
 }
 
 void ProjectionSpecValidator::parseElement(const BSONElement& elem, const FieldPath& pathToElem) {
-    if (elem.type() == BSONType::Object) {
+    if (elem.type() == BSONType::object) {
         parseNestedObject(elem.Obj(), pathToElem);
     } else {
         ensurePathDoesNotConflictOrThrow(pathToElem.fullPath());
@@ -207,7 +207,7 @@ void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
         // The field name might be a dotted path.
         auto fieldPath = FieldPath(elem.fieldNameStringData());
 
-        if (elem.type() == BSONType::Object) {
+        if (elem.type() == BSONType::object) {
             // This is either an expression, or a nested specification.
             if (parseObjectAsExpression(fieldPath, elem.Obj(), _expCtx->variablesParseState)) {
                 // It was an expression.
@@ -266,7 +266,7 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
                 fieldName.find('.') == std::string::npos);
 
         auto currentPath = pathToObj.concat(fieldName);
-        if (elem.type() == BSONType::Object) {
+        if (elem.type() == BSONType::object) {
             // This is either an expression, or a nested specification.
             if (!parseObjectAsExpression(currentPath, elem.Obj(), variablesParseState)) {
                 // It was a nested subobject

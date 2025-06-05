@@ -54,7 +54,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     }
 
     auto viewNameElem = viewDefinition["_id"];
-    valid &= viewNameElem && viewNameElem.type() == BSONType::String;
+    valid &= viewNameElem && viewNameElem.type() == BSONType::string;
 
     auto viewName = NamespaceStringUtil::deserialize(
         dbName.tenantId(), viewNameElem.str(), SerializationContext::stateDefault());
@@ -72,20 +72,20 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     valid &= NamespaceString::validCollectionName(viewNameElem.str());
 
     auto viewOn = viewDefinition["viewOn"];
-    valid &= viewOn && viewOn.type() == BSONType::String;
+    valid &= viewOn && viewOn.type() == BSONType::string;
 
     if (auto pipeline = viewDefinition["pipeline"]) {
-        valid &= pipeline.type() == BSONType::Array;
+        valid &= pipeline.type() == BSONType::array;
         for (auto&& stage : pipeline.Obj()) {
-            valid &= stage.type() == BSONType::Object;
+            valid &= stage.type() == BSONType::object;
         }
     }
 
     auto collation = viewDefinition["collation"];
-    valid &= !collation || collation.type() == BSONType::Object;
+    valid &= !collation || collation.type() == BSONType::object;
 
     auto timeseries = viewDefinition["timeseries"];
-    valid &= !timeseries || timeseries.type() == BSONType::Object;
+    valid &= !timeseries || timeseries.type() == BSONType::object;
 
     uassert(
         ErrorCodes::InvalidViewDefinition,

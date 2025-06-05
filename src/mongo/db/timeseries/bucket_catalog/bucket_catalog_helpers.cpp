@@ -191,7 +191,7 @@ StatusWith<Schema> generateSchemaFromBucketDoc(tracking::Context& trackingContex
 
 StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName) {
     auto timeElem = doc[timeFieldName];
-    if (!timeElem || BSONType::Date != timeElem.type()) {
+    if (!timeElem || BSONType::date != timeElem.type()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "'" << timeFieldName << "' must be present and contain a "
                               << "valid BSON UTC datetime value"};
@@ -225,7 +225,7 @@ StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc
         }
     }
 
-    if (!timeElem || BSONType::Date != timeElem.type()) {
+    if (!timeElem || BSONType::date != timeElem.type()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "'" << timeFieldName << "' must be present and contain a "
                               << "valid BSON UTC datetime value"};

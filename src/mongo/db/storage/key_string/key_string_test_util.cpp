@@ -416,13 +416,13 @@ int compareNumbers(const BSONElement& lhs, const BSONElement& rhs) {
     invariant(lhs.isNumber());
     invariant(rhs.isNumber());
 
-    if (lhs.type() == NumberInt || lhs.type() == NumberLong) {
-        if (rhs.type() == NumberInt || rhs.type() == NumberLong) {
+    if (lhs.type() == BSONType::numberInt || lhs.type() == BSONType::numberLong) {
+        if (rhs.type() == BSONType::numberInt || rhs.type() == BSONType::numberLong) {
             return COMPARE_HELPER(lhs.numberLong(), rhs.numberLong());
         }
         return compareLongToDouble(lhs.numberLong(), rhs.Double());
     } else {  // double
-        if (rhs.type() == NumberDouble) {
+        if (rhs.type() == BSONType::numberDouble) {
             return COMPARE_HELPER(lhs.Double(), rhs.Double());
         }
         return -compareLongToDouble(rhs.numberLong(), lhs.Double());

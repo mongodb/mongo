@@ -48,12 +48,12 @@ IndexHintSpecs parse(boost::optional<TenantId> tenantId,
                      const BSONElement& element,
                      const SerializationContext& context) {
     switch (element.type()) {
-        case BSONType::Object: {
+        case BSONType::object: {
             IDLParserContext parserContext(
                 "IndexHintSpec", boost::none /*vts=*/, tenantId, context);
             return {IndexHintSpec::parse(parserContext, element.Obj())};
         }
-        case BSONType::Array: {
+        case BSONType::array: {
             const auto& elements = element.Array();
             IndexHintSpecs result;
             result.reserve(elements.size());

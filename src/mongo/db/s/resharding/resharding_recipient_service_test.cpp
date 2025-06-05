@@ -1614,7 +1614,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
         ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
             << op.getEntry();
         ASSERT_EQ(*op.getUuid(), doc.getReshardingUUID()) << op.getEntry();
-        ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+        ASSERT_EQ(op.getObject()["msg"].type(), BSONType::string) << op.getEntry();
         ASSERT_TRUE(receivedChangeEvent == expectedChangeEvent);
         ASSERT_TRUE(op.getFromMigrate());
         ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
@@ -1671,7 +1671,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryForImplicitShardColle
             << shardCollectionOp.getEntry();
         ASSERT_EQ(*shardCollectionOp.getUuid(), doc.getReshardingUUID())
             << shardCollectionOp.getEntry();
-        ASSERT_EQ(shardCollectionOp.getObject()["msg"].type(), BSONType::Object)
+        ASSERT_EQ(shardCollectionOp.getObject()["msg"].type(), BSONType::object)
             << shardCollectionOp.getEntry();
         ASSERT_FALSE(shardCollectionOp.getFromMigrate());
 

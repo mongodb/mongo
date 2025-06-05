@@ -580,7 +580,7 @@ Status insertDocuments(OperationContext* opCtx,
             // If the failpoint specifies no collection or matches the existing one, hang.
             return (fpNss.isEmpty() || nss == fpNss) &&
                 (!firstIdElem ||
-                 (begin != end && firstIdElem.type() == mongo::String &&
+                 (begin != end && firstIdElem.type() == BSONType::string &&
                   begin->doc["_id"].str() == firstIdElem.str()));
         });
 

@@ -1297,7 +1297,8 @@ void RunCommandAndWaitForWriteConcern::_waitForWriteConcern(BSONObjBuilder& bb) 
         MONGO_unlikely(scoped.isActive())) {
         const BSONObj& data = scoped.getData();
         bb.append(data["writeConcernError"]);
-        if (data.hasField(kErrorLabelsFieldName) && data[kErrorLabelsFieldName].type() == Array) {
+        if (data.hasField(kErrorLabelsFieldName) &&
+            data[kErrorLabelsFieldName].type() == BSONType::array) {
             // Propagate error labels specified in the failCommand failpoint to the
             // OperationContext decoration to override getErrorLabels() behaviors.
             invariant(!errorLabelsOverride(opCtx));

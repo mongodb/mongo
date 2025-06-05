@@ -32,6 +32,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/column/simple8b.h"
 #include "mongo/platform/int128.h"
+#include "mongo/stdx/utility.h"
 
 namespace mongo::bsoncolumn {
 static constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
@@ -41,7 +42,8 @@ static constexpr uint8_t kInvalidScaleIndex = 0xFF;
 static constexpr uint8_t kInvalidControlByte = 0xFE;
 
 inline bool isUncompressedLiteralControlByte(uint8_t control) {
-    return (control & 0xE0) == 0 || control == (uint8_t)MinKey || control == (uint8_t)MaxKey;
+    return (control & 0xE0) == 0 || control == (uint8_t)stdx::to_underlying(BSONType::minKey) ||
+        control == (uint8_t)stdx::to_underlying(BSONType::maxKey);
 }
 
 inline bool isInterleavedStartControlByte(char control) {
@@ -50,8 +52,8 @@ inline bool isInterleavedStartControlByte(char control) {
 }
 
 inline bool isSimple8bControlByte(uint8_t control) {
-    return control != EOO && !isUncompressedLiteralControlByte(control) &&
-        !isInterleavedStartControlByte(control);
+    return control != stdx::to_underlying(BSONType::eoo) &&
+        !isUncompressedLiteralControlByte(control) && !isInterleavedStartControlByte(control);
 }
 
 inline uint8_t numSimple8bBlocksForControlByte(uint8_t control) {
@@ -107,17 +109,19 @@ int64_t expandDelta(int64_t prev, int64_t delta);
 int128_t expandDelta(int128_t prev, int128_t delta);
 
 inline bool usesDeltaOfDelta(BSONType type) {
-    return type == jstOID || type == Date || type == bsonTimestamp;
+    return type == BSONType::oid || type == BSONType::date || type == BSONType::timestamp;
 }
 
 inline bool onlyZeroDelta(BSONType type) {
-    return type == RegEx || type == DBRef || type == CodeWScope || type == Symbol ||
-        type == Object || type == Array || type == jstNULL || type == Undefined || type == MinKey ||
-        type == MaxKey;
+    return type == BSONType::regEx || type == BSONType::dbRef || type == BSONType::codeWScope ||
+        type == BSONType::symbol || type == BSONType::object || type == BSONType::array ||
+        type == BSONType::null || type == BSONType::undefined || type == BSONType::minKey ||
+        type == BSONType::maxKey;
 }
 
 inline bool uses128bit(BSONType type) {
-    return type == NumberDecimal || type == BinData || type == String || type == Code;
+    return type == BSONType::numberDecimal || type == BSONType::binData ||
+        type == BSONType::string || type == BSONType::code;
 }
 
 inline int64_t calcDelta(int64_t val, int64_t prev) {

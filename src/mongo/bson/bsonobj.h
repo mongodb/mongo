@@ -622,7 +622,7 @@ public:
      */
     const char* firstElementFieldName() const {
         const char* p = objdata() + 4;
-        return *p == EOO ? "" : p + 1;
+        return *p == stdx::to_underlying(BSONType::eoo) ? "" : p + 1;
     }
 
     StringData firstElementFieldNameStringData() const {

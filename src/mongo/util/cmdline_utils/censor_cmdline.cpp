@@ -154,15 +154,15 @@ void censorBSONObjRecursive(const BSONObj& params,          // Object we are cen
         std::string dottedName = (parentPath.empty() ? param.fieldName()
                                       : isArray      ? parentPath
                                                      : parentPath + '.' + param.fieldName());
-        if (param.type() == Array) {
+        if (param.type() == BSONType::array) {
             BSONObjBuilder subArray(result->subarrayStart(param.fieldName()));
             censorBSONObjRecursive(param.Obj(), dottedName, true, &subArray);
             subArray.done();
-        } else if (param.type() == Object) {
+        } else if (param.type() == BSONType::object) {
             BSONObjBuilder subObj(result->subobjStart(param.fieldName()));
             censorBSONObjRecursive(param.Obj(), dottedName, false, &subObj);
             subObj.done();
-        } else if (param.type() == String) {
+        } else if (param.type() == BSONType::string) {
             if (_isPasswordArgument(dottedName.c_str())) {
                 result->append(param.fieldName(), "<password>");
             } else {

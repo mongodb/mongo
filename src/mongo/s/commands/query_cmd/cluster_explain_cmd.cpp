@@ -191,8 +191,9 @@ BSONObj makeExplainedObj(const BSONObj& outerObj,
                          const DatabaseName& dbName,
                          const SerializationContext& serializationContext) {
     const auto& first = outerObj.firstElement();
-    uassert(
-        ErrorCodes::BadValue, "explain command requires a nested object", first.type() == Object);
+    uassert(ErrorCodes::BadValue,
+            "explain command requires a nested object",
+            first.type() == BSONType::object);
     const BSONObj& innerObj = first.Obj();
 
     if (auto innerDb = innerObj["$db"]) {

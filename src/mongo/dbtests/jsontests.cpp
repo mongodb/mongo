@@ -1194,9 +1194,9 @@ TEST(FromJsonTest, NumericTypes) {
         for (const auto& json : altReps) {
             checkEquivalence(json, obj);
             BSONObj o = fromjson(json);
-            ASSERT(o["int"].type() == NumberInt);
-            ASSERT(o["long"].type() == NumberLong);
-            ASSERT(o["double"].type() == NumberDouble);
+            ASSERT(o["int"].type() == BSONType::numberInt);
+            ASSERT(o["long"].type() == BSONType::numberLong);
+            ASSERT(o["double"].type() == BSONType::numberDouble);
             ASSERT(o["long"].numberLong() == val.l);
         }
     }
@@ -1249,10 +1249,10 @@ TEST(FromJsonTest, EmbeddedDates) {
     for (const auto& format : formats) {
         const std::string json = fmt::sprintf(format, kMin, kMax);
         BSONObj o = fromjson(json);
-        ASSERT_EQUALS(3, (o["time.valid"].type()));
+        ASSERT_EQUALS(3, stdx::to_underlying(o["time.valid"].type()));
         BSONObj e = o["time.valid"].embeddedObjectUserCheck();
-        ASSERT_EQUALS(9, e["$gt"].type());
-        ASSERT_EQUALS(9, e["$lt"].type());
+        ASSERT_EQUALS(9, stdx::to_underlying(e["$gt"].type()));
+        ASSERT_EQUALS(9, stdx::to_underlying(e["$lt"].type()));
         checkEquivalence(json, bson);
     }
 }

@@ -67,7 +67,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::crea
                           << " field is required and must be a string",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kKeyFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kKeyFieldName].type() ==
-                    BSONType::String);
+                    BSONType::string);
     uassert(5874501,
             str::stream() << DocumentSourceInternalGeoNearDistance::kNearFieldName
                           << " field is required and must be an object or array",
@@ -78,7 +78,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::crea
                           << " field is required and must be a string",
             obj.hasField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName) &&
                 obj[DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName].type() ==
-                    BSONType::String);
+                    BSONType::string);
     uassert(
         5874503,
         str::stream() << DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName

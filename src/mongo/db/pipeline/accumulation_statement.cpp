@@ -84,7 +84,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     auto fieldName = elem.fieldNameStringData();
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",
-            elem.type() == BSONType::Object &&
+            elem.type() == BSONType::object &&
                 elem.embeddedObject().firstElementFieldName()[0] == '$');
 
     uassert(40235,
@@ -104,7 +104,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
     auto accName = specElem.fieldNameStringData();
     uassert(40237,
             str::stream() << "The " << accName << " accumulator is a unary operator",
-            specElem.type() != BSONType::Array);
+            specElem.type() != BSONType::array);
 
     auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
         AccumulationStatement::getParser(accName);

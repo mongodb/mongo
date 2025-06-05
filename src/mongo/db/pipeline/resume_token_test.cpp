@@ -232,8 +232,8 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     auto rtNoTypeBitsData = ResumeToken::parse(noTypeBitsDoc).getData();
     ASSERT_EQ(hasTypeBitsData, rtHasTypeBitsData);
     ASSERT_EQ(noTypeBitsData, rtNoTypeBitsData);
-    ASSERT_EQ(BSONType::NumberDouble, rtHasTypeBitsData.eventIdentifier["_id"].getType());
-    ASSERT_EQ(BSONType::NumberInt, rtNoTypeBitsData.eventIdentifier["_id"].getType());
+    ASSERT_EQ(BSONType::numberDouble, rtHasTypeBitsData.eventIdentifier["_id"].getType());
+    ASSERT_EQ(BSONType::numberInt, rtNoTypeBitsData.eventIdentifier["_id"].getType());
 }
 
 TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {

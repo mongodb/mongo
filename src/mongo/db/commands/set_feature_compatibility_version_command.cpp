@@ -281,11 +281,11 @@ void handleDropPendingDBsGarbage(OperationContext* parentOpCtx) {
                 const auto bsonVersion = batch[0][DatabaseType::kVersionFieldName];
                 tassert(10291400,
                         "The version field is expected to exist and be an object",
-                        bsonVersion.type() == BSONType::Object);
+                        bsonVersion.type() == BSONType::object);
                 const BSONElement bsonTimestamp = bsonVersion[DatabaseVersion::kTimestampFieldName];
                 tassert(10291401,
                         "The timestamp field is expected to exist and be a timestamp",
-                        bsonTimestamp.type() == BSONType::bsonTimestamp);
+                        bsonTimestamp.type() == BSONType::timestamp);
                 timestamp = bsonTimestamp.timestamp();
                 return true;
             }));

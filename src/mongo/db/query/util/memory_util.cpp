@@ -47,12 +47,12 @@ namespace mongo::memory_util {
 
 MemorySize MemorySize::parseFromBSON(const BSONElement& element) {
     switch (element.type()) {
-        case String:
+        case BSONType::string:
             return uassertStatusOK(parse(element.str()));
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
-        case NumberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
             return {element.safeNumberDouble(), MemoryUnits::kBytes};
         default:
             uasserted(ErrorCodes::InvalidBSONType,

@@ -51,7 +51,7 @@ Status validateStorageEngineOptions(const BSONObj& storageEngine) {
     //     ...
     // }
     for (auto&& elem : storageEngine) {
-        if (elem.type() != mongo::Object) {
+        if (elem.type() != BSONType::object) {
             return {ErrorCodes::BadValue,
                     str::stream() << "'storageEngine." << elem.fieldName()
                                   << "' must be an embedded document"};

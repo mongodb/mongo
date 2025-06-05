@@ -221,7 +221,7 @@ TEST_F(SimpleDoc, NotCommonPrefix) {
     ASSERT_OK(firstNewElem);
     ASSERT_EQUALS(firstNewElem.getValue().compareWithElement(root()["b"], nullptr), 0);
     ASSERT_EQUALS(newElem.getFieldName(), "b");
-    ASSERT_EQUALS(newElem.getType(), NumberInt);
+    ASSERT_EQUALS(newElem.getType(), BSONType::numberInt);
     ASSERT_TRUE(newElem.hasValue());
     ASSERT_EQUALS(newElem.getValueInt(), 1);
 
@@ -574,7 +574,7 @@ TEST_F(ArrayDoc, ExcessivePaddingNotRequestedIfArrayAlreadyPadded) {
     for (size_t i = 0; i < 5; ++i) {
         Element arrayA = doc().root().leftChild();
         ASSERT_EQ(arrayA.getFieldName(), "a");
-        ASSERT_EQ(arrayA.getType(), mongo::Array);
+        ASSERT_EQ(arrayA.getType(), mongo::BSONType::array);
         arrayA.appendInt("", 1).transitional_ignore();
     }
 

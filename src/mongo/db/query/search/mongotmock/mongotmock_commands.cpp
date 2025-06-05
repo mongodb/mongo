@@ -143,7 +143,7 @@ private:
             BSONElement cursorsArrayElem = cmdResponsePair.response.getField("cursors");
             uassert(6253508,
                     "Cursors field in response must be an array",
-                    cursorsArrayElem.type() == BSONType::Array);
+                    cursorsArrayElem.type() == BSONType::array);
             auto cursorsArray = cursorsArrayElem.Array();
             uassert(
                 6253509, "Cursors field must have exactly two cursors", cursorsArray.size() == 2);
@@ -311,7 +311,7 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 "cursorId should be type NumberLong",
-                cmdObj["cursorId"].type() == BSONType::NumberLong);
+                cmdObj["cursorId"].type() == BSONType::numberLong);
         const CursorId id = cmdObj["cursorId"].Long();
         uassert(ErrorCodes::InvalidOptions, "cursorId may not equal 0", id != 0);
 
@@ -367,32 +367,32 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 "cursorId should be type NumberLong",
-                cmdObj["cursorId"].type() == BSONType::NumberLong);
+                cmdObj["cursorId"].type() == BSONType::numberLong);
         const CursorId id = cmdObj["cursorId"].Long();
         uassert(ErrorCodes::InvalidOptions, "cursorId may not equal 0", id != 0);
 
         uassert(ErrorCodes::InvalidOptions,
                 "'history' should be of type Array",
-                cmdObj["history"].type() == BSONType::Array);
+                cmdObj["history"].type() == BSONType::array);
 
         std::deque<mongotmock::MockedResponse> mockedResponses;
 
         for (auto&& cmdResponsePair : cmdObj["history"].embeddedObject()) {
             uassert(ErrorCodes::InvalidOptions,
                     "Each element of 'history' should be an object",
-                    cmdResponsePair.type() == BSONType::Object);
+                    cmdResponsePair.type() == BSONType::object);
             uassert(ErrorCodes::InvalidOptions,
                     "Each element of 'history' should have an 'expectedCommand' "
                     "field of type object",
-                    cmdResponsePair["expectedCommand"].type() == BSONType::Object);
+                    cmdResponsePair["expectedCommand"].type() == BSONType::object);
             uassert(ErrorCodes::InvalidOptions,
                     "Each element of 'history' should have a 'response' field of "
                     "type object",
-                    cmdResponsePair["response"].type() == BSONType::Object);
+                    cmdResponsePair["response"].type() == BSONType::object);
             if (cmdResponsePair.Obj().hasField("maybeUnused")) {
                 uassert(ErrorCodes::InvalidOptions,
                         "The 'maybeUnused' field must be a boolean",
-                        cmdResponsePair["maybeUnused"].type() == BSONType::Bool);
+                        cmdResponsePair["maybeUnused"].type() == BSONType::boolean);
             }
 
             mockedResponses.push_back({

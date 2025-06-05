@@ -562,7 +562,7 @@ TEST(ArrayAPI, SimpleNumericArray) {
 
 DEATH_TEST_REGEX(ArrayAPI,
                  FindFirstChildNamedOnDeserializedArray,
-                 R"#(Invariant failure.*getType\(\) != BSONType::Array)#") {
+                 R"#(Invariant failure.*getType\(\) != BSONType::array)#") {
     mmb::Document doc;
     auto array = doc.makeElementArray("a");
     auto elem0 = doc.makeElementInt("", 0);
@@ -572,7 +572,7 @@ DEATH_TEST_REGEX(ArrayAPI,
 
 DEATH_TEST_REGEX(ArrayAPI,
                  FindFirstChildNamedOnSerializedArray,
-                 R"#(Invariant failure.*getType\(\) != BSONType::Array)#") {
+                 R"#(Invariant failure.*getType\(\) != BSONType::array)#") {
     auto obj = fromjson("{a: [0, 1]}");
     mmb::Document doc(obj);
     auto rootElem = doc.root();
@@ -586,34 +586,34 @@ TEST(Element, setters) {
     mmb::Element t0 = doc.makeElementNull("t0");
 
     t0.setValueBool(true).transitional_ignore();
-    ASSERT_EQUALS(mongo::Bool, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::boolean, t0.getType());
 
     t0.setValueInt(12345).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberInt, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::numberInt, t0.getType());
 
     t0.setValueLong(12345LL).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberLong, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::numberLong, t0.getType());
 
     t0.setValueTimestamp(mongo::Timestamp()).transitional_ignore();
-    ASSERT_EQUALS(mongo::bsonTimestamp, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::timestamp, t0.getType());
 
     t0.setValueDate(mongo::Date_t::fromMillisSinceEpoch(12345LL)).transitional_ignore();
-    ASSERT_EQUALS(mongo::Date, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::date, t0.getType());
 
     t0.setValueDouble(123.45).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberDouble, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::numberDouble, t0.getType());
 
     t0.setValueDecimal(mongo::Decimal128("123.45E1234")).transitional_ignore();
-    ASSERT_EQUALS(mongo::NumberDecimal, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::numberDecimal, t0.getType());
 
     t0.setValueOID(mongo::OID("47cc67093475061e3d95369d")).transitional_ignore();
-    ASSERT_EQUALS(mongo::jstOID, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::oid, t0.getType());
 
     t0.setValueRegex("[a-zA-Z]?", "").transitional_ignore();
-    ASSERT_EQUALS(mongo::RegEx, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::regEx, t0.getType());
 
     t0.setValueString("foo bar baz").transitional_ignore();
-    ASSERT_EQUALS(mongo::String, t0.getType());
+    ASSERT_EQUALS(mongo::BSONType::string, t0.getType());
 }
 
 TEST(Element, toString) {
@@ -859,7 +859,7 @@ TEST(Documentation, Example1) {
     // Get the root of the document.
     mmb::Element root = doc.root();
 
-    // Create a new mongo::NumberInt typed Element to represent life, the universe, and
+    // Create a new mongo::BSONType::numberInt typed Element to represent life, the universe, and
     // everything, then push that Element into the root object, making it a child of root.
     mmb::Element e0 = doc.makeElementInt("ltuae", 42);
     ASSERT_OK(root.pushBack(e0));
@@ -871,13 +871,13 @@ TEST(Documentation, Example1) {
     ASSERT_OK(root.pushBack(e1));
     ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : {} }"), doc.getObject());
 
-    // Create a new mongo::NumberDouble typed Element to represent Pi, and insert it as child
-    // of the new object we just created.
+    // Create a new mongo::BSONType::numberDouble typed Element to represent Pi, and insert it as
+    // child of the new object we just created.
     mmb::Element e3 = doc.makeElementDouble("pi", 3.14);
     ASSERT_OK(e1.pushBack(e3));
     ASSERT_BSONOBJ_EQ(mongo::fromjson("{ ltuae : 42, magic : { pi : 3.14 } }"), doc.getObject());
 
-    // Create a new mongo::NumberDouble to represent Plancks constant in electrovolt
+    // Create a new mongo::BSONType::numberDouble to represent Plancks constant in electrovolt
     // micrometers, and add it as a child of the 'magic' object.
     mmb::Element e4 = doc.makeElementDouble("hbar", 1.239);
     ASSERT_OK(e1.pushBack(e4));
@@ -1090,7 +1090,7 @@ TEST(Document, LifecycleConstructDefault) {
     mmb::Document doc;
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(BSONType::object));
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
     ASSERT_FALSE(doc.root().leftChild().ok());
@@ -1106,7 +1106,7 @@ TEST(Document, LifecycleConstructEmptyBSONObj) {
     mmb::Document doc(obj);
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(BSONType::object));
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
     ASSERT_FALSE(doc.root().leftChild().ok());
@@ -1124,7 +1124,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     // Check the state of the root.
     ASSERT_TRUE(doc.root().ok());
     ASSERT_TRUE(const_cast<const mmb::Document&>(doc).root().ok());
-    ASSERT_TRUE(doc.root().isType(mongo::Object));
+    ASSERT_TRUE(doc.root().isType(BSONType::object));
     ASSERT_FALSE(doc.root().parent().ok());
     ASSERT_FALSE(doc.root().leftSibling().ok());
     ASSERT_FALSE(doc.root().rightSibling().ok());
@@ -1140,7 +1140,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e1Child.rightChild().ok());
 
     // Check the type, name, and value of 'e1'.
-    ASSERT_TRUE(e1Child.isType(mongo::NumberInt));
+    ASSERT_TRUE(e1Child.isType(BSONType::numberInt));
     ASSERT_EQUALS("e1", e1Child.getFieldName());
     ASSERT_TRUE(e1Child.hasValue());
     ASSERT_EQUALS(int32_t(1), e1Child.getValueInt());
@@ -1156,7 +1156,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e2Child.rightChild().ok());
 
     // Check the type, name and value of 'e2'.
-    ASSERT_TRUE(e2Child.isType(mongo::String));
+    ASSERT_TRUE(e2Child.isType(BSONType::string));
     ASSERT_EQUALS("e2", e2Child.getFieldName());
     ASSERT_TRUE(e2Child.hasValue());
     ASSERT_EQUALS("hello", e2Child.getValueString());
@@ -1172,7 +1172,7 @@ TEST(Document, LifecycleConstructSimpleBSONObj) {
     ASSERT_FALSE(e2Child.rightChild().ok());
 
     // Check the type, name and value of 'e3'.
-    ASSERT_TRUE(e3Child.isType(mongo::Bool));
+    ASSERT_TRUE(e3Child.isType(BSONType::boolean));
     ASSERT_EQUALS("e3", e3Child.getFieldName());
     ASSERT_TRUE(e3Child.hasValue());
     ASSERT_EQUALS(false, e3Child.getValueBool());
@@ -1270,17 +1270,17 @@ TEST(Document, ArrayIndexedAccessFromJson) {
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS("a", a.getFieldName());
-    ASSERT_EQUALS(mongo::NumberInt, a.getType());
+    ASSERT_EQUALS(BSONType::numberInt, a.getType());
 
     mmb::Element b = a.rightSibling();
     ASSERT_TRUE(b.ok());
     ASSERT_EQUALS("b", b.getFieldName());
-    ASSERT_EQUALS(mongo::Array, b.getType());
+    ASSERT_EQUALS(BSONType::array, b.getType());
 
     mmb::Element b0 = b[0];
     ASSERT_TRUE(b0.ok());
     ASSERT_EQUALS("0", b0.getFieldName());
-    ASSERT_EQUALS(mongo::Object, b0.getType());
+    ASSERT_EQUALS(BSONType::object, b0.getType());
 }
 
 TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
@@ -1301,17 +1301,17 @@ TEST(Document, ArrayIndexedAccessFromManuallyBuilt) {
     mmb::Element a = doc.root().leftChild();
     ASSERT_TRUE(a.ok());
     ASSERT_EQUALS("a", a.getFieldName());
-    ASSERT_EQUALS(mongo::NumberInt, a.getType());
+    ASSERT_EQUALS(BSONType::numberInt, a.getType());
 
     mmb::Element b = a.rightSibling();
     ASSERT_TRUE(b.ok());
     ASSERT_EQUALS("b", b.getFieldName());
-    ASSERT_EQUALS(mongo::Array, b.getType());
+    ASSERT_EQUALS(BSONType::array, b.getType());
 
     mmb::Element b0 = b[0];
     ASSERT_TRUE(b0.ok());
     ASSERT_EQUALS("ignored", b0.getFieldName());
-    ASSERT_EQUALS(mongo::Object, b0.getType());
+    ASSERT_EQUALS(BSONType::object, b0.getType());
 }
 
 TEST(Document, EndElement) {
@@ -1661,7 +1661,7 @@ TEST(Document, CreateElementFromBSONElement) {
 
     mmb::Element newElem = doc.root()["a"];
     ASSERT_TRUE(newElem.ok());
-    ASSERT_EQUALS(newElem.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(newElem.getType(), mongo::BSONType::numberInt);
     ASSERT_EQUALS(newElem.getValueInt(), 1);
 }
 
@@ -1876,7 +1876,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberDouble);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::numberDouble);
 
     mmb::Document doc;
 
@@ -1884,7 +1884,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     ASSERT_OK(doc.root().appendDouble(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::numberDouble);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDouble());
 
@@ -1892,7 +1892,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::numberDouble);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1900,7 +1900,7 @@ TEST(TypeSupport, EncodingEquivalenceDouble) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDouble(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberDouble);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::numberDouble);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1916,7 +1916,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::String);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::string);
 
     mmb::Document doc;
 
@@ -1924,7 +1924,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     ASSERT_OK(doc.root().appendString(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::String);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::string);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueString());
 
@@ -1932,7 +1932,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::String);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::string);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1940,7 +1940,7 @@ TEST(TypeSupport, EncodingEquivalenceString) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueString(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::String);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::string);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1956,7 +1956,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Object);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::object);
 
     mmb::Document doc;
 
@@ -1964,7 +1964,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_OK(doc.root().appendObject(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Object);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::object);
     ASSERT_TRUE(a.hasValue());
     ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueObject());
 
@@ -1972,7 +1972,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Object);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::object);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -1980,7 +1980,7 @@ TEST(TypeSupport, EncodingEquivalenceObject) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueObject(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Object);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::object);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -1997,7 +1997,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Array);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::array);
 
     mmb::Document doc;
 
@@ -2005,7 +2005,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_OK(doc.root().appendArray(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Array);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::array);
     ASSERT_TRUE(a.hasValue());
     ASSERT_BSONOBJ_EQ(value1, mmb::ConstElement(a).getValueArray());
 
@@ -2013,7 +2013,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Array);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::array);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2021,7 +2021,7 @@ TEST(TypeSupport, EncodingEquivalenceArray) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueArray(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Array);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::array);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2053,7 +2053,7 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     builder.appendBinData(name, sizeof(value2), value1, &value2[0]);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::BinData);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::binData);
 
     mmb::Document doc;
 
@@ -2061,14 +2061,14 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     ASSERT_OK(doc.root().appendBinary(name, sizeof(value2), value1, &value2[0]));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::BinData);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::binData);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::BinData);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::binData);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2076,7 +2076,7 @@ TEST(TypeSupport, EncodingEquivalenceBinary) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueBinary(sizeof(value2), value1, &value2[0]).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::BinData);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::binData);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2091,7 +2091,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     builder.appendUndefined(name);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Undefined);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::undefined);
 
     mmb::Document doc;
 
@@ -2099,7 +2099,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     ASSERT_OK(doc.root().appendUndefined(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Undefined);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::undefined);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueUndefined());
 
@@ -2107,7 +2107,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Undefined);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::undefined);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2115,7 +2115,7 @@ TEST(TypeSupport, EncodingEquivalenceUndefined) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueUndefined().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Undefined);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::undefined);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2131,7 +2131,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::jstOID);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::oid);
 
     mmb::Document doc;
 
@@ -2139,7 +2139,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     ASSERT_OK(doc.root().appendOID(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::jstOID);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::oid);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueOID());
 
@@ -2147,7 +2147,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::jstOID);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::oid);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2155,7 +2155,7 @@ TEST(TypeSupport, EncodingEquivalenceOID) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueOID(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::jstOID);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::oid);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2171,7 +2171,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Bool);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::boolean);
 
     mmb::Document doc;
 
@@ -2179,7 +2179,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     ASSERT_OK(doc.root().appendBool(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Bool);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::boolean);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueBool());
 
@@ -2187,7 +2187,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Bool);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::boolean);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2195,7 +2195,7 @@ TEST(TypeSupport, EncodingEquivalenceBoolean) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueBool(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Bool);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::boolean);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2211,7 +2211,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Date);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::date);
 
     mmb::Document doc;
 
@@ -2219,7 +2219,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     ASSERT_OK(doc.root().appendDate(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Date);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::date);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueDate());
 
@@ -2227,7 +2227,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Date);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::date);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2235,7 +2235,7 @@ TEST(TypeSupport, EncodingEquivalenceDate) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDate(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Date);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::date);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2250,7 +2250,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     builder.appendNull(name);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::jstNULL);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::null);
 
     mmb::Document doc;
 
@@ -2258,7 +2258,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     ASSERT_OK(doc.root().appendNull(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::null);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueNull());
 
@@ -2266,7 +2266,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::null);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2274,7 +2274,7 @@ TEST(TypeSupport, EncodingEquivalenceNull) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueNull().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::jstNULL);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::null);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2291,7 +2291,7 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     builder.appendRegex(name, value1, value2);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::RegEx);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::regEx);
 
     mmb::Document doc;
 
@@ -2299,14 +2299,14 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     ASSERT_OK(doc.root().appendRegex(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::RegEx);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::regEx);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::RegEx);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::regEx);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2314,7 +2314,7 @@ TEST(TypeSupport, EncodingEquivalenceRegex) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueRegex(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::RegEx);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::regEx);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2331,7 +2331,7 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     builder.appendDBRef(name, value1, value2);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::DBRef);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::dbRef);
 
     mmb::Document doc;
 
@@ -2339,14 +2339,14 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     ASSERT_OK(doc.root().appendDBRef(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::DBRef);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::dbRef);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::DBRef);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::dbRef);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2354,7 +2354,7 @@ TEST(TypeSupport, EncodingEquivalenceDBRef) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDBRef(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::DBRef);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::dbRef);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2370,7 +2370,7 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     builder.appendCode(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Code);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::code);
 
     mmb::Document doc;
 
@@ -2378,14 +2378,14 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     ASSERT_OK(doc.root().appendCode(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Code);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::code);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Code);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::code);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2393,7 +2393,7 @@ TEST(TypeSupport, EncodingEquivalenceCode) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueCode(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Code);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::code);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2409,7 +2409,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     builder.appendSymbol(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::Symbol);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::symbol);
 
     mmb::Document doc;
 
@@ -2417,7 +2417,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     ASSERT_OK(doc.root().appendSymbol(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::Symbol);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::symbol);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueSymbol());
 
@@ -2425,7 +2425,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::Symbol);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::symbol);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2433,7 +2433,7 @@ TEST(TypeSupport, EncodingEquivalenceSymbol) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueSymbol(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::Symbol);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::symbol);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2450,7 +2450,7 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     builder.appendCodeWScope(name, value1, value2);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::CodeWScope);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::codeWScope);
 
     mmb::Document doc;
 
@@ -2458,14 +2458,14 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     ASSERT_OK(doc.root().appendCodeWithScope(name, value1, value2));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::codeWScope);
     ASSERT_TRUE(a.hasValue());
 
     // Construct via call passing BSON element
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::codeWScope);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2473,7 +2473,7 @@ TEST(TypeSupport, EncodingEquivalenceCodeWithScope) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueCodeWithScope(value1, value2).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::CodeWScope);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::codeWScope);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2489,7 +2489,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberInt);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::numberInt);
 
     mmb::Document doc;
 
@@ -2497,7 +2497,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     ASSERT_OK(doc.root().appendInt(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::numberInt);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueInt());
 
@@ -2505,7 +2505,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::numberInt);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2513,7 +2513,7 @@ TEST(TypeSupport, EncodingEquivalenceInt) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueInt(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberInt);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::numberInt);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2529,7 +2529,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::bsonTimestamp);
+    ASSERT_TRUE(thing.type() == BSONType::timestamp);
 
     mmb::Document doc;
 
@@ -2537,7 +2537,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     ASSERT_OK(doc.root().appendTimestamp(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(a.getType(), BSONType::timestamp);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(value1 == mmb::ConstElement(a).getValueTimestamp());
 
@@ -2545,7 +2545,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(b.getType(), BSONType::timestamp);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2553,7 +2553,7 @@ TEST(TypeSupport, EncodingEquivalenceTimestamp) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueTimestamp(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::bsonTimestamp);
+    ASSERT_EQUALS(c.getType(), BSONType::timestamp);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2569,7 +2569,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberLong);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::numberLong);
 
     mmb::Document doc;
 
@@ -2577,7 +2577,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     ASSERT_OK(doc.root().appendLong(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::numberLong);
     ASSERT_TRUE(a.hasValue());
     ASSERT_EQUALS(value1, mmb::ConstElement(a).getValueLong());
 
@@ -2585,7 +2585,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::numberLong);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2593,7 +2593,7 @@ TEST(TypeSupport, EncodingEquivalenceLong) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueLong(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberLong);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::numberLong);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2609,7 +2609,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     builder.append(name, value1);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::NumberDecimal);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::numberDecimal);
 
     mmb::Document doc;
 
@@ -2617,7 +2617,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     ASSERT_OK(doc.root().appendDecimal(name, value1));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::numberDecimal);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(value1.isEqual(mmb::ConstElement(a).getValueDecimal()));
 
@@ -2625,7 +2625,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::numberDecimal);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call
@@ -2633,7 +2633,7 @@ TEST(TypeSupport, EncodingEquivalenceDecimal) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueDecimal(value1).transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::NumberDecimal);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::numberDecimal);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2648,7 +2648,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     builder.appendMinKey(name);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::MinKey);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::minKey);
 
     mmb::Document doc;
 
@@ -2656,7 +2656,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     ASSERT_OK(doc.root().appendMinKey(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::MinKey);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::minKey);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueMinKey());
 
@@ -2664,7 +2664,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::MinKey);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::minKey);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2672,7 +2672,7 @@ TEST(TypeSupport, EncodingEquivalenceMinKey) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueMinKey().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::MinKey);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::minKey);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2687,7 +2687,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     builder.appendMaxKey(name);
     mongo::BSONObj source = builder.done();
     const mongo::BSONElement thing = source.firstElement();
-    ASSERT_TRUE(thing.type() == mongo::MaxKey);
+    ASSERT_TRUE(thing.type() == mongo::BSONType::maxKey);
 
     mmb::Document doc;
 
@@ -2695,7 +2695,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_OK(doc.root().appendMaxKey(name));
     mmb::Element a = doc.root().rightChild();
     ASSERT_TRUE(a.ok());
-    ASSERT_EQUALS(a.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(a.getType(), mongo::BSONType::maxKey);
     ASSERT_TRUE(a.hasValue());
     ASSERT_TRUE(mmb::ConstElement(a).isValueMaxKey());
 
@@ -2703,7 +2703,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     ASSERT_OK(doc.root().appendElement(thing));
     mmb::Element b = doc.root().rightChild();
     ASSERT_TRUE(b.ok());
-    ASSERT_EQUALS(b.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(b.getType(), mongo::BSONType::maxKey);
     ASSERT_TRUE(b.hasValue());
 
     // Construct via setValue call.
@@ -2711,7 +2711,7 @@ TEST(TypeSupport, EncodingEquivalenceMaxKey) {
     mmb::Element c = doc.root().rightChild();
     ASSERT_TRUE(c.ok());
     c.setValueMaxKey().transitional_ignore();
-    ASSERT_EQUALS(c.getType(), mongo::MaxKey);
+    ASSERT_EQUALS(c.getType(), mongo::BSONType::maxKey);
     ASSERT_TRUE(c.hasValue());
 
     // Ensure identity:
@@ -2972,7 +2972,7 @@ TEST(DocumentInPlace, StringLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::String));
+    ASSERT_TRUE(x.isType(mongo::BSONType::string));
     ASSERT_EQUALS("bar", x.getValueString());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
@@ -2998,7 +2998,7 @@ TEST(DocumentInPlace, BinDataLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::BinData));
+    ASSERT_TRUE(x.isType(BSONType::binData));
 
     mongo::BSONElement value = x.getValue();
     ASSERT_EQUALS(binData2.type, value.binDataType());
@@ -3028,7 +3028,7 @@ TEST(DocumentInPlace, OIDLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::jstOID));
+    ASSERT_TRUE(x.isType(BSONType::oid));
     ASSERT_EQUALS(oid2, x.getValueOID());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
@@ -3048,7 +3048,7 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::Bool));
+    ASSERT_TRUE(x.isType(mongo::BSONType::boolean));
     ASSERT_EQUALS(false, x.getValueBool());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3056,7 +3056,7 @@ TEST(DocumentInPlace, BooleanLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::Bool));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::boolean));
     // ASSERT_EQUALS(true, x.getValueBool());
 }
 
@@ -3074,7 +3074,7 @@ TEST(DocumentInPlace, DateLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::Date));
+    ASSERT_TRUE(x.isType(mongo::BSONType::date));
     ASSERT_EQUALS(mongo::Date_t::fromMillisSinceEpoch(20000), x.getValueDate());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
@@ -3096,7 +3096,7 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberInt));
+    ASSERT_TRUE(x.isType(mongo::BSONType::numberInt));
     ASSERT_EQUALS(value2, x.getValueInt());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3104,7 +3104,7 @@ TEST(DocumentInPlace, NumberIntLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberInt));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::numberInt));
     // ASSERT_EQUALS(value1, x.getValueInt());
 }
 
@@ -3123,7 +3123,7 @@ TEST(DocumentInPlace, TimestampLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::bsonTimestamp));
+    ASSERT_TRUE(x.isType(mongo::BSONType::timestamp));
     ASSERT_TRUE(mongo::Timestamp(20000U) == x.getValueTimestamp());
 
     // TODO: When in-place updates for leaf elements is implemented, add tests here.
@@ -3146,7 +3146,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberLong));
+    ASSERT_TRUE(x.isType(mongo::BSONType::numberLong));
     ASSERT_EQUALS(value2, x.getValueLong());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3154,7 +3154,7 @@ TEST(DocumentInPlace, NumberLongLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberLong));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::numberLong));
     // ASSERT_EQUALS(value1, x.getValueLong());
 }
 
@@ -3175,7 +3175,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    ASSERT_TRUE(x.isType(mongo::BSONType::numberDouble));
     ASSERT_EQUALS(value2, x.getValueDouble());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3183,7 +3183,7 @@ TEST(DocumentInPlace, NumberDoubleLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::numberDouble));
     // ASSERT_EQUALS(value1, x.getValueDouble());
 }
 
@@ -3204,7 +3204,7 @@ TEST(DocumentInPlace, NumberDecimalLifecycle) {
     ASSERT_EQUALS(1U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    ASSERT_TRUE(x.isType(mongo::BSONType::numberDecimal));
     ASSERT_TRUE(value2.isEqual(x.getValueDecimal()));
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3212,7 +3212,7 @@ TEST(DocumentInPlace, NumberDecimalLifecycle) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDecimal));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::numberDecimal));
     // ASSERT_TRUE(value1.isEqual(x.getValueDecimal()));
 }
 
@@ -3236,7 +3236,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     ASSERT_EQUALS(2U, damages.size());
     apply(&obj, damages, source);
     ASSERT_TRUE(x.hasValue());
-    ASSERT_TRUE(x.isType(mongo::NumberLong));
+    ASSERT_TRUE(x.isType(mongo::BSONType::numberLong));
     ASSERT_EQUALS(value2, x.getValueLong());
 
     // TODO: Re-enable when in-place updates to leaf elements is supported
@@ -3244,7 +3244,7 @@ TEST(DocumentInPlace, DoubleToLongAndBack) {
     // ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source));
     // apply(&obj, damages, source);
     // ASSERT_TRUE(x.hasValue());
-    // ASSERT_TRUE(x.isType(mongo::NumberDouble));
+    // ASSERT_TRUE(x.isType(mongo::BSONType::numberDouble));
     // ASSERT_EQUALS(value1, x.getValueDouble());
 }
 

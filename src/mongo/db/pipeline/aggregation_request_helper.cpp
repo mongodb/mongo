@@ -254,7 +254,7 @@ void setFromRouter(const VersionContext& vCtx, MutableDocument& doc, mongo::Valu
 boost::optional<bool> parseExplainModeFromBSON(const BSONElement& explainElem) {
     uassert(ErrorCodes::TypeMismatch,
             "explain must be a boolean",
-            explainElem.type() == BSONType::Bool);
+            explainElem.type() == BSONType::boolean);
     if (explainElem.Bool()) {
         return true;
     } else {
@@ -287,7 +287,7 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
 
     uassert(ErrorCodes::TypeMismatch,
             "cursor field must be missing or an object",
-            cursorElem.type() == mongo::Object);
+            cursorElem.type() == BSONType::object);
 
     SimpleCursorOptions cursor = SimpleCursorOptions::parse(
         IDLParserContext(AggregateCommandRequest::kCursorFieldName), cursorElem.embeddedObject());

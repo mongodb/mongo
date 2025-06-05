@@ -2474,12 +2474,12 @@ public:
         auto resultArr = sbe::value::getArrayView(resultVal);
 
         for (auto&& elt : bsonArray) {
-            ASSERT(elt.type() == BSONType::Array);
+            ASSERT(elt.type() == BSONType::array);
 
             BSONObjIterator arrayIt{elt.embeddedObject()};
             ASSERT_TRUE(arrayIt.more());
             auto firstElt = arrayIt.next();
-            ASSERT(firstElt.type() == BSONType::Array);
+            ASSERT(firstElt.type() == BSONType::array);
             BSONArray partialBsonArr{firstElt.embeddedObject()};
 
             ASSERT_TRUE(arrayIt.more());
@@ -2576,7 +2576,7 @@ public:
         auto arr = sbe::value::getArrayView(arrVal);
 
         for (auto&& element : arrayOfArrays) {
-            ASSERT(element.type() == BSONType::Array);
+            ASSERT(element.type() == BSONType::array);
             auto [tag, val] =
                 makeOnePartialAggregate(aggFuncName, BSONArray{element.embeddedObject()});
             arr->push_back(tag, val);

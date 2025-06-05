@@ -140,7 +140,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::creat
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(5467600,
             "the match filter must be an expression in an object",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto parsedSpec = DocumentSourceChangeStreamOplogMatchSpec::parse(
         IDLParserContext("DocumentSourceChangeStreamOplogMatchSpec"), elem.Obj());
 

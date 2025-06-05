@@ -75,7 +75,7 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
     const auto& opName = expr.getOpName();
     uassert(9567000,
             str::stream() << opName << " supports an object as its argument",
-            input.getType() == BSONType::Object);
+            input.getType() == BSONType::object);
 
     // Retrieve the values from the incoming document.
     Value nsUnchecked = input["ns"_sd];
@@ -84,20 +84,20 @@ Value evaluate(const ExpressionInternalOwningShard& expr,
 
     uassert(9567001,
             str::stream() << opName << " requires 'ns' argument to be an string",
-            nsUnchecked.getType() == BSONType::String);
+            nsUnchecked.getType() == BSONType::string);
     NamespaceString ns(NamespaceStringUtil::deserialize(expCtx->getNamespaceString().tenantId(),
                                                         nsUnchecked.getStringData(),
                                                         expCtx->getSerializationContext()));
 
     uassert(9567002,
             str::stream() << opName << " requires 'shardVersion' argument to be an object",
-            shardVersionUnchecked.getType() == BSONType::Object);
+            shardVersionUnchecked.getType() == BSONType::object);
     const auto shardVersionObj = shardVersionUnchecked.getDocument().toBson();
     const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
 
     uassert(9567003,
             str::stream() << opName << " requires 'shardKeyVal' argument to be an object",
-            shardKeyValUnchecked.getType() == BSONType::Object);
+            shardKeyValUnchecked.getType() == BSONType::object);
     const auto shardKeyVal = shardKeyValUnchecked.getDocument().toBson();
 
     // Get the 'chunkManager' from the catalog cache.

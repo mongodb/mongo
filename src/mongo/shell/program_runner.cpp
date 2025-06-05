@@ -797,7 +797,7 @@ void ProgramRunner::loadEnvironmentVariables(BSONObj env) {
     for (const BSONElement& e : env) {
         uassert(ErrorCodes::FailedToParse,
                 "Environment variable values must be strings",
-                e.type() == mongo::String);
+                e.type() == BSONType::string);
 
         _envp.emplace(std::string(e.fieldName()), e.str());
     }
@@ -880,7 +880,7 @@ void ProgramRunner::parseArgs(BSONObj args, bool isMongo, bool isMongodProgram) 
         } else {
             uassert(ErrorCodes::FailedToParse,
                     "Program arguments must be strings",
-                    e.type() == mongo::String);
+                    e.type() == BSONType::string);
             str = e.str();
         }
         if (isMongo) {

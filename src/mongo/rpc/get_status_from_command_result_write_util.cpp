@@ -45,7 +45,7 @@ namespace mongo {
 
 Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
     BSONElement wcErrorElem;
-    Status status = bsonExtractTypedField(obj, "writeConcernError", Object, &wcErrorElem);
+    Status status = bsonExtractTypedField(obj, "writeConcernError", BSONType::object, &wcErrorElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return Status::OK();
@@ -68,7 +68,7 @@ Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {
 Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
     BSONElement writeErrorElem;
     auto status =
-        bsonExtractTypedField(cmdResponse, "writeErrors", BSONType::Array, &writeErrorElem);
+        bsonExtractTypedField(cmdResponse, "writeErrors", BSONType::array, &writeErrorElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return Status::OK();
@@ -82,7 +82,7 @@ Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
         return Status::OK();
     }
 
-    if (firstWriteErrorElem.type() != BSONType::Object) {
+    if (firstWriteErrorElem.type() != BSONType::object) {
         return Status(ErrorCodes::UnsupportedFormat,
                       str::stream() << "writeErrors should be an array of objects, found "
                                     << typeName(firstWriteErrorElem.type()));
@@ -97,7 +97,7 @@ Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
 
 Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
     BSONElement cursorElem;
-    Status status = bsonExtractTypedField(cmdResponse, "cursor", Object, &cursorElem);
+    Status status = bsonExtractTypedField(cmdResponse, "cursor", BSONType::object, &cursorElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return Status::OK();
@@ -107,7 +107,8 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
     }
 
     BSONElement firstBatchElem;
-    status = bsonExtractTypedField(cursorElem.Obj(), "firstBatch", Array, &firstBatchElem);
+    status =
+        bsonExtractTypedField(cursorElem.Obj(), "firstBatch", BSONType::array, &firstBatchElem);
     if (!status.isOK()) {
         if (status == ErrorCodes::NoSuchKey) {
             return Status::OK();
@@ -121,7 +122,7 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
     for (const auto& elem : firstBatchElem.Array()) {
         // extract ok field.
         BSONElement okElem;
-        status = bsonExtractTypedField(elem.Obj(), "ok", NumberDouble, &okElem);
+        status = bsonExtractTypedField(elem.Obj(), "ok", BSONType::numberDouble, &okElem);
         if (!status.isOK()) {
             if (status == ErrorCodes::NoSuchKey) {
                 continue;
@@ -134,7 +135,7 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
         }
         // extract error code field.
         BSONElement codeElem;
-        status = bsonExtractTypedField(elem.Obj(), "code", NumberInt, &codeElem);
+        status = bsonExtractTypedField(elem.Obj(), "code", BSONType::numberInt, &codeElem);
         if (!status.isOK()) {
             if (status == ErrorCodes::NoSuchKey) {
                 continue;
@@ -146,7 +147,7 @@ Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
         // extract errmsg field.
         BSONElement errMsgElem;
         std::string errmsg = "";
-        status = bsonExtractTypedField(elem.Obj(), "errmsg", String, &errMsgElem);
+        status = bsonExtractTypedField(elem.Obj(), "errmsg", BSONType::string, &errMsgElem);
         if (!status.isOK()) {
             if (status != ErrorCodes::NoSuchKey) {
                 return status;

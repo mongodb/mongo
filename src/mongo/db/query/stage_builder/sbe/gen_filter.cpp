@@ -334,8 +334,8 @@ SbExpr generateTraverseF(SbExpr inputExpr,
             b.makeFillEmptyFalse(
                 b.makeFunction("typeMatch",
                                fieldExpr.clone(),
-                               b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
-                                                   getBSONTypeMask(BSONType::Object)))),
+                               b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                                   getBSONTypeMask(BSONType::object)))),
             std::move(traverseFExpr),
             !inputExpr.isNull()
                 ? b.makeNot(b.makeFillEmptyFalse(b.makeFunction("isArray", inputExpr.clone())))
@@ -499,13 +499,13 @@ void generateComparison(MatchExpressionVisitorContext* context,
     // potential bug where traversing the path to the empty array ([]) would prevent _any_
     // comparison, meaning a comparison like {$gt: MinKey} would return false.
     const auto& rhs = expr->getData();
-    const auto checkWholeArray = rhs.type() == BSONType::Array || rhs.type() == BSONType::MinKey ||
-        rhs.type() == BSONType::MaxKey;
+    const auto checkWholeArray = rhs.type() == BSONType::array || rhs.type() == BSONType::minKey ||
+        rhs.type() == BSONType::maxKey;
     const auto traversalMode = checkWholeArray ? LeafTraversalMode::kArrayAndItsElements
                                                : LeafTraversalMode::kArrayElementsOnly;
 
     bool matchesNothing = false;
-    if (rhs.type() == BSONType::jstNULL &&
+    if (rhs.type() == BSONType::null &&
         (binaryOp == sbe::EPrimBinary::eq || binaryOp == sbe::EPrimBinary::lessEq ||
          binaryOp == sbe::EPrimBinary::greaterEq)) {
         matchesNothing = true;
@@ -807,8 +807,8 @@ public:
             abt::Operations::And,
             b.makeFunction("typeMatch",
                            lambdaParam,
-                           b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
-                                               getBSONTypeMask(BSONType::Object))),
+                           b.makeInt32Constant(getBSONTypeMask(BSONType::array) |
+                                               getBSONTypeMask(BSONType::object))),
             _context->topFrame().popExpr());
 
         _context->popFrame();
@@ -1163,7 +1163,7 @@ public:
 
         // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
         // register a SlotId for it and use the slot directly. Note that we don't auto-parameterize
-        // if the type set contains 'BSONType::Array'.
+        // if the type set contains 'BSONType::array'.
         if (auto typeMaskParam = expr->getInputParamId()) {
             auto typeMaskSlot = SbSlot{_context->state.registerInputParamSlot(*typeMaskParam)};
             auto makePredicate = [&](SbExpr inputExpr) {
@@ -1176,7 +1176,7 @@ public:
             return;
         }
 
-        const auto traversalMode = expr->typeSet().hasType(BSONType::Array)
+        const auto traversalMode = expr->typeSet().hasType(BSONType::array)
             ? LeafTraversalMode::kDoNotTraverseLeaf
             : LeafTraversalMode::kArrayElementsOnly;
 

@@ -210,7 +210,7 @@ private:
                 str::UTF8SafeTruncation(_buffer.begin() + before, _buffer.end(), written);
 
             BSONObjBuilder truncationInfo = _truncated.subobjStart(name);
-            truncationInfo.append("type"_sd, typeName(BSONType::String));
+            truncationInfo.append("type"_sd, typeName(BSONType::string));
             truncationInfo.append("size"_sd, static_cast<int64_t>(wouldWrite));
             truncationInfo.done();
 

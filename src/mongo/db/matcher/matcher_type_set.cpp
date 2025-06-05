@@ -66,7 +66,7 @@ Status addAliasToTypeSet(StringData typeAlias,
         // The string "missing" can be returned from the $type agg expression, but is not valid for
         // use in the $type match expression predicate. Return a special error message for this
         // case.
-        if (typeAlias == StringData{typeName(BSONType::EOO)}) {
+        if (typeAlias == StringData{typeName(BSONType::eoo)}) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "'missing' is not a legal type name. To query for "
                                            "non-existence of a field, use {$exists:false}.");
@@ -89,11 +89,11 @@ Status addAliasToTypeSet(StringData typeAlias,
 Status parseSingleType(BSONElement elt,
                        const findBSONTypeAliasFun& aliasMapFind,
                        MatcherTypeSet* typeSet) {
-    if (!elt.isNumber() && elt.type() != BSONType::String) {
+    if (!elt.isNumber() && elt.type() != BSONType::string) {
         return Status(ErrorCodes::TypeMismatch, "type must be represented as a number or a string");
     }
 
-    if (elt.type() == BSONType::String) {
+    if (elt.type() == BSONType::string) {
         return addAliasToTypeSet(elt.valueStringData(), aliasMapFind, typeSet);
     }
 
@@ -123,11 +123,11 @@ Status parseSingleType(BSONElement elt,
 constexpr StringData MatcherTypeSet::kMatchesAllNumbersAlias;
 
 const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
-    {std::string(JSONSchemaParser::kSchemaTypeArray), BSONType::Array},
-    {std::string(JSONSchemaParser::kSchemaTypeBoolean), BSONType::Bool},
-    {std::string(JSONSchemaParser::kSchemaTypeNull), BSONType::jstNULL},
-    {std::string(JSONSchemaParser::kSchemaTypeObject), BSONType::Object},
-    {std::string(JSONSchemaParser::kSchemaTypeString), BSONType::String},
+    {std::string(JSONSchemaParser::kSchemaTypeArray), BSONType::array},
+    {std::string(JSONSchemaParser::kSchemaTypeBoolean), BSONType::boolean},
+    {std::string(JSONSchemaParser::kSchemaTypeNull), BSONType::null},
+    {std::string(JSONSchemaParser::kSchemaTypeObject), BSONType::object},
+    {std::string(JSONSchemaParser::kSchemaTypeString), BSONType::string},
 };
 
 boost::optional<BSONType> MatcherTypeSet::findJsonSchemaTypeAlias(StringData key) {
@@ -153,7 +153,7 @@ StatusWith<MatcherTypeSet> MatcherTypeSet::fromStringAliases(
 StatusWith<MatcherTypeSet> MatcherTypeSet::parse(BSONElement elt) {
     MatcherTypeSet typeSet;
 
-    if (elt.type() != BSONType::Array) {
+    if (elt.type() != BSONType::array) {
         auto status = parseSingleType(elt, findBSONTypeAlias, &typeSet);
         if (!status.isOK()) {
             return status;
@@ -184,10 +184,10 @@ void MatcherTypeSet::toBSONArray(BSONArrayBuilder* builder) const {
 uint32_t MatcherTypeSet::getBSONTypeMask() const {
     uint32_t mask = 0;
     if (allNumbers) {
-        mask |= (mongo::getBSONTypeMask(BSONType::NumberInt) |
-                 mongo::getBSONTypeMask(BSONType::NumberLong) |
-                 mongo::getBSONTypeMask(BSONType::NumberDouble) |
-                 mongo::getBSONTypeMask(BSONType::NumberDecimal));
+        mask |= (mongo::getBSONTypeMask(BSONType::numberInt) |
+                 mongo::getBSONTypeMask(BSONType::numberLong) |
+                 mongo::getBSONTypeMask(BSONType::numberDouble) |
+                 mongo::getBSONTypeMask(BSONType::numberDecimal));
     }
 
     for (auto t : bsonTypes) {

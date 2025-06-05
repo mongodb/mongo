@@ -159,7 +159,7 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << stageName << " options must be specified in an object, but found: "
                           << typeName(spec.type()),
-            spec.type() == BSONType::Object);
+            spec.type() == BSONType::object);
 
     IDLParserContext ctx(stageName);
     auto ret = ListSessionsSpec::parse(ctx, spec.Obj());

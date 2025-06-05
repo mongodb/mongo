@@ -88,13 +88,13 @@ std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, St
     }();
     uassert(7246301,
             str::stream() << "field " << path << " cannot be indexed as an array (multikey)",
-            elt.type() != BSONType::Array);
+            elt.type() != BSONType::array);
 
     if (elt.eoo()) {
         return {kEmptyElt, false};
     } else if (tail.empty()) {
         return {elt, true};
-    } else if (elt.type() == BSONType::Object) {
+    } else if (elt.type() == BSONType::object) {
         return extractNonArrayElementAtPath(elt.embeddedObject(), tail);
     }
     // We found a scalar element, but there is more path to traverse, e.g. {a: 1} with a path of
@@ -167,7 +167,7 @@ BSONElement BtreeKeyGenerator::_extractNextElement(const BSONObj& obj,
     if (haveObjField) {
         return dps::extractElementAtOrArrayAlongDottedPath(obj, *field);
     } else if (positionalInfo.hasPositionallyIndexedElt()) {
-        if (arrField.type() == Array) {
+        if (arrField.type() == BSONType::array) {
             *arrayNestedArray = true;
         }
         *field = positionalInfo.remainingPath;
@@ -212,7 +212,7 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(const std::vector<const char*>& fiel
     _getKeysWithArray(fieldNamesTemp,
                       fixedTemp,
                       pooledBufferBuilder,
-                      arrEntry.type() == Object ? arrEntry.embeddedObject() : BSONObj(),
+                      arrEntry.type() == BSONType::object ? arrEntry.embeddedObject() : BSONObj(),
                       keys,
                       numNotFound,
                       positionalInfo,
@@ -426,7 +426,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
             // done expanding this field name
             (*fieldNames)[i] = "";
             numNotFound++;
-        } else if (e.type() == Array) {
+        } else if (e.type() == BSONType::array) {
             arrIdxs.insert(i);
             if (arrElt.eoo()) {
                 // we only expand arrays on a single path -- track the path here

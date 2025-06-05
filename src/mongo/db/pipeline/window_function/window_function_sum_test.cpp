@@ -55,33 +55,33 @@ TEST_F(WindowFunctionSumTest, IgnoresNonnumeric) {
 
 TEST_F(WindowFunctionSumTest, NarrowestType1) {
     sum.add(Value{1});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberInt);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberInt);
 
     sum.add(Value(std::numeric_limits<double>::quiet_NaN()));
     sum.add(Value(std::numeric_limits<double>::infinity()));
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
     // Returned type narrows after removing inf/nan.
     sum.remove(Value(std::numeric_limits<double>::quiet_NaN()));
     sum.remove(Value(std::numeric_limits<double>::infinity()));
-    ASSERT_EQUALS(sum.getValue().getType(), NumberInt);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberInt);
 
     sum.add(Value{2147483647});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberLong);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberLong);
     sum.add(Value{1.5});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
     sum.add(Value{Value(Decimal128("-100000000000000000000000000000"))});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDecimal);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDecimal);
 
     sum.remove(Value{Value(Decimal128("-100000000000000000000000000000"))});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
     sum.remove(Value{1.5});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberLong);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberLong);
     // Returned type narrows to int if the value fits.
     sum.remove(Value{1});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberInt);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberInt);
     // Returned type is double if sum overflows long.
     sum.add(Value(std::numeric_limits<long long>::max()));
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionSumTest, NarrowestType2) {
@@ -90,23 +90,23 @@ TEST_F(WindowFunctionSumTest, NarrowestType2) {
     sum.add(Value{1});
     sum.add(Value{1.5});
     sum.add(Value{2147483647});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
     sum.remove(Value{1.5});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberLong);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberLong);
     sum.remove(Value{1});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberInt);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberInt);
     sum.add(Value(std::numeric_limits<long long>::max()));
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionSumTest, NarrowestType3) {
     // Test narrowing a long when neither Decimal128 nor double were added.
     sum.add(Value{2147483648ll});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberLong);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberLong);
     sum.remove(Value{1});
-    ASSERT_EQUALS(sum.getValue().getType(), NumberInt);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberInt);
     sum.add(Value(std::numeric_limits<long long>::max()));
-    ASSERT_EQUALS(sum.getValue().getType(), NumberDouble);
+    ASSERT_EQUALS(sum.getValue().getType(), BSONType::numberDouble);
 }
 
 TEST_F(WindowFunctionSumTest, Overflow) {

@@ -183,10 +183,10 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
         auto& [iterator, builder] = frameStack.top();
         if (iterator.more()) {
             BSONElement elem = iterator.next();
-            if (elem.type() == BSONType::Object) {
+            if (elem.type() == BSONType::object) {
                 frameStack.emplace(BSONObjIterator(elem.Obj()),
                                    BSONObjBuilder(builder.subobjStart(elem.fieldNameStringData())));
-            } else if (elem.type() == BSONType::Array) {
+            } else if (elem.type() == BSONType::array) {
                 frameStack.emplace(
                     BSONObjIterator(elem.Obj()),
                     BSONObjBuilder(builder.subarrayStart(elem.fieldNameStringData())));
@@ -235,7 +235,7 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
     // extract type byte
     const uint8_t bsonType = dataFrame.getBSONType();
     BSONObj decryptedObj = validateBSONElement(plaintext, bsonType);
-    if (bsonType == BSONType::Object) {
+    if (bsonType == stdx::to_underlying(BSONType::object)) {
         builder->append(elemName, decryptedObj);
     } else {
         builder->appendAs(decryptedObj.firstElement(), elemName);
@@ -316,7 +316,7 @@ EncryptedDBClientBase::runCommandWithTarget(OpMsgRequest request,
  *
  */
 BSONObj EncryptedDBClientBase::validateBSONElement(ConstDataRange out, uint8_t bsonType) {
-    if (bsonType == BSONType::Object) {
+    if (bsonType == stdx::to_underlying(BSONType::object)) {
         ConstDataRangeCursor cdc = ConstDataRangeCursor(out);
         BSONObj valueObj;
 
@@ -440,7 +440,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
     // Extract the UUID from the callArgs
     auto binData = getBinDataArg(scope, cx, args, 0, BinDataType::newUUID);
     UUID uuid = UUID::fromCDR(ConstDataRange(binData.data(), binData.size()));
-    BSONType bsonType = BSONType::EOO;
+    BSONType bsonType = BSONType::eoo;
 
     BufBuilder plaintextBuilder;
     if (args.get(1).isObject()) {
@@ -457,9 +457,9 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
             BSONObj valueObj = mozjs::ValueWriter(cx, args.get(1)).toBSON();
             plaintextBuilder.appendBuf(valueObj.objdata(), valueObj.objsize());
             if (strcmp(jsclass->name, "Array") == 0) {
-                bsonType = BSONType::Array;
+                bsonType = BSONType::array;
             } else {
-                bsonType = BSONType::Object;
+                bsonType = BSONType::object;
             }
 
         } else if (scope->getProto<mozjs::MinKeyInfo>().getJSClass() == jsclass ||
@@ -512,7 +512,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
 
         plaintextBuilder.appendNum(static_cast<uint32_t>(valueStr.size() + 1));
         plaintextBuilder.appendStrBytesAndNul(valueStr);
-        bsonType = BSONType::String;
+        bsonType = BSONType::string;
 
     } else if (args.get(1).isNumber()) {
         uassert(ErrorCodes::BadValue,
@@ -521,7 +521,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
 
         double valueNum = mozjs::ValueWriter(cx, args.get(1)).toNumber();
         plaintextBuilder.appendNum(valueNum);
-        bsonType = BSONType::NumberDouble;
+        bsonType = BSONType::numberDouble;
     } else if (args.get(1).isBoolean()) {
         uassert(ErrorCodes::BadValue,
                 "Cannot deterministically encrypt booleans.",
@@ -533,7 +533,7 @@ void EncryptedDBClientBase::encrypt(mozjs::MozJSImplScope* scope,
         } else {
             plaintextBuilder.appendChar(0x00);
         }
-        bsonType = BSONType::Bool;
+        bsonType = BSONType::boolean;
     } else {
         uasserted(ErrorCodes::BadValue, "Cannot encrypt valuetype provided.");
     }
@@ -576,7 +576,7 @@ void EncryptedDBClientBase::decrypt(mozjs::MozJSImplScope* scope,
     const uint8_t bsonType = dataFrame.getBSONType();
     BSONObj parent;
     BSONObj decryptedObj = validateBSONElement(dataFrame.getPlaintext(), bsonType);
-    if (bsonType == BSONType::Object) {
+    if (bsonType == stdx::to_underlying(BSONType::object)) {
         mozjs::ValueReader(cx, args.rval()).fromBSON(decryptedObj, &parent, true);
     } else {
         mozjs::ValueReader(cx, args.rval())

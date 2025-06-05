@@ -74,7 +74,7 @@ public:
 
             // killOp always reports success once past the auth check.
             return true;
-        } else if (element.type() == BSONType::String) {
+        } else if (element.type() == BSONType::string) {
             // It's a string. Should be of the form shardid:opid.
             if (_killShardOperation(opCtx, element.str(), result)) {
                 reportSuccessfulCompletion(opCtx, dbName, cmdObj);

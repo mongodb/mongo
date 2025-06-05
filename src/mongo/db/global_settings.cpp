@@ -98,10 +98,10 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     std::shared_ptr<std::vector<std::string>> allowlistedClusterNetwork;
     if (e.isNull()) {
         // noop
-    } else if (e.type() == mongo::Array) {
+    } else if (e.type() == BSONType::array) {
         allowlistedClusterNetwork = std::make_shared<std::vector<std::string>>();
         for (const auto& sub : e.Array()) {
-            if (sub.type() != mongo::String) {
+            if (sub.type() != BSONType::string) {
                 return {ErrorCodes::BadValue, "Expected array of strings"};
             }
             allowlistedClusterNetwork->push_back(sub.str());

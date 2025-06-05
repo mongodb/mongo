@@ -162,7 +162,7 @@ boost::optional<BSONElement> derefPath(const BSONObj& obj, const FieldPath& fiel
         if (elem.eoo()) {
             return BSONElement{};
         }
-        if (elem.type() != BSONType::Object) {
+        if (elem.type() != BSONType::object) {
             return boost::none;
         }
         elem = elem.Obj()[fieldPath.getFieldName(i)];
@@ -215,7 +215,7 @@ bool matchesBSONObj(const InternalBucketGeoWithinMatchExpression* expr, const BS
     // checked later.
     auto parseMinMaxPoint = [](const BSONElement& elem, PointWithCRS* out) -> bool {
         auto geoObj = elem.embeddedObject();
-        if (Array == elem.type() || geoObj.firstElement().isNumber()) {
+        if (BSONType::array == elem.type() || geoObj.firstElement().isNumber()) {
             // Legacy Point.
             if (!GeoParser::parseLegacyPoint(elem, out, true).isOK()) {
                 return true;

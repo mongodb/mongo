@@ -109,7 +109,7 @@ SplitHorizon::ForwardMapping computeForwardMappings(
         auto convert = [](auto&& horizonObj) -> MapMember {
             const StringData horizonName = horizonObj.fieldName();
 
-            if (horizonObj.type() != String) {
+            if (horizonObj.type() != BSONType::string) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream() << "horizons." << horizonName
                                         << " field has non-string value of type "

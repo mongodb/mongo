@@ -125,10 +125,10 @@ Status validateResumeInput(OperationContext* opCtx,
 
     BSONType recordIdType = resumeInput["$recordId"].type();
     if (resumeInput.nFields() > 2 ||
-        (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
-         recordIdType != BSONType::jstNULL) ||
+        (recordIdType != BSONType::numberLong && recordIdType != BSONType::binData &&
+         recordIdType != BSONType::null) ||
         (resumeInput.nFields() == 2 &&
-         (resumeInput["$initialSyncId"].type() != BSONType::BinData ||
+         (resumeInput["$initialSyncId"].type() != BSONType::binData ||
           resumeInput["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -148,8 +148,8 @@ Status validateResumeInput(OperationContext* opCtx,
     // Clustered collections can only accept '$_resumeAfter' or '$_startAt' parameter of type
     // BinData. Non clustered collections should only accept '$_resumeAfter' or '$_startAt' of type
     // Long.
-    if ((isClusteredCollection && recordIdType == BSONType::NumberLong) ||
-        (!isClusteredCollection && recordIdType == BSONType::BinData)) {
+    if ((isClusteredCollection && recordIdType == BSONType::numberLong) ||
+        (!isClusteredCollection && recordIdType == BSONType::binData)) {
         return Status(ErrorCodes::Error(7738600),
                       str::stream()
                           << "The '" << resumeInputName
@@ -256,7 +256,7 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
 
 bool isTextScoreMeta(BSONElement elt) {
     // elt must be foo: {$meta: "textScore"}
-    if (mongo::Object != elt.type()) {
+    if (BSONType::object != elt.type()) {
         return false;
     }
     BSONObj metaObj = elt.Obj();
@@ -269,7 +269,7 @@ bool isTextScoreMeta(BSONElement elt) {
     if (metaElt.fieldNameStringData() != "$meta") {
         return false;
     }
-    if (mongo::String != metaElt.type()) {
+    if (BSONType::string != metaElt.type()) {
         return false;
     }
     if (metaElt.valueStringData() != metaTextScore) {

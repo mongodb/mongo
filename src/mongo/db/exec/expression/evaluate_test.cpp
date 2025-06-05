@@ -97,14 +97,14 @@ TEST(NowAndClusterTime, BasicTest) {
     {
         auto expression = ExpressionFieldPath::parse(&expCtx, "$$NOW", expCtx.variablesParseState);
         Value result = expression->evaluate(Document(), &expCtx.variables);
-        ASSERT_EQ(result.getType(), Date);
+        ASSERT_EQ(result.getType(), BSONType::date);
     }
     // $$CLUSTER_TIME is the timestamp type.
     {
         auto expression =
             ExpressionFieldPath::parse(&expCtx, "$$CLUSTER_TIME", expCtx.variablesParseState);
         Value result = expression->evaluate(Document(), &expCtx.variables);
-        ASSERT_EQ(result.getType(), bsonTimestamp);
+        ASSERT_EQ(result.getType(), BSONType::timestamp);
     }
 
     // Multiple references to $$NOW must return the same value.

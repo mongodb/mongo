@@ -382,25 +382,25 @@ void buildYAMLNode(YAML::Emitter& out, const BSONObj& in, bool isMap = true) {
             out << YAML::Value;
         }
         switch (elem.type()) {
-            case BSONType::Bool:
+            case BSONType::boolean:
                 out << elem.Bool();
                 break;
-            case BSONType::NumberInt:
+            case BSONType::numberInt:
                 out << elem.Int();
                 break;
-            case BSONType::NumberLong:
+            case BSONType::numberLong:
                 out << elem.Long();
                 break;
-            case BSONType::NumberDouble:
+            case BSONType::numberDouble:
                 out << YAML::Precision(10) << elem.Double();
                 break;
-            case BSONType::String:
+            case BSONType::string:
                 out << elem.String();
                 break;
-            case BSONType::Array:
+            case BSONType::array:
                 buildYAMLNode(out, elem.Obj(), false);
                 break;
-            case BSONType::Object:
+            case BSONType::object:
                 buildYAMLNode(out, elem.Obj(), true);
                 break;
             default:

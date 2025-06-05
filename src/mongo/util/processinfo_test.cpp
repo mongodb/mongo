@@ -91,7 +91,7 @@ TEST(ProcessInfo, TestSysInfo) {
     ASSERT_KEY("mountInfo");
 
     BSONElement mountInfoArray = obj.getField("mountInfo");
-    ASSERT_TRUE(mountInfoArray.type() == Array);
+    ASSERT_TRUE(mountInfoArray.type() == BSONType::array);
     int count = 0;
     BSONObjIterator it(mountInfoArray.Obj());
     while (it.more()) {

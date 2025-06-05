@@ -378,7 +378,7 @@ TEST_F(KeyStringBuilderTest, AllTypesSimple) {
 TEST_F(KeyStringBuilderTest, Array1) {
     BSONObj emptyArray = BSON("" << BSONArray());
 
-    ASSERT_EQUALS(Array, emptyArray.firstElement().type());
+    ASSERT_EQUALS(BSONType::array, emptyArray.firstElement().type());
 
     ROUNDTRIP(version, emptyArray);
     ROUNDTRIP(version, BSON("" << BSON_ARRAY(emptyArray.firstElement())));
@@ -947,7 +947,7 @@ TEST_F(KeyStringBuilderTest, Timestamp) {
 }
 
 TEST_F(KeyStringBuilderTest, AllTypesRoundtrip) {
-    for (int i = 1; i <= JSTypeMax; i++) {
+    for (int i = 1; i <= stdx::to_underlying(BSONType::jsTypeMax); i++) {
         {
             BSONObjBuilder b;
             b.appendMinForType("", i);

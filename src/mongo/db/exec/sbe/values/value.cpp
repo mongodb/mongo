@@ -318,65 +318,65 @@ std::string printTagAndVal(const std::pair<TypeTags, Value>& value) {
 BSONType tagToType(TypeTags tag) noexcept {
     switch (tag) {
         case TypeTags::Nothing:
-            return BSONType::EOO;
+            return BSONType::eoo;
         case TypeTags::NumberInt32:
-            return BSONType::NumberInt;
+            return BSONType::numberInt;
         case TypeTags::NumberInt64:
-            return BSONType::NumberLong;
+            return BSONType::numberLong;
         case TypeTags::NumberDouble:
-            return BSONType::NumberDouble;
+            return BSONType::numberDouble;
         case TypeTags::NumberDecimal:
-            return BSONType::NumberDecimal;
+            return BSONType::numberDecimal;
         case TypeTags::Date:
-            return BSONType::Date;
+            return BSONType::date;
         case TypeTags::Timestamp:
-            return BSONType::bsonTimestamp;
+            return BSONType::timestamp;
         case TypeTags::Boolean:
-            return BSONType::Bool;
+            return BSONType::boolean;
         case TypeTags::Null:
-            return BSONType::jstNULL;
+            return BSONType::null;
         case TypeTags::StringSmall:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::StringBig:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::Array:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::ArraySet:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::ArrayMultiSet:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::Object:
-            return BSONType::Object;
+            return BSONType::object;
         case TypeTags::ObjectId:
-            return BSONType::jstOID;
+            return BSONType::oid;
         case TypeTags::MinKey:
-            return BSONType::MinKey;
+            return BSONType::minKey;
         case TypeTags::MaxKey:
-            return BSONType::MaxKey;
+            return BSONType::maxKey;
         case TypeTags::bsonObject:
-            return BSONType::Object;
+            return BSONType::object;
         case TypeTags::bsonArray:
-            return BSONType::Array;
+            return BSONType::array;
         case TypeTags::bsonString:
-            return BSONType::String;
+            return BSONType::string;
         case TypeTags::bsonSymbol:
-            return BSONType::Symbol;
+            return BSONType::symbol;
         case TypeTags::bsonObjectId:
-            return BSONType::jstOID;
+            return BSONType::oid;
         case TypeTags::bsonBinData:
-            return BSONType::BinData;
+            return BSONType::binData;
         case TypeTags::bsonUndefined:
-            return BSONType::Undefined;
+            return BSONType::undefined;
         case TypeTags::bsonRegex:
-            return BSONType::RegEx;
+            return BSONType::regEx;
         case TypeTags::bsonJavascript:
-            return BSONType::Code;
+            return BSONType::code;
         case TypeTags::bsonDBPointer:
-            return BSONType::DBRef;
+            return BSONType::dbRef;
         case TypeTags::bsonCodeWScope:
-            return BSONType::CodeWScope;
+            return BSONType::codeWScope;
         default:
-            return BSONType::EOO;
+            return BSONType::eoo;
     }
 }
 

@@ -69,7 +69,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSearchIndexes::createFrom
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "The $listSearchIndexes stage specification must be an object. Found: "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto spec = DocumentSourceListSearchIndexesSpec::parse(IDLParserContext(kStageName),
                                                            elem.embeddedObject());
 
@@ -151,13 +151,13 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
         tassert(
             7486302,
             "The internal command manageSearchIndex should return a 'cursor' field with an object.",
-            !cursor.eoo() && cursor.type() == BSONType::Object);
+            !cursor.eoo() && cursor.type() == BSONType::object);
 
         cursor = cursor.Obj().getField(kFirstBatchFieldName);
         tassert(7486303,
                 "The internal command manageSearchIndex should return an array in the 'firstBatch' "
                 "field",
-                !cursor.eoo() && cursor.type() == BSONType::Array);
+                !cursor.eoo() && cursor.type() == BSONType::array);
         auto searchIndexes = cursor.Array();
 
         // If the manageSearchIndex command didn't return any documents, we should return EOF.
@@ -173,7 +173,7 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
                 str::stream() << "The internal command manageSearchIndex should return documents "
                                  "inside the 'firstBatch' field but found a bad entry: "
                               << (e.eoo() ? "EOO" : e.toString()),
-                e.type() == BSONType::Object);
+                e.type() == BSONType::object);
             _searchIndexes.push(e.Obj().getOwned());
         }
     }

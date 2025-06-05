@@ -100,7 +100,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetMetadata::createFromBson(
             str::stream() << "The " << kStageName
                           << " stage specification must be an object, found "
                           << typeName(elem.type()),
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     BSONObj obj = elem.embeddedObject();
     uassert(ErrorCodes::FailedToParse,

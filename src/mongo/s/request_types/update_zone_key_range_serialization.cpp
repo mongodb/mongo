@@ -40,7 +40,7 @@ boost::optional<std::string> stringOrNullParseFromBSON(const BSONElement& elem) 
     if (elem.isNull()) {
         return boost::none;
     }
-    if (elem.type() == BSONType::String) {
+    if (elem.type() == BSONType::string) {
         return elem.str();
     }
 

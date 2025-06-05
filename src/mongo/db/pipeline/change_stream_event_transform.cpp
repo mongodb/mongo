@@ -126,7 +126,7 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
     Value viewOn = data.getField("viewOn");
     tassert(8814203,
             "'viewOn' should either be missing or a non-empty string",
-            viewOn.missing() || viewOn.getType() == BSONType::String);
+            viewOn.missing() || viewOn.getType() == BSONType::string);
     if (viewOn.missing()) {
         return CollectionType::kCollection;
     }
@@ -149,7 +149,7 @@ Document copyDocExceptFields(const Document& source, std::initializer_list<Strin
 
 repl::OpTypeEnum getOplogOpType(const Document& oplog) {
     auto opTypeField = oplog[repl::OplogEntry::kOpTypeFieldName];
-    checkValueType(opTypeField, repl::OplogEntry::kOpTypeFieldName, BSONType::String);
+    checkValueType(opTypeField, repl::OplogEntry::kOpTypeFieldName, BSONType::string);
     return repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"), opTypeField.getString());
 }
 
@@ -178,10 +178,10 @@ NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
 void addTransactionIdFieldsIfPresent(const Document& input, MutableDocument& output) {
     // The lsid and txnNumber may be missing if this is a batched write.
     auto lsid = input[DocumentSourceChangeStream::kLsidField];
-    checkValueTypeOrMissing(lsid, DocumentSourceChangeStream::kLsidField, BSONType::Object);
+    checkValueTypeOrMissing(lsid, DocumentSourceChangeStream::kLsidField, BSONType::object);
     auto txnNumber = input[DocumentSourceChangeStream::kTxnNumberField];
     checkValueTypeOrMissing(
-        txnNumber, DocumentSourceChangeStream::kTxnNumberField, BSONType::NumberLong);
+        txnNumber, DocumentSourceChangeStream::kTxnNumberField, BSONType::numberLong);
     // We are careful here not to overwrite existing lsid or txnNumber fields with MISSING.
     if (!txnNumber.missing()) {
         output.addField(DocumentSourceChangeStream::kTxnNumberField, txnNumber);
@@ -286,7 +286,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     Value ts = input[repl::OplogEntry::kTimestampFieldName];
     Value ns = input[repl::OplogEntry::kNssFieldName];
     Value tenantId = input[repl::OplogEntry::kTidFieldName];
-    checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::String);
+    checkValueType(ns, repl::OplogEntry::kNssFieldName, BSONType::string);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     auto opType = getOplogOpType(input);
 
@@ -340,7 +340,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 checkValueType(diffObj,
                                repl::OplogEntry::kObjectFieldName + "." +
                                    update_oplog_entry::kDiffObjectFieldName,
-                               BSONType::Object);
+                               BSONType::object);
 
                 if (_changeStreamSpec.getShowRawUpdateDescription()) {
                     updateDescription = input[repl::OplogEntry::kObjectFieldName];
@@ -531,7 +531,7 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     }
 
     const auto wallTime = input[repl::OplogEntry::kWallClockTimeFieldName];
-    checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::Date);
+    checkValueType(wallTime, repl::OplogEntry::kWallClockTimeFieldName, BSONType::date);
     doc.addField(DocumentSourceChangeStream::kWallTimeField, wallTime);
 
     // Add the post-image, pre-image id, namespace, documentKey and other fields as appropriate.

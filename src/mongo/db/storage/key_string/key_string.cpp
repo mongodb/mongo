@@ -225,51 +225,51 @@ size_t numBytesForInt(uint8_t ctype) {
 
 uint8_t bsonTypeToGenericKeyStringType(BSONType type) {
     switch (type) {
-        case MinKey:
+        case BSONType::minKey:
             return CType::kMinKey;
 
-        case EOO:
-        case jstNULL:
+        case BSONType::eoo:
+        case BSONType::null:
             return CType::kNullish;
 
-        case Undefined:
+        case BSONType::undefined:
             return CType::kUndefined;
 
-        case NumberDecimal:
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
+        case BSONType::numberDecimal:
+        case BSONType::numberDouble:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
             return CType::kNumeric;
 
-        case mongo::String:
-        case Symbol:
+        case BSONType::string:
+        case BSONType::symbol:
             return CType::kStringLike;
 
-        case Object:
+        case BSONType::object:
             return CType::kObject;
-        case Array:
+        case BSONType::array:
             return CType::kArray;
-        case BinData:
+        case BSONType::binData:
             return CType::kBinData;
-        case jstOID:
+        case BSONType::oid:
             return CType::kOID;
-        case Bool:
+        case BSONType::boolean:
             return CType::kBool;
-        case Date:
+        case BSONType::date:
             return CType::kDate;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             return CType::kTimestamp;
-        case RegEx:
+        case BSONType::regEx:
             return CType::kRegEx;
-        case DBRef:
+        case BSONType::dbRef:
             return CType::kDBRef;
 
-        case Code:
+        case BSONType::code:
             return CType::kCode;
-        case CodeWScope:
+        case BSONType::codeWScope:
             return CType::kCodeWithScope;
 
-        case MaxKey:
+        case BSONType::maxKey:
             return CType::kMaxKey;
     }
     MONGO_UNREACHABLE;
@@ -1156,50 +1156,50 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
     }
 
     switch (elem.type()) {
-        case MinKey:
-        case MaxKey:
-        case EOO:
-        case Undefined:
-        case jstNULL:
+        case BSONType::minKey:
+        case BSONType::maxKey:
+        case BSONType::eoo:
+        case BSONType::undefined:
+        case BSONType::null:
             _append(bsonTypeToGenericKeyStringType(elem.type()), invert);
             break;
 
-        case NumberDouble:
+        case BSONType::numberDouble:
             _appendNumberDouble(elem._numberDouble(), invert);
             break;
-        case String:
+        case BSONType::string:
             _appendString(elem.valueStringData(), invert, f);
             break;
-        case Object:
+        case BSONType::object:
             _appendObject(elem.Obj(), invert, f);
             break;
-        case Array:
+        case BSONType::array:
             _appendArray(BSONArray(elem.Obj()), invert, f);
             break;
-        case BinData: {
+        case BSONType::binData: {
             int len;
             const char* data = elem.binData(len);
             _appendBinData(BSONBinData(data, len, elem.binDataType()), invert);
             break;
         }
 
-        case jstOID:
+        case BSONType::oid:
             _appendOID(elem.__oid(), invert);
             break;
-        case Bool:
+        case BSONType::boolean:
             _appendBool(elem.boolean(), invert);
             break;
-        case Date:
+        case BSONType::date:
             _appendDate(elem.date(), invert);
             break;
 
-        case RegEx:
+        case BSONType::regEx:
             _appendRegex(BSONRegEx(elem.regex(), elem.regexFlags()), invert);
             break;
-        case DBRef:
+        case BSONType::dbRef:
             _appendDBRef(BSONDBRef(elem.dbrefNS(), elem.dbrefOID()), invert);
             break;
-        case Symbol:
+        case BSONType::symbol:
             if (f) {
                 keyStringAsserted(
                     ErrorCodes::CannotBuildIndexKeys,
@@ -1209,26 +1209,26 @@ void BuilderBase<BufferT>::_appendBsonValue(const BSONElement& elem,
             }
             _appendSymbol(elem.valueStringData(), invert);
             break;
-        case Code:
+        case BSONType::code:
             _appendCode(elem.valueStringData(), invert);
             break;
-        case CodeWScope: {
+        case BSONType::codeWScope: {
             _appendCodeWString(
                 BSONCodeWScope(StringData(elem.codeWScopeCode(), elem.codeWScopeCodeLen() - 1),
                                BSONObj(elem.codeWScopeScopeData())),
                 invert);
             break;
         }
-        case NumberInt:
+        case BSONType::numberInt:
             _appendNumberInt(elem._numberInt(), invert);
             break;
-        case bsonTimestamp:
+        case BSONType::timestamp:
             _appendTimestamp(elem.timestamp(), invert);
             break;
-        case NumberLong:
+        case BSONType::numberLong:
             _appendNumberLong(elem._numberLong(), invert);
             break;
-        case NumberDecimal:
+        case BSONType::numberDecimal:
             _appendNumberDecimal(elem._numberDecimal(), invert);
             break;
     }

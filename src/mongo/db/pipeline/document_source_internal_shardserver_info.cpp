@@ -53,7 +53,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalShardServerInfo::crea
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "$_internalShardServerInfo must take an empty object but found: "
                           << elem,
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
 
     return new DocumentSourceInternalShardServerInfo(expCtx);
 }

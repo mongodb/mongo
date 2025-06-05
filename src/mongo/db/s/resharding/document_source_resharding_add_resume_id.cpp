@@ -55,14 +55,13 @@ namespace {
  */
 Document appendId(Document inputDoc) {
     auto eventTime = inputDoc.getField(repl::OplogEntry::kTimestampFieldName);
-    tassert(6387801,
-            "'ts' field is not a BSON Timestamp",
-            eventTime.getType() == BSONType::bsonTimestamp);
+    tassert(
+        6387801, "'ts' field is not a BSON Timestamp", eventTime.getType() == BSONType::timestamp);
     auto commitTxnTs = inputDoc.getField(CommitTransactionOplogObject::kCommitTimestampFieldName);
     tassert(6387802,
             str::stream() << "'" << CommitTransactionOplogObject::kCommitTimestampFieldName
                           << "' field is not a BSON Timestamp",
-            commitTxnTs.missing() || commitTxnTs.getType() == BSONType::bsonTimestamp);
+            commitTxnTs.missing() || commitTxnTs.getType() == BSONType::timestamp);
 
     MutableDocument doc{inputDoc};
     doc.remove(CommitTransactionOplogObject::kCommitTimestampFieldName);
@@ -91,7 +90,7 @@ DocumentSourceReshardingAddResumeId::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(6387803,
             str::stream() << "the '" << kStageName << "' spec must be an empty object",
-            elem.type() == BSONType::Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     return new DocumentSourceReshardingAddResumeId(expCtx);
 }
 

@@ -190,7 +190,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
 
     uassert(7429703,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
 
@@ -228,7 +228,7 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     uassert(7436200,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
 
@@ -244,7 +244,7 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
 
 void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     if (merging) {
-        assertMergingInputType(input, Array);
+        assertMergingInputType(input, BSONType::array);
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
 
         _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
@@ -351,7 +351,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
 
     uassert(7436100,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
     boost::intrusive_ptr<Expression> input =
@@ -388,7 +388,7 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
     expCtx->setSbeGroupCompatibility(SbeCompatibility::notCompatible);
     uassert(7436201,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
 

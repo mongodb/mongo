@@ -250,7 +250,7 @@ struct TestPath {
             if (idx == _fields.size() - 1) {
                 return {elem.value()};
             }
-            if (elem.type() != Object) {
+            if (elem.type() != BSONType::object) {
                 return {};
             }
             obj = elem.Obj();
@@ -345,7 +345,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
     ASSERT_EQ(paths[0].second.size(), 4);
-    ASSERT_EQ(paths[0].second[0].type(), Object);
+    ASSERT_EQ(paths[0].second[0].type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(paths[0].second[0].Obj(), fromjson("{a: 10}"));
     ASSERT_BSONOBJ_EQ(paths[0].second[1].Obj(), fromjson("{a: 11}"));
     ASSERT_BSONOBJ_EQ(paths[0].second[2].Obj(), fromjson("{a: 12}"));
@@ -369,7 +369,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
         ASSERT_EQ(paths[0].second.size(), 4);
-        ASSERT_EQ(paths[0].second[0].type(), Object);
+        ASSERT_EQ(paths[0].second[0].type(), BSONType::object);
         ASSERT_BSONOBJ_EQ(paths[0].second[0].Obj(), fromjson("{a: 10, b: {c: 30}}"));
         ASSERT_BSONOBJ_EQ(paths[0].second[1].Obj(), fromjson("{a: 11, b: {c: 31}}"));
         ASSERT_BSONOBJ_EQ(paths[0].second[2].Obj(), fromjson("{a: 12, b: {c: 32}}"));
@@ -383,7 +383,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
         ASSERT_EQ(paths[0].second.size(), 4);
-        ASSERT_EQ(paths[0].second[0].type(), Object);
+        ASSERT_EQ(paths[0].second[0].type(), BSONType::object);
         ASSERT_BSONOBJ_EQ(paths[0].second[0].Obj(), fromjson("{c: 30}"));
         ASSERT_BSONOBJ_EQ(paths[0].second[1].Obj(), fromjson("{c: 31}"));
         ASSERT_BSONOBJ_EQ(paths[0].second[2].Obj(), fromjson("{c: 32}"));
@@ -400,14 +400,14 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
         ASSERT_EQ(paths[0].second.size(), 4);
-        ASSERT_EQ(paths[0].second[0].type(), NumberInt);
+        ASSERT_EQ(paths[0].second[0].type(), BSONType::numberInt);
         ASSERT_EQ(paths[0].second[0].Int(), 10);
         ASSERT_EQ(paths[0].second[1].Int(), 11);
         ASSERT_EQ(paths[0].second[2].Int(), 12);
         ASSERT_EQ(paths[0].second[3].Int(), 13);
 
         ASSERT_EQ(paths[1].second.size(), 4);
-        ASSERT_EQ(paths[1].second[0].type(), Object);
+        ASSERT_EQ(paths[1].second[0].type(), BSONType::object);
         ASSERT_BSONOBJ_EQ(paths[1].second[0].Obj(), fromjson("{c: 30}"));
         ASSERT_BSONOBJ_EQ(paths[1].second[1].Obj(), fromjson("{c: 31}"));
         ASSERT_BSONOBJ_EQ(paths[1].second[2].Obj(), fromjson("{c: 32}"));
@@ -431,14 +431,14 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
     col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
     ASSERT_EQ(paths[0].second.size(), 4);
-    ASSERT_EQ(paths[0].second[0].type(), Object);
+    ASSERT_EQ(paths[0].second[0].type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(paths[0].second[0].Obj(), fromjson("{aa: 100}"));
     ASSERT_BSONOBJ_EQ(paths[0].second[1].Obj(), fromjson("{aa: 101}"));
     ASSERT_BSONOBJ_EQ(paths[0].second[2].Obj(), fromjson("{aa: 102}"));
     ASSERT_BSONOBJ_EQ(paths[0].second[3].Obj(), fromjson("{aa: 103}"));
 
     ASSERT_EQ(paths[1].second.size(), 4);
-    ASSERT_EQ(paths[1].second[0].type(), Object);
+    ASSERT_EQ(paths[1].second[0].type(), BSONType::object);
     ASSERT_BSONOBJ_EQ(paths[1].second[0].Obj(), fromjson("{c: 30}"));
     ASSERT_BSONOBJ_EQ(paths[1].second[1].Obj(), fromjson("{c: 31}"));
     ASSERT_BSONOBJ_EQ(paths[1].second[2].Obj(), fromjson("{c: 32}"));
@@ -452,10 +452,10 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
 struct TestArrayPath {
     std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
         auto a = refObj["a"];
-        if (a.type() == Array) {
+        if (a.type() == BSONType::array) {
             std::vector<const char*> addrs;
             for (auto&& elem : a.Array()) {
-                if (elem.type() == Object) {
+                if (elem.type() == BSONType::object) {
                     auto b = elem.Obj()["b"];
                     if (!b.eoo()) {
                         addrs.push_back(b.value());
@@ -464,7 +464,7 @@ struct TestArrayPath {
             }
 
             return addrs;
-        } else if (a.type() == Object) {
+        } else if (a.type() == BSONType::object) {
             auto b = a.Obj()["b"];
             if (!b.eoo()) {
                 return {b.value()};
@@ -506,7 +506,7 @@ void verifyDecompressPaths(const std::vector<T>& values) {
         col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
 
         ASSERT_EQ(testPaths[0].second.size(), objs.size());
-        ASSERT_EQ(testPaths[0].second[0].type(), Object);
+        ASSERT_EQ(testPaths[0].second[0].type(), BSONType::object);
 
         for (size_t i = 0; i < testPaths[0].second.size(); ++i) {
             ASSERT_BSONOBJ_EQ(testPaths[0].second[i].Obj(), objs[i]);
@@ -719,7 +719,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     // TODO(SERVER-87339): This is not the right answer for Traverse paths ,which is what this test
     // is simulating. We should be getting only 6 elements back, and no missing/EOO elements.
     ASSERT_EQ(paths[0].second.size(), 8);
-    ASSERT_EQ(paths[0].second[0].type(), NumberInt);
+    ASSERT_EQ(paths[0].second[0].type(), BSONType::numberInt);
     for (int i = 0; i < 8; ++i) {
         if (i == 1 || i == 5) {
             ASSERT(paths[0].second[i].eoo());
@@ -1003,7 +1003,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
         if (i == 3 || i == 7) {
             ASSERT(paths[0].second[i].eoo());
         } else {
-            ASSERT_EQ(paths[0].second[i].type(), MinKey);
+            ASSERT_EQ(paths[0].second[i].type(), BSONType::minKey);
         }
     }
 }

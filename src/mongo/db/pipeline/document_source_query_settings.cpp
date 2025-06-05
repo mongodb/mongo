@@ -216,7 +216,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(7746801,
             "$querySettings stage expects a document as argument",
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
 
     // Resolve whether to include the debug query shape or not.
     bool showDebugQueryShape = DocumentSourceQuerySettingsSpec::parse(

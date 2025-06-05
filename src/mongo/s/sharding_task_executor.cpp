@@ -235,7 +235,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         invariant(timeTracker);
         auto operationTime = args.response.data[kOperationTimeField];
         if (!operationTime.eoo()) {
-            invariant(operationTime.type() == BSONType::bsonTimestamp);
+            invariant(operationTime.type() == BSONType::timestamp);
             timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
         }
     };

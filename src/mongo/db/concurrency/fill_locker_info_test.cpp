@@ -62,7 +62,7 @@ TEST(FillLockerInfo, DoesReportWaitingForLockIfWaiting) {
     fillLockerInfo(info, infoBuilder);
     const BSONObj infoObj = infoBuilder.done();
 
-    ASSERT(infoObj["waitingForLock"].type() == BSONType::Bool);
+    ASSERT(infoObj["waitingForLock"].type() == BSONType::boolean);
     ASSERT_TRUE(infoObj["waitingForLock"].Bool());
 }
 
@@ -75,7 +75,7 @@ TEST(FillLockerInfo, DoesNotReportWaitingForLockIfNotWaiting) {
     fillLockerInfo(info, infoBuilder);
     const BSONObj infoObj = infoBuilder.done();
 
-    ASSERT(infoObj["waitingForLock"].type() == BSONType::Bool);
+    ASSERT(infoObj["waitingForLock"].type() == BSONType::boolean);
     ASSERT_FALSE(infoObj["waitingForLock"].Bool());
 }
 
@@ -89,7 +89,7 @@ TEST(FillLockerInfo, DoesReportLockStats) {
     fillLockerInfo(info, infoBuilder);
     const BSONObj infoObj = infoBuilder.done();
 
-    ASSERT_EQ(infoObj["lockStats"].type(), BSONType::Object);
+    ASSERT_EQ(infoObj["lockStats"].type(), BSONType::object);
 }
 
 DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invariant failure") {
@@ -115,11 +115,11 @@ TEST(FillLockerInfo, DoesReportLocksHeld) {
     fillLockerInfo(info, infoBuilder);
     const BSONObj infoObj = infoBuilder.done();
 
-    ASSERT_EQ(infoObj["locks"].type(), BSONType::Object);
+    ASSERT_EQ(infoObj["locks"].type(), BSONType::object);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(resourceIdGlobal.getType())].type(),
-              BSONType::String);
+              BSONType::string);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(resourceIdGlobal.getType())].String(), "w");
-    ASSERT_EQ(infoObj["locks"][resourceTypeName(dbId.getType())].type(), BSONType::String);
+    ASSERT_EQ(infoObj["locks"][resourceTypeName(dbId.getType())].type(), BSONType::string);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(dbId.getType())].String(), "w");
 }
 
@@ -137,8 +137,8 @@ TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
     fillLockerInfo(info, infoBuilder);
     BSONObj infoObj = infoBuilder.done();
 
-    ASSERT_EQ(infoObj["locks"].type(), BSONType::Object);
-    ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].type(), BSONType::String);
+    ASSERT_EQ(infoObj["locks"].type(), BSONType::object);
+    ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].type(), BSONType::string);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].String(),
               "W");  // One is held in IX, one in X, so X should win and be displayed as "W".
 
@@ -147,8 +147,8 @@ TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
                   OneLock{secondDbId, MODE_X},
                   OneLock{firstDbId, MODE_IX}};
 
-    ASSERT_EQ(infoObj["locks"].type(), BSONType::Object);
-    ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].type(), BSONType::String);
+    ASSERT_EQ(infoObj["locks"].type(), BSONType::object);
+    ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].type(), BSONType::string);
     ASSERT_EQ(infoObj["locks"][resourceTypeName(firstDbId.getType())].String(), "W");
 }
 

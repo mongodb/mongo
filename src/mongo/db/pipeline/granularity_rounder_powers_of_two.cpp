@@ -77,9 +77,9 @@ Value GranularityRounderPowersOfTwo::roundUp(Value value) {
     }
 
     Value exp;
-    if (value.getType() == BSONType::NumberDouble) {
+    if (value.getType() == BSONType::numberDouble) {
         exp = Value(static_cast<int>(std::floor(std::log2(value.getDouble())) + 1.0));
-    } else if (value.getType() == BSONType::NumberDecimal) {
+    } else if (value.getType() == BSONType::numberDecimal) {
         Decimal128 input = value.getDecimal();
         exp = Value(Decimal128(static_cast<int>((std::floor(input.log2().toDouble()) + 1.0))));
     } else {
@@ -102,9 +102,9 @@ Value GranularityRounderPowersOfTwo::roundDown(Value value) {
     }
 
     Value exp;
-    if (value.getType() == BSONType::NumberDouble) {
+    if (value.getType() == BSONType::numberDouble) {
         exp = Value(static_cast<int>(std::ceil(std::log2(value.getDouble())) - 1.0));
-    } else if (value.getType() == BSONType::NumberDecimal) {
+    } else if (value.getType() == BSONType::numberDecimal) {
         Decimal128 input = value.getDecimal();
         exp = Value(Decimal128(static_cast<int>((std::ceil(input.log2().toDouble()) - 1.0))));
     } else {

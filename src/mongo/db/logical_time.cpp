@@ -51,7 +51,7 @@ LogicalTime LogicalTime::fromOperationTime(const BSONObj& obj) {
     uassert(ErrorCodes::BadValue,
             str::stream() << kOperationTimeFieldName << " is of the wrong type '"
                           << typeName(opTimeElem.type()) << "'",
-            opTimeElem.type() == bsonTimestamp);
+            opTimeElem.type() == BSONType::timestamp);
     return LogicalTime(opTimeElem.timestamp());
 }
 

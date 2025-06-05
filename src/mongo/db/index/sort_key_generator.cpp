@@ -254,7 +254,7 @@ Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {
     }
 
     // If 'val' is a string, directly use the collator to obtain a comparison key.
-    if (val.getType() == BSONType::String) {
+    if (val.getType() == BSONType::string) {
         auto compKey = _collator->getComparisonKey(val.getString());
         return Value(compKey.getKeyData());
     }
@@ -376,7 +376,7 @@ bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
         }
 
         if (childNode) {
-            if (elt.type() == BSONType::Array) {
+            if (elt.type() == BSONType::array) {
                 // Slow path needed.
                 return false;
             }
@@ -388,7 +388,7 @@ bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
                 (*out)[childNode->partIdx] = elt;
             }
 
-            if (elt.type() == BSONType::Object && !childNode->children.empty()) {
+            if (elt.type() == BSONType::object && !childNode->children.empty()) {
                 if (!fastFillOutSortKeyPartsHelper(elt.embeddedObject(), *childNode, out)) {
                     return false;
                 }
@@ -445,7 +445,7 @@ void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
     if (_sortPattern.size() > 1) {
         tassert(8770404,
                 "If the sort pattern size is > 1, the sortKey should be an array",
-                _localObjStorage.firstElement().type() == BSONType::Array);
+                _localObjStorage.firstElement().type() == BSONType::array);
         BSONObjIterator sortKeyIt(_localObjStorage.firstElement().embeddedObject());
         size_t i = 0;
         while (i < eltsOut->size() && sortKeyIt.more()) {

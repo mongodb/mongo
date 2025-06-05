@@ -202,8 +202,8 @@ public:
         size_t elemCount = 0;
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uassert(8873800,
@@ -270,8 +270,8 @@ public:
         size_t elemCount = 0;
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -331,8 +331,8 @@ public:
         size_t elemCount = 0;
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -393,8 +393,8 @@ public:
         uint8_t scaleIndex = bsoncolumn::kInvalidScaleIndex;
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -434,8 +434,8 @@ public:
         size_t elemCount = 0;
         while (ptr < end) {
             const uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -496,8 +496,8 @@ public:
         size_t elemCount = 0;
         while (ptr < end) {
             const uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -541,8 +541,8 @@ public:
 
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -566,8 +566,8 @@ public:
 
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -591,8 +591,8 @@ public:
 
         while (ptr < end) {
             uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 return ptr;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -625,7 +625,8 @@ public:
         if (last) {
             while (ptr < end) {
                 uint8_t control = *ptr;
-                if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                if (control == stdx::to_underlying(BSONType::eoo) ||
+                    isUncompressedLiteralControlByte(control) ||
                     isInterleavedStartControlByte(control))
                     return ptr;
 
@@ -643,7 +644,8 @@ public:
             int128_t lastNonZero{0};
             while (ptr < end) {
                 uint8_t control = *ptr;
-                if (control == EOO || isUncompressedLiteralControlByte(control) ||
+                if (control == stdx::to_underlying(BSONType::eoo) ||
+                    isUncompressedLiteralControlByte(control) ||
                     isInterleavedStartControlByte(control)) {
 
                     if (lastNonZero != 0) {
@@ -683,8 +685,8 @@ public:
         uint64_t lastNonRLEBlock = simple8b::kSingleZero;
         while (ptr < end) {
             const uint8_t control = *ptr;
-            if (control == EOO || isUncompressedLiteralControlByte(control) ||
-                isInterleavedStartControlByte(control))
+            if (control == stdx::to_underlying(BSONType::eoo) ||
+                isUncompressedLiteralControlByte(control) || isInterleavedStartControlByte(control))
                 break;
 
             uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
@@ -713,7 +715,7 @@ public:
     static bool containsScalars(const BSONObj& obj) {
         bool result = false;
         BSONObjTraversal{true,
-                         BSONType::Object,
+                         BSONType::object,
                          [](auto&&...) { return true; },
                          [&](auto&&...) {
                              result = true;
@@ -827,63 +829,68 @@ private:
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<bool>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Bool, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::boolean, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.boolean());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<int32_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberInt, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberInt,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int32_t)val._numberInt());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<int64_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberLong, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberLong,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int64_t)val._numberLong());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<double>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberDouble, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberDouble,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val._numberDouble());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Decimal128>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == NumberDecimal, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::numberDecimal,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val._numberDecimal());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Date_t>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Date, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::date, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.date());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Timestamp>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == bsonTimestamp, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::timestamp,
+            "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.timestamp());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<StringData>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == String, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::string, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.valueStringData());
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<BSONBinData>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == BinData, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::binData, "materialize invoked with incorrect BSONElement type");
     int len = 0;
     const char* data = val.binData(len);
     return materialize(allocator, BSONBinData(data, len, val.binDataType()));
@@ -892,14 +899,14 @@ inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<BSO
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<BSONCode>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == Code, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::code, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, BSONCode(val.valueStringData()));
 }
 
 template <>
 inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<OID>(
     BSONElementStorage& allocator, BSONElement val) {
-    dassert(val.type() == jstOID, "materialize invoked with incorrect BSONElement type");
+    dassert(val.type() == BSONType::oid, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.OID());
 }
 

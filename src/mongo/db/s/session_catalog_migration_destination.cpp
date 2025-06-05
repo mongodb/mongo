@@ -216,7 +216,7 @@ BSONObj getNextSessionOplogBatch(OperationContext* opCtx,
     auto oplogElement = result[kOplogField];
     uassert(ErrorCodes::FailedToParse,
             "_getNextSessionMods response does not have the 'oplog' field as array",
-            oplogElement.type() == Array);
+            oplogElement.type() == BSONType::array);
 
     return result;
 }

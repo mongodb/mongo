@@ -179,7 +179,7 @@ StatusWith<std::string> ClientMetadata::parseApplicationDocument(const BSONObj& 
         // Name is the only required field, and any other fields are simply ignored.
         if (name == kName) {
 
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
                             << "The '" << kApplication << "." << kName
@@ -213,7 +213,7 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
         StringData name = e.fieldNameStringData();
 
         if (name == kName) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kDriver << "." << kName
@@ -222,7 +222,7 @@ Status ClientMetadata::validateDriverDocument(const BSONObj& doc) {
 
             foundName = true;
         } else if (name == kVersion) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kDriver << "." << kVersion
@@ -257,7 +257,7 @@ Status ClientMetadata::validateOperatingSystemDocument(const BSONObj& doc) {
         StringData name = e.fieldNameStringData();
 
         if (name == kType) {
-            if (e.type() != String) {
+            if (e.type() != BSONType::string) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream()
                                   << "The '" << kOperatingSystem << "." << kType

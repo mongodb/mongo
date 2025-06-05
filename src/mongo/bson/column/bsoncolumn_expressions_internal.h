@@ -172,87 +172,87 @@ public:
     void append(const BSONElement& val) {
         // This if-else block handles when there were no type change.
         if constexpr (std::is_same_v<T, double>) {
-            if (_type == NumberDouble) {
+            if (_type == BSONType::numberDouble) {
                 append(BSONElementValue(val.value()).Double());
                 return;
             }
         } else if constexpr (std::is_same_v<T, StringData>) {
-            if (_type == String) {
+            if (_type == BSONType::string) {
                 append(BSONElementValue(val.value()).String());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONObj>) {
-            if (_type == Object) {
+            if (_type == BSONType::object) {
                 append(BSONElementValue(val.value()).Obj());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONArray>) {
-            if (_type == Array) {
+            if (_type == BSONType::array) {
                 append(BSONElementValue(val.value()).Array());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONBinData>) {
-            if (_type == BinData) {
+            if (_type == BSONType::binData) {
                 append(BSONElementValue(val.value()).BinData());
                 return;
             }
         } else if constexpr (std::is_same_v<T, OID>) {
-            if (_type == jstOID) {
+            if (_type == BSONType::oid) {
                 append(BSONElementValue(val.value()).ObjectID());
                 return;
             }
         } else if constexpr (std::is_same_v<T, bool>) {
-            if (_type == Bool) {
+            if (_type == BSONType::boolean) {
                 append(BSONElementValue(val.value()).Boolean());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Date_t>) {
-            if (_type == Date) {
+            if (_type == BSONType::date) {
                 append(BSONElementValue(val.value()).Date());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONRegEx>) {
-            if (_type == RegEx) {
+            if (_type == BSONType::regEx) {
                 append(BSONElementValue(val.value()).Regex());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONDBRef>) {
-            if (_type == DBRef) {
+            if (_type == BSONType::dbRef) {
                 append(BSONElementValue(val.value()).DBRef());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONCode>) {
-            if (_type == Code) {
+            if (_type == BSONType::code) {
                 append(BSONElementValue(val.value()).Code());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONSymbol>) {
-            if (_type == Symbol) {
+            if (_type == BSONType::symbol) {
                 append(BSONElementValue(val.value()).Symbol());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
-            if (_type == CodeWScope) {
+            if (_type == BSONType::codeWScope) {
                 append(BSONElementValue(val.value()).CodeWScope());
                 return;
             }
         } else if constexpr (std::is_same_v<T, int32_t>) {
-            if (_type == NumberInt) {
+            if (_type == BSONType::numberInt) {
                 append(BSONElementValue(val.value()).Int32());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Timestamp>) {
-            if (_type == bsonTimestamp) {
+            if (_type == BSONType::timestamp) {
                 append(BSONElementValue(val.value()).timestamp());
                 return;
             }
         } else if constexpr (std::is_same_v<T, int64_t>) {
-            if (_type == NumberLong) {
+            if (_type == BSONType::numberLong) {
                 append((int64_t)BSONElementValue(val.value()).Int64());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Decimal128>) {
-            if (_type == NumberDecimal) {
+            if (_type == BSONType::numberDecimal) {
                 append(BSONElementValue(val.value()).Decimal());
                 return;
             }
@@ -322,7 +322,7 @@ private:
     boost::intrusive_ptr<BSONElementStorage> _allocator;
     Element _value = CMaterializer::materializeMissing(*_allocator);
     Element _working = _value;
-    BSONType _type = EOO;
+    BSONType _type = BSONType::eoo;
     const StringDataComparator* _comparator;
 };
 
@@ -545,87 +545,87 @@ public:
     template <typename T>
     void append(const BSONElement& val) {
         if constexpr (std::is_same_v<T, double>) {
-            if (_type == NumberDouble) {
+            if (_type == BSONType::numberDouble) {
                 append(BSONElementValue(val.value()).Double());
                 return;
             }
         } else if constexpr (std::is_same_v<T, StringData>) {
-            if (_type == String) {
+            if (_type == BSONType::string) {
                 append(BSONElementValue(val.value()).String());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONObj>) {
-            if (_type == Object) {
+            if (_type == BSONType::object) {
                 append(BSONElementValue(val.value()).Obj());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONArray>) {
-            if (_type == Array) {
+            if (_type == BSONType::array) {
                 append(BSONElementValue(val.value()).Array());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONBinData>) {
-            if (_type == BinData) {
+            if (_type == BSONType::binData) {
                 append(BSONElementValue(val.value()).BinData());
                 return;
             }
         } else if constexpr (std::is_same_v<T, OID>) {
-            if (_type == jstOID) {
+            if (_type == BSONType::oid) {
                 append(BSONElementValue(val.value()).ObjectID());
                 return;
             }
         } else if constexpr (std::is_same_v<T, bool>) {
-            if (_type == Bool) {
+            if (_type == BSONType::boolean) {
                 append(BSONElementValue(val.value()).Boolean());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Date_t>) {
-            if (_type == Date) {
+            if (_type == BSONType::date) {
                 append(BSONElementValue(val.value()).Date());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONRegEx>) {
-            if (_type == RegEx) {
+            if (_type == BSONType::regEx) {
                 append(BSONElementValue(val.value()).Regex());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONDBRef>) {
-            if (_type == DBRef) {
+            if (_type == BSONType::dbRef) {
                 append(BSONElementValue(val.value()).DBRef());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONCode>) {
-            if (_type == Code) {
+            if (_type == BSONType::code) {
                 append(BSONElementValue(val.value()).Code());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONSymbol>) {
-            if (_type == Symbol) {
+            if (_type == BSONType::symbol) {
                 append(BSONElementValue(val.value()).Symbol());
                 return;
             }
         } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
-            if (_type == CodeWScope) {
+            if (_type == BSONType::codeWScope) {
                 append(BSONElementValue(val.value()).CodeWScope());
                 return;
             }
         } else if constexpr (std::is_same_v<T, int32_t>) {
-            if (_type == NumberInt) {
+            if (_type == BSONType::numberInt) {
                 append(BSONElementValue(val.value()).Int32());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Timestamp>) {
-            if (_type == bsonTimestamp) {
+            if (_type == BSONType::timestamp) {
                 append(BSONElementValue(val.value()).timestamp());
                 return;
             }
         } else if constexpr (std::is_same_v<T, int64_t>) {
-            if (_type == NumberLong) {
+            if (_type == BSONType::numberLong) {
                 append((int64_t)BSONElementValue(val.value()).Int64());
                 return;
             }
         } else if constexpr (std::is_same_v<T, Decimal128>) {
-            if (_type == NumberDecimal) {
+            if (_type == BSONType::numberDecimal) {
                 append(BSONElementValue(val.value()).Decimal());
                 return;
             }
@@ -727,7 +727,7 @@ private:
     Element _max = _min;
     Element _minForType = _min;
     Element _maxForType = _min;
-    BSONType _type = EOO;
+    BSONType _type = BSONType::eoo;
     const StringDataComparator* _comparator;
 };
 
@@ -741,7 +741,7 @@ typename CMaterializer::Element first(const char* buffer,
 
     while (ptr < end) {
         const uint8_t control = *ptr;
-        if (control == EOO) {
+        if (control == stdx::to_underlying(BSONType::eoo)) {
             uassert(
                 9095605, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
             // We've reached end of stream without encountering a value, return missing.
@@ -790,7 +790,7 @@ typename CMaterializer::Element last(const char* buffer,
 
     while (ptr < end) {
         const uint8_t control = *ptr;
-        if (control == EOO) {
+        if (control == stdx::to_underlying(BSONType::eoo)) {
             uassert(
                 9095607, "BSONColumn data ended without reaching end of buffer", ptr + 1 == end);
             // We've reached end of stream without encountering a value, return missing.
@@ -801,40 +801,40 @@ typename CMaterializer::Element last(const char* buffer,
             BSONElement literal(ptr, 1, BSONElement::TrustedInitTag{});
             ptr += literal.size();
             switch (literal.type()) {
-                case Bool: {
+                case BSONType::boolean: {
                     int64_t last = literal.boolean();
                     ptr = BSONColumnBlockDecompressHelpers::lastDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095608,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
                         return CMaterializer{}.materialize(*allocator, static_cast<bool>(last));
                     }
                 } break;
-                case NumberInt: {
+                case BSONType::numberInt: {
                     int64_t last = literal._numberInt();
                     ptr = BSONColumnBlockDecompressHelpers::lastDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095609,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
                         return CMaterializer{}.materialize(*allocator, static_cast<int32_t>(last));
                     }
                 } break;
-                case NumberLong: {
+                case BSONType::numberLong: {
                     int64_t last = literal._numberLong();
                     ptr = BSONColumnBlockDecompressHelpers::lastDelta<int64_t>(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095610,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
                         return CMaterializer{}.materialize(*allocator, last);
                     }
                 } break;
-                case NumberDecimal: {
+                case BSONType::numberDecimal: {
                     int128_t last = Simple8bTypeUtil::encodeDecimal128(literal._numberDecimal());
                     ptr = BSONColumnBlockDecompressHelpers::lastDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095611,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -842,20 +842,20 @@ typename CMaterializer::Element last(const char* buffer,
                             *allocator, Simple8bTypeUtil::decodeDecimal128(last));
                     }
                 } break;
-                case NumberDouble: {
+                case BSONType::numberDouble: {
                     double last = literal._numberDouble();
                     ptr = BSONColumnBlockDecompressHelpers::lastDouble(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095612,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
                         return CMaterializer{}.materialize(*allocator, last);
                     }
                 } break;
-                case bsonTimestamp: {
+                case BSONType::timestamp: {
                     int64_t last = literal.timestampValue();
                     ptr = BSONColumnBlockDecompressHelpers::lastDeltaOfDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095613,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -863,10 +863,10 @@ typename CMaterializer::Element last(const char* buffer,
                                                            static_cast<Timestamp>(last));
                     }
                 } break;
-                case Date: {
+                case BSONType::date: {
                     int64_t last = literal.date().toMillisSinceEpoch();
                     ptr = BSONColumnBlockDecompressHelpers::lastDeltaOfDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095614,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -874,10 +874,10 @@ typename CMaterializer::Element last(const char* buffer,
                                                            Date_t::fromMillisSinceEpoch(last));
                     }
                 } break;
-                case jstOID: {
+                case BSONType::oid: {
                     int64_t last = Simple8bTypeUtil::encodeObjectId(literal.__oid());
                     ptr = BSONColumnBlockDecompressHelpers::lastDeltaOfDelta(ptr, end, last);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095615,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -887,13 +887,13 @@ typename CMaterializer::Element last(const char* buffer,
                                                              literal.__oid().getInstanceUnique()));
                     }
                 } break;
-                case String: {
+                case BSONType::string: {
                     auto encoded = Simple8bTypeUtil::encodeString(literal.valueStringData());
                     int128_t last;
                     int128_t reference;
                     ptr = BSONColumnBlockDecompressHelpers::lastString(
                         ptr, end, encoded, last, reference);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095616,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -907,14 +907,14 @@ typename CMaterializer::Element last(const char* buffer,
                         }
                     }
                 } break;
-                case BinData: {
+                case BSONType::binData: {
                     int size;
                     const char* binary = literal.binData(size);
                     if (size <= 16) {
                         int128_t last = *Simple8bTypeUtil::encodeBinary(binary, size);
                         ptr = BSONColumnBlockDecompressHelpers::lastDelta(ptr, end, last);
 
-                        if (*ptr == EOO) {
+                        if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                             uassert(9095617,
                                     "BSONColumn data ended without reaching end of buffer",
                                     ptr + 1 == end);
@@ -927,7 +927,7 @@ typename CMaterializer::Element last(const char* buffer,
                     } else {
                         ptr = BSONColumnBlockDecompressHelpers::validateLiteral<int128_t>(ptr, end);
 
-                        if (*ptr == EOO) {
+                        if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                             uassert(9095618,
                                     "BSONColumn data ended without reaching end of buffer",
                                     ptr + 1 == end);
@@ -936,13 +936,13 @@ typename CMaterializer::Element last(const char* buffer,
                     }
 
                 } break;
-                case Code: {
+                case BSONType::code: {
                     auto encoded = Simple8bTypeUtil::encodeString(literal.valueStringData());
                     int128_t last;
                     int128_t reference;
                     ptr = BSONColumnBlockDecompressHelpers::lastString(
                         ptr, end, encoded, last, reference);
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095619,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);
@@ -956,20 +956,20 @@ typename CMaterializer::Element last(const char* buffer,
                         }
                     }
                 } break;
-                case Object:
-                case Array:
-                case Undefined:
-                case jstNULL:
-                case RegEx:
-                case DBRef:
-                case CodeWScope:
-                case Symbol:
-                case MinKey:
-                case MaxKey:
+                case BSONType::object:
+                case BSONType::array:
+                case BSONType::undefined:
+                case BSONType::null:
+                case BSONType::regEx:
+                case BSONType::dbRef:
+                case BSONType::codeWScope:
+                case BSONType::symbol:
+                case BSONType::minKey:
+                case BSONType::maxKey:
                     // Non-delta types, deltas should only contain skip or 0
                     ptr = BSONColumnBlockDecompressHelpers::validateLiteral<int64_t>(ptr, end);
 
-                    if (*ptr == EOO) {
+                    if (*ptr == stdx::to_underlying(BSONType::eoo)) {
                         uassert(9095620,
                                 "BSONColumn data ended without reaching end of buffer",
                                 ptr + 1 == end);

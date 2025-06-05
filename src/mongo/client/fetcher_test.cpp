@@ -1005,7 +1005,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
     auto firstElement = cmdObj.firstElement();
     ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
     ASSERT_EQUALS(nss.coll(), firstElement.String());
-    ASSERT_EQUALS(mongo::BSONType::Array, cmdObj["cursors"].type());
+    ASSERT_EQUALS(mongo::BSONType::array, cmdObj["cursors"].type());
     auto cursors = cmdObj["cursors"].Array();
     ASSERT_EQUALS(1U, cursors.size());
     ASSERT_EQUALS(cursorId, cursors.front().numberLong());
@@ -1075,7 +1075,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
         auto firstElement = cmdObj.firstElement();
         ASSERT_EQUALS("killCursors", firstElement.fieldNameStringData());
         ASSERT_EQUALS(nss.coll(), firstElement.String());
-        ASSERT_EQUALS(mongo::BSONType::Array, cmdObj["cursors"].type());
+        ASSERT_EQUALS(mongo::BSONType::array, cmdObj["cursors"].type());
         auto cursors = cmdObj["cursors"].Array();
         ASSERT_EQUALS(1U, cursors.size());
         ASSERT_EQUALS(cursorId, cursors.front().numberLong());

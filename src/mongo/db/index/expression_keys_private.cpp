@@ -172,7 +172,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
         // upgrade, allowing users to recover from the possible index corruption. The old behaviour
         // before SERVER-44050 was to store 'null' index key if we encountered an array along the
         // index field path. We will use the same logic in the context of removing index keys.
-        if (ignoreArraysAlongPath && fieldVal.type() == BSONType::Array && !remainingPath.empty()) {
+        if (ignoreArraysAlongPath && fieldVal.type() == BSONType::array && !remainingPath.empty()) {
             fieldVal = nullObj.firstElement();
         }
 
@@ -183,7 +183,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
                               << indexPath.substr(0,
                                                   indexPath.size() - remainingPath.size() -
                                                       !remainingPath.empty()),
-                fieldVal.type() != BSONType::Array);
+                fieldVal.type() != BSONType::array);
 
         BSONObj fieldValObj;
         if (fieldVal.eoo()) {

@@ -60,7 +60,7 @@ boost::intrusive_ptr<Expression> ExpressionTestApiVersion::parse(ExpressionConte
                                                                  const VariablesParseState& vps) {
     uassert(5161700,
             "$_testApiVersion only supports an object as its argument",
-            expr.type() == BSONType::Object);
+            expr.type() == BSONType::object);
 
     const BSONObj params = expr.embeddedObject();
     uassert(5161701,

@@ -441,9 +441,9 @@ inline Value evaluate(const ExpressionFieldPath& expr, const Document& root, Var
 
     Value var = variables->getValue(variable, root);
     switch (var.getType()) {
-        case Object:
+        case BSONType::object:
             return evaluatePath(fieldPath, 1, var.getDocument());
-        case Array:
+        case BSONType::array:
             return evaluatePathArray(fieldPath, 1, var);
         default:
             return Value();

@@ -91,7 +91,7 @@ void generateNewDocumentFromSuppliedDoc(OperationContext* opCtx,
 
     // Extract the supplied document from the constants and validate that it is an object.
     auto suppliedDocElt = request->getUpdateConstants()->getField("new"_sd);
-    invariant(suppliedDocElt.type() == BSONType::Object);
+    invariant(suppliedDocElt.type() == BSONType::object);
     auto suppliedDoc = suppliedDocElt.embeddedObject();
 
     // The supplied doc is functionally a replacement update. We need a new driver to apply it.
@@ -167,7 +167,7 @@ void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSe
                     str::stream() << "After applying the update to the document, the field '"
                                   << (*path).dottedField()
                                   << "' was found to be an array or array descendant.",
-                    !elem.ok() || elem.getType() != BSONType::Array);
+                    !elem.ok() || elem.getType() != BSONType::array);
         }
     }
 }

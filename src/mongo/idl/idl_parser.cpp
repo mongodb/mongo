@@ -75,7 +75,7 @@ bool IDLParserContext::checkAndAssertTypeSlowPath(const BSONElement& element, BS
     auto elementType = element.type();
 
     // If the type is wrong, ignore Null and Undefined values
-    if (elementType == jstNULL || elementType == Undefined) {
+    if (elementType == BSONType::null || elementType == BSONType::undefined) {
         return false;
     }
 
@@ -88,7 +88,7 @@ bool IDLParserContext::checkAndAssertTypeSlowPath(const BSONElement& element, BS
 
 bool IDLParserContext::checkAndAssertBinDataTypeSlowPath(const BSONElement& element,
                                                          BinDataType type) const {
-    bool isBinDataType = checkAndAssertType(element, BinData);
+    bool isBinDataType = checkAndAssertType(element, BSONType::binData);
     if (!isBinDataType) {
         return false;
     }
@@ -111,7 +111,7 @@ bool IDLParserContext::checkAndAssertTypes(const BSONElement& element,
     auto pos = std::find(types.begin(), types.end(), elementType);
     if (pos == types.end()) {
         // If the type is wrong, ignore Null and Undefined values
-        if (elementType == jstNULL || elementType == Undefined) {
+        if (elementType == BSONType::null || elementType == BSONType::undefined) {
             return false;
         }
 
@@ -238,7 +238,7 @@ void IDLParserContext::throwBadType(const BSONElement& element,
 StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,
                                                           bool allowGlobalCollectionName) {
     const bool isUUID =
-        (element.type() == BinData && element.binDataType() == BinDataType::newUUID);
+        (element.type() == BSONType::binData && element.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Collection name must be provided. UUID is not valid in this "
                           << "context",
@@ -254,13 +254,13 @@ StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& ele
     // TODO SERVER-98383 remove Symbol support
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Collection name has invalid type " << typeName(element.type()),
-            element.type() == Symbol || element.type() == String);
+            element.type() == BSONType::symbol || element.type() == BSONType::string);
     return element.valueStringData();
 }
 
 std::variant<UUID, StringData> IDLParserContext::checkAndAssertCollectionNameOrUUID(
     const BSONElement& element) {
-    if (element.type() == BinData && element.binDataType() == BinDataType::newUUID) {
+    if (element.type() == BSONType::binData && element.binDataType() == BinDataType::newUUID) {
         return uassertStatusOK(UUID::parse(element));
     } else {
         // Ensure collection identifier is not a Command
@@ -350,7 +350,7 @@ BSONObj parseOwnedBSON(BSONElement element) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected field " << element.fieldNameStringData()
                           << "to be of type object",
-            element.type() == BSONType::Object);
+            element.type() == BSONType::object);
     return element.Obj().getOwned();
 }
 
@@ -362,7 +362,7 @@ bool parseBoolean(BSONElement element) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected field " << element.fieldNameStringData()
                           << "to be of type object",
-            element.type() == BSONType::Bool);
+            element.type() == BSONType::boolean);
     return element.boolean();
 }
 

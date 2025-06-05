@@ -354,7 +354,7 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                     auto bypassEmptyTsReplacementField = sharedBlock->cmdObj.getField(
                         write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName);
 
-                    if (bypassEmptyTsReplacementField.type() == BSONType::Bool) {
+                    if (bypassEmptyTsReplacementField.type() == BSONType::boolean) {
                         insertRequest.getWriteCommandRequestBase().setBypassEmptyTsReplacement(
                             bypassEmptyTsReplacementField.Bool());
                     }

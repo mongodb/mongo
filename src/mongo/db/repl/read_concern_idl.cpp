@@ -38,9 +38,9 @@ LogicalTime deserializeReadConcernLogicalTime(BSONElement e) {
     uassert(ErrorCodes::TypeMismatch,
             fmt::format("\"{}\" had the wrong type. Expected {}, found {}",
                         e.fieldNameStringData(),
-                        BSONType::bsonTimestamp,
+                        BSONType::timestamp,
                         typeName(e.type())),
-            e.type() == BSONType::bsonTimestamp);
+            e.type() == BSONType::timestamp);
 
     return LogicalTime(Timestamp(e.timestampValue()));
 }

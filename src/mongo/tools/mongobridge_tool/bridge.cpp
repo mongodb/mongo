@@ -103,7 +103,7 @@ boost::optional<HostAndPort> extractHostInfo(const OpMsgRequest& request) {
     }
 
     if (auto hostInfoElem = request.body["hostInfo"]) {
-        if (hostInfoElem.type() == String) {
+        if (hostInfoElem.type() == BSONType::string) {
             return HostAndPort{hostInfoElem.valueStringData()};
         }
     }
@@ -224,7 +224,7 @@ public:
         }
 
         if (auto hostInfoElem = request.body["hostInfo"]) {
-            if (hostInfoElem.type() == String) {
+            if (hostInfoElem.type() == BSONType::string) {
                 _host = HostAndPort{hostInfoElem.valueStringData()};
             }
         }

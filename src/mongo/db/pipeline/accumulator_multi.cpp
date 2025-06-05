@@ -144,7 +144,7 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
     tassert(5787802, "'n' must be initialized", _n);
 
     if (merging) {
-        assertMergingInputType(input, Array);
+        assertMergingInputType(input, BSONType::array);
         const auto& array = input.getArray();
         for (auto&& val : array) {
             _processValue(val);
@@ -231,7 +231,7 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
 
     uassert(5787900,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     BSONObj obj = elem.embeddedObject();
 
     auto [n, input] = AccumulatorN::parseArgs(expCtx, obj, vps);
@@ -316,7 +316,7 @@ AccumulationExpression AccumulatorFirstLastN::parseFirstLastN(ExpressionContext*
 
     uassert(5787801,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     auto obj = elem.embeddedObject();
 
     auto [n, input] = AccumulatorN::parseArgs(expCtx, obj, vps);
@@ -409,7 +409,7 @@ accumulatorNParseArgs(ExpressionContext* expCtx,
                       const VariablesParseState& vps) {
     uassert(5788001,
             str::stream() << "specification must be an object; found " << elem,
-            elem.type() == BSONType::Object);
+            elem.type() == BSONType::object);
     BSONObj obj = elem.embeddedObject();
 
     // Extract fields from specification object. sortBy and output are not immediately parsed into
@@ -701,7 +701,7 @@ void AccumulatorTopBottomN<sense, single>::processInternal(const Value& input, b
             // shard because we may need to spill to disk.
             auto doc = input.getDocument();
             auto vals = doc[kFieldNameOutput];
-            assertMergingInputType(vals, Array);
+            assertMergingInputType(vals, BSONType::array);
             for (auto&& val : vals.getArray()) {
                 _processValue(val);
             }

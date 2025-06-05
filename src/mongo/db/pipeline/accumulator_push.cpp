@@ -69,7 +69,7 @@ void AccumulatorPush::processInternal(const Value& input, bool merging) {
         // If we're merging, we need to take apart the arrays we receive and put their elements into
         // the array we are collecting.  If we didn't, then we'd get an array of arrays, with one
         // array from each merge source.
-        assertMergingInputType(input, Array);
+        assertMergingInputType(input, BSONType::array);
 
         const vector<Value>& vec = input.getArray();
         for (auto&& val : vec) {

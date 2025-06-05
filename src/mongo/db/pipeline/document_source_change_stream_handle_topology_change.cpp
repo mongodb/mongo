@@ -90,7 +90,7 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // If opType isn't a string, then this document has been manipulated. This means it cannot have
     // been produced by the internal shard-monitoring cursor that we opened on the config servers,
     // or by the kNewShardDetectedOpType mechanism, which bypasses filtering and projection stages.
-    if (opType.getType() != BSONType::String) {
+    if (opType.getType() != BSONType::string) {
         return false;
     }
 
@@ -110,10 +110,10 @@ bool isShardConfigEvent(const Document& eventDoc) {
 
     // Check whether this event occurred on the config.shards collection.
     auto nsObj = eventDoc[DocumentSourceChangeStream::kNamespaceField];
-    const bool isConfigDotShardsEvent = nsObj["db"_sd].getType() == BSONType::String &&
+    const bool isConfigDotShardsEvent = nsObj["db"_sd].getType() == BSONType::string &&
         nsObj["db"_sd].getStringData() ==
             NamespaceString::kConfigsvrShardsNamespace.db(omitTenant) &&
-        nsObj["coll"_sd].getType() == BSONType::String &&
+        nsObj["coll"_sd].getType() == BSONType::string &&
         nsObj["coll"_sd].getStringData() == NamespaceString::kConfigsvrShardsNamespace.coll();
 
     // If it isn't from config.shards, treat it as a normal user event.
@@ -124,12 +124,12 @@ bool isShardConfigEvent(const Document& eventDoc) {
     // We need to validate that this event hasn't been faked by a user projection in a way that
     // would cause us to tassert. Check the clusterTime field, which is needed to determine the
     // point from which the new shard should start reporting change events.
-    if (eventDoc["clusterTime"].getType() != BSONType::bsonTimestamp) {
+    if (eventDoc["clusterTime"].getType() != BSONType::timestamp) {
         return false;
     }
     // Check the fullDocument field, which should contain details of the new shard's name and hosts.
     auto fullDocument = eventDoc[DocumentSourceChangeStream::kFullDocumentField];
-    if (opType.getStringData() == "insert"_sd && fullDocument.getType() != BSONType::Object) {
+    if (opType.getStringData() == "insert"_sd && fullDocument.getType() != BSONType::object) {
         return false;
     }
 
@@ -144,7 +144,7 @@ DocumentSourceChangeStreamHandleTopologyChange::createFromBson(
     const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(8131300,
             str::stream() << "the '" << kStageName << "' spec must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            elem.type() == BSONType::object && elem.Obj().isEmpty());
     return new DocumentSourceChangeStreamHandleTopologyChange(expCtx);
 }
 
