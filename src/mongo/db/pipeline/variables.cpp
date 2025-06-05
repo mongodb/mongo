@@ -204,13 +204,18 @@ Value Variables::getValue(Id id, const Document& root) const {
             case Variables::kClusterTimeId:
             case Variables::kJsScopeId:
             case Variables::kIsMapReduceId:
-            case Variables::kUserRolesId:
+            case Variables::kUserRolesId: {
                 if (auto it = _definitions.find(id); it != _definitions.end()) {
                     return it->second.value;
                 }
-                uasserted(51144,
-                          str::stream() << "Builtin variable '$$" << getBuiltinVariableName(id)
-                                        << "' is not available");
+                std::stringstream message;
+                message << "Builtin variable '$$" << getBuiltinVariableName(id)
+                        << "' is not available";
+                if (id == Variables::kUserRolesId && !enableAccessToUserRoles.load()) {
+                    message << " as the server is not configured to accept it";
+                }
+                uasserted(51144, message.str());
+            }
             case Variables::kSearchMetaId: {
                 auto metaIt = _definitions.find(id);
                 return metaIt == _definitions.end() ? Value() : metaIt->second.value;
