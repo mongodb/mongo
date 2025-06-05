@@ -828,7 +828,10 @@ CollectionAcquisition& CollectionAcquisition::operator=(CollectionAcquisition&& 
 }
 
 CollectionAcquisition::CollectionAcquisition(CollectionOrViewAcquisition&& other) {
-    invariant(other.isCollection());
+    tassert(10566703,
+            "Cannot convert a CollectionOrViewAcquisition containing a view into a "
+            "CollectionAcquisition ",
+            other.isCollection());
     auto& acquisition = get<CollectionAcquisition>(other._collectionOrViewAcquisition);
     _txnResources = std::exchange(acquisition._txnResources, {});
     _acquiredCollection = std::exchange(acquisition._acquiredCollection, {});
@@ -869,16 +872,20 @@ bool CollectionAcquisition::exists() const {
 }
 
 UUID CollectionAcquisition::uuid() const {
-    invariant(exists(),
-              str::stream() << "Collection " << nss().toStringForErrorMsg()
-                            << " doesn't exist, so its UUID cannot be obtained");
+    tassert(10566702,
+            str::stream() << "Collection " << nss().toStringForErrorMsg()
+                          << " doesn't exist, so its UUID cannot be obtained",
+            exists());
     return _acquiredCollection->collectionPtr->uuid();
 }
 
 const ScopedCollectionDescription& CollectionAcquisition::getShardingDescription() const {
     // The collectionDescription will only not be set if the caller as acquired the acquisition
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
-    invariant(_acquiredCollection->collectionDescription);
+    tassert(10566704,
+            "Cannot retrieve sharding collectionDescription for kLocalCatalogOnly shard role "
+            "acquisitions",
+            _acquiredCollection->collectionDescription);
     return *_acquiredCollection->collectionDescription;
 }
 
@@ -967,7 +974,7 @@ const NamespaceString& ViewAcquisition::nss() const {
 }
 
 const ViewDefinition& ViewAcquisition::getViewDefinition() const {
-    invariant(_acquiredView->viewDefinition);
+    tassert(10566705, "Missing view definition", _acquiredView->viewDefinition);
     return *_acquiredView->viewDefinition;
 }
 
@@ -1421,7 +1428,10 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsMaybeLockFree(
 
 CollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
-    invariant(!OperationShardingState::isComingFromRouter(opCtx));
+    tassert(10566706,
+            "Cannot use acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss on "
+            "sharding-aware operations",
+            !OperationShardingState::isComingFromRouter(opCtx));
 
     auto& txnResources = TransactionResources::get(opCtx);
 

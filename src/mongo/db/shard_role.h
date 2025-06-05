@@ -296,7 +296,9 @@ public:
     }
 
     const CollectionAcquisition& getCollection() const {
-        invariant(isCollection());
+        tassert(10566700,
+                "Called getCollection() on a CollectionOrViewAcquisition containing a view",
+                isCollection());
         return get<CollectionAcquisition>(_collectionOrViewAcquisition);
     }
 
@@ -309,7 +311,9 @@ public:
     }
 
     const ViewAcquisition& getView() const {
-        invariant(isView());
+        tassert(10566701,
+                "Called getView on a CollectionOrViewAcquisition containing a collection",
+                isView());
         return get<ViewAcquisition>(_collectionOrViewAcquisition);
     }
 

@@ -595,9 +595,9 @@ TEST_F(ShardRoleTest, AcquireLocalCatalogOnlyWithPotentialDataLossSharded) {
     ASSERT_EQ(nssShardedCollection1, acquisition.getCollectionPtr()->ns());
 }
 
-DEATH_TEST_F(ShardRoleTest,
-             AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessDescription,
-             "Invariant failure") {
+DEATH_TEST_REGEX_F(ShardRoleTest,
+                   AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessDescription,
+                   "Tripwire assertion.*10566704") {
     auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
         operationContext(), nssUnshardedCollection1, MODE_IX);
 
