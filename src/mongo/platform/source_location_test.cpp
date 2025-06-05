@@ -83,7 +83,7 @@ TEST(SourceLocation, GlobalVariable) {
  * This condition can be adjusted when we upgrade to a better MSVC.
  * XCode has the same problem.
  */
-#if defined(_MSC_VER) || defined(__APPLE__)
+#if defined(_MSC_VER) || defined(__apple_build_version__)
 constexpr bool wrongLocation = true;
 #else
 constexpr bool wrongLocation = false;
