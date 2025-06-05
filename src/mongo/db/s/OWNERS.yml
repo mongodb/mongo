@@ -302,6 +302,9 @@ filters:
   - "shardsvr_notify_sharding_event_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "shardsvr_resolve_view_command_test.cpp":
+    approvers:
+      - 10gen/query-integration-search
   - "document_source_visitor_docs_needed_bounds.cpp":
     approvers:
       - 10gen/query-integration-search

@@ -15,6 +15,9 @@ filters:
   - "cluster_shutdown_cmd.cpp":
     approvers:
       - 10gen/server-programmability
+  - "cluster_filemd5_cmd.cpp":
+    approvers:
+      - 10gen/query-execution-router
   - "cluster_user_management_commands.cpp":
     approvers:
       - 10gen/server-security

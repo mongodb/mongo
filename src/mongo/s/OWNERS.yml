@@ -12,6 +12,12 @@ filters:
   - "*query_analyzer*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "query_analysis*":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "would_change_owning_shard_exception*":
+    approvers:
+      - 10gen/query-execution-router
   - "*refine_collection_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability

@@ -42,6 +42,13 @@ filters:
   - "default_baton*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "diagnostic_printers_test.cpp":
+    approvers:
+      - 10gen/query-integration-observability
+  - "keypattern.h":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
   - "field_parser*":
     approvers:
       - 10gen/server-programmability

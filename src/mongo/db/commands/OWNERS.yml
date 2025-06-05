@@ -57,6 +57,9 @@ filters:
   - "search_*":
     approvers:
       - 10gen/query-integration-search
+  - "shardsvr_run_search_index_command*":
+    approvers:
+      - 10gen/query-integration-search
   - "validate.cpp":
     approvers:
       - 10gen/server-validate

@@ -1473,6 +1473,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/connection_health_metrics_parameter.idl @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/dbmessage* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/default_baton* @10gen/server-networking-and-observability @svc-auto-approve-bot
+/src/mongo/db/**/diagnostic_printers_test.cpp @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/**/keypattern.h @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/field_parser* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/generic_argument_util.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/index_names.* @10gen/query-execution-write-exec @svc-auto-approve-bot
@@ -1642,6 +1644,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/test_commands_enabled.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/user_management_commands* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/search_* @10gen/query-integration-search @svc-auto-approve-bot
+/src/mongo/db/commands/**/shardsvr_run_search_index_command* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/commands/**/validate.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security @svc-auto-approve-bot
@@ -2427,6 +2430,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/**/shardsvr_commit* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/*structured_encryption_data_command* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/**/shardsvr_notify_sharding_event_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/src/mongo/db/s/**/shardsvr_resolve_view_command_test.cpp @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/s/**/document_source_visitor_docs_needed_bounds.cpp @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/s/**/shard_filtering_util* @10gen/query-execution-router @svc-auto-approve-bot
 /src/mongo/db/s/**/sharding_server_status.cpp @10gen/query-integration-observability @svc-auto-approve-bot
@@ -2595,6 +2599,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/dbhelper_tests.cpp @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/dbtests/**/validate_tests.cpp @10gen/server-validate @svc-auto-approve-bot
 /src/mongo/dbtests/**/deferred_writer.cpp @10gen/server-dbcheck @svc-auto-approve-bot
+/src/mongo/dbtests/**/pdfiletests.cpp @10gen/query-execution-write-exec @svc-auto-approve-bot
+/src/mongo/dbtests/**/wildcard_access_method_test.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/dbtests/**/wildcard_multikey_persistence_test.cpp @10gen/server-index-builds @svc-auto-approve-bot
+/src/mongo/dbtests/**/commandtests.cpp @10gen/query-execution @10gen/query-optimization @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/dbtests/**/*plan_executor* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/query_stage* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/dbtests/**/querytests.cpp @10gen/query-execution @svc-auto-approve-bot
@@ -2655,6 +2663,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/*move*collection* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*move*range* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*query_analyzer* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/query_analysis* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/would_change_owning_shard_exception* @10gen/query-execution-router @svc-auto-approve-bot
 /src/mongo/s/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*reshard* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/session_catalog_router* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -2721,6 +2731,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_kill_op.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_killoperations_cmd.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_shutdown_cmd.cpp @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/s/commands/**/cluster_filemd5_cmd.cpp @10gen/query-execution-router @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_user_management_commands.cpp @10gen/server-security @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_whats_my_uri_cmd.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_fle2* @10gen/server-security @svc-auto-approve-bot

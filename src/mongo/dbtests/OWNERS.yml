@@ -39,6 +39,20 @@ filters:
   - "deferred_writer.cpp":
     approvers:
       - 10gen/server-dbcheck
+  - "pdfiletests.cpp":
+    approvers:
+      - 10gen/query-execution-write-exec
+  - "wildcard_access_method_test.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "wildcard_multikey_persistence_test.cpp":
+    approvers:
+      - 10gen/server-index-builds
+  - "commandtests.cpp":
+    approvers:
+      - 10gen/query-execution
+      - 10gen/query-optimization
+      - 10gen/server-catalog-and-routing
   - "*plan_executor*":
     approvers:
       - 10gen/query-execution
