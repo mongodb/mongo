@@ -88,6 +88,22 @@ constexpr size_t kMaxArgumentCountForSwitchAndSetExprForSbe = 100;
 class BSONElement;
 
 /**
+ * The reasons why an expression is disabled (used for better error messages):
+ *
+ * testCommandsDisabled: Expression was registered via REGISTER_TEST_EXPRESSION, but
+ *                       getTestCommandsEnabled() is false.
+ * featureFlagDisabled:  Expression was registered via REGISTER_EXPRESSION_WITH_FEATURE_FLAG, but
+ *                       the feature flag was not enabled.
+ * otherReasonDisabled:  Expression was registered differently; probably by directly calling
+ *                       REGISTER_EXPRESSION_CONDITIONALLY with evaluatedCondition set to false.
+ */
+enum class ExpressionDisabledReason {
+    testCommandsDisabled,
+    featureFlagDisabled,
+    otherReasonDisabled,
+};
+
+/**
  * You can specify a condition, evaluated during startup,
  * that decides whether to register the parser.
  *
@@ -111,6 +127,12 @@ class BSONElement;
         FeatureFlag* featureFlagValue{constFeatureFlag};                                        \
         bool evaluatedCondition{__VA_ARGS__};                                                   \
         if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {   \
+            Expression::registerDisabledExpressionName(                                         \
+                "$" #key,                                                                       \
+                evaluatedCondition ? ExpressionDisabledReason::featureFlagDisabled              \
+                                   : (getTestCommandsEnabled()                                  \
+                                          ? ExpressionDisabledReason::otherReasonDisabled       \
+                                          : ExpressionDisabledReason::testCommandsDisabled));   \
             return;                                                                             \
         }                                                                                       \
         Expression::registerExpression(                                                         \
@@ -325,6 +347,19 @@ public:
                                    AllowedWithApiStrict allowedWithApiStrict,
                                    AllowedWithClientType allowedWithClientType,
                                    FeatureFlag* featureFlag);
+
+    /**
+     * Register an expression name as disabled to later improve the error message via
+     * getErrorMessage. There is no need to call this function directly - it will be called in
+     * REGISTER_EXPRESSION_CONDITIONALLY.
+     */
+    static void registerDisabledExpressionName(std::string key, ExpressionDisabledReason reason);
+
+    /**
+     * Return an error message for an unknown expression. Adds a hint in case the expression is
+     * switched off by a feature flag or is only available in testing mode.
+     */
+    static std::string getErrorMessage(StringData key);
 
     const ExpressionVector& getChildren() const {
         return _children;

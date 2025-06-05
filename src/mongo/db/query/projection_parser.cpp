@@ -548,7 +548,7 @@ void parseSubObject(ParseContext* ctx,
         } catch (const DBException&) {
             uasserted(31325,
                       str::stream()
-                          << "Unknown expression " << obj.firstElementFieldNameStringData());
+                          << Expression::getErrorMessage(obj.firstElementFieldNameStringData()));
         }
     }
 

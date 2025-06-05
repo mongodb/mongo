@@ -47,6 +47,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include <pstl/glue_algorithm_defs.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 
@@ -147,6 +148,9 @@ struct ParserRegistration {
 };
 
 StringMap<ParserRegistration> parserMap;
+
+// struct to map disabled expression names to feature flag (true) or test expressions (false)
+StringMap<ExpressionDisabledReason> disabledExpressionNames;
 }  // namespace
 
 void Expression::registerExpression(string key,
@@ -162,6 +166,30 @@ void Expression::registerExpression(string key,
         ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, featureFlag};
     // Add this expression to the global map of operator counters for expressions.
     operatorCountersAggExpressions.addCounter(key);
+}
+
+void Expression::registerDisabledExpressionName(string key, ExpressionDisabledReason reason) {
+    disabledExpressionNames[key] = reason;
+}
+
+std::string Expression::getErrorMessage(const StringData key) {
+    if (const auto it = disabledExpressionNames.find(key); it != disabledExpressionNames.end()) {
+        // the expression was disabled: return a more detail error message
+        switch (it->second) {
+            case ExpressionDisabledReason::otherReasonDisabled:
+                return fmt::format("Unknown expression {}: This expression is disabled.", key);
+            case ExpressionDisabledReason::testCommandsDisabled:
+                return fmt::format(
+                    "Unknown expression {}: This expression is for MongoDB's internal testing "
+                    "only.",
+                    key);
+            case ExpressionDisabledReason::featureFlagDisabled:
+                return fmt::format(
+                    "Unknown expression {}: This expression needs to be enabled by a feature flag.",
+                    key);
+        }
+    }
+    return fmt::format("Unknown expression {}", key);
 }
 
 intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const expCtx,

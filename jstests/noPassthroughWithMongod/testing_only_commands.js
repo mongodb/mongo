@@ -40,13 +40,34 @@ const isBoundedSortEnabled = function(conn) {
     return false;
 };
 
+// Check if expression $_testApiVersion is only available when enableTestCommands is true
+const isTestApiVersionAvailable = function(conn) {
+    const db = conn.getDB('TestDB');
+    const coll = db.bounded_sort_coll;
+    coll.drop();
+    db.createCollection(coll.getName());
+
+    const pipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
+    const result = db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}});
+    if (result.ok) {
+        return true;
+    }
+    // Otherwise it should be disabled.
+    assert.eq(result.code, 31325);
+    assert.eq(
+        result.errmsg,
+        "Invalid $project :: caused by :: Unknown expression $_testApiVersion: This expression is for MongoDB's internal testing only.");
+    return false;
+};
+
 TestData.enableTestCommands = false;
 
 var conn = MongoRunner.runMongod({});
 for (let i in testOnlyCommands) {
     assertCmdNotFound(conn.getDB('test'), testOnlyCommands[i]);
 }
-assert.eq(isBoundedSortEnabled(conn), false);
+assert(!isBoundedSortEnabled(conn));
+assert(!isTestApiVersionAvailable(conn));
 MongoRunner.stopMongod(conn);
 
 // Now enable the commands
@@ -56,5 +77,6 @@ var conn = MongoRunner.runMongod({});
 for (let i in testOnlyCommands) {
     assertCmdFound(conn.getDB('test'), testOnlyCommands[i]);
 }
-assert.eq(isBoundedSortEnabled(conn), true);
+assert(isBoundedSortEnabled(conn));
+assert(isTestApiVersionAvailable(conn));
 MongoRunner.stopMongod(conn);
