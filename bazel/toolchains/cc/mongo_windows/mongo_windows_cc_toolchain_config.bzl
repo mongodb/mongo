@@ -467,6 +467,7 @@ def _impl(ctx):
 
         fastbuild_feature = feature(
             name = "fastbuild",
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
@@ -570,7 +571,7 @@ def _impl(ctx):
 
         dynamic_link_msvcrt_feature = feature(
             name = "dynamic_link_msvcrt",
-            enabled = True,
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
@@ -597,6 +598,7 @@ def _impl(ctx):
 
         dbg_feature = feature(
             name = "dbg",
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
@@ -616,6 +618,7 @@ def _impl(ctx):
 
         opt_feature = feature(
             name = "opt",
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
@@ -957,6 +960,7 @@ def _impl(ctx):
 
         frame_pointer_feature = feature(
             name = "frame_pointer",
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],
@@ -1052,7 +1056,7 @@ def _impl(ctx):
 
         smaller_binary_feature = feature(
             name = "smaller_binary",
-            enabled = True,
+            enabled = False,
             flag_sets = [
                 flag_set(
                     actions = [ACTION_NAMES.c_compile, ACTION_NAMES.cpp_compile],

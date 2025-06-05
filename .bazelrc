@@ -367,14 +367,6 @@ common --define codeowners_add_auto_approve_user=True
 # Opt out of this by passing --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0 on the command line.
 common:linux --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
-# Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
-common:windows --features=-smaller_binary
-common:windows --features=-frame_pointer
-common:windows --features=-opt
-common:windows --features=-dbg
-common:windows --features=-fastbuild
-common:windows --features=-dynamic_link_msvcrt
-
 # Only use fission and debug compression on Linux
 common:windows --fission=no
 common:windows --//bazel/config:create_dwp=False
