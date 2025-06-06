@@ -39,7 +39,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -242,21 +241,10 @@ RecordId oplogOrderInsertOplog(OperationContext* opCtx,
  * long as the commit for each insert comes before the next insert starts.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
-    {
-        // Set replset settings before creation of underlying WiredTigerKvEngine
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString("realReplicaSet");
-        setGlobalReplSettings(replSettings);
-    }
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop();
-    {
-        // Settings are remembered by the engine, reset now to avoid contaminating other tests
-        repl::ReplSettings replSettings;
-        setGlobalReplSettings(replSettings);
-    }
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -289,21 +277,10 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
  * op and all earlier ops are durable.
  */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
-    {
-        // Set replset settings before creation of underlying WiredTigerKvEngine
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString("realReplicaSet");
-        setGlobalReplSettings(replSettings);
-    }
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     auto engine = static_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     engine->getOplogManager()->stop();
-    {
-        // Settings are remembered by the engine, reset now to avoid contaminating other tests
-        repl::ReplSettings replSettings;
-        setGlobalReplSettings(replSettings);
-    }
 
     auto isOpHidden = [&engine](const RecordId& id) {
         return engine->getOplogManager()->getOplogReadTimestamp() <
@@ -337,8 +314,8 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ASSERT(isOpHidden(id1));
     ASSERT(isOpHidden(id2));
 
-    engine->getOplogManager()->start(
-        longLivedOp.get(), *engine, *rs, getGlobalReplSettings().isReplSet());
+    bool isReplSet = false;
+    engine->getOplogManager()->start(longLivedOp.get(), *engine, *rs, isReplSet);
     engine->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get(), rs.get());
 
     ASSERT_FALSE(isOpHidden(id1));
@@ -430,7 +407,7 @@ StatusWith<RecordId> insertBSONWithSize(
 void testTruncateRange(int64_t numRecordsToInsert,
                        int64_t deletionPosBegin,
                        int64_t deletionPosEnd) {
-    auto harnessHelper = newRecordStoreHarnessHelper();
+    auto harnessHelper = newRecordStoreHarnessHelper(RecordStoreHarnessHelper::Options::Standalone);
     std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
     auto engine = harnessHelper->getEngine();
 
@@ -658,9 +635,8 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions();
     wtTableConfig.keyFormat = KeyFormat::String;
-    bool isReplSet = getGlobalReplSettings().isReplSet();
-    bool shouldRecoverFromOplogAsStandalone =
-        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
+    bool isReplSet = false;
+    bool shouldRecoverFromOplogAsStandalone = false;
     wtTableConfig.logEnabled =
         WiredTigerUtil::useTableLogging(nss, isReplSet, shouldRecoverFromOplogAsStandalone);
     const std::string config = WiredTigerRecordStoreBase::generateCreateString(

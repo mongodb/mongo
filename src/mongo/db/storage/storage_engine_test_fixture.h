@@ -34,7 +34,6 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/durable_catalog.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/ident.h"
@@ -56,11 +55,7 @@ class StorageEngineTest : public ServiceContextMongoDTest {
 public:
     explicit StorageEngineTest(Options options = {})
         : ServiceContextMongoDTest(std::move(options)),
-          _storageEngine(getServiceContext()->getStorageEngine()) {
-        repl::ReplicationCoordinator::set(
-            getServiceContext(),
-            std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext()));
-    }
+          _storageEngine(getServiceContext()->getStorageEngine()) {}
 
     StatusWith<MDBCatalog::EntryIdentifier> createCollection(OperationContext* opCtx,
                                                              NamespaceString ns,

@@ -43,13 +43,8 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -92,13 +87,6 @@ class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
     WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
         : _svcCtx(svcCtx), _dbpath("wt-kv-harness"), _forRepair(forRepair) {
-        // Faithfully simulate being in replica set mode for timestamping tests which requires
-        // parity for journaling settings.
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString("i am a replica set");
-        setGlobalReplSettings(replSettings);
-        repl::ReplicationCoordinator::set(
-            svcCtx, std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, replSettings));
         _svcCtx->setStorageEngine(makeEngine());
         getWiredTigerKVEngine()->notifyStorageStartupRecoveryComplete();
     }
@@ -130,15 +118,19 @@ private:
         WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
         wtConfig.cacheSizeMB = 1;
         wtConfig.extraOpenOptions = "log=(file_max=1m,prealloc=false)";
-        auto kv = std::make_unique<WiredTigerKVEngine>(
-            std::string{kWiredTigerEngineName},
-            _dbpath.path(),
-            _cs.get(),
-            std::move(wtConfig),
-            _forRepair,
-            getGlobalReplSettings().isReplSet(),
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-            getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
+        // Faithfully simulate being in replica set mode for timestamping tests which requires
+        // parity for journaling settings.
+        auto isReplSet = true;
+        auto shouldRecoverFromOplogAsStandalone = false;
+        auto replSetMemberInStandaloneMode = false;
+        auto kv = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
+                                                       _dbpath.path(),
+                                                       _cs.get(),
+                                                       std::move(wtConfig),
+                                                       _forRepair,
+                                                       isReplSet,
+                                                       shouldRecoverFromOplogAsStandalone,
+                                                       replSetMemberInStandaloneMode);
 
         auto client = _svcCtx->getService()->makeClient("opCtx");
         auto opCtx = client->makeOperationContext();

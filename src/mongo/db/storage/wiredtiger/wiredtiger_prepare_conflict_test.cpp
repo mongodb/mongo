@@ -29,14 +29,9 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 
-#include "mongo/db/global_settings.h"
-#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/prepare_conflict_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_metrics.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -69,9 +64,9 @@ std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
         clockSource,
         std::move(wtConfig),
         /*repair=*/false,
-        getGlobalReplSettings().isReplSet(),
-        repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-        getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
+        /*isReplSet=*/false,
+        /*shouldRecoverFromOplogAsStandalone=*/false,
+        /*inStandaloneMode=*/false);
 }
 
 class WiredTigerPrepareConflictTest : public unittest::Test {

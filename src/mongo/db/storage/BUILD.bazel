@@ -724,8 +724,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/catalog:durable_catalog",
         "//src/mongo/db/index_builds:resumable_index_builds_idl",
-        "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/repl:topology_coordinator",
         "//src/mongo/db/storage:storage_control",
         "//src/mongo/db/storage:storage_engine_impl",
         "//src/mongo/db/storage:storage_repair_observer",

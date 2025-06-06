@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -61,6 +59,8 @@
 
 namespace mongo {
 namespace {
+// All replicated collections are not logged.
+static constexpr bool kIsLogged = false;
 
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
@@ -72,9 +72,6 @@ public:
         _fastClockSource = std::make_unique<SystemClockSource>();
         _connection = std::make_unique<WiredTigerConnection>(
             _conn, _fastClockSource.get(), /*sessionCacheMax=*/33000);
-        _isReplSet = getGlobalReplSettings().isReplSet();
-        _shouldRecoverFromOplogAsStandalone =
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     }
 
     ~WiredTigerIndexHarnessHelper() final {
@@ -99,14 +96,13 @@ public:
                            indexName,
                            ordering};
 
-        const bool isLogged = false;
         StatusWith<std::string> result =
             WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
                                                   "",
                                                   "",
                                                   NamespaceStringUtil::serializeForCatalog(nss),
                                                   config,
-                                                  isLogged);
+                                                  kIsLogged);
         ASSERT_OK(result.getStatus());
 
         auto& ru = *storage_details::getRecoveryUnit(opCtx);
@@ -115,7 +111,7 @@ public:
                   WiredTigerIndex::create(WiredTigerRecoveryUnit::get(ru), uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
-            opCtx, ru, uri, UUID::gen(), "" /* ident */, config, isLogged);
+            opCtx, ru, uri, UUID::gen(), "" /* ident */, config, kIsLogged);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(OperationContext* opCtx,
@@ -141,13 +137,13 @@ public:
                            spec,
                            indexName,
                            ordering};
-        StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-            std::string{kWiredTigerEngineName},
-            "",
-            "",
-            NamespaceStringUtil::serializeForCatalog(nss),
-            config,
-            WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
+        StatusWith<std::string> result =
+            WiredTigerIndex::generateCreateString(std::string{kWiredTigerEngineName},
+                                                  "",
+                                                  "",
+                                                  NamespaceStringUtil::serializeForCatalog(nss),
+                                                  config,
+                                                  kIsLogged);
         ASSERT_OK(result.getStatus());
 
         auto& ru = *storage_details::getRecoveryUnit(opCtx);
@@ -157,25 +153,10 @@ public:
 
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(
-                opCtx,
-                ru,
-                uri,
-                UUID::gen(),
-                "" /* ident */,
-                keyFormat,
-                config,
-                WiredTigerUtil::useTableLogging(
-                    nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
+                opCtx, ru, uri, UUID::gen(), "" /* ident */, keyFormat, config, kIsLogged);
         }
         return std::make_unique<WiredTigerIndexStandard>(
-            opCtx,
-            ru,
-            uri,
-            UUID::gen(),
-            "" /* ident */,
-            keyFormat,
-            config,
-            WiredTigerUtil::useTableLogging(nss, _isReplSet, _shouldRecoverFromOplogAsStandalone));
+            opCtx, ru, uri, UUID::gen(), "" /* ident */, keyFormat, config, kIsLogged);
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
@@ -187,8 +168,6 @@ private:
     std::unique_ptr<ClockSource> _fastClockSource;
     WT_CONNECTION* _conn;
     std::unique_ptr<WiredTigerConnection> _connection;
-    bool _isReplSet;
-    bool _shouldRecoverFromOplogAsStandalone;
 };
 
 MONGO_INITIALIZER(RegisterSortedDataInterfaceHarnessFactory)(InitializerContext* const) {

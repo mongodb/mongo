@@ -167,7 +167,6 @@ mongo_cc_library(
     deps = [
         ":storage_wiredtiger_core",
         "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/storage:record_store_test_harness",
         "//src/mongo/util:clock_source_mock",
     ],
@@ -213,8 +212,6 @@ mongo_cc_unit_test(
         ":storage_wiredtiger_core",
         ":wiredtiger_record_store_test_harness",
         "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/repl:repl_coordinator_interface",
-        "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/storage:checkpointer",
         "//src/mongo/db/storage:recovery_unit_test_harness",
         "//src/mongo/db/storage:snapshot_window_options",
@@ -259,7 +256,6 @@ mongo_cc_benchmark(
     deps = [
         ":wiredtiger_index_test_harness",
         ":wiredtiger_record_store_test_harness",
-        "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/storage:record_store_bm",
         "//src/mongo/db/storage:sorted_data_interface_bm",
     ],
@@ -289,6 +285,5 @@ mongo_cc_benchmark(
         ":wiredtiger_record_store_test_harness",
         "//src/mongo/db:service_context_d",
         "//src/mongo/db:shard_role_api",
-        "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )

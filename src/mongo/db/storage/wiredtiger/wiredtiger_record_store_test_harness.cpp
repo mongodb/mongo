@@ -29,17 +29,10 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -70,25 +63,18 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
     wtConfig.cacheSizeMB = 1;
     wtConfig.extraOpenOptions = _testLoggingSettings(extraStrings.toString());
-    _engine = std::make_unique<WiredTigerKVEngine>(
-        std::string{kWiredTigerEngineName},
-        _dbpath.path(),
-        &_cs,
-        std::move(wtConfig),
-        false,
-        getGlobalReplSettings().isReplSet(),
-        repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-        getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
-
-    repl::ReplicationCoordinator::set(
-        serviceContext(),
-        options == Options::ReplicationEnabled
-            ? std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext())
-            : std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext(),
-                                                                 repl::ReplSettings()));
+    _isReplSet = options == Options::ReplicationEnabled;
+    auto shouldRecoverFromOplogAsStandalone = false;
+    auto replSetMemberInStandaloneMode = false;
+    _engine = std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
+                                                   _dbpath.path(),
+                                                   &_cs,
+                                                   std::move(wtConfig),
+                                                   false,
+                                                   _isReplSet,
+                                                   shouldRecoverFromOplogAsStandalone,
+                                                   replSetMemberInStandaloneMode);
     _engine->notifyStorageStartupRecoveryComplete();
-    _isReplSet = getGlobalReplSettings().isReplSet();
-    _shouldRecoverFromOplogAsStandalone = repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
@@ -105,8 +91,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     auto oplog = static_cast<WiredTigerRecordStore::Oplog*>(ret.get());
-    _engine->getOplogManager()->start(
-        opCtx.get(), *_engine, *oplog, getGlobalReplSettings().isReplSet());
+    _engine->getOplogManager()->start(opCtx.get(), *_engine, *oplog, _isReplSet);
     return ret;
 }
 

@@ -34,23 +34,12 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/repl_set_member_in_standalone_mode.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/execution_context.h"
-#include "mongo/db/storage/key_format.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
-#include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -85,22 +74,15 @@ public:
 
         // Use a replica set so that writes to replicated collections are not journaled and thus
         // retain their timestamps.
-        repl::ReplSettings replSettings;
-        replSettings.setReplSetString("rs");
-        setGlobalReplSettings(replSettings);
-        repl::ReplicationCoordinator::set(getGlobalServiceContext(),
-                                          std::make_unique<repl::ReplicationCoordinatorMock>(
-                                              getGlobalServiceContext(), replSettings));
-
-        _engine = std::make_unique<WiredTigerKVEngine>(
-            std::string{kWiredTigerEngineName},
-            _dbpath.path(),
-            &_cs,
-            std::move(wtConfig),
-            false,
-            getGlobalReplSettings().isReplSet(),
-            repl::ReplSettings::shouldRecoverFromOplogAsStandalone(),
-            getReplSetMemberInStandaloneMode(getGlobalServiceContext()));
+        _engine =
+            std::make_unique<WiredTigerKVEngine>(std::string{kWiredTigerEngineName},
+                                                 _dbpath.path(),
+                                                 &_cs,
+                                                 std::move(wtConfig),
+                                                 false /* repair */,
+                                                 true /* isReplSet */,
+                                                 false /* shouldRecoverFromOplogAsStandalone */,
+                                                 false /* inStandaloneMode */);
 
         _engine->notifyStorageStartupRecoveryComplete();
     }
