@@ -170,7 +170,7 @@ public:
                 getWiredTigerConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
             wtConfig.cacheSizeMB =
                 WiredTigerUtil::getSpillCacheSizeMB(spillWiredTigerGlobalOptions.cacheSizeGB);
-            wtConfig.inMemory = params.inMemory;
+            wtConfig.inMemory = false;
             wtConfig.logEnabled = false;
             wtConfig.prefetchEnabled = false;
             wtConfig.restoreEnabled = false;

@@ -58,10 +58,6 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
-    bool isEphemeral() const override {
-        return true;
-    }
-
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
         return std::make_unique<SpillRecoveryUnit>(_connection.get());
     }

@@ -52,17 +52,16 @@ SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalNam
                                                  ClockSource* clockSource,
                                                  WiredTigerConfig wtConfig)
     : WiredTigerKVEngineBase(canonicalName, path, clockSource, std::move(wtConfig)) {
-    if (!_wtConfig.inMemory) {
-        if (!boost::filesystem::exists(path)) {
-            try {
-                boost::filesystem::create_directories(path);
-            } catch (std::exception& e) {
-                LOGV2_ERROR(10380302,
-                            "Error creating data directory",
-                            "directory"_attr = path,
-                            "error"_attr = e.what());
-                throw;
-            }
+    tassert(10588600, "SpillWiredTigerKVEngine should not be in-memory", !_wtConfig.inMemory);
+    if (!boost::filesystem::exists(path)) {
+        try {
+            boost::filesystem::create_directories(path);
+        } catch (std::exception& e) {
+            LOGV2_ERROR(10380302,
+                        "Error creating data directory",
+                        "directory"_attr = path,
+                        "error"_attr = e.what());
+            throw;
         }
     }
 
