@@ -33,10 +33,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -182,12 +181,16 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
                                      const std::string& indexName,
                                      const BSONObj& keyPattern,
                                      const UUID& uuid) {
-    BSONObjBuilder indexInfoBob;
-    indexInfoBob.append("createIndexes", nss.coll());
-    indexInfoBob.append("v", 2);
-    indexInfoBob.append("key", keyPattern);
-    indexInfoBob.append("name", indexName);
-    return makeCommandOplogEntry(opTime, nss, indexInfoBob.obj(), uuid);
+    BSONObj indexInfo;
+    if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabledAndIgnoreFCVUnsafe()) {
+        indexInfo =
+            BSON("createIndexes" << nss.coll() << "spec"
+                                 << BSON("v" << 2 << "key" << keyPattern << "name" << indexName));
+    } else {
+        indexInfo = BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << keyPattern << "name"
+                                         << indexName);
+    }
+    return makeCommandOplogEntry(opTime, nss, indexInfo, uuid);
 }
 
 OplogEntry makeStartIndexBuildOplogEntry(OpTime opTime,

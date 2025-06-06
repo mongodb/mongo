@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 
 #include "mongo/base/error_codes.h"
@@ -111,10 +110,7 @@
 #include <utility>
 
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -4867,6 +4863,36 @@ TEST_F(OpObserverTest, MagicRestoreNoOplog) {
     getNOplogEntries(opCtx.get(), 0);  // This asserts that there are 0 entries.
 
     storageGlobalParams.magicRestore = false;
+}
+
+TEST_F(OpObserverTest, OnCreateIndexReplicateLocalCatalogIdentifiers) {
+    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
+    auto opCtx = cc().makeOperationContext();
+
+    auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    auto indexSpec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"
+                              << "a_1");
+
+    for (bool enable : {false, true}) {
+        RAIIServerParameterControllerForTest replicatedLocalCatalogIdentifiers(
+            "featureFlagReplicateLocalCatalogIdentifiers", enable);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onCreateIndex(opCtx.get(), nss, UUID::gen(), indexSpec, false);
+        wunit.commit();
+    }
+
+    auto oplogEntries = getNOplogEntries(opCtx.get(), 2);
+    auto disabledEntry = assertGet(OplogEntry::parse(oplogEntries[0]));
+    auto enabledEntry = assertGet(OplogEntry::parse(oplogEntries[1]));
+
+    ASSERT_BSONOBJ_EQ(disabledEntry.getObject(),
+                      BSON("createIndexes" << "coll"
+                                           << "v" << 2 << "key" << BSON("a" << 1) << "name"
+                                           << "a_1"));
+    ASSERT_BSONOBJ_EQ(enabledEntry.getObject(),
+                      BSON("createIndexes" << "coll"
+                                           << "spec" << indexSpec));
 }
 
 class OpObserverServerlessTest : public OpObserverTest {

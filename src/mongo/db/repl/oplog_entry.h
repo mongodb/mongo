@@ -275,10 +275,6 @@ public:
                                            const mongo::CollectionOptions& options,
                                            const BSONObj& idIndex);
 
-    static ReplOperation makeCreateIndexesCommand(NamespaceString nss,
-                                                  const UUID& uuid,
-                                                  const BSONObj& indexDoc);
-
     static BSONObj makeCreateCollCmdObj(const NamespaceString& collectionName,
                                         const mongo::CollectionOptions& options,
                                         const BSONObj& idIndex);
@@ -488,7 +484,6 @@ public:
     // Make helper functions accessible.
     using MutableOplogEntry::getOpTime;
     using MutableOplogEntry::makeCreateCommand;
-    using MutableOplogEntry::makeCreateIndexesCommand;
     using MutableOplogEntry::makeDeleteOperation;
     using MutableOplogEntry::makeInsertOperation;
     using MutableOplogEntry::makeUpdateOperation;

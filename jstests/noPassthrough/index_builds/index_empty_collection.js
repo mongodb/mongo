@@ -6,6 +6,7 @@
  *   requires_replication,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -61,11 +62,15 @@ try {
     const secondaryEmptyColl = secondary.getCollection(emptyColl.getFullName());
     IndexBuildTest.assertIndexes(secondaryEmptyColl, 2, ['_id_', 'b_1']);
 
-    // Index build optimatization for empty collection is replicated via old-style createIndexes
+    // Index build optimization for empty collection is replicated via old-style createIndexes
     // oplog entry.
     const cmdNs = testDB.getCollection('$cmd').getFullName();
+    const nameField =
+        FeatureFlagUtil.isPresentAndEnabled(testDB, 'featureFlagReplicateLocalCatalogIdentifiers')
+        ? 'o.spec.name'
+        : 'o.name';
     const ops = rst.dumpOplog(
-        primary, {op: 'c', ns: cmdNs, 'o.createIndexes': emptyColl.getName(), 'o.name': 'b_1'});
+        primary, {op: 'c', ns: cmdNs, 'o.createIndexes': emptyColl.getName(), [nameField]: 'b_1'});
     assert.eq(1,
               ops.length,
               'createIndexes oplog entry not generated for empty collection: ' + tojson(ops));

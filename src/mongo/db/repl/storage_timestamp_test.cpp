@@ -27,19 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <cstdint>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -132,6 +119,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -142,12 +130,10 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/stdx/future.h"  // IWYU pragma: keep
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -155,8 +141,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
@@ -166,8 +150,8 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <fstream>  // IWYU pragma: keep
-#include <future>
+#include <cstdint>
+#include <fstream>
 #include <initializer_list>
 #include <iterator>
 #include <list>
@@ -178,6 +162,10 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -328,7 +316,8 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 void assertIndexMetaDataMissing(std::shared_ptr<durable_catalog::CatalogEntryMetaData> collMetaData,
                                 StringData indexName) {
     const auto idxOffset = collMetaData->findIndexOffset(indexName);
-    ASSERT_EQUALS(-1, idxOffset) << indexName << ". Collection Metdata: " << collMetaData->toBSON();
+    ASSERT_EQUALS(-1, idxOffset) << indexName
+                                 << ". Collection Metadata: " << collMetaData->toBSON();
 }
 
 durable_catalog::CatalogEntryMetaData::IndexMetaData getIndexMetaData(
@@ -907,6 +896,16 @@ public:
         ASSERT_TRUE(match);
     }
 
+    StringData indexNameOplogField() const {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
+                VersionContext::getDecoration(_opCtx), fcvSnapshot)) {
+            return "o.spec.name";
+        }
+        return "o.name";
+    }
+
 private:
     BSONObj _getTxnDoc() {
         auto txnParticipant = TransactionParticipant::get(_opCtx);
@@ -1206,9 +1205,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
         NamespaceString::createNamespaceString_forTest("unittests.secondaryCreateCollection");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
-    {
-        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
-    }
+    ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
 
     BSONObjBuilder resultBuilder;
     auto swResult =
@@ -1221,9 +1218,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollection) {
                    });
     ASSERT_OK(swResult);
 
-    {
-        ASSERT(acquireCollForRead(_opCtx, nss).exists());
-    }
+    ASSERT(acquireCollForRead(_opCtx, nss).exists());
 
     assertNamespaceInIdents(nss, _pastTs, false);
     assertNamespaceInIdents(nss, _presentTs, true);
@@ -1243,12 +1238,8 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss1));
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
 
-    {
-        ASSERT_FALSE(acquireCollForRead(_opCtx, nss1).exists());
-    }
-    {
-        ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
-    }
+    ASSERT_FALSE(acquireCollForRead(_opCtx, nss1).exists());
+    ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
 
     const LogicalTime dummyLt = const_cast<const LogicalTime&>(_futureLt).addTicks(1);
     const Timestamp dummyTs = dummyLt.asTimestamp();
@@ -1268,12 +1259,8 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
                    });
     ASSERT_OK(swResult);
 
-    {
-        ASSERT(acquireCollForRead(_opCtx, nss1).exists());
-    }
-    {
-        ASSERT(acquireCollForRead(_opCtx, nss2).exists());
-    }
+    ASSERT(acquireCollForRead(_opCtx, nss1).exists());
+    ASSERT(acquireCollForRead(_opCtx, nss2).exists());
 
     assertNamespaceInIdents(nss1, _pastTs, false);
     assertNamespaceInIdents(nss1, _presentTs, true);
@@ -1314,9 +1301,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateCollectionBetweenInserts) {
         AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_IX);
 
         ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
-        {
-            ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
-        }
+        ASSERT_FALSE(acquireCollForRead(_opCtx, nss2).exists());
 
         BSONObjBuilder resultBuilder;
         auto swResult = doApplyOps(
@@ -1374,9 +1359,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
         "unittests.primaryCreateCollectionInApplyOps");
     ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
 
-    {
-        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
-    }
+    ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
 
     BSONObjBuilder resultBuilder;
     auto swResult =
@@ -1389,9 +1372,7 @@ TEST_F(StorageTimestampTest, PrimaryCreateCollectionInApplyOps) {
                    });
     ASSERT_OK(swResult);
 
-    {
-        ASSERT(acquireCollForRead(_opCtx, nss).exists());
-    }
+    ASSERT(acquireCollForRead(_opCtx, nss).exists());
 
     BSONObj result;
     ASSERT(Helpers::getLast(_opCtx, NamespaceString::kRsOplogNamespace, result));
@@ -2323,8 +2304,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // supports 2 phase index build.
     const auto createIndexesDocument =
         queryOplog(BSON("ns" << renamedNss.db_forTest() + ".$cmd" << "o.createIndexes"
-                             << BSON("$exists" << true) << "o.name"
-                             << "b_1"));
+                             << BSON("$exists" << true) << indexNameOplogField() << "b_1"));
     const auto tmpCollName =
         createIndexesDocument.getObjectField("o").getStringField("createIndexes");
     tmpName = NamespaceString::createNamespaceString_forTest(renamedNss.db_forTest(), tmpCollName);
@@ -2968,9 +2948,7 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("admin.system.users");
 
-    {
-        ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
-    }
+    ASSERT_FALSE(acquireCollForRead(_opCtx, nss).exists());
 
     ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
 

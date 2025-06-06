@@ -323,8 +323,16 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
     }
 
     BSONObjBuilder builder;
+    // Note that despite using this constant, we are not building a CreateIndexCommand here
     builder.append(CreateIndexesCommand::kCommandName, nss.coll());
-    builder.appendElements(indexDoc);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
+            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+        builder.append("spec", indexDoc);
+    } else {
+        builder.appendElements(indexDoc);
+    }
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

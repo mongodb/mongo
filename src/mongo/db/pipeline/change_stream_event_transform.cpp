@@ -55,9 +55,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 
@@ -422,8 +420,14 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
+
+                Value indexSpec;
+                if (auto specField = oField.getField("spec"); !specField.missing()) {
+                    indexSpec = specField;
+                } else {
+                    indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
+                }
                 // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
-                auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;

@@ -138,12 +138,8 @@
 #include <array>
 #include <cstdint>
 
-#include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -862,7 +858,14 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           uassert(ErrorCodes::InvalidNamespace,
                   "createIndexes value must be a string",
                   first.type() == BSONType::string);
-          BSONObj indexSpec = cmd.removeField("createIndexes");
+
+          // The index spec may either be appended to the object or nested in the spec field
+          // depending on the version which wrote the oplog entry
+          auto specField = cmd.getField("spec");
+          BSONObj indexSpec = specField.eoo()
+              ? cmd.removeField("createIndexes")
+              : getObjWithSanitizedStorageEngineOptions(opCtx, specField.Obj());
+
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           boost::optional<Lock::CollectionLock> collLock;
           if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(

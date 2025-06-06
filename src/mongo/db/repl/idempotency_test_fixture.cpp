@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
@@ -60,9 +61,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include <boost/optional.hpp>
 
 namespace mongo {
 namespace repl {
@@ -139,7 +138,7 @@ CollectionState::CollectionState(CollectionOptions collectionOptions_,
     : collectionOptions(std::move(collectionOptions_)),
       indexSpecs(std::move(indexSpecs_)),
       dataHash(std::move(dataHash_)),
-      exists(true) {};
+      exists(true) {}
 
 bool operator==(const CollectionState& lhs, const CollectionState& rhs) {
     if (!lhs.exists || !rhs.exists) {
@@ -241,12 +240,22 @@ OplogEntry IdempotencyTest::update(IdType _id, const BSONObj& obj) {
 OplogEntry IdempotencyTest::buildIndex(const BSONObj& indexSpec,
                                        const BSONObj& options,
                                        const UUID& uuid) {
+    BSONObjBuilder spec;
+    spec.append("v", 2);
+    spec.append("key", indexSpec);
+    spec.append("name", std::string(indexSpec.firstElementFieldName()) + "_index");
+    spec.appendElementsUnique(options);
+
     BSONObjBuilder bob;
     bob.append("createIndexes", _nss.coll());
-    bob.append("v", 2);
-    bob.append("key", indexSpec);
-    bob.append("name", std::string(indexSpec.firstElementFieldName()) + "_index");
-    bob.appendElementsUnique(options);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (fcvSnapshot.isVersionInitialized() &&
+        mongo::feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled(
+            VersionContext::getDecoration(_opCtx.get()), fcvSnapshot)) {
+        bob.append("spec", spec.obj());
+    } else {
+        bob.appendElements(spec.obj());
+    }
     return makeCommandOplogEntry(nextOpTime(), _nss, bob.obj(), uuid);
 }
 
