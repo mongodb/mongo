@@ -53,6 +53,8 @@
       # them.
       - known_query_shape_computation_problem
       - directly_against_shardsvrs_incompatible
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
 
 - name: common_aggregation_excludes
   value:
@@ -79,9 +81,6 @@
       - jstests/aggregation/exec/query_limits_test.js
       # Triggers SERVER-95731 pointer dereference.
       - jstests/aggregation/sources/internal_document_sources.js
-      # Exclude the test as it runs a large number of aggregations, increased also by the override,
-      # which causes the session to not be able to create more connections.
-      - jstests/aggregation/timeseries/timeseries_group_aggregations.js
 
     exclude_with_any_tags:
       - assumes_standalone_mongod
@@ -96,6 +95,8 @@
       # them.
       - known_query_shape_computation_problem
       - directly_against_shardsvrs_incompatible
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
 
 - name: common_multiversion_excludes
   value:

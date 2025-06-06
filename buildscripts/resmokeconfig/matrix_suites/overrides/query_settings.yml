@@ -42,14 +42,6 @@
       # Query settings application is skipped for queries targeting collections containing encryption information.
       - jstests/core/query/queryable_encryption/**/*.js
       - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
-      # These tests run many aggregations and are very slow in this passthrough. Since they don't
-      # provide much additional coverage we can exclude them.
-      - jstests/core/query/index_correctness_pbt.js
-      - jstests/core/query/plan_cache/cache_correctness_pbt.js
-      - jstests/core/query/run_all_plans_pbt.js
-      - jstests/core/query/partial_index_pbt.js
-      - jstests/core/query/query_knob_correctness_pbt.js
-      - jstests/core/query/or/subplanning_pbt.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads
@@ -60,6 +52,8 @@
       # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
       # them.
       - known_query_shape_computation_problem
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
 
 - name: common_aggregation_excludes
   value:
@@ -80,11 +74,6 @@
       # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
       # is a design decision due to mongos lacking collation information.
       - jstests/aggregation/sources/bucket/collation_bucket.js
-      # This test runs many aggregations and is very slow in this passthrough. Since it doesn't
-      # provide much additional coverage we can exclude it.
-      - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
-      - jstests/aggregation/sources/sort/sort_via_index_pbt.js
-      - jstests/aggregation/timeseries/timeseries_group_aggregations.js
     exclude_with_any_tags:
       - assumes_standalone_mongod
       - does_not_support_repeated_reads
@@ -95,6 +84,8 @@
       # concerning if the query doesn't normally have hope of succeeding, and we can safely ignore
       # them.
       - known_query_shape_computation_problem
+      # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+      - query_intensive_pbt
 
 - name: fallback_core_excludes
   value:
@@ -103,12 +94,6 @@
       - jstests/core/txns/disallow_operations_on_prepared_transaction.js
       # TODO SERVER-96805 Investigate why wildcard index candidate plans are non-deterministic.
       - jstests/core/index/wildcard/*.js
-      - jstests/core/query/index_correctness_pbt.js
-      - jstests/core/query/plan_cache/cache_correctness_pbt.js
-      - jstests/core/query/run_all_plans_pbt.js
-      - jstests/core/query/index_correctness_pbt.js
-      - jstests/core/query/plan_cache/cache_correctness_pbt.js
-      - jstests/core/query/run_all_plans_pbt.js
       # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
       # queries.
       - jstests/core/query/find_with_resume_after_param.js

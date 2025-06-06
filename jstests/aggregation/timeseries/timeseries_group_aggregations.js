@@ -5,6 +5,7 @@
  * permutations of them, while checking the results against a mongod using the classic engine.
  *
  * @tags: [
+ *      query_intensive_pbt,
  *      requires_timeseries,
  *       # We modify the value of a query knob. setParameter is not persistent.
  *      does_not_support_stepdowns,

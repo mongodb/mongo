@@ -15,12 +15,9 @@
  * pick the plan we are looking for. There may be a better plan available.
  *
  * @tags: [
+ * query_intensive_pbt,
  * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
- * # The below scenarios can slow down queries enough to hit a timeout.
- * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency,
- * config_shard_incompatible,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.

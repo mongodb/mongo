@@ -29,15 +29,12 @@ selector:
     # TODO SERVER-100610: Test directly or indirectly asserts on specific plan chosen
     - jstests/aggregation/sources/unionWith/unionWith.js
 
-    # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
-    # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
-    - jstests/aggregation/sources/agg_stages_basic_behavior_pbt.js
-    - jstests/aggregation/sources/sort/sort_via_index_pbt.js
-    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
-
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling
+    # This test runs many queries. This passthrough runs analyze for each indexed field on every query,
+    # causing a > 1 hour runtime. Exclude this test to keep the suite runtime reasonable.
+    - query_intensive_pbt
 executor:
   config:
     shell_options:

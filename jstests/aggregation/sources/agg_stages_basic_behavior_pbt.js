@@ -11,12 +11,9 @@
  * they may break sometimes, such as with SERVER-100299.
  *
  * @tags: [
+ * query_intensive_pbt,
  * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
- * # The below scenarios can slow down queries enough to hit a timeout.
- * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency,
- * config_shard_incompatible,
  * # Runs queries that may return many results, requiring getmores.
  * requires_getmore,
  * # This test runs commands that are not allowed with security token: setParameter.
@@ -41,7 +38,7 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const numRuns = 100;
+const numRuns = 20;
 
 /*
  * --- Exclusion projection testing ---

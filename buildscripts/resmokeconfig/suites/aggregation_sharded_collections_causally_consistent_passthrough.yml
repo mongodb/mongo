@@ -22,9 +22,6 @@ selector:
     - jstests/aggregation/optimization/use_query_projection.js
     - jstests/aggregation/optimization/use_query_sort.js
     - jstests/aggregation/sources/graphLookup/variables.js
-    # This test runs many aggregations, and is especially slow in this passthrough. Since it doesn't
-    # provide additional useful coverage in this passthrough we can exclude it.
-    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
   exclude_with_any_tags:
     # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
     # override when it refuses to replace the readPreference of a particular command. Above each tag
@@ -55,6 +52,8 @@ selector:
     - requires_replication
     - requires_spawning_own_processes
     - requires_2_or_more_shards
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
 executor:
   archive:
     hooks:

@@ -69,13 +69,6 @@ selector:
     - src/mongo/db/modules/*/jstests/fle2/fle2_bulk_write.js
     # analyzeShardKey cannot run directly on a shard replica set
     - jstests/core_sharding/analyze_shard_key/*.js
-    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
-    - jstests/core/query/plan_cache/cache_correctness_pbt.js
-    - jstests/core/query/index_correctness_pbt.js
-    - jstests/core/query/run_all_plans_pbt.js
-    - jstests/core/query/partial_index_pbt.js
-    - jstests/core/query/query_knob_correctness_pbt.js
-    - jstests/core/query/or/subplanning_pbt.js
 
     # Express has no interaction with FCV, and thus this test does not provide valuable coverage.
     - jstests/core/index/express_pbt.js
@@ -88,6 +81,8 @@ selector:
     - requires_2_or_more_shards
     # an initial sync nodes is not a fully initialized shard server
     - assumes_sharding_initialized
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
 executor:
   hooks:
     - class: CleanEveryN

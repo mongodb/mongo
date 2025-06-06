@@ -3,15 +3,13 @@
  * $or predicate. This tests subplanning code paths which are significantly different from others.
  *
  * @tags: [
+ * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
  * requires_timeseries,
  * assumes_no_implicit_collection_creation_on_get_collection,
  * # Incompatible with setParameter
  * does_not_support_stepdowns,
- * # Change in read concern can slow down queries enough to hit a timeout.
- * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
  * ]

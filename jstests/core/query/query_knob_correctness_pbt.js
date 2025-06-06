@@ -3,22 +3,20 @@
  * compared to a collection scan with no knobs set.
  *
  * @tags: [
+ * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
+ * config_shard_incompatible,
  * requires_timeseries,
- * # TODO SERVER-104420 consider removing the below tag
- * assumes_no_implicit_collection_creation_on_get_collection,
  * # Incompatible with setParameter
  * does_not_support_stepdowns,
- * # Change in read concern can slow down queries enough to hit a timeout.
- * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
  * # Some query knobs may not exist on older versions.
  * multiversion_incompatible
  * ]
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {queryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
@@ -40,6 +38,10 @@ const numQueriesPerRun = 50;
 
 const controlColl = db.query_knob_correctness_pbt_control;
 const experimentColl = db.query_knob_correctness_pbt_experiment;
+
+function runSetParamCommand(cmd) {
+    FixtureHelpers.runCommandOnAllShards({db: db.getSiblingDB("admin"), cmdObj: cmd});
+}
 
 /*
  * Runs the given function with the query knobs set, then sets the query knobs back to their
@@ -69,7 +71,7 @@ function runWithKnobs(knobToVal, fn) {
     }
 
     // Set the requested knobs.
-    assert.commandWorked(db.adminCommand({setParameter: 1, ...knobToVal}));
+    runSetParamCommand({setParameter: 1, ...knobToVal});
 
     // With the finally block, we'll always revert the parameters back to their original settings,
     // even if an exception is thrown.
@@ -77,9 +79,7 @@ function runWithKnobs(knobToVal, fn) {
         return fn();
     } finally {
         // Reset to the original settings.
-        // TODO SERVER-104420 consider using `runCommandOnAllShards` to send the command to every
-        // shard.
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...priorSettings}));
+        runSetParamCommand({setParameter: 1, ...priorSettings});
     }
 }
 
@@ -115,7 +115,7 @@ function getWorkloadModel(isTS, aggModel) {
     return fc
         .record({
             collSpec: getCollectionModel({isTS}),
-            queries: fc.array(aggModel, {minLength: numQueriesPerRun, maxLength: numQueriesPerRun}),
+            queries: fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun}),
             knobToVal: queryKnobsModel
         })
         .map(({collSpec, queries, knobToVal}) => {

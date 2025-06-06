@@ -26,9 +26,6 @@ selector:
     - jstests/aggregation/sources/unionWith/unionWith_explain.js
     # TODO SERVER-96515 Re-enable this test.
     - jstests/aggregation/expressions/expression_set_field_null_chars.js
-    # This test runs many aggregations, and is especially slow in this passthrough. Since it doesn't
-    # provide additional useful coverage in this passthrough we can exclude it.
-    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
   exclude_with_any_tags:
     # The following tests start their own ShardingTest or ReplSetTest, respectively.
     - requires_sharding
@@ -41,6 +38,8 @@ selector:
     - inspects_command_opcounters
     - known_query_shape_computation_problem
     - requires_2_or_more_shards
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
 executor:
   archive:
     hooks:

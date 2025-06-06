@@ -4,6 +4,7 @@
  * calculation.
  *
  * @tags: [
+ *   query_intensive_pbt,
  *   requires_timeseries,
  *   assumes_standalone_mongod,
  *   # Plan cache state is node-local and will not get migrated alongside user data

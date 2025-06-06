@@ -5,6 +5,7 @@
  * key we use to store the cache entry. This test attempts to target these potential bugs.
  *
  * @tags: [
+ * query_intensive_pbt,
  * requires_timeseries,
  * assumes_standalone_mongod,
  * # Plan cache state is node-local and will not get migrated alongside user data

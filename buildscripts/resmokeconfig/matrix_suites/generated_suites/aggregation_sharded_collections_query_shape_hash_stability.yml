@@ -59,7 +59,6 @@ selector:
     - jstests/aggregation/sources/setWindowFields/parse.js
     - jstests/aggregation/exec/query_limits_test.js
     - jstests/aggregation/sources/internal_document_sources.js
-    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - requires_profiling
@@ -74,6 +73,7 @@ selector:
     - assumes_against_mongod_not_mongos
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - query_intensive_pbt
   roots:
     - jstests/aggregation/**/*.js
 test_kind: js_test

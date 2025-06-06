@@ -36,16 +36,6 @@ selector:
     # This test change $group memory limits, so analyze command fails
     - jstests/core/query/release_memory/group.js
 
-    # These tests run many queries. This passthrough runs analyze for each indexed field on every query,
-    # causing a > 1 hour runtime. Exclude the tests below to keep the suite runtime reasonable.
-    - jstests/core/query/index_correctness_pbt.js
-    - jstests/core/query/run_all_plans_pbt.js
-    - jstests/core/query/partial_index_pbt.js
-    - jstests/core/index/express_pbt.js
-    - jstests/core/query/explain/is_cached_is_true_for_one_plan_pbt.js
-    - jstests/core/query/query_knob_correctness_pbt.js
-    - jstests/core/query/or/subplanning_pbt.js
-
     # TODO SERVER-100451: $elemMatch estimation using histograms
     - jstests/core/query/boolean_expression_simplification.js
     # TODO SERVER-100665: Inversion of non exact index bounds
@@ -74,6 +64,9 @@ selector:
     # TODO SERVER-100739: Empty array breaks histogramCE
     - jstests/core/query/nan.js
 
+    # This test is very slow since it runs many queries and analyze is run on every indexed field.
+    - jstests/core/index/express_pbt.js
+
   exclude_with_any_tags:
     # Profiler entries will have different shape in CBR
     - requires_profiling
@@ -81,6 +74,9 @@ selector:
     - inspects_command_opcounters
     # This passthrough executes writes transparently to the test. If fsyncLock() is run, the testcase will hang.
     - requires_fsync
+    # These tests run many queries. This passthrough runs analyze for each indexed field on every query,
+    # causing a > 1 hour runtime. Exclude the tests below to keep the suite runtime reasonable.
+    - query_intensive_pbt
 executor:
   config:
     shell_options:

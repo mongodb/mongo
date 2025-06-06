@@ -59,7 +59,6 @@ selector:
     - jstests/aggregation/sources/setWindowFields/parse.js
     - jstests/aggregation/exec/query_limits_test.js
     - jstests/aggregation/sources/internal_document_sources.js
-    - jstests/aggregation/timeseries/timeseries_group_aggregations.js
     - src/mongo/db/modules/enterprise/jstests/fle2/basic_create_collection.js
     - src/mongo/db/modules/enterprise/jstests/fle2/fle2_bulk_write.js
     - jstests/aggregation/sources/densify/memory_limit.js
@@ -88,6 +87,7 @@ selector:
     - assumes_against_mongod_not_mongos
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - query_intensive_pbt
     - multiversion_incompatible
     - requires_2_or_more_shards
   roots:

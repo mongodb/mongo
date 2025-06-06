@@ -31,6 +31,8 @@ selector:
     # "Cowardly refusing to override write concern of command: ..."
     - assumes_write_concern_unchanged
     - assumes_standalone_mongod
+    # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
+    - query_intensive_pbt
 
 executor:
   archive:

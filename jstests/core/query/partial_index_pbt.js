@@ -6,6 +6,7 @@
  * Queries with similar shapes are run consecutively, to trigger plan cache interactions.
  *
  * @tags: [
+ * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
  * assumes_no_implicit_collection_creation_after_drop,

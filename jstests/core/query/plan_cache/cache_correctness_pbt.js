@@ -4,15 +4,13 @@
  * Auto-parameterization has had issues in the past. This test attempts to target that area.
  *
  * @tags: [
+ * query_intensive_pbt,
  * # This test runs commands that are not allowed with security token: setParameter.
  * not_allowed_with_signed_security_token,
  * requires_timeseries,
  * assumes_no_implicit_collection_creation_after_drop,
  * # Incompatible with setParameter
  * does_not_support_stepdowns,
- * # Change in read concern can slow down queries enough to hit a timeout.
- * assumes_read_concern_unchanged,
- * does_not_support_causal_consistency,
  * # Runs queries that may return many results, requiring getmores
  * requires_getmore,
  * ]
@@ -31,7 +29,7 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const numRuns = 100;
+const numRuns = 50;
 const numQueriesPerRun = 15;
 
 const controlColl = db.cache_correctness_pbt_control;

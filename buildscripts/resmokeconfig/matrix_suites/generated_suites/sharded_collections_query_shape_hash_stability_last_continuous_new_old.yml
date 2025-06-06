@@ -121,6 +121,7 @@ selector:
     - requires_fsync
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - query_intensive_pbt
     - multiversion_incompatible
     - requires_2_or_more_shards
   roots:

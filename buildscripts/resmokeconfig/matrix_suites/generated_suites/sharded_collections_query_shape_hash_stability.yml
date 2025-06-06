@@ -105,6 +105,7 @@ selector:
     - requires_fsync
     - known_query_shape_computation_problem
     - directly_against_shardsvrs_incompatible
+    - query_intensive_pbt
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js
