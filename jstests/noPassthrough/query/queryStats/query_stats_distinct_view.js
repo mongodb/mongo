@@ -47,14 +47,16 @@ function runViewTest(conn, coll) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(firstEntry,
-                          firstEntry.key,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 2,
-                          /* expectedDocsReturnedMax */ 2,
-                          /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: firstEntry,
+        expectedQueryStatsKey: firstEntry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 2,
+        expectedDocsReturnedMax: 2,
+        expectedDocsReturnedMin: 2,
+        expectedDocsReturnedSumOfSq: 4,
+        getMores: false
+    });
 }
 
 const options = {

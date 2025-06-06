@@ -67,14 +67,16 @@ const db = mongos.getDB("test");
     }));  // returns 1 doc, exhausts the cursor
     queryStats = getQueryStatsAggCmd(db);
     assert.eq(1, queryStats.length, queryStats);
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 2,
-                          /* expectedDocsReturnedMax */ 2,
-                          /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4,
-                          /* getMores */ true);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 2,
+        expectedDocsReturnedMax: 2,
+        expectedDocsReturnedMin: 2,
+        expectedDocsReturnedSumOfSq: 4,
+        getMores: true
+    });
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
@@ -92,14 +94,16 @@ const db = mongos.getDB("test");
     ]);  // returns 1 doc
     queryStats = getQueryStatsAggCmd(db);
     assert.eq(1, queryStats.length, queryStats);
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 4,
-                          /* expectedDocsReturnedSum */ 5,
-                          /* expectedDocsReturnedMax */ 2,
-                          /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 9,
-                          /* getMores */ true);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 4,
+        expectedDocsReturnedSum: 5,
+        expectedDocsReturnedMax: 2,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 9,
+        getMores: true
+    });
 }
 
 // Assert on batchSize-limited agg queries that killCursors will write metrics with partial results
@@ -133,14 +137,16 @@ const db = mongos.getDB("test");
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
     const queryStats = getLatestQueryStatsEntry(db, {collName: coll.getName()});
-    assertExpectedResults(queryStats,
-                          queryStatsKey,
-                          /* expectedExecCount */ 2,
-                          /* expectedDocsReturnedSum */ 2,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: queryStats,
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 2,
+        expectedDocsReturnedSum: 2,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 2,
+        getMores: false
+    });
 }
 
 // SERVER-83964 Test that query stats are collected if the database doesn't exist.

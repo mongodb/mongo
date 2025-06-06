@@ -50,14 +50,16 @@ function testDefaultCountCommand(db, collName) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(firstEntry,
-                          firstEntry.key,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 1,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 1,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: firstEntry,
+        expectedQueryStatsKey: firstEntry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 1,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 1,
+        getMores: false
+    });
 
     // Check that only one query stats entry is added.
     const stats = getQueryStats(db.getMongo(), {collName: collName});
@@ -87,14 +89,16 @@ function testCountCommandWithQuery(db, collName) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(firstEntry,
-                          firstEntry.key,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 1,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 1,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: firstEntry,
+        expectedQueryStatsKey: firstEntry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 1,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 1,
+        getMores: false
+    });
 
     // Check that only one query stats entry is added.
     const stats = getQueryStats(db.getMongo(), {collName: collName});
@@ -125,14 +129,16 @@ function testCountCommandWithIndex(db, collName) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(firstEntry,
-                          firstEntry.key,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 1,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 1,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: firstEntry,
+        expectedQueryStatsKey: firstEntry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 1,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 1,
+        getMores: false
+    });
 
     // Check that only one query stats entry is added.
     const stats = getQueryStats(db.getMongo(), {collName: collName});

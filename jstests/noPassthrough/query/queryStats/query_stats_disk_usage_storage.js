@@ -63,10 +63,12 @@ function runStorageStatsTestFind(conn, coll) {
     const shape = {filter: {}};
     const expectedDocs = 7;
 
-    const queryStatsKey = getFindQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
     clearPlanCacheAndQueryStatsStore(conn, coll);
 
-    const queryStats = exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+    const queryStats = exhaustCursorAndGetQueryStats(
+        {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
     // The assertions in exhaustCursorAndGetQueryStats will check that the metrics are
     // sensible (e.g., max >= min), so we'll just assert that the minimum > 0.
@@ -100,14 +102,16 @@ function runStorageStatsTestDistinct(conn, coll) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ expectedDocs,
-                          /* expectedDocsReturnedMax */ expectedDocs,
-                          /* expectedDocsReturnedMin */ expectedDocs,
-                          /* expectedDocsReturnedSumOfSq */ expectedDocs ** 2,
-                          false);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: expectedDocs,
+        expectedDocsReturnedMax: expectedDocs,
+        expectedDocsReturnedMin: expectedDocs,
+        expectedDocsReturnedSumOfSq: expectedDocs ** 2,
+        getMores: false
+    });
 
     assert.gt(queryStats[0].metrics.bytesRead.min, 0);
     assert.gte(queryStats[0].metrics.readTimeMicros.min, 0);
@@ -144,14 +148,16 @@ function runStorageStatsTestCount(conn, coll) {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 1,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 1,
-                          false);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 1,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 1,
+        getMores: false
+    });
 
     assert.gt(queryStats[0].metrics.bytesRead.min, 0, queryStats);
     assert.gte(queryStats[0].metrics.readTimeMicros.min, 0, queryStats);

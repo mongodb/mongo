@@ -48,7 +48,8 @@ function runMatchSortPipelineTest(conn, coll) {
             [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -58,8 +59,8 @@ function runMatchSortPipelineTest(conn, coll) {
             pipeline: [{$match: {v: {$gt: 0, $lt: 5}}}, {$sort: {v: 1}}],
             cursor: {batchSize: batchSize},
         };
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -76,7 +77,8 @@ function runMatchPipelineTest(conn, coll) {
     const expectedDocs = 4;
 
     const shape = {pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]};
-    const queryStatsKey = getAggregateQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -87,8 +89,8 @@ function runMatchPipelineTest(conn, coll) {
             cursor: {batchSize: batchSize},
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -114,7 +116,8 @@ function runViewPipelineTest(conn, coll) {
             [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(conn, view.getName(), shape);
+    const queryStatsKey =
+        getAggregateQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, view);
@@ -125,8 +128,8 @@ function runViewPipelineTest(conn, coll) {
             cursor: {batchSize: batchSize},
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, view, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The view only contains 6 documents, but the query still ends up being a collection
         // scan of all docs in the collection.
@@ -150,7 +153,8 @@ function runCollStatsPipelineTest(conn, coll) {
     const pipeline = [{$collStats: {}}, {$sort: {ns: 1}}];
     const shape = {pipeline: pipeline};
 
-    const queryStatsKey = getAggregateQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -160,8 +164,8 @@ function runCollStatsPipelineTest(conn, coll) {
             pipeline: pipeline,
             cursor: {batchSize: batchSize},
         };
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,

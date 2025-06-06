@@ -46,7 +46,8 @@ function runCachedPlanTest(conn, coll) {
     const expectedDocs = 5;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {y: {$gt: "?number"}}]}};
 
-    const queryStatsKey = getFindQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -58,20 +59,20 @@ function runCachedPlanTest(conn, coll) {
         };
 
         // No entries in the plan cache - this query will definitely not use the plan cache.
-        const queryStatsColdCache =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStatsColdCache = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
         assertAggregatedBoolean(
             queryStatsColdCache, "fromPlanCache", {trueCount: 0, falseCount: 1});
 
         // Inactive entry in the plan cache - we still won't use the plan cache here.
-        const queryStatsInactiveCache =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStatsInactiveCache = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
         assertAggregatedBoolean(
             queryStatsInactiveCache, "fromPlanCache", {trueCount: 0, falseCount: 2});
 
         // Active entry in the plan cache - we will use the plan cache.
-        const queryStatsActiveCache =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStatsActiveCache = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
         assertAggregatedBoolean(
             queryStatsActiveCache, "fromPlanCache", {trueCount: 1, falseCount: 2});
     }

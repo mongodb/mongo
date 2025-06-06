@@ -43,7 +43,8 @@ function runUnindexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -55,8 +56,8 @@ function runUnindexedFindTest(conn, coll) {
             batchSize: batchSize
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -75,7 +76,8 @@ function runIndexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {y: {$gt: "?number"}}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     // Results should be the same independent of batch size. We need to reach a batch size of
     // docsReturned + 1 for the initial find command to return an exhausted cursor.
@@ -85,8 +87,8 @@ function runIndexedFindTest(conn, coll) {
         // In the sharded case, this will target only one shard.
         const cmd =
             {find: coll.getName(), filter: {y: {$gt: 0}}, sort: {v: 1}, batchSize: batchSize};
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 4,
@@ -110,7 +112,8 @@ function runFindAgainstViewTest(conn, coll) {
     const expectedDocs = 3;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey = getFindQueryStatsKey(conn, view.getName(), shape);
+    const queryStatsKey =
+        getFindQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -122,8 +125,8 @@ function runFindAgainstViewTest(conn, coll) {
             batchSize: batchSize
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, view, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The view only contains 6 documents, but the query still ends up being a collection
         // scan of all docs in the collection.

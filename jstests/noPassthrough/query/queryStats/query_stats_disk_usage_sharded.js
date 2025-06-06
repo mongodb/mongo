@@ -66,12 +66,12 @@ function runLookupForeignShardedPipelineTest(st) {
     }};
     const shape = {pipeline: [lookup]};
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        localColl.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: foreignColl.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: localColl.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: foreignColl.getName()}]},
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, localColl);
@@ -85,8 +85,8 @@ function runLookupForeignShardedPipelineTest(st) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, localColl, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // Due to the index, we look at all local documents plus only the matching foreign
         // documents.
@@ -140,12 +140,12 @@ function runUnionWithShardedPipelineTest(st) {
         ]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        coll1.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: coll2.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll1.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: coll2.getName()}]},
+    });
 
     const expectedDocs = 10;
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
@@ -157,8 +157,8 @@ function runUnionWithShardedPipelineTest(st) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll1, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // Index scan against coll1 for 5 docs examined and collection scan against coll2 for 7,
         // giving a total of 12 docs and 5 keys examined.

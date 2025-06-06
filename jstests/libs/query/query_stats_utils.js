@@ -293,14 +293,16 @@ export function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
               "Query Shape Key is missing or has extra fields: " + tojson(resultingKey));
 }
 
-export function assertExpectedResults(results,
-                                      expectedQueryStatsKey,
-                                      expectedExecCount,
-                                      expectedDocsReturnedSum,
-                                      expectedDocsReturnedMax,
-                                      expectedDocsReturnedMin,
-                                      expectedDocsReturnedSumOfSq,
-                                      getMores) {
+export function assertExpectedResults({
+    results,
+    expectedQueryStatsKey,
+    expectedExecCount,
+    expectedDocsReturnedSum,
+    expectedDocsReturnedMax,
+    expectedDocsReturnedMin,
+    expectedDocsReturnedSumOfSq,
+    getMores
+}) {
     const {key, keyHash, queryShapeHash, metrics, asOf} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
@@ -607,7 +609,7 @@ export function getQueryStatsShapeHashes(entries) {
 /**
  * Helper function to construct a query stats key for a find query.
  */
-export function getFindQueryStatsKey(conn, collName, queryShapeExtra, extra = {}) {
+export function getFindQueryStatsKey({conn, collName, queryShapeExtra, extra = {}}) {
     // This is most of the query stats key. There are configuration-specific details that are
     // added conditionally afterwards.
     const baseQueryShape = {
@@ -639,7 +641,7 @@ export function getFindQueryStatsKey(conn, collName, queryShapeExtra, extra = {}
 /**
  * Helper function to construct a query stats key for an aggregate query.
  */
-export function getAggregateQueryStatsKey(conn, collName, queryShapeExtra, extra = {}) {
+export function getAggregateQueryStatsKey({conn, collName, queryShapeExtra, extra = {}}) {
     const testDB = conn.getDB("test");
     const coll = testDB[collName];
     const baseQueryShape = {cmdNs: {db: "test", coll: collName}, command: "aggregate"};
@@ -781,7 +783,7 @@ function isView(conn, coll) {
  * returning the query stats. Asserts that the expected number of documents is ultimately returned,
  * and asserts that query stats are written as expected.
  */
-export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs) {
+export function exhaustCursorAndGetQueryStats({conn, cmd, key, expectedDocs}) {
     const testDB = conn.getDB("test");
 
     // Set up the namespace and the batch size - it goes in different fields for find vs. aggregate.
@@ -841,14 +843,16 @@ export function exhaustCursorAndGetQueryStats(conn, coll, cmd, key, expectedDocs
     const queryStats = getSingleQueryStatsEntryForNs(conn, namespace);
     jsTest.log.info("Query Stats", {queryStats});
 
-    assertExpectedResults(queryStats,
-                          key,
-                          /* expectedExecCount */ execCountPost,
-                          /* expectedDocsReturnedSum */ expectedDocs * execCountPost,
-                          /* expectedDocsReturnedMax */ expectedDocs,
-                          /* expectedDocsReturnedMin */ expectedDocs,
-                          /* expectedDocsReturnedSumOfSq */ expectedDocs ** 2 * execCountPost,
-                          expectGetMores);
+    assertExpectedResults({
+        results: queryStats,
+        expectedQueryStatsKey: key,
+        expectedExecCount: execCountPost,
+        expectedDocsReturnedSum: expectedDocs * execCountPost,
+        expectedDocsReturnedMax: expectedDocs,
+        expectedDocsReturnedMin: expectedDocs,
+        expectedDocsReturnedSumOfSq: expectedDocs ** 2 * execCountPost,
+        getMores: expectGetMores
+    });
 
     return queryStats;
 }

@@ -67,12 +67,12 @@ function runUnindexedLookupPipelineTest(conn, localColl) {
     }};
     const shape = {pipeline: [lookup]};
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        localColl.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: foreignColl.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: localColl.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: foreignColl.getName()}]},
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, localColl);
@@ -83,8 +83,8 @@ function runUnindexedLookupPipelineTest(conn, localColl) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, localColl, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // There are two cases for expectedDocs:
         // 1. The query can be a collection scan against the foreign collection for each doc in
@@ -136,12 +136,12 @@ function runUnindexedUnoptimizedLookupPipelineTest(conn, localColl) {
     const pipeline = [{$_internalInhibitOptimization: {}}, lookup];
     const shape = {pipeline: pipeline};
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        localColl.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: foreignColl.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: localColl.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: foreignColl.getName()}]},
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, localColl);
@@ -152,8 +152,8 @@ function runUnindexedUnoptimizedLookupPipelineTest(conn, localColl) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, localColl, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The lookup is a collection scan against the foreign collection for each document in the
         // local collection.
@@ -184,12 +184,12 @@ function runIndexedLookupPipelineTest(conn, localColl) {
     }};
     const shape = {pipeline: [lookup]};
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        localColl.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: foreignColl.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: localColl.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: foreignColl.getName()}]},
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, localColl);
@@ -200,8 +200,8 @@ function runIndexedLookupPipelineTest(conn, localColl) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, localColl, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 2,
@@ -243,12 +243,12 @@ function runUnionWithPipelineTest(conn, coll1) {
         ]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        coll1.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: coll2.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll1.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: coll2.getName()}]},
+    });
 
     // The query expects 6 docs from coll1 and 2 from coll2
     const expectedDocs = 8;
@@ -261,8 +261,8 @@ function runUnionWithPipelineTest(conn, coll1) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll1, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The query is a collection scan across both collections for 7 + 3 = 10 docs examined.
         assertAggregatedMetricsSingleExec(queryStats, {
@@ -310,12 +310,12 @@ function runIndexedUnionWithPipelineTest(conn, coll1) {
         ]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn,
-        coll1.getName(),
-        shape,
-        {otherNss: [{db: "test", coll: coll2.getName()}]},
-    );
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: coll1.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: coll2.getName()}]},
+    });
 
     // The query expects 6 docs from coll1 and 2 from coll2
     const expectedDocs = 8;
@@ -328,8 +328,8 @@ function runIndexedUnionWithPipelineTest(conn, coll1) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll1, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The query can leverage the index on each collection to examine only the matching
         // documents.
@@ -383,16 +383,20 @@ function runDocumentsLookupTest(conn, coll) {
         ].concat(lookup)
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(
-        conn, "$cmd.aggregate", shape, {otherNss: [{db: "test", coll: coll.getName()}]});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: "$cmd.aggregate",
+        queryShapeExtra: shape,
+        extra: {otherNss: [{db: "test", coll: coll.getName()}]}
+    });
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
 
         const cmd = {aggregate: 1, pipeline: [documents, lookup], cursor: {batchSize: batchSize}};
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 2,
@@ -453,7 +457,8 @@ function runFacetPipelineTest(conn, coll) {
         ]
     };
 
-    const queryStatsKey = getAggregateQueryStatsKey(conn, coll.getName(), shape);
+    const queryStatsKey =
+        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     // $facet returns a single document.
     const expectedDocs = 1;
@@ -462,7 +467,8 @@ function runFacetPipelineTest(conn, coll) {
 
     const cmd = {aggregate: coll.getName(), pipeline: pipeline, cursor: {batchSize: batchSize}};
 
-    const queryStats = exhaustCursorAndGetQueryStats(conn, coll, cmd, queryStatsKey, expectedDocs);
+    const queryStats = exhaustCursorAndGetQueryStats(
+        {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
     assertAggregatedMetricsSingleExec(queryStats, {
         keysExamined: 0,

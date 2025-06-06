@@ -59,14 +59,16 @@ coll.insert({v: 4});
     }));  // returns 1 doc, exhausts the cursor
     queryStats = getQueryStatsFindCmd(db);
     assert.eq(1, queryStats.length, queryStats);
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 2,
-                          /* expectedDocsReturnedMax */ 2,
-                          /* expectedDocsReturnedMin */ 2,
-                          /* expectedDocsReturnedSumOfSq */ 4,
-                          /* getMores */ true);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 2,
+        expectedDocsReturnedMax: 2,
+        expectedDocsReturnedMin: 2,
+        expectedDocsReturnedSumOfSq: 4,
+        getMores: true
+    });
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
@@ -75,14 +77,16 @@ coll.insert({v: 4});
     coll.find({v: {$gt: 0, $lt: 2}}).batchSize(10).toArray();  // return 1 doc
     queryStats = getQueryStatsFindCmd(db);
     assert.eq(1, queryStats.length, queryStats);
-    assertExpectedResults(queryStats[0],
-                          queryStatsKey,
-                          /* expectedExecCount */ 4,
-                          /* expectedDocsReturnedSum */ 3,
-                          /* expectedDocsReturnedMax */ 2,
-                          /* expectedDocsReturnedMin */ 0,
-                          /* expectedDocsReturnedSumOfSq */ 5,
-                          /* getMores */ true);
+    assertExpectedResults({
+        results: queryStats[0],
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 4,
+        expectedDocsReturnedSum: 3,
+        expectedDocsReturnedMax: 2,
+        expectedDocsReturnedMin: 0,
+        expectedDocsReturnedSumOfSq: 5,
+        getMores: true
+    });
 }
 
 // Assert on batchSize-limited find queries that killCursors will write metrics with partial results
@@ -108,14 +112,16 @@ coll.insert({v: 4});
     assert.commandWorked(
         db.runCommand({killCursors: coll2.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
     const queryStats = getLatestQueryStatsEntry(db);
-    assertExpectedResults(queryStats,
-                          queryStatsKey,
-                          /* expectedExecCount */ 2,
-                          /* expectedDocsReturnedSum */ 2,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 2,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: queryStats,
+        expectedQueryStatsKey: queryStatsKey,
+        expectedExecCount: 2,
+        expectedDocsReturnedSum: 2,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 2,
+        getMores: false
+    });
 }
 
 // SERVER-83964 Test that query stats are collected if the database doesn't exist.

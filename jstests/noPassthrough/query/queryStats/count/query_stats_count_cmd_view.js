@@ -54,12 +54,14 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    assertExpectedResults(entry,
-                          entry.key,
-                          /* expectedExecCount */ 1,
-                          /* expectedDocsReturnedSum */ 1,
-                          /* expectedDocsReturnedMax */ 1,
-                          /* expectedDocsReturnedMin */ 1,
-                          /* expectedDocsReturnedSumOfSq */ 1,
-                          /* getMores */ false);
+    assertExpectedResults({
+        results: entry,
+        expectedQueryStatsKey: entry.key,
+        expectedExecCount: 1,
+        expectedDocsReturnedSum: 1,
+        expectedDocsReturnedMax: 1,
+        expectedDocsReturnedMin: 1,
+        expectedDocsReturnedSumOfSq: 1,
+        getMores: false
+    });
 });

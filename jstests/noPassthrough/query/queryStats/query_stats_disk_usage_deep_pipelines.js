@@ -5,7 +5,6 @@
  * @tags: [requires_fcv_80]
  */
 
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertAggregatedMetricsSingleExec,
     clearPlanCacheAndQueryStatsStore,
@@ -103,8 +102,12 @@ function runLookupUnionWithPipelineTest(conn, collOuter) {
         {db: "test", coll: collInner.getName()},
         {db: "test", coll: collMiddle.getName()},
     ];
-    const queryStatsKey =
-        getAggregateQueryStatsKey(conn, collOuter.getName(), shape, {otherNss: otherNss});
+    const queryStatsKey = getAggregateQueryStatsKey({
+        conn: conn,
+        collName: collOuter.getName(),
+        queryShapeExtra: shape,
+        extra: {otherNss: otherNss}
+    });
 
     // The query takes documents matching v < 3 from collOuter (5 docs) does a lookup from those
     // to collMiddle (still 5 docs) and unions that result with documents from collInner matching
@@ -119,8 +122,8 @@ function runLookupUnionWithPipelineTest(conn, collOuter) {
             cursor: {batchSize: batchSize}
         };
 
-        const queryStats =
-            exhaustCursorAndGetQueryStats(conn, collOuter, cmd, queryStatsKey, expectedDocs);
+        const queryStats = exhaustCursorAndGetQueryStats(
+            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
         // The query is ultimately a collection scan over all three collections, 7 + 3 + 2 = 12
         // docsExamined.
@@ -192,10 +195,14 @@ function runDeepBranchingPipelineTest(conn, coll1) {
                 cursor: {batchSize: batchSize}
             };
 
-            const queryStatsKey = getAggregateQueryStatsKey(
-                conn, coll1.getName(), pipelineUnionWithLookupShape, {otherNss: otherNss});
-            const queryStats =
-                exhaustCursorAndGetQueryStats(conn, coll1, cmd, queryStatsKey, expectedDocs);
+            const queryStatsKey = getAggregateQueryStatsKey({
+                conn: conn,
+                collName: coll1.getName(),
+                queryShapeExtra: pipelineUnionWithLookupShape,
+                extra: {otherNss: otherNss}
+            });
+            const queryStats = exhaustCursorAndGetQueryStats(
+                {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
             assertAggregatedMetricsSingleExec(queryStats, {
                 keysExamined: 8,
@@ -234,10 +241,14 @@ function runDeepBranchingPipelineTest(conn, coll1) {
                 cursor: {batchSize: batchSize},
             };
 
-            const queryStatsKey = getAggregateQueryStatsKey(
-                conn, coll1.getName(), pipelineUnionShape, {otherNss: otherNssUnion});
-            const queryStats =
-                exhaustCursorAndGetQueryStats(conn, coll1, cmd, queryStatsKey, expectedDocs);
+            const queryStatsKey = getAggregateQueryStatsKey({
+                conn: conn,
+                collName: coll1.getName(),
+                queryShapeExtra: pipelineUnionShape,
+                extra: {otherNss: otherNssUnion}
+            });
+            const queryStats = exhaustCursorAndGetQueryStats(
+                {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
 
             // Metrics for this query are generally the sums of those for the subpipelines, plus 1
             // key and 1 doc examined for the initial match stage.
