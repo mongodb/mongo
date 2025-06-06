@@ -87,7 +87,7 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
-    name: antithesis_jstestfuzz_sharded_with_config_transitions
+    name: antithesis_jstestfuzz_sharded_with_config_transitions_and_add_remove_shard
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -99,7 +99,7 @@ tasks:
       - func: "do setup for antithesis"
       - func: "antithesis image build and push"
         vars:
-          suite: jstestfuzz_sharded_with_config_transitions
+          suite: jstestfuzz_sharded_with_config_transitions_and_add_remove_shard
           resmoke_args: >-
             --runAllFeatureFlagTests
 

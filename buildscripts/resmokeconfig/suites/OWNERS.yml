@@ -137,7 +137,7 @@ filters:
   - "sharding_jscore_passthrough_with_config_transitions_and_add_remove_shard.yml":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "jstestfuzz_sharded_with_config_transitions*":
+  - "jstestfuzz_sharded_with_config_transitions_and_add_remove_shard.yml":
     approvers:
       - 10gen/server-catalog-and-routing
   - "query_correctness_query_shape_hash_stability_generated_test.yml":
