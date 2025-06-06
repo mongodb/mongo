@@ -52,7 +52,7 @@ structs:
             normalizeFunction:
                 description: Type of score normalization function (none, sigmoid, minMaxScaler)
                 type: ScoreNormalizeFunction
-                default: "kSigmoid"
+                default: "kNone"
             weight:
                 description: Number to multiply the 'score' expression by, after normalization
                 type: safeDouble

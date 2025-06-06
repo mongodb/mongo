@@ -557,10 +557,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
             input: {
                 pipelines: {
                     name1: [
-                        {$score: {score: "$score_50"}}
+                        {$score: {score: "$score_50", normalizeFunction: "sigmoid"}}
                     ],
                     name2: [
-                        {$score: {score: "$score_10"}}
+                        {$score: {score: "$score_10", normalizeFunction: "sigmoid"}}
                     ]
                 },
                 normalization: "minMaxScaler"
@@ -654,7 +654,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                 }
                             }
                         }
-                    } 
+                    }
                 },
                 {
                     "$unionWith": {
@@ -738,7 +738,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedNormalization
                                             }
                                         }
                                     }
-                                } 
+                                }
                             }
                         ]
                     }
@@ -874,7 +874,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithFirstPipeline
                 pipelines: {
                     pipeOne: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score: 5.0 } }
+                        { $score: { score: 5.0, normalizeFunction: "sigmoid" } }
                     ],
                     pipeTwo: [
                         { $match : { age : 50 } }
@@ -900,7 +900,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNotScoredPipelineWithSecondPipelin
                     ],
                     pipeTwo: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score: "$age" } }
+                        { $score: { score: "$age", normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -965,7 +965,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelineTextMatchAllowed) {
                 pipelines: {
                     pipeOne: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score: "$age" } }
+                        { $score: { score: "$age", normalizeFunction: "sigmoid" } }
                     ],
                     pipeTwo: [
                         {
@@ -1161,10 +1161,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAllowedSigmoid) {
             input: {
                 pipelines: {
                     name1: [
-                        {$score: {score: "$score_50"}}
+                        {$score: {score: "$score_50", normalizeFunction: "sigmoid"}}
                     ],
                     name2: [
-                        {$score: {score: "$score_10"}}
+                        {$score: {score: "$score_10", normalizeFunction: "sigmoid"}}
                     ]
                 },
                 normalization: "sigmoid"
@@ -1531,7 +1531,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score : { $divide: [6.0, 3.0] } } }
+                        { $score: { score : { $divide: [6.0, 3.0] }, normalizeFunction: "sigmoid" } }
                     ],
                     name2: [
                         {
@@ -1568,13 +1568,22 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
         R"({
             "expectedStages": [
                 {
-                    $match: {
-                        author : "Agatha Christie"
+                    "$match": {
+                        "author": "Agatha Christie"
                     }
                 },
                 {
                     "$setMetadata": {
-                        "score": { "$divide": [ { "$const": 6.0 }, { "$const": 3.0 } ] }
+                        "score": {
+                            "$divide": [
+                                {
+                                    "$const": 6
+                                },
+                                {
+                                    "$const": 3
+                                }
+                            ]
+                        }
                     }
                 },
                 {
@@ -1621,10 +1630,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                         "name1_score": {
                             "$multiply": [
                                 {
-                                    $meta: "score"
+                                    "$meta": "score"
                                 },
                                 {
-                                    "$const": 1.0
+                                    "$const": 1
                                 }
                             ]
                         }
@@ -1635,13 +1644,16 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                "$search": { 
-                                    "mongotQuery": { 
-                                        "index": "search_index", 
-                                        "text": { "query": "mystery", "path": "genres" } 
-                                    }, 
-                                    "requiresSearchSequenceToken": false, 
-                                    "requiresSearchMetaCursor": true 
+                                "$search": {
+                                    "mongotQuery": {
+                                        "index": "search_index",
+                                        "text": {
+                                            "query": "mystery",
+                                            "path": "genres"
+                                        }
+                                    },
+                                    "requiresSearchSequenceToken": false,
+                                    "requiresSearchMetaCursor": true
                                 }
                             },
                             {
@@ -1656,10 +1668,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                                     "name2_score": {
                                         "$multiply": [
                                             {
-                                                $meta: "score"
+                                                "$meta": "score"
                                             },
                                             {
-                                                "$const": 1.0
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -1673,12 +1685,16 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                         "coll": "pipeline_test",
                         "pipeline": [
                             {
-                                $vectorSearch: {
-                                    queryVector: [1.0, 2.0, 3.0],
-                                    path: "plot_embedding",
-                                    numCandidates: 300,
-                                    index: "vector_index",
-                                    limit: 10
+                                "$vectorSearch": {
+                                    "queryVector": [
+                                        1,
+                                        2,
+                                        3
+                                    ],
+                                    "path": "plot_embedding",
+                                    "numCandidates": 300,
+                                    "index": "vector_index",
+                                    "limit": 10
                                 }
                             },
                             {
@@ -1693,10 +1709,10 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                                     "name3_score": {
                                         "$multiply": [
                                             {
-                                                $meta: "score"
+                                                "$meta": "score"
                                             },
                                             {
-                                                "$const": 1.0
+                                                "$const": 1
                                             }
                                         ]
                                     }
@@ -1757,7 +1773,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckMultiplePipelinesAndOptionalArguments
                 },
                 {
                     "$sort": {
-                        "$computed0": {$meta: "score"},
+                        "$computed0": {
+                            "$meta": "score"
+                        },
                         "_id": 1
                     }
                 },
@@ -3098,7 +3116,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score : { $add: [1.0, 4] } } }
+                        { $score: { score : { $add: [1.0, 4] }, normalizeFunction: "sigmoid" } }
                     ],
                     name2: [
                         {
@@ -3110,7 +3128,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchMetaUsed) {
                                 }
                             }
                         },
-                        { $score: { score : { $subtract: [4.0, 2] } } }
+                        { $score: { score : { $subtract: [4.0, 2] }, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3130,7 +3148,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfSearchStoredSourceUsed) {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ],
                     name2: [
                         {
@@ -3163,7 +3181,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ],
                     name2: [
                         {
@@ -3175,7 +3193,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                                 }
                             }
                         },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3206,7 +3224,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionWithNotAllowed) {
                 pipelines: {
                     name1: [
                         { $sample: { size: 10 } },
-                        { $score: { score : 5.0 } },
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } },
                         { $limit: 10 }
                     ],
                     name2: [
@@ -3223,7 +3241,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckLimitSampleUnionWithNotAllowed) {
                                 ]
                             }
                         },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3254,7 +3272,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
                 pipelines: {
                     name1: [
                         { $sample: { size: 10 } },
-                        { $score: { score : 5.0 } },
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } },
                         { $limit: 10 }
                     ],
                     name2: [
@@ -3275,7 +3293,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfNestedUnionWithModifiesFields) {
                                 ]
                             }
                         },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3295,11 +3313,11 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfIncludeProject) {
                 pipelines: {
                     name1: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score : 5.0 } }
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } }
                     ],
                     name2: [
                         { $match : { age : 50 } },
-                        { $score: { score : 5.0 } },
+                        { $score: { score : 5.0, normalizeFunction: "sigmoid" } },
                         { $project: { author: 1 } }
                     ]
                 },
@@ -3320,7 +3338,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
                 pipelines: {
                     foo: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: { score: 5.0 } }
+                        { $score: { score: 5.0, normalizeFunction: "sigmoid" } }
                     ],
                     bar: [
                         {
@@ -3334,7 +3352,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameDuplicated) {
                         }
                     ],
                     foo: [
-                        { $score: { score: 5.0 } }
+                        { $score: { score: 5.0, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3354,7 +3372,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameStartsWithDollar) {
                 pipelines: {
                     $matchAuthor: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: {score: 5.0} }
+                        { $score: {score: 5.0, normalizeFunction: "sigmoid"} }
                     ],
                     matchGenres: [
                         {
@@ -3385,7 +3403,7 @@ TEST_F(DocumentSourceScoreFusionTest, ErrorsIfPipelineNameContainsDot) {
                 pipelines: {
                     matchAuthor: [
                         { $match : { author : "Agatha Christie" } },
-                        { $score: {score: 5.0} }
+                        { $score: {score: 5.0, normalizeFunction: "sigmoid"} }
                     ],
                     "match.genres": [
                         {
@@ -3474,7 +3492,7 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                                 spherical: true
                             }
                         },
-                        { $score: { score: { $meta: "geoNearDistance" } } }
+                        { $score: { score: { $meta: "geoNearDistance" }, normalizeFunction: "sigmoid" } }
                     ]
                 },
                 normalization: "none"
@@ -3486,7 +3504,6 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
         DocumentSourceScoreFusion::createFromBson(spec.firstElement(), getExpCtx());
     const auto pipeline = Pipeline::create(desugaredList, getExpCtx());
     BSONObj asOneObj = BSON("expectedStages" << pipeline->serializeToBson());
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "expectedStages": [
@@ -3516,7 +3533,9 @@ TEST_F(DocumentSourceScoreFusionTest, CheckIfScoreWithGeoNearDistanceMetadataPip
                 },
                 {
                     "$setMetadata": {
-                        "score": { "$meta": "geoNearDistance" }
+                        "score": {
+                            "$meta": "geoNearDistance"
+                        }
                     }
                 },
                 {

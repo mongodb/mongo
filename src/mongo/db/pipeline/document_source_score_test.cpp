@@ -83,9 +83,8 @@ TEST_F(DocumentSourceScoreTest, CheckNoOptionalArgsIncluded) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    // Default is sigmoid so a normalization stage for sigmoid will be included in the desugared
-    // list.
-    ASSERT_EQ(desugaredList.size(), 2);
+    // Default normalization is none.
+    ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
     auto stage = exec::agg::buildStage(ds);
     ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
@@ -127,9 +126,8 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
 
     const auto desugaredList =
         DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
-    // Default is sigmoid so a normalization stage for sigmoid will be included in the desugared
-    // list.
-    ASSERT_EQ(desugaredList.size(), 2);
+    // Default normalization is none.
+    ASSERT_EQ(desugaredList.size(), 1);
     boost::intrusive_ptr<DocumentSource> ds = *desugaredList.begin();
     auto stage = exec::agg::buildStage(ds);
     ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
