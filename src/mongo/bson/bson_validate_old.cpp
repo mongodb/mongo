@@ -205,7 +205,7 @@ Status validateElementInfo(Buffer* buffer,
     if (!buffer->readNumber<signed char>(&type))
         return makeError("invalid bson", idElem, StringData());
 
-    if (type == EOO) {
+    if (type == stdx::to_underlying(BSONType::eoo)) {
         *nextState = ValidationState::EndObj;
         return Status::OK();
     }
@@ -215,23 +215,23 @@ Status validateElementInfo(Buffer* buffer,
         return status;
 
     switch (type) {
-        case MinKey:
-        case MaxKey:
-        case jstNULL:
-        case Undefined:
+        case stdx::to_underlying(BSONType::minKey):
+        case stdx::to_underlying(BSONType::maxKey):
+        case stdx::to_underlying(BSONType::null):
+        case stdx::to_underlying(BSONType::undefined):
             return Status::OK();
 
-        case jstOID:
+        case stdx::to_underlying(BSONType::oid):
             if (!buffer->skip(OID::kOIDSize))
                 return makeError("invalid bson", idElem, *elemName);
             return Status::OK();
 
-        case NumberInt:
+        case stdx::to_underlying(BSONType::numberInt):
             if (!buffer->skip(sizeof(int32_t)))
                 return makeError("invalid bson", idElem, *elemName);
             return Status::OK();
 
-        case Bool:
+        case stdx::to_underlying(BSONType::boolean):
             uint8_t val;
             if (!buffer->readNumber(&val))
                 return makeError("invalid bson", idElem, *elemName);
@@ -239,20 +239,20 @@ Status validateElementInfo(Buffer* buffer,
                 return makeError("invalid boolean value", idElem, *elemName);
             return Status::OK();
 
-        case NumberDouble:
-        case NumberLong:
-        case bsonTimestamp:
-        case Date:
+        case stdx::to_underlying(BSONType::numberDouble):
+        case stdx::to_underlying(BSONType::numberLong):
+        case stdx::to_underlying(BSONType::timestamp):
+        case stdx::to_underlying(BSONType::date):
             if (!buffer->skip(sizeof(int64_t)))
                 return makeError("invalid bson", idElem, *elemName);
             return Status::OK();
 
-        case NumberDecimal:
+        case stdx::to_underlying(BSONType::numberDecimal):
             if (!buffer->skip(sizeof(Decimal128::Value)))
                 return makeError("Invalid bson", idElem, *elemName);
             return Status::OK();
 
-        case DBRef:
+        case stdx::to_underlying(BSONType::dbRef):
             status = buffer->readUTF8String(*elemName, nullptr);
             if (!status.isOK())
                 return status;
@@ -261,7 +261,7 @@ Status validateElementInfo(Buffer* buffer,
             }
             return Status::OK();
 
-        case RegEx:
+        case stdx::to_underlying(BSONType::regEx):
             status = buffer->readCString(*elemName, nullptr);
             if (!status.isOK())
                 return status;
@@ -271,15 +271,15 @@ Status validateElementInfo(Buffer* buffer,
 
             return Status::OK();
 
-        case Code:
-        case Symbol:
-        case String:
+        case stdx::to_underlying(BSONType::code):
+        case stdx::to_underlying(BSONType::symbol):
+        case stdx::to_underlying(BSONType::string):
             status = buffer->readUTF8String(*elemName, nullptr);
             if (!status.isOK())
                 return status;
             return Status::OK();
 
-        case BinData: {
+        case stdx::to_underlying(BSONType::binData): {
             int sz;
             if (!buffer->readNumber<int>(&sz))
                 return makeError("invalid bson", idElem, *elemName);
@@ -289,11 +289,11 @@ Status validateElementInfo(Buffer* buffer,
                 return makeError("invalid bson", idElem, *elemName);
             return Status::OK();
         }
-        case CodeWScope:
+        case stdx::to_underlying(BSONType::codeWScope):
             *nextState = ValidationState::BeginCodeWScope;
             return Status::OK();
-        case Object:
-        case Array:
+        case stdx::to_underlying(BSONType::object):
+        case stdx::to_underlying(BSONType::array):
             *nextState = ValidationState::BeginObj;
             return Status::OK();
 

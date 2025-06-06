@@ -42,7 +42,7 @@ static bool isDataInterleaved(const char* binary, size_t size) {
 
     while (pos != end) {
         uint8_t control = *pos;
-        if (control == EOO) {
+        if (control == stdx::to_underlying(BSONType::eoo)) {
             // Reached the end of the binary.
             return false;
         }

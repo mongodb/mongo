@@ -46,9 +46,9 @@ static bool isDataOnlyInterleaved(const char* binary, size_t size) {
 
     while (pos != end) {
         uint8_t control = *pos;
-        if (control == EOO) {
+        if (control == stdx::to_underlying(BSONType::eoo)) {
             // Reached the end of interleaved mode and this should be the end of the binary.
-            return *(++pos) == EOO;
+            return *(++pos) == stdx::to_underlying(BSONType::eoo);
         }
 
         if (bsoncolumn::isInterleavedStartControlByte(control)) {
@@ -106,7 +106,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::CellBlock::Path>& 
 
     BSONObj obj = elem.embeddedObject();
 
-    if (elem.type() == Array) {
+    if (elem.type() == BSONType::array) {
         // We only want to decompress an array if there is a single element.
         // TODO SERVER-90044 remove this condition.
         if (obj.nFields() != 1) {
@@ -201,7 +201,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
                 continue;
             }
             // Must be an EOO element.
-            invariant(elem.type() == EOO,
+            invariant(elem.type() == BSONType::eoo,
                       str::stream() << "Iterator API returned data that was not an object nor EOO: "
                                     << elem.toString());
             BSONObjBuilder bob;
