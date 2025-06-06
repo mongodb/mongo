@@ -10,40 +10,38 @@ import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
-const dbPrefix = jsTestName() + '_DB_';
-const dbCount = 2;
-const collPrefix = 'sharded_coll_';
-const collCount = 2;
-
-function getRandomShard(connCache) {
-    const shards = Object.keys(connCache.shards);
-    return shards[Random.randInt(shards.length)];
-}
-
 export const $config = (function() {
     let data = {
-        getRandomDb: function(db) {
-            return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
-        },
-        getRandomCollection: function(db) {
-            return db[collPrefix + Random.randInt(collCount)];
-        },
-        movePrimaryAllowedErrorCodes: [
+        dbPrefix: jsTestName() + '_DB_',
+        dbCount: 2,
+        collPrefix: 'sharded_coll_',
+        collCount: 2,
+        kMovePrimaryAllowedErrorCodes: [
             ErrorCodes.ConflictingOperationInProgress,
             // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
             // occurs at this phase, the movePrimary operation does not recover.
             7120202,
-            // In the FSM tests, there is a chance that there are still some User collections
-            // left to clone. This occurs when a MovePrimary joins an already existing MovePrimary
+            // In the FSM tests, there is a chance that there are still some User collections left
+            // to clone. This occurs when a MovePrimary joins an already existing MovePrimary
             // command that has purposefully triggered a failpoint.
             9046501,
-        ]
+        ],
+        getRandomDb: function getRandomDb(db) {
+            return db.getSiblingDB(this.dbPrefix + Random.randInt(this.dbCount));
+        },
+        getRandomCollection: function getRandomCollection(db) {
+            return db[this.collPrefix + Random.randInt(this.collCount)];
+        },
+        getRandomShard: function getRandomShard(connCache) {
+            const shards = Object.keys(connCache.shards);
+            return shards[Random.randInt(shards.length)];
+        }
     };
 
     let states = {
         create: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
             const fullNs = coll.getFullName();
 
             jsTestLog('Executing create state: ' + fullNs);
@@ -51,18 +49,18 @@ export const $config = (function() {
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
         drop: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
 
             assert.eq(coll.drop(), true);
         },
         rename: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const srcColl = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const srcColl = data.getRandomCollection(db);
             const srcCollName = srcColl.getFullName();
-            const destCollNS = this.getRandomCollection(db).getFullName();
+            const destCollNS = data.getRandomCollection(db).getFullName();
             const destCollName = destCollNS.split('.')[1];
 
             jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
@@ -74,17 +72,17 @@ export const $config = (function() {
                 ]);
         },
         movePrimary: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const shardId = getRandomShard(connCache);
+            db = data.getRandomDb(db);
+            const shardId = data.getRandomShard(connCache);
 
             jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
             assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({movePrimary: db.getName(), to: shardId}),
-                this.movePrimaryAllowedErrorCodes);
+                data.kMovePrimaryAllowedErrorCodes);
         },
         collMod: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
 
             jsTestLog('Executing collMod state: ' + coll.getFullName());
             assert.commandWorkedOrFailedWithCode(
@@ -92,14 +90,14 @@ export const $config = (function() {
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
+            db = data.getRandomDb(db);
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
-            db = this.getRandomDb(db);
-            const coll = this.getRandomCollection(db);
+            db = data.getRandomDb(db);
+            const coll = data.getRandomCollection(db);
             jsTestLog('Executing checkMetadataConsistency state for collection: ' +
                       coll.getFullName());
             const inconsistencies = coll.checkMetadataConsistency().toArray();
@@ -142,8 +140,8 @@ export const $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        for (var i = 0; i < dbCount; i++) {
-            const dbName = dbPrefix + i;
+        for (var i = 0; i < data.dbCount; i++) {
+            const dbName = data.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
             newDb.adminCommand({enablesharding: dbName});
         }
