@@ -279,7 +279,7 @@ public:
 
     Status autoCompact(RecoveryUnit&, const AutoCompactOptions& options) override;
 
-    bool underCachePressure() override;
+    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override;
 
     size_t getCacheSizeMB() override;
 

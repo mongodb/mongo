@@ -208,6 +208,8 @@ public:
         int32_t evictionDirtyTargetMB{0};
         // This specifies the value for the eviction_dirty_trigger configuration parameter.
         int32_t evictionDirtyTriggerMB{0};
+        // This specifies the value for the eviction_update_trigger configuration parameter.
+        int32_t evictionUpdatesTriggerMB{0};
         // This specifies the value for the in_memory configuration parameter.
         bool inMemory{false};
         // This specifies the value for the log.enabled configuration parameter.
@@ -639,7 +641,15 @@ public:
 
     KeyFormat getKeyFormat(RecoveryUnit&, StringData ident) const override;
 
-    bool underCachePressure() override;
+    /**
+     * As part of the periodic runner cache pressure rollback thread, this function will
+     * intermittently check to see if the storage engine is under cache pressure using a
+     * combination of Storage Engine metrics and server metrics. The function will calculate by
+     * using the Storage Engine's cache ratio, application threads time spent waiting on cache and
+     * eviction, transactions being committed to the Storage Engine, and available write and read
+     * tickets.
+     */
+    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override;
 
     // TODO SERVER-81069: Remove this since it's intrinsically tied to encryption options only.
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
@@ -686,6 +696,16 @@ private:
     struct IdentToDrop {
         std::string uri;
         StorageEngine::DropIdentCallback callback;
+    };
+
+    // Tracks the state of statistics relevant to cache pressure. These only make sense as deltas
+    // against the previous value.
+    struct CachePressureStats {
+        int64_t cacheWaitUsecs = 0;
+        int64_t evictWaitUsecs = 0;
+        int64_t txnsCommittedCount = 0;
+        // Record when the current stats were generated.
+        int64_t timestamp = 0;
     };
 
     Status _createRecordStore(const NamespaceString& ns,
@@ -765,6 +785,12 @@ private:
     // Wrapped method call to WT_SESSION::drop that handles sub-level error codes if applicable.
     Status _drop(WiredTigerSession& session, const char* uri, const char* config);
 
+    bool _windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTigerSession& session,
+                                                       int concurrentWriteOuts,
+                                                       int concurrentReadOuts);
+
+    bool _storageCacheRatioReachesEvictionTrigger(WiredTigerSession& session);
+
     mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;
@@ -842,6 +868,17 @@ private:
 
     // Tracks the time since the last _waitUntilDurableSession reset().
     Timer _timeSinceLastDurabilitySessionReset;
+
+    // Record the stats for use in calculating deltas between calls to underCachePressure().
+    CachePressureStats _lastStats;
+
+    // Tracks the last time we saw the cache pressure result for thread pressure was not exceeded.
+    Date_t _lastGoodputObservedTimestamp;
+
+    // Since we are tracking the total tickets over a duration, and the tickets we hold are an
+    // instantaneous value, we will use an exponentially decaying moving average to smooth out
+    // noise and avoid aggressive short-term over-corrections due to short-term changes.
+    double _totalTicketsEDMA = 1.0;  // Setting a default value.
 
     // Prevents a database's directory from being deleted concurrently with creation (necessary for
     // --directoryPerDb).

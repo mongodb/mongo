@@ -206,6 +206,33 @@ server_parameters:
         default: false
         redact: false
 
+    cachePressureEvictionStallThresholdProportion:
+        description: "To adjust the thread pressure sensitivity proportion in detecting cache pressure for the storage engine."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: gCachePressureEvictionStallThresholdProportion
+        default: 0.95
+        validator: {gte: 0, lte: 1}
+        redact: false
+
+    cachePressureEvictionStallDetectionWindowSeconds:
+        description: "The duration of time to allow cache pressure statistics to accumulate and average."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: gCachePressureEvictionStallDetectionWindowSeconds
+        default: 30
+        validator: {gte: 1}
+        redact: false
+
+    cachePressureExponentiallyDecayingMovingAverageAlphaValue:
+        description: "The alpha value used to calculate the exponentially decaying moving average of total tickets."
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<double>"
+        cpp_varname: gCachePressureExponentiallyDecayingMovingAverageAlphaValue
+        default: 0.1
+        validator: {gte: 0, lte: 1}
+        redact: false
+
     # TODO (SERVER-102036): Remove this parameter.
     disableSpillKVEngine:
         description: "Temporary parameter to disable spill kv engine."

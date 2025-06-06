@@ -153,6 +153,19 @@ server_parameters:
             lte: 10000
         redact: false
 
+    wiredTigerEvictionUpdatesMaxGB:
+        description: >-
+            Absolute threshold for updates in cache where eviction starts operating
+            aggressively;
+            Defaults to half of eviction dirty trigger.
+        set_at: startup
+        cpp_varname: "wiredTigerGlobalOptions.evictionUpdatesTriggerGB"
+        default: 0
+        validator:
+            gte: 0
+            lte: 10000
+        redact: false
+
     wiredTigerEvictionDebugMode:
         description: >-
             If true, modify internal WiredTiger algorithms to force lookaside eviction to happen more

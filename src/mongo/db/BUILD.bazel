@@ -3070,6 +3070,7 @@ mongo_cc_library(
         "periodic_runner_cache_pressure_rollback.h",
     ],
     deps = [
+        "//src/mongo/db/admission:execution_control",
         "//src/mongo/db/session:kill_sessions_local",
         "//src/mongo/db/transaction",
         "//src/mongo/util:periodic_runner",

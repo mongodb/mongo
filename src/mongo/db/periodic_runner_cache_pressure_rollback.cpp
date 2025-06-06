@@ -29,6 +29,7 @@
 #include "mongo/db/periodic_runner_cache_pressure_rollback.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/execution_control_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -62,9 +63,12 @@ using Argument =
     decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument;
 
 bool underCachePressure(OperationContext* opCtx) {
-    bool rollbackCachePressure =
-        opCtx->getServiceContext()->getStorageEngine()->underCachePressure();
+    auto ticketMgr = admission::TicketHolderManager::get(opCtx->getServiceContext());
+    auto writeTicketHolder = ticketMgr->getTicketHolder(MODE_IX);
+    auto readTicketHolder = ticketMgr->getTicketHolder(MODE_IS);
 
+    bool rollbackCachePressure = opCtx->getServiceContext()->getStorageEngine()->underCachePressure(
+        writeTicketHolder->used(), readTicketHolder->used());
     return rollbackCachePressure;
 }
 

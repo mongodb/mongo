@@ -191,7 +191,7 @@ public:
         return true;
     }
 
-    bool underCachePressure() override {
+    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override {
         return false;
     }
 
