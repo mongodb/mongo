@@ -27,8 +27,6 @@
 #
 """Text Writing Utilites."""
 
-from . import common
-
 # Number of spaces to indent code
 _INDENT_SPACE_COUNT = 4
 
@@ -101,7 +99,6 @@ class IndentedTextWriter(object):
         """Create an indented text writer."""
         self._stream = stream
         self._indent = 0
-        self._template_context = None  # type: Mapping[str, str]
 
     def write_unindented_line(self, msg):
         # type: (str) -> None
@@ -126,49 +123,10 @@ class IndentedTextWriter(object):
         self._stream.write(_indent_text(self._indent, msg))
         self._stream.write("\n")
 
-    def set_template_mapping(self, template_params):
-        # type: (Mapping[str,str]) -> None
-        """Set the current template mapping parameters for string.Template formatting."""
-        assert not self._template_context
-        self._template_context = template_params
-
-    def clear_template_mapping(self):
-        # type: () -> None
-        """Clear the current template mapping parameters for string.Template formatting."""
-        assert self._template_context
-        self._template_context = None
-
-    def write_template(self, template):
-        # type: (str) -> None
-        """Write a template to the stream."""
-        msg = common.template_format(template, self._template_context)
-        self._stream.write(_indent_text(self._indent, msg))
-        self._stream.write("\n")
-
     def write_empty_line(self):
         # type: () -> None
         """Write a line to the stream."""
         self._stream.write("\n")
-
-
-class TemplateContext(object):
-    """Set the template context for the writer."""
-
-    def __init__(self, writer, template_params):
-        # type: (IndentedTextWriter, Mapping[str,str]) -> None
-        """Create a template context."""
-        self._writer = writer
-        self._template_context = template_params
-
-    def __enter__(self):
-        # type: () -> None
-        """Set the template mapping for the writer."""
-        self._writer.set_template_mapping(self._template_context)
-
-    def __exit__(self, *args):
-        # type: (*str) -> None
-        """Clear the template mapping for the writer."""
-        self._writer.clear_template_mapping()
 
 
 class WriterBlock(object):
@@ -217,14 +175,14 @@ class IndentedScopedBlock(WriterBlock):
     def __enter__(self):
         # type: () -> None
         """Write the beginning of the block and then indent."""
-        self._writer.write_template(self._opening)
+        self._writer.write_line(self._opening)
         self._writer.indent()
 
     def __exit__(self, *args):
         # type: (*str) -> None
         """Unindent the block and print the ending."""
         self._writer.unindent()
-        self._writer.write_template(self._closing)
+        self._writer.write_line(self._closing)
 
 
 class NamespaceScopeBlock(WriterBlock):

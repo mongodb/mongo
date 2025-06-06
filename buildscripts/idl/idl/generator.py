@@ -116,9 +116,7 @@ def _get_field_enum(field):
 def _get_field_constant_name(field):
     # type: (ast.Field) -> str
     """Get the C++ string constant name for a field."""
-    return common.template_args(
-        "k${constant_name}FieldName", constant_name=common.title_case(field.cpp_name)
-    )
+    return f"k{common.title_case(field.cpp_name)}FieldName"
 
 
 def _get_field_member_validator_name(field):
@@ -488,11 +486,6 @@ class _CppFileWriterBase(object):
             self._writer.write_line(" * " + desc)
         self._writer.write_line(" */")
 
-    def _with_template(self, template_params):
-        # type: (Mapping[str,str]) -> writer.TemplateContext
-        """Generate a template context for the current parameters."""
-        return writer.TemplateContext(self._writer, template_params)
-
     def _block(self, opening, closing):
         # type: (str, str) -> Union[writer.IndentedScopedBlock,writer.EmptyBlock]
         """Generate an indented block if opening is not empty."""
@@ -700,42 +693,29 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if cpp_type_info.return_by_reference():
             param_type += "&"
 
-        template_params = {
-            "method_name": _get_field_member_getter_name(field),
-            "param_type": param_type,
-            "body": cpp_type_info.get_getter_body(member_name),
-            "const_type": "const " if cpp_type_info.return_by_reference() else "",
-        }
+        method_name = _get_field_member_getter_name(field)
+        body = cpp_type_info.get_getter_body(member_name)
+        const_type = "const " if cpp_type_info.return_by_reference() else ""
 
         # Generate a getter that disables xvalue for view types (i.e. StringData), constructed
         # optional types, and non-primitive types.
-        with self._with_template(template_params):
-            if field.chained_struct_field:
-                self._writer.write_template(
-                    "${const_type}${param_type} ${method_name}() const { return %s.%s(); }"
-                    % (
-                        (
-                            _get_field_member_name(field.chained_struct_field),
-                            _get_field_member_getter_name(field),
-                        )
-                    )
-                )
+        if field.chained_struct_field:
+            member_name = _get_field_member_name(field.chained_struct_field)
+            self._writer.write_line(
+                f"{const_type}{param_type} {method_name}() const {{ return {member_name}.{method_name}(); }}"
+            )
 
-            elif field.type.is_struct:
-                # Support mutable accessors
-                self._writer.write_template(
-                    "const ${param_type} ${method_name}() const { ${body} }"
-                )
+        elif field.type.is_struct:
+            # Support mutable accessors
+            self._writer.write_line(f"const {param_type} {method_name}() const {{ {body} }}")
 
-                if not struct.immutable:
-                    self._writer.write_template("${param_type} ${method_name}() { ${body} }")
-            else:
-                self._writer.write_template(
-                    "${const_type}${param_type} ${method_name}() const { ${body} }"
-                )
+            if not struct.immutable:
+                self._writer.write_line(f"{param_type} {method_name}() {{ {body} }}")
+        else:
+            self._writer.write_line(f"{const_type}{param_type} {method_name}() const {{ {body} }}")
 
-                if field.non_const_getter:
-                    self._writer.write_template("${param_type} ${method_name}() { ${body} }")
+            if field.non_const_getter:
+                self._writer.write_line(f"{param_type} {method_name}() {{ {body} }}")
 
     def gen_validators(self, field):
         # type: (ast.Field) -> None
@@ -748,17 +728,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if not cpp_types.is_primitive_type(param_type):
             param_type = "const " + param_type + "&"
 
-        template_params = {
-            "method_name": _get_field_member_validator_name(field),
-            "param_type": param_type,
-        }
+        method_name = _get_field_member_validator_name(field)
 
-        with self._with_template(template_params):
-            # Declare method implemented in C++ file.
-            self._writer.write_template("void ${method_name}(${param_type} value);")
-            self._writer.write_template(
-                "void ${method_name}(IDLParserContext& ctxt, ${param_type} value);"
-            )
+        # Declare method implemented in C++ file.
+        self._writer.write_line(f"void {method_name}({param_type} value);")
+        self._writer.write_line(f"void {method_name}(IDLParserContext& ctxt, {param_type} value);")
 
         self._writer.write_empty_line()
 
@@ -872,35 +846,22 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         ]
         for field in fields:
             self._writer.write_line(
-                common.template_args(
-                    'static constexpr auto ${constant_name} = "${field_name}"_sd;',
-                    constant_name=_get_field_constant_name(field),
-                    field_name=field.name,
-                )
+                f'static constexpr auto {_get_field_constant_name(field)} = "{field.name}"_sd;'
             )
 
         if isinstance(struct, ast.Command):
             self._writer.write_line(
-                common.template_args(
-                    "static constexpr auto kCommandDescription = ${description}_sd;",
-                    description=_encaps(struct.description),
-                )
+                f"static constexpr auto kCommandDescription = {_encaps(struct.description)}_sd;"
             )
 
             self._writer.write_line(
-                common.template_args(
-                    'static constexpr auto kCommandName = "${command_name}"_sd;',
-                    command_name=struct.command_name,
-                )
+                f'static constexpr auto kCommandName = "{struct.command_name}"_sd;'
             )
 
             # Initialize constexpr for command alias if specified in the IDL spec.
             if struct.command_alias:
                 self._writer.write_line(
-                    common.template_args(
-                        'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
-                        command_alias=struct.command_alias,
-                    )
+                    f'static constexpr auto kCommandAlias = "{struct.command_alias}"_sd;',
                 )
 
     def gen_field_enum(self, struct):
@@ -958,11 +919,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 if enum_value.description is not None:
                     self.gen_description_comment(enum_value.description)
                 self._writer.write_line(
-                    common.template_args(
-                        "${name}${value},",
-                        name=enum_value.name,
-                        value=enum_type_info.get_cpp_value_assignment(enum_value),
-                    )
+                    f"{enum_value.name}{enum_type_info.get_cpp_value_assignment(enum_value)},",
                 )
 
     def gen_op_msg_request_methods(self, command):
@@ -992,10 +949,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate the field list entries map for a generic argument or reply field list."""
         field_list_info = generic_field_list_types.get_field_list_info(struct)
         self._writer.write_line(
-            common.template_args(
-                "// Map: fieldName -> ${should_forward_name}",
-                should_forward_name=field_list_info.get_should_forward_name(),
-            )
+            f"// Map: fieldName -> {field_list_info.get_should_forward_name()}",
         )
         self._writer.write_line("static const StaticImmortal<StringMap<bool>> _genericFields;")
         self.write_empty_line()
@@ -1034,18 +988,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 )
             )
 
+        cls = common.title_case(struct.name)
         for op in ["==", "!=", "<", ">", "<=", ">="]:
-            with self._block(
-                common.template_args(
-                    "friend bool operator${op}(const ${cls}& a, const ${cls}& b) {",
-                    op=op,
-                    cls=common.title_case(struct.name),
-                ),
-                "}",
-            ):
-                self._writer.write_line(
-                    common.template_args("return a._relopTuple() ${op} b._relopTuple();", op=op)
-                )
+            with self._block(f"friend bool operator{op}(const {cls}& a, const {cls}& b) {{", "}"):
+                self._writer.write_line(f"return a._relopTuple() {op} b._relopTuple();")
 
         self.write_empty_line()
 
@@ -1110,7 +1056,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         cls = scp.cpp_class
 
-        with self._block("class %s : public ServerParameter {" % (cls.name), "};"):
+        with self._block(f"class {cls.name} : public ServerParameter {{", "};"):
             self._writer.write_unindented_line("public:")
             if scp.default is not None:
                 self._writer.write_line(
@@ -1192,9 +1138,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (bool, Union[str, bool]) -> None
         """Generate an apiVersions or deprecatedApiVersions function for a command's base class."""
         fn_name = "apiVersions" if is_api_versions else "deprecatedApiVersions"
-        fn_def = "const std::set<std::string>& %s() const final" % fn_name
         value = "kApiVersions1" if api_version else "kNoApiVersions"
-        with self._block("%s {" % (fn_def), "}"):
+        with self._block(f"const std::set<std::string>& {fn_name}() const final {{", "}"):
             self._writer.write_line("return %s;" % value)
 
     def gen_invocation_base_class_declaration(self, command):
@@ -1633,30 +1578,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             tenant,
                         )
                     )
-                    return common.template_args(
-                        "${method_name}(tempContext, ${expression})",
-                        method_name=method_name,
-                        expression=expression,
-                    )
+                    return f"{method_name}(tempContext, {expression})"
 
-                if ast_type.deserialize_with_tenant:
-                    arguments = "${method_name}(${tenant}, ${expression}, ${context})"
-                    if is_catalog_ctxt:  # serializeForCatalog doesn't need a serializationContext
-                        arguments = "${method_name}(${tenant}, ${expression})"
-                        method_name = method_name.replace("serialize", "serializeForCatalog")
-                    return common.template_args(
-                        arguments,
-                        method_name=method_name,
-                        tenant=tenant,
-                        expression=expression,
-                        context=serialization_context,
-                    )
+                if not ast_type.deserialize_with_tenant:
+                    return f"{method_name}({expression})"
+                elif is_catalog_ctxt:  # serializeForCatalog doesn't need a serializationContext
+                    method_name = method_name.replace("serialize", "serializeForCatalog")
+                    return f"{method_name}({tenant}, {expression})"
                 else:
-                    return common.template_args(
-                        "${method_name}(${expression})",
-                        method_name=method_name,
-                        expression=expression,
-                    )
+                    return f"{method_name}({tenant}, {expression}, {serialization_context})"
 
             # BSONObjects are allowed to be pass through without deserialization
             assert ast_type.bson_serialization_type in [["object"], ["array"]]
@@ -2271,29 +2201,21 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Update the serialization context whether or not we received a tenantId object
             if tenant == "request.getValidatedTenantId()":
                 # inject a context into the IDLParserContext that tags the class as a command request
-                self._writer.write_line(
-                    "setSerializationContext(SerializationContext::stateCommandRequest());"
-                )
-                with self._block(
-                    "if (request.validatedTenancyScope != boost::none && request.validatedTenancyScope->isFromAtlasProxy()) {",
-                    "}",
-                ):
-                    self._writer.write_line("_serializationContext.setPrefixState(true);")
+                self._writer._stream.write("""
+    setSerializationContext(SerializationContext::stateCommandRequest());
+    if (request.validatedTenancyScope != boost::none && request.validatedTenancyScope->isFromAtlasProxy()) {
+        _serializationContext.setPrefixState(true);
+    }""")
             else:
                 # if a non-default serialization context was passed in via the IDLParserContext,
                 # use that to set the local serialization context, otherwise set it to a command
                 # request
-                with self._block(
-                    "if (ctxt.getSerializationContext() != SerializationContext::stateDefault()) {",
-                    "}",
-                ):
-                    self._writer.write_line(
-                        "setSerializationContext(ctxt.getSerializationContext());"
-                    )
-                with self._block("else {", "}"):
-                    self._writer.write_line(
-                        "setSerializationContext(SerializationContext::stateCommandRequest());"
-                    )
+                self._writer._stream.write("""
+    if (ctxt.getSerializationContext() != SerializationContext::stateDefault()) {
+        setSerializationContext(ctxt.getSerializationContext());
+    } else {
+        setSerializationContext(SerializationContext::stateCommandRequest());
+    }""")
 
         else:
             self._writer.write_line(
@@ -2487,29 +2409,24 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if not cpp_types.is_primitive_type(param_type):
             param_type += "&"
 
-        method_template = {
-            "class_name": common.title_case(struct.cpp_name),
-            "method_name": _get_field_member_validator_name(field),
-            "param_type": param_type,
-            "optional_param": optional_params[0],
-        }
+        class_name = common.title_case(struct.cpp_name)
+        method_name = _get_field_member_validator_name(field)
 
-        with self._with_template(method_template):
-            self._writer.write_template(
-                "void ${class_name}::${method_name}(${optional_param}const ${param_type} value)"
-            )
-            with self._block("{", "}"):
-                if validator.gt is not None:
-                    self._compare_and_return_status(">", validator.gt, field, optional_params[1])
-                if validator.gte is not None:
-                    self._compare_and_return_status(">=", validator.gte, field, optional_params[1])
-                if validator.lt is not None:
-                    self._compare_and_return_status("<", validator.lt, field, optional_params[1])
-                if validator.lte is not None:
-                    self._compare_and_return_status("<=", validator.lte, field, optional_params[1])
+        self._writer.write_line(
+            f"void {class_name}::{method_name}({optional_params[0]}const {param_type} value)"
+        )
+        with self._block("{", "}"):
+            if validator.gt is not None:
+                self._compare_and_return_status(">", validator.gt, field, optional_params[1])
+            if validator.gte is not None:
+                self._compare_and_return_status(">=", validator.gte, field, optional_params[1])
+            if validator.lt is not None:
+                self._compare_and_return_status("<", validator.lt, field, optional_params[1])
+            if validator.lte is not None:
+                self._compare_and_return_status("<=", validator.lte, field, optional_params[1])
 
-                if validator.callback is not None:
-                    self._writer.write_line("uassertStatusOK(%s(value));" % (validator.callback))
+            if validator.callback is not None:
+                self._writer.write_line("uassertStatusOK(%s(value));" % (validator.callback))
 
         self._writer.write_empty_line()
 
@@ -2659,215 +2576,191 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the serialize method definition for a custom type."""
 
         # Generate custom serialization
-        template_params = {
-            "field_name": _get_field_constant_name(field),
-            "access_member": _access_member(field),
-            "serialization_context": "_serializationContext",
-            "serialization_options": "options",
-        }
+        field_name = _get_field_constant_name(field)
+        access_member = _access_member(field)
 
-        with self._with_template(template_params):
-            # Is this a scalar bson C++ type?
-            bson_cpp_type = cpp_types.get_bson_cpp_type(field.type)
+        # Is this a scalar bson C++ type?
+        bson_cpp_type = cpp_types.get_bson_cpp_type(field.type)
 
-            # Object types need to go through the generic custom serialization code below
-            if bson_cpp_type and bson_cpp_type.has_serializer():
-                if field.type.is_array:
-                    self._writer.write_template(
-                        "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
-                    )
-                    with self._block("for (const auto& item : ${access_member}) {", "}"):
-                        expression = bson_cpp_type.gen_serializer_expression(
-                            self._writer,
-                            "item",
-                            field.query_shape == ast.QueryShapeFieldType.CUSTOM,
-                            is_catalog_ctxt,
-                        )
-                        template_params["expression"] = expression
-                        self._writer.write_template("arrayBuilder.append(${expression});")
-                else:
+        # Object types need to go through the generic custom serialization code below
+        if bson_cpp_type and bson_cpp_type.has_serializer():
+            if field.type.is_array:
+                self._writer.write_line(
+                    f"BSONArrayBuilder arrayBuilder(builder->subarrayStart({field_name}));"
+                )
+                with self._block(f"for (const auto& item : {access_member}) {{", "}"):
                     expression = bson_cpp_type.gen_serializer_expression(
                         self._writer,
-                        _access_member(field),
+                        "item",
                         field.query_shape == ast.QueryShapeFieldType.CUSTOM,
                         is_catalog_ctxt,
                     )
-                    template_params["expression"] = expression
-                    if not field.should_serialize_with_options:
-                        self._writer.write_template(
-                            "builder->append(${field_name}, ${expression});"
-                        )
-                    elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
-                        self._writer.write_template(
-                            "options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);"
-                        )
-                    elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
-                        self._writer.write_template(
-                            "builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));"
-                        )
-                    else:
-                        assert False
-
-            elif field.type.bson_serialization_type[0] == "any":
-
-                def maybe_add_serialization_context(*args):
-                    """Append 'SerializationContext' arg if needed."""
-                    if field.type.deserialize_with_tenant:
-                        args += ("${serialization_context}",)
-                    return args
-
-                def maybe_add_serialization_options(*args):
-                    """Append 'SerializationOptions' arg if needed."""
-                    if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
-                        args += ("${serialization_options}",)
-                    return args
-
-                def generate_args_template(*args):
-                    """Simply return a string, with all the arguments separated by a comma."""
-                    return ", ".join(args)
-
-                def generate_call_site(serializer, subject, *args):
-                    """Generate either a function or a method invocation with the appropriate arguments."""
-                    args = maybe_add_serialization_context(*args)
-                    args = maybe_add_serialization_options(*args)
-                    if writer.is_function(serializer):
-                        # It should be invoked as 'function(subject, ...args);'
-                        return f"{serializer}({generate_args_template(subject, *args)});"
-                    else:
-                        # It should be invoked as 'subject.method(...args);'
-                        truncated_serializer = writer.get_method_name(serializer)
-                        return f"{subject}.{truncated_serializer}({generate_args_template(*args)});"
-
-                if field.type.is_array:
-                    # Array variants - we pass an array builder
-                    self._writer.write_template(
-                        "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
-                    )
-                    with self._block("for (const auto& item : ${access_member}) {", "}"):
-                        template = generate_call_site(
-                            field.type.serializer,
-                            "item",
-                            "&arrayBuilder",
-                        )
-                        self._writer.write_template(template)
-                else:
-                    # Non-array variants - we pass the field name they should use, and a BSONObjBuilder.
-                    template = generate_call_site(
-                        field.type.serializer, "${access_member}", "${field_name}", "builder"
-                    )
-                    self._writer.write_template(template)
-
+                    self._writer.write_line(f"arrayBuilder.append({expression});")
             else:
-                method_name = writer.get_method_name(field.type.serializer)
-                template_params["method_name"] = method_name
-
-                if field.chained:
-                    # Just directly call the serializer for chained structs without opening up a
-                    # nested document.
-                    self._writer.write_template("${access_member}.${method_name}(builder);")
-                elif field.type.is_array:
-                    self._writer.write_template(
-                        "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
+                expression = bson_cpp_type.gen_serializer_expression(
+                    self._writer,
+                    _access_member(field),
+                    field.query_shape == ast.QueryShapeFieldType.CUSTOM,
+                    is_catalog_ctxt,
+                )
+                if not field.should_serialize_with_options:
+                    self._writer.write_line(f"builder->append({field_name}, {expression});")
+                elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+                    self._writer.write_line(
+                        f"options.serializeLiteral({expression}).serializeForIDL({field_name}, builder);"
                     )
-                    with self._block("for (const auto& item : ${access_member}) {", "}"):
-                        self._writer.write_line(
-                            "BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());"
-                        )
-                        self._writer.write_template("item.${method_name}(&subObjBuilder);")
+                elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
+                    self._writer.write_line(
+                        f"builder->append({field_name}, options.serializeFieldPathFromString({expression}));"
+                    )
                 else:
-                    self._writer.write_template(
-                        "${access_member}.${method_name}(${field_name}, builder);"
+                    assert False
+
+        elif field.type.bson_serialization_type[0] == "any":
+
+            def maybe_add_serialization_context(*args):
+                """Append 'SerializationContext' arg if needed."""
+                if field.type.deserialize_with_tenant:
+                    args += ("_serializationContext",)
+                return args
+
+            def maybe_add_serialization_options(*args):
+                """Append 'SerializationOptions' arg if needed."""
+                if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                    args += ("options",)
+                return args
+
+            def generate_args_template(*args):
+                """Simply return a string, with all the arguments separated by a comma."""
+                return ", ".join(args)
+
+            def generate_call_site(serializer, subject, *args):
+                """Generate either a function or a method invocation with the appropriate arguments."""
+                args = maybe_add_serialization_context(*args)
+                args = maybe_add_serialization_options(*args)
+                if writer.is_function(serializer):
+                    # It should be invoked as 'function(subject, ...args);'
+                    return f"{serializer}({generate_args_template(subject, *args)});"
+                else:
+                    # It should be invoked as 'subject.method(...args);'
+                    truncated_serializer = writer.get_method_name(serializer)
+                    return f"{subject}.{truncated_serializer}({generate_args_template(*args)});"
+
+            if field.type.is_array:
+                # Array variants - we pass an array builder
+                self._writer.write_line(
+                    f"BSONArrayBuilder arrayBuilder(builder->subarrayStart({field_name}));"
+                )
+                with self._block(f"for (const auto& item : {access_member}) {{", "}"):
+                    template = generate_call_site(
+                        field.type.serializer,
+                        "item",
+                        "&arrayBuilder",
                     )
+                    self._writer.write_line(template)
+            else:
+                # Non-array variants - we pass the field name they should use, and a BSONObjBuilder.
+                template = generate_call_site(
+                    field.type.serializer, access_member, field_name, "builder"
+                )
+                self._writer.write_line(template)
+
+        else:
+            method_name = writer.get_method_name(field.type.serializer)
+
+            if field.chained:
+                # Just directly call the serializer for chained structs without opening up a
+                # nested document.
+                self._writer.write_line(f"{access_member}.{method_name}(builder);")
+            elif field.type.is_array:
+                self._writer.write_line(
+                    f"BSONArrayBuilder arrayBuilder(builder->subarrayStart({field_name}));"
+                )
+                with self._block(f"for (const auto& item : {access_member}) {{", "}"):
+                    self._writer.write_line(
+                        "BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());"
+                    )
+                    self._writer.write_line(f"item.{method_name}(&subObjBuilder);")
+            else:
+                self._writer.write_line(f"{access_member}.{method_name}({field_name}, builder);")
 
     def _gen_serializer_method_struct(self, field):
         # type: (ast.Field) -> None
         """Generate the serialize method definition for a struct type."""
 
-        template_params = {
-            "field_name": _get_field_constant_name(field),
-            "access_member": _access_member(field),
-        }
+        field_name = _get_field_constant_name(field)
+        access_member = _access_member(field)
 
-        with self._with_template(template_params):
-            if field.chained:
-                # Just directly call the serializer for chained structs without opening up a nested
-                # document.
-                if not field.should_serialize_with_options:
-                    self._writer.write_template("${access_member}.serialize(builder);")
-                else:
-                    self._writer.write_template("${access_member}.serialize(builder, options);")
-
-            elif field.type.is_array:
-                self._writer.write_template(
-                    "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
-                )
-                with self._block("for (const auto& item : ${access_member}) {", "}"):
-                    self._writer.write_line(
-                        "BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());"
-                    )
-                    if not field.should_serialize_with_options:
-                        self._writer.write_line("item.serialize(&subObjBuilder);")
-                    else:
-                        self._writer.write_line("item.serialize(&subObjBuilder, options);")
+        if field.chained:
+            # Just directly call the serializer for chained structs without opening up a nested
+            # document.
+            if not field.should_serialize_with_options:
+                self._writer.write_line(f"{access_member}.serialize(builder);")
             else:
-                self._writer.write_template(
-                    "BSONObjBuilder subObjBuilder(builder->subobjStart(${field_name}));"
-                )
+                self._writer.write_line(f"{access_member}.serialize(builder, options);")
+
+        elif field.type.is_array:
+            self._writer.write_line(
+                f"BSONArrayBuilder arrayBuilder(builder->subarrayStart({field_name}));"
+            )
+            with self._block(f"for (const auto& item : {access_member}) {{", "}"):
+                self._writer.write_line("BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());")
                 if not field.should_serialize_with_options:
-                    self._writer.write_template("${access_member}.serialize(&subObjBuilder);")
+                    self._writer.write_line("item.serialize(&subObjBuilder);")
                 else:
-                    self._writer.write_template(
-                        "${access_member}.serialize(&subObjBuilder, options);"
-                    )
+                    self._writer.write_line("item.serialize(&subObjBuilder, options);")
+        else:
+            self._writer.write_line(
+                f"BSONObjBuilder subObjBuilder(builder->subobjStart({field_name}));"
+            )
+            if not field.should_serialize_with_options:
+                self._writer.write_line(f"{access_member}.serialize(&subObjBuilder);")
+            else:
+                self._writer.write_line(f"{access_member}.serialize(&subObjBuilder, options);")
 
     def _gen_serializer_method_array_variant(self, field):
-        template_params = {
-            "field_name": _get_field_constant_name(field),
-            "access_member": "item",
-        }
+        field_name = _get_field_constant_name(field)
 
-        with self._with_template(template_params):
-            self._writer.write_template(
-                "BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));"
+        self._writer.write_line(
+            f"BSONArrayBuilder arrayBuilder(builder->subarrayStart({field_name}));"
+        )
+        with self._block(f"for (const auto& item : {_access_member(field)}) {{", "}"):
+            self._writer.write_line("BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());")
+            self._gen_serializer_method_variant_helper(
+                field, field_name, "item", builder="&subObjBuilder"
             )
-            with self._block("for (const auto& item : %s) {" % _access_member(field), "}"):
-                self._writer.write_line("BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());")
-                self._gen_serializer_method_variant_helper(
-                    field, template_params, builder="&subObjBuilder"
-                )
 
     def _gen_serializer_method_variant(self, field):
         # type: (ast.Field) -> None
         """Generate the serialize method definition for a variant type."""
-        template_params = {
-            "field_name": _get_field_constant_name(field),
-            "access_member": _access_member(field),
-        }
 
-        with self._with_template(template_params):
-            self._gen_serializer_method_variant_helper(field, template_params)
+        self._gen_serializer_method_variant_helper(
+            field, _get_field_constant_name(field), _access_member(field)
+        )
 
-    def _gen_serializer_method_variant_helper(self, field, template_params, builder="builder"):
+    def _gen_serializer_method_variant_helper(
+        self, field, field_name, access_member, builder="builder"
+    ):
         # type: (ast.Field, Dict[str, str], str) -> None
 
-        with self._block("visit(OverloadedVisitor{", "}, ${access_member});"):
+        with self._block("visit(OverloadedVisitor{", f"}}, {access_member});"):
             for variant_type in itertools.chain(
                 field.type.variant_types,
                 field.type.variant_struct_types if field.type.variant_struct_types else [],
             ):
-                template_params["cpp_type"] = (
+                cpp_type = (
                     "std::vector<" + variant_type.cpp_type + ">"
                     if variant_type.is_array
                     else variant_type.cpp_type
                 )
 
-                template_params["param_opt"] = ""
+                param_opt = ""
                 if field.should_serialize_with_options:
-                    template_params["param_opt"] = ", options"
-                with self._block("[%s${param_opt}](const ${cpp_type}& value) {" % builder, "},"):
+                    param_opt = ", options"
+                with self._block(f"[{builder}{param_opt}](const {cpp_type}& value) {{", "},"):
                     bson_cpp_type = cpp_types.get_bson_cpp_type(variant_type)
                     if field.type.is_variant and field.type.is_array:
-                        self._writer.write_template("value.serialize(%s);" % builder)
+                        self._writer.write_line(f"value.serialize({builder});")
                     elif bson_cpp_type and bson_cpp_type.has_serializer():
                         assert not field.type.is_array
                         expression = bson_cpp_type.gen_serializer_expression(
@@ -2876,33 +2769,30 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             field.query_shape == ast.QueryShapeFieldType.CUSTOM,
                             False,
                         )
-                        template_params["expression"] = expression
                         if not field.should_serialize_with_options:
-                            self._writer.write_template(
-                                "builder->append(${field_name}, ${expression});"
-                            )
+                            self._writer.write_line(f"builder->append({field_name}, {expression});")
                         elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
-                            self._writer.write_template(
-                                "options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);"
+                            self._writer.write_line(
+                                f"options.serializeLiteral({expression}).serializeForIDL({field_name}, builder);"
                             )
                         elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
-                            self._writer.write_template(
-                                "builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));"
+                            self._writer.write_line(
+                                f"builder->append({field_name}, options.serializeFieldPathFromString({expression}));"
                             )
                         else:
                             assert False
                     else:
                         if not field.should_serialize_with_options:
-                            self._writer.write_template(
-                                "idl::idlSerialize(builder, ${field_name}, value);"
+                            self._writer.write_line(
+                                f"idl::idlSerialize(builder, {field_name}, value);"
                             )
                         elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
-                            self._writer.write_template(
-                                "options.serializeLiteral(value).serializeForIDL(${field_name}, builder);"
+                            self._writer.write_line(
+                                f"options.serializeLiteral(value).serializeForIDL({field_name}, builder);"
                             )
                         elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
-                            self._writer.write_template(
-                                "idl::idlSerialize(builder, ${field_name}, options.serializeFieldPathFromString(value));"
+                            self._writer.write_line(
+                                f"idl::idlSerialize(builder, {field_name}, options.serializeFieldPathFromString(value));"
                             )
                         else:
                             assert False
@@ -3070,24 +2960,20 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             with self._block(optional_block_start, "}"):
                 self._writer.write_line("OpMsg::DocumentSequence documentSequence;")
-                self._writer.write_template(
-                    "documentSequence.name = %s.toString();" % (_get_field_constant_name(field))
+                self._writer.write_line(
+                    f"documentSequence.name = {_get_field_constant_name(field)}.toString();"
                 )
 
-                with self._block("for (const auto& item : %s) {" % (_access_member(field)), "}"):
+                with self._block(f"for (const auto& item : {_access_member(field)}) {{", "}"):
                     if not field.type.is_struct:
                         if field.type.is_variant:
                             # _gen_serializer_method_variant expects builder to be a pointer.
                             self._writer.write_line("BSONObjBuilder objBuilder;")
                             self._writer.write_line("BSONObjBuilder* builder = &objBuilder;")
 
-                            template_params = {
-                                "field_name": _get_field_constant_name(field),
-                                "access_member": "item",
-                            }
-
-                            with self._with_template(template_params):
-                                self._gen_serializer_method_variant_helper(field, template_params)
+                            self._gen_serializer_method_variant_helper(
+                                field, _get_field_constant_name(field), "item"
+                            )
 
                             self._writer.write_line(
                                 "documentSequence.objs.push_back(builder->obj());"
@@ -3104,7 +2990,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_line("item.serialize(&builder);")
                         self._writer.write_line("documentSequence.objs.push_back(builder.obj());")
 
-                self._writer.write_template("request.sequences.emplace_back(documentSequence);")
+                self._writer.write_line("request.sequences.emplace_back(documentSequence);")
 
             # Add a blank line after each block
             self._writer.write_empty_line()
@@ -3180,10 +3066,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_known_fields_declaration(self, struct, name, include_op_msg_implicit):
         # type: (ast.Struct, str, bool) -> None
         """Generate the known fields declaration with specified name."""
-        block_name = common.template_args(
-            "const std::vector<StringData> ${class_name}::_${name}Fields {",
-            name=name,
-            class_name=common.title_case(struct.cpp_name),
+        block_name = (
+            f"const std::vector<StringData> {common.title_case(struct.cpp_name)}::_{name}Fields {{"
         )
         with self._block(block_name, "};"):
             sorted_fields = sorted(
@@ -3201,18 +3085,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     continue
 
                 self._writer.write_line(
-                    common.template_args(
-                        "${class_name}::${constant_name},",
-                        class_name=common.title_case(struct.cpp_name),
-                        constant_name=_get_field_constant_name(field),
-                    )
+                    f"{common.title_case(struct.cpp_name)}::{_get_field_constant_name(field)},"
                 )
 
-            self._writer.write_line(
-                common.template_args(
-                    "${class_name}::kCommandName,", class_name=common.title_case(struct.cpp_name)
-                )
-            )
+            self._writer.write_line(f"{common.title_case(struct.cpp_name)}::kCommandName,")
 
     def gen_known_fields_declaration(self, struct):
         # type: (ast.Struct) -> None
@@ -3227,27 +3103,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         field_list_info = generic_field_list_types.get_field_list_info(struct)
         klass = common.title_case(struct.cpp_name)
-        self._writer.write_line(
-            common.template_args(
-                "// Map: fieldName -> ${should_forward_name}",
-                should_forward_name=field_list_info.get_should_forward_name(),
-            )
-        )
-        block_name = common.template_args(
-            "const StaticImmortal<StringMap<bool>> ${klass}::_genericFields {{", klass=klass
-        )
+        self._writer.write_line(f"// Map: fieldName -> {field_list_info.get_should_forward_name()}")
+        block_name = f"const StaticImmortal<StringMap<bool>> {klass}::_genericFields {{"
         with self._block(block_name, "}};"):
             sorted_entries = sorted(struct.fields, key=lambda f: f.name)
             for entry in sorted_entries:
                 self._writer.write_line(
-                    common.template_args(
-                        '{"${name}", ${should_forward}},',
-                        klass=klass,
-                        name=entry.name,
-                        should_forward="true"
-                        if entry.generic_field_info.get_should_forward()
-                        else "false",
-                    )
+                    f'{{"{entry.name}", {"true" if entry.generic_field_info.get_should_forward() else "false"} }},'
                 )
 
     def _gen_server_parameter_specialized(self, param):
@@ -3306,21 +3168,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate a single IDLServerParameterWithStorage."""
         if param.feature_flag_phase is not None:
             self._writer.write_line(
-                common.template_args(
-                    "auto ret = std::make_unique<FeatureFlagServerParameter>(${name}, &${storage});",
-                    storage=param.cpp_varname,
-                    name=_encaps(param.name),
-                )
+                f"auto ret = std::make_unique<FeatureFlagServerParameter>({_encaps(param.name)}, &{param.cpp_varname});"
             )
         else:
             # Explicitly specify the storage type to keep MSVC happy.
             self._writer.write_line(
-                common.template_args(
-                    "auto ret = std::make_unique<IDLServerParameterWithStorage<${spt},decltype(${storage})>>(${name}, ${storage});",
-                    storage=param.cpp_varname,
-                    spt=param.set_at,
-                    name=_encaps(param.name),
-                )
+                f"auto ret = std::make_unique<IDLServerParameterWithStorage<{param.set_at},decltype({param.cpp_varname})>>({_encaps(param.name)}, {param.cpp_varname});"
             )
 
         if param.on_update is not None:
@@ -3365,11 +3218,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         for alias_no, alias in enumerate(param.deprecated_name):
             self._writer.write_line(
-                common.template_args(
-                    "registerServerParameter(std::make_unique<IDLServerParameterDeprecatedAlias>(${name}, ${param_var}));",
-                    name=_encaps(alias),
-                    param_var="scp_%d.get()" % (param_no),
-                )
+                f"registerServerParameter(std::make_unique<IDLServerParameterDeprecatedAlias>({_encaps(alias)}, scp_{param_no}.get()));"
             )
 
     def gen_server_parameters(self, params, header_file_name):
@@ -3442,21 +3291,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         with self._condition(opt.condition):
             with self._block(section, ";"):
-                self._writer.write_line(
-                    common.template_format(
-                        ".addOptionChaining(${name}, ${short}, moe::${argtype}, ${desc}, ${deprname}, ${deprshortname}, ${usage})",
-                        {
-                            "name": _encaps(opt.name),
-                            "short": _encaps(opt.short_name),
-                            "argtype": opt.arg_vartype,
-                            "desc": _get_expression(opt.description),
-                            "deprname": _encaps_list(opt.deprecated_name),
-                            "deprshortname": _encaps_list(opt.deprecated_short_name),
-                            "usage": usage,
-                        },
-                    )
-                )
-                self._writer.write_line(".setSources(moe::%s)" % (opt.source))
+                self._writer.write_line(f"""\
+.addOptionChaining({_encaps(opt.name)}, {_encaps(opt.short_name)}, moe::{opt.arg_vartype},
+    {_get_expression(opt.description)}, {_encaps_list(opt.deprecated_name)},
+    {_encaps_list(opt.deprecated_short_name)}, {usage})
+.setSources(moe::{opt.source})
+""")
                 if opt.hidden:
                     self._writer.write_line(".hidden()")
                 if opt.redact:
@@ -3485,12 +3325,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 if opt.validator:
                     if opt.validator.callback:
                         self._writer.write_line(
-                            common.template_args(
-                                ".addConstraint(new moe::CallbackKeyConstraint<${argtype}>(${key}, ${callback}))",
-                                argtype=vartype,
-                                key=_encaps(opt.name),
-                                callback=opt.validator.callback,
-                            )
+                            f".addConstraint(new moe::CallbackKeyConstraint<{vartype}>({_encaps(opt.name)}, {opt.validator.callback}))"
                         )
 
                     if (
@@ -3499,24 +3334,28 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         or (opt.validator.gte is not None)
                         or (opt.validator.lte is not None)
                     ):
+                        gt = (
+                            "boost::none"
+                            if opt.validator.gt is None
+                            else _get_expression(opt.validator.gt)
+                        )
+                        lt = (
+                            "boost::none"
+                            if opt.validator.lt is None
+                            else _get_expression(opt.validator.lt)
+                        )
+                        gte = (
+                            "boost::none"
+                            if opt.validator.gte is None
+                            else _get_expression(opt.validator.gte)
+                        )
+                        lte = (
+                            "boost::none"
+                            if opt.validator.lte is None
+                            else _get_expression(opt.validator.lte)
+                        )
                         self._writer.write_line(
-                            common.template_args(
-                                ".addConstraint(new moe::BoundaryKeyConstraint<${argtype}>(${key}, ${gt}, ${lt}, ${gte}, ${lte}))",
-                                argtype=vartype,
-                                key=_encaps(opt.name),
-                                gt="boost::none"
-                                if opt.validator.gt is None
-                                else _get_expression(opt.validator.gt),
-                                lt="boost::none"
-                                if opt.validator.lt is None
-                                else _get_expression(opt.validator.lt),
-                                gte="boost::none"
-                                if opt.validator.gte is None
-                                else _get_expression(opt.validator.gte),
-                                lte="boost::none"
-                                if opt.validator.lte is None
-                                else _get_expression(opt.validator.lte),
-                            )
+                            f".addConstraint(new moe::BoundaryKeyConstraint<{vartype}>({_encaps(opt.name)}, {gt}, {lt}, {gte}, {lte}))"
                         )
 
         self.write_empty_line()
