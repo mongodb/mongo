@@ -57,9 +57,9 @@ public:
         : ServiceContextMongoDTest(std::move(options)),
           _storageEngine(getServiceContext()->getStorageEngine()) {}
 
-    StatusWith<MDBCatalog::EntryIdentifier> createCollection(OperationContext* opCtx,
-                                                             NamespaceString ns,
-                                                             CollectionOptions options = {}) {
+    MDBCatalog::EntryIdentifier createCollection(OperationContext* opCtx,
+                                                 NamespaceString ns,
+                                                 CollectionOptions options = {}) {
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb db(opCtx, ns.dbName(), LockMode::MODE_X);
         if (!options.uuid) {
@@ -89,11 +89,10 @@ public:
             catalog.registerCollection(opCtx, std::move(coll), /*ts=*/boost::none);
         });
 
-        return {{mdbCatalog->getEntry(catalogId)}};
+        return mdbCatalog->getEntry(catalogId);
     }
 
-    StatusWith<MDBCatalog::EntryIdentifier> createTempCollection(OperationContext* opCtx,
-                                                                 NamespaceString ns) {
+    MDBCatalog::EntryIdentifier createTempCollection(OperationContext* opCtx, NamespaceString ns) {
         CollectionOptions options;
         options.temp = true;
         return createCollection(opCtx, ns, options);

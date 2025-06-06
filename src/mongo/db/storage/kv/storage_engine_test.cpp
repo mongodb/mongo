@@ -102,9 +102,8 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 
     // Add a collection, `db.coll1` to both the DurableCatalog and KVEngine. The returned value is
     // the `ident` name given to the collection.
-    auto swCollInfo =
+    auto collInfo =
         createCollection(opCtx.get(), NamespaceString::createNamespaceString_forTest("db.coll1"));
-    ASSERT_OK(swCollInfo.getStatus());
 
     // Create a table in the KVEngine not reflected in the DurableCatalog. This should be dropped
     // when reconciling.
@@ -119,12 +118,12 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
 
     // There are two idents. `_mdb_catalog` and the ident for `db.coll1`.
     ASSERT_EQUALS(static_cast<const unsigned long>(2), idents.size());
-    ASSERT_TRUE(idents.find(swCollInfo.getValue().ident) != idents.end());
+    ASSERT_TRUE(idents.find(collInfo.ident) != idents.end());
     ASSERT_TRUE(idents.find("_mdb_catalog") != idents.end());
 
     // Drop the `db.coll1` table, while leaving the MDBCatalog entry.
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
-                        swCollInfo.getValue().ident,
+                        collInfo.ident,
                         /*identHasSizeInfo=*/true));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
@@ -138,11 +137,10 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), collNs);
 
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
-                        swCollInfo.getValue().ident,
+                        collInfo.ident,
                         /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
@@ -155,7 +153,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }
 
-    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
+    ASSERT(!identExists(opCtx.get(), collInfo.ident));
     ASSERT(!collectionExists(opCtx.get(), collNs));
 }
 
@@ -204,9 +202,8 @@ protected:
     std::string prepareIndexBuild(OperationContext* opCtx, BSONObj& indexSpec) {
         // Creates a collection.
         auto ns = NamespaceString::createNamespaceString_forTest("db.coll1");
-        auto swCollInfo = createCollection(opCtx, ns);
-        ASSERT_OK(swCollInfo.getStatus());
-        auto catalogId = swCollInfo.getValue().catalogId;
+        auto collInfo = createCollection(opCtx, ns);
+        auto catalogId = collInfo.catalogId;
         auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, ns);
         ASSERT(uuid);
         collectionUUID = *uuid;
@@ -464,8 +461,7 @@ TEST_F(StorageEngineTest, StartupRecoveryBuildMissingIdIndex) {
                                 std::make_unique<repl::StorageInterfaceImpl>());
     auto opCtx = cc().makeOperationContext();
     auto ns = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    createCollection(opCtx.get(), ns);
 
     auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), ns);
     ASSERT(coll);
@@ -485,8 +481,7 @@ TEST_F(StorageEngineTest, StartupRecoveryClearLocalTempCollections) {
     auto opCtx = cc().makeOperationContext();
     // Create a local temp collection.
     auto ns = NamespaceString::createNamespaceString_forTest("local.coll1");
-    auto swCollInfo = createTempCollection(opCtx.get(), ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    createTempCollection(opCtx.get(), ns);
 
     startup_recovery::repairAndRecoverDatabases(opCtx.get(),
                                                 StorageEngine::LastShutdownState::kClean);
@@ -604,8 +599,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
     const std::string indexName("a_1");
 
-    auto swCollInfo = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), ns);
 
 
     // Start a single-phase (i.e. no build UUID) index.
@@ -616,8 +610,8 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
         wuow.commit();
     }
 
-    const auto indexIdent = _storageEngine->getMDBCatalog()->getIndexIdent(
-        opCtx.get(), swCollInfo.getValue().catalogId, indexName);
+    const auto indexIdent =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexName);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
 
@@ -636,8 +630,7 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
     const std::string indexA("a_1");
     const std::string indexB("b_1");
 
-    auto swCollInfo = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), ns);
 
     Lock::GlobalLock lk(&*opCtx, MODE_IX);
 
@@ -662,10 +655,10 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
         }
     }
 
-    const auto indexIdentA = _storageEngine->getMDBCatalog()->getIndexIdent(
-        opCtx.get(), swCollInfo.getValue().catalogId, indexA);
-    const auto indexIdentB = _storageEngine->getMDBCatalog()->getIndexIdent(
-        opCtx.get(), swCollInfo.getValue().catalogId, indexB);
+    const auto indexIdentA =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexA);
+    const auto indexIdentB =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), collInfo.catalogId, indexB);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
 
@@ -694,14 +687,11 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), collNs);
 
     // Drop the ident from the storage engine but keep the underlying files.
     _storageEngine->getEngine()->dropIdentForImport(
-        *opCtx.get(),
-        *shard_role_details::getRecoveryUnit(opCtx.get()),
-        swCollInfo.getValue().ident);
+        *opCtx.get(), *shard_role_details::getRecoveryUnit(opCtx.get()), collInfo.ident);
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the
@@ -713,7 +703,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
         catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
     }
 
-    ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
+    ASSERT(identExists(opCtx.get(), collInfo.ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
     ASSERT_EQ(1U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
@@ -724,11 +714,10 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), collNs);
 
     ASSERT_OK(dropIdent(*shard_role_details::getRecoveryUnit(opCtx.get()),
-                        swCollInfo.getValue().ident,
+                        collInfo.ident,
                         /*identHasSizeInfo=*/true));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
@@ -738,7 +727,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 
-    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
+    ASSERT(!identExists(opCtx.get(), collInfo.ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
     ASSERT_EQ(0U, StorageRepairObserver::get(getGlobalServiceContext())->getModifications().size());
@@ -748,8 +737,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), collNs);
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     Lock::GlobalWrite writeLock(opCtx.get(), Date_t::max(), Lock::InterruptBehavior::kThrow);
@@ -768,12 +756,12 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // When in a repair context, loadMDBCatalog() recreates catalog entries for orphaned idents.
     _storageEngine->loadMDBCatalog(opCtx.get(), StorageEngine::LastShutdownState::kClean);
     catalog::initializeCollectionCatalog(opCtx.get(), _storageEngine, boost::none);
-    auto identNs = swCollInfo.getValue().ident;
+    auto identNs = collInfo.ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs =
         NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
 
-    ASSERT(identExists(opCtx.get(), swCollInfo.getValue().ident));
+    ASSERT(identExists(opCtx.get(), collInfo.ident));
     ASSERT(collectionExists(opCtx.get(), orphanNs));
 
     StorageRepairObserver::get(getGlobalServiceContext())->onRepairDone(opCtx.get(), callbackMock);
@@ -784,8 +772,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     auto opCtx = cc().makeOperationContext();
 
     const NamespaceString collNs = NamespaceString::createNamespaceString_forTest("db.coll1");
-    auto swCollInfo = createCollection(opCtx.get(), collNs);
-    ASSERT_OK(swCollInfo.getStatus());
+    auto collInfo = createCollection(opCtx.get(), collNs);
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // Only drop the catalog entry; storage engine still knows about this ident.
@@ -810,8 +797,8 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
-    ASSERT(!identExists(opCtx.get(), swCollInfo.getValue().ident));
-    auto identNs = swCollInfo.getValue().ident;
+    ASSERT(!identExists(opCtx.get(), collInfo.ident));
+    auto identNs = collInfo.ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     NamespaceString orphanNs =
         NamespaceString::createNamespaceString_forTest("local.orphan." + identNs);
@@ -1015,8 +1002,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
 
     const NamespaceString coll1Ns = NamespaceString::createNamespaceString_forTest("db.coll1");
     const NamespaceString coll2Ns = NamespaceString::createNamespaceString_forTest("db.coll2");
-    auto swCollInfo = createCollection(opCtx.get(), coll1Ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    createCollection(opCtx.get(), coll1Ns);
     ASSERT(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 
@@ -1048,8 +1034,7 @@ TEST_F(StorageEngineTestNotEphemeral, UseAlternateStorageLocation) {
     ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_FALSE(collectionExists(opCtx.get(), coll2Ns));
 
-    swCollInfo = createCollection(opCtx.get(), coll2Ns);
-    ASSERT_OK(swCollInfo.getStatus());
+    createCollection(opCtx.get(), coll2Ns);
     ASSERT_FALSE(collectionExists(opCtx.get(), coll1Ns));
     ASSERT_TRUE(collectionExists(opCtx.get(), coll2Ns));
 
@@ -1088,7 +1073,6 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
     const std::string indexName("a_1");
 
     auto coll = createCollection(opCtx.get(), ns);
-    ASSERT_OK(coll);
 
     auto buildUUID = UUID::gen();
     {
@@ -1101,8 +1085,8 @@ TEST_F(StorageEngineTest, IdentMissingForNonReadyIndex) {
 
     // Drop the index ident, but leave it in the catalog. This can happen if the process is killed
     // while we're restarting an index build (as we drop and recreate the ident).
-    const auto indexIdent = _storageEngine->getMDBCatalog()->getIndexIdent(
-        opCtx.get(), coll.getValue().catalogId, indexName);
+    const auto indexIdent =
+        _storageEngine->getMDBCatalog()->getIndexIdent(opCtx.get(), coll.catalogId, indexName);
     ASSERT_OK(dropIdent(
         *shard_role_details::getRecoveryUnit(opCtx.get()), indexIdent, /*identHasSizeInfo=*/true));
     ASSERT_FALSE(identExists(opCtx.get(), indexIdent));
@@ -1141,7 +1125,7 @@ TEST_F(StorageEngineTest, IdentMissingForReadyIndex) {
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);
 
-    ASSERT_OK(createCollection(opCtx.get(), ns));
+    createCollection(opCtx.get(), ns);
 
     // Create a ready index, and then drop the ident without removing it from the catalog
     {

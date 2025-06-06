@@ -191,7 +191,7 @@ void normalTest(CollectionMarkersTest* fixture, std::string collectionName) {
     auto opCtx = fixture->getClient()->makeOperationContext();
 
     auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
-    ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
+    fixture->createCollection(opCtx.get(), collNs);
 
     static constexpr auto dataLength = 4;
     auto [insertedRecordId, now] = fixture->insertElementWithCollectionMarkerUpdate(
@@ -220,7 +220,7 @@ TEST_F(CollectionMarkersTest, NormalCollectionPartialMarkerUsage) {
     auto opCtx = getClient()->makeOperationContext();
 
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
-    ASSERT_OK(createCollection(opCtx.get(), collNs));
+    createCollection(opCtx.get(), collNs);
 
     static constexpr auto dataLength = 4;
     auto [insertedRecordId, now] =
@@ -251,7 +251,7 @@ void createNewMarkerTest(CollectionMarkersTest* fixture, std::string collectionN
     auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
-        ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
+        fixture->createCollection(opCtx.get(), collNs);
     }
 
     {
@@ -321,7 +321,7 @@ void ascendingOrderTest(CollectionMarkersTest* fixture, std::string collectionNa
     auto collNs = NamespaceString::createNamespaceString_forTest("test", collectionName);
     {
         auto opCtx = fixture->getClient()->makeOperationContext();
-        ASSERT_OK(fixture->createCollection(opCtx.get(), collNs));
+        fixture->createCollection(opCtx.get(), collNs);
     }
 
     {
@@ -379,7 +379,7 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
     {
         auto opCtx = getClient()->makeOperationContext();
-        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        createCollection(opCtx.get(), collNs);
         insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
     }
 
@@ -416,7 +416,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
     {
         auto opCtx = getClient()->makeOperationContext();
-        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        createCollection(opCtx.get(), collNs);
         // Add documents of various sizes
         for (int round = 0; round < kNumRounds; round++) {
             for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
@@ -474,7 +474,7 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     // Create a collection and insert records into it.
     {
         auto opCtx = getClient()->makeOperationContext();
-        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        createCollection(opCtx.get(), collNs);
         // Add documents of various sizes
         for (int round = 0; round < kNumRounds; round++) {
             for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
