@@ -318,7 +318,8 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromClassicCacheEntry::makePla
         auto classicCacheKey =
             plan_cache_key_factory::make<PlanCacheKey>(*plannerData.cq, collection);
         auto classicPlanCache = CollectionQueryInfo::get(collection).getPlanCache();
-        classicPlanCache->deactivate(classicCacheKey);
+        size_t evictedCount = classicPlanCache->deactivate(classicCacheKey);
+        planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
     };
 
     return attemptToUsePlan(
@@ -376,8 +377,9 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
     auto deactivateEntry = [](const PlannerData& plannerData) {
         // Deactivate the current cache entry.
         auto& sbePlanCache = sbe::getPlanCache(plannerData.opCtx);
-        sbePlanCache.deactivate(
+        size_t evictedCount = sbePlanCache.deactivate(
             plan_cache_key_factory::make(*plannerData.cq, plannerData.collections));
+        planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
     };
 
     return attemptToUsePlan(

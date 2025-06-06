@@ -33,6 +33,8 @@
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 #include "mongo/db/query/plan_cache/plan_cache_log_utils.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 template <class CachedPlanType, class DebugInfo>
@@ -108,6 +110,7 @@ public:
 
     void onPromoteCacheEntry(const KeyType& key,
                              const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+                             const CachedPlanType& newPlan,
                              size_t newWorks) const final {
         tassert(1003136, "Expected oldEntry to not be null", oldEntry);
         tassert(1003137, "oldEntry is expected to have non zero works", oldEntry->readsOrWorks);
@@ -115,6 +118,14 @@ public:
 
         if (_collection) {
             MultiPlanBucket::release(key.toString(), _collection);
+        }
+
+        if (oldEntry->cachedPlan->solutionHash != newPlan.solutionHash) {
+            if constexpr (std::is_same_v<CachedPlanType, sbe::CachedSbePlan>) {
+                planCacheCounters.incrementSbeInactiveCachedPlansReplacedCounter();
+            } else {
+                planCacheCounters.incrementClassicInactiveCachedPlansReplacedCounter();
+            }
         }
 
         log_detail::logPromoteCacheEntry(_cq.toStringShort(),

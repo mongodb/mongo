@@ -47,6 +47,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 
 #include <queue>
@@ -155,7 +156,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
 
     auto key = plan_cache_key_factory::make<PlanCacheKey>(query, collection);
 
-    uassertStatusOK(
+    size_t evictedCount = uassertStatusOK(
         CollectionQueryInfo::get(collection)
             .getPlanCache()
             ->set(std::move(key),
@@ -165,6 +166,7 @@ void updateClassicPlanCacheFromClassicCandidatesImpl(
                   &callbacks,
                   isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
                   boost::none /* worksGrowthCoefficient */));
+    planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
 }
 
 void updateSbePlanCache(OperationContext* opCtx,
@@ -187,7 +189,7 @@ void updateSbePlanCache(OperationContext* opCtx,
 
     auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
 
-    uassertStatusOK(sbe::getPlanCache(opCtx).set(
+    size_t evictedCount = uassertStatusOK(sbe::getPlanCache(opCtx).set(
         plan_cache_key_factory::make(query, collections),
         std::move(cachedPlan),
         nReads,
@@ -195,6 +197,7 @@ void updateSbePlanCache(OperationContext* opCtx,
         &callbacks,
         isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
         boost::none /* worksGrowthCoefficient */));
+    planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
 }
 
 }  // namespace
@@ -260,7 +263,7 @@ void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
 
         bool shouldOmitDiagnosticInformation =
             CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
-        sbe::getPlanCache(opCtx).setPinned(
+        size_t evictedCount = sbe::getPlanCache(opCtx).setPinned(
             key,
             canonical_query_encoder::computeHash(
                 canonical_query_encoder::encodeForPlanCacheCommand(query)),
@@ -268,6 +271,7 @@ void updateSbePlanCacheWithPinnedEntry(OperationContext* opCtx,
             opCtx->getServiceContext()->getPreciseClockSource()->now(),
             buildDebugInfo(&solution),
             shouldOmitDiagnosticInformation);
+        planCacheCounters.incrementSbeCachedPlansEvictedCounter(evictedCount);
     }
 }
 

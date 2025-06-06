@@ -508,14 +508,16 @@ public:
      * for constructing DebugInfo.
      *
      * If the mapping was set successfully, returns Status::OK(), even if it evicted another entry.
+     * Returns the number of older entries evicted as a result.
      */
-    Status set(const KeyType& key,
-               std::unique_ptr<CachedPlanType> cachedPlan,
-               ReadsOrWorks newReadsOrWorks,
-               Date_t now,
-               const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
-               PlanSecurityLevel securityLevel,
-               boost::optional<double> worksGrowthCoefficient = boost::none) {
+    StatusWith<size_t> set(
+        const KeyType& key,
+        std::unique_ptr<CachedPlanType> cachedPlan,
+        ReadsOrWorks newReadsOrWorks,
+        Date_t now,
+        const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
+        PlanSecurityLevel securityLevel,
+        boost::optional<double> worksGrowthCoefficient = boost::none) {
         invariant(cachedPlan);
 
         auto oldEntryWithPartitionLock = this->getWithPartitionLock(key);
@@ -569,7 +571,7 @@ public:
         }();
 
         if (!shouldBeCreated) {
-            return Status::OK();
+            return 0;
         }
 
         // We use callback function here to build the 'DebugInfo' rather than pass in a constructed
@@ -590,20 +592,20 @@ public:
                           increasedReadsOrWorks ? *increasedReadsOrWorks : newReadsOrWorks,
                           callbacks->buildDebugInfo());
 
-        this->put(key, std::move(newEntry), partitionLock);
-        return Status::OK();
+        return this->put(key, std::move(newEntry), partitionLock);
     }
 
     /**
      * Adds a 'cachedPlan', resulting from a single QuerySolution, into the cache. A new cache entry
-     * is always created and always active in this scenario.
+     * is always created and always active in this scenario. Returns the number of older entries
+     * evicted as a result.
      */
-    void setPinned(const KeyType& key,
-                   const uint32_t planCacheCommandKey,
-                   std::unique_ptr<CachedPlanType> plan,
-                   Date_t now,
-                   DebugInfoType debugInfo,
-                   bool shouldOmitDiagnosticInformation) {
+    size_t setPinned(const KeyType& key,
+                     const uint32_t planCacheCommandKey,
+                     std::unique_ptr<CachedPlanType> plan,
+                     Date_t now,
+                     DebugInfoType debugInfo,
+                     bool shouldOmitDiagnosticInformation) {
         invariant(plan);
         std::shared_ptr<Entry> entry =
             Entry::createPinned(std::move(plan),
@@ -614,18 +616,19 @@ public:
                                 shouldOmitDiagnosticInformation ? PlanSecurityLevel::kSensitive
                                                                 : PlanSecurityLevel::kNotSensitive,
                                 std::move(debugInfo));
-        this->put(key, std::move(entry));
+        return this->put(key, std::move(entry));
     }
 
     /**
      * Set a cache entry back to the 'inactive' state. Rather than completely evicting an entry
      * when the associated plan starts to perform poorly, we deactivate it, so that plans which
-     * perform even worse than the one already in the cache may not easily take its place.
+     * perform even worse than the one already in the cache may not easily take its place. Returns
+     * the number of older entries evicted as a result.
      */
-    void deactivate(const KeyType& key) {
+    size_t deactivate(const KeyType& key) {
         if (internalQueryCacheDisableInactiveEntries.load()) {
             // This is a noop if inactive entries are disabled.
-            return;
+            return 0;
         }
 
         auto [entry, partitionLock] = this->getWithPartitionLock(key);
@@ -634,15 +637,17 @@ public:
             tassert(6007021,
                     "Unexpected error code from LRU store",
                     entry.getStatus() == ErrorCodes::NoSuchKey);
-            return;
+            return 0;
         }
 
         auto entryPtr = *entry.getValue();
         if (entryPtr->isActive == true) {
             std::shared_ptr<Entry> newEntry = entryPtr->clone();
             newEntry->isActive = false;
-            this->put(key, std::move(newEntry), partitionLock);
+            return this->put(key, std::move(newEntry), partitionLock);
         }
+
+        return 0;
     }
 
     /**
@@ -828,7 +833,7 @@ private:
             // inactive entry's works. We use this as an indicator that it's safe to
             // cache (as an active entry) the plan this query used for the future.
             if (callbacks) {
-                callbacks->onPromoteCacheEntry(key, oldEntry, newWorksRaw);
+                callbacks->onPromoteCacheEntry(key, oldEntry, newPlan, newWorksRaw);
             }
             // We'll replace the old inactive entry with an active entry.
             res.shouldBeCreated = true;

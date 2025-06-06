@@ -229,8 +229,9 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto cache = CollectionQueryInfo::get(collectionPtr()).getPlanCache();
-        cache->deactivate(
+        size_t evictedCount = cache->deactivate(
             plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, collectionPtr()));
+        planCacheCounters.incrementClassicCachedPlansEvictedCounter(evictedCount);
     }
 
     // Use the query planning module to plan the whole query.

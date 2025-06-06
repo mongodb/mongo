@@ -28,6 +28,13 @@ function getReplannedPlanIsCachedPlanMetric() {
         .replanned_plan_is_cached_plan;
 }
 
+function getInactiveCachedPlansReplacedMetric() {
+    const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
+    return assert.commandWorked(db.serverStatus())
+        .metrics.query.planCache[planCacheType]
+        .inactive_cached_plans_replaced;
+}
+
 function getCachedPlanForQuery(filter) {
     const planCacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
     const matchingCacheEntries = coll.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
@@ -165,6 +172,33 @@ assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);
+
+// Test case for 'inactive_cached_plans_replaced' metric.
+{
+    // Clear the plan cache for the collection.
+    coll.getPlanCache().clear();
+
+    const baseReplacedMetric = getInactiveCachedPlansReplacedMetric();
+
+    // Run a query where the {b: 1} index will easily win.
+    assert.eq(1, coll.find(bIndexQuery).itcount());
+
+    // The plan cache should now hold an inactive entry.
+    let entry = getCachedPlanForQuery(bIndexQuery);
+    let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
+    assert.eq(entry.isActive, false);
+    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+    assert.eq(baseReplacedMetric, getInactiveCachedPlansReplacedMetric());
+
+    // Now run a query where the {a: 1} index will win. This is faster than the previous plan so we
+    // expect it to replace the inactive entry. The new entry is expected to become active
+    // immediately.
+    assert.eq(1, coll.find(aIndexQuery).itcount());
+    entry = getCachedPlanForQuery(aIndexQuery);
+    assert.eq(entry.isActive, true);
+    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+    assert.eq(baseReplacedMetric + 1, getInactiveCachedPlansReplacedMetric());
+}
 
 // Drop and recreate the collection. Now we test that the query system does not replan in cases
 // where the plan is performing only slightly less efficiently than the cached plan.

@@ -663,6 +663,14 @@ public:
         classicReplannedPlanIsCachedPlan.incrementRelaxed();
     }
 
+    void incrementClassicCachedPlansEvictedCounter(size_t increment) {
+        classicCachedPlansEvicted.incrementRelaxed(increment);
+    }
+
+    void incrementClassicInactiveCachedPlansReplacedCounter() {
+        classicInactiveCachedPlansReplaced.incrementRelaxed();
+    }
+
     void incrementSbeHitsCounter() {
         sbeHits.incrementRelaxed();
     }
@@ -683,6 +691,14 @@ public:
         sbeReplannedPlanIsCachedPlan.incrementRelaxed();
     }
 
+    void incrementSbeCachedPlansEvictedCounter(size_t increment) {
+        sbeCachedPlansEvicted.incrementRelaxed(increment);
+    }
+
+    void incrementSbeInactiveCachedPlansReplacedCounter() {
+        sbeInactiveCachedPlansReplaced.incrementRelaxed();
+    }
+
 private:
     static Counter64& _makeMetric(std::string name) {
         return *MetricBuilder<Counter64>("query.planCache." + std::move(name));
@@ -701,11 +717,16 @@ private:
     Counter64& classicReplanned = _makeMetric("classic.replanned");
     Counter64& classicReplannedPlanIsCachedPlan =
         _makeMetric("classic.replanned_plan_is_cached_plan");
+    Counter64& classicCachedPlansEvicted = _makeMetric("classic.cached_plans_evicted");
+    Counter64& classicInactiveCachedPlansReplaced =
+        _makeMetric("classic.inactive_cached_plans_replaced");
     Counter64& sbeHits = _makeMetric("sbe.hits");
     Counter64& sbeMisses = _makeMetric("sbe.misses");
     Counter64& sbeSkipped = _makeMetric("sbe.skipped");
     Counter64& sbeReplanned = _makeMetric("sbe.replanned");
     Counter64& sbeReplannedPlanIsCachedPlan = _makeMetric("sbe.replanned_plan_is_cached_plan");
+    Counter64& sbeCachedPlansEvicted = _makeMetric("sbe.cached_plans_evicted");
+    Counter64& sbeInactiveCachedPlansReplaced = _makeMetric("sbe.inactive_cached_plans_replaced");
 };
 extern PlanCacheCounters planCacheCounters;
 

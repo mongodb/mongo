@@ -66,6 +66,7 @@ public:
     virtual void onPromoteCacheEntry(
         const KeyType& key,
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
+        const CachedPlanType& newPlan,
         size_t newWorks) const = 0;
     virtual void onUnexpectedPinnedCacheEntry(
         const KeyType& key,
