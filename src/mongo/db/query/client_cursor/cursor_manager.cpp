@@ -171,10 +171,6 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
               "Cursor timed out",
               "cursorId"_attr = cursor->cursorid(),
               "idleSince"_attr = cursor->getLastUseDate());
-        // The memory tracker needs to be moved from the cursor to the opCtx in order for memory
-        // metrics to be reset on a valid tracker.
-        OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursor.get(), opCtx);
-
         cursor->dispose(opCtx, boost::none);
     }
     return toDisposeWithoutMutex.size();
@@ -412,6 +408,8 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
+    clientCursor->_memoryUsageTracker =
+        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
 
     // Transfer ownership of the cursor to '_cursorMap'.
     auto partition = _cursorMap->lockOnePartition(cursorId);
@@ -468,9 +466,6 @@ void CursorManager::deregisterAndDestroyCursor(
 void CursorManager::_destroyCursor(OperationContext* opCtx,
                                    std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     LOGV2_DEBUG(8928406, 2, "Destroying cursor", "cursorId"_attr = cursor->cursorid());
-    // The memory tracker needs to be moved from the cursor to the opCtx in order for memory
-    // metrics to be reset on a valid tracker.
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursor.get(), opCtx);
 
     // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor can
     // require taking lock manager locks, which we want to avoid while holding a mutex. If we did
@@ -511,7 +506,6 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
         return Status::OK();
     }
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(cursor);
-
     deregisterAndDestroyCursor(std::move(lockedPartition), opCtx, std::move(ownedCursor));
     return Status::OK();
 }

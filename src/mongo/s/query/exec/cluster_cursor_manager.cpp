@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_in_use_info.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -207,6 +208,8 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
         [&](CursorId cursorId) -> bool { return _cursorEntryMap.count(cursorId) == 0; },
         _pseudoRandom);
 
+    cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+
     // Create a new CursorEntry and register it in the CursorEntryContainer's map.
     auto emplaceResult = _cursorEntryMap.emplace(cursorId,
                                                  CursorEntry(std::move(cursor),
@@ -275,6 +278,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     CurOp::get(opCtx)->debug().planCacheShapeHash = cursorGuard->getPlanCacheShapeHash();
     CurOp::get(opCtx)->debug().queryStatsInfo.keyHash = cursorGuard->getQueryStatsKeyHash();
 
+    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
+                                                        cursorGuard->releaseMemoryUsageTracker());
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
 
@@ -298,6 +303,8 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
 
     auto cursorGuard = entry->releaseCursor(opCtx, commandName);
     cursorGuard->reattachToOperationContext(opCtx);
+    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
+                                                        cursorGuard->releaseMemoryUsageTracker());
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
@@ -329,6 +336,11 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     if (!isReleaseMemory) {
         entry->setLastActive(now);
     }
+
+    if (cursorState == CursorState::NotExhausted && !killPending) {
+        cursor->setMemoryUsageTracker(OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx));
+    }
+
     entry->returnCursor(std::move(cursor));
 
     if (cursorState == CursorState::NotExhausted && !killPending) {

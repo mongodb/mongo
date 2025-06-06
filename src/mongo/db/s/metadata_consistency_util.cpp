@@ -409,7 +409,6 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
             const auto cursorManager = Grid::get(opCtx)->getCursorManager();
             auto pinnedCursor = uassertStatusOK(
                 cursorManager->checkOutCursor(cursor.getCursorId(), opCtx, authChecker));
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(pinnedCursor.get(), opCtx);
             while (true) {
                 auto next = pinnedCursor->next();
                 if (!next.isOK() || next.getValue().isEOF()) {

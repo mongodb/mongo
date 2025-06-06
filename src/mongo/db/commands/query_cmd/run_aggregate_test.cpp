@@ -173,9 +173,10 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
             CursorManager* cursorManager = CursorManager::get(opCtx->getServiceContext());
             ClientCursorPin pin =
                 unittest::assertGet(cursorManager->pinCursor(opCtx, cursorId, "getMore"));
-            OperationMemoryUsageTracker* tracker =
-                OperationMemoryUsageTracker::getFromClientCursor_forTest(pin.getCursor());
+            std::unique_ptr<OperationMemoryUsageTracker> tracker =
+                OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx);
             ASSERT(tracker);
+            ASSERT_EQ(getTrackerOpCtx(tracker.get()), nullptr);
             // $trackingMock will always be increasing memory count with each document returned, so
             // the max will always be the same as the current.
             ASSERT_GT(tracker->currentMemoryBytes(), prevMemoryInUse);
@@ -183,8 +184,7 @@ TEST_F(RunAggregateTest, TransferOperationMemoryUsageTracker) {
 
             prevMemoryInUse = tracker->currentMemoryBytes();
 
-            // Between operations, the opCtx in the tracker should be null.
-            ASSERT_EQ(getTrackerOpCtx(tracker), nullptr);
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx, std::move(tracker));
         }
 
         BSONObj getMoreCmdObj = fromjson(fmt::format(

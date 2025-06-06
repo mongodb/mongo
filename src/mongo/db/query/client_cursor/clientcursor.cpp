@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -235,6 +236,8 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // transferred to another pin object via move construction or move assignment, but in this case
     // it is still considered pinned.
     cursorStats().openPinned.increment();
+    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx,
+                                                        std::move(_cursor->_memoryUsageTracker));
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -292,6 +295,9 @@ void ClientCursorPin::release() {
 
     invariant(_cursor->_operationUsingCursor);
     invariant(_cursorManager);
+
+    _cursor->_memoryUsageTracker =
+        OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(_cursor->_operationUsingCursor);
 
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.

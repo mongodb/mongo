@@ -94,9 +94,6 @@ public:
                 auto cursorPin =
                     CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, definition()->getName());
                 if (cursorPin.isOK()) {
-                    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
-                        cursorPin.getValue().getCursor(), opCtx);
-
                     if (MONGO_unlikely(releaseMemoryHangAfterPinCursor.shouldFail())) {
                         LOGV2(9745500,
                               "releaseMemoryHangAfterPinCursor fail point enabled. Blocking until "
@@ -128,8 +125,6 @@ public:
                         response = acquireLocksAndReleaseMemory(opCtx, cursorPin.getValue());
                     }
 
-                    OperationMemoryUsageTracker::moveToCursorIfAvailable(
-                        opCtx, cursorPin.getValue().getCursor());
                     if (response.isOK()) {
                         released.push_back(cursorId);
                     } else {

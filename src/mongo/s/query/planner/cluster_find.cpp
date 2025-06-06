@@ -986,8 +986,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     validateOperationSessionInfo(opCtx, cursorId, &pinnedCursor.getValue());
 
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(pinnedCursor.getValue().get(), opCtx);
-
     // Ensure that the client still has the privileges to run the originating command.
     if (!authzSession->isAuthorizedForPrivileges(
             pinnedCursor.getValue()->getOriginatingPrivileges())) {
@@ -1138,10 +1136,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
     collectQueryStatsMongos(opCtx, pinnedCursor.getValue());
-
-    if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
-        OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, pinnedCursor.getValue().get());
-    }
 
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.

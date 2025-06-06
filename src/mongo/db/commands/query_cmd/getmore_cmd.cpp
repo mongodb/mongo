@@ -668,9 +668,6 @@ public:
                 exec->detachFromOperationContext();
 
                 cursorPin->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-                // Transfer ownership of the memory tracker from the OpCtx to the cursor so that we
-                // collect memory statistics for subsequent calls to getMore().
-                OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, cursorPin.getCursor());
 
                 if (opCtx->isExhaust() && clientsLastKnownCommittedOpTime(opCtx)) {
                     // Update the cursor's lastKnownCommittedOpTime to the current
@@ -811,10 +808,6 @@ public:
             }
 
             ClientCursorPin cursorPin = pinCursorWithRetry(opCtx, cursorId, nss);
-
-            // Transfer memory tracker ownership from the cursor back to the OpCtx so memory usage
-            // is tracked for the duration of this getMore().
-            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(cursorPin.getCursor(), opCtx);
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==

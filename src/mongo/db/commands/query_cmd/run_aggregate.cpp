@@ -234,9 +234,6 @@ ClientCursorPin registerCursor(const AggExState& aggExState,
         ExternalDataSourceScopeGuard::get(pin.getCursor()) = extDataSrcGuard;
     }
 
-    // Transfer ownership of the OperationMemoryUsageTracker from the opCtx to the cursor so that it
-    // is tracked across getMore() calls.
-    OperationMemoryUsageTracker::moveToCursorIfAvailable(opCtx, pin.getCursor());
     return pin;
 }
 

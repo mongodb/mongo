@@ -189,9 +189,13 @@ TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51028);
 }
 
+}  // namespace
+
 /**
  * A test fixture for making aggregate() requests followed by getMore()s, where we can examine
  * memory metrics between requests.
+ *
+ * Not in a nameless namespace so it can be a friend of OperationMemoryUsageTracker.
  */
 class ClusterAggregateMemoryTrackingTest : public ClusterCommandTestFixture {
 public:
@@ -260,13 +264,18 @@ protected:
         auto cursorManager = Grid::get(&*opCtx)->getCursorManager();
         auto pinnedCursor =
             unittest::assertGet(cursorManager->checkOutCursorNoAuthCheck(cursorId, &*opCtx));
-        // Make sure to return the cursor when we're done.
+        // Make sure to return the tracker and the cursor when we're done.
+        std::unique_ptr<OperationMemoryUsageTracker> memoryUsageTracker;
         ScopeGuard guard{[&] {
+            OperationMemoryUsageTracker::moveToOpCtxIfAvailable(opCtx.get(),
+                                                                std::move(memoryUsageTracker));
             pinnedCursor.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
         }};
-        OperationMemoryUsageTracker* memoryUsageTracker =
-            OperationMemoryUsageTracker::getFromClientCursor_forTest(pinnedCursor.operator->());
+        // The tracker should be on the opCtx now.
+        memoryUsageTracker = OperationMemoryUsageTracker::moveFromOpCtxIfAvailable(opCtx.get());
         ASSERT_NE(nullptr, memoryUsageTracker);
+        // Since we took the tracker off of the opCtx, the tracker's opCtx pointer will be null.
+        ASSERT_EQ(nullptr, memoryUsageTracker->_opCtx);
         return std::make_pair(memoryUsageTracker->currentMemoryBytes(),
                               memoryUsageTracker->maxMemoryBytes());
     }
@@ -320,6 +329,8 @@ private:
 
     boost::optional<LogicalSessionId> _lsid;
 };
+
+namespace {
 
 TEST_F(ClusterAggregateMemoryTrackingTest, MemoryTrackingWorksOnRouter) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagQueryMemoryTracking",

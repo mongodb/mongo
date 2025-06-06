@@ -114,12 +114,7 @@ public:
                     cursorManager->checkOutCursorNoAuthCheck(id, opCtx, definition()->getName());
 
                 if (pinnedCursor.isOK()) {
-                    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(
-                        pinnedCursor.getValue().get(), opCtx);
-
                     ScopeGuard returnCursorGuard([&pinnedCursor, opCtx] {
-                        OperationMemoryUsageTracker::moveToCursorIfAvailable(
-                            opCtx, pinnedCursor.getValue().get());
                         pinnedCursor.getValue().returnCursor(
                             ClusterCursorManager::CursorState::NotExhausted);
                     });

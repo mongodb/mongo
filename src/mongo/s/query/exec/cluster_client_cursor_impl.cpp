@@ -172,7 +172,6 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     tassert(7448200,
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
-    OperationMemoryUsageTracker::moveToOpCtxIfAvailable(this, opCtx);
 
     query_stats::writeQueryStatsOnCursorDisposeOrKill(opCtx,
                                                       _queryStatsKeyHash,

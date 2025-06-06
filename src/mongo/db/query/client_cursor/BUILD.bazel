@@ -21,12 +21,14 @@ mongo_cc_library(
         "collect_query_stats_mongod.h",
         "cursor_manager.h",
         "//src/mongo/db/catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
+        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
     ],
     deps = [
         ":cursor_server_params",
         "//src/mongo/db:commands",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/memory_tracking",
     ],
 )
 
@@ -46,6 +48,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "cursor_idl_validator.h",
+        "//src/mongo/db/memory_tracking:operation_memory_usage_tracker.h",
     ],
     deps = [
         "//src/mongo/db:server_base",

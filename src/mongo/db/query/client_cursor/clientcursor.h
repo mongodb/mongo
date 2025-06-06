@@ -37,6 +37,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
@@ -510,6 +511,8 @@ private:
 
     // The execution time collected from the initial operation prior to any getMore requests.
     boost::optional<Microseconds> _firstResponseExecutionTime;
+
+    std::unique_ptr<OperationMemoryUsageTracker> _memoryUsageTracker;
 };
 
 /**
