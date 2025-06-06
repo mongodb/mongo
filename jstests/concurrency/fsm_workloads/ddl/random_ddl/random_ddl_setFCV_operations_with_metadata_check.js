@@ -207,6 +207,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.teardown = function(db, collName, cluster) {
+        assert.commandWorked(
+            db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         const fcvExecutions =
             db.getSiblingDB(
                   $config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName]
