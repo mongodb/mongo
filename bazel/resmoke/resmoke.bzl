@@ -1,91 +1,64 @@
-load("//bazel/install_rules:install_rules.bzl", "MongoInstallInfo")
+def resmoke_config_impl(ctx):
+    base_name = ctx.label.name.removesuffix("_config")
+    test_list_file = ctx.actions.declare_file(base_name + ".txt")
+    generated_config_file = ctx.actions.declare_file(base_name + ".yml")
+    base_config_file = ctx.files.base_config[0]
 
-def get_from_volatile_status(ctx, key):
-    return "`grep '^" + key + " ' " + ctx.version_file.short_path + " | cut -d' ' -f2`"
-
-def _resmoke_suite_test_impl(ctx):
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     python_path = []
-    for path in ctx.attr.resmoke[PyInfo].imports.to_list():
+    for path in ctx.attr.generator[PyInfo].imports.to_list():
         if path not in python_path:
-            python_path.append("$TEST_SRCDIR/" + path)
-    python_path = ctx.configuration.host_path_separator.join(python_path)
+            python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+    generator_deps = [ctx.attr.generator[PyInfo].transitive_sources]
 
-    # Put install binaries on the path for resmoke. The MongoInstallInfo has each binary in its own
-    # directory.
-    binary_path = []
-    for data in ctx.attr.data:
-        if MongoInstallInfo in data:
-            for file in data.files.to_list():
-                binary_path.append("$TEST_SRCDIR/_main/" + file.short_path.replace("bin/" + file.basename, "bin/"))
-    binary_path = ctx.configuration.host_path_separator.join(binary_path)
+    test_list = [test.short_path for test in ctx.files.srcs]
+    for exclude in [test.short_path for test in ctx.files.exclude_files]:
+        if exclude in test_list:
+            test_list.remove(exclude)
+    ctx.actions.write(test_list_file, "\n".join(test_list))
 
-    suite = ctx.attr.config.files.to_list()[0].path
+    deps = depset([test_list_file, base_config_file] + ctx.files.srcs, transitive = [python.files] + generator_deps)
 
-    resmoke_args = [
-        "run",
-        "--dbpathPrefix=$TEST_UNDECLARED_OUTPUTS_DIR/data",
-        "--taskWorkDir=$TEST_UNDECLARED_OUTPUTS_DIR",
-        "--multiversionDir=multiversion_binaries",
-        "--noValidateSelectorPaths",  # Skip validating selector paths. Excluded files in a suite config should not be required dependencies.
-        "--continueOnFailure",
-        "--suite",
-        suite,
-    ] + ctx.attr.resmoke_args
-
-    if ctx.attr.evergreen_format:
-        resmoke_args.append("--installDir=dist-test/bin")
-        resmoke_args.append("--log=evg")
-        resmoke_args.append("--reportFile=$TEST_UNDECLARED_OUTPUTS_DIR/report.json")
-        resmoke_args.append("--cedarReportFile=cedar_report.json")
-
-        # Symbolization is not yet functional, SERVER-103538
-        resmoke_args.append("--skipSymbolization")
-
-        resmoke_args.append("--buildId=" + get_from_volatile_status(ctx, "build_id"))
-        resmoke_args.append("--distroId=" + get_from_volatile_status(ctx, "distro_id"))
-        resmoke_args.append("--executionNumber=" + get_from_volatile_status(ctx, "execution"))
-        resmoke_args.append("--projectName=" + get_from_volatile_status(ctx, "project"))
-        resmoke_args.append("--gitRevision=" + get_from_volatile_status(ctx, "revision"))
-        resmoke_args.append("--revisionOrderId=" + get_from_volatile_status(ctx, "revision_order_id"))
-        resmoke_args.append("--taskId=" + get_from_volatile_status(ctx, "task_id"))
-        resmoke_args.append("--taskName=" + get_from_volatile_status(ctx, "task_name"))
-        resmoke_args.append("--variantName=" + get_from_volatile_status(ctx, "build_variant"))
-        resmoke_args.append("--versionId=" + get_from_volatile_status(ctx, "version_id"))
-        resmoke_args.append("--requester=" + get_from_volatile_status(ctx, "requester"))
-
-    # This script is the action to run resmoke. It looks like this (abbreviated):
-    # PATH=$TEST_SRCDIR/_main/install-mongo/bin/:$PATH PYTHONPATH=$TEST_SRCDIR/poetry/packaging python3 resmoke.py run ... $@
-    # The $@ allows passing extra arguments to resmoke using --test_arg in the bazel invocation.
-    script = "ln -sf $TEST_SRCDIR/_main/bazel/resmoke/.resmoke_mongo_version.yml $TEST_SRCDIR/_main/\n"  # workaround for resmoke assuming this location.
-    script = script + "PATH=" + binary_path + ":$PATH"
-    script = script + " " + "PYTHONPATH=" + python_path + " "
-    script = script + python.interpreter.path + " buildscripts/resmoke.py " + " ".join(resmoke_args) + " $@"
-    ctx.actions.write(
-        output = ctx.outputs.executable,
-        content = script,
+    ctx.actions.run(
+        executable = python.interpreter.path,
+        inputs = deps,
+        outputs = [generated_config_file],
+        arguments = [
+            "bazel/resmoke/resmoke_config_generator.py",
+            "--output",
+            generated_config_file.path,
+            "--test-list",
+            test_list_file.path,
+            "--base-config",
+            base_config_file.path,
+            "--exclude-with-any-tags",
+            ",".join(ctx.attr.exclude_with_any_tags),
+            "--include-with-any-tags",
+            ",".join(ctx.attr.include_with_any_tags),
+        ],
+        env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
     )
 
-    resmoke_deps = [ctx.attr.resmoke[PyInfo].transitive_sources]
-    deps = depset(transitive = [python.files] + resmoke_deps)
-    runfiles = ctx.runfiles(files = deps.to_list() + ctx.files.data + ctx.files.deps + ctx.files.srcs + [ctx.version_file])
-    return [DefaultInfo(runfiles = runfiles)]
+    return [DefaultInfo(files = depset([generated_config_file]))]
 
-_resmoke_suite_test = rule(
-    implementation = _resmoke_suite_test_impl,
+resmoke_config = rule(
+    resmoke_config_impl,
     attrs = {
-        "config": attr.label(allow_files = True),
-        "data": attr.label_list(allow_files = True),
-        "deps": attr.label_list(allow_files = True),
-        "needs_mongo": attr.bool(default = False),
-        "needs_mongod": attr.bool(default = False),
-        "resmoke": attr.label(default = "//buildscripts:resmoke"),
-        "resmoke_args": attr.string_list(),
-        "srcs": attr.label_list(allow_files = True),
-        "evergreen_format": attr.bool(default = False),
+        "generator": attr.label(
+            doc = "The config generator to use.",
+            default = "//bazel/resmoke:resmoke_config_generator",
+        ),
+        "srcs": attr.label_list(allow_files = True, doc = "Tests to write as the 'roots' of the selector"),
+        "exclude_files": attr.label_list(allow_files = True),
+        "exclude_with_any_tags": attr.string_list(),
+        "include_with_any_tags": attr.string_list(),
+        "base_config": attr.label(
+            allow_files = True,
+            doc = "The base resmoke YAML config for the suite",
+        ),
     },
+    doc = "Generates a resmoke config YAML",
     toolchains = ["@bazel_tools//tools/python:toolchain_type"],
-    test = True,
 )
 
 def resmoke_suite_test(
@@ -93,45 +66,63 @@ def resmoke_suite_test(
         config,
         data = [],
         deps = [],
+        exclude_files = [],
+        exclude_with_any_tags = [],
+        include_with_any_tags = [],
         resmoke_args = [],
         srcs = [],
         tags = [],
         timeout = "eternal",
-        needs_mongo = False,
-        needs_mongod = False,
-        needs_mongos = False,
         **kwargs):
-    install_deps = []
-    if needs_mongo:
-        install_deps.append("//:install-mongo")
-    if needs_mongod:
-        install_deps.append("//:install-mongod")
-    if needs_mongos:
-        install_deps.append("//:install-mongos")
+    generated_config = name + "_config"
+    resmoke_config(
+        name = generated_config,
+        srcs = srcs,
+        exclude_files = exclude_files,
+        base_config = config,
+        exclude_with_any_tags = exclude_with_any_tags,
+        include_with_any_tags = include_with_any_tags,
+        tags = ["resmoke_config"],
+    )
 
-    _resmoke_suite_test(
+    resmoke_shim = Label("//bazel/resmoke:resmoke_shim.py")
+    resmoke = Label("//buildscripts:resmoke")
+    extra_args = select({
+        "//bazel/resmoke:in_evergreen_enabled": [
+            "--log=evg",
+            "--cedarReportFile=cedar_report.json",
+            "--skipSymbolization",  # Symbolization is not yet functional, SERVER-103538
+            "--installDir=dist-test/bin",
+        ],
+        "//conditions:default": ["--installDir=install-dist-test/bin"],
+    })
+    native.py_test(
         name = name,
-        config = config,
-        data = data + [
-            config,
+        # To a user of resmoke_suite_test, the `srcs` is the list of tests to select. However, to the py_test rule,
+        # the `srcs` are expected to be Python files only.
+        srcs = [resmoke_shim],
+        data = data + srcs + [
+            generated_config,
             "//bazel/resmoke:resmoke_mongo_version",
             "//bazel/resmoke:on_feature_flags",
             "//bazel/resmoke:off_feature_flags",
             "//bazel/resmoke:unreleased_ifr_flags",
+            "//bazel/resmoke:volatile_status",
             "//buildscripts/resmokeconfig:all_files",  # This needs to be reduced, SERVER-103610
             "//src/mongo/util/version:releases.yml",
         ] + select({
             "//bazel/resmoke:in_evergreen_enabled": ["//:installed-dist-test"],
-            "//conditions:default": install_deps,
+            "//conditions:default": ["//:install-dist-test"],
         }),
-        srcs = srcs,
-        deps = deps,
-        resmoke_args = resmoke_args,
+        deps = deps + [resmoke],
+        main = resmoke_shim,
+        args = [
+            "run",
+            "--suites=$(location %s)" % native.package_relative_label(generated_config),
+            "--multiversionDir=multiversion_binaries",
+            "--continueOnFailure",
+        ] + extra_args + resmoke_args,
+        tags = tags + ["no-cache", "local"],
         timeout = timeout,
-        tags = tags + ["local", "no-cache"],
-        evergreen_format = select({
-            "//bazel/resmoke:in_evergreen_enabled": True,
-            "//conditions:default": False,
-        }),
         **kwargs
     )

@@ -1,4 +1,5 @@
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@poetry//:dependencies.bzl", "dependency")
 
 genrule(
     name = "resmoke_mongo_version",
@@ -46,6 +47,20 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
+# We want to use keys from volatile-status in the resmoke `py_test`, so this creates a file that
+# it can depend on.
+genrule(
+    name = "volatile_status",
+    srcs = [],
+    outs = ["volatile-status.txt"],
+    cmd = """
+    cat bazel-out/volatile-status.txt  > $@
+    """,
+    stamp = True,
+    tags = ["external"],  # Consuming information from volatile-status, so this should always execute.
+    visibility = ["//visibility:public"],
+)
+
 bool_flag(
     name = "in_evergreen",
     build_setting_default = False,
@@ -57,3 +72,22 @@ config_setting(
         "//bazel/resmoke:in_evergreen": "True",
     },
 )
+
+py_binary(
+    name = "resmoke_config_generator",
+    srcs = ["resmoke_config_generator.py"],
+    main = "resmoke_config_generator.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+exports_files(["resmoke_shim.py"])
