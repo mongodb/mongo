@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
@@ -80,5 +81,24 @@ public:
 
     static constexpr auto kServerStatusSectionName = "mirroredReads"_sd;
 };
+
+/**
+ * Utility functions used for testing that expose internal functionality.
+ */
+
+/**
+ * Returns the list of hosts that will be targeted for targeted mirrored reads.
+ */
+std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext);
+
+/**
+ * Updates the list of hosts that will be targeted by targeted mirrored reads.
+ *
+ * The function will update the list of hosts to target on config version changes, or if the repl
+ * set tag used to target hosts is updated (tagChanged).
+ */
+void updateCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext,
+                                                   const repl::ReplSetConfig& replSetConfig,
+                                                   bool tagChanged);
 
 }  // namespace mongo

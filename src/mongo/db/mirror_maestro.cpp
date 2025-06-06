@@ -109,6 +109,9 @@ constexpr auto kMirroredReadsScheduledKey = "scheduled"_sd;
 
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroTracksPending);
+MONGO_FAIL_POINT_DEFINE(skipRegisteringMirroredReadsTopologyObserverCallback);
+
+using Tag = std::pair<std::string, std::string>;
 
 class MirrorMaestroImpl {
 public:
@@ -126,6 +129,19 @@ public:
      * Mirror only if this maestro has been initialized.
      */
     void tryMirror(const std::shared_ptr<CommandInvocation>& invocation);
+
+    /**
+     * Returns the list of hosts to send mirrored reads to for targeted mirroring.
+     */
+    std::vector<HostAndPort> getCachedHostsForTargetedMirroring();
+
+    /**
+     * Update the list of hosts to target for targeted mirroring. The list of hosts will be updated
+     * iff the config version has been incremented, or the replica set tag being used to target
+     * hosts has been changed.
+     */
+    void updateCachedHostsForTargetedMirroring(const repl::ReplSetConfig& replSetConfig,
+                                               bool tagChanged);
 
     /**
      * Maintains the state required for mirroring requests.
@@ -158,7 +174,103 @@ public:
         double _mirrorCount;
     };
 
+    /**
+     * Maintains the list of hosts to mirror to when targeted mirroring is enabled. Targeted
+     * mirroring uses replica set tags in order to target specific nodes.
+     */
+    class TargetedHostsCacheManager {
+    public:
+        struct TaggedHostsType {
+            repl::ConfigVersionAndTerm configVersionAndTerm;
+            std::vector<HostAndPort> hosts;
+        };
+
+        using VersionedTaggedHostsType = VersionedValue<TaggedHostsType>;
+
+        TargetedHostsCacheManager() = default;
+
+        /**
+         * Updates the list of hosts to send mirrored reads to for targeted mirroring. The hosts
+         * should be updated upon an increment in config version, or if the user changes the replica
+         * set tag that should be used to target nodes.
+         */
+        void maybeUpdateHosts(Tag tag, const repl::ReplSetConfig& replSetConfig, bool tagChanged) {
+            std::lock_guard lk(_mutex);
+            _hosts.refreshSnapshot(_taggedHostsSnapshot);
+
+            if (MONGO_likely(_taggedHostsSnapshot)) {
+                // The config version and term should never decrease.
+                invariant(replSetConfig.getConfigVersionAndTerm() >=
+                              _taggedHostsSnapshot->configVersionAndTerm,
+                          "Unexpected stale config version");
+
+                // If the version and term has not changed, and the replica set tag used to target
+                // has not changed, do nothing.
+                if (!tagChanged &&
+                    replSetConfig.getConfigVersionAndTerm() ==
+                        _taggedHostsSnapshot->configVersionAndTerm) {
+                    return;
+                }
+            }
+
+            auto updatedHosts = std::make_shared<TaggedHostsType>();
+            auto& updatedHostsValue = *updatedHosts;
+
+            updatedHostsValue.configVersionAndTerm = replSetConfig.getConfigVersionAndTerm();
+
+            auto tagConfig = replSetConfig.getTagConfig();
+            for (const auto& member : replSetConfig.members()) {
+                for (auto&& it = member.tagsBegin(); it != member.tagsEnd(); ++it) {
+                    if (tagConfig.getTagKey(*it) == tag.first &&
+                        tagConfig.getTagValue(*it) == tag.second) {
+                        updatedHostsValue.hosts.push_back(member.getHostAndPort());
+                        break;
+                    }
+                }
+            }
+
+            _hosts.update(std::move(updatedHosts));
+        }
+
+        std::vector<HostAndPort> getHosts() {
+            _hosts.refreshSnapshot(_taggedHostsSnapshot);
+            if (MONGO_likely(_taggedHostsSnapshot)) {
+                return _taggedHostsSnapshot->hosts;
+            }
+
+            return {};
+        }
+
+
+    private:
+        // Mutex used only to serialize updates to _hosts
+        stdx::mutex _mutex;
+        static thread_local VersionedTaggedHostsType::Snapshot _taggedHostsSnapshot;
+        VersionedTaggedHostsType _hosts;
+    };
+
 private:
+    friend void updateCachedHostsForTargetedMirroring_forTest(
+        ServiceContext* serviceContext, const repl::ReplSetConfig& replSetConfig, bool tagChanged);
+
+    friend std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(
+        ServiceContext* serviceContext);
+
+    // TODO SERVER-104849 Update this function to refresh the snapshot of the server parameter
+    // that will be stored on MirrorMaestroImpl
+    /**
+     * Returns the replica set tag that should be used to target mirrored reads.
+     */
+    Tag _getTagForTargetedMirror() const {
+        auto tag = _params->_data.get().getTargetedMirroring().getTag();
+        if (tag.isEmpty()) {
+            return {"", ""};
+        }
+
+        auto tagElem = tag.firstElement();
+        return {tagElem.fieldName(), tagElem.str()};
+    }
+
     /**
      * Attempt to mirror invocation to a subset of hosts based on params
      *
@@ -200,8 +312,11 @@ private:
     std::shared_ptr<executor::TaskExecutor> _executor;
     repl::TopologyVersionObserver _topologyVersionObserver;
     synchronized_value<PseudoRandom> _random{PseudoRandom(SecureRandom{}.nextInt64())};
+    TargetedHostsCacheManager _cachedHostsForTargetedMirrors;
 };
 
+thread_local MirrorMaestroImpl::TargetedHostsCacheManager::VersionedTaggedHostsType::Snapshot
+    MirrorMaestroImpl::TargetedHostsCacheManager::_taggedHostsSnapshot;
 const auto getMirrorMaestroImpl = ServiceContext::declareDecoration<MirrorMaestroImpl>();
 
 // Define a new serverStatus section "mirroredReads"
@@ -363,6 +478,16 @@ void MirrorMaestro::onReceiveMirroredRead(OperationContext* opCtx) {
     if (MONGO_unlikely(invocation->isMirrored())) {
         gMirroredReadsSection.processedAsSecondary.fetchAndAddRelaxed(1);
     }
+}
+
+std::vector<HostAndPort> MirrorMaestroImpl::getCachedHostsForTargetedMirroring() {
+    return _cachedHostsForTargetedMirrors.getHosts();
+}
+
+void MirrorMaestroImpl::updateCachedHostsForTargetedMirroring(
+    const repl::ReplSetConfig& replSetConfig, bool tagChanged) {
+    _cachedHostsForTargetedMirrors.maybeUpdateHosts(
+        _getTagForTargetedMirror(), replSetConfig, tagChanged);
 }
 
 void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invocation) {
@@ -584,6 +709,12 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
 
     _executor->startup();
     _topologyVersionObserver.init(serviceContext);
+    if (MONGO_likely(!skipRegisteringMirroredReadsTopologyObserverCallback.shouldFail())) {
+        _topologyVersionObserver.registerTopologyChangeObserver(
+            [this](const repl::ReplSetConfig& replSetConfig) {
+                updateCachedHostsForTargetedMirroring(replSetConfig, false /* tagChanged */);
+            });
+    }
 
     _params = ServerParameterSet::getNodeParameterSet()->get<MirroredReadsServerParameter>(
         kMirroredReadsParamName);
@@ -623,6 +754,19 @@ void MirrorMaestroImpl::shutdown() {
 
     // Set _initGuard.liveness to kShutdown
     _initGuard.liveness = Liveness::kShutdown;
+}
+
+std::vector<HostAndPort> getCachedHostsForTargetedMirroring_forTest(
+    ServiceContext* serviceContext) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    return impl.getCachedHostsForTargetedMirroring();
+}
+
+void updateCachedHostsForTargetedMirroring_forTest(ServiceContext* serviceContext,
+                                                   const repl::ReplSetConfig& replSetConfig,
+                                                   bool tagChanged) {
+    auto& impl = getMirrorMaestroImpl(serviceContext);
+    impl.updateCachedHostsForTargetedMirroring(replSetConfig, tagChanged);
 }
 
 }  // namespace mongo

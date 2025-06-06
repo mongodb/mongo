@@ -126,6 +126,23 @@ public:
         return cache;
     }
 
+    void forceElectionAndWaitForCacheUpdate(std::shared_ptr<const HelloResponse> cachedResponse) {
+        // Force an election to advance topology version
+        auto opCtx = makeOperationContext();
+        auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+        simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
+
+        int sleepCounter = 0;
+        // Wait for the observer to update its cache
+        while (observer->getCached()->getTopologyVersion()->getCounter() ==
+               cachedResponse->getTopologyVersion()->getCounter()) {
+            sleepFor(sleepTime);
+            // Make sure the test doesn't wait here for longer than 15 seconds.
+            ASSERT_LTE(sleepCounter++, 150);
+        }
+        LOGV2(9326401, "Observer topology incremented after successful election");
+    }
+
 protected:
     ReplicationCoordinatorImpl* replCoord;
 
@@ -152,32 +169,40 @@ TEST_F(TopologyVersionObserverTest, UpdateCache) {
     auto cachedResponse = getObserverCache();
     ASSERT(cachedResponse);
 
-    // Force an election to advance topology version
-    auto opCtx = makeOperationContext();
-    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
-    simulateSuccessfulV1ElectionWithoutExitingDrainMode(electionTimeoutWhen, opCtx.get());
-
-    auto sleepCounter = 0;
-    // Wait for the observer to update its cache
-    while (observer->getCached()->getTopologyVersion()->getCounter() ==
-           cachedResponse->getTopologyVersion()->getCounter()) {
-        sleepFor(sleepTime);
-        // Make sure the test doesn't wait here for longer than 15 seconds.
-        ASSERT_LTE(sleepCounter++, 150);
-    }
-    LOGV2(9326401, "Observer topology incremented after successful election");
+    forceElectionAndWaitForCacheUpdate(cachedResponse);
 
     auto newResponse = observer->getCached();
     ASSERT(newResponse && newResponse->getTopologyVersion());
     ASSERT(newResponse->getTopologyVersion()->getCounter() >
            cachedResponse->getTopologyVersion()->getCounter());
 
+    auto opCtx = makeOperationContext();
     auto expectedResponse =
         replCoord->awaitHelloResponse(opCtx.get(), {}, boost::none, boost::none);
     ASSERT(expectedResponse && expectedResponse->getTopologyVersion());
 
     ASSERT_EQ(newResponse->getTopologyVersion()->getCounter(),
               expectedResponse->getTopologyVersion()->getCounter());
+}
+
+TEST_F(TopologyVersionObserverTest, CallbackExecutedOnTopologyChange) {
+    // Wait for the observer to see the initial replSetConfig
+    auto cachedResponse = getObserverCache();
+    ASSERT(cachedResponse);
+
+    // Set up a notification to learn when the callback has been called
+    Notification<ReplSetConfig> receivedConfig;
+    observer->registerTopologyChangeObserver(
+        [&](const ReplSetConfig& config) { receivedConfig.set(config); });
+
+    ASSERT(!receivedConfig);
+
+    // Force an election
+    forceElectionAndWaitForCacheUpdate(cachedResponse);
+
+    // Verify callback was executed successfully after the topology change.
+    ASSERT(receivedConfig);
+    ASSERT_EQ(receivedConfig.get().getConfigVersion(), replCoord->getConfig().getConfigVersion());
 }
 
 TEST_F(TopologyVersionObserverTest, HandleDBException) {

@@ -2666,6 +2666,20 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "mirror_maestro_test",
+    srcs = ["mirror_maestro_test.cpp"],
+    tags = ["mongo_unittest_eighth_group"],
+    deps = [
+        ":mirror_maestro",
+        "//src/mongo/db:service_context_d_test_fixture",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:replmocks",
+        "//src/mongo/idl:server_parameter_test_util",
+        "//src/mongo/unittest",
+    ],
+)
+
 mongo_cc_library(
     name = "change_stream_options_manager",
     srcs = [

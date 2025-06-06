@@ -77,6 +77,8 @@ constexpr auto kTopologyVersionObserverName = "TopologyVersionObserver";
  */
 class TopologyVersionObserver final {
 public:
+    using TopologyChangeCallback = std::function<void(const ReplSetConfig&)>;
+
     static constexpr auto kDelayMS = Milliseconds(10);
 
     TopologyVersionObserver() = default;
@@ -99,6 +101,11 @@ public:
      */
     std::shared_ptr<const HelloResponse> getCached() noexcept;
 
+    /**
+     * Adds a function to a list of callbacks to be called upon a topology version change.
+     */
+    void registerTopologyChangeObserver(TopologyChangeCallback cb);
+
     std::string toString() const;
 
     /**
@@ -118,7 +125,7 @@ private:
         kShutdown,
     };
 
-    void _cacheHelloResponse(OperationContext*, boost::optional<TopologyVersion>);
+    void _handleTopologyUpdate(OperationContext*, boost::optional<TopologyVersion>);
 
     void _workerThreadBody() noexcept;
 
@@ -149,6 +156,11 @@ private:
      * This variable is only changed from the worker thread
      */
     AtomicWord<State> _state;
+
+    /**
+     * A list of callbacks to be called when a topology change is detected.
+     */
+    std::vector<TopologyChangeCallback> _callbacks;
 
     // Holds a reference to the worker opCtx to allow `shutdown()` to stop the observer thread.
     // This variable should only be set after the `_workerThreadBody()` checks _shouldShutdown.
