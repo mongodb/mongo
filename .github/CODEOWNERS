@@ -756,6 +756,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/**/local_reads.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/**/pin_getmore_cursor.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/**/profiler.js @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/libs/**/run_with_retries.js @10gen/query-execution @svc-auto-approve-bot
 /jstests/libs/**/stats.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/libs/**/search.js @10gen/query-integration-search @svc-auto-approve-bot
 /jstests/libs/**/shard_targeting_util.js @10gen/query-optimization @svc-auto-approve-bot

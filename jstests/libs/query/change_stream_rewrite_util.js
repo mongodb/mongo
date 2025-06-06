@@ -8,6 +8,12 @@ import {
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {runWithRetries} from "jstests/libs/run_with_retries.js";
+
+const isResumableError = (e) => {
+    return ErrorCodes.isNetworkError(e.code) || ErrorCodes.isExceededTimeLimitError(e.code) ||
+        ErrorCodes.isStaleShardVersionError(e.code) || ErrorCodes.isSnapshotError(e.code);
+};
 
 // Function which generates a write workload on the specified collection, including all events that
 // a change stream may consume. Assumes that the specified collection does not already exist.
@@ -249,14 +255,23 @@ export function verifyChangeStreamOnWholeCluster({
 
     assert(!cursor.hasNext(), () => tojson(cursor.next()));
 
-    const stats = adminDB.runCommand({
-        explain: {
-            aggregate: 1,
-            pipeline: [{$changeStream: changeStreamSpec}, userMatchExpr],
-            cursor: {batchSize: 0}
-        },
-        verbosity: "executionStats"
-    });
+    // BF-37671 has revealed that the following command often failed with transient errors, so we
+    // wrap it a retry loop with backoff.
+    const stats = runWithRetries(() => {
+        return assert.commandWorked(adminDB.runCommand({
+            explain: {
+                aggregate: 1,
+                pipeline: [{$changeStream: changeStreamSpec}, userMatchExpr],
+                cursor: {batchSize: 0}
+            },
+            verbosity: "executionStats"
+        }));
+    }, isResumableError);
+
+    assert.commandWorked(stats);
+
+    assert(stats.hasOwnProperty('shards'),
+           () => `expecting stats to have 'shards' attribute, but got ${tojson(stats)}`);
 
     assertNumMatchingOplogEventsForShard(
         stats, st.shard0.shardName, expectedOplogNReturnedPerShard[0]);
