@@ -28,3 +28,4 @@
 - featureFlagSbeFull
 # TODO (SERVER-73632): Delete featureFlagRouterPort.
 - featureFlagRouterPort
+- featureFlagSessionsCollectionCoordinatorOnConfigServer

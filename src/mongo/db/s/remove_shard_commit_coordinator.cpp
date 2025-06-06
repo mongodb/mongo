@@ -191,6 +191,14 @@ void RemoveShardCommitCoordinator::_dropLocalCollections(OperationContext* opCtx
         uasserted(RemoveShardDrainingInfo(*pendingCleanupState),
                   "All collections must be empty before removing the shard.");
     }
+
+    DBDirectClient client(opCtx);
+    BSONObj result;
+    if (!client.dropCollection(NamespaceString::kLogicalSessionsNamespace,
+                               ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
+                               &result)) {
+        uassertStatusOK(getStatusFromCommandResult(result));
+    }
 }
 
 void RemoveShardCommitCoordinator::_commitRemoveShard(

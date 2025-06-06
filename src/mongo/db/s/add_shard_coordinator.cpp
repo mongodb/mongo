@@ -200,11 +200,14 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
             }))
         .then(_buildPhaseHandler(
             Phase::kPrepareNewShard,
-            [this, _ = shared_from_this()] { return !_doc.getIsConfigShard(); },
             [this, _ = shared_from_this()](auto* opCtx) {
                 auto& targeter = _getTargeter(opCtx);
 
                 _dropSessionsCollection(opCtx);
+
+                if (_doc.getIsConfigShard()) {
+                    return;
+                }
 
                 topology_change_helpers::getClusterTimeKeysFromReplicaSet(
                     opCtx, targeter, _executorWithoutGossip);
