@@ -324,18 +324,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildInputPipelineScoreDetails(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     boost::intrusive_ptr<DocumentSource> rawScoreAddFields =
         buildRawScoreAddFieldsStage(expCtx, inputPipelineName);
-    const std::string scoreName = fmt::format("${}_score", inputPipelineName);
-    boost::intrusive_ptr<DocumentSource> setPipelineScoreMetadata =
-        DocumentSourceSetMetadata::create(
-            expCtx,
-            ExpressionFieldPath::parse(expCtx.get(), scoreName, expCtx->variablesParseState),
-            DocumentMetadataFields::MetaType::kScore);
     boost::intrusive_ptr<DocumentSource> scoreDetailsAddFields =
         addInputPipelineScoreDetails(expCtx, inputPipelineName, inputGeneratesScoreDetails);
     std::list<boost::intrusive_ptr<DocumentSource>> initialScoreDetails = {
-        std::move(rawScoreAddFields),
-        std::move(setPipelineScoreMetadata),
-        std::move(scoreDetailsAddFields)};
+        std::move(rawScoreAddFields), std::move(scoreDetailsAddFields)};
     return initialScoreDetails;
 }
 
@@ -365,17 +357,19 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildFirstPipelineStages(
     outputStages.emplace_back(
         buildScoreAddFieldsStage(expCtx, inputPipelineOneName, normalization, weight));
 
-    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
-    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
-        outputStages.emplace_back(
-            builtSetWindowFieldsStageForMinMaxScalerNormalization(expCtx, inputPipelineOneName));
-    }
-
+    // TODO SERVER-105867: Investigate why these two stages have to happen on the shard and not on
+    // the merging node in order for $score's scoreDetails to be populated correctly.
     if (includeScoreDetails) {
         std::list<boost::intrusive_ptr<DocumentSource>> initialScoreDetailsStages =
             buildInputPipelineScoreDetails(
                 inputPipelineOneName, inputGeneratesScoreDetails, expCtx);
         outputStages.splice(outputStages.end(), std::move(initialScoreDetailsStages));
+    }
+
+    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
+    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
+        outputStages.emplace_back(
+            builtSetWindowFieldsStageForMinMaxScalerNormalization(expCtx, inputPipelineOneName));
     }
     return outputStages;
 }
@@ -553,20 +547,19 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipelineStage(
     oneInputPipeline->pushBack(buildReplaceRootStage(expCtx));
     oneInputPipeline->pushBack(
         buildScoreAddFieldsStage(expCtx, inputPipelineName, normalization, weight));
-    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
-    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
-        oneInputPipeline->pushBack(
-            builtSetWindowFieldsStageForMinMaxScalerNormalization(expCtx, inputPipelineName));
-    }
-
     if (includeScoreDetails) {
-        buildInputPipelineScoreDetails(inputPipelineName, inputGeneratesScoreDetails, expCtx);
         std::list<boost::intrusive_ptr<DocumentSource>> initialScoreDetailsStages =
             buildInputPipelineScoreDetails(inputPipelineName, inputGeneratesScoreDetails, expCtx);
         for (auto&& docSource : initialScoreDetailsStages) {
             oneInputPipeline->pushBack(docSource);
         }
     }
+    // Build the $setWindowFields stage, to perform minMaxScaler normalization, if applicable.
+    if (normalization == ScoreFusionNormalizationEnum::kMinMaxScaler) {
+        oneInputPipeline->pushBack(
+            builtSetWindowFieldsStageForMinMaxScalerNormalization(expCtx, inputPipelineName));
+    }
+
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
 
     auto collName = expCtx->getNamespaceString().coll();
