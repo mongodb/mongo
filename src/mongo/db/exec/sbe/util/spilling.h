@@ -37,6 +37,7 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/spill_table.h"
+#include "mongo/db/transaction_resources.h"
 
 #include <utility>
 
@@ -114,24 +115,24 @@ public:
         return _spillTable->getCursor(opCtx);
     }
 
-    void resetCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+    void resetCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
         switchToSpilling(opCtx);
         ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
         cursor.reset();
     }
 
-    auto saveCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+    auto saveCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
         switchToSpilling(opCtx);
         ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
         return cursor->save();
     }
 
-    auto restoreCursor(OperationContext* opCtx, std::unique_ptr<SeekableRecordCursor>& cursor) {
+    auto restoreCursor(OperationContext* opCtx, std::unique_ptr<SpillTable::Cursor>& cursor) {
         switchToSpilling(opCtx);
         ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
-        return cursor->restore();
+        return cursor->restore(*shard_role_details::getRecoveryUnit(opCtx));
     }
 
     int64_t storageSize(OperationContext* opCtx);

@@ -635,8 +635,8 @@ private:
     bool _saveStorageCursorOnDetachFromOperationContext = false;
 };
 
-WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
-                                             WiredTigerRecoveryUnit& ru,
+WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
+                                             WiredTigerRecoveryUnitBase& ru,
                                              Params params)
     : WiredTigerRecordStoreBase(std::move(params.baseParams)),
       _inMemory(params.inMemory),
@@ -786,18 +786,14 @@ RecoveryUnit& WiredTigerRecordStore::getRecoveryUnit(RecoveryUnit& ru) const {
 void WiredTigerRecordStore::_deleteRecord(OperationContext* opCtx,
                                           RecoveryUnit& ru,
                                           const RecordId& id) {
-    invariant(getRecoveryUnit(ru).inUnitOfWork());
-
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
     if (_keyFormat == KeyFormat::Long) {
         _initNextIdIfNeeded(opCtx, ru);
     }
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
-    // getSession() will open a txn if there was no txn active.
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
     wtRu.getSession();
-    wtRu.assertInActiveTxn();
 
     OpStats opStats{};
     wtDeleteRecord(opCtx, wtRu, id, opStats);
@@ -809,14 +805,11 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              RecoveryUnit& ru,
                                              std::vector<Record>* records,
                                              const std::vector<Timestamp>& timestamps) {
-    invariant(getRecoveryUnit(ru).inUnitOfWork());
-
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
 
-    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
@@ -884,13 +877,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 
 Status WiredTigerRecordStore::_updateRecord(
     OperationContext* opCtx, RecoveryUnit& ru, const RecordId& id, const char* data, int len) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
-    invariant(wtRu.inUnitOfWork());
-
-    // getSession() will open a txn if there was no txn active.
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
     wtRu.getSession();
-    wtRu.assertInActiveTxn();
-
 
     OpStats opStats{};
     auto status = wtUpdateRecord(opCtx, wtRu, id, data, len, opStats);
@@ -924,12 +912,11 @@ StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContex
         entries[i].size = where->targetSize;
     }
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
 
-    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     CursorKey key = makeCursorKey(id, _keyFormat);
@@ -1037,7 +1024,7 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(OperationCo
 }
 
 Status WiredTigerRecordStore::_truncate(OperationContext* opCtx, RecoveryUnit& ru) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
     auto status = wtTruncate(opCtx, wtRu);
     if (!status.isOK()) {
         return status;
@@ -1054,7 +1041,7 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
                                              const RecordId& maxRecordId,
                                              int64_t hintDataSizeDiff,
                                              int64_t hintNumRecordsDiff) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
     auto status = wtRangeTruncate(opCtx, wtRu, minRecordId, maxRecordId);
     if (!status.isOK()) {
         return status;
@@ -1067,7 +1054,7 @@ Status WiredTigerRecordStore::_rangeTruncate(OperationContext* opCtx,
 StatusWith<int64_t> WiredTigerRecordStore::_compact(OperationContext* opCtx,
                                                     RecoveryUnit& ru,
                                                     const CompactOptions& options) {
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
     return wtCompact(opCtx, wtRu, options);
 }
 
@@ -1078,15 +1065,18 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
         return;
     }
 
-    WiredTigerUtil::validateTableLogging(
-        *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(), _uri, _isLogged, boost::none, *results);
+    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn(),
+                                         _uri,
+                                         _isLogged,
+                                         boost::none,
+                                         *results);
 
     if (!options.isFullValidation()) {
         invariant(!options.verifyConfigurationOverride().has_value());
         return;
     }
 
-    int err = WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnit::get(ru).getSession(),
+    int err = WiredTigerUtil::verifyTable(*WiredTigerRecoveryUnitBase::get(ru).getSession(),
                                           _uri,
                                           options.verifyConfigurationOverride(),
                                           results->getErrorsUnsafe());
@@ -1123,7 +1113,7 @@ void WiredTigerRecordStore::validate(RecoveryUnit& ru,
 void WiredTigerRecordStore::appendNumericCustomStats(RecoveryUnit& ru,
                                                      BSONObjBuilder* result,
                                                      double scale) const {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn();
 
     BSONObjBuilder bob(result->subobjStart(_engineName));
 
@@ -1133,7 +1123,7 @@ void WiredTigerRecordStore::appendNumericCustomStats(RecoveryUnit& ru,
 void WiredTigerRecordStore::appendAllCustomStats(RecoveryUnit& ru,
                                                  BSONObjBuilder* result,
                                                  double scale) const {
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn();
     BSONObjBuilder bob(result->subobjStart(_engineName));
     {
         BSONObjBuilder metadata(bob.subobjStart("metadata"));
@@ -1427,7 +1417,7 @@ RecordStore::Capped::TruncateAfterResult WiredTigerRecordStore::Capped::_truncat
     // Truncate the collection starting from the record located at 'firstRemovedId' to the end of
     // the collection.
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor startwrap(std::move(cursorParams), _uri, *wtRu.getSession());
@@ -1436,14 +1426,14 @@ RecordStore::Capped::TruncateAfterResult WiredTigerRecordStore::Capped::_truncat
     auto key = makeCursorKey(firstRemovedId, _keyFormat);
     setKey(start, &key);
 
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru)).getSession();
+    WiredTigerSession* session = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru)).getSession();
     invariantWTOK(session->truncate(nullptr, start, nullptr, nullptr), *session);
 
     _changeNumRecordsAndDataSize(ru, -recordsRemoved, -bytesRemoved);
 
     txn.commit();
 
-    _handleTruncateAfter(WiredTigerRecoveryUnit::get(getRecoveryUnit(ru)), lastKeptId);
+    _handleTruncateAfter(WiredTigerRecoveryUnit::get(wtRu), lastKeptId);
 
     return {recordsRemoved, bytesRemoved, std::move(firstRemovedId)};
 }
@@ -1513,7 +1503,7 @@ void WiredTigerRecordStore::Oplog::validate(RecoveryUnit& ru,
         return;
     }
 
-    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(),
+    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnitBase::get(ru).getSessionNoTxn(),
                                          getURI(),
                                          _isLogged,
                                          boost::none,
@@ -1545,7 +1535,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getLatestTimestamp(RecoveryU
     // so in a UOW. This also ensures we do not return uncommitted entries.
     invariant(!ru.inUnitOfWork());
 
-    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(ru);
     bool ruWasActive = wtRu.isActive();
 
     // getSession will open a txn if there was no txn active.
@@ -1573,7 +1563,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getLatestTimestamp(RecoveryU
 }
 
 StatusWith<Timestamp> WiredTigerRecordStore::Oplog::getEarliestTimestamp(RecoveryUnit& ru) {
-    auto wtRu = WiredTigerRecoveryUnit::get(&ru);
+    auto wtRu = WiredTigerRecoveryUnitBase::get(&ru);
 
     auto cursorParams = getWiredTigerCursorParams(*wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu->getSession());
@@ -1593,14 +1583,11 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
                                                     RecoveryUnit& ru,
                                                     std::vector<Record>* records,
                                                     const std::vector<Timestamp>& timestamps) {
-    invariant(getRecoveryUnit(ru).inUnitOfWork());
-
-    auto& wtRu = WiredTigerRecoveryUnit::get(getRecoveryUnit(ru));
+    auto& wtRu = WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru));
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, _overwrite);
     WiredTigerCursor curwrap(std::move(cursorParams), _uri, *wtRu.getSession());
 
-    wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
@@ -1670,7 +1657,7 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.get());
         int ret = WT_OP_CHECK(
-            wiredTigerCursorInsert(WiredTigerRecoveryUnit::get(getRecoveryUnit(ru)), c));
+            wiredTigerCursorInsert(WiredTigerRecoveryUnitBase::get(getRecoveryUnit(ru)), c));
         invariant(ret != WT_DUPLICATE_KEY);
         if (ret)
             return wtRCToStatus(ret, c->session, "WiredTigerRecordStore::insertRecord");

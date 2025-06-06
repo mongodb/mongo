@@ -257,7 +257,8 @@ auto SpillableDocumentMapImpl::IteratorImpl<IsConst>::getCurrentDocument() -> re
 template <bool IsConst>
 void SpillableDocumentMapImpl::IteratorImpl<IsConst>::restoreDiskIt() {
     _diskIt->reattachToOperationContext(_map->_expCtx->getOperationContext());
-    bool restoreResult = _diskIt->restore();
+    bool restoreResult = _diskIt->restore(
+        *shard_role_details::getRecoveryUnit(_map->_expCtx->getOperationContext()));
     tassert(2398004, "Unable to restore disk cursor", restoreResult);
 }
 

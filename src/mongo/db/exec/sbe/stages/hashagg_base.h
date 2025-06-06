@@ -165,7 +165,7 @@ protected:
 
     // A record store which is instantiated and written to in the case of spilling.
     std::unique_ptr<SpillingStore> _recordStore;
-    std::unique_ptr<SeekableRecordCursor> _rsCursor;
+    std::unique_ptr<SpillTable::Cursor> _rsCursor;
 
     // A monotonically increasing counter used to ensure uniqueness of 'RecordId' values. When
     // spilling, the key is encoding into the 'RecordId' of the '_recordStore'. Record ids must be

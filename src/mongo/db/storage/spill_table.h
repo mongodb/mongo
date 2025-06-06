@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
@@ -43,7 +45,28 @@ namespace mongo {
  */
 class SpillTable {
 public:
-    explicit SpillTable(std::unique_ptr<RecordStore> rs) : _rs(std::move(rs)) {}
+    class Cursor {
+    public:
+        Cursor(RecoveryUnit* ru, std::unique_ptr<SeekableRecordCursor> cursor);
+
+        boost::optional<Record> seekExact(const RecordId& id);
+
+        boost::optional<Record> next();
+
+        void detachFromOperationContext();
+
+        void reattachToOperationContext(OperationContext* opCtx);
+
+        void save();
+
+        bool restore(RecoveryUnit& ru);
+
+    private:
+        RecoveryUnit* _ru;
+        std::unique_ptr<SeekableRecordCursor> _cursor;
+    };
+
+    SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs);
 
     virtual ~SpillTable() {}
 
@@ -100,7 +123,7 @@ public:
      * The cursor is logically positioned before the first (or last if !forward) record in the
      * collection so that a record will be returned on the first call to next().
      */
-    std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext*, bool forward = true) const;
+    std::unique_ptr<Cursor> getCursor(OperationContext*, bool forward = true) const;
 
     /**
      * Removes all records.
@@ -124,6 +147,7 @@ public:
                          int64_t hintNumRecordsIncrement = 0);
 
 protected:
+    std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
 };
 

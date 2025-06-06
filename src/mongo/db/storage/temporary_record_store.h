@@ -40,7 +40,8 @@ namespace mongo {
  */
 class TemporaryRecordStore : public SpillTable {
 public:
-    explicit TemporaryRecordStore(std::unique_ptr<RecordStore> rs) : SpillTable(std::move(rs)) {}
+    explicit TemporaryRecordStore(std::unique_ptr<RecordStore> rs)
+        : SpillTable(nullptr, std::move(rs)) {}
 
     // Not copyable.
     TemporaryRecordStore(const TemporaryRecordStore&) = delete;

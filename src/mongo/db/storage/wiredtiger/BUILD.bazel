@@ -45,7 +45,6 @@ mongo_cc_library(
     name = "storage_wiredtiger_core",
     srcs = [
         "spill_wiredtiger_kv_engine.cpp",
-        "spill_wiredtiger_record_store.cpp",
         "wiredtiger_begin_transaction_block.cpp",
         "wiredtiger_compiled_configuration.cpp",
         "wiredtiger_connection.cpp",
@@ -72,7 +71,6 @@ mongo_cc_library(
     hdrs = [
         "spill_recovery_unit.h",
         "spill_wiredtiger_kv_engine.h",
-        "spill_wiredtiger_record_store.h",
         "wiredtiger_begin_transaction_block.h",
         "wiredtiger_compiled_configuration.h",
         "wiredtiger_connection.h",
@@ -227,7 +225,6 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "storage_wiredtiger_record_store_and_index_test",
     srcs = [
-        "spill_wiredtiger_record_store_test.cpp",
         "wiredtiger_index_test.cpp",
         "wiredtiger_record_store_test.cpp",
         "wiredtiger_standard_index_test.cpp",

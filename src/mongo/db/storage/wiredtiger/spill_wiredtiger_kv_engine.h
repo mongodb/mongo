@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/storage/wiredtiger/spill_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 namespace mongo {
@@ -36,10 +37,9 @@ namespace mongo {
 class ClockSource;
 
 /**
- * WiredTigerKVEngineBase implementation for creating SpillWiredTigerRecordStores. This class uses
- * its own WiredTiger instance called "spill" WiredTiger instance. Journaling is disabled for this
- * WiredTiger instance. The cache size of this WiredTiger instance is also configured to be very
- * small.
+ * This class uses its own WiredTiger instance called "spill" WiredTiger instance. Journaling is
+ * disabled for this WiredTiger instance. The cache size of this WiredTiger instance is also
+ * configured to be very small.
  */
 class SpillWiredTigerKVEngine final : public WiredTigerKVEngineBase {
 public:
@@ -63,7 +63,7 @@ public:
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
-        MONGO_UNREACHABLE;
+        return std::make_unique<SpillRecoveryUnit>(_connection.get());
     }
 
     bool supportsDirectoryPerDB() const override {

@@ -621,10 +621,11 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* opCtx,
                                                               KeyFormat keyFormat) {
     invariant(_spillKVEngine);
-    std::unique_ptr<RecordStore> rs = _spillKVEngine->makeTemporaryRecordStore(
-        *shard_role_details::getRecoveryUnit(opCtx), ident::generateNewInternalIdent(), keyFormat);
+    auto ru = _spillKVEngine->newRecoveryUnit();
+    std::unique_ptr<RecordStore> rs =
+        _spillKVEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
-    return std::make_unique<SpillTable>(std::move(rs));
+    return std::make_unique<SpillTable>(std::move(ru), std::move(rs));
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(

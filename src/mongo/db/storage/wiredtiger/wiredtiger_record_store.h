@@ -239,7 +239,9 @@ public:
         bool tracksSizeAdjustments;
     };
 
-    WiredTigerRecordStore(WiredTigerKVEngine* kvEngine, WiredTigerRecoveryUnit&, Params params);
+    WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
+                          WiredTigerRecoveryUnitBase&,
+                          Params params);
 
     ~WiredTigerRecordStore() override;
 
@@ -402,7 +404,7 @@ protected:
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
     std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
     bool _tracksSizeAdjustments;
-    WiredTigerKVEngine* _kvEngine;  // not owned.
+    WiredTigerKVEngineBase* _kvEngine;  // not owned.
 };
 
 class WiredTigerRecordStore::Capped : public WiredTigerRecordStore, public RecordStoreBase::Capped {

@@ -157,7 +157,7 @@ public:
         MapPointer _map;
         MemIterator _memIt;
 
-        std::unique_ptr<SeekableRecordCursor> _diskIt = nullptr;
+        std::unique_ptr<SpillTable::Cursor> _diskIt = nullptr;
         bool _diskItExhausted = true;
         std::deque<MemoryUsageTokenWith<Document>> _diskDocuments;
     };
