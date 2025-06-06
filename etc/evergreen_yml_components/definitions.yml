@@ -2171,6 +2171,7 @@ functions:
         provider: ec2
         distro: ${distro_id}
         timeout_teardown_secs: 86400 # 24 hours
+        retries: 5
         security_group_ids:
           - sg-097bff6dd0d1d31d0
 
@@ -2217,6 +2218,7 @@ functions:
         provider: ec2
         distro: ${distro}
         timeout_teardown_secs: 86400 # 1 day
+        retries: 5
     - command: host.list
       params:
         wait: true
