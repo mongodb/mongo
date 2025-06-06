@@ -156,13 +156,6 @@ double objectIdToDouble(const sbe::value::ObjectIdType* sd);
 double valueToDouble(sbe::value::TypeTags tag, sbe::value::Value val);
 
 /**
- * Given a BSONBuilder building a document, add an additional field with a specific name and value.
- */
-void addSbeValueToBSONBuilder(const SBEValue& sbeValue,
-                              const std::string& fieldName,
-                              BSONObjBuilder& builder);
-
-/**
  * Convert a SBEValue of any supported type into a BSONObj.
  */
 BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName);

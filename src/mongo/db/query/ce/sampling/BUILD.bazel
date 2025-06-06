@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_library", "mongo_cc_unit_test")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_benchmark", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,13 +12,11 @@ exports_files(
 mongo_cc_library(
     name = "sampling_test_utils",
     srcs = [
-        "sampling_test_utils.cpp",
     ],
     hdrs = [
         "sampling_test_utils.h",
     ],
     deps = [
-        "//src/mongo/db/catalog:catalog_test_fixture",
         "//src/mongo/db/query/ce:ce_test_utils",
     ],
 )
@@ -57,15 +55,6 @@ mongo_cc_unit_test(
     deps = [
         ":sampling_test_utils",
         "//src/mongo/db:query_exec",
-    ],
-)
-
-mongo_cc_benchmark(
-    name = "sampling_bm",
-    srcs = ["ce_sampling_bm.cpp"],
-    tags = ["second_half_bm"],
-    deps = [
-        ":sampling_test_utils",
-        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/catalog:catalog_test_fixture",
     ],
 )

@@ -34,7 +34,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/repl/oplog.h"
@@ -154,39 +153,6 @@ public:
         return docs;
     }
 
-    static std::vector<BSONObj> createDocumentsFromSBEValue(std::vector<stats::SBEValue> data,
-                                                            int numberOfFields = 1) {
-
-        tassert(10472401,
-                "Number of fields should be fewer than the letters of the English alphabet (<= 26)",
-                numberOfFields <= 26);
-
-        std::vector<BSONObj> docs;
-        for (size_t i = 0; i < data.size(); i++) {
-
-            BSONObjBuilder builder;
-            stats::addSbeValueToBSONBuilder(stats::makeInt64Value(i), "_id", builder);
-
-            for (int instance = 0; instance < numberOfFields; instance++) {
-                std::string attributeName;
-
-                // Create simple attribute names starting from 'a' based on ascii codes (i.e.,
-                // starting from ascii 97 (a) to ascii 122 (z))
-                attributeName = (char)(97 + instance);
-                stats::addSbeValueToBSONBuilder(data[i], attributeName, builder);
-            }
-
-            docs.push_back(builder.obj());
-        }
-        return docs;
-    }
-
-    static BSONObj createBSONObjOperandWithSBEValue(std::string str, stats::SBEValue value) {
-        BSONObjBuilder builder;
-        stats::addSbeValueToBSONBuilder(value, str, builder);
-        return builder.obj();
-    }
-
     static CardinalityEstimate makeCardinalityEstimate(
         double estimate,
         cost_based_ranker::EstimationSource source = cost_based_ranker::EstimationSource::Code) {
@@ -201,42 +167,5 @@ public:
 
     NamespaceString _kTestNss;
 };
-
-struct SamplingEstimationBenchmarkConfiguration : public BenchmarkConfiguration {
-
-    int numberOfFields;
-    int sampleSize;
-    boost::optional<int> numChunks;
-    SamplingEstimatorImpl::SamplingStyle samplingAlgo;
-
-    SamplingEstimationBenchmarkConfiguration(size_t size,
-                                             DataDistributionEnum dataDistribution,
-                                             DataType dataType,
-                                             boost::optional<size_t> ndv,
-                                             boost::optional<QueryType> queryType,
-                                             size_t numberOfFields,
-                                             size_t kSampleSize,
-                                             int numOfChunks,
-                                             boost::optional<size_t> numberOfQueries = boost::none)
-        : BenchmarkConfiguration(size, dataDistribution, dataType, queryType, ndv, numberOfQueries),
-          numberOfFields(numberOfFields),
-          sampleSize(kSampleSize) {
-
-        // Translate the number of chunks variable to both number of chunks and sampling algo.
-        // This benchmark given as input numOfChunks <= 0 will use kRandom.
-        if (numOfChunks <= 0) {
-            samplingAlgo = SamplingEstimatorImpl::SamplingStyle::kRandom;
-            numChunks = boost::none;
-        } else {
-            samplingAlgo = SamplingEstimatorImpl::SamplingStyle::kChunk;
-            numChunks = numOfChunks;
-        }
-    };
-};
-
-
-void generateData(SamplingEstimationBenchmarkConfiguration& configuration,
-                  size_t seedData,
-                  std::vector<stats::SBEValue>& data);
 
 }  // namespace mongo::ce
