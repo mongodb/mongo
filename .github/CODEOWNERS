@@ -45,6 +45,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/setup_spawnhost_coredump @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/hang_analyzer.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/evergreen_resmoke_job_count.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/evergreen_task_timeout.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/evergreen_gen_smoke_test_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmoke_tests_runtime_validate.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/powercycle* @10gen/devprod-correctness @svc-auto-approve-bot

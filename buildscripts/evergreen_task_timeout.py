@@ -24,7 +24,6 @@ from buildscripts.timeouts.timeout_service import TimeoutParams, TimeoutService
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.expansions import get_expansion
 from buildscripts.util.taskname import determine_task_base_name
-from evergreen import EvergreenApi, RetryingEvergreenApi
 
 LOGGER = structlog.get_logger(__name__)
 DEFAULT_TIMEOUT_OVERRIDES = "etc/evergreen_timeouts.yml"
@@ -478,12 +477,6 @@ def main():
         help="File containing timeout overrides to use.",
     )
     parser.add_argument(
-        "--evg-api-config",
-        dest="evg_api_config",
-        default=DEFAULT_EVERGREEN_AUTH_CONFIG,
-        help="Evergreen API config file.",
-    )
-    parser.add_argument(
         "--evg-project-config",
         dest="evg_project_config",
         default=DEFAULT_EVERGREEN_CONFIG,
@@ -506,15 +499,15 @@ def main():
     LOGGER.info("Determining timeouts", cli_args=options)
 
     def dependencies(binder: inject.Binder) -> None:
-        binder.bind(
-            EvergreenApi,
-            RetryingEvergreenApi.get_api(config_file=os.path.expanduser(options.evg_api_config)),
-        )
         binder.bind(TimeoutOverrides, timeout_overrides)
+        LOGGER.info(
+            "Evaluating Evergreen project YAML", evg_project_config=options.evg_project_config
+        )
         binder.bind(
             EvergreenProjectConfig,
             parse_evergreen_file(os.path.expanduser(options.evg_project_config)),
         )
+        LOGGER.info("Configuring resmoke proxy")
         binder.bind(
             ResmokeProxyService,
             ResmokeProxyService(

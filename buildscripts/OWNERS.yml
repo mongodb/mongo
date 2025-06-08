@@ -26,6 +26,9 @@ filters:
   - "evergreen_resmoke_job_count.py":
     approvers:
       - 10gen/devprod-correctness
+  - "evergreen_task_timeout.py":
+    approvers:
+      - 10gen/devprod-correctness
   - "evergreen_gen_smoke_test_tasks.py":
     approvers:
       - 10gen/devprod-correctness
