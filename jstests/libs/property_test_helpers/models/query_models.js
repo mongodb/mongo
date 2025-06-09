@@ -28,13 +28,14 @@ export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false}
             return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
         });
 }
-const projectArb = oneof(getSingleFieldProjectArb(true /*isInclusion*/),
-                         getSingleFieldProjectArb(false /*isInclusion*/));
+export const simpleProjectArb = oneof(getSingleFieldProjectArb(true /*isInclusion*/),
+                                      getSingleFieldProjectArb(false /*isInclusion*/));
 
 // Project from one field to another. {$project {a: '$b'}}
-const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destField, srcField]) {
-    return {$project: {[destField]: srcField}};
-});
+export const computedProjectArb =
+    fc.tuple(fieldArb, dollarFieldArb).map(function([destField, srcField]) {
+        return {$project: {[destField]: srcField}};
+    });
 
 // Add field with a constant argument. {$addFields: {a: 5}}
 export const addFieldsConstArb =
@@ -42,9 +43,10 @@ export const addFieldsConstArb =
         return {$addFields: {[destField]: leafParams}};
     });
 // Add field from source field. {$addFields: {a: '$b'}}
-const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function([destField, sourceField]) {
-    return {$addFields: {[destField]: sourceField}};
-});
+export const addFieldsVarArb =
+    fc.tuple(fieldArb, dollarFieldArb).map(function([destField, sourceField]) {
+        return {$addFields: {[destField]: sourceField}};
+    });
 
 /*
  * Generates a random $sort, with [1, maxNumSortComponents] sort components.
@@ -89,7 +91,7 @@ export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
 function getAllowedStages(allowOrs, deterministicBag) {
     if (deterministicBag) {
         return [
-            projectArb,
+            simpleProjectArb,
             getMatchArb(allowOrs),
             addFieldsConstArb,
             computedProjectArb,
@@ -102,7 +104,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
         return [
             limitArb,
             skipArb,
-            projectArb,
+            simpleProjectArb,
             getMatchArb(allowOrs),
             addFieldsConstArb,
             computedProjectArb,
@@ -120,5 +122,5 @@ function getAllowedStages(allowOrs, deterministicBag) {
 export function getAggPipelineModel({allowOrs = true, deterministicBag = true} = {}) {
     const aggStageArb = oneof(...getAllowedStages(allowOrs, deterministicBag));
     // Length 6 seems long enough to cover interactions between stages.
-    return fc.array(aggStageArb, {minLength: 0, maxLength: 6});
+    return fc.array(aggStageArb, {minLength: 1, maxLength: 6});
 }

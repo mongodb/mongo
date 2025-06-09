@@ -75,7 +75,7 @@ function getWorkloadModel(isTS) {
             sort: getSortArb(8 /* maxNumSortComponents */),
             pipelines: fc.array(getAggPipelineModel(),
                                 {minLength: 0, maxLength: numQueriesPerRun, size: '+2'}),
-            collSpec: getCollectionModel(isTS)
+            collSpec: getCollectionModel({isTS})
         })
         .map(({sort, pipelines, collSpec}) => {
             // Prefix every pipeline with the sort operation.

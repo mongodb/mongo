@@ -34,7 +34,7 @@ export function makeWorkloadModel({collModel, aggModel, aggsModel, numQueriesPer
         !aggsModel || !numQueriesPerRun,
         'Cannot specify `aggsModel` and `numQueriesPerRun`, since `numQueriesPerRun` is only used when provided `aggModel`.');
     if (aggModel) {
-        aggsModel = fc.array(aggModel, {minLength: numQueriesPerRun, maxLength: numQueriesPerRun});
+        aggsModel = fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun, size: '+2'});
     }
     typeCheckManyAggsModel(aggsModel);
     return fc.record({collSpec: collModel, queries: aggsModel});

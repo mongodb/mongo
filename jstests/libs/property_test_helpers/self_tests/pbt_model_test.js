@@ -116,7 +116,7 @@ function testMatchedDocsMetrics(allowOrs) {
         }
         // Run 100 queries total.
         const numRuns = 20;
-        const numQueriesPerRun = 5;
+        const numQueriesPerRun = 10;
         testProperty(
             mockProperty,
             {experimentColl},
@@ -124,7 +124,6 @@ function testMatchedDocsMetrics(allowOrs) {
             numRuns);
 
         const avgNumDocsReturned = avg(numDocsReturned);
-        assert.eq(numDocsReturned.length, numRuns * numQueriesPerRun, name);
         assert.gt(avgNumDocsReturned, minimumAcceptedAvgNumDocs, name);
         jsTestLog('Average number of documents returned for ' + name +
                   ' was: ' + avgNumDocsReturned);
