@@ -22,6 +22,7 @@ buildvariants:
       bazel_compile_flags: >-
         --build_enterprise=False
         --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
       compile_variant: macos-arm64
     tasks:
@@ -45,7 +46,9 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: arm64-enterprise
-      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
+      bazel_compile_flags: >-
+        --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos-arm64
     tasks:
@@ -71,6 +74,7 @@ buildvariants:
       bazel_compile_flags: >-
         --build_enterprise=False
         --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
       compile_variant: macos
     tasks:
@@ -94,7 +98,9 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: x86_64-enterprise
-      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
+      bazel_compile_flags: >-
+        --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos
     tasks:
@@ -118,9 +124,7 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: arm64
-      bazel_compile_flags: >-
-        --build_enterprise=False
-        --local_clang_compiler
+      bazel_compile_flags: --build_enterprise=False
       resmoke_jobs_max: 6
       compile_variant: macos-arm64
     tasks:
@@ -144,9 +148,7 @@ buildvariants:
       push_bucket: downloads.mongodb.org
       push_name: macos
       push_arch: x86_64
-      bazel_compile_flags: >-
-        --build_enterprise=False
-        --local_clang_compiler
+      bazel_compile_flags: --build_enterprise=False
       resmoke_jobs_max: 6
       compile_variant: macos
     tasks:
@@ -171,7 +173,6 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: x86_64-enterprise
-      bazel_compile_flags: --local_clang_compiler
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos
     tasks:
@@ -196,7 +197,6 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: macos
       push_arch: arm64-enterprise
-      bazel_compile_flags: --local_clang_compiler
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos-arm64
     tasks:

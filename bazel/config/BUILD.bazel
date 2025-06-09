@@ -26,7 +26,6 @@ load(
     "libunwind",
     "linker",
     "linkstatic",
-    "local_clang_compiler",
     "lsan",
     "mongo_toolchain_version",
     "msan",
@@ -92,15 +91,15 @@ config_setting(
     },
 )
 
-local_clang_compiler(
-    name = "local_clang_compiler",
+bool_flag(
+    name = "apple_clang",
     build_setting_default = False,
 )
 
 config_setting(
-    name = "use_local_clang_compiler",
+    name = "use_apple_clang",
     flag_values = {
-        "//bazel/config:local_clang_compiler": "True",
+        ":apple_clang": "true",
     },
 )
 

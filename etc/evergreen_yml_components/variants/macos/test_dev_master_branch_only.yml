@@ -13,7 +13,9 @@ buildvariants:
     expansions:
       compile_variant: *enterprise-macos-arm64
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-      bazel_compile_flags: --developer_dir=/Applications/Xcode15.app
+      bazel_compile_flags: >-
+        --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG

@@ -9,7 +9,7 @@ To build MongoDB, you will need:
 - A modern C++ compiler capable of compiling C++20. One of the following is required:
   - GCC 14.2 or newer
   - Clang 19.1 or newer
-  - Apple XCode 14 or newer
+  - Apple XCode 16.4 or newer
   - Visual Studio 2022 version 17.0 or newer (See Windows section below for details)
 - On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
   - Fedora/RHEL - `dnf install libcurl-devel`
@@ -95,4 +95,8 @@ To install dependencies on Debian or Ubuntu systems:
 
 ## OS X
 
-Install Xcode 14.0 or newer.
+Install Xcode 16.4 or newer. Make sure macOS 15.5 platform
+is installed.
+
+Install llvm and lld, version 19 from brew:
+brew install llvm@19 lld@19

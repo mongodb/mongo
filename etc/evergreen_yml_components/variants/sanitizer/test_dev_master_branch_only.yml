@@ -341,6 +341,7 @@ buildvariants:
         --opt=on
         --build_enterprise=False
         --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
     tasks:
       - name: compile_test_serial_TG
       - name: run_unit_tests_TG
@@ -368,6 +369,7 @@ buildvariants:
         --dbg=True
         --opt=on
         --developer_dir=/Applications/Xcode15.app
+        --use_apple_clang
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG
@@ -398,7 +400,6 @@ buildvariants:
         --dbg=True
         --opt=on
         --build_enterprise=False
-        --local_clang_compiler
     tasks:
       - name: compile_test_serial_TG
       - name: run_unit_tests_TG
@@ -425,7 +426,6 @@ buildvariants:
       bazel_compile_flags: >-
         --dbg=True
         --opt=on
-        --local_clang_compiler
       resmoke_jobs_max: 6
     tasks:
       - name: compile_test_serial_TG

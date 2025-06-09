@@ -14,8 +14,8 @@ package(default_visibility = ["//visibility:public"])
             "@platforms//cpu:" + cpu,
         ],
         toolchain = select({
-            "@//bazel/config:use_local_clang_compiler": "@mongo_apple_brew_llvm_toolchain_config//:cc-compiler-" + apple_arch,
-            "@//conditions:default": "@mongo_apple_toolchain_config//:cc-compiler-" + apple_arch,
+            "@//bazel/config:use_apple_clang": "@mongo_apple_toolchain_config//:cc-compiler-" + apple_arch,
+            "@//conditions:default": "@mongo_apple_brew_llvm_toolchain_config//:cc-compiler-" + apple_arch,
         }),
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     )

@@ -23,20 +23,6 @@ compiler_type = rule(
     build_setting = config.string(flag = True),
 )
 
-# =============
-# compiler_type
-# =============
-
-local_clang_compiler_provider = provider(
-    doc = "use the local clang compiler",
-    fields = ["enabled"],
-)
-
-local_clang_compiler = rule(
-    implementation = lambda ctx: local_clang_compiler_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
 # =========
 # mongo_toolchain_version
 # =========
