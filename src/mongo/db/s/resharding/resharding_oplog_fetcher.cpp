@@ -84,6 +84,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/string_map.h"
@@ -305,57 +306,69 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
 
 ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
     std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
-    return ExecutorFuture(executor)
-        .then([this, executor, cancelToken] {
-            if (_startAt == kFinalOpAlreadyFetched) {
-                LOGV2_INFO(10355401,
-                           "Not rescheduling resharding oplog fetcher since there is no "
-                           "more work to do",
-                           "donorShard"_attr = _donorShard,
-                           "reshardingUUID"_attr = _reshardingUUID);
+    auto delay = std::make_shared<Milliseconds>(0);
+    return AsyncTry([this, executor, cancelToken, delay] {
+               return executor->sleepFor(*delay, cancelToken).then([this, executor, cancelToken] {
+                   if (_startAt == kFinalOpAlreadyFetched) {
+                       LOGV2_INFO(10355401,
+                                  "Not rescheduling resharding oplog fetcher since there is no "
+                                  "more work to do",
+                                  "donorShard"_attr = _donorShard,
+                                  "reshardingUUID"_attr = _reshardingUUID);
+                       return false;
+                   }
+
+                   // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+                   ThreadClient client(fmt::format("OplogFetcher-{}-{}",
+                                                   _reshardingUUID.toString(),
+                                                   _donorShard.toString()),
+                                       _service()->getService(ClusterRole::ShardServer),
+                                       ClientOperationKillableByStepdown{false});
+
+                   boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
+                   {
+                       stdx::lock_guard lk(_mutex);
+                       _aggCancelSource.emplace(cancelToken);
+                       aggOpCtxFactory.emplace(_aggCancelSource->token(), executor);
+                   }
+                   return iterate(client.get(), *aggOpCtxFactory);
+               });
+           })
+        .until([this, executor, cancelToken, delay](StatusWith<bool> statusWithMoreOplogsToCome) {
+            if (!statusWithMoreOplogsToCome.isOK() || !statusWithMoreOplogsToCome.getValue() ||
+                cancelToken.isCanceled()) {
+                return true;
+            } else {
+                auto sleepDuration = Milliseconds{
+                    _isPreparingForCriticalSection.load()
+                        ? resharding::gReshardingOplogFetcherSleepMillisDuringCriticalSection.load()
+                        : resharding::gReshardingOplogFetcherSleepMillisBeforeCriticalSection
+                              .load()};
+                *delay = sleepDuration;
                 return false;
             }
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            ThreadClient client(fmt::format("OplogFetcher-{}-{}",
-                                            _reshardingUUID.toString(),
-                                            _donorShard.toString()),
-                                _service()->getService(ClusterRole::ShardServer),
-                                ClientOperationKillableByStepdown{false});
-
-            boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
-            {
-                stdx::lock_guard lk(_mutex);
-                _aggCancelSource.emplace(cancelToken);
-                aggOpCtxFactory.emplace(_aggCancelSource->token(), executor);
-            }
-            return iterate(client.get(), *aggOpCtxFactory);
         })
-        .then([this, executor, cancelToken](bool moreToCome) mutable {
-            if (!moreToCome) {
-                LOGV2_INFO(6077401,
-                           "Resharding oplog fetcher done fetching",
-                           "donorShard"_attr = _donorShard,
-                           "reshardingUUID"_attr = _reshardingUUID);
-                return ExecutorFuture(std::move(executor));
-            }
-
+        .on(executor, cancelToken)
+        .onCompletion([this, executor, cancelToken](StatusWith<bool> statusWith) {
             if (cancelToken.isCanceled()) {
                 return ExecutorFuture<void>(
                     std::move(executor),
                     Status{ErrorCodes::CallbackCanceled,
                            "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
-
-            // Wait a little before re-running the aggregation pipeline on the donor's oplog.
-            auto sleepDuration = Milliseconds{
-                _isPreparingForCriticalSection.load()
-                    ? resharding::gReshardingOplogFetcherSleepMillisDuringCriticalSection.load()
-                    : resharding::gReshardingOplogFetcherSleepMillisBeforeCriticalSection.load()};
-            return executor->sleepFor(sleepDuration, cancelToken)
-                .then([this, executor, cancelToken] {
-                    return _reschedule(std::move(executor), cancelToken);
-                });
+            if (!statusWith.isOK()) {
+                return ExecutorFuture<void>(std::move(executor), statusWith.getStatus());
+            } else {
+                auto moreOplogsToCome = statusWith.getValue();
+                // If the cancelToken is not canceled then moreToCome has to be false at this point
+                // for us to have exited the until condition of AsyncTry.
+                invariant(!moreOplogsToCome);
+                LOGV2_INFO(6077401,
+                           "Resharding oplog fetcher done fetching",
+                           "donorShard"_attr = _donorShard,
+                           "reshardingUUID"_attr = _reshardingUUID);
+                return ExecutorFuture(std::move(executor));
+            }
         });
 }
 
