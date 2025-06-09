@@ -37,23 +37,23 @@
 
 namespace mongo {
 
-class IngressAdmissionRateLimiter {
+class IngressRequestRateLimiter {
 public:
-    IngressAdmissionRateLimiter();
+    IngressRequestRateLimiter();
     /**
-     * Returns the reference to IngressAdmissionRateLimiter associated with the operation's service
+     * Returns the reference to IngressRequestRateLimiter associated with the operation's service
      * context.
      */
-    static IngressAdmissionRateLimiter& get(ServiceContext* opCtx);
+    static IngressRequestRateLimiter& get(ServiceContext* opCtx);
 
     /**
      * Attempt to receive admission into the system. If the current rate of request admissions has
      * exceeded the configured rate limit and consumed the burst size, the operation will be
      * rejected with an error in the SystemOverloaded category.
      */
-    Status admitRequest(OperationContext* opCtx);
-
-    // TODO: SERVER-105536 Implement appendStats method just like ingress admission controller
+    // TODO: SERVER-104932 Remove exemption of command not subject to admission control, all
+    //       requests must use the rate limiter
+    Status admitRequest(OperationContext* opCtx, bool commandInvocationSubjectToAdmissionControl);
 
     /**
      * Adjusts the refresh rate of the rate limiter to 'refreshRatePerSec'.
@@ -66,16 +66,21 @@ public:
     void setAdmissionBurstSize(std::int32_t burstSize);
 
     /**
-     * Called automatically when the value of the server parameter ingressAdmissionRatePerSec
+     * Called automatically when the value of the server parameter ingressRequestAdmissionRatePerSec
      * changes value.
      */
     static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
 
     /**
-     * Called automatically when the value of the server parameter ingressAdmissionBurstSize changes
-     * value.
+     * Called automatically when the value of the server parameter ingressRequestAdmissionBurstSize
+     * changes value.
      */
     static Status onUpdateAdmissionBurstSize(std::int32_t burstSize);
+
+    /**
+     * Reports the ingress admission rate limiter metrics.
+     */
+    void appendStats(BSONObjBuilder* bob) const;
 
 private:
     admission::RateLimiter _rateLimiter;

@@ -16,38 +16,38 @@ function testServerParameter(conn) {
     // Test setting burst size
     assert.commandFailedWithCode(db.adminCommand({
         setParameter: 1,
-        ingressAdmissionBurstSize: 0,
+        ingressRequestAdmissionBurstSize: 0,
     }),
                                  ErrorCodes.BadValue);
 
     assert.commandFailedWithCode(db.adminCommand({
         setParameter: 1,
-        ingressAdmissionBurstSize: -1,
+        ingressRequestAdmissionBurstSize: -1,
     }),
                                  ErrorCodes.BadValue);
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, ingressAdmissionBurstSize: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstSize: 1}));
 
-    assert.commandWorked(db.adminCommand({setParameter: 1, ingressAdmissionBurstSize: 2}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstSize: 2}));
 
     // Test setting admission rate
 
     assert.commandFailedWithCode(db.adminCommand({
         setParameter: 1,
-        ingressAdmissionRatePerSec: -1,
+        ingressRequestAdmissionRatePerSec: -1,
     }),
                                  ErrorCodes.BadValue);
 
     assert.commandWorked(db.adminCommand({
         setParameter: 1,
-        ingressAdmissionRatePerSec: 1,
+        ingressRequestAdmissionRatePerSec: 1,
     }));
 
     // Restore server parameters
     assert.commandWorked(db.adminCommand({
         setParameter: 1,
-        ingressAdmissionRatePerSec: maxInt32,
-        ingressAdmissionBurstSize: maxInt32
+        ingressRequestAdmissionRatePerSec: maxInt32,
+        ingressRequestAdmissionBurstSize: maxInt32
     }));
 }
 
@@ -62,7 +62,9 @@ const testRateLimiterError = (conn) => {
 
     const db = conn.getDB(`${jsTest.name()}_db`);
     const initialStatus = db.serverStatus();
-    const initialCounts = initialStatus.metrics.commands.insert.total;
+    const initialIngressRequestRateLimiter = initialStatus.network.ingressRequestRateLimiter;
+    const initialInserts = initialStatus.metrics.commands.insert.total;
+    assert.eq(initialIngressRequestRateLimiter.totalAvailableTokens, maxBurstSize);
 
     const makeThread = () => new Thread((host) => {
         const assertContainSystemOverloadedErrorLabel = (res) => {
@@ -94,22 +96,35 @@ const testRateLimiterError = (conn) => {
     threads.forEach(t => t.join());
 
     const status = db.serverStatus();
-    const counts = status.metrics.commands.insert.total;
-    assert.eq(counts - initialCounts, maxBurstSize);
+    const ingressRequestRateLimiter = status.network.ingressRequestRateLimiter;
+    const inserts = status.metrics.commands.insert.total;
+
+    // We assert that addedToQueue is 0 since queuing is disabled
+    assert.eq(ingressRequestRateLimiter.successfulAdmissions -
+                  initialIngressRequestRateLimiter.successfulAdmissions,
+              maxBurstSize);
+    assert.eq(ingressRequestRateLimiter.rejectedAdmissions -
+                  initialIngressRequestRateLimiter.rejectedAdmissions,
+              extraRequests);
+    assert.eq(ingressRequestRateLimiter.attemptedAdmissions -
+                  initialIngressRequestRateLimiter.attemptedAdmissions,
+              maxBurstSize + extraRequests);
+    assert.eq(inserts - initialInserts, maxBurstSize);
+    assert.eq(ingressRequestRateLimiter.totalAvailableTokens, 0);
 };
 
 // Parameters for ingress admission rate limiting enabled
 const kParams = {
-    ingressAdmissionRatePerSec: 1,
-    ingressAdmissionBurstSize: maxBurstSize,
-    ingressAdmissionRateLimiterEnabled: true,
+    ingressRequestAdmissionRatePerSec: 1,
+    ingressRequestAdmissionBurstSize: maxBurstSize,
+    ingressRequestRateLimiterEnabled: true,
 };
 
 // Parameters for ingress admission rate limiting disabled
 const kParamsRestore = {
-    ingressAdmissionRatePerSec: maxInt32,
-    ingressAdmissionBurstSize: maxInt32,
-    ingressAdmissionRateLimiterEnabled: false,
+    ingressRequestAdmissionRatePerSec: maxInt32,
+    ingressRequestAdmissionBurstSize: maxInt32,
+    ingressRequestRateLimiterEnabled: false,
 };
 
 /**
@@ -180,7 +195,7 @@ function runTestReplSet() {
                 ...kParams,
                 logComponentVerbosity: tojson({command: 2}),
                 featureFlagIngressRateLimiting: 1,
-                ingressAdmissionRateLimiterEnabled: 0,  // kept disable during repl set setup
+                ingressRequestRateLimiterEnabled: 0,  // kept disable during repl set setup
                 "failpoint.ingressRateLimiterVerySlowRate": tojson({
                     mode: "alwaysOn",
                 }),
@@ -202,7 +217,7 @@ function runTestReplSet() {
 
     // Enable rate limiting now that the replset is up
     assert.commandWorked(
-        primary.adminCommand({setParameter: 1, ingressAdmissionRateLimiterEnabled: 1}));
+        primary.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 1}));
     testRateLimiterError(primary);
 
     assert.commandWorked(primary.adminCommand({setParameter: 1, ...kParamsRestore}));

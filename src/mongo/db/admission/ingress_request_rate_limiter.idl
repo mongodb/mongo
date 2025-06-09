@@ -29,39 +29,39 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/admission/ingress_admission_rate_limiter.h"
+        - "mongo/db/admission/ingress_request_rate_limiter.h"
         - "mongo/db/server_options.h"
 
 server_parameters:
-    ingressAdmissionRateLimiterEnabled:
-        description: Controls whether ingress admission rate limiter mechanism is enabled.
+    ingressRequestRateLimiterEnabled:
+        description: Controls whether ingress request rate limiter mechanism is enabled.
         set_at: [startup, runtime]
-        cpp_varname: gIngressAdmissionRateLimiterEnabled
+        cpp_varname: gIngressRequestRateLimiterEnabled
         cpp_vartype: AtomicWord<bool>
         default: false
         redact: false
 
-    ingressAdmissionRatePerSec:
+    ingressRequestAdmissionRatePerSec:
         description: "The number of new requests that will be admitted per second"
         set_at: [startup, runtime]
-        cpp_varname: gIngressAdmissionRateLimiterRatePerSec
+        cpp_varname: gIngressRequestRateLimiterRatePerSec
         cpp_vartype: Atomic<int32_t>
-        on_update: IngressAdmissionRateLimiter::onUpdateAdmissionRatePerSec
+        on_update: IngressRequestRateLimiter::onUpdateAdmissionRatePerSec
         default:
             expr: std::numeric_limits<int32_t>::max()
         validator: {gte: 1}
         redact: false
 
-    ingressAdmissionBurstSize:
+    ingressRequestAdmissionBurstSize:
         description: >-
             The maximum number of requests above what the configured rate limit would allow that
             will be admitted before excess admissions begin to be rejected. This will allow the
             server to handle temporary bursts of requests or periods of time where the configured
             rate limit is exceeded slightly.
         set_at: [startup, runtime]
-        cpp_varname: gIngressAdmissionRateLimiterBurstSize
+        cpp_varname: gIngressRequestRateLimiterBurstSize
         cpp_vartype: Atomic<int32_t>
-        on_update: IngressAdmissionRateLimiter::onUpdateAdmissionBurstSize
+        on_update: IngressRequestRateLimiter::onUpdateAdmissionBurstSize
         default:
             expr: std::numeric_limits<int32_t>::max()
         validator: {gte: 1}

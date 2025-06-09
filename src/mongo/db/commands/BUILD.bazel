@@ -868,6 +868,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_status_core",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:service_executor",

@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/admission/ingress_admission_rate_limiter.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/admission/ingress_admission_rate_limiter_gen.h"
+#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/decorable.h"
 
@@ -49,37 +50,49 @@ MONGO_FAIL_POINT_DEFINE(ingressRateLimiterVerySlowRate);
 // every 55 hours
 constexpr auto kSlowest = 5e-6;
 
-const auto getIngressAdmissionRateLimiter =
-    ServiceContext::declareDecoration<boost::optional<IngressAdmissionRateLimiter>>();
+const auto getIngressRequestRateLimiter =
+    ServiceContext::declareDecoration<boost::optional<IngressRequestRateLimiter>>();
 
 const ConstructorActionRegistererType<ServiceContext> onServiceContextCreate{
-    "InitIngressAdmissionRateLimiter", [](ServiceContext* ctx) {
-        getIngressAdmissionRateLimiter(ctx).emplace();
+    "InitIngressRequestRateLimiter", [](ServiceContext* ctx) {
+        getIngressRequestRateLimiter(ctx).emplace();
     }};
 }  // namespace
 
-IngressAdmissionRateLimiter::IngressAdmissionRateLimiter()
-    : _rateLimiter{static_cast<double>(gIngressAdmissionRateLimiterRatePerSec.load()),
-                   static_cast<double>(gIngressAdmissionRateLimiterBurstSize.load()),
+IngressRequestRateLimiter::IngressRequestRateLimiter()
+    : _rateLimiter{static_cast<double>(gIngressRequestRateLimiterRatePerSec.load()),
+                   static_cast<double>(gIngressRequestRateLimiterBurstSize.load()),
                    0,
-                   "IngressAdmissionRateLimiter"} {
+                   "ingressRequestRateLimiter"} {
     if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
         _rateLimiter.setRefreshRatePerSec(kSlowest);
     }
 }
 
 
-IngressAdmissionRateLimiter& IngressAdmissionRateLimiter::get(ServiceContext* service) {
-    return *getIngressAdmissionRateLimiter(service);
+IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* service) {
+    return *getIngressRequestRateLimiter(service);
 }
 
-Status IngressAdmissionRateLimiter::admitRequest(OperationContext* opCtx) {
+Status IngressRequestRateLimiter::admitRequest(OperationContext* opCtx,
+                                               bool commandInvocationSubjectToAdmissionControl) {
     // TODO: SERVER-104934 Implement ip based exemption
+    // TODO: SERVER-104932 Remove commandInvocationSubjectToAdmissionControl in favor of
+    // a failpoint to bypass operations such as shutdown and setParameter
+
+    // The rate limiter applies only requests when the client is authenticated to prevent DoS
+    // attacks caused by many unauthenticated requests. In the case auth is disabled, all
+    // requests will be subject to rate limiting.
+    if (!AuthorizationSession::get(opCtx->getClient())->isAuthenticated() ||
+        !commandInvocationSubjectToAdmissionControl) {
+        _rateLimiter.recordExemption();
+        return Status::OK();
+    }
 
     return _rateLimiter.acquireToken(opCtx);
 }
 
-void IngressAdmissionRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
+void IngressRequestRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
     if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
         _rateLimiter.setRefreshRatePerSec(kSlowest);
         return;
@@ -87,13 +100,13 @@ void IngressAdmissionRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRat
     _rateLimiter.setRefreshRatePerSec(refreshRatePerSec);
 }
 
-void IngressAdmissionRateLimiter::setAdmissionBurstSize(std::int32_t burstSize) {
+void IngressRequestRateLimiter::setAdmissionBurstSize(std::int32_t burstSize) {
     _rateLimiter.setBurstSize(burstSize);
 }
 
-Status IngressAdmissionRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
+Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
     if (auto client = Client::getCurrent()) {
-        auto& instance = getIngressAdmissionRateLimiter(client->getServiceContext());
+        auto& instance = getIngressRequestRateLimiter(client->getServiceContext());
 
         if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
             instance->_rateLimiter.setRefreshRatePerSec(kSlowest);
@@ -106,13 +119,27 @@ Status IngressAdmissionRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t ref
     return Status::OK();
 }
 
-Status IngressAdmissionRateLimiter::onUpdateAdmissionBurstSize(std::int32_t burstSize) {
+Status IngressRequestRateLimiter::onUpdateAdmissionBurstSize(std::int32_t burstSize) {
     if (auto client = Client::getCurrent()) {
-        getIngressAdmissionRateLimiter(client->getServiceContext())
+        getIngressRequestRateLimiter(client->getServiceContext())
             ->setAdmissionBurstSize(static_cast<double>(burstSize));
     }
 
     return Status::OK();
+}
+
+void IngressRequestRateLimiter::appendStats(BSONObjBuilder* bob) const {
+    // First we get the stats in a separate object in order to not mutate bob
+    auto rateLimiterBob = BSONObjBuilder{};
+    _rateLimiter.appendStats(&rateLimiterBob);
+    auto const rateLimiterStats = rateLimiterBob.obj();
+
+    // Then we copy elements one by one to avoid coping queueing stats
+    bob->append(rateLimiterStats.getField("rejectedAdmissions"));
+    bob->append(rateLimiterStats.getField("successfulAdmissions"));
+    bob->append(rateLimiterStats.getField("exemptedAdmissions"));
+    bob->append(rateLimiterStats.getField("attemptedAdmissions"));
+    bob->append(rateLimiterStats.getField("totalAvailableTokens"));
 }
 
 }  // namespace mongo

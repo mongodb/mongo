@@ -10,24 +10,25 @@ exports_files(
 )
 
 idl_generator(
-    name = "ingress_admission_rate_limiter_gen",
-    src = "ingress_admission_rate_limiter.idl",
+    name = "ingress_request_rate_limiter_gen",
+    src = "ingress_request_rate_limiter.idl",
 )
 
 mongo_cc_library(
-    name = "ingress_admission_rate_limiter",
+    name = "ingress_request_rate_limiter",
     srcs = [
-        "ingress_admission_rate_limiter.cpp",
-        ":ingress_admission_rate_limiter_gen",
+        "ingress_request_rate_limiter.cpp",
+        ":ingress_request_rate_limiter_gen",
     ],
     hdrs = [
-        "ingress_admission_rate_limiter.h",
+        "ingress_request_rate_limiter.h",
     ],
     deps = [
         ":rate_limiter",
         "//src/mongo:base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
     ],
 )
 
@@ -79,6 +80,7 @@ mongo_cc_library(
     ],
     deps = [
         ":ingress_admission_control",
+        ":ingress_request_rate_limiter",
         ":ticketholder_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.

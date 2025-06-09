@@ -3199,7 +3199,7 @@ mongo_cc_library(
         "write_block_bypass",
         "//src/mongo:base",
         "//src/mongo/db/admission:ingress_admission_control",
-        "//src/mongo/db/admission:ingress_admission_rate_limiter",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:auth_umc",
         "//src/mongo/db/auth:authprivilege",

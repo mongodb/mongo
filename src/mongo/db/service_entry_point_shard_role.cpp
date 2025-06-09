@@ -40,8 +40,8 @@
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
-#include "mongo/db/admission/ingress_admission_rate_limiter.h"
-#include "mongo/db/admission/ingress_admission_rate_limiter_gen.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
+#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -1764,23 +1764,10 @@ void ExecCommandDatabase::_initiateCommand() {
 
     const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
 
-    if (gFeatureFlagIngressRateLimiting.isEnabled() && gIngressAdmissionRateLimiterEnabled.load()) {
-        const bool isAuthSufficientForRateLimiting =
-            AuthorizationSession::get(client)->isAuthenticated();
-
-        // TODO: SERVER-104932 Remove _invocation->isSubjectToIngressAdmissionControl in favor of
-        // a failpoint to bypass operations such as shutdown and setParameter
-        // TODO: SERVER-105536 Make exempt tickets accumulate ftdc stats by allowing the rate
-        // limiter to manage exemption itself
-
-        // The rate limiter applies only requests when the client is authenticated to prevent DoS
-        // attacks caused by many unauthenticated requests. In the case auth is disabled, all
-        // requests will be subject to rate limiting.
-        if (isAuthSufficientForRateLimiting && _invocation->isSubjectToIngressAdmissionControl()) {
-            auto& admissionRateLimiter =
-                IngressAdmissionRateLimiter::get(opCtx->getServiceContext());
-            uassertStatusOK(admissionRateLimiter.admitRequest(opCtx));
-        }
+    if (gFeatureFlagIngressRateLimiting.isEnabled() && gIngressRequestRateLimiterEnabled.load()) {
+        auto& requestRateLimiter = IngressRequestRateLimiter::get(opCtx->getServiceContext());
+        uassertStatusOK(requestRateLimiter.admitRequest(
+            opCtx, _invocation->isSubjectToIngressAdmissionControl()));
     }
 
     if (gIngressAdmissionControlEnabled.load()) {
