@@ -1222,7 +1222,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx, RecoveryU
     int ret = cursor->largest_key(cursor);
     if (ret == WT_ROLLBACK) {
         // Force the caller to rollback its transaction if we can't make progress with eviction.
-        // TODO (SERVER-63620): Convert this to a different error code that is distinguishable from
+        // TODO (SERVER-105908): Convert this to a different error code that is distinguishable from
         // a true write conflict.
         int err, sub_level_err;
         const char* err_msg;
