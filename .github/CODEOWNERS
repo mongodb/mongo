@@ -217,6 +217,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./docs/OWNERS.yml
 /docs/**/building.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/cpp_style.md @10gen/server-programmability @svc-auto-approve-bot
+/docs/**/idl.md @10gen/server-programmability @svc-auto-approve-bot
 /docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot

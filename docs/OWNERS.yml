@@ -6,6 +6,9 @@ filters:
   - "cpp_style.md":
     approvers:
       - 10gen/server-programmability
+  - "idl.md":
+    approvers:
+      - 10gen/server-programmability
   - "poetry_execution.md":
     approvers:
       - 10gen/devprod-correctness
