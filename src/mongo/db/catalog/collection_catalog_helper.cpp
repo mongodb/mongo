@@ -266,7 +266,7 @@ void removeIndex(OperationContext* opCtx,
          storageEngine,
          uuid = collection->uuid(),
          nss = collection->ns(),
-         indexNameStr = indexName.toString(),
+         indexNameStr = std::string{indexName},
          ident,
          isTwoPhaseDrop](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             StorageEngine::DropIdentCallback onDrop =

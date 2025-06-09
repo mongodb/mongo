@@ -106,7 +106,7 @@ IndexSpec& IndexSpec::unique(bool value) {
 }
 
 IndexSpec& IndexSpec::name(StringData value) {
-    _name = value.toString();
+    _name = std::string{value};
     _dynamicName = false;
     return *this;
 }

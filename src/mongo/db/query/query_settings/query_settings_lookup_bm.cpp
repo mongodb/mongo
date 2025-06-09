@@ -85,7 +85,7 @@ std::unique_ptr<ParsedFindCommand> generateSmallParsedFindRequest(
     const NamespaceString& nss,
     BSONObjBuilder& bob) {
     auto rawFilter = BSON(generateFieldName() << BSON("$eq" << 1));
-    bob.appendElements(BSON("find" << nss.coll().toString() << "$db"
+    bob.appendElements(BSON("find" << nss.coll() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter));
     auto findCmd = query_request_helper::makeFromFindCommand(
@@ -119,7 +119,7 @@ std::unique_ptr<ParsedFindCommand> generateMediumParsedFindRequest(
                                               << BSON(generateFieldName() << BSON("$ne" << 1))
                                               << BSON(generateFieldName() << 2)));
     auto rawProjection = BSON("_id" << 0 << generateFieldName() << 1 << generateFieldName() << 1);
-    bob.appendElements(BSON("find" << nss.coll().toString() << "$db"
+    bob.appendElements(BSON("find" << nss.coll() << "$db"
                                    << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
                                    << rawFilter << "projection" << rawProjection));
     auto findCmd = query_request_helper::makeFromFindCommand(
@@ -181,10 +181,9 @@ std::unique_ptr<ParsedFindCommand> generateLargeParsedFindRequest(
                                     << BSON_ARRAY(1 << 2 << 3 << "$field") << "total"
                                     << BSON("$sum" << generateFieldName()));
     auto rawSort = BSON("_id" << 1 << generateFieldName() << -1);
-    bob.appendElements(BSON("find" << nss.coll().toString() << "$db"
-                                   << nss.dbName().serializeWithoutTenantPrefix_UNSAFE() << "filter"
-                                   << rawFilter << "projection" << rawProjection << "sort"
-                                   << rawSort));
+    bob.appendElements(BSON(
+        "find" << nss.coll() << "$db" << nss.dbName().serializeWithoutTenantPrefix_UNSAFE()
+               << "filter" << rawFilter << "projection" << rawProjection << "sort" << rawSort));
     auto findCmd = query_request_helper::makeFromFindCommand(
         std::move(bob.asTempObj()), boost::none /* vts */, nss.tenantId(), kSerializationContext);
     return uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCmd)}));

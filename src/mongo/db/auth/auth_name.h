@@ -69,7 +69,7 @@ public:
         if constexpr (std::is_same_v<Name, std::string>) {
             _name = std::move(name);
         } else {
-            _name = StringData(name).toString();
+            _name = std::string{StringData(name)};
         }
         _dbname = std::move(dbname);
     }

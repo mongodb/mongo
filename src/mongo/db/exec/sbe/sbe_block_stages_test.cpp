@@ -101,7 +101,7 @@ protected:
                                                              blockSlots,
                                                              metaSlot,
                                                              bitmapSlot,
-                                                             tsOptions.getTimeField().toString(),
+                                                             std::string{tsOptions.getTimeField()},
                                                              1 /*nodeId*/);
 
         return {std::move(tsBucketStage), std::move(blockSlots), bitmapSlot, metaSlot};

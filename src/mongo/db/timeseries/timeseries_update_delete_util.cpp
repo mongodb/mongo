@@ -249,7 +249,7 @@ StatusWith<write_ops::UpdateModification> translateUpdate(
 }
 
 std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField) {
-    return [timeField = timeField.toString()](const BSONObj& bucket) {
+    return [timeField = std::string{timeField}](const BSONObj& bucket) {
         return BucketUnpacker::computeMeasurementCount(bucket, timeField);
     };
 }
@@ -310,7 +310,7 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     // Split out the time field predicate which can be potentially used for bucket-level routing.
     auto timeOnlyPred = residualPred
         ? expression::splitMatchExpressionBy(std::move(residualPred),
-                                             {tsOptions.getTimeField().toString()} /*fields*/,
+                                             {std::string{tsOptions.getTimeField()}} /*fields*/,
                                              {} /*renames*/,
                                              expression::isOnlyDependentOn)
               .first
@@ -321,8 +321,8 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
         ? BucketSpec::createPredicatesOnBucketLevelField(
               timeOnlyPred.get(),
               BucketSpec{
-                  tsOptions.getTimeField().toString(),
-                  metaField.map([](StringData s) { return s.toString(); }),
+                  std::string{tsOptions.getTimeField()},
+                  metaField.map([](StringData s) { return std::string{s}; }),
               },
               *tsOptions.getBucketMaxSpanSeconds(),
               expCtx,

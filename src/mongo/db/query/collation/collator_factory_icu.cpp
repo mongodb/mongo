@@ -529,7 +529,7 @@ StatusWith<std::unique_ptr<CollatorInterface>> CollatorFactoryICU::makeFromBSON(
     }
 
     // Construct an icu::Locale.
-    auto userLocale = icu::Locale::createFromName(collation.getLocale().toString().c_str());
+    auto userLocale = icu::Locale::createFromName(std::string{collation.getLocale()}.c_str());
     if (userLocale.isBogus()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Field '" << Collation::kLocaleFieldName

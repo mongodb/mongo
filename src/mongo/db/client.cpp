@@ -92,7 +92,7 @@ void Client::initThread(StringData desc,
     if (session) {
         fullDesc = str::stream() << desc << session->id();
     } else {
-        fullDesc = desc.toString();
+        fullDesc = std::string{desc};
     }
 
     setThreadName(fullDesc);

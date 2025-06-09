@@ -319,10 +319,10 @@ CollectionType ConfigServerTestFixture::setupCollection(
     const KeyPattern& shardKey,
     const std::vector<ChunkType>& chunks,
     std::function<void(CollectionType& coll)> collectionCustomizer) {
-    auto dbDoc = findOneOnConfigCollection(
-        operationContext(),
-        NamespaceString::kConfigDatabasesNamespace,
-        BSON(DatabaseType::kDbNameFieldName << nss.db_forTest().toString()));
+    auto dbDoc =
+        findOneOnConfigCollection(operationContext(),
+                                  NamespaceString::kConfigDatabasesNamespace,
+                                  BSON(DatabaseType::kDbNameFieldName << nss.db_forTest()));
     if (!dbDoc.isOK()) {
         // If the database is not setup, choose the first available shard as primary to implicitly
         // create the db
@@ -423,7 +423,7 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
     auto response = configShard->runCommand(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             ns.dbName(),
-                                            BSON("listIndexes" << ns.coll().toString()),
+                                            BSON("listIndexes" << ns.coll()),
                                             Milliseconds(defaultConfigCommandTimeoutMS.load()),
                                             Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {

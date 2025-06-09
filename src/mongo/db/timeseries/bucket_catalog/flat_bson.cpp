@@ -255,7 +255,7 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
 
         // Found entry that is used for an Array, we can claim this field.
         if (first->isArrayFieldName()) {
-            first->claimArrayFieldNameForObject(fieldName.toString());
+            first->claimArrayFieldNameForObject(std::string{fieldName});
             return first;
         }
     }
@@ -431,7 +431,7 @@ FlatBSON<Derived, Element, Value>::_update(typename FlatBSONStore<Element, Value
                 UpdateStatus subStatus{UpdateStatus::NoChange};
 
                 if (it == end) {
-                    std::tie(it, end) = obj.insert(it, kArrayFieldName.toString());
+                    std::tie(it, end) = obj.insert(it, std::string{kArrayFieldName});
                 }
 
                 std::tie(subStatus, it, end) =
@@ -483,10 +483,10 @@ FlatBSON<Derived, Element, Value>::_updateObj(typename FlatBSONStore<Element, Va
 
         if (it == end) {
             // Field missing, we need to insert it at the end so we preserve the input field order.
-            std::tie(it, end) = obj.insert(it, fieldName.toString());
+            std::tie(it, end) = obj.insert(it, std::string{fieldName});
         } else if (it->isArrayFieldName()) {
             // Entry is only used for Arrays, we can claim the field name.
-            it->claimArrayFieldNameForObject(fieldName.toString());
+            it->claimArrayFieldNameForObject(std::string{fieldName});
         } else if (it->fieldName() != fieldName) {
             // Traversing the FlatBSONStore structure in lock-step with the input document resulted
             // in a miss. This means one of two things. (1) The input document does not contain all
@@ -506,14 +506,14 @@ FlatBSON<Derived, Element, Value>::_updateObj(typename FlatBSONStore<Element, Va
                         // Still not found, insert the new field. Location doesn't matter much
                         // as we are operating on incoming documents of different field orders.
                         // Select the point we know furthest back.
-                        std::tie(it, end) = obj.insert(it, fieldName.toString());
+                        std::tie(it, end) = obj.insert(it, std::string{fieldName});
                     } else {
                         it = found;
                     }
                 } else {
                     // All previous elements have been found as we have never skipped, proceed
                     // with inserting this new field.
-                    std::tie(it, end) = obj.insert(it, fieldName.toString());
+                    std::tie(it, end) = obj.insert(it, std::string{fieldName});
                 }
             } else {
                 it = found;

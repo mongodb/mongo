@@ -105,8 +105,8 @@ namespace {
 
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
-static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
-static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
+static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId));
+static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId));
 
 std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
 std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};
@@ -881,7 +881,7 @@ TEST_F(FleCrudTest, Insert100Fields) {
 
     uint64_t fieldCount = 100;
     ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
-        return fieldName.toString();
+        return std::string{fieldName};
     };
     doSingleWideInsert(1, fieldCount, valueGenerator);
 
@@ -909,7 +909,7 @@ TEST_F(FleCrudTest, Insert20Fields50Rows) {
     uint64_t rowCount = 50;
 
     ValueGenerator valueGenerator = [](StringData fieldName, uint64_t row) {
-        return fieldName.toString() + std::to_string(row % 7);
+        return std::string{fieldName} + std::to_string(row % 7);
     };
 
 
@@ -1810,7 +1810,7 @@ EncryptedFieldConfig QETextSearchCrudTest::getEFC() {
         qtc.setDiacriticSensitive(!schema.diacf);
         qtcs.push_back(std::move(qtc));
     }
-    EncryptedField ef(UUID::gen(), kTestFieldName.toString());
+    EncryptedField ef(UUID::gen(), std::string{kTestFieldName});
     std::variant<std::vector<QueryTypeConfig>, QueryTypeConfig> vqtcs = std::move(qtcs);
     ef.setBsonType("string"_sd);
     ef.setQueries(vqtcs);
@@ -2031,7 +2031,7 @@ void QETextSearchCrudTest::verifyESCEntriesForString(StringData testString,
     auto doc = BSON(kTestFieldName << testString);
     if (padding) {
         ASSERT(qtype.has_value());  // padding values must always have a query type
-        doc = BSON(kTestFieldName << (testString.toString() + "\xff"));
+        doc = BSON(kTestFieldName << (testString + "\xff"));
     }
     auto element = doc.firstElement();
 
@@ -2070,7 +2070,7 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSubstrings(
     stdx::unordered_set<std::string> res;
     for (uint32_t ss_len = lb; ss_len <= std::min(ub, uint32_t(foldedString.size())); ss_len++) {
         for (uint32_t i = 0; i <= foldedString.size() - ss_len; i++) {
-            res.insert(foldedString.substrToBuf(&_stackBuf, i, ss_len).toString());
+            res.insert(std::string{foldedString.substrToBuf(&_stackBuf, i, ss_len)});
         }
     }
     return res;
@@ -2081,8 +2081,8 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedSuffixes(
     stdx::unordered_set<std::string> res;
     for (uint32_t suff_len = lb; suff_len <= std::min(ub, uint32_t(foldedString.size()));
          suff_len++) {
-        res.insert(foldedString.substrToBuf(&_stackBuf, foldedString.size() - suff_len, suff_len)
-                       .toString());
+        res.insert(std::string{
+            foldedString.substrToBuf(&_stackBuf, foldedString.size() - suff_len, suff_len)});
     }
     return res;
 }
@@ -2092,7 +2092,7 @@ stdx::unordered_set<std::string> QETextSearchCrudTest::getExpectedPrefixes(
     stdx::unordered_set<std::string> res;
     for (uint32_t pref_len = lb; pref_len <= std::min(ub, uint32_t(foldedString.size()));
          pref_len++) {
-        res.insert(foldedString.substrToBuf(&_stackBuf, 0, pref_len).toString());
+        res.insert(std::string{foldedString.substrToBuf(&_stackBuf, 0, pref_len)});
     }
     return res;
 }
@@ -2124,7 +2124,7 @@ void QETextSearchCrudTest::verifyExpectationsAfterInsertions(
 
         totalTags++;  // exact
         unicode::String unicodeFoldedStr(foldedStr);
-        auto foldedStrStd = foldedStr.toString();
+        std::string foldedStrStd{foldedStr};
         exactCounts[foldedStrStd]++;
         for (const auto& schema : _schemas) {
             uint32_t msize;

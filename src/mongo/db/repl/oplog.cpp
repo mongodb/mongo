@@ -1808,7 +1808,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             opCtx,
                             op.getNss(),
                             redact(op.toBSONForLogging()),
-                            repl::kUpdateOnMissingDocMsg.toString());
+                            std::string{repl::kUpdateOnMissingDocMsg});
                     } else if (mode == OplogApplication::Mode::kInitialSync) {
                         // TODO (SERVER-87994): Revisit the verbosity of the logging.
                         LOGV2_DEBUG(8776803,

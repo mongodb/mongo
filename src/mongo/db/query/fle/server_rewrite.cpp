@@ -224,7 +224,7 @@ NamespaceString getAndValidateEscNsFromSchema(const EncryptionInformation& encry
         return NamespaceString();
     }
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
-    return NamespaceStringUtil::deserialize(nss.dbName(), efc.getEscCollection()->toString());
+    return NamespaceStringUtil::deserialize(nss.dbName(), std::string{*efc.getEscCollection()});
 }
 
 std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
@@ -244,7 +244,7 @@ std::map<NamespaceString, NamespaceString> generateEncryptInfoEscMap(
             escMap.emplace(std::piecewise_construct,
                            std::forward_as_tuple(std::move(schemaNs)),
                            std::forward_as_tuple(NamespaceStringUtil::deserialize(
-                               dbName, efc.getEscCollection()->toString())));
+                               dbName, std::string{*efc.getEscCollection()})));
         }
     }
     return escMap;

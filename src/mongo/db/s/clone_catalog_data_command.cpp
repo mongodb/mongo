@@ -92,7 +92,7 @@ void cloneDatabase(OperationContext* opCtx,
     // Clone the non-ignored collections.
     std::set<std::string> clonedColls;
     Cloner cloner;
-    uassertStatusOK(cloner.copyDb(opCtx, dbName, from.toString(), trackedColls, &clonedColls));
+    uassertStatusOK(cloner.copyDb(opCtx, dbName, std::string{from}, trackedColls, &clonedColls));
     {
         BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
         cloneBarr.append(clonedColls);

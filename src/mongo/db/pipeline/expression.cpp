@@ -1640,7 +1640,7 @@ intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(ExpressionContext*
             expCtx->setSystemVarReferencedInQuery(varId);
         }
 
-        return new ExpressionFieldPath(expCtx, fieldPath.toString(), varId);
+        return new ExpressionFieldPath(expCtx, std::string{fieldPath}, varId);
     } else {
         return new ExpressionFieldPath(expCtx,
                                        "CURRENT." + raw.substr(1),  // strip the "$" prefix
@@ -2070,7 +2070,7 @@ boost::intrusive_ptr<Expression> ExpressionMeta::_rewriteAsLet(
     // {$let: {in: "$$stream.some.path", vars: {"stream": {$meta: "stream"}}}}.
     return ExpressionLet::create(
         expCtx,
-        {std::make_pair(typeName.toString(), make_intrusive<ExpressionMeta>(expCtx, type))},
+        {std::make_pair(std::string{typeName}, make_intrusive<ExpressionMeta>(expCtx, type))},
         vpsIn,
         [&path, &typeName](ExpressionContext* ctx, const VariablesParseState& vpsWithLetVars) {
             auto varAndPath = fmt::format("$${}.{}", typeName, path);
@@ -2108,7 +2108,7 @@ ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionCon
         fieldPath = typeName.substr(idx + 1);
         try {
             // Make sure the field path is valid.
-            FieldPath path{fieldPath->toString()};
+            FieldPath path{std::string{*fieldPath}};
         } catch (DBException&) {
             uasserted(9692111, ExpressionMeta::kParseErrPrefix + typeName);
         }
@@ -4071,7 +4071,7 @@ ExpressionRegex::getConstantPatternAndOptions() const {
         if (patternValue.getType() == BSONType::regEx) {
             StringData flags = patternValue.getRegexFlags();
             if (!flags.empty()) {
-                return flags.toString();
+                return std::string{flags};
             }
         }
         return {};
@@ -4947,7 +4947,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrStartsWith::parse(ExpressionCon
     auto fleEncStartsWith = EncStrStartsWithStruct::parse(ctx, expr.Obj());
 
     auto inputExpr =
-        ExpressionFieldPath::parse(expCtx, fleEncStartsWith.getInput().toString(), vps);
+        ExpressionFieldPath::parse(expCtx, std::string{fleEncStartsWith.getInput()}, vps);
 
     auto prefixExpr =
         Expression::parseOperand(expCtx, fleEncStartsWith.getPrefix().getElement(), vps);
@@ -4992,7 +4992,8 @@ boost::intrusive_ptr<Expression> ExpressionEncStrEndsWith::parse(ExpressionConte
 
     auto fleEncEndsWith = EncStrEndsWithStruct::parse(ctx, expr.Obj());
 
-    auto inputExpr = ExpressionFieldPath::parse(expCtx, fleEncEndsWith.getInput().toString(), vps);
+    auto inputExpr =
+        ExpressionFieldPath::parse(expCtx, std::string{fleEncEndsWith.getInput()}, vps);
 
     auto suffixExpr =
         Expression::parseOperand(expCtx, fleEncEndsWith.getSuffix().getElement(), vps);
@@ -5038,7 +5039,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrContains::parse(ExpressionConte
     auto fleEncStrContains = EncStrContainsStruct::parse(ctx, expr.Obj());
 
     auto inputExpr =
-        ExpressionFieldPath::parse(expCtx, fleEncStrContains.getInput().toString(), vps);
+        ExpressionFieldPath::parse(expCtx, std::string{fleEncStrContains.getInput()}, vps);
 
     auto substringExpr =
         Expression::parseOperand(expCtx, fleEncStrContains.getSubstring().getElement(), vps);
@@ -5085,7 +5086,7 @@ boost::intrusive_ptr<Expression> ExpressionEncStrNormalizedEq::parse(
     auto fleEncStrNormalizedEq = EncStrNormalizedEqStruct::parse(ctx, expr.Obj());
 
     auto inputExpr =
-        ExpressionFieldPath::parse(expCtx, fleEncStrNormalizedEq.getInput().toString(), vps);
+        ExpressionFieldPath::parse(expCtx, std::string{fleEncStrNormalizedEq.getInput()}, vps);
 
     auto stringExpr =
         Expression::parseOperand(expCtx, fleEncStrNormalizedEq.getString().getElement(), vps);

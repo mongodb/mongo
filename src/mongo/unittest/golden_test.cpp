@@ -89,7 +89,7 @@ void GoldenTestContext::onError(const std::string& message,
                     "reason"_attr = diffOutput.getStatus().reason());
     }
 
-    throw TestAssertionFailureException(_testInfo->file().toString(), _testInfo->line(), message);
+    throw TestAssertionFailureException(std::string{_testInfo->file()}, _testInfo->line(), message);
 }
 
 }  // namespace mongo::unittest

@@ -109,7 +109,7 @@ public:
                         key_string::Version keyStringVersion,
                         Ordering ordering,
                         KeyFormat rsKeyFormat)
-        : _ident(std::make_shared<Ident>(ident.toString())),
+        : _ident(std::make_shared<Ident>(std::string{ident})),
           _keyStringVersion(keyStringVersion),
           _ordering(ordering),
           _rsKeyFormat(rsKeyFormat) {}

@@ -80,7 +80,7 @@ void validateAPIParameters(const CommandInvocation& invocation) {
 
     if (genericArgs.getApiStrict().value_or(false)) {
         auto& cmdApiVersions = command->apiVersions();
-        auto apiVersionFromClient = genericArgs.getApiVersion()->toString();
+        auto apiVersionFromClient = std::string{*genericArgs.getApiVersion()};
         bool strictAssert = (cmdApiVersions.find(apiVersionFromClient) != cmdApiVersions.end());
         uassert(ErrorCodes::APIStrictError,
                 fmt::format("Provided apiStrict:true, but the command {} is not in API Version {}. "
@@ -103,7 +103,7 @@ void validateAPIParameters(const CommandInvocation& invocation) {
 
     if (genericArgs.getApiDeprecationErrors().value_or(false)) {
         auto& cmdDepApiVersions = command->deprecatedApiVersions();
-        auto apiVersionFromClient = genericArgs.getApiVersion()->toString();
+        auto apiVersionFromClient = std::string{*genericArgs.getApiVersion()};
         bool deprecationAssert =
             (cmdDepApiVersions.find(apiVersionFromClient) == cmdDepApiVersions.end());
         uassert(ErrorCodes::APIDeprecationError,

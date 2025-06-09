@@ -221,7 +221,7 @@ void RemoveShardCommitCoordinator::_commitRemoveShard(
 
     if (!_doc.getIsTransitionToDedicated()) {
         // Don't remove the config shard's RSM because it is used to target the config server.
-        ReplicaSetMonitor::remove(_doc.getReplicaSetName()->toString());
+        ReplicaSetMonitor::remove(std::string{*_doc.getReplicaSetName()});
     }
 }
 

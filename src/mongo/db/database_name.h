@@ -211,7 +211,7 @@ public:
      * tolerated in the serialized output, and should otherwise be avoided whenever possible.
      */
     std::string serializeWithoutTenantPrefix_UNSAFE() const {
-        return db(omitTenant).toString();
+        return std::string{db(omitTenant)};
     }
 
     /**
@@ -405,7 +405,7 @@ protected:
     }
 
     std::string toString() const {
-        return db(omitTenant).toString();
+        return std::string{db(omitTenant)};
     }
 
     std::string toStringWithTenantId() const {
@@ -414,7 +414,7 @@ protected:
             return str::stream() << tenantId.toString() << "_" << db(omitTenant);
         }
 
-        return db(omitTenant).toString();
+        return std::string{db(omitTenant)};
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

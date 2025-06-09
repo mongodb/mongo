@@ -58,7 +58,7 @@ std::string mockTypeToString(CollatorInterfaceMock::MockType type) {
 }
 
 Collation makeCollation(StringData locale, StringData version) {
-    Collation collation(locale.toString());
+    Collation collation(std::string{locale});
     // "backwards" is optional. The ICU collator always sets it to true/false based on the locale.
     collation.setBackwards(false);
     collation.setVersion(version);
@@ -82,8 +82,8 @@ std::shared_ptr<CollatorInterface> CollatorInterfaceMock::cloneShared() const {
 int CollatorInterfaceMock::compare(StringData left, StringData right) const {
     switch (_mockType) {
         case MockType::kReverseString: {
-            std::string leftString = left.toString();
-            std::string rightString = right.toString();
+            std::string leftString = std::string{left};
+            std::string rightString = std::string{right};
             std::reverse(leftString.begin(), leftString.end());
             std::reverse(rightString.begin(), rightString.end());
             StringData leftReversed(leftString);
@@ -103,7 +103,7 @@ CollatorInterface::ComparisonKey CollatorInterfaceMock::getComparisonKey(
     StringData stringData) const {
     switch (_mockType) {
         case MockType::kReverseString: {
-            std::string keyDataString = stringData.toString();
+            std::string keyDataString = std::string{stringData};
             std::reverse(keyDataString.begin(), keyDataString.end());
             return makeComparisonKey(std::move(keyDataString));
         }

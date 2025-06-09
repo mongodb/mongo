@@ -98,7 +98,7 @@ HostAndPort validateTarget(OperationContext* opCtx, StringData targetStr) {
 constexpr auto kReplSetTestEgress = "replSetTestEgress"_sd;
 auto getNetworkInterface() {
     static auto uniqueNI = ([] {
-        auto ret = executor::makeNetworkInterface(kReplSetTestEgress.toString());
+        auto ret = executor::makeNetworkInterface(std::string{kReplSetTestEgress});
         ret->startup();
         return ret;
     })();

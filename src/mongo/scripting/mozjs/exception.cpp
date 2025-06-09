@@ -104,7 +104,7 @@ Status JSErrorReportToStatus(JSContext* cx,
         }
     }
 
-    return Status(error, jsstr.toStringData().toString());
+    return Status(error, std::string{jsstr.toStringData()});
 }
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {

@@ -396,7 +396,7 @@ Status HelloResponse::initialize(const BSONObj& doc) {
                                             << typeName(BSONType::string) << " but found type "
                                             << typeName(tagsElement.type()));
             }
-            _tags[tagElement.fieldNameStringData().toString()] = tagElement.String();
+            _tags[std::string{tagElement.fieldNameStringData()}] = tagElement.String();
         }
         _tagsSet = true;
     }
@@ -524,7 +524,7 @@ void HelloResponse::setIsSecondary(bool secondary) {
 
 void HelloResponse::setReplSetName(StringData setName) {
     _setNameSet = true;
-    _setName = setName.toString();
+    _setName = std::string{setName};
 }
 
 void HelloResponse::setReplSetVersion(long long version) {

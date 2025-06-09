@@ -49,7 +49,7 @@ void MeasurementMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                                   size_t numMeasurements) {
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
         str::stream errMsg;
-        errMsg << "Compressed bucket contains uncompressed data field: " << key.toString();
+        errMsg << "Compressed bucket contains uncompressed data field: " << key;
         massert(8830600, errMsg, columnValue.isBinData(BinDataType::Column));
 
         int binLength = 0;

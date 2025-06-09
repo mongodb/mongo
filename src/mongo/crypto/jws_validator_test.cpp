@@ -54,7 +54,7 @@ public:
                                           StringData msg,
                                           StringData signature,
                                           bool shouldPass) {
-            this->keyID = keyID.toString();
+            this->keyID = std::string{keyID};
 
             std::string strE = hexblob::decode(e);
             std::string base64E = base64url::encode(StringData(strE.data(), strE.length()));

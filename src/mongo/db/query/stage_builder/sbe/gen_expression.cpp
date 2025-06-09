@@ -3599,11 +3599,10 @@ private:
                 _context->state.env->getAccessor(timeZoneDBSlot)->getViewOfValue();
             auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
             uassert(5157900,
-                    str::stream() << "$" << exprName.toString()
-                                  << " parameter 'timezone' must be a string",
+                    str::stream() << "$" << exprName << " parameter 'timezone' must be a string",
                     sbe::value::isString(timezoneTag));
             uassert(5157901,
-                    str::stream() << "$" << exprName.toString()
+                    str::stream() << "$" << exprName
                                   << " parameter 'timezone' must be a valid timezone",
                     sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
             auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
@@ -3616,13 +3615,13 @@ private:
             inputValidationCases.emplace_back(
                 generateABTNonStringCheck(makeVariable(timezoneName)),
                 makeABTFail(ErrorCodes::Error{5157902},
-                            str::stream() << "$" << exprName.toString()
+                            str::stream() << "$" << std::string{exprName}
                                           << " parameter 'timezone' must be a string"));
             inputValidationCases.emplace_back(
                 makeNot(makeABTFunction(
                     "isTimezone", makeABTVariable(timeZoneDBSlot), makeVariable(timezoneName))),
                 makeABTFail(ErrorCodes::Error{5157903},
-                            str::stream() << "$" << exprName.toString()
+                            str::stream() << "$" << std::string{exprName}
                                           << " parameter 'timezone' must be a valid timezone"));
             arguments.push_back(makeABTVariable(timeZoneDBSlot));
             arguments.push_back(makeVariable(timezoneName));
@@ -3636,7 +3635,7 @@ private:
             {std::move(dateName), std::move(timezoneName), funcName},
             abt::makeSeq(std::move(dateExpression),
                          std::move(timezoneExpression),
-                         abt::make<abt::FunctionCall>(exprName.toString(), std::move(arguments))),
+                         abt::make<abt::FunctionCall>(std::string{exprName}, std::move(arguments))),
             buildABTMultiBranchConditionalFromCaseValuePairs(std::move(inputValidationCases),
                                                              abt::Constant::nothing())));
     }
@@ -3694,7 +3693,7 @@ private:
                               makeABTFunction(exprName, makeVariable(argName))}},
             makeABTFail(ErrorCodes::Error{7157800},
                         str::stream()
-                            << "$" << exprName.toString() << " supports only numeric types"));
+                            << "$" << std::string{exprName} << " supports only numeric types"));
 
         pushABT(abt::make<abt::Let>(
             std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
@@ -3765,12 +3764,12 @@ private:
             {ABTCaseValuePair{generateABTNullMissingOrUndefined(argName), abt::Constant::null()},
              ABTCaseValuePair{makeNot(std::move(checkIsNumber)),
                               makeABTFail(ErrorCodes::Error{7157802},
-                                          str::stream() << "$" << exprName.toString()
+                                          str::stream() << "$" << std::string{exprName}
                                                         << " supports only numeric types")},
              ABTCaseValuePair{generateABTNaNCheck(argName), std::move(variable)},
              ABTCaseValuePair{std::move(checkBounds), std::move(trigonometricExpr)}},
             makeABTFail(ErrorCodes::Error{7157803},
-                        str::stream() << "Cannot apply $" << exprName.toString()
+                        str::stream() << "Cannot apply $" << std::string{exprName}
                                       << ", value must be in " << lowerBound.printLowerBound()
                                       << ", " << upperBound.printUpperBound()));
 
@@ -4008,12 +4007,12 @@ private:
             // To match classic engine semantics, $setEquals and $setIsSubset should throw an error
             // for any non-array arguments including null and missing values.
             if (setOp == SetOperation::Equals || setOp == SetOperation::IsSubset) {
-                return makeIf(
-                    makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
-                    makeABTFail(ErrorCodes::Error{7158100},
-                                str::stream()
-                                    << "All operands of $" << operatorName << " must be arrays."),
-                    abt::make<abt::FunctionCall>(setFunctionName.toString(), std::move(variables)));
+                return makeIf(makeFillEmptyTrue(std::move(checkNotArrayAnyArgument)),
+                              makeABTFail(ErrorCodes::Error{7158100},
+                                          str::stream() << "All operands of $" << operatorName
+                                                        << " must be arrays."),
+                              abt::make<abt::FunctionCall>(std::string{setFunctionName},
+                                                           std::move(variables)));
             } else {
                 return buildABTMultiBranchConditionalFromCaseValuePairs(
                     {ABTCaseValuePair{std::move(checkNullAnyArgument), abt::Constant::null()},
@@ -4022,7 +4021,8 @@ private:
                                                   str::stream()
                                                       << "All operands of $" << operatorName
                                                       << " must be arrays.")}},
-                    abt::make<abt::FunctionCall>(setFunctionName.toString(), std::move(variables)));
+                    abt::make<abt::FunctionCall>(std::string{setFunctionName},
+                                                 std::move(variables)));
             }
         }();
 
@@ -4082,7 +4082,7 @@ private:
 
         auto makeError = [exprName](int errorCode, StringData message) {
             return makeABTFail(ErrorCodes::Error{errorCode},
-                               str::stream() << "$" << exprName.toString() << ": " << message);
+                               str::stream() << "$" << std::string{exprName} << ": " << message);
         };
 
         auto makeRegexFunctionCall = [&](abt::ABT compiledRegex) {

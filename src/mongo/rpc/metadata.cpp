@@ -203,7 +203,7 @@ boost::optional<OpMsgRequest::DocumentSequence> extractDocumentSequence(BSONObj 
         return boost::none;
     }
 
-    OpMsgRequest::DocumentSequence sequence{docSeqName->toString()};
+    OpMsgRequest::DocumentSequence sequence{std::string{*docSeqName}};
     for (auto elem : docSeqElem.Obj()) {
         sequence.objs.push_back(elem.Obj().shareOwnershipWith(cmdObj));
     }

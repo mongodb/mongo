@@ -809,7 +809,7 @@ private:
                 MONGO_UNREACHABLE;
         }
 
-        const auto urlString = url.toString();
+        const auto urlString = std::string{url};
         curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());
 
         DataBuilder dataBuilder(4096), headerBuilder(4096);

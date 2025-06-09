@@ -49,7 +49,7 @@ std::string ResourcePattern::serialize(const SerializationContext& context) cons
         case MatchTypeEnum::kMatchDatabaseName:
             return "<database " + DatabaseNameUtil::serialize(_ns.dbName(), context) + ">";
         case MatchTypeEnum::kMatchCollectionName:
-            return "<collection " + _ns.coll().toString() + " in any database>";
+            return "<collection " + std::string{_ns.coll()} + " in any database>";
         case MatchTypeEnum::kMatchExactNamespace:
             return "<" + NamespaceStringUtil::serialize(_ns, context) + ">";
         case MatchTypeEnum::kMatchAnyNormalResource:
@@ -58,9 +58,9 @@ std::string ResourcePattern::serialize(const SerializationContext& context) cons
             return "<all resources>";
         case MatchTypeEnum::kMatchExactSystemBucketResource:
             return "<" + DatabaseNameUtil::serialize(_ns.dbName(), context) + ".system.bucket" +
-                _ns.coll().toString() + " resources>";
+                std::string{_ns.coll()} + " resources>";
         case MatchTypeEnum::kMatchSystemBucketInAnyDBResource:
-            return "<any system.bucket." + _ns.coll().toString() + ">";
+            return "<any system.bucket." + std::string{_ns.coll()} + ">";
         case MatchTypeEnum::kMatchAnySystemBucketInDBResource:
             return "<" + DatabaseNameUtil::serialize(_ns.dbName(), context) + "system.bucket.*>";
         case MatchTypeEnum::kMatchAnySystemBucketResource:

@@ -71,7 +71,7 @@ class AccumOp {
 public:
     AccumOp(std::string opName);
 
-    AccumOp(StringData opName) : AccumOp(opName.toString()) {}
+    AccumOp(StringData opName) : AccumOp(std::string{opName}) {}
 
     AccumOp(const AccumulationStatement& acc);
 

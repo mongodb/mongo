@@ -129,7 +129,7 @@ private:
                           const std::variant<std::monostate, UserName, TenantId>& tenantOrUser,
                           Date_t expiration,
                           TenantProtocol tenantProtocol)
-        : _originalToken(securityToken.toString()),
+        : _originalToken(std::string{securityToken}),
           _expiration(expiration),
           _tenantOrUser(tenantOrUser),
           _tenantProtocol(tenantProtocol) {}

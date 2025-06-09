@@ -147,7 +147,7 @@ public:
             if (swDbInfo == ErrorCodes::NamespaceNotFound) {
                 uassert(CollectionUUIDMismatchInfo(fromNss.dbName(),
                                                    *request().getCollectionUUID(),
-                                                   fromNss.coll().toString(),
+                                                   std::string{fromNss.coll()},
                                                    boost::none),
                         "Database does not exist",
                         !request().getCollectionUUID());

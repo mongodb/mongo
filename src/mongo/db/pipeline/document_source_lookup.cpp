@@ -385,7 +385,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
         variableValidation::validateNameForUserWrite(varName);
 
         _letVariables.emplace_back(
-            varName.toString(),
+            std::string{varName},
             Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
             _variablesParseState.defineVariable(varName));
     }
@@ -1377,7 +1377,7 @@ DepsTracker::State DocumentSourceLookUp::getDependencies(DepsTracker* deps) cons
                 break;
             }
         }
-        deps->fields.insert(ref.dottedSubstring(0, firstNumericIx).toString());
+        deps->fields.insert(std::string{ref.dottedSubstring(0, firstNumericIx)});
     }
 
     // Purposely ignore '_matchSrc' and '_unwindSrc', since those should only be absorbed if we know

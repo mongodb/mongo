@@ -88,7 +88,7 @@ public:
     }
 
     void setAPIVersion(StringData apiVersion) {
-        _apiVersion = apiVersion.toString();
+        _apiVersion = std::string{apiVersion};
     }
 
     const boost::optional<bool>& getAPIStrict() const {

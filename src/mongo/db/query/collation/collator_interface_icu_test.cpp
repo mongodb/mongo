@@ -137,7 +137,7 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingLocaleStringParsing) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -155,7 +155,7 @@ TEST(CollatorInterfaceICUTest, ASCIIComparisonWorksUsingComparisonKeys) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
 
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
     ASSERT_EQ(std::string("en"), locale.getLanguage());
     ASSERT_EQ(std::string("US"), locale.getCountry());
 
@@ -336,7 +336,7 @@ TEST(CollatorInterfaceICUTest, StringsWithEmbeddedNullByteCompareCorrectlyUsingC
 TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
     Collation collationSpec;
     collationSpec.setLocale("en_US");
-    auto locale = icu::Locale::createFromName(collationSpec.getLocale().toString().c_str());
+    auto locale = icu::Locale::createFromName(std::string{collationSpec.getLocale()}.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale, status));
@@ -354,11 +354,11 @@ TEST(CollatorInterfaceICUTest, TwoUSEnglishCollationsAreEqual) {
 TEST(CollatorInterfaceICUTest, USEnglishAndBritishEnglishCollationsAreNotEqual) {
     Collation collationSpec1;
     collationSpec1.setLocale("en_US");
-    auto locale1 = icu::Locale::createFromName(collationSpec1.getLocale().toString().c_str());
+    auto locale1 = icu::Locale::createFromName(std::string{collationSpec1.getLocale()}.c_str());
 
     Collation collationSpec2;
     collationSpec2.setLocale("en_UK");
-    auto locale2 = icu::Locale::createFromName(collationSpec2.getLocale().toString().c_str());
+    auto locale2 = icu::Locale::createFromName(std::string{collationSpec2.getLocale()}.c_str());
 
     UErrorCode status = U_ZERO_ERROR;
     std::unique_ptr<icu::Collator> coll1(icu::Collator::createInstance(locale1, status));

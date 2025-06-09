@@ -135,7 +135,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         [&] { _unregisterResourceNameIfNoLongerNeeded(resId, ns); });
 
     if (locker->getDebugInfo().empty()) {
-        locker->setDebugInfo(reason.toString());
+        locker->setDebugInfo(std::string{reason});
     }
 
     try {
@@ -144,8 +144,8 @@ void DDLLockManager::_lock(OperationContext* opCtx,
 
         const auto& lockHolders = locker->getLockInfoFromResourceHolders(resId);
         std::stringstream lockHoldersDebugInfo;
-        lockHoldersDebugInfo << "Failed to acquire DDL lock for '" << ns.toString() << "' in mode "
-                             << modeName(mode) << " after "
+        lockHoldersDebugInfo << "Failed to acquire DDL lock for '" << std::string{ns}
+                             << "' in mode " << modeName(mode) << " after "
                              << duration_cast<Milliseconds>(waitingTime.elapsed()).toString()
                              << " that is currently locked by '[";
         for (std::size_t i = 0; i < lockHolders.size(); i++) {
@@ -341,9 +341,9 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      LockMode mode,
                                                      bool waitForRecovery,
                                                      Milliseconds timeout)
-    : _resourceName(resName.toString()),
+    : _resourceName(std::string{resName}),
       _resourceId(resId),
-      _reason(reason.toString()),
+      _reason(std::string{reason}),
       _mode(mode),
       _result(LockResult::LOCK_INVALID),
       _locker(locker),

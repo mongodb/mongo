@@ -273,7 +273,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
         invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
         GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getNamespaceOrUUID().nss().coll().toString());
+            std::string{findCommand->getNamespaceOrUUID().nss().coll()});
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         runCommandWithSession(conn,
@@ -1133,8 +1133,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(result));
                 int count = cursorResponse.getBatch().size();
                 while (cursorResponse.getCursorId() != 0) {
-                    GetMoreCommandRequest getMoreRequest(cursorResponse.getCursorId(),
-                                                         cursorResponse.getNSS().coll().toString());
+                    GetMoreCommandRequest getMoreRequest(
+                        cursorResponse.getCursorId(), std::string{cursorResponse.getNSS().coll()});
                     BSONObj getMoreCommandResult;
                     runCommandWithSession(
                         conn,

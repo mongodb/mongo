@@ -156,7 +156,7 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
 }
 
 void assertNodeSelected(MockReplicaSet* replSet, ReadPreference rp, StringData host) {
-    assertOneOfNodesSelected(replSet, rp, std::vector<std::string>{host.toString()});
+    assertOneOfNodesSelected(replSet, rp, std::vector<std::string>{std::string{host}});
 }
 
 TEST_F(BasicRS, QueryPrimary) {

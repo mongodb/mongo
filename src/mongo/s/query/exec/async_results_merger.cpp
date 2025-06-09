@@ -402,7 +402,7 @@ AsyncResultsMerger::RemoteCursorPtr AsyncResultsMerger::_buildRemote(WithLock lk
                                          rc.getHostAndPort(),
                                          rc.getCursorResponse().getNSS(),
                                          rc.getCursorResponse().getCursorId(),
-                                         rc.getShardId().toString(),
+                                         std::string{rc.getShardId()},
                                          rc.getCursorResponse().getPartialResultsReturned());
 
     // We don't check the return value of _addBatchToBuffer here; if there was an error, it will be
@@ -669,7 +669,7 @@ BSONObj AsyncResultsMerger::_makeRequest(WithLock,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
     invariant(!remote.cbHandle.isValid());
 
-    GetMoreCommandRequest getMoreRequest(remote.cursorId, remote.cursorNss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
     if (_awaitDataTimeout) {
         getMoreRequest.setMaxTimeMS(

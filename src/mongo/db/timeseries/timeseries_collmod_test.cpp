@@ -61,7 +61,7 @@ protected:
 
 // Collmods with timeseries options should be correctly translated to timeseries buckets
 TEST_F(TimeseriesCollmodTest, TimeseriesCollModCommandTranslation) {
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
 
     // Set all of the fields that makeTimeseriesBucketsCollModCommand transfers over to something
@@ -106,7 +106,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModIndexTranslation) {
     BSONObj expectedTranslation = BSON("control.min.tm" << 1 << "control.max.tm" << 1);
 
     CollMod collModCmd(_ns1);
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
     auto collModIndex = CollModIndex();
     collModIndex.setKeyPattern(timeseriesIndexSpec);
@@ -123,7 +123,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModBadIndex) {
     auto badIndex = BSON("$hint" << BSON("field" << 1));
 
     CollMod collModCmd(testNss);
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
     auto collModIndex = CollModIndex();
     collModIndex.setKeyPattern(badIndex);
@@ -141,7 +141,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModBadIndex) {
 
 // If view translation is required, a new Collmod pointer should be returned
 TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslation) {
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
 
     // Modify the timeseries options to trigger a change
@@ -160,7 +160,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslation) {
 
 // Checks that view translation is skipped if the command does not have a timeseries mod
 TEST_F(TimeseriesCollmodTest, TimeseriesCollmodViewTranslationNoTimeseriesMod) {
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     CollMod collModCmd(testNss);
     auto collModView = timeseries::makeTimeseriesViewCollModCommand(timeseriesOptions, collModCmd);
     ASSERT(!collModView);
@@ -168,7 +168,7 @@ TEST_F(TimeseriesCollmodTest, TimeseriesCollmodViewTranslationNoTimeseriesMod) {
 
 // If the timeseries options are invalid, a null pointer should be returned
 TEST_F(TimeseriesCollmodTest, TimeseriesCollModViewTranslationInvalidMod) {
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
 
     // There is an internal check that prevents these options from being edited at the same time.
@@ -194,7 +194,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslation) {
     collModCmd.setTimeseries(collModTimeseries);
 
     // Create an existing collection with timeseries options.
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     timeseriesOptions.setBucketRoundingSeconds(1000);
     timeseriesOptions.setBucketMaxSpanSeconds(1000);
     CreateCommand cmd = CreateCommand(testNss);
@@ -236,7 +236,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
     collModCmd.setTimeseries(collModTimeseries);
 
     // Create an existing collection with timeseries options.
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     timeseriesOptions.setBucketRoundingSeconds(100);
     timeseriesOptions.setBucketMaxSpanSeconds(100);
     CreateCommand cmd = CreateCommand(testNss);
@@ -284,7 +284,7 @@ TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationAndV
 
 // Collmod processing will proceed normally on a non timeseries collection.
 TEST_F(TimeseriesCollmodTest, ProcessCollModCommandWithTimeseriesTranslationNotTimeseries) {
-    auto timeseriesOptions = TimeseriesOptions(_timeField.toString());
+    auto timeseriesOptions = TimeseriesOptions(std::string{_timeField});
     auto collModTimeseries = CollModTimeseries();
 
     // Create a non timeseries collection.

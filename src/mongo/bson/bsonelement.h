@@ -603,7 +603,7 @@ public:
      * Like valueStringDataSafe, but returns std::string.
      */
     std::string str() const {
-        return valueStringDataSafe().toString();
+        return std::string{valueStringDataSafe()};
     }
 
     /**

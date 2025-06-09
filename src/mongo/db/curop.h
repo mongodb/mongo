@@ -553,7 +553,7 @@ public:
      * Sets the message for FailPoints used.
      */
     void setFailPointMessage(WithLock, StringData message) {
-        _failPointMessage = message.toString();
+        _failPointMessage = std::string{message};
     }
 
     /**
@@ -657,7 +657,7 @@ public:
     }
 
     void setPlanSummary(WithLock, StringData summary) {
-        _planSummary = summary.toString();
+        _planSummary = std::string{summary};
     }
 
     void setPlanSummary(WithLock, std::string summary) {

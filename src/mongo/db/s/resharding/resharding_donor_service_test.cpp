@@ -531,7 +531,7 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
     ReshardBlockingWritesChangeEventO2Field expectedChangeEvent{
         doc.getSourceNss(),
         doc.getReshardingUUID(),
-        resharding::kReshardFinalOpLogType.toString(),
+        std::string{resharding::kReshardFinalOpLogType},
     };
 
     for (const auto& recipientShardId : doc.getRecipientShards()) {
@@ -1114,7 +1114,7 @@ TEST_F(ReshardingDonorServiceTest, AbortAfterStepUpWithAbortReasonFromCoordinato
             auto abortReason = persistedDonorDocument.getMutableState().getAbortReason();
             ASSERT(abortReason);
             ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardCollectionAborted);
-            ASSERT_EQ(abortReason->getStringField("errmsg").toString(), abortErrMsg);
+            ASSERT_EQ(abortReason->getStringField("errmsg"), abortErrMsg);
         }
 
         stepDown();
@@ -1180,7 +1180,7 @@ TEST_F(ReshardingDonorServiceTest, FailoverAfterDonorErrorsPriorToObtainingTimes
             auto abortReason = persistedDonorDocument.getMutableState().getAbortReason();
             ASSERT(abortReason);
             ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::InternalError);
-            ASSERT_EQ(abortReason->getStringField("errmsg").toString(),
+            ASSERT_EQ(abortReason->getStringField("errmsg"),
                       "Simulating an unrecoverable error for testing");
         }
 

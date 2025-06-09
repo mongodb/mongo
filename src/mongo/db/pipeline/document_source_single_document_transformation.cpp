@@ -55,7 +55,7 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     bool isIndependentOfAnyCollection)
     : DocumentSource(name, pExpCtx),
       exec::agg::Stage(name, pExpCtx),
-      _name(name.toString()),
+      _name(std::string{name}),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
     if (parsedTransform) {
         _transformationProcessor.emplace(

@@ -210,7 +210,7 @@ BSONObj MutableOplogEntry::makeCreateCollCmdObj(const NamespaceString& collectio
                                                 const CollectionOptions& options,
                                                 const BSONObj& idIndex) {
     BSONObjBuilder b;
-    b.append("create", collectionName.coll().toString());
+    b.append("create", std::string{collectionName.coll()});
     {
         // Don't store the UUID as part of the options, but instead only at the top level
         CollectionOptions optionsToStore = options;

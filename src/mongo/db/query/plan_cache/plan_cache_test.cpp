@@ -938,7 +938,7 @@ class CachePlanSelectionTest : public unittest::Test {
 protected:
     void setUp() override {
         params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-        addIndex(BSON("_id" << 1), IndexConstants::kIdIndexName.toString());
+        addIndex(BSON("_id" << 1), std::string{IndexConstants::kIdIndexName});
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {

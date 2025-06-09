@@ -67,7 +67,7 @@ public:
     template <typename Callback>
     stdx::thread runThread(StringData name, Callback&& cb) {
         return stdx::thread([this, name, cb] {
-            auto client = _serviceCtx->getService()->makeClient(name.toString());
+            auto client = _serviceCtx->getService()->makeClient(std::string{name});
             auto opCtx = client->makeOperationContext();
 
             cb(opCtx.get());
@@ -94,7 +94,7 @@ public:
     template <typename Callback>
     stdx::thread runThread(StringData name, Callback&& cb) {
         return stdx::thread([this, name, cb] {
-            auto client = _serviceCtx->getService()->makeClient(name.toString());
+            auto client = _serviceCtx->getService()->makeClient(std::string{name});
             auto opCtx = client->makeOperationContext();
 
             opCtx->runWithDeadline(

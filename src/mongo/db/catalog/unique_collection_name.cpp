@@ -82,7 +82,7 @@ StatusWith<NamespaceString> generateRandomCollectionName(OperationContext* opCtx
         return charsToChooseFrom[i];
     };
 
-    auto collectionName = collectionNameModel.toString();
+    auto collectionName = std::string{collectionNameModel};
     std::transform(
         collectionName.begin(), collectionName.end(), collectionName.begin(), replacePercentSign);
 

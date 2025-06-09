@@ -260,7 +260,7 @@ void AuthenticationSession::setMechanismName(StringData mechanismName) {
             "Attempt to change the mechanism name",
             _mechName.empty() || _mechName == mechanismName);
 
-    _mechName = mechanismName.toString();
+    _mechName = std::string{mechanismName};
     _mechCounter = authCounter.getMechanismCounter(_mechName);
     _mechCounter->incAuthenticateReceived();
     if (_isSpeculative) {

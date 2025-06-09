@@ -89,7 +89,7 @@ WiredTigerCursor::WiredTigerCursor(Params params,
         // Add this option without a trailing comma. This enables an optimization in WiredTiger to
         // skip parsing the config string if this is the only option. See SERVER-43232 for details.
         if (!params.allowOverwrite) {
-            _config = kOverwriteFalse.toString();
+            _config = std::string{kOverwriteFalse};
             configStr = kOverwriteFalse.data();
         }
     }

@@ -65,7 +65,7 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
 
     if (view) {
         manageSearchIndexRequest.setView(boost::make_optional(
-            MongotQueryViewSpec(view->getNss().coll().toString(), view->getEffectivePipeline())));
+            MongotQueryViewSpec(std::string{view->getNss().coll()}, view->getEffectivePipeline())));
     }
 
     // Create a RemoteCommandRequest with the request and host-and-port.

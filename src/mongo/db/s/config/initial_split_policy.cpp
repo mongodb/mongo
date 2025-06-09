@@ -711,7 +711,7 @@ std::vector<BSONObj> SamplingBasedSplitPolicy::createRawPipeline(const ShardKeyP
                 {"k", V{fieldRef->dottedField()}},
                 {"v", Doc{{"$ifNull", V{Arr{V{"$" + fieldRef->dottedField()}, V{BSONNULL}}}}}}});
         }
-        sortValBuilder.append(fieldRef->dottedField().toString(), 1);
+        sortValBuilder.append(std::string{fieldRef->dottedField()}, 1);
     }
     res.push_back(BSON("$sample" << BSON("size" << numInitialChunks * samplesPerChunk)));
     res.push_back(BSON("$sort" << sortValBuilder.obj()));

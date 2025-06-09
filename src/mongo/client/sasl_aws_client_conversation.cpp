@@ -85,15 +85,15 @@ awsIam::AWSCredentials SaslAWSClientConversation::_getCredentials() const {
 awsIam::AWSCredentials SaslAWSClientConversation::_getUserCredentials() const {
     if (_saslClientSession->hasParameter(SaslClientSession::parameterAWSSessionToken)) {
         return awsIam::AWSCredentials(
-            _saslClientSession->getParameter(SaslClientSession::parameterUser).toString(),
-            _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString(),
-            _saslClientSession->getParameter(SaslClientSession::parameterAWSSessionToken)
-                .toString());
+            std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)},
+            std::string{_saslClientSession->getParameter(SaslClientSession::parameterPassword)},
+            std::string{
+                _saslClientSession->getParameter(SaslClientSession::parameterAWSSessionToken)});
     }
 
     return awsIam::AWSCredentials(
-        _saslClientSession->getParameter(SaslClientSession::parameterUser).toString(),
-        _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString());
+        std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)},
+        std::string{_saslClientSession->getParameter(SaslClientSession::parameterPassword)});
 }
 
 awsIam::AWSCredentials SaslAWSClientConversation::_getLocalAWSCredentials() const {
@@ -105,12 +105,12 @@ awsIam::AWSCredentials SaslAWSClientConversation::_getLocalAWSCredentials() cons
 
     if (!awsAccessKeyId.empty() && !awsSecretAccessKey.empty()) {
         if (!awsSessionToken.empty()) {
-            return awsIam::AWSCredentials(awsAccessKeyId.toString(),
-                                          awsSecretAccessKey.toString(),
-                                          awsSessionToken.toString());
+            return awsIam::AWSCredentials(std::string{awsAccessKeyId},
+                                          std::string{awsSecretAccessKey},
+                                          std::string{awsSessionToken});
         }
 
-        return awsIam::AWSCredentials(awsAccessKeyId.toString(), awsSecretAccessKey.toString());
+        return awsIam::AWSCredentials(std::string{awsAccessKeyId}, std::string{awsSecretAccessKey});
     }
 
     StringData ecsMetadata = getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");

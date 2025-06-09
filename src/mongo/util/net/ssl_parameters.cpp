@@ -246,10 +246,10 @@ Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
 
     if (overrideParam.getAttributes()) {
         sslGlobalParams.clusterAuthX509OverrideAttributes =
-            overrideParam.getAttributes()->toString();
+            std::string{*overrideParam.getAttributes()};
     } else if (overrideParam.getExtensionValue()) {
         sslGlobalParams.clusterAuthX509OverrideExtensionValue =
-            overrideParam.getExtensionValue()->toString();
+            std::string{*overrideParam.getExtensionValue()};
     }
 
     return Status::OK();

@@ -234,7 +234,7 @@ class SimpleFunctionCollector final : public FTDCCollectorInterface {
 public:
     SimpleFunctionCollector(StringData name,
                             unique_function<void(OperationContext*, BSONObjBuilder&)> collectFn)
-        : _name(name.toString()), _collectFn(std::move(collectFn)) {}
+        : _name(std::string{name}), _collectFn(std::move(collectFn)) {}
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
         _collectFn(opCtx, builder);

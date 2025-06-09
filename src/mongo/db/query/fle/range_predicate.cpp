@@ -98,7 +98,7 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
     StringData path, ParsedFindRangePayload payload) const {
     auto* expCtx = _rewriter->getExpressionContext();
     return fleBetweenFromPayload(ExpressionFieldPath::createPathFromString(
-                                     expCtx, path.toString(), expCtx->variablesParseState),
+                                     expCtx, std::string{path}, expCtx->variablesParseState),
                                  payload);
 }
 

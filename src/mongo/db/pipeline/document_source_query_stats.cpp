@@ -95,7 +95,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone;
     std::string hmacKey;
     auto parsed = DocumentSourceQueryStatsSpec::parse(
-        IDLParserContext(DocumentSourceQueryStats::kStageName.toString()), obj);
+        IDLParserContext(std::string{DocumentSourceQueryStats::kStageName}), obj);
     boost::optional<TransformIdentifiersSpec> transformIdentifiers =
         parsed.getTransformIdentifiers();
 

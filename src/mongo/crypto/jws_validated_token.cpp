@@ -114,7 +114,7 @@ Status JWSValidatedToken::validate(JWKManager* keyMgr) const {
 }
 
 JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
-    : _originalToken(token.toString()) {
+    : _originalToken(std::string{token}) {
     auto tokenSplit = parseSignedToken(token);
 
     auto headerString = base64url::decode(tokenSplit.header);
@@ -136,7 +136,7 @@ StatusWith<IssuerAudiencePair> JWSValidatedToken::extractIssuerAndAudienceFromCo
     auto jwt = JWT::parse(IDLParserContext{"JWT"}, payload);
 
     IssuerAudiencePair pair;
-    pair.issuer = jwt.getIssuer().toString();
+    pair.issuer = std::string{jwt.getIssuer()};
 
     auto& audience = jwt.getAudience();
     if (std::holds_alternative<std::string>(audience)) {

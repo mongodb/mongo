@@ -105,7 +105,7 @@ constexpr auto kHelloString = "hello"_sd;
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 const std::string kAutomationServiceDescriptorFieldName =
-    HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
+    std::string{HelloCommandReply::kAutomationServiceDescriptorFieldName};
 
 class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:

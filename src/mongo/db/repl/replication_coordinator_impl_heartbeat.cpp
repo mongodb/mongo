@@ -215,7 +215,7 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
         // Pretend we sent a request so that _untrackHeartbeatHandle succeeds.
         _trackHeartbeatHandle(lk, handle, HeartbeatState::kSent, request.target);
         invariant(_heartbeatHandles.contains(handle));
-        replSetNameString = replSetName.toString();
+        replSetNameString = std::string{replSetName};
     }
 
     executor::TaskExecutor::ResponseStatus status(request.target, response, ping);
@@ -1052,7 +1052,7 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats(WithLock) {
 void ReplicationCoordinatorImpl::restartScheduledHeartbeats_forTest() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(getTestCommandsEnabled());
-    _restartScheduledHeartbeats(lk, _rsConfig.unsafePeek().getReplSetName().toString());
+    _restartScheduledHeartbeats(lk, std::string{_rsConfig.unsafePeek().getReplSetName()});
 };
 
 void ReplicationCoordinatorImpl::_restartScheduledHeartbeats(WithLock lk,
@@ -1092,7 +1092,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats(WithLock lk) {
             continue;
         }
         auto target = rsc.getMemberAt(i).getHostAndPort();
-        _scheduleHeartbeatToTarget(lk, target, now, rsc.getReplSetName().toString());
+        _scheduleHeartbeatToTarget(lk, target, now, std::string{rsc.getReplSetName()});
         _topCoord->restartHeartbeat(now, target);
     }
 

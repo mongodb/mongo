@@ -309,11 +309,11 @@ public:
     }
 
     void putDBRef(const BSONDBRef& dbref) {
-        putRefCountable(make_intrusive<RCDBRef>(dbref.ns.toString(), dbref.oid));
+        putRefCountable(make_intrusive<RCDBRef>(std::string{dbref.ns}, dbref.oid));
     }
 
     void putCodeWScope(const BSONCodeWScope& cws) {
-        putRefCountable(make_intrusive<RCCodeWScope>(cws.code.toString(), cws.scope));
+        putRefCountable(make_intrusive<RCCodeWScope>(std::string{cws.code}, cws.scope));
     }
 
     void putDecimal(const Decimal128& d) {

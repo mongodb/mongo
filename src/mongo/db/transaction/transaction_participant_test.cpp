@@ -3935,9 +3935,9 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     auto transactionDocument = stashedState.getObjectField("transaction");
     auto parametersDocument = transactionDocument.getObjectField("parameters");
 
-    ASSERT_EQ(stashedState.getField("host").valueStringData().toString(),
+    ASSERT_EQ(stashedState.getField("host").valueStringData(),
               prettyHostNameAndPort(opCtx()->getClient()->getLocalPort()));
-    ASSERT_EQ(stashedState.getField("desc").valueStringData().toString(), "inactive transaction");
+    ASSERT_EQ(stashedState.getField("desc").valueStringData(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), _sessionId.toBSON());
     ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), _txnNumber);
     ASSERT_EQ(parametersDocument.getField("autocommit").boolean(), autocommit);
@@ -3953,9 +3953,9 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
         startTime + Seconds(gTransactionLifetimeLimitSeconds.load()));
     ASSERT_EQ(transactionDocument.getField("timePreparedMicros").numberLong(), preparedDuration);
 
-    ASSERT_EQ(stashedState.getField("client").valueStringData().toString(), "");
+    ASSERT_EQ(stashedState.getField("client").valueStringData(), "");
     ASSERT_EQ(stashedState.getField("connectionId").numberLong(), 0);
-    ASSERT_EQ(stashedState.getField("appName").valueStringData().toString(), "appName");
+    ASSERT_EQ(stashedState.getField("appName").valueStringData(), "appName");
     ASSERT_BSONOBJ_EQ(stashedState.getField("clientMetadata").Obj(), obj.getField("client").Obj());
     ASSERT_EQ(stashedState.getField("waitingForLock").boolean(), false);
     ASSERT_EQ(stashedState.getField("active").boolean(), false);

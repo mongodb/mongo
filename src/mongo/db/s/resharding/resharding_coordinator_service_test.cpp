@@ -410,7 +410,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$[].mutableState.state"
-                << DonorState_serializer(DonorStateEnum::kDonatingInitialData).toString()
+                << DonorState_serializer(DonorStateEnum::kDonatingInitialData)
                 << ReshardingCoordinatorDocument::kDonorShardsFieldName +
                     ".$[].mutableState.minFetchTimestamp"
                 << _cloneTimestamp
@@ -431,7 +431,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
-                << RecipientState_serializer(RecipientStateEnum::kApplying).toString()));
+                << RecipientState_serializer(RecipientStateEnum::kApplying)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
@@ -444,7 +444,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
-                << RecipientState_serializer(RecipientStateEnum::kStrictConsistency).toString()));
+                << RecipientState_serializer(RecipientStateEnum::kStrictConsistency)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
@@ -453,7 +453,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$[].mutableState.state"
-                << DonorState_serializer(DonorStateEnum::kDone).toString()));
+                << DonorState_serializer(DonorStateEnum::kDone)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
@@ -476,7 +476,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
-                << RecipientState_serializer(RecipientStateEnum::kDone).toString()));
+                << RecipientState_serializer(RecipientStateEnum::kDone)));
 
         updateCoordinatorDoc(opCtx, coordDoc.getReshardingUUID(), updates);
     }
@@ -504,7 +504,7 @@ public:
         BSONObj updates = BSON(
             "$set" << BSON(
                 ReshardingCoordinatorDocument::kRecipientShardsFieldName + ".$[].mutableState.state"
-                << RecipientState_serializer(RecipientStateEnum::kError).toString()
+                << RecipientState_serializer(RecipientStateEnum::kError)
                 << ReshardingCoordinatorDocument::kRecipientShardsFieldName +
                     ".$[].mutableState.abortReason"
                 << tmpBuilder.obj()));
@@ -1117,7 +1117,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
 
         LOGV2(5093701,
               "Running step down test case",
-              "stepDownAfter"_attr = (CoordinatorState_serializer(state).toString()));
+              "stepDownAfter"_attr = CoordinatorState_serializer(state));
 
         switch (state) {
             case CoordinatorStateEnum::kCloning: {

@@ -76,12 +76,13 @@ abt::ABT makeBalancedTree(Builder builder, std::vector<abt::ABT> leaves) {
 abt::ABT makeBooleanOpTree(abt::Operations logicOp, std::vector<abt::ABT> leaves);
 
 inline auto makeABTFunction(StringData name, abt::ABTVector args) {
-    return abt::make<abt::FunctionCall>(name.toString(), std::move(args));
+    return abt::make<abt::FunctionCall>(std::string{name}, std::move(args));
 }
 
 template <typename... Args>
 inline auto makeABTFunction(StringData name, Args&&... args) {
-    return abt::make<abt::FunctionCall>(name.toString(), abt::makeSeq(std::forward<Args>(args)...));
+    return abt::make<abt::FunctionCall>(std::string{name},
+                                        abt::makeSeq(std::forward<Args>(args)...));
 }
 
 inline auto makeABTConstant(sbe::value::TypeTags tag, sbe::value::Value value) {

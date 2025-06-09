@@ -111,7 +111,7 @@ StatusWith<std::unique_ptr<ExpressionWithPlaceholder>> ExpressionWithPlaceholder
 
     boost::optional<std::string> placeholder;
     if (statusWithId.getValue()) {
-        placeholder = statusWithId.getValue()->toString();
+        placeholder = std::string{*statusWithId.getValue()};
         if (!matchesPlaceholderPattern(*placeholder)) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "The top-level field name must be an alphanumeric "
@@ -134,7 +134,7 @@ void ExpressionWithPlaceholder::optimizeFilter() {
     invariant(newPlaceholder.getStatus());
 
     if (newPlaceholder.getValue()) {
-        _placeholder = newPlaceholder.getValue()->toString();
+        _placeholder = std::string{*newPlaceholder.getValue()};
         dassert(matchesPlaceholderPattern(*_placeholder));
     } else {
         _placeholder = boost::none;

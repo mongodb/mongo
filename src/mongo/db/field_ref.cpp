@@ -90,7 +90,7 @@ void FieldRef::parse(StringData path) {
     // We guarantee that accesses through getPart() will be valid while 'this' is. So we
     // keep a copy in a local sting.
 
-    _dotted = ValidatedPathString{path.toString()};
+    _dotted = ValidatedPathString{std::string{path}};
     tassert(1589700,
             "the size of the path is larger than accepted",
             _dotted.get().size() <= BSONObjMaxInternalSize);
@@ -138,7 +138,7 @@ void FieldRef::setPart(FieldIndex i, StringData part) {
         _replacements.resize(_parts.size());
     }
 
-    _replacements[i] = ValidatedPathString{part.toString()};
+    _replacements[i] = ValidatedPathString{std::string{part}};
     _parts[i] = boost::none;
 }
 
@@ -147,7 +147,7 @@ void FieldRef::appendPart(StringData part) {
         _replacements.resize(_parts.size());
     }
 
-    _replacements.push_back(ValidatedPathString{part.toString()});
+    _replacements.push_back(ValidatedPathString{std::string{part}});
     _parts.push_back(boost::none);
 }
 

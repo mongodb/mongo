@@ -426,7 +426,7 @@ boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
         Expression::parseOperand(pExpCtx.get(), obj.firstElement(), pExpCtx->variablesParseState);
 
     auto renameMap =
-        StringMap<std::string>{{metaField.value(), timeseries::kBucketMetaFieldName.toString()}};
+        StringMap<std::string>{{metaField.value(), std::string{timeseries::kBucketMetaFieldName}}};
     SubstituteFieldPathWalker walker{renameMap};
     auto mutatedExpr = expression_walker::walk<Expression>(clonedExpr.get(), &walker);
     if (!mutatedExpr) {
@@ -494,16 +494,16 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
         return {};
     }
 
-    std::string controlCountField = timeseries::kControlFieldNamePrefix.toString() +
-        timeseries::kBucketControlCountFieldName.toString();
+    std::string controlCountField = std::string{timeseries::kControlFieldNamePrefix} +
+        std::string{timeseries::kBucketControlCountFieldName};
 
     auto ifExpr = ExpressionCompare::create(
         pExpCtx,
         ExpressionCompare::CmpOp::GTE,
         ExpressionFieldPath::createPathFromString(
             pExpCtx,
-            timeseries::kControlFieldNamePrefix.toString() +
-                timeseries::kBucketControlVersionFieldName.toString(),
+            std::string{timeseries::kControlFieldNamePrefix} +
+                std::string{timeseries::kBucketControlVersionFieldName},
             pExpCtx->variablesParseState),
         ExpressionConstant::create(pExpCtx,
                                    Value(timeseries::kTimeseriesControlCompressedSortedVersion)));
@@ -547,7 +547,7 @@ std::unique_ptr<AccumulationExpression> rewriteMinMaxGroupAccm(
     if (path.getPathLength() <= 1) {
         return {};
     }
-    const auto& accFieldName = path.getFieldName(1).toString();
+    const auto& accFieldName = std::string{path.getFieldName(1)};
     if (!bucketUnpacker.providesFieldWithoutModification(accFieldName)) {
         return {};
     }
@@ -1113,7 +1113,7 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     auto& metaName = _bucketUnpacker.getMetaField().value();
     auto [addFieldsSpec, deleteStage] =
         nextTransform->extractComputedProjections(metaName,
-                                                  timeseries::kBucketMetaFieldName.toString(),
+                                                  std::string{timeseries::kBucketMetaFieldName},
                                                   BucketUnpacker::reservedBucketFieldNames);
     if (addFieldsSpec.isEmpty()) {
         return boost::none;
@@ -1650,9 +1650,9 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     // Try to insert bucket-level $sort and $group stages before we unpack any buckets. We ensure
     // that the generated $group preserves all bucket fields, so that the $_internalUnpackBucket
     // stage and the original $group stage can read them.
-    std::vector<std::string> fieldsToInclude{timeseries::kBucketMetaFieldName.toString(),
-                                             timeseries::kBucketControlFieldName.toString(),
-                                             timeseries::kBucketDataFieldName.toString()};
+    std::vector<std::string> fieldsToInclude{std::string{timeseries::kBucketMetaFieldName},
+                                             std::string{timeseries::kBucketControlFieldName},
+                                             std::string{timeseries::kBucketDataFieldName}};
     const auto& computedMetaProjFields = _bucketUnpacker.bucketSpec().computedMetaProjFields();
     std::copy(computedMetaProjFields.begin(),
               computedMetaProjFields.end(),

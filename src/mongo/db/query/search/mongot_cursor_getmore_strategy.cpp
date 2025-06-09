@@ -62,7 +62,7 @@ BSONObj MongotTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     const NamespaceString& nss,
     long long prevBatchNumReceived,
     long long totalNumReceived) {
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
 
     boost::optional<long long> docsNeeded = _getNextDocsRequested(totalNumReceived);
 

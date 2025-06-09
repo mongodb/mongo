@@ -333,7 +333,7 @@ void ObjectWrapper::Key::del(JSContext* cx, JS::HandleObject o) {
 
 std::string ObjectWrapper::Key::toString(JSContext* cx) {
     JSStringWrapper jsstr;
-    return toStringData(cx, &jsstr).toString();
+    return std::string{toStringData(cx, &jsstr)};
 }
 
 StringData ObjectWrapper::Key::toStringData(JSContext* cx, JSStringWrapper* jsstr) {

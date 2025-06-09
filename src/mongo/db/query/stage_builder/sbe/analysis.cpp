@@ -71,7 +71,7 @@ FieldEffects::FieldEffects(bool isInclusion,
         const auto& path = paths[i];
 
         bool isDottedPath = path.find('.') != std::string::npos;
-        std::string field = getTopLevelField(path).toString();
+        std::string field = std::string{getTopLevelField(path)};
 
         // Add 'field' to '_fields' if needed.
         const bool presentInEffectsMap = _effects.count(field);
@@ -676,7 +676,7 @@ void QsnAnalysis::analyzeQsNode(const QuerySolutionNode* qsNode, QsnInfo& qsnInf
             while (it.more()) {
                 auto f = getTopLevelField(it.next().fieldNameStringData());
                 if (!ixscanSet.count(f)) {
-                    auto str = f.toString();
+                    auto str = std::string{f};
                     ixscanFields.emplace_back(str);
                     ixscanSet.emplace(std::move(str));
                 }

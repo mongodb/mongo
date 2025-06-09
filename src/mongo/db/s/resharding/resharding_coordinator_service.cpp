@@ -138,7 +138,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
                auto opCtx = opCtxHolder.get();
                DBDirectClient client(opCtx);
                BSONObj result;
-               client.runCommand(nss.dbName(), BSON("create" << nss.coll().toString()), result);
+               client.runCommand(nss.dbName(), BSON("create" << nss.coll()), result);
                const auto& status = getStatusFromCommandResult(result);
                if (status.code() != ErrorCodes::NamespaceExists) {
                    uassertStatusOK(status);

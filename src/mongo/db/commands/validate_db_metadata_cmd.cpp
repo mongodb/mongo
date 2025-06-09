@@ -149,7 +149,7 @@ public:
             auto dbNames = validateCmdRequest.getDb()
                 ? std::vector<DatabaseName>{DatabaseNameUtil::deserialize(
                       validateCmdRequest.getDbName().tenantId(),
-                      validateCmdRequest.getDb()->toString(),
+                      std::string{*validateCmdRequest.getDb()},
                       validateCmdRequest.getSerializationContext())}
                 : collectionCatalog->getAllDbNames();
 

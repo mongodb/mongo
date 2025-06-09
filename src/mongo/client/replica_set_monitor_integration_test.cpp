@@ -169,7 +169,7 @@ public:
         ASSERT_OK(cmdStatus);
         const auto shards = res.data["shards"].Array();
         ASSERT_FALSE(shards.empty());
-        return shards.front().embeddedObject().getStringField("host").toString();
+        return std::string{shards.front().embeddedObject().getStringField("host")};
     }
 
 protected:

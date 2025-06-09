@@ -35,7 +35,7 @@ namespace mongo::query_shape {
 
 DistinctCmdShapeComponents::DistinctCmdShapeComponents(
     const ParsedDistinctCommand& request, const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : key(request.distinctCommandRequest->getKey().toString()),
+    : key(std::string{request.distinctCommandRequest->getKey()}),
       representativeQuery(request.query->serialize(
           SerializationOptions::kRepresentativeQueryShapeSerializeOptions)) {}
 

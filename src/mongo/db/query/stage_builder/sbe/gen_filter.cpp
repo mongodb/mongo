@@ -1041,7 +1041,7 @@ public:
                                 std::move(translatedCmpExpr));
 
         // Now generate the actual field path expression for the LHS.
-        FieldPath fp("CURRENT." + expr->fieldRef()->dottedField().toString());
+        FieldPath fp("CURRENT." + std::string{expr->fieldRef()->dottedField()});
 
         auto translatedFieldPathExpr = generateExpressionFieldPath(
             _context->state, fp, boost::none, _context->rootSlot, *_context->slots);

@@ -2961,7 +2961,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._block(optional_block_start, "}"):
                 self._writer.write_line("OpMsg::DocumentSequence documentSequence;")
                 self._writer.write_line(
-                    f"documentSequence.name = {_get_field_constant_name(field)}.toString();"
+                    f"documentSequence.name = std::string{{{_get_field_constant_name(field)}}};"
                 )
 
                 with self._block(f"for (const auto& item : {_access_member(field)}) {{", "}"):

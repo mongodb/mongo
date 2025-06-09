@@ -49,7 +49,7 @@ namespace mongo {
 NamedPipeOutput::NamedPipeOutput(const std::string&,
                                  const std::string& pipeRelativePath,
                                  bool persistPipe)
-    : _pipeAbsolutePath(kDefaultPipePath.toString() + pipeRelativePath),
+    : _pipeAbsolutePath(std::string{kDefaultPipePath} + pipeRelativePath),
       _pipe(CreateNamedPipeA(_pipeAbsolutePath.c_str(),
                              PIPE_ACCESS_OUTBOUND,
                              (PIPE_TYPE_BYTE | PIPE_WAIT),

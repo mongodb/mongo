@@ -66,7 +66,7 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& 
 }
 
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(StringData queryStr) {
-    BSONObj queryObj = fromjson(queryStr.toString());
+    BSONObj queryObj = fromjson(std::string{queryStr});
     return canonicalize(queryObj);
 }
 

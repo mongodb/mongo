@@ -46,7 +46,7 @@ BasicFTSTokenizer::BasicFTSTokenizer(const FTSLanguage* language)
 
 void BasicFTSTokenizer::reset(StringData document, Options options) {
     _options = options;
-    _document = document.toString();
+    _document = std::string{document};
     _tokenizer = std::make_unique<Tokenizer>(_language, _document);
 }
 
@@ -74,10 +74,10 @@ bool BasicFTSTokenizer::moveNext() {
         }
 
         if (_options & FTSTokenizer::kGenerateCaseSensitiveTokens) {
-            word = token.data.toString();
+            word = std::string{token.data};
         }
 
-        _stem = _stemmer.stem(word).toString();
+        _stem = std::string{_stemmer.stem(word)};
         return true;
     }
 }

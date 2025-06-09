@@ -698,7 +698,7 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     // scan phase.
     invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
                   _phase == IndexBuildPhaseEnum::kCollectionScan,
-              IndexBuildPhase_serializer(_phase).toString());
+              IndexBuildPhase_serializer(_phase));
     _phase = IndexBuildPhaseEnum::kCollectionScan;
 
     BSONObj objToIndex;
@@ -879,7 +879,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
                   _phase == IndexBuildPhaseEnum::kCollectionScan ||
                   _phase == IndexBuildPhaseEnum::kBulkLoad,
-              IndexBuildPhase_serializer(_phase).toString());
+              IndexBuildPhase_serializer(_phase));
     _phase = IndexBuildPhaseEnum::kBulkLoad;
 
     // Doesn't allow yielding when in a foreground index build.
@@ -953,7 +953,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     // already in the drain writes phase.
     invariant(_phase == IndexBuildPhaseEnum::kBulkLoad ||
                   _phase == IndexBuildPhaseEnum::kDrainWrites,
-              IndexBuildPhase_serializer(_phase).toString());
+              IndexBuildPhase_serializer(_phase));
     _phase = IndexBuildPhaseEnum::kDrainWrites;
 
     ReadSourceScope readSourceScope(opCtx, readSource);

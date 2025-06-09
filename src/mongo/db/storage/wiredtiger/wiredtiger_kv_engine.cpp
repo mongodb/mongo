@@ -565,7 +565,7 @@ std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(
         if (ident == "sizeStorer")
             continue;
 
-        all.push_back(ident.toString());
+        all.push_back(std::string{ident});
     }
 
     fassert(50663, ret == WT_NOTFOUND);
@@ -1705,7 +1705,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
             this,
             WiredTigerRecoveryUnit::get(*storage_details::getRecoveryUnit(opCtx)),
             WiredTigerRecordStore::Oplog::Params{.uuid = *uuid,
-                                                 .ident = ident.toString(),
+                                                 .ident = std::string{ident},
                                                  .engineName = _canonicalName,
                                                  .inMemory = _wtConfig.inMemory,
                                                  .oplogMaxSize = options.oplogMaxSize,
@@ -1726,7 +1726,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
         }();
         WiredTigerRecordStore::Params params{
             .baseParams{.uuid = uuid,
-                        .ident = ident.toString(),
+                        .ident = std::string{ident},
                         .engineName = _canonicalName,
                         .keyFormat = options.keyFormat,
                         .overwrite = options.allowOverwrite,
@@ -1874,7 +1874,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(Recover
     const bool isLogged = false;
     WiredTigerRecordStore::Params params;
     params.baseParams.uuid = boost::none;
-    params.baseParams.ident = ident.toString();
+    params.baseParams.ident = std::string{ident};
     params.baseParams.engineName = _canonicalName;
     params.baseParams.keyFormat = keyFormat;
     params.baseParams.overwrite = true;
@@ -1946,8 +1946,8 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
     // Use a dedicated session in an alter operation to avoid transaction issues.
     WiredTigerSession session(_connection.get());
 
-    auto uriNullTerminated = uri.toString();
-    auto configNullTerminated = config.toString();
+    auto uriNullTerminated = std::string{uri};
+    auto configNullTerminated = std::string{config};
 
     auto ret = session.alter(uriNullTerminated.c_str(), configNullTerminated.c_str());
     // WT may return EBUSY if the database contains dirty data. If we checkpoint and retry the
@@ -2171,7 +2171,7 @@ std::vector<std::string> WiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) cons
 boost::optional<boost::filesystem::path> WiredTigerKVEngine::getDataFilePathForIdent(
     StringData ident) const {
     boost::filesystem::path identPath = _path;
-    identPath /= ident.toString() + ".wt";
+    identPath /= std::string{ident} + ".wt";
 
     boost::system::error_code ec;
     if (!boost::filesystem::exists(identPath, ec)) {
@@ -2191,7 +2191,7 @@ stdx::unique_lock<stdx::mutex> WiredTigerKVEngine::_ensureIdentPath(StringData i
         StringData dir = ident.substr(0, idx);
 
         boost::filesystem::path subdir = _path;
-        subdir /= dir.toString();
+        subdir /= std::string{dir};
         if (!boost::filesystem::exists(subdir)) {
             LOGV2_DEBUG(22341, 1, "creating subdirectory: {dir}", "dir"_attr = dir);
             try {
@@ -2218,7 +2218,7 @@ bool WiredTigerKVEngine::_removeIdentDirectoryIfEmpty(StringData ident, size_t s
         return false;
     }
     boost::filesystem::path subdir = _path;
-    subdir /= ident.substr(0, separatorPos).toString();
+    subdir /= std::string{ident.substr(0, separatorPos)};
     stdx::unique_lock<stdx::mutex> directoryModifyLock(_directoryModificationMutex);
     if (!boost::filesystem::exists(subdir)) {
         return true;

@@ -51,7 +51,7 @@ public:
     explicit StringMapHashedKey(StringData sd, std::size_t hash) : _sd(sd), _hash(hash) {}
 
     explicit operator std::string() const {
-        return _sd.toString();
+        return std::string{_sd};
     }
 
     StringData key() const {

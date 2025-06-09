@@ -358,12 +358,12 @@ private:
             for (size_t i = 1; i < fieldRef.numParts(); ++i) {
                 if (fieldRef.isNumericPathComponentStrict(i)) {
                     auto prefix = fieldRef.dottedSubstring(0, i);
-                    _deps->fields.insert(prefix.toString());
+                    _deps->fields.insert(std::string{prefix});
                     return;
                 }
             }
 
-            _deps->fields.insert(path->toString());
+            _deps->fields.insert(std::string{*path});
         }
     }
 

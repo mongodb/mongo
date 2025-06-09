@@ -55,13 +55,13 @@ TEST(Tokenizer, Basic1) {
     Tokenizer i(languageEnglishV2(), "blue red green");
 
     ASSERT(i.more());
-    ASSERT_EQUALS(i.next().data.toString(), "blue");
+    ASSERT_EQUALS(i.next().data, "blue");
 
     ASSERT(i.more());
-    ASSERT_EQUALS(i.next().data.toString(), "red");
+    ASSERT_EQUALS(i.next().data, "red");
 
     ASSERT(i.more());
-    ASSERT_EQUALS(i.next().data.toString(), "green");
+    ASSERT_EQUALS(i.next().data, "green");
 
     ASSERT(!i.more());
 }
@@ -79,9 +79,9 @@ TEST(Tokenizer, Basic2) {
     ASSERT_EQUALS(Token::TEXT, c.type);
     ASSERT_EQUALS(Token::INVALID, d.type);
 
-    ASSERT_EQUALS("blue", a.data.toString());
-    ASSERT_EQUALS("-", b.data.toString());
-    ASSERT_EQUALS("red", c.data.toString());
+    ASSERT_EQUALS("blue", a.data);
+    ASSERT_EQUALS("-", b.data);
+    ASSERT_EQUALS("red", c.data);
 }
 
 TEST(Tokenizer, Basic3) {
@@ -97,9 +97,9 @@ TEST(Tokenizer, Basic3) {
     ASSERT_EQUALS(Token::TEXT, c.type);
     ASSERT_EQUALS(Token::INVALID, d.type);
 
-    ASSERT_EQUALS("blue", a.data.toString());
-    ASSERT_EQUALS("-", b.data.toString());
-    ASSERT_EQUALS("red", c.data.toString());
+    ASSERT_EQUALS("blue", a.data);
+    ASSERT_EQUALS("-", b.data);
+    ASSERT_EQUALS("red", c.data);
 
     ASSERT_EQUALS(0U, a.offset);
     ASSERT_EQUALS(5U, b.offset);
@@ -112,8 +112,8 @@ TEST(Tokenizer, Quote1English) {
     Token a = i.next();
     Token b = i.next();
 
-    ASSERT_EQUALS("eliot's", a.data.toString());
-    ASSERT_EQUALS("car", b.data.toString());
+    ASSERT_EQUALS("eliot's", a.data);
+    ASSERT_EQUALS("car", b.data);
 }
 
 TEST(Tokenizer, Quote1French) {
@@ -123,9 +123,9 @@ TEST(Tokenizer, Quote1French) {
     Token b = i.next();
     Token c = i.next();
 
-    ASSERT_EQUALS("eliot", a.data.toString());
-    ASSERT_EQUALS("s", b.data.toString());
-    ASSERT_EQUALS("car", c.data.toString());
+    ASSERT_EQUALS("eliot", a.data);
+    ASSERT_EQUALS("s", b.data);
+    ASSERT_EQUALS("car", c.data);
 }
 }  // namespace fts
 }  // namespace mongo

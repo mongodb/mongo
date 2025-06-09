@@ -280,7 +280,7 @@ public:
     }
 
     std::string help() const final {
-        return kCreateCommandHelp.toString();
+        return std::string{kCreateCommandHelp};
     }
 
     bool allowedInTransactions() const final {

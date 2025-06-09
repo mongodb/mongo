@@ -109,7 +109,7 @@ bool parseUpdateExpression(
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The array filter for identifier '" << arrayFilter.first
                               << "' was not used in the update " << updateExpr,
-                foundIdentifiers.find(arrayFilter.first.toString()) != foundIdentifiers.end());
+                foundIdentifiers.find(std::string{arrayFilter.first}) != foundIdentifiers.end());
     }
 
     return positional;

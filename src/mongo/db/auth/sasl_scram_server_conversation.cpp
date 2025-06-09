@@ -298,7 +298,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     std::string outputData = sb.str();
 
     // add client-first-message-bare and server-first-message to _authMessage
-    _authMessage = str::stream() << client_first_message_bare.toString() << "," << outputData;
+    _authMessage = str::stream() << std::string{client_first_message_bare} << "," << outputData;
 
     return std::make_tuple(false, std::move(outputData));
 }
@@ -336,7 +336,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
 
     // add client-final-message-without-proof to authMessage
     const auto client_final_message_without_proof = inputData.substr(0, last_comma);
-    _authMessage += "," + client_final_message_without_proof.toString();
+    _authMessage += "," + std::string{client_final_message_without_proof};
 
     const auto last_field = inputData.substr(last_comma + 1);
     if ((last_field.size() < 3) || !last_field.starts_with("p=")) {
@@ -381,7 +381,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
 
-    const auto decodedProof = base64::decode(proof.toString());
+    const auto decodedProof = base64::decode(std::string{proof});
     std::string serverSignature;
     const auto checkSecret =
         [&](const scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy>& secret) {

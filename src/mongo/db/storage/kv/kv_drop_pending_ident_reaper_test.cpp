@@ -213,7 +213,7 @@ Status KVEngineMock::dropIdent(RecoveryUnit& ru,
                                const StorageEngine::DropIdentCallback& onDrop) {
     auto status = dropIdentFn(ru, ident);
     if (status.isOK()) {
-        droppedIdents.push_back(ident.toString());
+        droppedIdents.push_back(std::string{ident});
     }
     return status;
 }

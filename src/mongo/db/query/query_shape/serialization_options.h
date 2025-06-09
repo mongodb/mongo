@@ -105,7 +105,7 @@ struct SerializationOptions {
         if (transformIdentifiers) {
             return transformIdentifiersCallback(str);
         }
-        return str.toString();
+        return std::string{str};
     }
 
     std::string serializeFieldPath(const FieldPath& path) const {

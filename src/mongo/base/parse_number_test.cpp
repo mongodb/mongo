@@ -290,7 +290,7 @@ PARSE_TEST(TestSkipLeadingWhitespace) {
         }
 
         for (StringData ws : whitespaces) {
-            std::string withWhitespace = ws.toString() + numStr;
+            std::string withWhitespace = std::string{ws} + numStr;
             if (shouldParse) {
                 ASSERT_PARSES_WITH_PARSER(NumberType, withWhitespace, skipWs, expected);
             } else {
@@ -338,7 +338,7 @@ PARSE_TEST(TestEndOfNum) {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
         for (StringData& suffix : suffixes) {
-            std::string spec = numStr.toString() + suffix;
+            std::string spec = std::string{numStr} + suffix;
             char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().allowTrailingText()(spec, &actual, &numEnd);
@@ -400,7 +400,7 @@ PARSE_TEST(TestSkipLeadingWsAndEndptr) {
             ASSERT_EQ(ErrorCodes::FailedToParse, parsed);
         }
         for (StringData& prefix : whitespaces) {
-            std::string spec = prefix.toString() + numStr;
+            std::string spec = std::string{prefix} + numStr;
             char* numEnd = nullptr;
             NumberType actual;
             parsed = NumberParser().skipWhitespace()(spec, &actual, &numEnd);

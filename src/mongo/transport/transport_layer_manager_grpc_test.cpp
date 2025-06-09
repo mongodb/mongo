@@ -388,8 +388,8 @@ public:
                                      grpc::CommandServiceTestFixtures::kClientCertificateKeyFile,
                                      "tlm_gprc");
 
-        setTLSCertificatePaths(_tempDir->getCAFile().toString(),
-                               _tempDir->getPEMKeyFile().toString());
+        setTLSCertificatePaths(std::string{_tempDir->getCAFile()},
+                               std::string{_tempDir->getPEMKeyFile()});
         AsioGRPCTransportLayerManagerTest::setUp();
 
         setServerCallback([](Session& session) {
@@ -452,10 +452,10 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) 
 
         // Overwrite the tmp files to hold new certs.
         boost::filesystem::copy_file(kEcdsaCAFile,
-                                     getFilePathCA().toString(),
+                                     std::string{getFilePathCA()},
                                      boost::filesystem::copy_options::overwrite_existing);
         boost::filesystem::copy_file(kEcdsaPEMFile,
-                                     getFilePathPEM().toString(),
+                                     std::string{getFilePathPEM()},
                                      boost::filesystem::copy_options::overwrite_existing);
 
         ASSERT_DOES_NOT_THROW(SSLManagerCoordinator::get()->rotate());
@@ -478,7 +478,7 @@ TEST_F(RotateCertificatesTransportLayerManagerTest,
         ASSERT_GRPC_STUB_CONNECTED(stub);
         ASSERT_ASIO_ECHO_SUCCEEDS(getAsioTransportLayer());
 
-        boost::filesystem::resize_file(getFilePathCA().toString(), 0);
+        boost::filesystem::resize_file(std::string{getFilePathCA()}, 0);
 
         ASSERT_THROWS_CODE(SSLManagerCoordinator::get()->rotate(),
                            DBException,
@@ -507,7 +507,7 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesUsesOldCer
 
         // Overwrite the tmp files to hold new, invalid certs.
         boost::filesystem::copy_file(kInvalidPEMFile,
-                                     getFilePathPEM().toString(),
+                                     std::string{getFilePathPEM()},
                                      boost::filesystem::copy_options::overwrite_existing);
 
         ASSERT_THROWS_CODE(SSLManagerCoordinator::get()->rotate(),

@@ -79,7 +79,7 @@ public:
             expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies());
         return create(projection, expCtx, specifiedName);
     } catch (DBException& ex) {
-        ex.addContext("Invalid " + specifiedName.toString());
+        ex.addContext("Invalid " + std::string{specifiedName});
         throw;
     }
 

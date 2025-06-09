@@ -94,7 +94,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parseShiftArgs(BSONObj obj,
             offsetFound);
 
     return make_intrusive<ExpressionShift>(
-        expCtx, accName.toString(), std::move(output), std::move(defaultVal), offset);
+        expCtx, std::string{accName}, std::move(output), std::move(defaultVal), offset);
 }
 
 boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,

@@ -96,7 +96,7 @@ struct TestCase {
     TestCase(StringData contents_,
              std::initializer_list<std::string> expected_,
              FailureMode mode_ = FailureMode::Success)
-        : fileContents(contents_.toString()), expected(expected_), mode(mode_) {}
+        : fileContents(std::string{contents_}), expected(expected_), mode(mode_) {}
 
     std::string fileContents;
     std::vector<std::string> expected;
@@ -155,7 +155,7 @@ std::initializer_list<TestCase> testCases = {
     // These two keys should pass the security file parsing, but fail loading them as
     // security keys because they are too short or two long
     {"abc", {"abc"}, TestCase::FailureMode::SecurityKeyConstraint},
-    {longKeyMaker(), {longKeyMaker().toString()}, TestCase::FailureMode::SecurityKeyConstraint}};
+    {longKeyMaker(), {std::string{longKeyMaker()}}, TestCase::FailureMode::SecurityKeyConstraint}};
 
 TEST(SecurityFile, Test) {
     for (const auto& testCase : testCases) {

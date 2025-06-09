@@ -513,7 +513,7 @@ inline StringData Value::getRawData() const {
 
 inline std::string Value::getString() const {
     MONGO_verify(getType() == BSONType::string);
-    return _storage.getString().toString();
+    return std::string{_storage.getString()};
 }
 
 inline OID Value::getOid() const {
@@ -550,11 +550,11 @@ inline const char* Value::getRegexFlags() const {
 
 inline std::string Value::getSymbol() const {
     MONGO_verify(getType() == BSONType::symbol);
-    return _storage.getString().toString();
+    return std::string{_storage.getString()};
 }
 inline std::string Value::getCode() const {
     MONGO_verify(getType() == BSONType::code);
-    return _storage.getString().toString();
+    return std::string{_storage.getString()};
 }
 
 inline int Value::getInt() const {

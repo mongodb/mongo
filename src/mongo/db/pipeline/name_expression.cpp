@@ -59,6 +59,6 @@ std::string NameExpression::evaluate(ExpressionContext* expCtx, const Document& 
             fmt::format("Expected string, but got {}", typeName(value.getType())),
             value.getType() == BSONType::string);
 
-    return value.getStringData().toString();
+    return std::string{value.getStringData()};
 }
 }  // namespace mongo

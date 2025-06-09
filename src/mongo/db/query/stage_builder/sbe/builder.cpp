@@ -514,7 +514,7 @@ void addPrefixesToSet(StringData str, StringDataSet& s) {
 
 void addPrefixesToSet(StringData str, StringSet& s) {
     for (;;) {
-        auto [_, inserted] = s.insert(str.toString());
+        auto [_, inserted] = s.insert(std::string{str});
         if (!inserted) {
             break;
         }
@@ -930,7 +930,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
 
         if (doClusteredCollectionScanSbe) {
             _data->clusterKeyFieldName =
-                clustered_util::getClusterKeyFieldName(*(csn->clusteredIndex)).toString();
+                std::string{clustered_util::getClusterKeyFieldName(*(csn->clusteredIndex))};
 
             const auto& collection = _collections.getMainCollection();
             const CollatorInterface* ccCollator = collection->getDefaultCollator();
@@ -2745,9 +2745,9 @@ std::unique_ptr<ProjectionPlan> SlotBasedStageBuilder::makeProjectionPlan(
     StringSet resultFieldSet;
     for (const auto& p : resultPaths) {
         auto f = getTopLevelField(p);
-        auto [_, inserted] = resultFieldSet.insert(f.toString());
+        auto [_, inserted] = resultFieldSet.insert(std::string{f});
         if (inserted) {
-            resultFields.emplace_back(f.toString());
+            resultFields.emplace_back(std::string{f});
         }
     }
 
@@ -2850,9 +2850,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
     StringSet resultFieldSet;
     for (const auto& p : plan->resultPaths) {
         auto f = getTopLevelField(p);
-        auto [_, inserted] = resultFieldSet.insert(f.toString());
+        auto [_, inserted] = resultFieldSet.insert(std::string{f});
         if (inserted) {
-            resultFields.emplace_back(f.toString());
+            resultFields.emplace_back(std::string{f});
         }
     }
 
@@ -4794,23 +4794,23 @@ SlotBasedStageBuilder::buildSearchMetadataSlots() {
     // If Search in SBE is used, we should only build these metadata slots if the metadata type is
     // requested by the pipeline. However, since Search in SBE is currently not in use, SERVER-99589
     // changed it to always build these slots, for simplicity of a refactor.
-    metadataNames.push_back(Document::metaFieldSearchScore.toString());
+    metadataNames.push_back(std::string{Document::metaFieldSearchScore});
     metadataSlots.push_back(_slotIdGenerator.generate());
     _data->metadataSlots.searchScoreSlot = metadataSlots.back();
 
-    metadataNames.push_back(Document::metaFieldSearchHighlights.toString());
+    metadataNames.push_back(std::string{Document::metaFieldSearchHighlights});
     metadataSlots.push_back(_slotIdGenerator.generate());
     _data->metadataSlots.searchHighlightsSlot = metadataSlots.back();
 
-    metadataNames.push_back(Document::metaFieldSearchScoreDetails.toString());
+    metadataNames.push_back(std::string{Document::metaFieldSearchScoreDetails});
     metadataSlots.push_back(_slotIdGenerator.generate());
     _data->metadataSlots.searchDetailsSlot = metadataSlots.back();
 
-    metadataNames.push_back(Document::metaFieldSearchSortValues.toString());
+    metadataNames.push_back(std::string{Document::metaFieldSearchSortValues});
     metadataSlots.push_back(_slotIdGenerator.generate());
     _data->metadataSlots.searchSortValuesSlot = metadataSlots.back();
 
-    metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
+    metadataNames.push_back(std::string{Document::metaFieldSearchSequenceToken});
     metadataSlots.push_back(_slotIdGenerator.generate());
     _data->metadataSlots.searchSequenceToken = metadataSlots.back();
 
@@ -4939,7 +4939,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const Quer
     auto [idxScanStage, idxOutputs] =
         generateSingleIntervalIndexScan(_state,
                                         collection,
-                                        kIdIndexName.toString(),
+                                        std::string{kIdIndexName},
                                         indexDescriptor->keyPattern(),
                                         true /* forward */,
                                         makeNewKeyFunc(key_string::Discriminator::kExclusiveBefore),

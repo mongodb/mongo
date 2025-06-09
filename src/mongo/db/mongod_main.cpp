@@ -1237,7 +1237,7 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
  * and can be found in the /proc filesystem.
  */
 Status shutdownProcessByDBPathPidFile(const std::string& dbpath) {
-    auto pidfile = (boost::filesystem::path(dbpath) / kLockFileBasename.toString()).string();
+    auto pidfile = (boost::filesystem::path(dbpath) / std::string{kLockFileBasename}).string();
     if (!boost::filesystem::exists(pidfile)) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "There doesn't seem to be a server running with dbpath: "

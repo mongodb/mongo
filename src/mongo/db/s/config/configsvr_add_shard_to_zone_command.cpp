@@ -78,7 +78,7 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->addShardToZone(
-                opCtx, getShard().toString(), request().getZone().toString()));
+                opCtx, std::string{getShard()}, std::string{request().getZone()}));
         }
 
     private:

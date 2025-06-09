@@ -342,7 +342,7 @@ public:
             invariant(_cursor);
             invariant(opCtx);
             _operationUsingCursor = opCtx;
-            _commandUsingCursor = commandName.toString();
+            _commandUsingCursor = std::string{commandName};
             return ClusterClientCursorGuard(opCtx, std::move(_cursor));
         }
 

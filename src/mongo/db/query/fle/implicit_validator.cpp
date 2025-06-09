@@ -91,7 +91,7 @@ std::unique_ptr<Node> buildTreeFromEncryptedFieldPaths(
                 // the rest of the path forms a new branch; append nodes until the last part
                 for (; i < fieldPath.numParts(); i++) {
                     level->subobjs.push_back(
-                        {fieldPath.getPart(i).toString(), boost::none, std::vector<Node>()});
+                        {std::string{fieldPath.getPart(i)}, boost::none, std::vector<Node>()});
                     level = &(level->subobjs.back());
                 }
                 if (field.getBsonType().has_value()) {

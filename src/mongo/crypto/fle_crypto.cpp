@@ -1256,7 +1256,7 @@ void parseAndVerifyInsertUpdatePayload(std::vector<EDCServerPayloadInfo>* pField
                                        EncryptedBinDataType type,
                                        ConstDataRange subCdr) {
     EDCServerPayloadInfo payloadInfo;
-    payloadInfo.fieldPathName = fieldPath.toString();
+    payloadInfo.fieldPathName = std::string{fieldPath};
 
     uassert(7291901,
             "Encountered a Queryable Encryption insert/update payload type that is no "
@@ -1441,20 +1441,20 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValueV2 ||
         encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValueV2 ||
         encryptedTypeBinding == EncryptedBinDataType::kFLE2TextIndexedValue) {
-        pFields->push_back({cdr, fieldPath.toString()});
+        pFields->push_back({cdr, std::string{fieldPath}});
     }
 }
 
 void collectFieldValidationInfo(stdx::unordered_map<std::string, ConstDataRange>* pFields,
                                 ConstDataRange cdr,
                                 StringData fieldPath) {
-    pFields->insert({fieldPath.toString(), cdr});
+    pFields->insert({std::string{fieldPath}, cdr});
 }
 
 stdx::unordered_map<std::string, EncryptedField> toFieldMap(const EncryptedFieldConfig& efc) {
     stdx::unordered_map<std::string, EncryptedField> fields;
     for (const auto& field : efc.getFields()) {
-        fields.insert({field.getPath().toString(), field});
+        fields.insert({std::string{field.getPath()}, field});
     }
 
     return fields;
@@ -2855,7 +2855,7 @@ ECOCCompactionDocumentV2 ECOCCompactionDocumentV2::parseAndDecrypt(const BSONObj
     auto keys = StateCollectionTokensV2::Encrypted(ecocDoc.getValue()).decrypt(token);
 
     ECOCCompactionDocumentV2 ret;
-    ret.fieldName = ecocDoc.getFieldName().toString();
+    ret.fieldName = std::string{ecocDoc.getFieldName()};
     // Copy the ESC key over to prevent a segfault when the keys object gets deleted.
     ret.esc = ESCDerivedFromDataTokenAndContentionFactorToken(
         keys.getESCDerivedFromDataTokenAndContentionFactorToken());
@@ -3651,7 +3651,7 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
     stdx::unordered_set<std::string> indexedFields;
     for (const auto& f : efc.getFields()) {
         if (f.getQueries().has_value()) {
-            indexedFields.insert(f.getPath().toString());
+            indexedFields.insert(std::string{f.getPath()});
         }
     }
 
@@ -3662,7 +3662,7 @@ void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,
             uassert(6373601,
                     str::stream() << "Field '" << fieldPath
                                   << "' is encrypted, but absent from schema",
-                    indexedFields.contains(fieldPath.toString()));
+                    indexedFields.contains(std::string{fieldPath}));
         }
     });
 
@@ -4240,7 +4240,7 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
         compactionTokens.end(),
         std::back_inserter(parsed),
         [](const auto& token) {
-            auto fieldName = token.fieldNameStringData().toString();
+            auto fieldName = std::string{token.fieldNameStringData()};
 
             if (token.isBinData(BinDataType::BinDataGeneral)) {
                 auto ecoc = ECOCToken::parse(token._binDataVector());

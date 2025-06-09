@@ -131,7 +131,7 @@ Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptio
 DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(
     DepsTracker* deps) const {
     for (const auto& skElem : _reshardingKey.toBSON()) {
-        deps->fields.insert(skElem.fieldNameStringData().toString());
+        deps->fields.insert(std::string{skElem.fieldNameStringData()});
     }
 
     return DepsTracker::State::SEE_NEXT;

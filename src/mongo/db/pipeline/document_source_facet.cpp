@@ -113,7 +113,7 @@ vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& ele
             rawPipeline.push_back(subPipeElem.embeddedObject());
         }
 
-        rawFacetPipelines.emplace_back(facetName.toString(), std::move(rawPipeline));
+        rawFacetPipelines.emplace_back(std::string{facetName}, std::move(rawPipeline));
     }
     return rawFacetPipelines;
 }

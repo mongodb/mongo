@@ -59,7 +59,7 @@ public:
         ss << "create,";
         ss << extraStrings;
         std::string config = ss.str();
-        int ret = wiredtiger_open(dbpath.toString().c_str(), nullptr, config.c_str(), &_conn);
+        int ret = wiredtiger_open(std::string{dbpath}.c_str(), nullptr, config.c_str(), &_conn);
         invariant(wtRCToStatus(ret, nullptr));
     }
     ~WiredTigerConnectionTest() {

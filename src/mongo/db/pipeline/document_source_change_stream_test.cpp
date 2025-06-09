@@ -1697,7 +1697,7 @@ TEST_F(ChangeStreamStageTest, TransformReshardBlockingWrites) {
     auto reshardingUuid = UUID::gen();
 
     ReshardBlockingWritesChangeEventO2Field o2Field{
-        nss, reshardingUuid, resharding::kReshardFinalOpLogType.toString()};
+        nss, reshardingUuid, std::string{resharding::kReshardFinalOpLogType}};
     auto reshardingBlockingWrites = makeOplogEntry(OpTypeEnum::kNoop,
                                                    nss,
                                                    BSONObj(),

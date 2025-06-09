@@ -91,19 +91,19 @@ void DiagnosticDataCollectionDirectoryPathServerParameter::append(
 Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(
     StringData str, const boost::optional<TenantId>&) {
     if (!hasGlobalServiceContext()) {
-        ftdcDirectoryPathParameter = str.toString();
+        ftdcDirectoryPathParameter = std::string{str};
         return Status::OK();
     }
 
     FTDCController* controller = FTDCController::get(getGlobalServiceContext());
     if (controller) {
-        Status s = controller->setDirectory(str.toString());
+        Status s = controller->setDirectory(std::string{str});
         if (!s.isOK()) {
             return s;
         }
     }
 
-    ftdcDirectoryPathParameter = str.toString();
+    ftdcDirectoryPathParameter = std::string{str};
     return Status::OK();
 }
 
@@ -239,7 +239,7 @@ FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringDat
                                                                        StringData name,
                                                                        const DatabaseName& db,
                                                                        BSONObj cmdObj)
-    : _name(name.toString()),
+    : _name(std::string{name}),
       _request(OpMsgRequestBuilder::create(
           boost::none /* TODO SERVER-74464 investigate if tenant-aware. */,
           db,
@@ -345,7 +345,7 @@ public:
     }
 
     std::string name() const final {
-        return kName.toString();
+        return std::string{kName};
     }
 
 private:

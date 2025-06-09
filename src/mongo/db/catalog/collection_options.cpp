@@ -364,7 +364,7 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
         options.indexOptionDefaults = std::move(*indexOptionDefaults);
     }
     if (auto viewOn = cmd.getViewOn()) {
-        options.viewOn = viewOn->toString();
+        options.viewOn = std::string{*viewOn};
     }
     if (auto pipeline = cmd.getPipeline()) {
         BSONArrayBuilder builder;

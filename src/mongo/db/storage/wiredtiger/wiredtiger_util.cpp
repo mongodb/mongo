@@ -68,7 +68,7 @@ const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
 
 StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
-    std::string strUri = uri.toString();
+    std::string strUri = std::string{uri};
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);
     if (ret == WT_NOTFOUND) {
@@ -108,7 +108,7 @@ using std::string;
 
 std::string WiredTigerUtil::buildTableUri(StringData ident) {
     invariant(ident.find(kTableUriPrefix) == string::npos);
-    return kTableUriPrefix + ident.toString();
+    return kTableUriPrefix + std::string{ident};
 }
 
 void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerSession& session,
@@ -850,7 +850,7 @@ void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
 
         validationResult.addWarning(fmt::format(
             "Failed to check WT table logging setting for {}",
-            indexName ? fmt::format("index '{}'", indexName->toString()) : "collection"));
+            indexName ? fmt::format("index '{}'", std::string{*indexName}) : "collection"));
 
         return;
     }
@@ -863,7 +863,7 @@ void WiredTigerUtil::validateTableLogging(WiredTigerSession& session,
 
         validationResult.addError(fmt::format(
             "Detected incorrect table logging setting for {}",
-            indexName ? fmt::format("index '{}'", indexName->toString()) : "collection"));
+            indexName ? fmt::format("index '{}'", std::string{*indexName}) : "collection"));
     }
 }
 
@@ -1113,10 +1113,11 @@ Status WiredTigerUtil::exportTableToBSON(WiredTigerSession& session,
                 continue;
             }
 
-            BSONObjBuilder*& measurementsSubObj = measurementsMappedByCategory[category.toString()];
+            BSONObjBuilder*& measurementsSubObj =
+                measurementsMappedByCategory[std::string{category}];
             if (!measurementsSubObj)
                 measurementsSubObj = new BSONObjBuilder();
-            measurementsSubObj->appendNumber(str::ltrim(measurement.toString()), value);
+            measurementsSubObj->appendNumber(str::ltrim(std::string{measurement}), value);
         }
     }
 

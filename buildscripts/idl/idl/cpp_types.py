@@ -251,7 +251,7 @@ class _CppTypeView(CppTypeBase):
 
     def get_transform_to_storage_type(self, expression):
         # type: (str) -> Optional[str]
-        return f"{expression}.toString()"
+        return f"std::string{{{expression}}}"
 
 
 class _CppTypeVector(CppTypeBase):

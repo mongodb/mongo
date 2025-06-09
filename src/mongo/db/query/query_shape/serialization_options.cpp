@@ -514,7 +514,7 @@ std::string SerializationOptions::serializeFieldPathFromString(StringData path) 
             return serializeFieldPath("invalidFieldPathPlaceholder");
         }
     }
-    return path.toString();
+    return std::string{path};
 }
 
 bool SerializationOptions::isDefaultSerialization() const {

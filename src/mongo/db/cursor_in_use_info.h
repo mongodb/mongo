@@ -46,7 +46,7 @@ class CursorInUseInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::CursorInUse;
 
-    CursorInUseInfo(StringData commandName) : _commandName(commandName.toString()) {}
+    CursorInUseInfo(StringData commandName) : _commandName(std::string{commandName}) {}
 
     StringData commandName() const {
         return _commandName;

@@ -198,7 +198,7 @@ public:
         if (renamesFound == 1u) {
             // There is an applicable rename. Modify the path of this expression to use the new
             // name.
-            return {true, rewrittenPathRef.dottedField().toString()};
+            return {true, std::string{rewrittenPathRef.dottedField()}};
         }
 
         return {true, boost::none};

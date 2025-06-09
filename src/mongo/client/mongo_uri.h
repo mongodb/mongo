@@ -286,7 +286,7 @@ public:
         out._connectString = ConnectionString(std::move(hostAndPort));
 
         if (!out.getAppName()) {
-            out._options["appName"] = applicationName.toString();
+            out._options["appName"] = std::string{applicationName};
         }
 
         return out;

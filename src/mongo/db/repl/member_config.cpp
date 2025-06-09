@@ -65,7 +65,7 @@ MemberConfig MemberConfig::parseFromBSON(const BSONObj& mcfg) {
 MemberConfig::MemberConfig(const BSONObj& mcfg) {
     parseProtected(IDLParserContext("MemberConfig"), mcfg);
 
-    std::string hostAndPortString = getHost().toString();
+    std::string hostAndPortString = std::string{getHost()};
     boost::trim(hostAndPortString);
     HostAndPort host;
     uassertStatusOK(host.initialize(hostAndPortString));

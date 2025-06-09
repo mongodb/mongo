@@ -70,7 +70,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
                     return projection_executor::AddFieldsProjectionExecutor::create(expCtx,
                                                                                     addFieldsSpec);
                 } catch (DBException& ex) {
-                    ex.addContext("Invalid " + userSpecifiedName.toString());
+                    ex.addContext("Invalid " + std::string{userSpecifiedName});
                     throw;
                 }
             }(),

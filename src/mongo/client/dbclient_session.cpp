@@ -220,7 +220,7 @@ executor::RemoteCommandResponse initWireVersion(
         helloObj["saslSupportedMechs"].type() == BSONType::array) {
         auto array = helloObj["saslSupportedMechs"].Array();
         for (const auto& elem : array) {
-            saslMechsForAuth->push_back(elem.checkAndGetStringData().toString());
+            saslMechsForAuth->push_back(std::string{elem.checkAndGetStringData()});
         }
     }
 
@@ -256,7 +256,7 @@ void DBClientSession::connect(const HostAndPort& serverAddress,
     // 'applicationName' parameter, since the memory that it views within _applicationName will be
     // freed. Do not reference the 'applicationName' parameter after this line. If you need to
     // access the application name, do it through the _applicationName member.
-    _applicationName = applicationName.toString();
+    _applicationName = std::string{applicationName};
 
     auto speculativeAuthType = auth::SpeculativeAuthType::kNone;
     std::shared_ptr<SaslClientSession> saslClientSession;

@@ -64,7 +64,7 @@ void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
 
 void ResourceCatalog::add(ResourceId id, DDLResourceName resourceName) {
     invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
-    _add(id, StringData(resourceName).toString());
+    _add(id, std::string{StringData(resourceName)});
 }
 
 void ResourceCatalog::_add(ResourceId id, std::string name) {
@@ -84,7 +84,7 @@ void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
 
 void ResourceCatalog::remove(ResourceId id, DDLResourceName resourceName) {
     invariant(id.getType() == RESOURCE_DDL_DATABASE || id.getType() == RESOURCE_DDL_COLLECTION);
-    _remove(id, StringData(resourceName).toString());
+    _remove(id, std::string{StringData(resourceName)});
 }
 
 ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {

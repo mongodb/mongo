@@ -106,7 +106,7 @@ public:
         if (!unittest::shouldUseGRPCEgress()) {
             ConnectionPool::Options cpOptions{};
             cpOptions.minConnections = 0;
-            net = makeNetworkInterface(name.toString(), nullptr, nullptr, std::move(cpOptions));
+            net = makeNetworkInterface(std::string{name}, nullptr, nullptr, std::move(cpOptions));
         } else {
 #ifdef MONGO_CONFIG_GRPC
             net = makeNetworkInterfaceGRPC(kNetworkInterfaceGRPCInstanceName);
@@ -588,7 +588,7 @@ TEST_F(TaskExecutorFixture, FastExhaustResponses) {
     SingleProducerSingleConsumerQueue<RemoteCommandResponse> queue;
 
     auto cursorId = cursorReply.getCursor()->getCursorId();
-    GetMoreCommandRequest getMore(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMore(cursorId, std::string{nss.coll()});
     getMore.setDbName(nss.dbName());
     getMore.setBatchSize(1);
     RemoteCommandRequest getMoreRequest(getServer(), nss.dbName(), getMore.toBSON(), opCtx.get());

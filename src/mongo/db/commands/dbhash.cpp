@@ -278,14 +278,14 @@ public:
             }
 
             if (desiredCollections.size() > 0 &&
-                desiredCollections.count(collNss.coll().toString()) == 0)
+                desiredCollections.count(std::string{collNss.coll()}) == 0)
                 return true;
 
             if (collection->isCapped()) {
-                cappedCollectionSet.insert(collNss.coll().toString());
+                cappedCollectionSet.insert(std::string{collNss.coll()});
             }
 
-            collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
+            collectionToUUIDMap.emplace(std::string{collNss.coll()}, collection->uuid());
 
             // Compute the hash for this collection.
             // TODO(SERVER-103401): Investigate usage validity of
@@ -293,7 +293,7 @@ public:
             std::string hash = _hashCollection(
                 opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), excludeRecordIds);
 
-            collectionToHashMap[collNss.coll().toString()] = hash;
+            collectionToHashMap[std::string{collNss.coll()}] = hash;
 
             return true;
         };

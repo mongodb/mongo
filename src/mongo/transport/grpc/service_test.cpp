@@ -314,16 +314,16 @@ TEST_F(CommandServiceTest, ClientCancellation) {
 
 TEST_F(CommandServiceTest, TooLowWireVersionIsRejected) {
     ContextInitializerType initContext = [](auto& ctx) {
-        ctx.AddMetadata(util::constants::kWireVersionKey.toString(), "-1");
-        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(std::string{util::constants::kWireVersionKey}, "-1");
+        ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
     };
     runMetadataValidationTest(::grpc::StatusCode::FAILED_PRECONDITION, initContext);
 }
 
 TEST_F(CommandServiceTest, InvalidWireVersionIsRejected) {
     ContextInitializerType initContext = [](auto& ctx) {
-        ctx.AddMetadata(util::constants::kWireVersionKey.toString(), "foo");
-        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(std::string{util::constants::kWireVersionKey}, "foo");
+        ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
     };
     runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, initContext);
 }
@@ -331,14 +331,14 @@ TEST_F(CommandServiceTest, InvalidWireVersionIsRejected) {
 TEST_F(CommandServiceTest, InvalidClientIdIsRejected) {
     ContextInitializerType initContext = [](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientIdKey.toString(), "not a valid UUID");
+        ctx.AddMetadata(std::string{util::constants::kClientIdKey}, "not a valid UUID");
     };
     runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, initContext);
 }
 
 TEST_F(CommandServiceTest, MissingWireVersionIsRejected) {
     ContextInitializerType initContext = [](auto& ctx) {
-        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
     };
     runMetadataValidationTest(::grpc::StatusCode::FAILED_PRECONDITION, initContext);
 }
@@ -346,7 +346,7 @@ TEST_F(CommandServiceTest, MissingWireVersionIsRejected) {
 TEST_F(CommandServiceTest, ClientMetadataDocumentIsOptional) {
     ContextInitializerType initContext = [](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientIdKey.toString(), UUID::gen().toString());
+        ctx.AddMetadata(std::string{util::constants::kClientIdKey}, UUID::gen().toString());
     };
     runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
 }
@@ -366,7 +366,7 @@ TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
     // returning an error in such cases.
     ContextInitializerType initContext = [](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientMetadataKey.toString(), "notvalidbase64:l;;?");
+        ctx.AddMetadata(std::string{util::constants::kClientMetadataKey}, "notvalidbase64:l;;?");
     };
     runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
 }
@@ -374,7 +374,8 @@ TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
 TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
     ContextInitializerType initContext = [](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientMetadataKey.toString(), base64::encode("Not BSON"));
+        ctx.AddMetadata(std::string{util::constants::kClientMetadataKey},
+                        base64::encode("Not BSON"));
     };
     runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
 }
@@ -391,7 +392,7 @@ TEST_F(CommandServiceTest, NewClientsAreLogged) {
     ContextInitializerType initContext = [clientId = UUID::gen().toString()](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
         CommandServiceTestFixtures::addClientMetadataDocument(ctx);
-        ctx.AddMetadata(util::constants::kClientIdKey.toString(), clientId);
+        ctx.AddMetadata(std::string{util::constants::kClientIdKey}, clientId);
     };
     runMetadataLogTest(initContext,
                        5,  // nStreamsToCreate
@@ -413,7 +414,7 @@ TEST_F(CommandServiceTest, OmittedClientIdIsLogged) {
 TEST_F(CommandServiceTest, NoLogsForMissingMetadataDocument) {
     ContextInitializerType initContext = [clientId = UUID::gen().toString()](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientIdKey.toString(), clientId);
+        ctx.AddMetadata(std::string{util::constants::kClientIdKey}, clientId);
     };
     runMetadataLogTest(initContext,
                        7,  // nStreamsToCreate
@@ -509,10 +510,10 @@ TEST_F(CommandServiceTest, AuthTokenHandling) {
         [&](const HostAndPort& addr, bool useAuth, boost::optional<std::string> authToken) {
             ::grpc::ClientContext ctx;
             auto stub = CommandServiceTestFixtures::makeStub(addr);
-            ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
+            ctx.AddMetadata(std::string{util::constants::kWireVersionKey},
                             std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
             if (authToken) {
-                ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), *authToken);
+                ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, *authToken);
             }
             auto stream = useAuth ? stub.authenticatedCommandStream(&ctx)
                                   : stub.unauthenticatedCommandStream(&ctx);
@@ -558,8 +559,8 @@ TEST_F(CommandServiceTest, AuthTokenHandling) {
 TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
     ClientCallbackType clientCallback = [&](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
-        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
-        ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
+        ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
+        ctx.AddMetadata(std::string{util::constants::kWireVersionKey},
                         std::to_string(WireVersion::WIRE_VERSION_50));
 
         auto stream = streamFactory(ctx, stub);

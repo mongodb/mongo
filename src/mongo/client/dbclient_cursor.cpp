@@ -126,7 +126,7 @@ Message DBClientCursor::assembleInit() {
 
 Message DBClientCursor::assembleGetMore() {
     tassert(9279706, "CursorId is unexpectedly zero", _cursorId);
-    auto getMoreRequest = GetMoreCommandRequest(_cursorId, _ns.coll().toString());
+    auto getMoreRequest = GetMoreCommandRequest(_cursorId, std::string{_ns.coll()});
     getMoreRequest.setBatchSize(
         boost::make_optional(_batchSize != 0, static_cast<int64_t>(_batchSize)));
     getMoreRequest.setMaxTimeMS(boost::make_optional(

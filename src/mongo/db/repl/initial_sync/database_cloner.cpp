@@ -112,7 +112,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         }
         LOGV2_DEBUG(21147, 2, "Allowing cloning of collectionInfo", "info"_attr = info);
 
-        bool isDuplicate = seen.insert(result.getName().toString()).second;
+        bool isDuplicate = seen.insert(std::string{result.getName()}).second;
         uassert(51005,
                 str::stream() << "collection info contains duplicate collection name "
                               << "'" << result.getName() << "': " << info,

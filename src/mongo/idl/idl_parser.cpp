@@ -294,7 +294,7 @@ std::vector<std::string> transformVector(const std::vector<StringData>& input) {
     output.reserve(input.size());
 
     std::transform(begin(input), end(input), std::back_inserter(output), [](auto&& str) {
-        return str.toString();
+        return std::string{str};
     });
 
     return output;

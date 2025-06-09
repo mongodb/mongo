@@ -315,7 +315,7 @@ public:
     void insertDonorFinalEventNoopOplogEntry(const NamespaceString& sourceNss) {
         auto msg = BSON("msg" << "Writes to {} are temporarily blocked for resharding");
         ReshardBlockingWritesChangeEventO2Field o2Field{
-            sourceNss, UUID::gen(), resharding::kReshardFinalOpLogType.toString()};
+            sourceNss, UUID::gen(), std::string{resharding::kReshardFinalOpLogType}};
         insertNoopOplogEntry(sourceNss, msg, o2Field.toBSON());
     }
 

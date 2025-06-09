@@ -384,7 +384,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
     for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
-        targetedShards.emplace_back(remoteCursor->getShardId().toString());
+        targetedShards.emplace_back(std::string{remoteCursor->getShardId()});
     }
 
     sharded_agg_helpers::partitionAndAddMergeCursorsSource(
@@ -883,7 +883,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                 "pipeline was not split, but more than one remote cursor is present",
                 shardDispatchResults.remoteCursors.size() == 1);
         auto&& remoteCursor = std::move(shardDispatchResults.remoteCursors.front());
-        const auto shardId = remoteCursor->getShardId().toString();
+        const auto shardId = std::string{remoteCursor->getShardId()};
         const auto reply = uassertStatusOK(storePossibleCursor(opCtx,
                                                                namespaces.requestedNss,
                                                                std::move(remoteCursor),

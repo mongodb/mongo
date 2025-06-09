@@ -170,7 +170,7 @@ private:
             for (const auto& fieldInfo : _pathAmbiguity) {
                 auto fieldVal = _fieldRef.getPart(fieldNum++);
                 disambiguatedPath.push_back(fieldInfo.fieldType == BSONType::numberInt
-                                                ? Value(std::stoi(fieldVal.toString()))
+                                                ? Value(std::stoi(std::string{fieldVal}))
                                                 : Value(fieldVal));
             }
             // Add the vector of individual fields into the 'disambiguatedPaths' document. The name

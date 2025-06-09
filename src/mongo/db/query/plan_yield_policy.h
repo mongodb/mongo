@@ -136,7 +136,7 @@ public:
     }
 
     static YieldPolicy parseFromBSON(StringData element) {
-        const std::string& yieldPolicy = element.toString();
+        const std::string& yieldPolicy = std::string{element};
         if (yieldPolicy == "YIELD_AUTO") {
             return YieldPolicy::YIELD_AUTO;
         }

@@ -1996,7 +1996,7 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
 };  // accumOpInfoMap
 
 std::string AccumOp::getOpNameForAccStmt(const AccumulationStatement& accStmt) {
-    std::string opName = accStmt.expr.name.toString();
+    std::string opName = std::string{accStmt.expr.name};
 
     // The parser transforms "{$count: ..}" into "{$group: {..: {$sum: NumberInt(1)}}}".
     // We pattern match for "{$sum: 1}" here to reverse the transform performed by the parser.
@@ -2004,7 +2004,7 @@ std::string AccumOp::getOpNameForAccStmt(const AccumulationStatement& accStmt) {
         mongo::Value value = constArg->getValue();
         if (opName == AccumulatorSum::kName && value.getType() == BSONType::numberInt &&
             value.coerceToInt() == 1) {
-            return kAccumulatorCountName.toString();
+            return std::string{kAccumulatorCountName};
         }
     }
 

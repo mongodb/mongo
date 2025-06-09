@@ -239,7 +239,7 @@ public:
                 client.runCommand(
                     nss.dbName(),
                     analyzeCommandAsAggregationCommand(
-                        opCtx, nss.coll(), key->toString(), sampleRate, cmd.getNumberBuckets())
+                        opCtx, nss.coll(), std::string{*key}, sampleRate, cmd.getNumberBuckets())
                         .getValue(),
                     analyzeResult);
 
@@ -252,7 +252,7 @@ public:
 
                 // Invalidate statistics in the cache for the analyzed path
                 stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
-                uassertStatusOK(statsCatalog.invalidatePath(nss, key->toString()));
+                uassertStatusOK(statsCatalog.invalidatePath(nss, std::string{*key}));
 
             } else if (sampleSize || sampleRate) {
                 uassert(

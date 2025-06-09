@@ -438,7 +438,7 @@ std::tuple<BSONElement, BSONElement, std::string> _getNextFields(const BSONObj& 
                                                                  StringData field) {
     if (auto res = _splitPath(field)) {
         auto& [left, next] = *res;
-        return std::make_tuple(min.getField(left), max.getField(left), next.toString());
+        return std::make_tuple(min.getField(left), max.getField(left), std::string{next});
     }
     return std::make_tuple(BSONElement(), BSONElement(), std::string());
 }

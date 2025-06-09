@@ -137,7 +137,7 @@ public:
             const auto& request = requestParser.request();
             if (auto uuid = request.getCollectionUUID()) {
                 auto status = Status(CollectionUUIDMismatchInfo(
-                                         nss.dbName(), *uuid, nss.coll().toString(), boost::none),
+                                         nss.dbName(), *uuid, std::string{nss.coll()}, boost::none),
                                      "'collectionUUID' is specified for a time-series view "
                                      "namespace; views do not have UUIDs");
                 uassertStatusOK(populateCollectionUUIDMismatch(opCtx, status));

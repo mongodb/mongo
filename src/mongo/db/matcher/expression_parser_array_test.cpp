@@ -151,7 +151,7 @@ TEST(MatchExpressionParserArrayTest, AllElemMatch3) {
     MatchExpression* emObject = expr->getChild(0);
     ASSERT_EQUALS(MatchExpression::ELEM_MATCH_OBJECT, emObject->matchType());
     ASSERT_EQUALS(1U, emObject->numChildren());
-    ASSERT_EQUALS("x", emObject->path().toString());
+    ASSERT_EQUALS("x", emObject->path());
 
     // Child should be another AND with two children.
     MatchExpression* and2 = emObject->getChild(0);
@@ -162,11 +162,11 @@ TEST(MatchExpressionParserArrayTest, AllElemMatch3) {
     MatchExpression* leaf1 = and2->getChild(0);
     ASSERT_EQUALS(MatchExpression::EQ, leaf1->matchType());
     ASSERT_EQUALS(0U, leaf1->numChildren());
-    ASSERT_EQUALS("y", leaf1->path().toString());
+    ASSERT_EQUALS("y", leaf1->path());
     MatchExpression* leaf2 = and2->getChild(1);
     ASSERT_EQUALS(MatchExpression::EQ, leaf2->matchType());
     ASSERT_EQUALS(0U, leaf2->numChildren());
-    ASSERT_EQUALS("z", leaf2->path().toString());
+    ASSERT_EQUALS("z", leaf2->path());
 }
 
 TEST(MatchExpressionParserArrayTest, AllElemMatchBad) {

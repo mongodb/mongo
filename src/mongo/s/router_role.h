@@ -75,7 +75,7 @@ public:
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        RouteContext context{comment.toString()};
+        RouteContext context{std::string{comment}};
         while (true) {
             auto cdb = _getRoutingInfo(opCtx);
             try {
@@ -162,7 +162,7 @@ public:
 private:
     template <typename F>
     auto _routeImpl(OperationContext* opCtx, StringData comment, F&& work) {
-        RouteContext context{comment.toString()};
+        RouteContext context{std::string{comment}};
         while (true) {
             try {
                 return std::forward<F>(work)();
@@ -190,7 +190,7 @@ public:
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        RouteContext context{comment.toString()};
+        RouteContext context{std::string{comment}};
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
             for (const auto& nss : _targetedNamespaces) {

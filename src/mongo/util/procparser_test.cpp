@@ -868,26 +868,26 @@ public:
 
 TEST_F(FTDCProcSysFsFileNr, TestSuccess) {
     parseSysFsFileNr(procparser::FileNrKey::kMaxFileHandles, "1 0 2\n");
-    ASSERT_EQ(uint64Map.at(procparser::kMaxFileHandlesKey.toString()), 2);
-    ASSERT(!contains(uint64Map, procparser::kFileHandlesInUseKey.toString()));
+    ASSERT_EQ(uint64Map.at(std::string{procparser::kMaxFileHandlesKey}), 2);
+    ASSERT(!contains(uint64Map, std::string{procparser::kFileHandlesInUseKey}));
 }
 
 TEST_F(FTDCProcSysFsFileNr, TestSuccess2) {
     parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1 0 2\n");
-    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
-    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+    ASSERT_EQ(uint64Map.at(std::string{procparser::kFileHandlesInUseKey}), 1);
+    ASSERT(!contains(uint64Map, std::string{procparser::kMaxFileHandlesKey}));
 }
 
 TEST_F(FTDCProcSysFsFileNr, TestOnlyParseUpToWhatWeNeed) {
     parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1 0\n");
-    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
-    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+    ASSERT_EQ(uint64Map.at(std::string{procparser::kFileHandlesInUseKey}), 1);
+    ASSERT(!contains(uint64Map, std::string{procparser::kMaxFileHandlesKey}));
 }
 
 TEST_F(FTDCProcSysFsFileNr, TestOnlyParseUpToWhatWeNeed2) {
     parseSysFsFileNr(procparser::FileNrKey::kFileHandlesInUse, "1\n");
-    ASSERT_EQ(uint64Map.at(procparser::kFileHandlesInUseKey.toString()), 1);
-    ASSERT(!contains(uint64Map, procparser::kMaxFileHandlesKey.toString()));
+    ASSERT_EQ(uint64Map.at(std::string{procparser::kFileHandlesInUseKey}), 1);
+    ASSERT(!contains(uint64Map, std::string{procparser::kMaxFileHandlesKey}));
 }
 
 TEST_F(FTDCProcSysFsFileNr, TestFailure) {
@@ -917,7 +917,7 @@ TEST_F(FTDCProcSysFsFileNr, TestFile) {
 class FTDCProcPressure : public BaseProcTest {
 public:
     bool isPSISupported(StringData filename) {
-        int fd = open(filename.toString().c_str(), 0);
+        int fd = open(std::string{filename}.c_str(), 0);
         if (fd == -1) {
             return false;
         }

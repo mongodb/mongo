@@ -74,7 +74,7 @@ public:
     }
 
     void setAttribute(StringData key, int value) {
-        _span->SetAttribute(key.toString(), value);
+        _span->SetAttribute(std::string{key}, value);
     }
 
     void setStatus(const Status& status) {

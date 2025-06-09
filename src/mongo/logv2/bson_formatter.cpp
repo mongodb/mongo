@@ -117,7 +117,7 @@ struct BSONValueExtractor {
 
     template <typename Period>
     void operator()(StringData name, const Duration<Period>& value) {
-        _builder.append(name.toString() + value.mongoUnitSuffix(), value.count());
+        _builder.append(std::string{name} + value.mongoUnitSuffix(), value.count());
     }
 
     template <typename T>

@@ -433,8 +433,8 @@ protected:
     }
 
     Phase getPhase(const std::shared_ptr<Instance>& instance) {
-        auto phaseString =
-            getMetrics(instance).getObjectField("mutableFields").getStringField("phase").toString();
+        auto phaseString = std::string{
+            getMetrics(instance).getObjectField("mutableFields").getStringField("phase")};
         IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhase()");
         return MultiUpdateCoordinatorPhase_parse(errCtx, phaseString);
     }

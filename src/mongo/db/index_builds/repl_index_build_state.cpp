@@ -66,7 +66,7 @@ namespace {
 std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
     std::vector<std::string> indexNames;
     for (const auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+        std::string name = std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
         invariant(!name.empty(),
                   str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
                                 << IndexDescriptor::kIndexNameFieldName << "' field: " << spec);

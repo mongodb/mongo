@@ -186,7 +186,7 @@ StatusWith<std::string> ClientMetadata::parseApplicationDocument(const BSONObj& 
                             << "' field must be a string in the client metadata document"};
             }
 
-            std::string value = str::escape(e.checkAndGetStringData().toString());
+            std::string value = str::escape(std::string{e.checkAndGetStringData()});
 
             if (value.size() > kMaxApplicationNameByteLength) {
                 return {ErrorCodes::ClientMetadataAppNameTooLarge,

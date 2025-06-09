@@ -6853,13 +6853,13 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
     ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 0);
     ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 0);
 
-    ASSERT_EQ(state.getField("host").valueStringData().toString(),
+    ASSERT_EQ(state.getField("host").valueStringData(),
               prettyHostNameAndPort(operationContext()->getClient()->getLocalPort()));
-    ASSERT_EQ(state.getField("desc").valueStringData().toString(), "inactive transaction");
+    ASSERT_EQ(state.getField("desc").valueStringData(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(state.getField("lsid").Obj(), getSessionId().toBSON());
-    ASSERT_EQ(state.getField("client").valueStringData().toString(), "");
+    ASSERT_EQ(state.getField("client").valueStringData(), "");
     ASSERT_EQ(state.getField("connectionId").numberLong(), 0);
-    ASSERT_EQ(state.getField("appName").valueStringData().toString(), "appName");
+    ASSERT_EQ(state.getField("appName").valueStringData(), "appName");
     ASSERT_BSONOBJ_EQ(state.getField("clientMetadata").Obj(), obj.getField("client").Obj());
     ASSERT_EQ(state.getField("active").boolean(), false);
 }

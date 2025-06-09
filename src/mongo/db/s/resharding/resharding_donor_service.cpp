@@ -862,7 +862,7 @@ void ReshardingDonorService::DonorStateMachine::
             ReshardBlockingWritesChangeEventO2Field changeEvent{
                 _metadata.getSourceNss(),
                 _metadata.getReshardingUUID(),
-                resharding::kReshardFinalOpLogType.toString(),
+                std::string{resharding::kReshardFinalOpLogType},
             };
 
             repl::MutableOplogEntry oplog;

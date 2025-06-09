@@ -133,7 +133,8 @@ public:
                         newOpCtxPtr.get(), nss, collectionUUID, allowMigrations);
             }
 
-            tellShardsToRefresh(opCtx, ns(), ConfigsvrSetAllowMigrations::kCommandName.toString());
+            tellShardsToRefresh(
+                opCtx, ns(), std::string{ConfigsvrSetAllowMigrations::kCommandName});
 
             // Since we no write happened on this txnNumber, we need to make a dummy write to
             // protect against older requests with old txnNumbers.

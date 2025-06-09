@@ -150,11 +150,11 @@ StatusWith<boost::filesystem::path> FTDCFileManager::generateArchiveFileName(
     auto fileName = path;
     fileName /= std::string(kFTDCArchiveFile);
     fileName += std::string(".");
-    fileName += suffix.toString();
+    fileName += std::string{suffix};
 
     if (_previousArchiveFileSuffix != suffix) {
         // If the suffix has changed, reset the uniquifier counter to zero
-        _previousArchiveFileSuffix = suffix.toString();
+        _previousArchiveFileSuffix = std::string{suffix};
         _fileNameUniquifier = 0;
     }
 

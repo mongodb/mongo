@@ -216,7 +216,7 @@ public:
 
         // Use the map if available. Otherwise linearly search through the vector.
         if (_fieldToChildMap) {
-            auto it = _fieldToChildMap->find(fieldName.toString());
+            auto it = _fieldToChildMap->find(std::string{fieldName});
             if (it == _fieldToChildMap->end()) {
                 return nullptr;
             }
@@ -234,10 +234,10 @@ public:
     void addChild(StringData fieldName, std::unique_ptr<ASTNode> node) {
         auto rawPtrNode = node.get();
         addChildToInternalVector(std::move(node));
-        _fieldNames.push_back(fieldName.toString());
+        _fieldNames.push_back(std::string{fieldName});
 
         if (_fieldToChildMap) {
-            _fieldToChildMap->emplace(fieldName.toString(), rawPtrNode);
+            _fieldToChildMap->emplace(std::string{fieldName}, rawPtrNode);
         } else if (!_fieldToChildMap && _fieldNames.size() >= kUseMapThreshold) {
             // Start using the map, so we can perform getChild lookups faster.
             _fieldToChildMap = std::make_unique<FieldToChildMap>();
@@ -260,7 +260,7 @@ public:
             _children.erase(_children.begin() + std::distance(_fieldNames.begin(), it));
             _fieldNames.erase(it);
             if (_fieldToChildMap)
-                _fieldToChildMap->erase(fieldName.toString());
+                _fieldToChildMap->erase(std::string{fieldName});
             return true;
         }
 

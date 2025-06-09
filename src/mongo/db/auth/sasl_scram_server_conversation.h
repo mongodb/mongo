@@ -77,7 +77,7 @@ public:
 
     StatusWith<std::string> saslPrep(StringData str) const {
         if (std::is_same<SHA1Block, HashBlock>::value) {
-            return str.toString();
+            return std::string{str};
         } else {
             return icuSaslPrep(str);
         }

@@ -41,9 +41,9 @@ namespace mongo::query_settings::query_framework {
 std::string serialize(QueryFrameworkControlEnum queryFramework) {
     switch (queryFramework) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
-            return kClassic.toString();
+            return std::string{kClassic};
         case QueryFrameworkControlEnum::kTrySbeEngine:
-            return kSbe.toString();
+            return std::string{kSbe};
         default:
             MONGO_UNREACHABLE;
     }

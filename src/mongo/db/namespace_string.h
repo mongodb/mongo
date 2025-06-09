@@ -794,7 +794,7 @@ private:
     }
 
     std::string toString() const {
-        return ns().toString();
+        return std::string{ns()};
     }
 
     std::string toStringWithTenantId() const {
@@ -802,7 +802,7 @@ private:
             return str::stream() << TenantId{OID::from(_data.data() + kDataOffset)} << "_" << ns();
         }
 
-        return ns().toString();
+        return std::string{ns()};
     }
 
     /**
@@ -914,7 +914,7 @@ inline StringData nsToDatabaseSubstring(StringData ns) {
  * TODO: make this return a StringData
  */
 inline std::string nsToDatabase(StringData ns) {
-    return nsToDatabaseSubstring(ns).toString();
+    return std::string{nsToDatabaseSubstring(ns)};
 }
 
 /**

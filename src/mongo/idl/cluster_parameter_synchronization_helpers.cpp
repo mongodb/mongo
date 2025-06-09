@@ -184,7 +184,7 @@ void updateParameter(OperationContext* opCtx,
     UninterruptibleLockGuard ulg(opCtx);  // NOLINT (ResourceMutex acquisition)
 
     BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, name.toString(), tenantId);
+    sp->append(opCtx, &oldValueBob, std::string{name}, tenantId);
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
 
     uassertStatusOK(sp->set(doc, tenantId));

@@ -134,7 +134,7 @@ public:
         return _str;
     }
     void setField1(StringData value) {
-        _str = value.toString();
+        _str = std::string{value};
     }
 
 private:

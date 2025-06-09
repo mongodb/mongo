@@ -406,8 +406,8 @@ TEST_F(AssignKeyRangeToZoneTestFixture, TimeseriesCollMustHaveTimeKeyRangeMinKey
     const StringData metaField = "meta"_sd;
     const StringData timeField = "time"_sd;
     const std::string controlTimeField =
-        timeseries::kControlMinFieldNamePrefix.toString() + timeField;
-    const TimeseriesOptions timeseriesOptions(timeField.toString());
+        std::string{timeseries::kControlMinFieldNamePrefix} + timeField;
+    const TimeseriesOptions timeseriesOptions(std::string{timeField});
     CollectionType shardedCollection(ns,
                                      OID::gen(),
                                      Timestamp(1, 1),

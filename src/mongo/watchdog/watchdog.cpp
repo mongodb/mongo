@@ -85,7 +85,7 @@ const auto getWatchdogMonitorInterface =
 }  // namespace
 
 WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, StringData threadName)
-    : _period(period), _enabled(true), _threadName(threadName.toString()) {}
+    : _period(period), _enabled(true), _threadName(std::string{threadName}) {}
 
 void WatchdogPeriodicThread::start() {
     {
@@ -694,9 +694,9 @@ constexpr StringData DirectoryCheck::kProbeFileNameExt;
 void DirectoryCheck::run(OperationContext* opCtx) {
     // Ensure we have unique file names if multiple processes share the same logging directory
     boost::filesystem::path file = _directory;
-    file /= kProbeFileName.toString();
+    file /= std::string{kProbeFileName};
     file += ProcessId::getCurrent().toString();
-    file += kProbeFileNameExt.toString();
+    file += std::string{kProbeFileNameExt};
 
     checkFile(opCtx, file);
 

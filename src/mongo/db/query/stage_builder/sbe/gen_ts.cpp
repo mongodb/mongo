@@ -81,7 +81,7 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         ;
         match_expression::addDependencies(unpackNode->eventFilter.get(), &eventFilterDeps);
         for (const auto& path : eventFilterDeps.fields) {
-            auto rootField = FieldPath::extractFirstFieldFromDottedPath(path).toString();
+            auto rootField = std::string{FieldPath::extractFirstFieldFromDottedPath(path)};
             // Check that the collected path doesn't start from a metadata field, and that it's one
             // of the fields that the query uses.
             if (fieldSet.find(rootField) != fieldSet.end() &&
@@ -91,7 +91,7 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
                 sbe::value::CellBlock::PathRequest pReq(sbe::value::CellBlock::kFilter);
                 for (size_t i = 0; i < fp.getPathLength(); i++) {
                     pReq.path.insert(pReq.path.end(),
-                                     {sbe::value::CellBlock::Get{fp.getFieldName(i).toString()},
+                                     {sbe::value::CellBlock::Get{std::string{fp.getFieldName(i)}},
                                       sbe::value::CellBlock::Traverse{}});
                 }
                 pReq.path.emplace_back(sbe::value::CellBlock::Id{});
@@ -370,7 +370,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
         match_expression::addDependencies(eventFilter, &eventFilterDeps);
         for (const std::string& eventFilterPath : eventFilterDeps.fields) {
             const auto& name =
-                std::pair(PlanStageSlots::kField, FieldPath(eventFilterPath).front().toString());
+                std::pair(PlanStageSlots::kField, std::string{FieldPath(eventFilterPath).front()});
             if (!outputs.has(name)) {
                 outputs.set(name, SbSlot{_state.getNothingSlot()});
             }

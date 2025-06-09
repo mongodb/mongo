@@ -165,13 +165,13 @@ void _doPin(OperationContext* opCtx) {
     boost::optional<Timestamp> pin = _calculatePin(opCtx);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (!pin) {
-        storageEngine->unpinOldestTimestamp(ReshardingHistoryHook::kName.toString());
+        storageEngine->unpinOldestTimestamp(std::string{ReshardingHistoryHook::kName});
         return;
     }
 
     StatusWith<Timestamp> res =
         storageEngine->pinOldestTimestamp(*shard_role_details::getRecoveryUnit(opCtx),
-                                          ReshardingHistoryHook::kName.toString(),
+                                          std::string{ReshardingHistoryHook::kName},
                                           pin.value(),
                                           false);
     if (!res.isOK()) {

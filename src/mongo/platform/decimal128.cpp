@@ -570,7 +570,7 @@ std::string Decimal128::_convertToScientificNotation(StringData coefficient,
 std::string Decimal128::_convertToStandardDecimalNotation(StringData coefficient,
                                                           int exponent) const {
     if (exponent == 0) {
-        return coefficient.toString();
+        return std::string{coefficient};
     } else {
         invariant(exponent < 0);
         std::string result;

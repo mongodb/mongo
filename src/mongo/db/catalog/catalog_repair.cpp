@@ -113,12 +113,12 @@ bool identHandler(StorageEngine* engine,
         // Keep the tables that are needed to rebuild this index.
         // Note: the table that stores the rebuild metadata itself (i.e. |ident|) isn't kept.
         for (const mongo::IndexStateInfo& idx : resumeInfo.getIndexes()) {
-            internalIdentsToKeep.insert(idx.getSideWritesTable().toString());
+            internalIdentsToKeep.insert(std::string{idx.getSideWritesTable()});
             if (idx.getDuplicateKeyTrackerTable()) {
-                internalIdentsToKeep.insert(idx.getDuplicateKeyTrackerTable()->toString());
+                internalIdentsToKeep.insert(std::string{*idx.getDuplicateKeyTrackerTable()});
             }
             if (idx.getSkippedRecordTrackerTable()) {
-                internalIdentsToKeep.insert(idx.getSkippedRecordTrackerTable()->toString());
+                internalIdentsToKeep.insert(std::string{*idx.getSkippedRecordTrackerTable()});
             }
         }
 
@@ -365,7 +365,7 @@ StatusWith<StorageEngine::ReconcileResult> reconcileCatalogAndIdents(
                     engine->addDropPendingIdent(
                         Timestamp::min(), std::make_shared<Ident>(indexIdent), /*onDrop=*/nullptr);
                 }
-                indexesToDrop.push_back(indexName.toString());
+                indexesToDrop.push_back(std::string{indexName});
                 continue;
             }
         }

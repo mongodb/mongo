@@ -96,9 +96,10 @@ public:
      * Only modifies: "fullDocumentBeforeChange" and "preImageId".
      */
     GetModPathsReturn getModifiedPaths() const final {
-        return {GetModPathsReturn::Type::kFiniteSet,
-                {kFullDocumentBeforeChangeFieldName.toString(), kPreImageIdFieldName.toString()},
-                {}};
+        return {
+            GetModPathsReturn::Type::kFiniteSet,
+            {std::string{kFullDocumentBeforeChangeFieldName}, std::string{kPreImageIdFieldName}},
+            {}};
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
@@ -121,7 +122,7 @@ public:
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
-        deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kPreImageIdField});
         // This stage does not restrict the output fields to a finite set, and has no impact on
         // whether metadata is available or needed.
         return DepsTracker::State::SEE_NEXT;

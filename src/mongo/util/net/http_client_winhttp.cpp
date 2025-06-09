@@ -184,7 +184,7 @@ public:
         };
 
         // Break down URL for handling below.
-        const auto urlString = toNativeString(urlSD.toString().c_str());
+        const auto urlString = toNativeString(std::string{urlSD}.c_str());
         auto url = uassertStatusOK(parseUrl(urlString));
         uassert(
             ErrorCodes::BadValue, "URL endpoint must be https://", url.https || _allowInsecureHTTP);

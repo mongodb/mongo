@@ -350,8 +350,8 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         expectedDownConvertedDoc.setField(
             expectedImageOpTimeFieldName,
             Value{Document{
-                {repl::OpTime::kTimestampFieldName.toString(), forgedImageEntry.getTimestamp()},
-                {repl::OpTime::kTermFieldName.toString(), opTime.getTerm()}}});
+                {std::string{repl::OpTime::kTimestampFieldName}, forgedImageEntry.getTimestamp()},
+                {std::string{repl::OpTime::kTermFieldName}, opTime.getTerm()}}});
         ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDownConvertedDoc.freeze());
 
         ASSERT_TRUE(imageLookup->getNext().isEOF());

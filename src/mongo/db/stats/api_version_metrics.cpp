@@ -71,7 +71,7 @@ void APIVersionMetrics::update(StringData appName, const APIParameters& apiParam
     Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
     boost::optional<int> parsedVersion;
 
-    auto appNameStr = appName.toString();
+    auto appNameStr = std::string{appName};
 
     {
         auto sharedLock = _mutex.readLock();

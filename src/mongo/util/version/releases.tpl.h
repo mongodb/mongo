@@ -260,7 +260,7 @@ inline int majorVersion(FeatureCompatibilityVersion v) {
     if (pos == std::string::npos) {
         return -1;
     }
-    return stoi(str.substr(pos-1, 1).toString());
+    return stoi(std::string{str.substr(pos-1, 1)});
 }
 
 inline int minorVersion(FeatureCompatibilityVersion v) {
@@ -269,7 +269,7 @@ inline int minorVersion(FeatureCompatibilityVersion v) {
     if (pos == std::string::npos) {
         return -1;
     }
-    return stoi(str.substr(pos+1, 1).toString());
+    return stoi(std::string{str.substr(pos+1, 1)});
 }
 
 /**

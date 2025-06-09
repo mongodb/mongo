@@ -1289,7 +1289,7 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
             // innermost parent $elemMatch, as well as the
             // inner path prefix.
             rt->elemMatchExpr = context.elemMatchExpr;
-            rt->pathPrefix = getPathPrefix(node->path().toString());
+            rt->pathPrefix = getPathPrefix(std::string{node->path()});
         } else {
             // We're not an $elemMatch context, so we should store
             // the prefix of the full path.

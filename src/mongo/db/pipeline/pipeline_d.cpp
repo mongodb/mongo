@@ -1875,11 +1875,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
 
     // If the user specified a "key" field, use that field to satisfy the "near" query. Otherwise,
     // look for a geo-indexed field in 'collection' that can.
-    auto nearFieldName =
-        (geoNearStage->getKeyField()
-             ? geoNearStage->getKeyField()->fullPath()
-             : extractGeoNearFieldFromIndexes(expCtx->getOperationContext(), collection))
-            .toString();
+    auto nearFieldName = std::string{
+        geoNearStage->getKeyField()
+            ? geoNearStage->getKeyField()->fullPath()
+            : extractGeoNearFieldFromIndexes(expCtx->getOperationContext(), collection)};
 
     // Create a PlanExecutor whose query is the "near" predicate on 'nearFieldName' combined with
     // the optional "query" argument in the $geoNear stage.

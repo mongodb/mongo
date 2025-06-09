@@ -239,7 +239,7 @@ TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveReshardingMetricsDescr
         auto metrics = createInstanceMetrics(getClockSource(), instanceId, role);
         auto report = metrics->reportForCurrentOp();
 
-        ASSERT_EQ(report.getStringField("desc").toString(),
+        ASSERT_EQ(report.getStringField("desc"),
                   fmt::format("ReshardingMetrics{}Service {}",
                               ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));
@@ -254,7 +254,7 @@ TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromRecipientStateDocument) {
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"),
               "ReshardingMetricsRecipientService " + opId.toString());
-    ASSERT_EQ(report.getStringField("recipientState").toString(), RecipientState_serializer(state));
+    ASSERT_EQ(report.getStringField("recipientState"), RecipientState_serializer(state));
 }
 
 TEST_F(ReshardingMetricsTest, RestoresByteAndDocumentCountsFromRecipientStateDocument) {
@@ -343,7 +343,7 @@ TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromDonorStateDocument) {
 
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"), "ReshardingMetricsDonorService " + opId.toString());
-    ASSERT_EQ(report.getStringField("donorState").toString(), DonorState_serializer(state));
+    ASSERT_EQ(report.getStringField("donorState"), DonorState_serializer(state));
 }
 
 TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromCoordinatorStateDocument) {
@@ -354,8 +354,7 @@ TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromCoordinatorStateDocument)
     verifyCommonCurrentOpFields(report);
     ASSERT_EQ(report.getStringField("desc"),
               "ReshardingMetricsCoordinatorService " + opId.toString());
-    ASSERT_EQ(report.getStringField("coordinatorState").toString(),
-              CoordinatorState_serializer(state));
+    ASSERT_EQ(report.getStringField("coordinatorState"), CoordinatorState_serializer(state));
 }
 
 TEST_F(ReshardingMetricsTest, RestoresFromReshardingApplierProgressDocument) {

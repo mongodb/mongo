@@ -225,7 +225,7 @@ void DocumentSourceMergeCursors::recordRemoteCursorShardIds(
     const std::vector<RemoteCursor>& remoteCursors) {
     for (const auto& remoteCursor : remoteCursors) {
         tassert(5549103, "Encountered invalid shard ID", !remoteCursor.getShardId().empty());
-        _shardsWithCursors.emplace(remoteCursor.getShardId().toString());
+        _shardsWithCursors.emplace(std::string{remoteCursor.getShardId()});
     }
 }
 

@@ -130,7 +130,7 @@ std::unique_ptr<Expression> makeEqAggExpr(
     ExpressionCompare::CmpOp comparisonType = ExpressionCompare::EQ) {
     auto valExpr = make_intrusive<ExpressionConstant>(expCtx, value);
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
     std::vector<boost::intrusive_ptr<Expression>> children = {std::move(fieldpath),
                                                               std::move(valExpr)};
     return std::make_unique<ExpressionCompare>(expCtx, comparisonType, std::move(children));
@@ -146,7 +146,7 @@ std::unique_ptr<Expression> makeInAggExpr(ExpressionContext* const expCtx,
     }
     auto valArray = make_intrusive<ExpressionArray>(expCtx, std::move(valExprs));
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
     std::vector<boost::intrusive_ptr<Expression>> children{std::move(fieldpath),
                                                            std::move(valArray)};
     return std::make_unique<ExpressionIn>(expCtx, std::move(children));

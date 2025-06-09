@@ -73,14 +73,14 @@ JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher)
 
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     auto currentValidators = std::atomic_load(&_validators);  // NOLINT
-    auto it = currentValidators->find(keyId.toString());
+    auto it = currentValidators->find(std::string{keyId});
     if (it == currentValidators->end()) {
         // We were asked to handle an unknown keyId. Try refreshing, to see if the JWKS has been
         // updated.
         LOGV2_DEBUG(7938400,
                     3,
                     "Could not locate key in key cache, attempting key cache refresh",
-                    "keyId"_attr = keyId.toString());
+                    "keyId"_attr = keyId);
         auto loadKeysStatus = loadKeys();
         if (!loadKeysStatus.isOK()) {
             LOGV2_WARNING(7938401,
@@ -92,7 +92,7 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
         }
 
         currentValidators = std::atomic_load(&_validators);  // NOLINT
-        it = currentValidators->find(keyId.toString());
+        it = currentValidators->find(std::string{keyId});
 
         // If it still cannot be found, return an error.
         if (it == currentValidators->end()) {
@@ -137,7 +137,7 @@ Status JWKManager::loadKeys() try {
                               << base64url::encode(RSAKey.getPublicExponent()),
                 (E.size() > 1) || ((E.size() == 1) && (E[0] >= 3)));
 
-        auto keyId = RSAKey.getKeyId().toString();
+        auto keyId = std::string{RSAKey.getKeyId()};
         uassert(ErrorCodes::DuplicateKeyId,
                 str::stream() << "Key IDs must be unique, duplicate '" << keyId << "'",
                 newKeyMaterial->find(keyId) == newKeyMaterial->end());

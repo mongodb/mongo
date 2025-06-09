@@ -364,7 +364,7 @@ inline bool determineIncludeField(StringData fieldName,
                                   BucketSpec::Behavior unpackerBehavior,
                                   const std::set<std::string>& unpackFieldsToIncludeExclude) {
     const bool isInclude = unpackerBehavior == BucketSpec::Behavior::kInclude;
-    const bool unpackFieldsContains = unpackFieldsToIncludeExclude.find(fieldName.toString()) !=
+    const bool unpackFieldsContains = unpackFieldsToIncludeExclude.find(std::string{fieldName}) !=
         unpackFieldsToIncludeExclude.cend();
     return isInclude == unpackFieldsContains;
 }

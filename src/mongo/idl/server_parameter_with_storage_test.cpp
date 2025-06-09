@@ -94,7 +94,7 @@ void doStorageTest(StringData name,
         // append() API.
         BSONObjBuilder b;
         element_type exp;
-        param.append(nullptr, &b, name.toString(), boost::none);
+        param.append(nullptr, &b, std::string{name}, boost::none);
         ASSERT(b.obj().firstElement().coerce(&exp));
         ASSERT_EQ_OR_NAN(param.getValue(boost::none), exp);
     }

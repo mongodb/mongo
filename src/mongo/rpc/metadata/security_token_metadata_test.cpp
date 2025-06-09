@@ -62,13 +62,12 @@ namespace {
 constexpr auto kPingFieldName = "ping"_sd;
 
 std::string makeSecurityToken(const UserName& userName) {
-    return auth::ValidatedTenancyScopeFactory::create(
-               userName,
-               "secret"_sd,
-               auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-               auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
-        .getOriginalToken()
-        .toString();
+    return std::string{auth::ValidatedTenancyScopeFactory::create(
+                           userName,
+                           "secret"_sd,
+                           auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
+                           .getOriginalToken()};
 }
 
 class SecurityTokenMetadataTest : public ServiceContextTest {

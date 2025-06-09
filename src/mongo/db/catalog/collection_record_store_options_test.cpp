@@ -160,7 +160,7 @@ TEST_F(CollectionRecordStoreOptionsTest, TimeseriesRecordStoreOptionsNotClustere
     RecordStore::Options expectedRSOptions{
         .forceUpdateWithFullDocument = true /* exclusive for timeseries */,
         .customBlockCompressor =
-            kDefaultTimeseriesCollectionCompressor.toString() /* exclusive for timeseries */};
+            std::string{kDefaultTimeseriesCollectionCompressor} /* exclusive for timeseries */};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 
@@ -176,7 +176,7 @@ TEST_F(CollectionRecordStoreOptionsTest, TimeseriesRecordStoreOptions) {
         .allowOverwrite = false,
         .forceUpdateWithFullDocument = true /* exclusive for timeseries */,
         .customBlockCompressor =
-            kDefaultTimeseriesCollectionCompressor.toString() /* exclusive for timeseries */};
+            std::string{kDefaultTimeseriesCollectionCompressor} /* exclusive for timeseries */};
     assertEQ(expectedRSOptions, actualRSOptions);
 }
 

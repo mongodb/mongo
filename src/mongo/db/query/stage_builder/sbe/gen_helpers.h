@@ -855,7 +855,7 @@ inline std::vector<std::string> getTopLevelFields(const std::vector<std::string>
 
         auto [_, inserted] = topLevelFieldsSet.insert(field);
         if (inserted) {
-            topLevelFields.emplace_back(field.toString());
+            topLevelFields.emplace_back(std::string{field});
         }
     }
 

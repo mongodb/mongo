@@ -218,7 +218,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                 }
 
                 const auto shardIdentity = topology_change_helpers::createShardIdentity(
-                    opCtx, _doc.getChosenName()->toString());
+                    opCtx, std::string{*_doc.getChosenName()});
 
                 topology_change_helpers::installShardIdentity(opCtx,
                                                               shardIdentity,
@@ -250,7 +250,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
 
                 ShardType shard;
-                shard.setName(_doc.getChosenName()->toString());
+                shard.setName(std::string{*_doc.getChosenName()});
                 shard.setHost(targeter.connectionString().toString());
                 shard.setState(ShardType::ShardState::kShardAware);
 
@@ -324,7 +324,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
                                      repl::ReplClientInfo::forClient(opCtx->getClient())
                                          .setLastOpToSystemLastOpTime(opCtx);
 
-                                     _result = _doc.getChosenName().value().toString();
+                                     _result = std::string{_doc.getChosenName().value()};
                                  }))
         .onError([this, _ = shared_from_this()](const Status& status) {
             if (!_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(status)) {

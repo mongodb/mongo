@@ -56,7 +56,7 @@ Status bsonExtractFieldImpl(const BSONObj& object,
         return kDefaultCase;
     }
     return Status(ErrorCodes::NoSuchKey,
-                  str::stream() << "Missing expected field \"" << fieldName.toString() << "\"");
+                  str::stream() << "Missing expected field \"" << std::string{fieldName} << "\"");
 }
 
 Status bsonExtractTypedFieldImpl(const BSONObj& object,
@@ -210,7 +210,7 @@ Status bsonExtractStringFieldWithDefault(const BSONObj& object,
     BSONElement element;
     Status status = bsonExtractTypedFieldImpl(object, fieldName, BSONType::string, &element, true);
     if (status == ErrorCodes::NoSuchKey) {
-        *out = defaultValue.toString();
+        *out = std::string{defaultValue};
         return Status::OK();
     }
     if (status.isOK())

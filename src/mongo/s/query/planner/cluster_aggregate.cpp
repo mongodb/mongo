@@ -576,7 +576,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         if (!executionNsRoutingInfoStatus.isOK()) {
             uassert(CollectionUUIDMismatchInfo(request.getDbName(),
                                                *request.getCollectionUUID(),
-                                               request.getNamespace().coll().toString(),
+                                               std::string{request.getNamespace().coll()},
                                                boost::none),
                     "Database does not exist",
                     executionNsRoutingInfoStatus != ErrorCodes::NamespaceNotFound ||

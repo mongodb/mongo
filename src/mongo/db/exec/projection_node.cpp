@@ -66,7 +66,7 @@ void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
         }
     } else {
         // FieldPath can't be empty, so it is safe to obtain the first path component here.
-        addOrGetChild(path.getFieldName(0).toString())->_addProjectionForPath(path.tail());
+        addOrGetChild(std::string{path.getFieldName(0)})->_addProjectionForPath(path.tail());
     }
 }
 
@@ -96,12 +96,12 @@ void ProjectionNode::_addExpressionForPath(const FieldPath& path,
         return;
     }
     // FieldPath can't be empty, so it is safe to obtain the first path component here.
-    addOrGetChild(path.getFieldName(0).toString())->_addExpressionForPath(path.tail(), expr);
+    addOrGetChild(std::string{path.getFieldName(0)})->_addExpressionForPath(path.tail(), expr);
 }
 
 boost::intrusive_ptr<Expression> ProjectionNode::getExpressionForPath(const FieldPath& path) const {
     // The FieldPath always conatins at least one field.
-    auto fieldName = path.getFieldName(0).toString();
+    auto fieldName = std::string{path.getFieldName(0)};
 
     if (path.getPathLength() == 1) {
         if (_expressions.find(fieldName) != _expressions.end()) {

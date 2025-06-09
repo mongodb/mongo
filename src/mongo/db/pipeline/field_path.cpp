@@ -63,7 +63,7 @@ const StringDataSet kAllowedDollarPrefixedFields = {
 
 std::string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     if (prefix.empty()) {
-        return suffix.toString();
+        return std::string{suffix};
     }
 
     return str::stream() << prefix << "." << suffix;

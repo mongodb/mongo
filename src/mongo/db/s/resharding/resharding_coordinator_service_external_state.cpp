@@ -177,7 +177,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             for (const auto& zone : *rawBSONZones) {
                 ChunkRange range(zone.getMin(), zone.getMax());
                 TagsType tag(
-                    coordinatorDoc.getTempReshardingNss(), zone.getZone().toString(), range);
+                    coordinatorDoc.getTempReshardingNss(), std::string{zone.getZone()}, range);
 
                 parsedZones->push_back(tag);
             }
@@ -411,7 +411,7 @@ ReshardingCoordinatorExternalStateImpl::_getDocumentsCopiedFromRecipients(
         auto obj = firstBatch[0].getObjectField("documentsCopied");
         for (const auto& element : obj) {
             const auto fieldName = element.fieldNameStringData();
-            ShardId donorShardId(fieldName.toString());
+            ShardId donorShardId(std::string{fieldName});
 
             uassert(
                 9929909,

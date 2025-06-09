@@ -109,13 +109,13 @@ void uassertKmsRequestInternal(kms_request_t* request, const char* file, int lin
 
 template <typename T>
 AWSCredentials parseCredentials(StringData data) {
-    BSONObj obj = fromjson(data.toString());
+    BSONObj obj = fromjson(std::string{data});
 
     auto creds = T::parse(IDLParserContext("security-credentials"), obj);
 
-    return AWSCredentials(creds.getAccessKeyId().toString(),
-                          creds.getSecretAccessKey().toString(),
-                          creds.getToken().toString());
+    return AWSCredentials(std::string{creds.getAccessKeyId()},
+                          std::string{creds.getSecretAccessKey()},
+                          std::string{creds.getToken()});
 }
 }  // namespace
 
@@ -172,7 +172,7 @@ std::string generateClientSecond(StringData serverFirstBase64,
     uassertKmsRequest(kms_request_set_service(request.get(), kAwsServiceName.data()));
 
     uassertKmsRequest(kms_request_add_header_field(
-        request.get(), "Host", serverFirst.getStsHost().toString().c_str()));
+        request.get(), "Host", std::string{serverFirst.getStsHost()}.c_str()));
 
     auto serverNonce = serverFirst.getServerNonce();
     uassertKmsRequest(kms_request_add_header_field(
@@ -209,20 +209,20 @@ std::string generateClientSecond(StringData serverFirstBase64,
 
 std::string getRegionFromHost(StringData host) {
     if (host == kAwsDefaultStsHost) {
-        return kAwsDefaultRegion.toString();
+        return std::string{kAwsDefaultRegion};
     }
 
     size_t firstPeriod = host.find('.');
     if (firstPeriod == std::string::npos) {
-        return kAwsDefaultRegion.toString();
+        return std::string{kAwsDefaultRegion};
     }
 
     size_t secondPeriod = host.find('.', firstPeriod + 1);
     if (secondPeriod == std::string::npos) {
-        return host.substr(firstPeriod + 1).toString();
+        return std::string{host.substr(firstPeriod + 1)};
     }
 
-    return host.substr(firstPeriod + 1, secondPeriod - firstPeriod - 1).toString();
+    return std::string{host.substr(firstPeriod + 1, secondPeriod - firstPeriod - 1)};
 }
 
 std::string parseRoleFromEC2IamSecurityCredentials(StringData data) {
@@ -233,7 +233,7 @@ std::string parseRoleFromEC2IamSecurityCredentials(StringData data) {
         pos = data.size();
     }
 
-    return data.substr(0, pos).toString();
+    return std::string{data.substr(0, pos)};
 }
 
 AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data) {

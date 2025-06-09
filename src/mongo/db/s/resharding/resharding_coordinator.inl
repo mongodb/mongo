@@ -613,7 +613,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                 [&](const BSONObj& data) {
                     auto ns = data.getStringField("sourceNamespace");
                     return ns.empty() ? true
-                                      : ns.toString() ==
+                                      : std::string{ns} ==
                             NamespaceStringUtil::serialize(_coordinatorDoc.getSourceNss(),
                                                            SerializationContext::stateDefault());
                 });

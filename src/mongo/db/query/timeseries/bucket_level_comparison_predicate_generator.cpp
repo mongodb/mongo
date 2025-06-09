@@ -104,7 +104,7 @@ boost::optional<StringData> checkComparisonPredicateEligibility(
     }
 
     // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
-    if (bucketSpec.fieldIsComputed(matchExprPath.toString())) {
+    if (bucketSpec.fieldIsComputed(std::string{matchExprPath})) {
         return "can't handle a computed field"_sd;
     }
 

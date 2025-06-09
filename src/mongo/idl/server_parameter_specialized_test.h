@@ -92,7 +92,7 @@ public:
 
     void setId(StringData id) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-        _id = id.toString();
+        _id = std::string{id};
     }
 
     void parse(const BSONObj& updatedObj) {

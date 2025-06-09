@@ -189,8 +189,8 @@ void toEncryptedBinData(StringData field, EncryptedBinDataType dt, T t, BSONObjB
 // Sample encryption keys for creating mock encrypted payloads.
 constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
-static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
-static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
+static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId));
+static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId));
 
 inline const FLEIndexKey& getIndexKey() {
     static std::string indexVec = hexblob::decode(

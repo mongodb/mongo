@@ -157,7 +157,7 @@ private:
             }
 
             children.push_back(std::make_unique<SortKeyTreeNode>());
-            children.back()->name = part->fieldPath->getFieldName(pathIdx).toString();
+            children.back()->name = std::string{part->fieldPath->getFieldName(pathIdx)};
             children.back()->addSortPatternPart(part, pathIdx + 1, partIdx);
             bloomFilter.insert(children.back()->name.c_str(), children.back()->name.size());
         }

@@ -284,7 +284,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     auto now = opCtx->getServiceContext()->getFastClockSource()->now();
     auto it = _samplers.find(samplerName);
     if (it == _samplers.end()) {
-        auto sampler = Sampler{samplerName.toString(), now};
+        auto sampler = Sampler{std::string{samplerName}, now};
         it = _samplers.emplace(samplerName, std::move(sampler)).first;
     } else {
         it->second.setLastPingTime(now);

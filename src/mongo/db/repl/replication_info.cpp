@@ -355,7 +355,7 @@ auto& oplogInfoServerStatus =
     *ServerStatusSectionBuilder<OplogInfoServerStatus>("oplog").forShard();
 
 const std::string kAutomationServiceDescriptorFieldName =
-    HelloCommandReply::kAutomationServiceDescriptorFieldName.toString();
+    std::string{HelloCommandReply::kAutomationServiceDescriptorFieldName};
 
 class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:

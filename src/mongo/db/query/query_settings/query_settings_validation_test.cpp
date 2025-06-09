@@ -149,16 +149,15 @@ TEST_F(QuerySettingsValidationTestFixture,
 
         auto aggCmdBSON = [&]() {
             if (collectionLessRejectionIncompatibleStages.contains(stage)) {
-                return BSON("aggregate" << collectionlessNss.coll().toString() << "$db"
-                                        << collectionlessNss.db_forTest().toString() << "pipeline"
-                                        << BSON_ARRAY(BSON(stage.toString() << BSONObj())));
+                return BSON("aggregate" << collectionlessNss.coll() << "$db"
+                                        << collectionlessNss.db_forTest() << "pipeline"
+                                        << BSON_ARRAY(BSON(stage << BSONObj())));
             }
 
             return BSON("aggregate" << "testColl"
                                     << "$db"
                                     << "testColl"
-                                    << "pipeline"
-                                    << BSON_ARRAY(BSON(stage.toString() << BSONObj())));
+                                    << "pipeline" << BSON_ARRAY(BSON(stage << BSONObj())));
         }();
 
         assertInvalidQueryAndQuerySettingsCombination(

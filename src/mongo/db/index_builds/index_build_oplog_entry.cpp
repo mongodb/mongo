@@ -141,7 +141,7 @@ StatusWith<IndexBuildOplogEntry> IndexBuildOplogEntry::parse(const repl::OplogEn
 
     return IndexBuildOplogEntry{*collUUID,
                                 commandType,
-                                commandName.toString(),
+                                std::string{commandName},
                                 swBuildUUID.getValue(),
                                 std::move(indexNames),
                                 std::move(indexSpecs),

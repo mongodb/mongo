@@ -115,7 +115,7 @@ TEST(DataTypeTerminated, StringDataNormalStore) {
         ASSERT_EQ(adv, w.size() + 1);
         ptr += adv;
         avail -= adv;
-        expected += w.toString();
+        expected += std::string{w};
         expected += '\0';
     }
     ASSERT_EQUALS(expected, buf.substr(0, buf.size() - avail));
@@ -125,7 +125,7 @@ TEST(DataTypeTerminated, StringDataNormalLoad) {
     const StringData writes[] = {StringData("a"), StringData("bb"), StringData("ccc")};
     std::string buf;
     for (const auto& w : writes) {
-        buf += w.toString();
+        buf += std::string{w};
         buf += '\0';
     }
     const char* const bufBegin = &*buf.begin();

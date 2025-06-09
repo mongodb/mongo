@@ -244,7 +244,7 @@ std::unique_ptr<Expression> generateBetweenWithFFP(
     auto ffp = Value(generateFFP(path, lb, ub, 0, 255).firstElement());
     auto ffpExpr = make_intrusive<ExpressionConstant>(expCtx, ffp);
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
     std::vector<boost::intrusive_ptr<Expression>> children = {std::move(fieldpath),
                                                               std::move(ffpExpr)};
     return std::make_unique<ExpressionCompare>(expCtx, op, std::move(children));

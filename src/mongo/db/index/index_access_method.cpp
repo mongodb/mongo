@@ -1116,7 +1116,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     return fileName
         ? Sorter::makeFromExistingRanges(
-              fileName->toString(),
+              std::string{*fileName},
               *ranges,
               makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
               BtreeExternalSortComparison(),

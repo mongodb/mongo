@@ -181,7 +181,7 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
                           << url);
     }
 
-    const auto optionsStr = options.toString();
+    const auto optionsStr = std::string{options};
     for (auto i =
              boost::make_split_iterator(optionsStr, boost::first_finder("&", boost::is_iequal()));
          i != std::remove_reference<decltype((i))>::type{};
@@ -344,7 +344,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
     // 1. Validate and remove the scheme prefix `mongodb://` or `mongodb+srv://`
     const bool isSeedlist = url.starts_with(kURISRVPrefix);
     if (!(url.starts_with(kURIPrefix) || isSeedlist)) {
-        return MongoURI(uassertStatusOK(ConnectionString::parse(url.toString())));
+        return MongoURI(uassertStatusOK(ConnectionString::parse(std::string{url})));
     }
 
     // 2. Split up the URI into its components for further parsing and validation
@@ -381,7 +381,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
         str::stream() << "Password cannot properly be URL decoded for mongodb:// URL: " << url);
 
     // 4. Validate, split, and URL decode the host identifiers.
-    const auto hostIdentifiersStr = hostIdentifiers.toString();
+    const auto hostIdentifiersStr = std::string{hostIdentifiers};
     std::vector<HostAndPort> servers;
     for (auto i = boost::make_split_iterator(hostIdentifiersStr,
                                              boost::first_finder(",", boost::is_iequal()));

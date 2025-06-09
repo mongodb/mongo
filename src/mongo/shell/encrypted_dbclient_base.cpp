@@ -280,7 +280,7 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::doRunCommand(
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionRequest(
     EncryptedDBClientBase::RunCommandParams params) {
     auto& request = params.request;
-    auto commandName = request.getCommandName().toString();
+    auto commandName = std::string{request.getCommandName()};
     const DatabaseName dbName = request.parseDbName();
 
     if (std::find(kEncryptedCommands.begin(), kEncryptedCommands.end(), StringData(commandName)) ==

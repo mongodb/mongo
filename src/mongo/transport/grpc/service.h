@@ -57,7 +57,7 @@ public:
     virtual void stopAcceptingRequests() = 0;
 
     std::string toString() const {
-        return name().toString();
+        return std::string{name()};
     }
 };
 

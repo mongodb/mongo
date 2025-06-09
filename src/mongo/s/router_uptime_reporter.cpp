@@ -96,7 +96,7 @@ void reportStatus(OperationContext* opCtx,
     mType.setUptime(upTimeTimer.seconds());
     // balancer is never active in the router. Here for backwards compatibility only.
     mType.setWaiting(true);
-    mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
+    mType.setMongoVersion(std::string{VersionInfoInterface::instance().version()});
     auto statusWith = getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse);
     if (statusWith.isOK()) {
         mType.setAdvisoryHostFQDNs(statusWith.getValue());

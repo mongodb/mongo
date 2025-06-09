@@ -48,7 +48,7 @@ StatusWith<bool> SaslX509ClientConversation::step(StringData inputData, std::str
     }
     auto stepBSON = step.toBSON();
 
-    *outputData = StringData(stepBSON.objdata(), stepBSON.objsize()).toString();
+    *outputData = std::string{StringData(stepBSON.objdata(), stepBSON.objsize())};
 
     return StatusWith<bool>(true);
 }

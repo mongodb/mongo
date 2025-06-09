@@ -109,16 +109,16 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
 
     std::string username;
     auto response = bsonExtractStringFieldWithDefault(
-        params, saslCommandUserFieldName, clientName.toString(), &username);
+        params, saslCommandUserFieldName, std::string{clientName}, &username);
     if (!response.isOK()) {
         return response;
     }
-    if (username != clientName.toString()) {
+    if (username != std::string{clientName}) {
         StringBuilder message;
         message << "Username \"";
         message << params[saslCommandUserFieldName].valueStringData();
         message << "\" does not match the provided client certificate user \"";
-        message << clientName.toString() << "\"";
+        message << std::string{clientName} << "\"";
         return {ErrorCodes::AuthenticationFailed, message.str()};
     }
 
@@ -237,7 +237,7 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                 if (elem.type() != BSONType::string) {
                     return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
                 }
-                availableMechanisms.push_back(elem.checkAndGetStringData().toString());
+                availableMechanisms.push_back(std::string{elem.checkAndGetStringData()});
                 // The drivers spec says that if SHA-256 is available then it MUST be selected
                 // as the SASL mech.
                 if (availableMechanisms.back() == kMechanismScramSha256) {
@@ -245,7 +245,7 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                 }
             }
 
-            return availableMechanisms.empty() ? kInternalAuthFallbackMechanism.toString()
+            return availableMechanisms.empty() ? std::string{kInternalAuthFallbackMechanism}
                                                : availableMechanisms.front();
         });
 }
@@ -380,7 +380,8 @@ std::string getBSONString(BSONObj container, StringData field) {
 SpeculativeAuthType speculateAuth(BSONObjBuilder* helloRequestBuilder,
                                   const MongoURI& uri,
                                   std::shared_ptr<SaslClientSession>* saslClientSession) {
-    auto mechanism = uri.getOption("authMechanism").get_value_or(kMechanismScramSha256.toString());
+    auto mechanism =
+        uri.getOption("authMechanism").get_value_or(std::string{kMechanismScramSha256});
 
     auto optParams = uri.makeAuthObjFromOptions(LATEST_WIRE_VERSION, {mechanism});
     if (!optParams) {
@@ -407,7 +408,7 @@ SpeculativeAuthType speculateInternalAuth(
     const HostAndPort& remoteHost,
     BSONObjBuilder* helloRequestBuilder,
     std::shared_ptr<SaslClientSession>* saslClientSession) try {
-    auto params = getInternalAuthParams(0, kMechanismScramSha256.toString());
+    auto params = getInternalAuthParams(0, std::string{kMechanismScramSha256});
     if (params.isEmpty()) {
         return SpeculativeAuthType::kNone;
     }

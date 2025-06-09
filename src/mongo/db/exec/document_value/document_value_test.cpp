@@ -114,18 +114,18 @@ TEST(DocumentConstruction, FromNonEmptyBson) {
     Document document = fromBson(BSON("a" << 1 << "b"
                                           << "q"));
     ASSERT_EQUALS(2ULL, document.computeSize());
-    ASSERT_EQUALS("a", getNthField(document, 0).first.toString());
+    ASSERT_EQUALS("a", getNthField(document, 0).first);
     ASSERT_EQUALS(1, getNthField(document, 0).second.getInt());
-    ASSERT_EQUALS("b", getNthField(document, 1).first.toString());
+    ASSERT_EQUALS("b", getNthField(document, 1).first);
     ASSERT_EQUALS("q", getNthField(document, 1).second.getString());
 }
 
 TEST(DocumentConstruction, FromInitializerList) {
     auto document = Document{{"a", 1}, {"b", "q"_sd}};
     ASSERT_EQUALS(2ULL, document.computeSize());
-    ASSERT_EQUALS("a", getNthField(document, 0).first.toString());
+    ASSERT_EQUALS("a", getNthField(document, 0).first);
     ASSERT_EQUALS(1, getNthField(document, 0).second.getInt());
-    ASSERT_EQUALS("b", getNthField(document, 1).first.toString());
+    ASSERT_EQUALS("b", getNthField(document, 1).first);
     ASSERT_EQUALS("q", getNthField(document, 1).second.getString());
 }
 
@@ -551,8 +551,8 @@ public:
         LOGV2(20585, "{md_peek}", "md_peek"_attr = md.peek().toString());
         ASSERT_EQUALS(2ULL, md.peek().computeSize());
         ASSERT(md.peek()["b"].missing());
-        ASSERT_EQUALS("a", getNthField(md.peek(), 0).first.toString());
-        ASSERT_EQUALS("c", getNthField(md.peek(), 1).first.toString());
+        ASSERT_EQUALS("a", getNthField(md.peek(), 0).first);
+        ASSERT_EQUALS("c", getNthField(md.peek(), 1).first);
         ASSERT_EQUALS(99, md.peek()["c"].getInt());
         assertRoundTrips(md.peek());
 
@@ -560,7 +560,7 @@ public:
         md["a"] = Value();
         ASSERT_EQUALS(1ULL, md.peek().computeSize());
         ASSERT(md.peek()["a"].missing());
-        ASSERT_EQUALS("c", getNthField(md.peek(), 0).first.toString());
+        ASSERT_EQUALS("c", getNthField(md.peek(), 0).first);
         ASSERT_EQUALS(99, md.peek()["c"].getInt());
         assertRoundTrips(md.peek());
 
@@ -701,7 +701,7 @@ public:
         FieldIterator iterator(fromBson(BSON("a" << 1)));
         ASSERT(iterator.more());
         Document::FieldPair field = iterator.next();
-        ASSERT_EQUALS("a", field.first.toString());
+        ASSERT_EQUALS("a", field.first);
         ASSERT_EQUALS(1, field.second.getInt());
         ASSERT(!iterator.more());
     }
@@ -715,17 +715,17 @@ public:
                                                  << "z")));
         ASSERT(iterator.more());
         Document::FieldPair field = iterator.next();
-        ASSERT_EQUALS("a", field.first.toString());
+        ASSERT_EQUALS("a", field.first);
         ASSERT_EQUALS(1, field.second.getInt());
         ASSERT(iterator.more());
 
         Document::FieldPair field2 = iterator.next();
-        ASSERT_EQUALS("b", field2.first.toString());
+        ASSERT_EQUALS("b", field2.first);
         ASSERT_EQUALS(5.6, field2.second.getDouble());
         ASSERT(iterator.more());
 
         Document::FieldPair field3 = iterator.next();
-        ASSERT_EQUALS("c", field3.first.toString());
+        ASSERT_EQUALS("c", field3.first);
         ASSERT_EQUALS("z", field3.second.getString());
         ASSERT(!iterator.more());
     }

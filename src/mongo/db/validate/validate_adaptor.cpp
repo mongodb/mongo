@@ -412,7 +412,7 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
  */
 int _idxInt(StringData idx) {
     try {
-        auto idxInt = std::stoi(idx.toString());
+        auto idxInt = std::stoi(std::string{idx});
         return idxInt;
     } catch (const std::invalid_argument&) {
         return INT_MIN;
@@ -606,7 +606,7 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
     // Builds a hash map for the fields to avoid repeated traversals.
     auto buildFieldTable = [&](StringMap<BSONElement>* table, const BSONObj& fields) {
         for (const auto& field : fields) {
-            table->insert({field.fieldNameStringData().toString(), field});
+            table->insert({std::string{field.fieldNameStringData()}, field});
         }
     };
 
@@ -633,7 +633,7 @@ Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
 
     // Validates the time field.
     int bucketCount = 0;
-    auto timeFieldName = coll->getTimeseriesOptions().value().getTimeField().toString();
+    auto timeFieldName = std::string{coll->getTimeseriesOptions().value().getTimeField()};
     if (Status status = _validateTimeseriesDataFieldTypes(dataFields[timeFieldName], bucketVersion);
         !status.isOK()) {
         return status;

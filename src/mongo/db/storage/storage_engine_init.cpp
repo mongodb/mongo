@@ -219,7 +219,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(
                                        TimedSectionId::writeNewMetadata,
                                        startupTimeElapsedBuilder);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
-        metadata->setStorageEngine(factory->getCanonicalName().toString());
+        metadata->setStorageEngine(std::string{factory->getCanonicalName()});
         metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
         uassertStatusOK(metadata->write());
     }
@@ -313,7 +313,7 @@ void registerStorageEngine(ServiceContext* service,
     // and all factories should be added before we pick a storage engine.
     invariant(!service->getStorageEngine());
 
-    auto name = factory->getCanonicalName().toString();
+    auto name = std::string{factory->getCanonicalName()};
     storageFactories(service).emplace(name, std::move(factory));
 }
 
@@ -322,7 +322,7 @@ bool isRegisteredStorageEngine(ServiceContext* service, StringData name) {
 }
 
 StorageEngine::Factory* getFactoryForStorageEngine(ServiceContext* service, StringData name) {
-    const auto result = storageFactories(service).find(name.toString());
+    const auto result = storageFactories(service).find(std::string{name});
     if (result == storageFactories(service).end()) {
         return nullptr;
     }

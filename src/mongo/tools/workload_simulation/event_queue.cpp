@@ -84,11 +84,11 @@ bool EventQueue::wait_for(Duration d, WaitType t) {
         switch (t) {
             case WaitType::Event:
                 _eventQueue.push(
-                    std::make_tuple(wakeTime, std::move(promise), getThreadName().toString()));
+                    std::make_tuple(wakeTime, std::move(promise), std::string{getThreadName()}));
                 break;
             case WaitType::Observer:
                 _observerQueue.push(
-                    std::make_tuple(wakeTime, std::move(promise), getThreadName().toString()));
+                    std::make_tuple(wakeTime, std::move(promise), std::string{getThreadName()}));
         }
     }
     _cv.notify_one();

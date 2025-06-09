@@ -371,7 +371,7 @@ void clearTempFilesExceptForResumableBuilds(const std::vector<ResumeIndexInfo>& 
         for (const auto& index : indexes) {
             boost::optional<StringData> indexFilename = index.getFileName();
             if (indexFilename) {
-                resumableIndexFiles.insert(indexFilename->toString());
+                resumableIndexFiles.insert(std::string{*indexFilename});
             }
         }
     }

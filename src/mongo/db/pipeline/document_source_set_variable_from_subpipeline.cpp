@@ -95,8 +95,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
     uassert(
         625291,
         str::stream() << "SetVariableFromSubPipeline only allows setting $$SEARCH_META variable,  "
-                      << spec.getSetVariable().toString() << " is not allowed.",
-        spec.getSetVariable().toString() == searchMetaStr);
+                      << spec.getSetVariable() << " is not allowed.",
+        spec.getSetVariable() == searchMetaStr);
 
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline = Pipeline::parse(
         spec.getPipeline(), expCtx->copyForSubPipeline(expCtx->getNamespaceString()));

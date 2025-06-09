@@ -132,7 +132,8 @@ public:
         auto clientThread = stdx::thread([&] {
             fixtures.clientCtx->setDeadline(deadline);
             for (auto& kvp : clientMetadata) {
-                fixtures.clientCtx->addMetadataEntry(kvp.first.toString(), kvp.second.toString());
+                fixtures.clientCtx->addMetadataEntry(std::string{kvp.first},
+                                                     std::string{kvp.second});
             }
             fixtures.clientStream =
                 makeStub().unauthenticatedCommandStream(fixtures.clientCtx.get(), reactor);
@@ -437,7 +438,7 @@ public:
         auto credentials = util::isUnixSchemeGRPCFormattedURI(uri)
             ? ::grpc::InsecureChannelCredentials()
             : ::grpc::SslCredentials(sslOps);
-        return Stub(::grpc::CreateChannel(uri.toString(), credentials));
+        return Stub(::grpc::CreateChannel(std::string{uri}, credentials));
     }
 
     /**
@@ -445,22 +446,22 @@ public:
      * a superset of the required metadata for any individual RPC.
      */
     static void addRequiredClientMetadata(::grpc::ClientContext& ctx) {
-        ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
+        ctx.AddMetadata(std::string{util::constants::kWireVersionKey},
                         std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
                                            .get()
                                            ->incomingExternalClient.maxWireVersion));
-        ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), "my-token");
+        ctx.AddMetadata(std::string{util::constants::kAuthenticationTokenKey}, "my-token");
     }
 
     static void addClientMetadataDocument(::grpc::ClientContext& ctx) {
         auto clientDoc = makeClientMetadataDocument();
-        ctx.AddMetadata(util::constants::kClientMetadataKey.toString(),
+        ctx.AddMetadata(std::string{util::constants::kClientMetadataKey},
                         base64::encode(clientDoc.objdata(), clientDoc.objsize()));
     }
 
     static void addAllClientMetadata(::grpc::ClientContext& ctx) {
         addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(util::constants::kClientIdKey.toString(), UUID::gen().toString());
+        ctx.AddMetadata(std::string{util::constants::kClientIdKey}, UUID::gen().toString());
         addClientMetadataDocument(ctx);
     }
 };

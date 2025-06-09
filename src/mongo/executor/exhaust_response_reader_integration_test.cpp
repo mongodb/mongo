@@ -275,7 +275,7 @@ TEST_F(ExhaustResponseReaderIntegrationFixture, CommandSucceeds) {
         client.runCommandRequest(makeTestRequest(nss.dbName(), find.toBSON())).getNoThrow());
     auto cursorReply = CursorInitialReply::parse(IDLParserContext("findReply"), findResp.data);
 
-    GetMoreCommandRequest getMore(cursorReply.getCursor()->getCursorId(), nss.coll().toString());
+    GetMoreCommandRequest getMore(cursorReply.getCursor()->getCursorId(), std::string{nss.coll()});
     getMore.setDbName(nss.dbName());
     getMore.setBatchSize(1);
     auto getMoreRequest = makeTestRequest(nss.dbName(), getMore.toBSON());

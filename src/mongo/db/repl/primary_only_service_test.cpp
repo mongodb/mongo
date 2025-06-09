@@ -325,7 +325,7 @@ private:
         BSONObj result;
         client.runCommand(nss.dbName(),
                           BSON("createIndexes"
-                               << nss.coll().toString() << "indexes"
+                               << nss.coll() << "indexes"
                                << BSON_ARRAY(BSON("key" << BSON("x" << 1) << "name"
                                                         << "TestTTLIndex"
                                                         << "expireAfterSeconds" << 100000))),

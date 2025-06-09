@@ -141,7 +141,7 @@ void BSONElementIterator::_setTraversalStart(size_t suffixIndex, BSONElement ele
 }
 
 void BSONElementIterator::ArrayIterationState::reset(const FieldRef& ref, int start) {
-    restOfPath = ref.dottedField(start).toString();
+    restOfPath = std::string{ref.dottedField(start)};
     hasMore = restOfPath.size() > 0;
     if (hasMore) {
         nextPieceOfPath = ref.getPart(start);

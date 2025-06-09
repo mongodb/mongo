@@ -101,7 +101,7 @@ MONGO_INITIALIZER(ShouldAlwaysRecordTraffic)(InitializerContext*) {
 class TrafficRecorder::Recording {
 public:
     Recording(const StartTrafficRecording& options)
-        : _path(_getPath(options.getDestination().toString())),
+        : _path(_getPath(std::string{options.getDestination()})),
           _maxLogSize(options.getMaxFileSize()) {
 
         MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Options

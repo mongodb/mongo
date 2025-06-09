@@ -71,7 +71,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         TailableModeEnum tailableMode) {
     auto executorPool = Grid::get(opCtx)->getExecutorPool();
     auto result = storePossibleCursor(opCtx,
-                                      remoteCursor->getShardId().toString(),
+                                      std::string{remoteCursor->getShardId()},
                                       remoteCursor->getHostAndPort(),
                                       std::move(remoteCursor->getCursorResponse()),
                                       requestedNss,

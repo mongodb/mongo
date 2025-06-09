@@ -422,7 +422,7 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
     boost::optional<SbSlot> oplogTsSlot;
     if (csn->shouldTrackLatestOplogTimestamp) {
         // Add the "ts" field to 'fields' if it's not already present.
-        std::string tsField = repl::OpTime::kTimestampFieldName.toString();
+        std::string tsField = std::string{repl::OpTime::kTimestampFieldName};
         fields = appendVectorUnique(std::move(fields), std::vector{std::move(tsField)});
 
         // Retrieve the "oplogTs" slot so we can pass it to makeScan() below.

@@ -59,8 +59,8 @@ public:
         bool validateOnClose = true)
         : GoldenTestContextBase(
               config,
-              fs::path(sanitizeName(testInfo->suiteName().toString())) /
-                  fs::path(sanitizeName(testInfo->testName().toString()) + ".txt"),
+              fs::path(sanitizeName(std::string{testInfo->suiteName()})) /
+                  fs::path(sanitizeName(std::string{testInfo->testName()}) + ".txt"),
               validateOnClose,
               [this](auto const&... args) { return onError(args...); }),
           _testInfo(testInfo) {}

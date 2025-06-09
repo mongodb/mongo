@@ -617,7 +617,7 @@ CursorId earlyExitWithNoResults(OperationContext* opCtx,
                                 const auto& findCommand) {
     uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
                                        *findCommand.getCollectionUUID(),
-                                       query.nss().coll().toString(),
+                                       std::string{query.nss().coll()},
                                        boost::none),
             "Database does not exist",
             !findCommand.getCollectionUUID());

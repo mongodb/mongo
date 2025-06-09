@@ -293,7 +293,7 @@ public:
                 "Must specify a window function in output field",
                 accumulatorName);
         return make_intrusive<ExpressionFromAccumulator<NonRemovableType>>(
-            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+            expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
@@ -361,7 +361,7 @@ public:
                 str::stream() << "'window' field is not allowed in " << accumulatorName,
                 windowFieldMissing);
         return make_intrusive<ExpressionFromLeftUnboundedWindowFunction<FunctionType>>(
-            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+            expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
@@ -412,7 +412,7 @@ public:
                 "Must specify a window function in output field",
                 accumulatorName);
         return make_intrusive<ExpressionRemovable<NonRemovableType, RemovableType>>(
-            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+            expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
     }
 
     ExpressionRemovable(ExpressionContext* expCtx,
@@ -443,14 +443,14 @@ public:
                 expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
                 expCtx,
-                accumulatorName.toString(),
+                std::string{accumulatorName},
                 std::move(sortExpression),
                 sortPatternPart.isAscending,
                 std::move(bounds));
         } else {
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
                 expCtx,
-                accumulatorName.toString(),
+                std::string{accumulatorName},
                 sortPatternPart.expression,
                 sortPatternPart.isAscending,
                 std::move(bounds));
@@ -491,7 +491,7 @@ public:
             // newer versions, since we need to make sure that the $sort stage is giving us the sort
             // key.
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx, accumulatorName->toString(), std::move(bounds));
+                expCtx, std::string{*accumulatorName}, std::move(bounds));
         }
         // TODO SERVER-85426 This whole branch/helper can be deleted.
         return createLegacyRankWF(expCtx, *accumulatorName, *sortBy, std::move(bounds));
@@ -894,7 +894,7 @@ public:
                 sortBy && sortBy->isSingleElementKey());
 
         return make_intrusive<ExpressionLinearFill>(
-            expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
+            expCtx, std::string{*accumulatorName}, std::move(input), std::move(bounds));
     }
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {

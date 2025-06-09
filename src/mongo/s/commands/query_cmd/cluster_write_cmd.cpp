@@ -550,8 +550,8 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
             auto clusterWriteWithoutShardKeyExplainRes = [&] {
                 ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
                     ClusterExplain::wrapAsExplain(req.toBSON(), verbosity),
-                    clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")
-                        .toString(),
+                    std::string{
+                        clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")},
                     write_without_shard_key::targetDocForExplain);
                 const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);

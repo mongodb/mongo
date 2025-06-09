@@ -96,7 +96,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
         std::string term = str::toLower(t.data);
         if (tools.stopwords->isStopWord(term))
             continue;
-        term = tools.stemmer->stem(term).toString();
+        term = std::string{tools.stemmer->stem(term)};
 
         ScoreHelperStruct& data = terms[term];
 
@@ -134,7 +134,7 @@ void FTSSpec::_scoreStringV1(const Tools& tools,
 }
 
 bool FTSSpec::_weightV1(StringData field, double* out) const {
-    Weights::const_iterator i = _weights.find(field.toString());
+    Weights::const_iterator i = _weights.find(std::string{field});
     if (i == _weights.end())
         return false;
     *out = i->second;

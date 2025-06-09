@@ -450,7 +450,7 @@ void validateShardKeyAgainstExistingZones(OperationContext* opCtx,
 
             if (coll && coll->getTimeseriesOptions()) {
                 const std::string controlTimeField =
-                    timeseries::kControlMinFieldNamePrefix.toString() +
+                    std::string{timeseries::kControlMinFieldNamePrefix} +
                     coll->getTimeseriesOptions()->getTimeField();
                 if (tagMinKeyElement.fieldNameStringData() == controlTimeField) {
                     uassert(ErrorCodes::InvalidOptions,

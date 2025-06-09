@@ -180,7 +180,7 @@ public:
     std::vector<std::string> serialize() const {
         std::vector<std::string> ret;
         for (const auto fieldRef : _fieldRefSet) {
-            ret.push_back(fieldRef->dottedField().toString());
+            ret.push_back(std::string{fieldRef->dottedField()});
         }
         return ret;
     }

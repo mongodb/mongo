@@ -303,7 +303,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                             << newCollectionEpoch.value() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
                             << "reshardingFields.state"
-                            << CoordinatorState_serializer(coordinatorDoc.getState()).toString()
+                            << CoordinatorState_serializer(coordinatorDoc.getState())
                             << "reshardingFields.recipientFields" << recipientFields.toBSON());
             if (newCollectionTimestamp.has_value()) {
                 setFields =
@@ -333,7 +333,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                 BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
                 setBuilder.append("reshardingFields.state",
-                                  CoordinatorState_serializer(nextState).toString());
+                                  std::string{CoordinatorState_serializer(nextState)});
                 setBuilder.append("lastmod",
                                   opCtx->getServiceContext()->getPreciseClockSource()->now());
 
@@ -443,7 +443,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                                                            SerializationContext::stateDefault())),
                     BSON("$set" << BSON(
                              "reshardingFields.state"
-                             << CoordinatorState_serializer(nextState).toString()
+                             << CoordinatorState_serializer(nextState)
                              << "reshardingFields.recipientFields.approxDocumentsToCopy"
                              << coordinatorDoc.getApproxDocumentsToCopy().value()
                              << "reshardingFields.recipientFields.approxBytesToCopy"
@@ -474,7 +474,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
 
                     setBuilder.append("reshardingFields.state",
-                                      CoordinatorState_serializer(nextState).toString());
+                                      std::string{CoordinatorState_serializer(nextState)});
                     setBuilder.append("lastmod",
                                       opCtx->getServiceContext()->getPreciseClockSource()->now());
 
@@ -553,7 +553,7 @@ void setupZonesForTempNss(OperationContext* opCtx,
     for (const auto& zone : newZones) {
         BSONObjBuilder cmdBuilder;
         ConfigsvrUpdateZoneKeyRange cmd(
-            nss, zone.getMin(), zone.getMax(), zone.getZone().toString());
+            nss, zone.getMin(), zone.getMax(), std::string{zone.getZone()});
         cmd.serialize(&cmdBuilder);
         cmdBuilder.append("writeConcern", resharding::kMajorityWriteConcern.toBSON());
 

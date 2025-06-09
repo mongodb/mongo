@@ -414,7 +414,7 @@ void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& co
         } else {
             // Since exclude is applied after addComputedMetaProjFields, we must erase the new field
             // from the include/exclude fields so this doesn't get removed.
-            _spec.removeIncludeExcludeField(field.toString());
+            _spec.removeIncludeExcludeField(std::string{field});
         }
     }
 

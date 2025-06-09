@@ -265,7 +265,7 @@ template <typename... Ts>
 inline auto _fn(StringData name, Ts&&... pack) {
     std::vector<ExprHolder> v;
     (v.push_back(std::forward<Ts>(pack)), ...);
-    return ExprHolder{make<FunctionCall>(name.toString(), holdersToABTs(std::move(v)))};
+    return ExprHolder{make<FunctionCall>(std::string{name}, holdersToABTs(std::move(v)))};
 }
 
 /**

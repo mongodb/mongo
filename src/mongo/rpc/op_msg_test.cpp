@@ -847,13 +847,12 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
                                                           "secret");
 
     const auto kTenantId = TenantId(OID::gen());
-    const auto token = auth::ValidatedTenancyScopeFactory::create(
-                           UserName("user", "admin", kTenantId),
-                           "secret"_sd,
-                           auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
-                           .getOriginalToken()
-                           .toString();
+    const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
+                                       UserName("user", "admin", kTenantId),
+                                       "secret"_sd,
+                                       auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                                       auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
+                                       .getOriginalToken()};
     auto msg =
         OpMsgBytes{
             kNoFlags,  //
@@ -885,12 +884,11 @@ TEST_F(OpMsgWithAuth, ValidatedTenancyScopeShouldNotBeSerialized) {
 
     const auto kTenantId = TenantId(OID::gen());
 
-    const auto token = auth::ValidatedTenancyScopeFactory::create(
-                           kTenantId,
-                           auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
-                           auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
-                           .getOriginalToken()
-                           .toString();
+    const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
+                                       kTenantId,
+                                       auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
+                                       auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
+                                       .getOriginalToken()};
 
     const auto body = BSON("ping" << 1);
     auto msgBytes = OpMsgBytes{
@@ -1006,15 +1004,15 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
 
 void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
     const auto kTenantId = TenantId(OID::gen());
-    const auto token = auth::ValidatedTenancyScopeFactory::create(
-                           UserName("user", "admin", kTenantId),
-                           "secret"_sd,
-                           simulateAtlasProxyTenantProtocol
-                               ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
-                               : auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                           auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
-                           .getOriginalToken()
-                           .toString();
+    const auto token =
+        std::string{auth::ValidatedTenancyScopeFactory::create(
+                        UserName("user", "admin", kTenantId),
+                        "secret"_sd,
+                        simulateAtlasProxyTenantProtocol
+                            ? auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy
+                            : auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                        auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
+                        .getOriginalToken()};
     auto msg =
         OpMsgBytes{
             kNoFlags,  //
@@ -1213,12 +1211,11 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
     BSONObjBuilder builder;
     builder.append("ping", 1).append("$db", db);
 
-    const auto token = auth::ValidatedTenancyScopeFactory::create(
-                           kTenantId,
-                           auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-                           auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
-                           .getOriginalToken()
-                           .toString();
+    const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
+                                       kTenantId,
+                                       auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                                       auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
+                                       .getOriginalToken()};
 
     const auto body = builder.obj();
     OpMsg msg =
@@ -1259,12 +1256,11 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTSIncludePrefix) {
     BSONObjBuilder builder;
     builder.append("ping", 1).append("$db", db);
 
-    const auto token = auth::ValidatedTenancyScopeFactory::create(
-                           kTenantId,
-                           auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
-                           auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
-                           .getOriginalToken()
-                           .toString();
+    const auto token = std::string{auth::ValidatedTenancyScopeFactory::create(
+                                       kTenantId,
+                                       auth::ValidatedTenancyScope::TenantProtocol::kAtlasProxy,
+                                       auth::ValidatedTenancyScopeFactory::TenantForTestingTag{})
+                                       .getOriginalToken()};
 
     const auto body = builder.obj();
     OpMsg msg =

@@ -1351,7 +1351,7 @@ private:
     public:
         PasswordFetcher(StringData configParameter, StringData prompt)
             : _password(configParameter.begin(), configParameter.end()),
-              _prompt(prompt.toString()) {
+              _prompt(std::string{prompt}) {
             invariant(!prompt.empty());
         }
 
@@ -3653,7 +3653,7 @@ UniqueX509 SSLManagerOpenSSL::_getX509Object(StringData keyFile,
     }
 
     ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
-    if (BIO_read_filename(inBIO, keyFile.toString().c_str()) <= 0) {
+    if (BIO_read_filename(inBIO, std::string{keyFile}.c_str()) <= 0) {
         uasserted(4913001,
                   str::stream() << "cannot read key file when setting subject name: " << keyFile
                                 << " " << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));
@@ -3703,9 +3703,9 @@ void SSLManagerOpenSSL::_getX509CertInfo(UniqueX509& x509,
     uassert(4913004, "date conversion failed", notAfterMillis != Date_t());
 
     if (keyFile)
-        info->keyFile = keyFile->toString();
+        info->keyFile = std::string{*keyFile};
     if (targetClusterURI)
-        info->targetClusterURI = targetClusterURI->toString();
+        info->targetClusterURI = std::string{*targetClusterURI};
 }
 
 
@@ -3717,7 +3717,7 @@ void SSLManagerOpenSSL::_getCRLInfo(StringData crlFile, CRLInformationToLog* inf
 
     ON_BLOCK_EXIT([&] { BIO_free(inBIO); });
 
-    if (BIO_read_filename(inBIO, crlFile.toString().c_str()) <= 0) {
+    if (BIO_read_filename(inBIO, std::string{crlFile}.c_str()) <= 0) {
         uasserted(4913006,
                   str::stream() << "cannot read crl file when setting subject name: " << crlFile
                                 << " " << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()));

@@ -296,7 +296,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                 _name = _invocation->definition()->getName();
             } else {
                 _nss = NamespaceString(request.parseDbName());
-                _name = request.getCommandName().toString();
+                _name = std::string{request.getCommandName()};
             }
         }
 
@@ -355,7 +355,7 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << ns << "'",
             NamespaceString::isValid(ns));
-    return ns.toString();
+    return std::string{ns};
 }
 
 NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& dbName,
@@ -1099,7 +1099,7 @@ std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
 }
 
 Command::Command(StringData name, std::vector<StringData> aliases)
-    : _name(name.toString()), _aliases(std::move(aliases)) {}
+    : _name(std::string{name}), _aliases(std::move(aliases)) {}
 
 void Command::initializeClusterRole(ClusterRole role) {
     for (auto&& [ptr, stat] : {

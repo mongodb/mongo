@@ -147,7 +147,7 @@ public:
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uassert(CollectionUUIDMismatchInfo(request().getDbName(),
                                                    *request().getCollectionUUID(),
-                                                   request().getNamespace().coll().toString(),
+                                                   std::string{request().getNamespace().coll()},
                                                    boost::none),
                         "Database does not exist",
                         !request().getCollectionUUID());

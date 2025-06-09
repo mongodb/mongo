@@ -661,7 +661,7 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
     // It is only legal to push down the projection it if preserves all of the fields on which we
     // need to sort.
     for (auto&& sortComponent : sortNode->pattern) {
-        if (!projectNode->hasField(sortComponent.fieldNameStringData().toString())) {
+        if (!projectNode->hasField(std::string{sortComponent.fieldNameStringData()})) {
             return root;
         }
     }

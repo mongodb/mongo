@@ -127,7 +127,7 @@ constexpr auto kSysBlockDeviceDirectoryName = "device";
  * be reading directly from the kernel.
  */
 StatusWith<std::string> readFileAsString(StringData filename) {
-    int fd = open(filename.toString().c_str(), 0);
+    int fd = open(std::string{filename}.c_str(), 0);
     if (fd == -1) {
         auto ec = lastSystemError();
         return Status(ErrorCodes::FileOpenFailed,
@@ -391,7 +391,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
             // If there is one last token, check if it is actually "kB"
             if (valueIt != StringSplitIterator()) {
                 StringData kbToken = stringDataFromRange(*valueIt);
-                auto keyWithSuffix = key.toString();
+                auto keyWithSuffix = std::string{key};
 
                 if (kbToken == "kB") {
                     keyWithSuffix.append("_kb");
@@ -487,7 +487,7 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                     StringData stringValue = stringDataFromRange(*valuesIt);
                     uint64_t value;
                     if (NumberParser{}(stringValue, &value).isOK()) {
-                        builder->appendNumber(prefix.toString() + key.toString(),
+                        builder->appendNumber(std::string{prefix} + std::string{key},
                                               static_cast<long long>(value));
                         foundKeys = true;
                     }
@@ -556,7 +556,7 @@ Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& lines
                 return Status(ErrorCodes::FailedToParse,
                               str::stream() << "Couldn't parse '" << stringValue << "' to number");
             }
-            sub.appendNumber(key.toString(), value);
+            sub.appendNumber(std::string{key}, value);
             foundKeys = true;
             ++partIt;
         }
@@ -716,7 +716,7 @@ Status parseProcSelfMountStatsImpl(
     std::function<boost::filesystem::space_info(const boost::filesystem::path&,
                                                 boost::system::error_code&)> getSpace) {
     invariant(getSpace);
-    std::istringstream iss(data.toString());
+    std::istringstream iss(std::string{data});
     for (std::string line; std::getline(iss, line);) {
         // As described in the /proc/[pid]/mountinfo section of `man 5 proc`:
         //
@@ -797,7 +797,7 @@ bool isInterestingDisk(const boost::filesystem::path& path) {
 
 std::vector<std::string> findPhysicalDisks(StringData sysBlockPath) {
     boost::system::error_code ec;
-    auto sysBlockPathStr = sysBlockPath.toString();
+    auto sysBlockPathStr = std::string{sysBlockPath};
 
     auto statusSysBlock = boost::filesystem::status(sysBlockPathStr, ec);
     if (ec) {

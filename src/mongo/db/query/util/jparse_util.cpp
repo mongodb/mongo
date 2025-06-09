@@ -691,7 +691,7 @@ BSONObj fromFuzzerJson(const char* jsonString, int* len) {
 }
 
 BSONObj fromFuzzerJson(StringData str) {
-    return fromFuzzerJson(str.toString().c_str());
+    return fromFuzzerJson(std::string{str}.c_str());
 }
 
 } /* namespace mongo */

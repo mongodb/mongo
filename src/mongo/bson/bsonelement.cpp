@@ -799,7 +799,7 @@ std::string BSONElement::_asCode() const {
     switch (type()) {
         case BSONType::string:
         case BSONType::code:
-            return valueStringData().toString();
+            return std::string{valueStringData()};
         case BSONType::codeWScope:
             return std::string(codeWScopeCode(),
                                ConstDataView(valuestr()).read<LittleEndian<int>>() - 1);

@@ -44,7 +44,7 @@ void validateWriteAllowed(OperationContext* opCtx) {
 }  // namespace
 
 RecordStoreBase::RecordStoreBase(boost::optional<UUID> uuid, StringData ident)
-    : _ident(std::make_shared<Ident>(ident.toString())), _uuid(uuid) {}
+    : _ident(std::make_shared<Ident>(std::string{ident})), _uuid(uuid) {}
 
 boost::optional<UUID> RecordStoreBase::uuid() const {
     return _uuid;

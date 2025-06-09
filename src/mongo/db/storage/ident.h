@@ -44,7 +44,7 @@ namespace mongo {
  */
 class Ident {
 public:
-    explicit Ident(StringData ident) : _ident(ident.toString()) {}
+    explicit Ident(StringData ident) : _ident(std::string{ident}) {}
     virtual ~Ident() = default;
 
     const std::string& getIdent() const {

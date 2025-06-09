@@ -184,14 +184,14 @@ void addNodeAtPathHelper(ProjectionPathASTNode* root,
     if (path.getPathLength() == componentIndex + 1) {
         uassert(31250, str::stream() << "Path collision at " << path.fullPath(), !child);
 
-        root->addChild(nextComponent.toString(), std::move(newChild));
+        root->addChild(std::string{nextComponent}, std::move(newChild));
         return;
     }
 
     if (!child) {
         auto newInternalChild = std::make_unique<ProjectionPathASTNode>();
         auto rawInternalChild = newInternalChild.get();
-        root->addChild(nextComponent.toString(), std::move(newInternalChild));
+        root->addChild(std::string{nextComponent}, std::move(newInternalChild));
         addNodeAtPathHelper(rawInternalChild, path, componentIndex + 1, std::move(newChild));
         return;
     }

@@ -84,18 +84,18 @@ BSONObj generateX509UserDocument(const StringData username) {
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
 SSLX509Name buildX509Name() {
     return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
-        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
+        {{{std::string{kOID_CommonName}, 19 /* Printable String */, "mongodb.com"}}}));
 }
 
 // Construct a simple X509 name equivalent to "OU=Kernel,O=MongoDB"
 SSLX509Name buildClusterX509Name() {
     return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
-        {{{kOID_CountryName.toString(), kX509UTF8String, "US"}},
-         {{kOID_StateName.toString(), kX509UTF8String, "New York"}},
-         {{kOID_LocalityName.toString(), kX509UTF8String, "New York City"}},
-         {{kOID_OName.toString(), kX509UTF8String, "MongoDB"}},
-         {{kOID_OUName.toString(), kX509UTF8String, "Kernel"}},
-         {{kOID_CommonName.toString(), kX509UTF8String, "client"}}}));
+        {{{std::string{kOID_CountryName}, kX509UTF8String, "US"}},
+         {{std::string{kOID_StateName}, kX509UTF8String, "New York"}},
+         {{std::string{kOID_LocalityName}, kX509UTF8String, "New York City"}},
+         {{std::string{kOID_OName}, kX509UTF8String, "MongoDB"}},
+         {{std::string{kOID_OUName}, kX509UTF8String, "Kernel"}},
+         {{std::string{kOID_CommonName}, kX509UTF8String, "client"}}}));
 }
 
 void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeerInfo info) {
@@ -122,8 +122,8 @@ protected:
         params.sslPEMKeyFile = "jstests/libs/server.pem";
         params.sslCAFile = "jstests/libs/ca.pem";
         params.sslClusterFile = "jstests/libs/server.pem";
-        params.clusterAuthX509ExtensionValue = kX509Subject.toString();
-        sslGlobalParams.clusterAuthX509ExtensionValue = kX509Subject.toString();
+        params.clusterAuthX509ExtensionValue = std::string{kX509Subject};
+        sslGlobalParams.clusterAuthX509ExtensionValue = std::string{kX509Subject};
         auto manager = SSLManagerInterface::create(params, true);
 
         session->setSSLManager(manager);

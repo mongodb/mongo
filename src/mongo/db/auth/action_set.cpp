@@ -102,7 +102,7 @@ ActionSet ActionSet::parseFromStringVector(const std::vector<StringData>& action
         auto swActionType = parseActionFromString(action);
         if (!swActionType.isOK()) {
             if ((swActionType.getStatus() == ErrorCodes::FailedToParse) && unrecognizedActions) {
-                unrecognizedActions->push_back(action.toString());
+                unrecognizedActions->push_back(std::string{action});
             }
             continue;
         }

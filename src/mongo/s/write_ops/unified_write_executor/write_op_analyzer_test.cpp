@@ -64,7 +64,7 @@ struct WriteOpAnalyzerTest : public ShardingTestFixture {
             const auto bson = chunkData.getDocument().toBson();
             ChunkRange range{bson.getField("_id").Obj().getOwned(),
                              bson.getField("max").Obj().getOwned()};
-            ShardId shard{bson.getField("shard").valueStringDataSafe().toString()};
+            ShardId shard{std::string{bson.getField("shard").valueStringDataSafe()}};
             chunks.emplace_back(uuid,
                                 std::move(range),
                                 ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}),

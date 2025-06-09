@@ -149,7 +149,7 @@ public:
                     request().getFind() || request().getBounds());
 
 
-            std::string destination = request().getTo().toString();
+            std::string destination = std::string{request().getTo()};
             const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, destination);
 
             if (!toStatus.isOK()) {

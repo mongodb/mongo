@@ -468,7 +468,7 @@ SymmetricKey aesGeneratePredictableKey256(StringData stringKey, StringData keyId
     SecureVector<uint8_t> key(keySize);
     std::copy(stringKey.begin(), stringKey.end(), key->begin());
 
-    return SymmetricKey(std::move(key), crypto::aesAlgorithm, keyId.toString());
+    return SymmetricKey(std::move(key), crypto::aesAlgorithm, std::string{keyId});
 }
 
 // Convenience wrappers to avoid line-wraps later.

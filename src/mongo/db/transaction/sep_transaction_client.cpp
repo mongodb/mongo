@@ -372,7 +372,7 @@ ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
 
                        GetMoreCommandRequest getMoreRequest(
                            cursorResponse->getCursorId(),
-                           cursorResponse->getNSS().coll().toString());
+                           std::string{cursorResponse->getNSS().coll()});
                        getMoreRequest.setBatchSize(batchSize);
 
                        return runCommand(cursorResponse->getNSS().dbName(), getMoreRequest.toBSON())

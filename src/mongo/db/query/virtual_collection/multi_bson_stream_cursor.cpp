@@ -170,7 +170,7 @@ boost::optional<Record> MultiBsonStreamCursor::nextFromCurrentStream() {
  */
 std::unique_ptr<InputStream<NamedPipeInput>> MultiBsonStreamCursor::getInputStream(
     const std::string& url) {
-    auto filePathPos = url.find(ExternalDataSourceMetadata::kUrlProtocolFile.toString());
+    auto filePathPos = url.find(std::string{ExternalDataSourceMetadata::kUrlProtocolFile});
     tassert(ErrorCodes::BadValue,
             fmt::format("Invalid file url: {}", url),
             filePathPos != std::string::npos);

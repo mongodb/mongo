@@ -109,7 +109,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(Re
                                                                               KeyFormat keyFormat) {
     WiredTigerRecordStore::Params params;
     params.baseParams.uuid = boost::none;
-    params.baseParams.ident = ident.toString();
+    params.baseParams.ident = std::string{ident};
     params.baseParams.engineName = _canonicalName;
     params.baseParams.keyFormat = keyFormat;
     params.baseParams.overwrite = true;

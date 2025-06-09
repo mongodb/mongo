@@ -40,7 +40,7 @@ class WindowOp {
 public:
     WindowOp(std::string opName);
 
-    WindowOp(StringData opName) : WindowOp(opName.toString()) {}
+    WindowOp(StringData opName) : WindowOp(std::string{opName}) {}
 
     WindowOp(const WindowFunctionStatement& wf);
 

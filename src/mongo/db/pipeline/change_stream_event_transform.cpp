@@ -259,22 +259,22 @@ ChangeStreamDefaultEventTransformation::buildSupportedEvents() const {
 
 std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDependencies() const {
     std::set<std::string> accessedFields = {
-        repl::OplogEntry::kOpTypeFieldName.toString(),
-        repl::OplogEntry::kTimestampFieldName.toString(),
-        repl::OplogEntry::kNssFieldName.toString(),
-        repl::OplogEntry::kUuidFieldName.toString(),
-        repl::OplogEntry::kObjectFieldName.toString(),
-        repl::OplogEntry::kObject2FieldName.toString(),
-        repl::OplogEntry::kSessionIdFieldName.toString(),
-        repl::OplogEntry::kTxnNumberFieldName.toString(),
-        DocumentSourceChangeStream::kTxnOpIndexField.toString(),
-        repl::OplogEntry::kWallClockTimeFieldName.toString(),
-        DocumentSourceChangeStream::kCommitTimestampField.toString(),
-        repl::OplogEntry::kTidFieldName.toString()};
+        std::string{repl::OplogEntry::kOpTypeFieldName},
+        std::string{repl::OplogEntry::kTimestampFieldName},
+        std::string{repl::OplogEntry::kNssFieldName},
+        std::string{repl::OplogEntry::kUuidFieldName},
+        std::string{repl::OplogEntry::kObjectFieldName},
+        std::string{repl::OplogEntry::kObject2FieldName},
+        std::string{repl::OplogEntry::kSessionIdFieldName},
+        std::string{repl::OplogEntry::kTxnNumberFieldName},
+        std::string{DocumentSourceChangeStream::kTxnOpIndexField},
+        std::string{repl::OplogEntry::kWallClockTimeFieldName},
+        std::string{DocumentSourceChangeStream::kCommitTimestampField},
+        std::string{repl::OplogEntry::kTidFieldName}};
 
     if (_preImageRequested || _postImageRequested) {
-        accessedFields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
-        accessedFields.insert(DocumentSourceChangeStream::kApplyOpsTsField.toString());
+        accessedFields.insert(std::string{DocumentSourceChangeStream::kApplyOpsIndexField});
+        accessedFields.insert(std::string{DocumentSourceChangeStream::kApplyOpsTsField});
     }
     return accessedFields;
 }
@@ -613,13 +613,13 @@ ChangeStreamViewDefinitionEventTransformation::ChangeStreamViewDefinitionEventTr
 
 std::set<std::string> ChangeStreamViewDefinitionEventTransformation::getFieldNameDependencies()
     const {
-    return std::set<std::string>{repl::OplogEntry::kOpTypeFieldName.toString(),
-                                 repl::OplogEntry::kTimestampFieldName.toString(),
-                                 repl::OplogEntry::kUuidFieldName.toString(),
-                                 repl::OplogEntry::kObjectFieldName.toString(),
-                                 DocumentSourceChangeStream::kTxnOpIndexField.toString(),
-                                 repl::OplogEntry::kWallClockTimeFieldName.toString(),
-                                 repl::OplogEntry::kTidFieldName.toString()};
+    return std::set<std::string>{std::string{repl::OplogEntry::kOpTypeFieldName},
+                                 std::string{repl::OplogEntry::kTimestampFieldName},
+                                 std::string{repl::OplogEntry::kUuidFieldName},
+                                 std::string{repl::OplogEntry::kObjectFieldName},
+                                 std::string{DocumentSourceChangeStream::kTxnOpIndexField},
+                                 std::string{repl::OplogEntry::kWallClockTimeFieldName},
+                                 std::string{repl::OplogEntry::kTidFieldName}};
 }
 
 Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(

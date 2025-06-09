@@ -4437,7 +4437,7 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
                                    "current replica set config"});
             } else {
                 const boost::optional<std::string> horizon =
-                    sni.empty() ? SplitHorizon::kDefaultHorizon.toString() : iter->second;
+                    sni.empty() ? std::string{SplitHorizon::kDefaultHorizon} : iter->second;
                 const auto response = _makeHelloResponse(horizon, lock, hasValidConfig);
                 promise->emplaceValue(response);
             }
@@ -4873,7 +4873,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // of other members's state, allowing us to make informed sync source decisions.
     if (newSyncSource.empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
         !_getMemberState(lk).primary()) {
-        _restartScheduledHeartbeats(lk, _rsConfig.unsafePeek().getReplSetName().toString());
+        _restartScheduledHeartbeats(lk, std::string{_rsConfig.unsafePeek().getReplSetName()});
     }
 
     return newSyncSource;
@@ -5346,12 +5346,12 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
             // ourSetName is empty if this was in auto initiate mode.
             uassert(
                 8001600, "Auto bootstrapped replica set not yet initialized", rsc.isInitialized());
-            return rsc.getReplSetName().toString();
+            return std::string{rsc.getReplSetName()};
         } else if (!_settings.isServerless()) {
             return _settings.ourSetName();
         } else {
             if (rsc.isInitialized()) {
-                return rsc.getReplSetName().toString();
+                return std::string{rsc.getReplSetName()};
             }
 
             // In serverless mode before having an initialized config, simply use the replica set

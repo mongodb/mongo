@@ -174,8 +174,8 @@ RegexMatchExpression::RegexMatchExpression(boost::optional<StringData> path,
                                            StringData options,
                                            clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(REGEX, path, std::move(annotation)),
-      _regex(regex.toString()),
-      _flags(options.toString()),
+      _regex(std::string{regex}),
+      _flags(std::string{options}),
       _re(makeRegex(_regex, _flags)) {
 
     uassert(ErrorCodes::BadValue,

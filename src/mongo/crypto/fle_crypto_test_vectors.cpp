@@ -83,7 +83,7 @@ struct EdgeCalcTestVector {
         }
 
         for (StringData edgeSd : edges) {
-            std::string edge = edgeSd.toString();
+            std::string edge = std::string{edgeSd};
             if (std::all_of(expectedEdges.begin(), expectedEdges.end(), [edge](auto ee) {
                     return edge != ee;
                 })) {

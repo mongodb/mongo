@@ -183,9 +183,9 @@ void SampleCollectorCache::addCollector(StringData name,
                                         bool hasData,
                                         ClusterRole role,
                                         SampleCollectFn&& fn) {
-    _sampleCollectors[name.toString()] = {
+    _sampleCollectors[std::string{name}] = {
         ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
-            name.toString(), nullptr, ClientOperationKillableByStepdown{false})),
+            std::string{name}, nullptr, ClientOperationKillableByStepdown{false})),
         boost::none,
         std::move(fn),
         role,
@@ -300,7 +300,7 @@ void SampleCollectorCache::refresh(OperationContext* opCtx, BSONObjBuilder* buil
 }
 
 void SampleCollectorCache::_startNewPool(size_t minThreads, size_t maxThreads) {
-    auto roleName = getRoleName(_role).toString();
+    auto roleName = std::string{getRoleName(_role)};
     roleName[0] = ctype::toUpper(roleName[0]);
 
     ThreadPool::Options options;

@@ -178,7 +178,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     changeLog.setClientAddr(opCtx->getClient()->clientAddress(true));
     changeLog.setTime(now);
     changeLog.setNS(operationNS);
-    changeLog.setWhat(what.toString());
+    changeLog.setWhat(std::string{what});
     // TODO SERVER-99655, SERVER-99552: update once gSnapshotFCVInDDLCoordinators is enabled on the
     // lastLTS and the OFCV is snapshotted for DDLs that do not pass by coordinators.
     if (auto& vCtx = VersionContext::getDecoration(opCtx); vCtx.isInitialized()) {

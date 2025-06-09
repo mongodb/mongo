@@ -76,7 +76,7 @@ public:
             connectionId = client->getConnectionId();
             if (auto metadata = ClientMetadata::get(client)) {
                 clientMetadata = metadata->getDocument();
-                appName = metadata->getApplicationName().toString();
+                appName = std::string{metadata->getApplicationName()};
             }
         }
     };

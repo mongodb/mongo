@@ -623,7 +623,7 @@ void buildCredentials(BSONObjBuilder* builder, const UserName& userName, const T
         if (digestPassword) {
             hashedPwd = createPasswordDigest(userName.getUser(), password);
         } else {
-            hashedPwd = password.toString();
+            hashedPwd = std::string{password};
         }
         auto sha1Cred = scram::Secrets<SHA1Block>::generateCredentials(
             hashedPwd, saslGlobalParams.scramSHA1IterationCount.load());
@@ -702,7 +702,7 @@ private:
             : UMCTransactionClient(cmdName),
               _client(opCtx->getServiceContext()
                           ->getService(ClusterRole::ShardServer)
-                          ->makeClient(cmdName.toString())),
+                          ->makeClient(std::string{cmdName})),
               _writeConcern(opCtx->getWriteConcern().toBSON().removeField(
                   ReadWriteConcernProvenanceBase::kSourceFieldName)) {
             _vts = auth::ValidatedTenancyScope::get(opCtx);

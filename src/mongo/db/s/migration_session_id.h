@@ -82,7 +82,7 @@ public:
     std::string toString() const;
 
     static MigrationSessionId fromString(StringData sessionId) {
-        MigrationSessionId id(sessionId.toString());
+        MigrationSessionId id(std::string{sessionId});
         return id;
     }
 

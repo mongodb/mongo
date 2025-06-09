@@ -127,9 +127,9 @@ public:
 
     void add(StringData name, StringData alias = {}) {
         auto p = std::make_shared<const LanguageType>(std::string{name});
-        _map[name.toString()] = p;
+        _map[std::string{name}] = p;
         if (!alias.empty()) {
-            _map[alias.toString()] = p;
+            _map[std::string{alias}] = p;
         }
     }
 

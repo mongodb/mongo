@@ -66,7 +66,7 @@ StatusWith<StringData> findPEMBlob(StringData blob,
 
 StatusWith<std::string> readPEMFile(StringData fileName) {
     // Calling `toString()` is necessary as `fileName` does not have to be null-terminated.
-    std::ifstream pemFile(fileName.toString(), std::ios::binary);
+    std::ifstream pemFile(std::string{fileName}, std::ios::binary);
     if (!pemFile.is_open()) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
                       fmt::format("Failed to open PEM file: {}", fileName));

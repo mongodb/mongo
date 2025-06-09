@@ -37,6 +37,6 @@ inline BitsetTerm makeBitsetTerm(const Minterm& minterm) {
 }
 
 inline BitsetTerm makeBitsetTerm(StringData predicates, StringData mask) {
-    return BitsetTerm{Bitset{predicates.toString()}, Bitset{mask.toString()}};
+    return BitsetTerm{Bitset{std::string{predicates}}, Bitset{std::string{mask}}};
 }
 }  // namespace mongo::boolean_simplification

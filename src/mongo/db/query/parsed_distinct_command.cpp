@@ -275,7 +275,7 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
         CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFind)});
 
     cq->setDistinct(CanonicalDistinct(
-        distinctRequest.getKey().toString(),
+        std::string{distinctRequest.getKey()},
         distinctRequest.getMirrored().value_or(false),
         distinctRequest.getSampleId(),
         isDistinctMultiplanningEnabled ? boost::make_optional(projection) : boost::none));

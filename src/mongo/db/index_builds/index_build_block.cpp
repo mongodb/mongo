@@ -97,7 +97,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
                                       const IndexStateInfo& stateInfo,
                                       IndexBuildPhaseEnum phase) {
 
-    _indexName = _spec.getStringField("name").toString();
+    _indexName = std::string{_spec.getStringField("name")};
     auto writableEntry = collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
         _indexName,

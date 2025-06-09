@@ -165,7 +165,7 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfOneGroupWithMultipleAccumulat
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookup) {
     const std::vector<BSONObj> rawPipeline = {
-        fromjson("{$lookup: {from: '" + kSecondaryNamespace.coll().toString() +
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
                  "', localField: 'x', foreignField: 'y', as: 'out'}}"),
     };
     auto pipeline = buildTestPipeline(rawPipeline);
@@ -192,9 +192,9 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfASingleLookup) {
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
     const std::vector<BSONObj> rawPipeline = {
-        fromjson("{$lookup: {from: '" + kSecondaryNamespace.coll().toString() +
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
                  "', localField: 'x', foreignField: 'y', as: 'out'}}"),
-        fromjson("{$lookup: {from: '" + kSecondaryNamespace.coll().toString() +
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
                  "', localField: 'a', foreignField: 'b', as: 'c'}}"),
     };
     auto pipeline = buildTestPipeline(rawPipeline);
@@ -224,10 +224,10 @@ TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookups) {
 
 TEST_F(QueryPlannerPipelinePushdownTest, PushdownOfTwoLookupsAndTwoGroups) {
     const std::vector<BSONObj> rawPipeline = {
-        fromjson("{$lookup: {from: '" + kSecondaryNamespace.coll().toString() +
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
                  "', localField: 'x', foreignField: 'y', as: 'out'}}"),
         fromjson("{$group: {_id: '$out', count: {$sum: '$x'}}}"),
-        fromjson("{$lookup: {from: '" + kSecondaryNamespace.coll().toString() +
+        fromjson("{$lookup: {from: '" + std::string{kSecondaryNamespace.coll()} +
                  "', localField: 'a', foreignField: 'b', as: 'c'}}"),
         fromjson("{$group: {_id: '$c', count: {$min: '$count'}}}"),
     };

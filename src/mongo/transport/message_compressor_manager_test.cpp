@@ -98,7 +98,7 @@ void checkNegotiationResult(const BSONObj& result, const std::vector<std::string
 
     std::vector<std::string> resultAlgos;
     for (const auto& e : compressorsListObj) {
-        resultAlgos.push_back(e.checkAndGetStringData().toString());
+        resultAlgos.push_back(std::string{e.checkAndGetStringData()});
     }
     ASSERT_EQ(algos.size(), resultAlgos.size());
     for (size_t i = 0; i < algos.size(); i++) {

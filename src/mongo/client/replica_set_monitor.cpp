@@ -98,7 +98,7 @@ void ReplicaSetMonitor::cleanup() {
 }
 
 std::function<void()> ReplicaSetMonitor::_getCleanupCallback(StringData name) {
-    return [n = name.toString()] {
+    return [n = std::string{name}] {
         LOGV2(5046701, "ReplicaSetMonitor cleanup callback invoked", "name"_attr = n);
         // This callback should never invoke ReplicaSetMonitorManager::removeMonitor() because it's
         // a race: the RSM stored in ReplicaSetMonitorManager could be a new one. However, we can

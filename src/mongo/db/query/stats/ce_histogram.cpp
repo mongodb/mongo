@@ -50,7 +50,7 @@ namespace {
 TypeCounts mapStatsTypeCountToTypeCounts(std::vector<TypeTag> tc) {
     TypeCounts out;
     for (const auto& t : tc) {
-        out.emplace(deserialize(t.getTypeName().toString()), t.getCount());
+        out.emplace(deserialize(std::string{t.getTypeName()}), t.getCount());
     }
     return out;
 }

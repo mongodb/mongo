@@ -226,14 +226,14 @@ Value DocumentSourceFindAndModifyImageLookup::serialize(const SerializationOptio
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(
     DepsTracker* deps) const {
-    deps->fields.insert(OplogEntry::kSessionIdFieldName.toString());
-    deps->fields.insert(OplogEntry::kTxnNumberFieldName.toString());
-    deps->fields.insert(OplogEntry::kNeedsRetryImageFieldName.toString());
-    deps->fields.insert(OplogEntry::kWallClockTimeFieldName.toString());
-    deps->fields.insert(OplogEntry::kNssFieldName.toString());
-    deps->fields.insert(OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(OplogEntry::kTermFieldName.toString());
-    deps->fields.insert(OplogEntry::kUuidFieldName.toString());
+    deps->fields.insert(std::string{OplogEntry::kSessionIdFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTxnNumberFieldName});
+    deps->fields.insert(std::string{OplogEntry::kNeedsRetryImageFieldName});
+    deps->fields.insert(std::string{OplogEntry::kWallClockTimeFieldName});
+    deps->fields.insert(std::string{OplogEntry::kNssFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTimestampFieldName});
+    deps->fields.insert(std::string{OplogEntry::kTermFieldName});
+    deps->fields.insert(std::string{OplogEntry::kUuidFieldName});
     return DepsTracker::State::SEE_NEXT;
 }
 
@@ -309,8 +309,8 @@ Document DocumentSourceFindAndModifyImageLookup::_downConvertIfNeedsRetryImage(D
                     ? repl::OplogEntry::kPreImageOpTimeFieldName
                     : repl::OplogEntry::kPostImageOpTimeFieldName,
                 Value{Document{
-                    {repl::OpTime::kTimestampFieldName.toString(), imageOpTime.getTimestamp()},
-                    {repl::OpTime::kTermFieldName.toString(), imageOpTime.getTerm()}}});
+                    {std::string{repl::OpTime::kTimestampFieldName}, imageOpTime.getTimestamp()},
+                    {std::string{repl::OpTime::kTermFieldName}, imageOpTime.getTerm()}}});
             _stashedDownconvertedDoc = downConvertedDoc.freeze();
             return Document{forgedNoopOplogEntry->getEntry().toBSON()};
         }

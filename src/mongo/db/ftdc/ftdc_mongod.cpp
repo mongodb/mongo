@@ -230,7 +230,7 @@ void startMongoDFTDC(ServiceContext* serviceContext) {
 
     if (dir.empty()) {
         dir = storageGlobalParams.dbpath;
-        dir /= kFTDCDefaultDirectory.toString();
+        dir /= std::string{kFTDCDefaultDirectory};
     }
 
     std::vector<RegisterCollectorsFunction> registerFns{

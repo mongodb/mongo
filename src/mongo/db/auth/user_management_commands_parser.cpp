@@ -64,7 +64,7 @@ Status _checkNoExtraFields(const BSONObj& cmdObj,
     // ones.
     for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
         StringData fieldName = (*iter).fieldNameStringData();
-        if (!isGenericArgument(fieldName) && !validFieldNames.count(fieldName.toString())) {
+        if (!isGenericArgument(fieldName) && !validFieldNames.count(std::string{fieldName})) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "\"" << fieldName
                                         << "\" is not "

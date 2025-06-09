@@ -259,7 +259,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
                                                       indexDescriptor->getEntry()->getIdent(),
-                                                      indexName.toString(),
+                                                      std::string{indexName},
                                                       collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
@@ -298,7 +298,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWithMatchingQueryUsingCollator) {
     auto filter = fromjson("{a: 'iii'}");
     LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
                                                       indexDescriptor->getEntry()->getIdent(),
-                                                      indexName.toString(),
+                                                      std::string{indexName},
                                                       collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
@@ -334,7 +334,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexWWithNonMatchingQuery) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
                                                       indexDescriptor->getEntry()->getIdent(),
-                                                      indexName.toString(),
+                                                      std::string{indexName},
                                                       collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
 
@@ -381,7 +381,7 @@ TEST_F(ExpressPlanTest, TestLookupViaUserIndexNullCollectionOnRestoreThrows) {
     CollatorInterface* collator = nullptr;
     LookupViaUserIndex<const CollectionPtr*> iterator(filter.firstElement(),
                                                       indexDescriptor->getEntry()->getIdent(),
-                                                      indexName.toString(),
+                                                      std::string{indexName},
                                                       collator);
     iterator.open(operationContext(), &collectionPtr, &iteratorStats);
     auto nss = NamespaceString::createNamespaceString_forTest("ExpressPlanTest.TestCollection");

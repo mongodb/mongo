@@ -47,9 +47,9 @@ StatusWith<bool> SaslPLAINClientConversation::step(StringData inputData, std::st
     // Create PLAIN message on the form: user\0user\0pwd
 
     StringBuilder sb;
-    sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
-       << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() << '\0'
-       << _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString();
+    sb << std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)} << '\0'
+       << std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)} << '\0'
+       << std::string{_saslClientSession->getParameter(SaslClientSession::parameterPassword)};
 
     *outputData = sb.str();
 

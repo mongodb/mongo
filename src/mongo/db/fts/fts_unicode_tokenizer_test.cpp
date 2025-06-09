@@ -49,7 +49,7 @@ std::vector<std::string> tokenizeString(const char* str,
     std::vector<std::string> terms;
 
     while (tokenizer.moveNext()) {
-        terms.push_back(tokenizer.get().toString());
+        terms.push_back(std::string{tokenizer.get()});
     }
 
     return terms;

@@ -745,7 +745,7 @@ TEST_F(LogV2TypesTest, Stringlike) {
     StringData str_data = "a StringData"_sd;
     LOGV2(20019, "StringData {name}", "name"_attr = str_data);
     ASSERT_EQUALS(text->back(), "StringData a StringData");
-    validateJSON(str_data.toString());
+    validateJSON(std::string{str_data});
     ASSERT_EQUALS(lastBSONElement().String(), str_data);
 
     {
@@ -881,8 +881,7 @@ TEST_F(LogV2TypesTest, UUID) {
 TEST_F(LogV2TypesTest, BoostOptional) {
     LOGV2(20028, "boost::optional empty {name}", "name"_attr = boost::optional<bool>());
     ASSERT_EQUALS(text->back(),
-                  std::string("boost::optional empty ") +
-                      constants::kNullOptionalString.toString());
+                  std::string("boost::optional empty ") + constants::kNullOptionalString);
     ASSERT(mongo::fromjson(json->back())
                .getField(kAttributesFieldName)
                .Obj()
@@ -1465,7 +1464,7 @@ TEST_F(LogV2ContainerTest, OptionalsAsElements) {
     LOGV2(20049, "{name}", "name"_attr = listOptionalBool);
     ASSERT_EQUALS(text->back(), textJoin(listOptionalBool, [](const auto& item) -> std::string {
                       if (!item)
-                          return constants::kNullOptionalString.toString();
+                          return std::string{constants::kNullOptionalString};
                       if (*item)
                           return "true";
                       return "false";
@@ -1540,7 +1539,7 @@ TEST_F(LogV2ContainerTest, AssociativeWithOptionalSequential) {
                       if (item.second) {
                           r += textJoin(*item.second, [](int v) { return fmt::format("{}", v); });
                       } else {
-                          r += constants::kNullOptionalString.toString();
+                          r += std::string{constants::kNullOptionalString};
                       }
                       return r;
                   }));
@@ -1836,7 +1835,7 @@ public:
 
         BSONObj fieldObj = report.getField(attrName).Obj();
         BSONObj truncated;
-        std::string currentObjPath = attrName.toString();
+        std::string currentObjPath = std::string{attrName};
 
         // validate nested "truncated" elements except for the last (leaf) truncated element.
         for (size_t i = 0; i < path.size(); i++) {

@@ -124,7 +124,7 @@ protected:
      */
     MessageCompressorBase(MessageCompressor id)
         : _id{static_cast<MessageCompressorId>(id)},
-          _name{getMessageCompressorName(id).toString()} {}
+          _name{std::string{getMessageCompressorName(id)}} {}
 
     /*
      * Called by sub-classes to bump their bytesIn/bytesOut counters for compression

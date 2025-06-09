@@ -53,7 +53,7 @@ class NamedPipeOutput {
 public:
     // Searches the named pipe in 'kDefaultPipePath' + 'pipeRelativePath'
     NamedPipeOutput(const std::string& pipeRelativePath)
-        : NamedPipeOutput(kDefaultPipePath.toString(), pipeRelativePath) {}
+        : NamedPipeOutput(std::string{kDefaultPipePath}, pipeRelativePath) {}
 
     // Searches the named pipe in 'pipeDir' + 'pipeRelativePath' in POSIX system'
     NamedPipeOutput(const std::string& pipeDir,

@@ -256,11 +256,11 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
     // Leaf nodes with a path and some array operators.
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
         bool supportSparse = Indexability::nodeSupportedBySparseIndex(node);
-        (*out)[prefix + node->path().toString()] = {supportSparse};
+        (*out)[prefix + std::string{node->path()}] = {supportSparse};
     } else if (Indexability::isBoundsGeneratingElemMatchObject(node)) {
         // If the array uses an index on its children, it's something like
         // {foo : {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
-        prefix += node->path().toString() + ".";
+        prefix += std::string{node->path()} + ".";
 
         for (size_t i = 0; i < node->numChildren(); ++i) {
             getFields(node->getChild(i), prefix, out);
@@ -318,7 +318,7 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findRelevantIndices(
     for (auto&& index : allIndices) {
         BSONObjIterator it(index.keyPattern);
         BSONElement elt = it.next();
-        const std::string fieldName = elt.fieldNameStringData().toString();
+        const std::string fieldName = std::string{elt.fieldNameStringData()};
 
         // If the index is non-sparse we can use the field regardless its sparsity, otherwise we
         // should find the field that can be answered by a sparse index.
@@ -540,7 +540,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
             auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
-                    const auto newPath = fullPathToNode.toString() + child->path();
+                    const auto newPath = std::string{fullPathToNode} + child->path();
                     return _compatible(keyPatternElt,
                                        index,
                                        keyPatternIdx,
@@ -772,9 +772,9 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
     if (Indexability::isBoundsGenerating(node)) {
         string fullPath;
         if (MatchExpression::NOT == node->matchType()) {
-            fullPath = prefix + node->getChild(0)->path().toString();
+            fullPath = prefix + std::string{node->getChild(0)->path()};
         } else {
-            fullPath = prefix + node->path().toString();
+            fullPath = prefix + std::string{node->path()};
         }
 
         MONGO_verify(nullptr == node->getTag());
@@ -812,7 +812,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         }
     } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
         // Note we skip empty path components since they are not allowed in index key patterns.
-        const auto newPath = prefix + node->path().toString();
+        const auto newPath = prefix + std::string{node->path()};
         ElemMatchContext newEMContext;
         // Note this StringData is unowned and references the string declared on the stack here.
         // This should be fine since we are only ever reading from this in recursive calls as
@@ -825,7 +825,7 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
 
         // If the array uses an index on its children, it's something like
         // {foo: {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
-        prefix += node->path().toString() + ".";
+        prefix += std::string{node->path()} + ".";
         for (size_t i = 0; i < node->numChildren(); ++i) {
             rateIndices(node->getChild(i), prefix, indices, newContext);
         }

@@ -303,7 +303,7 @@ CommandService::CommandService(TransportLayer* tl,
                         util::constants::kAuthenticatedCommandStreamMethodName,
                         util::constants::kAuthenticationTokenKey)};
     }
-    return _handleStream(serverCtx, stream, authTokenEntry->second.toString());
+    return _handleStream(serverCtx, stream, std::string{authTokenEntry->second});
 }
 
 void CommandService::shutdown() {

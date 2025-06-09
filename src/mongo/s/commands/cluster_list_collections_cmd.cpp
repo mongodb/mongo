@@ -173,12 +173,13 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
         for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
                 (resource.isExactNamespacePattern() && resource.dbNameToMatch() == dbName)) {
-                collectionNames.emplace(resource.collectionToMatch().toString());
+                collectionNames.emplace(std::string{resource.collectionToMatch()});
             }
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
                 (resource.isExactSystemBucketsCollection() && resource.dbNameToMatch() == dbName)) {
-                collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
+                collectionNames.emplace(systemBucketsDot +
+                                        std::string{resource.collectionToMatch()});
             }
         }
     }

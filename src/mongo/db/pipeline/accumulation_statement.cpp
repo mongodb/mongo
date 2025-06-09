@@ -117,14 +117,14 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             "Accumulators should only appear in a user operation",
             expCtx->getOperationContext());
     assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
-                                   accName.toString(),
+                                   std::string{accName},
                                    allowedWithApiStrict,
                                    allowedWithClientType);
 
     expCtx->incrementGroupAccumulatorExprCounter(accName);
     auto accExpr = parser(expCtx, specElem, vps);
 
-    return AccumulationStatement(fieldName.toString(), std::move(accExpr));
+    return AccumulationStatement(std::string{fieldName}, std::move(accExpr));
 }
 
 MONGO_INITIALIZER_GROUP(BeginAccumulatorRegistration, ("default"), ("EndAccumulatorRegistration"))

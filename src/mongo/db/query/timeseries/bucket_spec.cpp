@@ -161,7 +161,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
 
         if (auto looseResult = expression::copyExpressionAndApplyRenames(
-                matchExpr, {{bucketSpec.metaField().value(), kBucketMetaFieldName.toString()}});
+                matchExpr, {{bucketSpec.metaField().value(), std::string{kBucketMetaFieldName}}});
             looseResult) {
             auto tightResult = looseResult->clone();
             return {std::move(looseResult), std::move(tightResult)};
@@ -423,8 +423,8 @@ BucketSpec::splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
 
     return expression::splitMatchExpressionBy(
         std::move(expr),
-        {metaField->toString()},
-        {{metaField->toString(), kBucketMetaFieldName.toString()}},
+        {std::string{*metaField}},
+        {{std::string{*metaField}, std::string{kBucketMetaFieldName}}},
         expression::isOnlyDependentOn);
 }
 
@@ -448,8 +448,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
     std::unique_ptr<MatchExpression> bucketMetricPred = nullptr;
     if (residualPred) {
         BucketSpec bucketSpec{
-            tsOptions.getTimeField().toString(),
-            metaField.map([](StringData s) { return s.toString(); }),
+            std::string{tsOptions.getTimeField()},
+            metaField.map([](StringData s) { return std::string{s}; }),
             // Since we are operating on a collection, not a query-result,
             // there are no inclusion/exclusion projections we need to apply
             // to the buckets before unpacking. So we can use default values
@@ -532,9 +532,9 @@ BucketSpec::BucketSpec(BucketSpec&& other)
 }
 
 BucketSpec::BucketSpec(const TimeseriesOptions& tsOptions)
-    : BucketSpec(tsOptions.getTimeField().toString(),
+    : BucketSpec(std::string{tsOptions.getTimeField()},
                  tsOptions.getMetaField()
-                     ? boost::optional<string>(tsOptions.getMetaField()->toString())
+                     ? boost::optional<string>(std::string{*tsOptions.getMetaField()})
                      : boost::none) {}
 
 BucketSpec& BucketSpec::operator=(const BucketSpec& other) {

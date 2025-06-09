@@ -93,7 +93,7 @@ BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
     const auto digested = createPasswordDigest(username, password);
     const auto sha1Cred = scram::Secrets<SHA1Block>::generateCredentials(digested, 10000);
     const auto sha256Cred =
-        scram::Secrets<SHA256Block>::generateCredentials(password.toString(), 15000);
+        scram::Secrets<SHA256Block>::generateCredentials(std::string{password}, 15000);
     return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
                       << AuthorizationManager::USER_NAME_FIELD_NAME << username
                       << AuthorizationManager::USER_DB_FIELD_NAME << database << "credentials"
@@ -262,7 +262,7 @@ protected:
         if (_digestPassword) {
             return mongo::createPasswordDigest(username, password);
         } else {
-            return password.toString();
+            return std::string{password};
         }
     }
 

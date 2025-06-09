@@ -84,7 +84,7 @@ using ResolveRoleOption = auth::AuthorizationBackendInterface::ResolveRoleOption
 // Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
 SSLX509Name buildX509Name() {
     return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
-        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
+        {{{std::string{kOID_CommonName}, 19 /* Printable String */, "mongodb.com"}}}));
 }
 
 void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeerInfo info) {

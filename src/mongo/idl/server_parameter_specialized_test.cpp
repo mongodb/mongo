@@ -147,7 +147,7 @@ void SpecializedConstructorServerParameter::append(OperationContext*,
 
 Status SpecializedConstructorServerParameter::setFromString(StringData value,
                                                             const boost::optional<TenantId>&) {
-    gSCSP = value.toString();
+    gSCSP = std::string{value};
     return Status::OK();
 }
 
@@ -196,7 +196,7 @@ void SpecializedWithStringValueServerParameter::append(OperationContext*,
 
 Status SpecializedWithStringValueServerParameter::setFromString(StringData value,
                                                                 const boost::optional<TenantId>&) {
-    _data = value.toString();
+    _data = std::string{value};
     return Status::OK();
 }
 
@@ -324,7 +324,7 @@ std::string gSWO = "Initial Value";
 }  // namespace
 
 Status SpecializedWithOptions::setFromString(StringData value, const boost::optional<TenantId>&) {
-    gSWO = value.toString();
+    gSWO = std::string{value};
     return Status::OK();
 }
 
@@ -356,7 +356,7 @@ Status SpecializedRuntimeOnly::setFromString(StringData value, const boost::opti
 Status SpecializedRedactedSettable::setFromString(StringData value,
                                                   const boost::optional<TenantId>&) {
     std::cout << "Setting to: " << value << "\n";
-    _data = value.toString();
+    _data = std::string{value};
     return Status::OK();
 }
 
@@ -550,7 +550,7 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
 
     // Assert that the parameter can be appended to a builder.
     builder.resetToEmpty();
-    specializedCsp->append(nullptr, &builder, kSpecializedCSPName.toString(), boost::none);
+    specializedCsp->append(nullptr, &builder, std::string{kSpecializedCSPName}, boost::none);
     auto obj = builder.asTempObj();
     ASSERT_EQ(obj.nFields(), 4);
     ASSERT_EQ(obj["_id"_sd].String(), kSpecializedCSPName);
@@ -571,7 +571,7 @@ TEST(SpecializedServerParameter, clusterServerParameter) {
     // Assert that the parameter can be reset to its defaults.
     builder.resetToEmpty();
     ASSERT_OK(specializedCsp->reset(boost::none));
-    specializedCsp->append(nullptr, &builder, kSpecializedCSPName.toString(), boost::none);
+    specializedCsp->append(nullptr, &builder, std::string{kSpecializedCSPName}, boost::none);
     obj = builder.asTempObj();
     ASSERT_EQ(obj.nFields(), 4);
     ASSERT_EQ(obj["_id"_sd].String(), kSpecializedCSPName);

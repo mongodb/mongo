@@ -356,7 +356,7 @@ public:
                         }
 
                         bool shouldRestore =
-                            databasesRestored.find(dbNss.db_forSharding().toString()) !=
+                            databasesRestored.find(std::string{dbNss.db_forSharding()}) !=
                             databasesRestored.end();
 
                         LOGV2_DEBUG(6261305,

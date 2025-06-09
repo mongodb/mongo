@@ -88,7 +88,7 @@ bool FTSMatcher::_hasPositiveTerm_string(const FTSLanguage* language, const stri
     tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
-        string word = tokenizer->get().toString();
+        string word = std::string{tokenizer->get()};
         if (_query.getPositiveTerms().count(word) > 0) {
             return true;
         }
@@ -118,7 +118,7 @@ bool FTSMatcher::_hasNegativeTerm_string(const FTSLanguage* language, const stri
     tokenizer->reset(raw.c_str(), _getTokenizerOptions());
 
     while (tokenizer->moveNext()) {
-        string word = tokenizer->get().toString();
+        string word = std::string{tokenizer->get()};
         if (_query.getNegatedTerms().count(word) > 0) {
             return true;
         }

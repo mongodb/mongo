@@ -930,7 +930,7 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime(
     // causing this query to return an inaccurate timestamp, we specify an afterClusterTime of the
     // defaultBeginFetchingOpTime so that we wait for all previous writes to be visible.
     BSONObjBuilder cmd;
-    cmd.append("find", NamespaceString::kSessionTransactionsTableNamespace.coll().toString());
+    cmd.append("find", std::string{NamespaceString::kSessionTransactionsTableNamespace.coll()});
     cmd.append("filter",
                BSON("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState))));
     cmd.append("sort", BSON(SessionTxnRecord::kStartOpTimeFieldName << 1));

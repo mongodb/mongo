@@ -122,7 +122,7 @@ SplitHorizon::ForwardMapping computeForwardMappings(
                 uasserted(ErrorCodes::BadValue, "Horizons cannot have empty names");
             }
 
-            return {horizonName.toString(), HostAndPort{horizonObj.valueStringData()}};
+            return {std::string{horizonName}, HostAndPort{horizonObj.valueStringData()}};
         };
 
         const auto horizonEntries = [&] {
@@ -196,7 +196,7 @@ std::string SplitHorizon::determineHorizon(
             return found->second;
         }
     }
-    return kDefaultHorizon.toString();
+    return std::string{kDefaultHorizon};
 }
 
 void SplitHorizon::toBSON(BSONObjBuilder& configBuilder) const {

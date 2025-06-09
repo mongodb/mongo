@@ -448,7 +448,7 @@ public:
                     opCtx->inMultiDocumentTransaction());
 
             const auto writeCmd = request().getWriteCmd();
-            const auto shardId = ShardId(request().getShardId().toString());
+            const auto shardId = ShardId(std::string{request().getShardId()});
             const auto targetDocId = request().getTargetDocId();
             LOGV2_DEBUG(6962400,
                         2,
@@ -511,7 +511,7 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            const auto shardId = ShardId(request().getShardId().toString());
+            const auto shardId = ShardId(std::string{request().getShardId()});
             auto vts = auth::ValidatedTenancyScope::get(opCtx);
             const auto writeCmdObj = [&] {
                 const auto explainCmdObj = request().getWriteCmd();

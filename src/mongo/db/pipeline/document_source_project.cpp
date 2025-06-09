@@ -103,7 +103,7 @@ intrusive_ptr<DocumentSource> DocumentSourceProject::create(
                     ProjectionPolicies::aggregateProjectionPolicies(),
                     builderParams);
             } catch (DBException& ex) {
-                ex.addContext("Invalid " + specifiedName.toString());
+                ex.addContext("Invalid " + std::string{specifiedName});
                 throw;
             }
         }(),

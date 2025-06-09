@@ -79,7 +79,7 @@ public:
     /* implicit */ FieldPath(StringData inputPath,
                              bool precomputeHashes = false,
                              bool validateFieldNames = true)
-        : FieldPath(inputPath.toString(), precomputeHashes, validateFieldNames) {}
+        : FieldPath(std::string{inputPath}, precomputeHashes, validateFieldNames) {}
     /* implicit */ FieldPath(const char* inputPath,
                              bool precomputeHashes = false,
                              bool validateFieldNames = true)

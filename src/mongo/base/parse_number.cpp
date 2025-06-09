@@ -229,7 +229,7 @@ Status parseNumberFromStringHelper<double>(StringData stringValue,
     if (!parser._skipLeadingWhitespace && ctype::isSpace(stringValue[0]))
         return Status(ErrorCodes::FailedToParse, "Leading whitespace");
 
-    std::string str = stringValue.toString();
+    std::string str = std::string{stringValue};
     const char* cStr = str.c_str();
     char* endp;
     errno = 0;
@@ -298,7 +298,7 @@ Status parseNumberFromStringHelper<Decimal128>(StringData stringValue,
     std::uint32_t signalingFlags = 0;
     size_t charsConsumed;
     auto parsedDecimal =
-        Decimal128(stringValue.toString(), &signalingFlags, parser._roundingMode, &charsConsumed);
+        Decimal128(std::string{stringValue}, &signalingFlags, parser._roundingMode, &charsConsumed);
 
     if (Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kOverflow)) {
         return Status(ErrorCodes::Overflow, "Conversion from string to decimal would overflow");

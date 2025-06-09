@@ -119,13 +119,12 @@ protected:
     std::string makeSecurityToken(const UserName& userName,
                                   ValidatedTenancyScope::TenantProtocol protocol =
                                       ValidatedTenancyScope::TenantProtocol::kDefault) {
-        return auth::ValidatedTenancyScopeFactory::create(
-                   userName,
-                   "secret"_sd,
-                   protocol,
-                   auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
-            .getOriginalToken()
-            .toString();
+        return std::string{auth::ValidatedTenancyScopeFactory::create(
+                               userName,
+                               "secret"_sd,
+                               protocol,
+                               auth::ValidatedTenancyScopeFactory::TokenForTestingTag{})
+                               .getOriginalToken()};
     }
 
     ServiceContext::UniqueClient client;

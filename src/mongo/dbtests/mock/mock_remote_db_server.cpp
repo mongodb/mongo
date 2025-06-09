@@ -153,12 +153,12 @@ void MockRemoteDBServer::remove(const NamespaceString& nss, const BSONObj&) {
 
 void MockRemoteDBServer::assignCollectionUuid(StringData ns, const mongo::UUID& uuid) {
     scoped_spinlock sLock(_lock);
-    _uuidToNs[uuid] = ns.toString();
+    _uuidToNs[uuid] = std::string{ns};
 }
 
 rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgRequest& request) {
     checkIfUp(id);
-    std::string cmdName = request.getCommandName().toString();
+    std::string cmdName = std::string{request.getCommandName()};
 
     StatusWith<BSONObj> reply([this, &cmdName] {
         scoped_spinlock lk(_lock);

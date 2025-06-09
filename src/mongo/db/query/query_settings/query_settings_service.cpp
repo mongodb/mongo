@@ -536,7 +536,7 @@ QuerySettingsService& QuerySettingsService::get(OperationContext* opCtx) {
 }
 
 std::string QuerySettingsService::getQuerySettingsClusterParameterName() {
-    return kQuerySettingsClusterParameterName.toString();
+    return std::string{kQuerySettingsClusterParameterName};
 }
 
 const stdx::unordered_set<StringData, StringMapHasher>&
@@ -597,7 +597,7 @@ QuerySettings lookupQuerySettingsWithRejectionCheckOnShard(
 }
 
 std::string getQuerySettingsClusterParameterName() {
-    return kQuerySettingsClusterParameterName.toString();
+    return std::string{kQuerySettingsClusterParameterName};
 }
 
 bool canPipelineBeRejected(const std::vector<BSONObj>& pipeline) {

@@ -99,7 +99,7 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
     // Add size of field name and the child element.
     sizeTracker.addEntry(fieldName.size(), nodePtr);
 
-    auto result = children.insert({fieldName.toString(), std::move(node)});
+    auto result = children.insert({std::string{fieldName}, std::move(node)});
     uassert(7693400,
             str::stream() << "Document already has a field named '" << fieldName << "'",
             result.second);

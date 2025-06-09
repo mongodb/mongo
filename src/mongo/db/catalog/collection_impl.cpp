@@ -262,7 +262,7 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
 
     // The index ident is expired, but it could still be drop pending. Mark it as in use if
     // possible.
-    auto newIdent = storageEngine->markIdentInUse(ident.toString());
+    auto newIdent = storageEngine->markIdentInUse(std::string{ident});
     if (newIdent) {
         return newIdent;
     }
@@ -2045,7 +2045,7 @@ void CollectionImpl::getAllIndexes(std::vector<std::string>* names) const {
             continue;
         }
 
-        names->push_back(index.nameStringData().toString());
+        names->push_back(std::string{index.nameStringData()});
     }
 }
 

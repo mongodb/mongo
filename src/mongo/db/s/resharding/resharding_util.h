@@ -431,12 +431,12 @@ void verifyIndexSpecsMatch(InputIterator1 sourceIndexSpecsBegin,
         localIndexSpecsBegin,
         localIndexSpecsEnd,
         std::inserter(localIndexSpecMap, localIndexSpecMap.end()),
-        [](const auto& spec) { return std::pair(spec.getStringField("name").toString(), spec); });
+        [](const auto& spec) { return std::pair(std::string{spec.getStringField("name")}, spec); });
 
     UnorderedFieldsBSONObjComparator bsonCmp;
     for (auto it = sourceIndexSpecsBegin; it != sourceIndexSpecsEnd; ++it) {
         auto spec = *it;
-        auto specName = spec.getStringField("name").toString();
+        auto specName = std::string{spec.getStringField("name")};
         uassert(9365601,
                 str::stream() << "Resharded collection missing source collection index: "
                               << specName,

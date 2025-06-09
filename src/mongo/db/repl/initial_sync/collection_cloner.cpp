@@ -225,7 +225,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
 
 BaseCloner::AfterStageBehavior CollectionCloner::collStatsStage() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
+    BSONObjBuilder b(BSON("collStats" << _sourceNss.coll()));
 
     BSONObj res;
     getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
@@ -361,7 +361,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::setupIndexBuildersForUnfinished
         std::vector<BSONObj> indexSpecs;
         for (const auto& indexSpec : groupedIndexSpec.second) {
             std::string indexName =
-                indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+                std::string{indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName)};
             indexNames.push_back(indexName);
             indexSpecs.push_back(indexSpec.getOwned());
         }

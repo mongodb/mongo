@@ -570,7 +570,7 @@ void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _state = State::ErrorOccurred;
-    _errMsg = errMsg.toString();
+    _errMsg = std::string{errMsg};
 }
 
 MigrationSessionId SessionCatalogMigrationDestination::getMigrationSessionId() const {

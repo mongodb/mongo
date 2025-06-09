@@ -136,12 +136,12 @@ int Client::getClusterMaxWireVersion() const {
 
 void Client::setMetadataOnClientContext(ClientContext& ctx, const ConnectOptions& options) {
     if (options.authToken) {
-        ctx.addMetadataEntry(util::constants::kAuthenticationTokenKey.toString(),
+        ctx.addMetadataEntry(std::string{util::constants::kAuthenticationTokenKey},
                              *options.authToken);
     }
-    ctx.addMetadataEntry(util::constants::kClientMetadataKey.toString(), _clientMetadata);
-    ctx.addMetadataEntry(util::constants::kClientIdKey.toString(), _id.toString());
-    ctx.addMetadataEntry(util::constants::kWireVersionKey.toString(),
+    ctx.addMetadataEntry(std::string{util::constants::kClientMetadataKey}, _clientMetadata);
+    ctx.addMetadataEntry(std::string{util::constants::kClientIdKey}, _id.toString());
+    ctx.addMetadataEntry(std::string{util::constants::kWireVersionKey},
                          std::to_string(getClusterMaxWireVersion()));
 }
 

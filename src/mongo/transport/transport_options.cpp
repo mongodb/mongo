@@ -58,7 +58,7 @@ auto parseConnectionListParameters(const BSONObj& obj) {
     for (const auto& range : params.getRanges()) {
         auto swr = CIDR::parse(range);
         if (!swr.isOK()) {
-            output.push_back(range.toString());
+            output.push_back(std::string{range});
         } else {
             output.push_back(std::move(swr.getValue()));
         }

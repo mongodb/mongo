@@ -141,12 +141,12 @@ Status HostAndPort::initialize(StringData s) {
         if (openBracketPos != 0) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
-                              << "'[' present, but not first character in " << s.toString());
+                              << "'[' present, but not first character in " << std::string{s});
         }
         if (closeBracketPos == std::string::npos) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "ipv6 address is missing closing ']' in hostname in "
-                                        << s.toString());
+                                        << std::string{s});
         }
 
         hostPart = s.substr(openBracketPos + 1, closeBracketPos - openBracketPos - 1);
@@ -155,29 +155,29 @@ Status HostAndPort::initialize(StringData s) {
             // If the last colon is inside the brackets, then there must not be a port.
             if (s.size() != closeBracketPos + 1) {
                 return Status(ErrorCodes::FailedToParse,
-                              str::stream()
-                                  << "missing colon after ']' before the port in " << s.toString());
+                              str::stream() << "missing colon after ']' before the port in "
+                                            << std::string{s});
             }
             colonPos = std::string::npos;
         } else if (colonPos != closeBracketPos + 1) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Extraneous characters between ']' and pre-port ':'"
-                                        << " in " << s.toString());
+                                        << " in " << std::string{s});
         }
     } else if (closeBracketPos != std::string::npos) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "']' present without '[' in " << s.toString());
+                      str::stream() << "']' present without '[' in " << std::string{s});
     } else if (s.find(':') != colonPos) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream()
                           << "More than one ':' detected. If this is an ipv6 address,"
-                          << " it needs to be surrounded by '[' and ']'; " << s.toString());
+                          << " it needs to be surrounded by '[' and ']'; " << std::string{s});
     }
 
     if (hostPart.empty()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Empty host component parsing HostAndPort from \""
-                                    << str::escape(s.toString()) << "\"");
+                                    << str::escape(std::string{s}) << "\"");
     }
 
     int port;
@@ -191,12 +191,12 @@ Status HostAndPort::initialize(StringData s) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Port number " << port
                                         << " out of range parsing HostAndPort from \""
-                                        << str::escape(s.toString()) << "\"");
+                                        << str::escape(std::string{s}) << "\"");
         }
     } else {
         port = -1;
     }
-    _host = hostPart.toString();
+    _host = std::string{hostPart};
     _port = port;
     return Status::OK();
 }

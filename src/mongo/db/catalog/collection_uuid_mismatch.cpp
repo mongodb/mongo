@@ -76,9 +76,9 @@ void checkCollectionUUIDMismatch(OperationContext* opCtx,
     uassert(
         (CollectionUUIDMismatchInfo{ns.dbName(),
                                     *uuid,
-                                    ns.coll().toString(),
+                                    std::string{ns.coll()},
                                     actualNamespace && actualNamespace->isEqualDb(ns)
-                                        ? boost::make_optional(actualNamespace->coll().toString())
+                                        ? boost::make_optional(std::string{actualNamespace->coll()})
                                         : boost::none}),
         "Collection UUID does not match that specified",
         coll && coll->uuid() == *uuid);

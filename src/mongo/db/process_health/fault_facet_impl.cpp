@@ -61,7 +61,7 @@ Milliseconds FaultFacetImpl::getDuration() const {
 void FaultFacetImpl::update(HealthCheckStatus status) {
     auto lk = stdx::lock_guard(_mutex);
     _severity = status.getSeverity();
-    _description = status.getShortDescription().toString();
+    _description = std::string{status.getShortDescription()};
 }
 
 void FaultFacetImpl::appendDescription(BSONObjBuilder* builder) const {

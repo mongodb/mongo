@@ -515,7 +515,7 @@ private:
             _jsonTest = fromjson(json.str());
         }
 
-        _testName = _jsonTest.getStringField("description").toString();
+        _testName = std::string{_jsonTest.getStringField("description")};
         _testUri = uassertStatusOK(mongo::MongoURI::parse(_jsonTest["uri"].String()));
 
         _replicaSetName = _testUri.getOption("replicaSet");

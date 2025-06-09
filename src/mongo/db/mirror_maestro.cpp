@@ -408,7 +408,7 @@ public:
     AtomicWord<CounterT> processedAsSecondary;
 };
 auto& gMirroredReadsSection = *ServerStatusSectionBuilder<MirroredReadsSection>(
-                                   MirrorMaestro::kServerStatusSectionName.toString())
+                                   std::string{MirrorMaestro::kServerStatusSectionName})
                                    .forShard();
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
@@ -696,12 +696,12 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) {
         options.minConnections = kMirrorMaestroConnPoolMinSize;
         options.maxConnections = kMirrorMaestroConnPoolMaxSize;
         return executor::makeNetworkInterface(
-            kMirrorMaestroName.toString(), {}, {}, std::move(options));
+            std::string{kMirrorMaestroName}, {}, {}, std::move(options));
     };
 
     auto makePool = [&] {
         ThreadPool::Options options;
-        options.poolName = kMirrorMaestroName.toString();
+        options.poolName = std::string{kMirrorMaestroName};
         options.maxThreads = kMirrorMaestroThreadPoolMaxThreads;
         return std::make_unique<ThreadPool>(std::move(options));
     };

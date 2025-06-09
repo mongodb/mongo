@@ -208,7 +208,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, tag.toString(), std::move(annotation), jsonSchemaElement);
+            expCtx, std::string{tag}, std::move(annotation), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -231,7 +231,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, tag.toString(), e.wrap(), jsonSchemaElement);
+            expCtx, std::string{tag}, e.wrap(), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -245,7 +245,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, tag.toString(), BSON((name ? *name : ""_sd) << e.wrap()), jsonSchemaElement);
+            expCtx, std::string{tag}, BSON((name ? *name : ""_sd) << e.wrap()), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -259,7 +259,7 @@ inline std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const BSONObj& jsonSchemaElement = BSONObj()) {
     if (expCtx->getIsParsingCollectionValidator()) {
         return doc_validation_error::createAnnotation(
-            expCtx, tag.toString(), BSON((name ? *name : ""_sd) << obj), jsonSchemaElement);
+            expCtx, std::string{tag}, BSON((name ? *name : ""_sd) << obj), jsonSchemaElement);
     } else {
         return nullptr;
     }
@@ -1326,7 +1326,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     if (PathAcceptingKeyword::WITHIN == type || PathAcceptingKeyword::GEO_INTERSECTS == type) {
-        auto gq = std::make_unique<GeoExpression>(name ? name->toString() : "");
+        auto gq = std::make_unique<GeoExpression>(name ? std::string{*name} : "");
         auto parseStatus = gq->parseFrom(section);
         if (!parseStatus.isOK()) {
             return parseStatus;
@@ -1348,7 +1348,7 @@ StatusWithMatchExpression parseGeo(boost::optional<StringData> name,
                            "for more details.")};
         }
 
-        auto nq = std::make_unique<GeoNearExpression>(name ? name->toString() : "");
+        auto nq = std::make_unique<GeoNearExpression>(name ? std::string{*name} : "");
         auto status = nq->parseFrom(section);
         if (!status.isOK()) {
             return status;

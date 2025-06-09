@@ -93,7 +93,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
     std::string user =
-        _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
+        std::string{_saslClientSession->getParameter(SaslClientSession::parameterUser)};
 
     encodeSCRAMUsername(user);
     _clientNonce =
@@ -160,7 +160,7 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
     }
 
     // Append server-first-message and client-final-message-without-proof.
-    _authMessage += "," + inputData.toString() + ",c=biws,r=" + nonce;
+    _authMessage += "," + std::string{inputData} + ",c=biws,r=" + nonce;
 
     std::string decodedSalt, clientProof;
     try {

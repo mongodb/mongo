@@ -1105,9 +1105,9 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     if (!CollatorInterface::collatorsMatch(queryCollator, index.collator)) {
         for (auto&& collatedField :
              IndexScanNode::getFieldsWithStringBounds(bounds, index.keyPattern)) {
-            if (equalityFields.count(collatedField.toString())) {
+            if (equalityFields.count(std::string{collatedField})) {
                 ignoreFields.insert(collatedField);
-                equalityFields.erase(collatedField.toString());
+                equalityFields.erase(std::string{collatedField});
             } else {
                 unsupportedFields.insert(collatedField);
             }
@@ -1117,9 +1117,9 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         for (auto&& multikeyField : multikeyFields) {
             if (!confirmBoundsProvideSortComponentGivenMultikeyness(
                     multikeyField, bounds, multikeyFields)) {
-                if (equalityFields.count(multikeyField.toString())) {
+                if (equalityFields.count(std::string{multikeyField})) {
                     ignoreFields.insert(multikeyField);
-                    equalityFields.erase(multikeyField.toString());
+                    equalityFields.erase(std::string{multikeyField});
                 } else {
                     unsupportedFields.insert(multikeyField);
                 }
@@ -1153,7 +1153,7 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         }
 
         // Equality fields can be ignored for the purposes of sort order; see above.
-        if (equalityFields.contains(fieldName.toString())) {
+        if (equalityFields.contains(std::string{fieldName})) {
             continue;
         }
 

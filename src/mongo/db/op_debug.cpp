@@ -229,7 +229,7 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     if (!curop.getPlanSummary().empty()) {
-        pAttrs->addDeepCopy("planSummary", curop.getPlanSummary().toString());
+        pAttrs->addDeepCopy("planSummary", std::string{curop.getPlanSummary()});
     }
 
     if (planningTime > Microseconds::zero()) {
@@ -1203,7 +1203,7 @@ static void appendResolvedViewsInfoImpl(
 
         BSONArrayBuilder dependenciesArr(aView.subarrayStart("dependencyChain"));
         for (const auto& nss : dependencies) {
-            dependenciesArr.append(nss.coll().toString());
+            dependenciesArr.append(std::string{nss.coll()});
         }
         dependenciesArr.doneFast();
 

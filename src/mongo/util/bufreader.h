@@ -127,7 +127,7 @@ public:
     }
 
     void readStr(std::string& s) {
-        s = readCStr().toString();
+        s = std::string{readCStr()};
     }
 
     /**

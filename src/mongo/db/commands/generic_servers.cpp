@@ -344,7 +344,7 @@ public:
             arr.doneFast();
 
         } else {
-            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(logName.toString());
+            logv2::RamLog* ramlog = logv2::RamLog::getIfExists(std::string{logName});
             uassert(ErrorCodes::OperationFailed,
                     str::stream() << "No log named '" << logName << "'",
                     ramlog != nullptr);
@@ -379,7 +379,7 @@ OkReply ClearLogCmd::Invocation::typedRun(OperationContext* opCtx) {
     uassert(
         ErrorCodes::InvalidOptions, "Only the 'global' log can be cleared", logName == "global");
 
-    auto log = logv2::RamLog::getIfExists(logName.toString());
+    auto log = logv2::RamLog::getIfExists(std::string{logName});
     invariant(log);
     log->clear();
 

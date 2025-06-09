@@ -319,7 +319,7 @@ public:
             auto& cursor = _remoteCursors[i];
             GetMoreCommandRequest getMoreRequest(
                 cursor->getCursorResponse().getCursorId(),
-                cursor->getCursorResponse().getNSS().coll().toString());
+                std::string{cursor->getCursorResponse().getNSS().coll()});
             getMoreRequest.setBatchSize(
                 resharding::gReshardingCollectionClonerBatchSizeCount.load());
             BSONObj cmdObj;
@@ -330,7 +330,7 @@ public:
             cmdObj = getMoreRequest.toBSON();
 
             const HostAndPort& cursorHost = cursor->getHostAndPort();
-            _shardIds.push_back(ShardId(cursor->getShardId().toString()));
+            _shardIds.push_back(ShardId(std::string{cursor->getShardId()}));
             LOGV2_DEBUG(7763603,
                         2,
                         "ReshardingCollectionCloner setting up request",

@@ -84,8 +84,8 @@ TEST(MapReduceAggTest, testBasicTranslate) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr =
         MapReduceCommandRequest{nss,
-                                MapReduceJavascriptCode{mapJavascript.toString()},
-                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceJavascriptCode{std::string{mapJavascript}},
+                                MapReduceJavascriptCode{std::string{reduceJavascript}},
                                 MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -101,8 +101,8 @@ TEST(MapReduceAggTest, testSortWithoutLimit) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr =
         MapReduceCommandRequest{nss,
-                                MapReduceJavascriptCode{mapJavascript.toString()},
-                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceJavascriptCode{std::string{mapJavascript}},
+                                MapReduceJavascriptCode{std::string{reduceJavascript}},
                                 MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setSort(BSON("foo" << 1));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
@@ -122,8 +122,8 @@ TEST(MapReduceAggTest, testSortWithLimit) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr =
         MapReduceCommandRequest{nss,
-                                MapReduceJavascriptCode{mapJavascript.toString()},
-                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceJavascriptCode{std::string{mapJavascript}},
+                                MapReduceJavascriptCode{std::string{reduceJavascript}},
                                 MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setSort(BSON("foo" << 1));
     mr.setLimit(23);
@@ -147,8 +147,8 @@ TEST(MapReduceAggTest, testLimitNoSort) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr =
         MapReduceCommandRequest{nss,
-                                MapReduceJavascriptCode{mapJavascript.toString()},
-                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceJavascriptCode{std::string{mapJavascript}},
+                                MapReduceJavascriptCode{std::string{reduceJavascript}},
                                 MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setLimit(23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
@@ -168,13 +168,13 @@ TEST(MapReduceAggTest, testFeatureLadenTranslate) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Replace, false}};
     mr.setSort(BSON("foo" << 1));
     mr.setQuery(BSON("foo" << "fooval"));
     mr.setFinalize(
-        boost::make_optional(MapReduceJavascriptCodeOrNull{finalizeJavascript.toString()}));
+        boost::make_optional(MapReduceJavascriptCodeOrNull{std::string{finalizeJavascript}}));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
     const auto& sources = pipeline->getSources();
@@ -193,8 +193,8 @@ TEST(MapReduceAggTest, testOutMergeTranslate) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Merge, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -213,8 +213,8 @@ TEST(MapReduceAggTest, testOutReduceTranslate) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Reduce, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -235,8 +235,8 @@ TEST(MapReduceAggTest, testOutSameCollection) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll", OutputType::Replace, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -253,8 +253,8 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeDoesNotFail) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll", OutputType::Merge, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
@@ -264,8 +264,8 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail)
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db2"s), "coll", OutputType::Merge, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     ASSERT_DOES_NOT_THROW(map_reduce_common::translateFromMR(mr, expCtx));
@@ -275,8 +275,8 @@ TEST(MapReduceAggTest, testShardedTrueWithReplaceActionIsNotAllowed) {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Replace, true}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     ASSERT_THROWS_CODE(
@@ -289,8 +289,8 @@ TEST(MapReduceAggTest, testErrorMessagesTranslated) {
 
     auto mr = MapReduceCommandRequest{
         nss,
-        MapReduceJavascriptCode{mapJavascript.toString()},
-        MapReduceJavascriptCode{reduceJavascript.toString()},
+        MapReduceJavascriptCode{std::string{mapJavascript}},
+        MapReduceJavascriptCode{std::string{reduceJavascript}},
         MapReduceOutOptions{boost::make_optional("db"s), "coll2", OutputType::Merge, false}};
     mr.setLimit(-23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));

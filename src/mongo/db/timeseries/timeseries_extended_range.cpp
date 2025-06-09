@@ -120,10 +120,10 @@ bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
 bool collectionHasTimeIndex(OperationContext* opCtx, const Collection& collection) {
     auto tsOptions = collection.getTimeseriesOptions();
     invariant(tsOptions);
-    std::string controlMinTimeField = timeseries::kControlMinFieldNamePrefix.toString();
-    controlMinTimeField.append(tsOptions->getTimeField().toString());
-    std::string controlMaxTimeField = timeseries::kControlMaxFieldNamePrefix.toString();
-    controlMaxTimeField.append(tsOptions->getTimeField().toString());
+    std::string controlMinTimeField = std::string{timeseries::kControlMinFieldNamePrefix};
+    controlMinTimeField.append(std::string{tsOptions->getTimeField()});
+    std::string controlMaxTimeField = std::string{timeseries::kControlMaxFieldNamePrefix};
+    controlMaxTimeField.append(std::string{tsOptions->getTimeField()});
 
     auto indexCatalog = collection.getIndexCatalog();
     // The IndexIterator is initialized lazily, so the first call to 'next' positions it to the

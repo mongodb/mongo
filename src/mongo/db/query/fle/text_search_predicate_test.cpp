@@ -306,7 +306,7 @@ std::unique_ptr<Expression> makeEncStrStartsWith(ExpressionContext* const expCtx
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
 
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
 
     if constexpr (std::is_same_v<T, BSONObj>) {
         return std::make_unique<ExpressionEncStrStartsWith>(
@@ -327,7 +327,7 @@ std::unique_ptr<Expression> makeEncStrEndsWith(ExpressionContext* const expCtx,
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
 
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
 
     if constexpr (std::is_same_v<T, BSONObj>) {
         return std::make_unique<ExpressionEncStrEndsWith>(
@@ -348,7 +348,7 @@ std::unique_ptr<Expression> makeEncStrContains(ExpressionContext* const expCtx,
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
 
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
 
     if constexpr (std::is_same_v<T, BSONObj>) {
         return std::make_unique<ExpressionEncStrContains>(
@@ -369,7 +369,7 @@ std::unique_ptr<Expression> makeEncStrNormalizedEq(ExpressionContext* const expC
     static_assert(std::is_same_v<T, BSONObj> || std::is_same_v<T, Value>);
 
     auto fieldpath = ExpressionFieldPath::createPathFromString(
-        expCtx, path.toString(), expCtx->variablesParseState);
+        expCtx, std::string{path}, expCtx->variablesParseState);
 
     if constexpr (std::is_same_v<T, BSONObj>) {
         return std::make_unique<ExpressionEncStrNormalizedEq>(

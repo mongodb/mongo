@@ -49,7 +49,7 @@ DocumentSourceTeeConsumer::DocumentSourceTeeConsumer(const intrusive_ptr<Express
       exec::agg::Stage(stageName, expCtx),
       _facetId(facetId),
       _bufferSource(bufferSource),
-      _stageName(stageName.toString()) {}
+      _stageName(std::string{stageName}) {}
 
 boost::intrusive_ptr<DocumentSourceTeeConsumer> DocumentSourceTeeConsumer::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -68,7 +68,7 @@ namespace {
 IndexBounds makeFullScanIndexBound(StringData fieldName) {
     IndexBounds bounds;
     bounds.isSimpleRange = true;
-    OrderedIntervalList oil(fieldName.toString());
+    OrderedIntervalList oil(std::string{fieldName});
     oil.intervals = {IndexBoundsBuilder::allValues()};
     bounds.fields.push_back(oil);
     return bounds;

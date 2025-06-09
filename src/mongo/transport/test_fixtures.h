@@ -284,9 +284,9 @@ inline std::unique_ptr<TempCertificatesDir> copyCertsToTempDir(std::string caFil
                                                                std::string directoryPrefix) {
     auto tempDir = std::make_unique<TempCertificatesDir>(directoryPrefix);
 
-    boost::filesystem::copy_file(caFile, tempDir->getCAFile().toString());
-    boost::filesystem::copy_file(pemFile, tempDir->getPEMKeyFile().toString());
-    boost::filesystem::copy_file(clientPemFile, tempDir->getClientPEMKeyFile().toString());
+    boost::filesystem::copy_file(caFile, std::string{tempDir->getCAFile()});
+    boost::filesystem::copy_file(pemFile, std::string{tempDir->getPEMKeyFile()});
+    boost::filesystem::copy_file(clientPemFile, std::string{tempDir->getClientPEMKeyFile()});
 
     return tempDir;
 };

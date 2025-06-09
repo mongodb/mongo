@@ -52,7 +52,7 @@ RecordStore::Options getRecordStoreOptions(const NamespaceString& nss,
     bool isTimeseries = collectionOptions.timeseries.has_value();
     if (isTimeseries) {
         recordStoreOptions.customBlockCompressor =
-            kDefaultTimeseriesCollectionCompressor.toString();
+            std::string{kDefaultTimeseriesCollectionCompressor};
         recordStoreOptions.forceUpdateWithFullDocument = isTimeseries;
     }
 

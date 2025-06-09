@@ -203,7 +203,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                         str::stream() << "Duplicate document sequence: " << name,
                         !msg.getSequence(name));  // TODO IDL
 
-                msg.sequences.push_back({name.toString()});
+                msg.sequences.push_back({std::string{name}});
                 while (!seqBuf.atEof()) {
                     msg.sequences.back().objs.push_back(seqBuf.read<Validated<BSONObj>>());
                 }

@@ -281,8 +281,8 @@ Status CyrusSaslClientSession::initialize() {
         return Status(ErrorCodes::AlreadyInitialized,
                       "Cannot reinitialize CyrusSaslClientSession.");
 
-    int result = sasl_client_new(getParameter(parameterServiceName).toString().c_str(),
-                                 getParameter(parameterServiceHostname).toString().c_str(),
+    int result = sasl_client_new(std::string{getParameter(parameterServiceName)}.c_str(),
+                                 std::string{getParameter(parameterServiceHostname)}.c_str(),
                                  nullptr,
                                  nullptr,
                                  _callbacks,
@@ -305,7 +305,7 @@ Status CyrusSaslClientSession::step(StringData inputData, std::string* outputDat
     if (_step == 0) {
         const char* actualMechanism;
         result = sasl_client_start(_saslConnection,
-                                   getParameter(parameterMechanism).toString().c_str(),
+                                   std::string{getParameter(parameterMechanism)}.c_str(),
                                    nullptr,
                                    &output,
                                    &outputSize,

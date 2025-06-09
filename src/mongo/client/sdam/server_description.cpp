@@ -140,7 +140,7 @@ void ServerDescription::saveHosts(const BSONObj response) {
 void ServerDescription::saveTags(BSONObj tagsObj) {
     const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
     for (const auto& key : keys) {
-        _tags[key] = tagsObj.getStringField(key).toString();
+        _tags[key] = std::string{tagsObj.getStringField(key)};
     }
 }
 

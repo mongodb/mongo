@@ -52,7 +52,7 @@ public:
     static constexpr StringData kName = "resharding"_sd;
 
     std::string getName() override {
-        return kName.toString();
+        return std::string{kName};
     }
 
     boost::optional<Timestamp> calculatePin(OperationContext* opCtx) override;

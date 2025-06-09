@@ -646,7 +646,7 @@ void generatePatternPropertyError(const InternalSchemaAllowedPropertiesMatchExpr
     // Only generate an error if we found a regex which matches a property that failed to match
     // against the corresponding sub-schema.
     if (ctx->shouldGenerateError(expr) && ctx->haveLatestCompleteError() && element) {
-        auto propertyName = element.fieldNameStringData().toString();
+        auto propertyName = std::string{element.fieldNameStringData()};
         BSONObjBuilder patternBuilder;
         patternBuilder.append("propertyName", propertyName);
         appendSchemaAnnotations(*patternSchema.second->getFilter(), patternBuilder);
@@ -686,7 +686,7 @@ void generateAdditionalPropertiesSchemaError(
     builder.append("operatorName", "additionalProperties");
     appendSchemaAnnotations(*expr.getChild(0), builder);
     builder.append("reason", "at least one additional property did not match the subschema");
-    builder.append("failingProperty", firstFailingElement.fieldNameStringData().toString());
+    builder.append("failingProperty", std::string{firstFailingElement.fieldNameStringData()});
     ctx->appendLatestCompleteError(&builder);
 }
 
@@ -1860,7 +1860,7 @@ private:
                 "'InternalSchemaAllElemMatchFromIndexMatchExpression' expression",
                 failingElement);
             _context->getCurrentObjBuilder().appendNumber(
-                "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
+                "itemIndex"_sd, std::stoll(std::string{failingElement.fieldNameStringData()}));
             _context->setChildInput(toObjectWithPlaceholder(failingElement),
                                     _context->getCurrentInversion());
         } else {
@@ -2107,7 +2107,7 @@ public:
         // If this node reports a path as its error, set 'latestCompleteError' appropriately.
         if (_context->shouldGenerateError(*expr) &&
             expr->getErrorAnnotation()->tag == "_propertyExists") {
-            _context->latestCompleteError = expr->path().toString();
+            _context->latestCompleteError = std::string{expr->path()};
             _context->popFrame();
         } else {
             _context->finishCurrentError(expr);

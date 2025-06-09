@@ -599,7 +599,7 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
         return StatusWith<ReplSetTagPattern>(
             ErrorCodes::UnknownReplWriteConcern,
             fmt::format("No write concern mode named '{}' found in replica set configuration",
-                        str::escape(patternName.toString())));
+                        str::escape(std::string{patternName})));
     }
     return StatusWith<ReplSetTagPattern>(iter->second);
 }

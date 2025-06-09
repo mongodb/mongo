@@ -88,7 +88,7 @@ TEST(KmsTest, TestGoodKey) {
 
     auto plaintext = service->decrypt(keyMaterial, BSONObj());
 
-    ASSERT_TRUE(isEquals(myKey.toString(), *plaintext));
+    ASSERT_TRUE(isEquals(std::string{myKey}, *plaintext));
 }
 
 }  // namespace

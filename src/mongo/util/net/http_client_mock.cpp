@@ -44,7 +44,7 @@ HttpClient::HttpReply MockHttpClient::request(HttpMethod method,
                 _allow);
     }
 
-    auto it = _expectations.find(Request{method, url.toString()});
+    auto it = _expectations.find(Request{method, std::string{url}});
     uassert(ErrorCodes::OperationFailed,
             "Unexpected request submitted to mock HttpClient",
             it != _expectations.end());

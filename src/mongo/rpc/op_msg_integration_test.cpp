@@ -126,7 +126,7 @@ std::string getThreadNameByAppName(DBClientBase* conn, StringData appName) {
     const auto cursorResponse = CursorResponse::parseFromBSON(curOpReply->getCommandReply());
     ASSERT_OK(cursorResponse.getStatus());
     const auto batch = cursorResponse.getValue().getBatch();
-    return batch.empty() ? "" : batch[0].getStringField("desc").toString();
+    return batch.empty() ? "" : std::string{batch[0].getStringField("desc")};
 }
 
 TEST(OpMsg, UnknownRequiredFlagClosesConnection) {
@@ -409,7 +409,7 @@ void exhaustGetMoreTest(bool enableChecksum) {
     // Construct getMore request with exhaust flag. Set batch size so we will need multiple batches
     // to exhaust the cursor.
     int batchSize = 2;
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());
@@ -528,7 +528,7 @@ TEST(OpMsg, ServerDoesNotSetMoreToComeOnErrorInGetMore) {
 
     // Construct getMore request with exhaust flag.
     int batchSize = 2;
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());
@@ -578,7 +578,7 @@ TEST(OpMsg, ExhaustWorksForAggCursor) {
     // Construct getMore request with exhaust flag. Set batch size so we will need multiple batches
     // to exhaust the cursor.
     int batchSize = 2;
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
     getMoreRequest.setBatchSize(batchSize);
     opMsgRequest = OpMsgRequestBuilder::create(
         auth::ValidatedTenancyScope::kNotRequired, nss.dbName(), getMoreRequest.toBSON());

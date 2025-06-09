@@ -206,7 +206,7 @@ TEST_F(MockServerStreamTest, SendReceiveInitialMetadata) {
     MetadataView expected = {{"foo", "bar"}, {"baz", "more metadata"}, {"baz", "repeated key"}};
 
     for (auto& kvp : expected) {
-        getServerContext().addInitialMetadataEntry(kvp.first.toString(), kvp.second.toString());
+        getServerContext().addInitialMetadataEntry(std::string{kvp.first}, std::string{kvp.second});
     }
     ASSERT_TRUE(getServerStream().write(makeUniqueMessage().sharedBuffer()));
 

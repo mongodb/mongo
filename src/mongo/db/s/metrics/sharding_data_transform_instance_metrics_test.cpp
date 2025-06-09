@@ -217,7 +217,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, ReportForCurrentOpShouldHaveGen
         auto instanceId = UUID::gen();
         auto metrics = createInstanceMetrics(instanceId, role);
         auto report = metrics->reportForCurrentOp();
-        ASSERT_EQ(report.getStringField("desc").toString(),
+        ASSERT_EQ(report.getStringField("desc"),
                   fmt::format("ShardingDataTransformMetrics{}Service {}",
                               ShardingDataTransformMetrics::getRoleName(role),
                               instanceId.toString()));

@@ -431,7 +431,7 @@ bool anyStageModifiesShardKeyOrNeedsMerge(OrderedPathSet shardKeyPaths,
 OrderedPathSet getShardKeyPathsSet(const ShardKeyPattern& shardKey) {
     OrderedPathSet shardKeyPaths;
     for (auto&& path : shardKey.getKeyPatternFields()) {
-        shardKeyPaths.emplace(path->dottedField().toString());
+        shardKeyPaths.emplace(std::string{path->dottedField()});
     }
 
     return shardKeyPaths;
@@ -1647,7 +1647,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCu
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
     for (auto&& remoteCursor : shardDispatchResults.remoteCursors) {
-        targetedShards.emplace_back(remoteCursor->getShardId().toString());
+        targetedShards.emplace_back(std::string{remoteCursor->getShardId()});
     }
 
     std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;

@@ -135,10 +135,10 @@ constexpr auto kIndexKeyId = "12345678-1234-9876-1234-123456789012"_sd;
 constexpr auto kIndexKey2Id = "12345678-1234-9876-1234-123456789013"_sd;
 constexpr auto kIndexKey3Id = "12345678-1234-9876-1234-123456789014"_sd;
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
-static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId.toString()));
-static UUID indexKey2Id = uassertStatusOK(UUID::parse(kIndexKey2Id.toString()));
-static UUID indexKey3Id = uassertStatusOK(UUID::parse(kIndexKey3Id.toString()));
-static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
+static UUID indexKeyId = uassertStatusOK(UUID::parse(kIndexKeyId));
+static UUID indexKey2Id = uassertStatusOK(UUID::parse(kIndexKey2Id));
+static UUID indexKey3Id = uassertStatusOK(UUID::parse(kIndexKey3Id));
+static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId));
 
 std::vector<char> testValue = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
 std::vector<char> testValue2 = {0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29};

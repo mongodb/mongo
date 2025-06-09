@@ -135,7 +135,7 @@ public:
      * Sets _setName to "name".
      */
     void setSetName(StringData name) {
-        _setName = name.toString();
+        _setName = std::string{name};
     }
 
     /**

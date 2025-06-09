@@ -39,7 +39,7 @@ void CollatorInterface::hash_combine(size_t& seed, StringData stringToHash) cons
 }
 
 std::string CollatorInterface::getComparisonString(StringData stringData) const {
-    return getComparisonKey(stringData).getKeyData().toString();
+    return std::string{getComparisonKey(stringData).getKeyData()};
 }
 
 }  // namespace mongo

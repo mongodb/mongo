@@ -84,7 +84,7 @@ public:
 
         // This should not happen.
         massert(16920,
-                "trying to match on unknown field: " + path->fieldRef().dottedField().toString(),
+                "trying to match on unknown field: " + std::string{path->fieldRef().dottedField()},
                 0);
 
         return new SingleElementElementIterator(BSONElement());
@@ -128,7 +128,7 @@ public:
 
         // Planning should not let this happen.
         massert(17409,
-                "trying to match on unknown field: " + path->fieldRef().dottedField().toString(),
+                "trying to match on unknown field: " + std::string{path->fieldRef().dottedField()},
                 0);
 
         return new SingleElementElementIterator(BSONElement());

@@ -1025,7 +1025,7 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
         } else {
             cmdResponse = swRes.getValue().getResponse();
         }
-        shardId = ShardId(swRes.getValue().getShardId().toString());
+        shardId = ShardId(std::string{swRes.getValue().getShardId()});
     }
 
     if (wce.has_value() && !cmdResponse.hasField("writeConcernError")) {
@@ -1088,7 +1088,7 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         // target document for the 'Write Phase'.
         ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
             cmdObjForPassthrough,
-            clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId").toString(),
+            std::string{clusterQueryWithoutShardKeyExplainRes.getStringField("targetShardId")},
             write_without_shard_key::targetDocForExplain);
         const auto explainClusterWriteWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON(), verbosity);

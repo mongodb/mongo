@@ -84,7 +84,7 @@ public:
                                    Variables::Id renamingVar = Variables::kRootId) const final {
         // The positional projection can change any field within the path it's applied to, so we'll
         // treat the first component in '_positionalInfo.path' as the computed path.
-        return {{_path.front().toString()}, {}};
+        return {{std::string{_path.front()}}, {}};
     }
 
     boost::intrusive_ptr<Expression> optimize() final {
@@ -152,7 +152,7 @@ public:
                                    Variables::Id renamingVar = Variables::kRootId) const final {
         // The $slice projection can change any field within the path it's applied to, so we'll
         // treat the first component in '_sliceInfo.path' as the computed path.
-        return {{_path.front().toString()}, {}};
+        return {{std::string{_path.front()}}, {}};
     }
 
     boost::intrusive_ptr<Expression> optimize() final {

@@ -97,7 +97,7 @@ public:
 
             const auto target = request().getCommandParameter();
             const auto name = request().getName()
-                ? boost::make_optional(request().getName()->toString())
+                ? boost::make_optional(std::string{*request().getName()})
                 : boost::none;
 
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);

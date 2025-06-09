@@ -94,7 +94,7 @@ namespace mongo {
 namespace {
 
 constexpr auto kUserKeyId = "ABCDEFAB-1234-9876-1234-123456789012"_sd;
-static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId.toString()));
+static UUID userKeyId = uassertStatusOK(UUID::parse(kUserKeyId));
 
 const FLEUserKey& getUserKey() {
     static std::string userVec = hexblob::decode(

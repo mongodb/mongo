@@ -310,7 +310,7 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
         variableValidation::validateNameForUserWrite(varName);
 
         _letVariables.emplace_back(
-            varName.toString(),
+            std::string{varName},
             Expression::parseOperand(expCtx.get(), varElem, expCtx->variablesParseState),
             // Variable::Id is set to INT64_MIN as it is not needed for processing $merge stage.
             // The '_letVariables' are evaluated in resolveLetVariablesIfNeeded(), serialized into

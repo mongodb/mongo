@@ -445,7 +445,7 @@ public:
     }
 
     std::string help() const final {
-        return Request::kCommandDescription.toString();
+        return std::string{Request::kCommandDescription};
     }
 };
 MONGO_REGISTER_COMMAND(CmdDataSize).forShard();
@@ -467,7 +467,7 @@ public:
     }
 
     std::string help() const final {
-        return Request::kCommandDescription.toString();
+        return std::string{Request::kCommandDescription};
     }
 
     bool allowedWithSecurityToken() const final {
@@ -763,7 +763,7 @@ public:
     }
 
     std::string help() const final {
-        return Request::kCommandDescription.toString();
+        return std::string{Request::kCommandDescription};
     }
 };
 MONGO_REGISTER_COMMAND(CmdDbStats).forShard();

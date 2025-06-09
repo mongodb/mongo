@@ -45,7 +45,7 @@ void UpdateIndexData::addPath(const FieldRef& path) {
 }
 
 void UpdateIndexData::addPathComponent(StringData pathComponent) {
-    _pathComponents.insert(pathComponent.toString());
+    _pathComponents.insert(std::string{pathComponent});
 }
 
 void UpdateIndexData::setAllPathsIndexed() {

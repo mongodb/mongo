@@ -459,14 +459,14 @@ inline StatusWith<bool> coerceFromString<bool>(StringData str) {
 
 template <>
 inline StatusWith<std::string> coerceFromString<std::string>(StringData str) {
-    return str.toString();
+    return std::string{str};
 }
 
 template <>
 inline StatusWith<std::vector<std::string>> coerceFromString<std::vector<std::string>>(
     StringData str) {
     std::vector<std::string> v;
-    str::splitStringDelim(str.toString(), &v, ',');
+    str::splitStringDelim(std::string{str}, &v, ',');
     return v;
 }
 

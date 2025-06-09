@@ -1573,7 +1573,7 @@ boost::intrusive_ptr<Expression> rewriteAggExpressionTree(
 
         // The remaining case is a reference to a field path in the current document.
         tassert(5920002, "Unexpected empty path", fieldExpr->getFieldPath().getPathLength() > 1);
-        auto firstPath = fieldExpr->getFieldPathWithoutCurrentPrefix().getFieldName(0).toString();
+        auto firstPath = std::string{fieldExpr->getFieldPathWithoutCurrentPrefix().getFieldName(0)};
 
         // Only attempt to rewrite paths that begin with one of the caller-requested fields.
         if (fields.find(firstPath) == fields.end()) {
@@ -1723,7 +1723,7 @@ std::unique_ptr<MatchExpression> rewriteMatchExpressionTree(
                     return nullptr;
                 }
 
-                auto firstPath = pathME->fieldRef()->getPart(0).toString();
+                auto firstPath = std::string{pathME->fieldRef()->getPart(0)};
 
                 // Only attempt to rewrite paths that begin with one of the caller-requested fields.
                 if (fields.find(firstPath) == fields.end()) {

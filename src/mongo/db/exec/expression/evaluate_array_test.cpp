@@ -201,7 +201,7 @@ void runTest(Document spec) {
             }
             if (ValueComparator().evaluate(result != expected)) {
                 std::string errMsg = str::stream()
-                    << "for expression " << field.first.toString() << " with argument "
+                    << "for expression " << std::string{field.first} << " with argument "
                     << args.toString() << " full tree: " << expr->serialize().toString()
                     << " expected: " << expected.toString() << " but got: " << result.toString();
                 FAIL(errMsg);

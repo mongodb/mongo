@@ -138,7 +138,7 @@ protected:
         doc.setPing(now());
         doc.setUptime(0);
         doc.setWaiting(true);
-        doc.setMongoVersion(VersionInfoInterface::instance().version().toString());
+        doc.setMongoVersion(std::string{VersionInfoInterface::instance().version()});
         return doc;
     }
 

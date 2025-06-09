@@ -61,7 +61,7 @@ std::string WiredTigerExtensions::getOpenExtensionsConfig() const {
 }
 
 void WiredTigerExtensions::addExtension(StringData extensionConfigStr) {
-    _wtExtensions.emplace_back(extensionConfigStr.toString());
+    _wtExtensions.emplace_back(std::string{extensionConfigStr});
 }
 
 }  // namespace mongo

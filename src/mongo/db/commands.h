@@ -1453,10 +1453,10 @@ private:
         // A command with 'apiStrict' cannot be invoked with alias.
         if (apiStrict && opMsgRequest.getCommandName() != command->getName()) {
             uasserted(ErrorCodes::APIStrictError,
-                      str::stream() << "Command invocation with name '"
-                                    << opMsgRequest.getCommandName().toString()
-                                    << "' is not allowed in 'apiStrict' mode, use '"
-                                    << command->getName() << "' instead");
+                      str::stream()
+                          << "Command invocation with name '" << opMsgRequest.getCommandName()
+                          << "' is not allowed in 'apiStrict' mode, use '" << command->getName()
+                          << "' instead");
         }
 
         return parsed;

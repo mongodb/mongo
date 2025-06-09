@@ -617,7 +617,7 @@ std::vector<std::string> IndexBuildsCoordinator::extractIndexNames(
     const std::vector<BSONObj>& specs) {
     std::vector<std::string> indexNames;
     for (const auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+        std::string name = std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
         invariant(!name.empty(),
                   str::stream() << "Bad spec passed into ReplIndexBuildState constructor, missing '"
                                 << IndexDescriptor::kIndexNameFieldName << "' field: " << spec);
@@ -661,7 +661,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
     std::vector<std::string> indexNames;
     for (auto& spec : specs) {
-        std::string name = spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+        std::string name = std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
         if (name.empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
@@ -800,7 +800,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     const auto mdbCatalog = MDBCatalog::get(opCtx);
     for (const auto& spec : specs) {
         std::string indexName =
-            spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+            std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
         if (indexName.empty()) {
             return Status(ErrorCodes::CannotCreateIndex,
                           str::stream()
@@ -1062,7 +1062,7 @@ void IndexBuildsCoordinator::applyStartIndexBuild(OperationContext* opCtx,
 
             for (const auto& spec : oplogEntry.indexSpecs) {
                 std::string name =
-                    spec.getStringField(IndexDescriptor::kIndexNameFieldName).toString();
+                    std::string{spec.getStringField(IndexDescriptor::kIndexNameFieldName)};
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Index spec is missing the 'name' field " << spec,
                         !name.empty());
@@ -1908,7 +1908,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 
                 boost::system::error_code ec;
                 boost::filesystem::remove(
-                    storageGlobalParams.dbpath + "/_tmp/" + index.getFileName()->toString(), ec);
+                    storageGlobalParams.dbpath + "/_tmp/" + std::string{*index.getFileName()}, ec);
 
                 if (ec) {
                     LOGV2(5043101,

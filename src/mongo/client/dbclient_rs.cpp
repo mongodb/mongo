@@ -114,7 +114,7 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
                                        const ClientAPIVersionParameters* apiParameters)
     : DBClientBase(apiParameters),
       _setName(name),
-      _applicationName(applicationName.toString()),
+      _applicationName(std::string{applicationName}),
       _so_timeout(so_timeout),
       _uri(std::move(uri)) {
     if (_uri.isValid()) {
@@ -210,7 +210,7 @@ bool DBClientReplicaSet::isStillConnected() {
 namespace {
 
 bool _isSecondaryCommand(StringData commandName, const BSONObj& commandArgs) {
-    if (_secOkCmdList.count(commandName.toString())) {
+    if (_secOkCmdList.count(std::string{commandName})) {
         return true;
     }
     if (commandName == "mapReduce" || commandName == "mapreduce") {

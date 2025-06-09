@@ -811,8 +811,8 @@ std::vector<BSONObj> getQueryReopeningCandidate(BucketCatalog& catalog,
         metaElement = bucketKey.metadata.element();
     }
 
-    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
-    auto maxDataTimeFieldPath = kDataFieldNamePrefix.toString() + options.getTimeField() + "." +
+    auto controlMinTimePath = std::string{kControlMinFieldNamePrefix} + options.getTimeField();
+    auto maxDataTimeFieldPath = std::string{kDataFieldNamePrefix} + options.getTimeField() + "." +
         std::to_string(gTimeseriesBucketMaxCount - 1);
 
     // Derive the maximum bucket size.

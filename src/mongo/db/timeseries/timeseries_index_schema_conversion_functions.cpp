@@ -652,12 +652,12 @@ boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCt
                                                           const IndexCatalog* indexCatalog,
                                                           const TimeseriesOptions& tsOptions) {
     const std::string controlTimeField =
-        timeseries::kControlMinFieldNamePrefix.toString() + tsOptions.getTimeField();
+        std::string{timeseries::kControlMinFieldNamePrefix} + tsOptions.getTimeField();
 
     // Populate a vector of index key fields which we check against existing indexes.
     boost::container::small_vector<std::string, 2> expectedPrefix;
     if (tsOptions.getMetaField().has_value()) {
-        expectedPrefix.push_back(kBucketMetaFieldName.toString());
+        expectedPrefix.push_back(std::string{kBucketMetaFieldName});
     }
     expectedPrefix.push_back(controlTimeField);
 

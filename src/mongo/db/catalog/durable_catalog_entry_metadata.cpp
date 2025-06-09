@@ -280,7 +280,7 @@ BSONObj CatalogEntryMetaData::toBSON(bool hasExclusiveAccess) const {
 
 void CatalogEntryMetaData::parse(const BSONObj& obj) {
     nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
-        obj.getStringField("ns").toString());
+        std::string{obj.getStringField("ns")});
 
     if (obj["options"].isABSONObj()) {
         options = uassertStatusOK(

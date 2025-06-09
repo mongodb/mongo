@@ -73,10 +73,10 @@ StatusWith<std::string> parseArrayFilterIdentifier(
     }
 
     if (!identifier.empty()) {
-        foundIdentifiers.emplace(identifier.toString());
+        foundIdentifiers.emplace(std::string{identifier});
     }
 
-    return identifier.toString();
+    return std::string{identifier};
 }
 
 /**
@@ -291,7 +291,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
             }
             childName = status.getValue();
         } else {
-            childName = fieldRef.getPart(i).toString();
+            childName = std::string{fieldRef.getPart(i)};
         }
 
         auto child = current->getChild(childName);
@@ -334,7 +334,7 @@ StatusWith<bool> UpdateObjectNode::parseAndMerge(
         }
         childName = status.getValue();
     } else {
-        childName = fieldRef.getPart(fieldRef.numParts() - 1).toString();
+        childName = std::string{fieldRef.getPart(fieldRef.numParts() - 1)};
     }
 
     if (current->getChild(childName)) {

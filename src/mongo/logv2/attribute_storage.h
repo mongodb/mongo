@@ -266,7 +266,7 @@ inline CustomAttributeValue mapValue(boost::none_t val) {
         builder.appendNull(fieldName);
     };
     custom.toString = [] {
-        return constants::kNullOptionalString.toString();
+        return std::string{constants::kNullOptionalString};
     };
     return custom;
 }

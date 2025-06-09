@@ -61,7 +61,7 @@ Status addAliasToTypeSet(StringData typeAlias,
         return Status::OK();
     }
 
-    auto optValue = aliasMapFind(typeAlias.toString());
+    auto optValue = aliasMapFind(std::string{typeAlias});
     if (!optValue) {
         // The string "missing" can be returned from the $type agg expression, but is not valid for
         // use in the $type match expression predicate. Return a special error message for this

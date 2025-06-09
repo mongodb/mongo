@@ -1169,7 +1169,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             uassertStatusOK(status);
         }
 
-        std::string expected = entry.getMd5().toString();
+        std::string expected = std::string{entry.getMd5()};
         std::string found = hasher->total();
 
         LOGV2_DEBUG(7844905,

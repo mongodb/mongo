@@ -93,7 +93,7 @@ void OpMsgFuzzerFixture::_setAuthorizationManager() {
 }
 
 OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
-    : _dir(kTempDirStem.toString()) {
+    : _dir(std::string{kTempDirStem}) {
     if (!skipGlobalInitializers) {
         auto ret = runGlobalInitializers(std::vector<std::string>{});
         invariant(ret);

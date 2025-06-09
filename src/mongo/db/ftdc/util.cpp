@@ -129,7 +129,7 @@ boost::filesystem::path getMongoSPath(const boost::filesystem::path& logFile) {
         base = full_path.substr(0, full_path.size() - base.extension().size());
     }
 
-    base += "." + kFTDCDefaultDirectory.toString();
+    base += "." + std::string{kFTDCDefaultDirectory};
     return base;
 }
 

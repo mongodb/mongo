@@ -190,8 +190,7 @@ TEST_F(DocumentSourceLookUpTest, LookupEmptyPipelineDoesntUseDiskAndIsOKInATrans
     expCtx->setResolvedNamespaces(ResolvedNamespaceMap{{fromNs, {fromNs, std::vector<BSONObj>()}}});
 
     auto docSource = DocumentSourceLookUp::createFromBson(
-        BSON("$lookup" << BSON("from" << fromNs.coll().toString() << "pipeline" << BSONArray()
-                                      << "as"
+        BSON("$lookup" << BSON("from" << fromNs.coll() << "pipeline" << BSONArray() << "as"
                                       << "as"))
             .firstElement(),
         expCtx);

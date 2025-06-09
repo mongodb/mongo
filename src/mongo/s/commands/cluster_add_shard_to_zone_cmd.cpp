@@ -81,7 +81,7 @@ public:
         void typedRun(OperationContext* opCtx) {
 
             BSONObjBuilder cmdBuilder;
-            ConfigsvrAddShardToZone cmd(getShard().toString(), request().getZone().toString());
+            ConfigsvrAddShardToZone cmd(std::string{getShard()}, std::string{request().getZone()});
             generic_argument_util::setMajorityWriteConcern(cmd);
             cmd.serialize(&cmdBuilder);
 

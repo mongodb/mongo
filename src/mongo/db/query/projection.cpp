@@ -200,7 +200,7 @@ private:
     void addTopLevelPathAsDependency() {
         const auto& path = _context->fullPath();
 
-        _context->data().addRequiredField(path.front().toString());
+        _context->data().addRequiredField(std::string{path.front()});
     }
 
     void addFullPathAsDependency() {

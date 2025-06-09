@@ -2350,7 +2350,7 @@ void TransactionRouter::MetricsTracker::endTransaction(
     if (terminationCause == TerminationCause::kAborted) {
         dassert(!abortCause.empty());
         routerTxnMetrics->incrementTotalAborted();
-        routerTxnMetrics->incrementAbortCauseMap(abortCause.toString());
+        routerTxnMetrics->incrementAbortCauseMap(std::string{abortCause});
     } else {
         dassert(commitType != CommitType::kNotInitiated);
         routerTxnMetrics->incrementTotalCommitted();

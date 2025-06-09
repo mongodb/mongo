@@ -97,7 +97,7 @@ StatusWith<CIDR> CIDR::parse(BSONElement from) {
 StatusWith<CIDR> CIDR::parse(StringData s) {
     CIDR value;
     auto slash = find(begin(s), end(s), '/');
-    auto ip = (slash == end(s)) ? s.toString() : s.substr(0, slash - begin(s)).toString();
+    auto ip = (slash == end(s)) ? std::string{s} : std::string{s.substr(0, slash - begin(s))};
 
     if (inet_pton(AF_INET, ip.c_str(), value._ip.data())) {
         value._family = AF_INET;

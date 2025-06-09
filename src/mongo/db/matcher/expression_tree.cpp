@@ -345,7 +345,7 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     }
                 }
 
-                auto key = childExpression->path().toString();
+                auto key = std::string{childExpression->path()};
                 if (!pathToExprsMap.contains(key)) {
                     std::vector<std::unique_ptr<MatchExpression>> exprs;
                     exprs.push_back(std::move(childExpression));

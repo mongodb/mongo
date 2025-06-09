@@ -70,7 +70,7 @@ bool shouldRun(const Simulation& simulation) {
 }  // namespace
 
 Simulation::Simulation(StringData suiteName, StringData workloadName)
-    : _suiteName(suiteName.toString()), _workloadName(workloadName.toString()) {}
+    : _suiteName(std::string{suiteName}), _workloadName(std::string{workloadName}) {}
 
 Simulation::~Simulation() {}
 

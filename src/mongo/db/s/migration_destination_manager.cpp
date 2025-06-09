@@ -394,7 +394,7 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
     LOGV2(21998, "Error during migration", "error"_attr = redact(msg));
     {
         stdx::lock_guard<stdx::mutex> sl(_mutex);
-        _errmsg = msg.toString();
+        _errmsg = std::string{msg};
         _state = kFail;
         _stateChangedCV.notify_all();
     }
@@ -408,7 +408,7 @@ void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
     LOGV2_WARNING(22010, "Error during migration", "error"_attr = redact(msg));
     {
         stdx::lock_guard<stdx::mutex> sl(_mutex);
-        _errmsg = msg.toString();
+        _errmsg = std::string{msg};
         _state = kFail;
         _stateChangedCV.notify_all();
     }

@@ -925,7 +925,7 @@ void validateHostAsShard(OperationContext* opCtx,
     auto resHello = greetReplicaSet(opCtx, targeter, executor);
 
     // Fail if the node being added is a mongos.
-    const std::string msg = resHello.getStringField("msg").toString();
+    const std::string msg = std::string{resHello.getStringField("msg")};
     uassert(ErrorCodes::IllegalOperation, "cannot add a mongos as a shard", msg != "isdbgrid");
 
     // Extract the maxWireVersion so we can verify that the node being added has a binary
@@ -1130,7 +1130,7 @@ std::string createShardName(OperationContext* opCtx,
     std::string selectedName;
 
     if (proposedShardName) {
-        selectedName = proposedShardName->toString();
+        selectedName = std::string{*proposedShardName};
     } else {
         auto greet = greetReplicaSet(opCtx, targeter, executor);
         selectedName = greet["setName"].str();

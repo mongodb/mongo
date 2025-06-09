@@ -292,12 +292,12 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
         }
         matchArrayBuilder.done();
 
-        pipeline.push_back(BSON(
-            "$lookup" << BSON(
-                "from" << nss.coll().toString() << "let" << letBuilder.obj() << "pipeline"
-                       << BSON_ARRAY(BSON("$match" << matchBuilder.obj()) << BSON("$limit" << 1))
-                       << "as"
-                       << "docs")));
+        pipeline.push_back(
+            BSON("$lookup" << BSON("from" << nss.coll() << "let" << letBuilder.obj() << "pipeline"
+                                          << BSON_ARRAY(BSON("$match" << matchBuilder.obj())
+                                                        << BSON("$limit" << 1))
+                                          << "as"
+                                          << "docs")));
         pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first" << "$docs"))));
         pipeline.push_back(BSON("$unset" << BSON_ARRAY("docs" << "_id")));
     } else {
@@ -963,10 +963,11 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
             str::stream() << "Cannot analyze a shard key for a non-existing collection",
             origCollUuid);
     // Perform best-effort validation that the collection has not been dropped and recreated.
-    uassert(CollectionUUIDMismatchInfo(nss.dbName(), collUuid, nss.coll().toString(), boost::none),
-            str::stream() << "Found that the collection UUID has changed from " << collUuid
-                          << " to " << origCollUuid << " since the command started",
-            origCollUuid == collUuid);
+    uassert(
+        CollectionUUIDMismatchInfo(nss.dbName(), collUuid, std::string{nss.coll()}, boost::none),
+        str::stream() << "Found that the collection UUID has changed from " << collUuid << " to "
+                      << origCollUuid << " since the command started",
+        origCollUuid == collUuid);
 
     LOGV2(7559400,
           "Generating split points using the shard key being analyzed",
@@ -1089,11 +1090,11 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
                 collection);
         // Perform best-effort validation that the collection has not been dropped and recreated.
-        uassert(
-            CollectionUUIDMismatchInfo(nss.dbName(), collUuid, nss.coll().toString(), boost::none),
-            str::stream() << "Found that the collection UUID has changed from " << collUuid
-                          << " to " << collection->uuid() << " since the command started",
-            collection->uuid() == collUuid);
+        uassert(CollectionUUIDMismatchInfo(
+                    nss.dbName(), collUuid, std::string{nss.coll()}, boost::none),
+                str::stream() << "Found that the collection UUID has changed from " << collUuid
+                              << " to " << collection->uuid() << " since the command started",
+                collection->uuid() == collUuid);
 
         // Performs best-effort validation that the shard key does not contain an array field by
         // extracting the shard key value from a random document in the collection and asserting

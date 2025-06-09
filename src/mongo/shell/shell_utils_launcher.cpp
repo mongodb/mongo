@@ -705,7 +705,7 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
                     pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
-            return kDefaultPipePath.toString();
+            return std::string{kDefaultPipePath};
         }
     }();
 
@@ -773,7 +773,7 @@ BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
                     pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
-            return kDefaultPipePath.toString();
+            return std::string{kDefaultPipePath};
         }
     }();
 
@@ -884,7 +884,7 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
                     pipeDirElem.type() == BSONType::string);
             return pipeDirElem.str();
         } else {
-            return kDefaultPipePath.toString();
+            return std::string{kDefaultPipePath};
         }
     }();
 

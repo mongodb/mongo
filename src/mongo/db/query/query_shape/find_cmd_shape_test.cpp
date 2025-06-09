@@ -43,7 +43,7 @@ namespace {
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
 std::string applyHmacForTest(StringData sd) {
-    return "REDACT_" + sd.toString();
+    return "REDACT_" + std::string{sd};
 }
 
 static const NamespaceStringOrUUID kDefaultTestNss =

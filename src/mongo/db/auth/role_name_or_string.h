@@ -56,7 +56,7 @@ class RoleNameOrString {
 public:
     RoleNameOrString() = delete;
     explicit RoleNameOrString(std::string role) : _roleName(std::move(role)) {}
-    explicit RoleNameOrString(StringData role) : _roleName(role.toString()) {}
+    explicit RoleNameOrString(StringData role) : _roleName(std::string{role}) {}
     explicit RoleNameOrString(RoleName role) : _roleName(std::move(role)) {}
 
     // IDL support.

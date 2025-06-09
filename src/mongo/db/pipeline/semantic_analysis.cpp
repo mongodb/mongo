@@ -365,7 +365,7 @@ PartitionedDependencies extractModifiedDependencies(const OrderedPathSet& depend
     // should not be included in the modified dependencies.
     for (auto&& dependency : dependencies) {
         bool preserved = false;
-        auto firstField = FieldPath::extractFirstFieldFromDottedPath(dependency).toString();
+        auto firstField = std::string{FieldPath::extractFirstFieldFromDottedPath(dependency)};
         // Because a path is preserved if the object it points to is preserved, if a prefix to a
         // path is preserved, then the path itself must be preserved. So we search for any prefixes
         // of 'dependency' as well. 'preservedPaths' is an *ordered* set, so we only have to search

@@ -873,8 +873,8 @@ Status checkLongName(const po::variables_map& vm,
                     sb << "Illegal option assignment: \"" << *keyValueVectorIt << "\"";
                     return Status(ErrorCodes::BadValue, sb.str());
                 }
-                std::string key = keySD.toString();
-                std::string value = valueSD.toString();
+                std::string key = std::string{keySD};
+                std::string value = std::string{valueSD};
                 // Make sure we aren't setting an option to two different values
                 if (mapValue.count(key) > 0 && mapValue[key] != value) {
                     StringBuilder sb;

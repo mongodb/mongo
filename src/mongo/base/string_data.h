@@ -309,11 +309,6 @@ public:
     STRING_DATA_DEFINE_FIND_OVERLOADS_(find_last_not_of, npos)
 #undef STRING_DATA_FIND_OVERLOADS_
 
-    /** Deprecated: Use an explicit cast instead: `sd.toString()` => `std::string{sd}` */
-    std::string toString() const {
-        return std::string{_sv};
-    }
-
     friend constexpr auto operator<=>(StringData a, StringData b) = default;
     friend constexpr bool operator==(StringData a, StringData b) = default;
 

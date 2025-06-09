@@ -66,7 +66,7 @@ std::string unpackName(StringData inputData) {
         X509MechanismClientStep1::parse(IDLParserContext{"x509-authentication"}, payload);
     const auto& user = request.getPrincipalName();
 
-    return user.value_or("").toString();
+    return std::string{user.value_or("")};
 }
 
 /**

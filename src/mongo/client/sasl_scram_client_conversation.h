@@ -119,7 +119,7 @@ public:
     std::string generateClientProof(const std::vector<std::uint8_t>& salt,
                                     size_t iterationCount) final {
         auto password = uassertStatusOK(saslPrep(
-            _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString()));
+            std::string{_saslClientSession->getParameter(SaslClientSession::parameterPassword)}));
         scram::Presecrets<HashBlock> presecrets(password, salt, iterationCount);
 
         auto targetHost = HostAndPort::parse(
@@ -145,7 +145,7 @@ public:
 
     StatusWith<std::string> saslPrep(StringData val) const final {
         if (std::is_same<SHA1Block, HashBlock>::value) {
-            return val.toString();
+            return std::string{val};
         } else {
             return icuSaslPrep(val);
         }

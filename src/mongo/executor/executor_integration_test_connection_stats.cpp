@@ -71,7 +71,7 @@ void assertConnectionStats(const AsyncClientFactory& factory,
 
     BSONObjBuilder bob;
     if (!assertConnectionStatsBase(factory, remote, bob, connectionPoolTest, gRPCTest)) {
-        FAIL(errMsg.toString() + " Stats: " + bob.obj().toString());
+        FAIL(std::string{errMsg} + " Stats: " + bob.obj().toString());
     }
 }
 
@@ -100,7 +100,7 @@ void assertConnectionStatsSoon(const AsyncClientFactory& factory,
             break;
         }
     }
-    FAIL(errMsg.toString() + statsOnError);
+    FAIL(std::string{errMsg} + statsOnError);
 }
 
 }  // namespace mongo::executor

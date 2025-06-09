@@ -478,10 +478,10 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     using Project = DocumentSourceProject;
 
     // Aliases for the field names of the the final projections
-    const auto kNss = NamespacePlacementType::kNssFieldName.toString();
-    const auto kUuid = NamespacePlacementType::kUuidFieldName.toString();
-    const auto kShards = NamespacePlacementType::kShardsFieldName.toString();
-    const auto kTimestamp = NamespacePlacementType::kTimestampFieldName.toString();
+    const auto kNss = std::string{NamespacePlacementType::kNssFieldName};
+    const auto kUuid = std::string{NamespacePlacementType::kUuidFieldName};
+    const auto kShards = std::string{NamespacePlacementType::kShardsFieldName};
+    const auto kTimestamp = std::string{NamespacePlacementType::kTimestampFieldName};
 
     auto pipeline = PipelineBuilder(opCtx,
                                     CollectionType::ConfigNS,
@@ -1435,7 +1435,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
                        allShardsQueryResponse.docs.end(),
                        std::back_inserter(shardsAtInitializationTime),
                        [](const BSONObj& doc) {
-                           return ShardId(doc.getStringField(ShardType::name.name()).toString());
+                           return ShardId(std::string{doc.getStringField(ShardType::name.name())});
                        });
     }
 

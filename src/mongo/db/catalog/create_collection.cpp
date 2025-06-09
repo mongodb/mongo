@@ -672,7 +672,7 @@ Status _createTimeseries(OperationContext* opCtx,
 
 
     CollectionOptions viewOptions;
-    viewOptions.viewOn = bucketsNs.coll().toString();
+    viewOptions.viewOn = std::string{bucketsNs.coll()};
     viewOptions.collation = options.collation;
     constexpr bool asArray = true;
     viewOptions.pipeline = timeseries::generateViewPipeline(*options.timeseries, asArray);
@@ -886,7 +886,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         std::string tmpNssPattern("tmp%%%%%.create");
         if (newCollName.isTimeseriesBucketsCollection()) {
             tmpNssPattern =
-                NamespaceString::kTimeseriesBucketsCollectionPrefix.toString() + tmpNssPattern;
+                std::string{NamespaceString::kTimeseriesBucketsCollectionPrefix} + tmpNssPattern;
         }
         for (int tries = 0; needsRenaming && tries < 10; ++tries) {
             auto tmpNameResult = makeUniqueCollectionName(opCtx, dbName, tmpNssPattern);

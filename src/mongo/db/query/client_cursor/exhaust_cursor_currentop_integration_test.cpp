@@ -95,7 +95,7 @@ const NamespaceString testNSS =
 
 const StringData testAppName = "curop_exhaust_cursor_test";
 std::unique_ptr<DBClientBase> connect(StringData appName = testAppName) {
-    auto swConn = unittest::getFixtureConnectionString().connect(appName.toString());
+    auto swConn = unittest::getFixtureConnectionString().connect(std::string{appName});
     uassertStatusOK(swConn.getStatus());
     return std::move(swConn.getValue());
 }

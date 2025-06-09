@@ -83,11 +83,11 @@ public:
                     auto clientMessage = makeUniqueMessage();
                     MockClientContext ctx;
                     ctx.addMetadataEntry(
-                        util::constants::kWireVersionKey.toString(),
+                        std::string{util::constants::kWireVersionKey},
                         std::to_string(WireSpec::getWireSpec(getGlobalServiceContext())
                                            .get()
                                            ->incomingExternalClient.maxWireVersion));
-                    ctx.addMetadataEntry(util::constants::kAuthenticationTokenKey.toString(),
+                    ctx.addMetadataEntry(std::string{util::constants::kAuthenticationTokenKey},
                                          "my-token");
                     auto stream = makeStream(ctx);
                     ASSERT_TRUE(stream->syncWrite(getReactor(), clientMessage.sharedBuffer()));

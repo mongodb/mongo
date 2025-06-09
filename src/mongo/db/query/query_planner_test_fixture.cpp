@@ -234,7 +234,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     const bool sparse = false;
     const bool unique = false;
     const bool multikey = false;
-    const auto name = indexName.toString();
+    const auto name = std::string{indexName};
     const MatchExpression* filterExpr = nullptr;
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,

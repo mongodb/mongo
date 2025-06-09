@@ -83,7 +83,7 @@ StringData JSStringWrapper::toStringData() const {
 }
 
 std::string JSStringWrapper::toString() const {
-    return toStringData().toString();
+    return std::string{toStringData()};
 }
 
 JSStringWrapper::operator bool() const {

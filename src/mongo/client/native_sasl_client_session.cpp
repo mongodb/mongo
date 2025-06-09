@@ -118,7 +118,7 @@ Status NativeSaslClientSession::initialize() {
         return Status(ErrorCodes::AlreadyInitialized,
                       "Cannot reinitialize NativeSaslClientSession.");
 
-    std::string mechanism = getParameter(parameterMechanism).toString();
+    std::string mechanism = std::string{getParameter(parameterMechanism)};
     if (mechanism == auth::kMechanismSaslPlain) {
         _saslConversation = std::make_unique<SaslPLAINClientConversation>(this);
     } else if (mechanism == auth::kMechanismScramSha1) {

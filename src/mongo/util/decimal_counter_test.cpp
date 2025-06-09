@@ -44,7 +44,7 @@ TEST(DecimalCounter, CountUntilWrapAround) {
     uint16_t check = 0;
     do {
         StringData str = counter;
-        ASSERT_EQ(std::to_string(check), str.toString());
+        ASSERT_EQ(std::to_string(check), str);
         ASSERT_EQ(str.data()[str.size()], '\0');
         ASSERT_EQ(uint16_t(++counter), ++check);
     } while (check);

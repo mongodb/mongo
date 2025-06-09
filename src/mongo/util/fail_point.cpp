@@ -357,7 +357,7 @@ static constexpr auto kFailPointServerParameterPrefix = "failpoint."_sd;
 
 FailPointServerParameter::FailPointServerParameter(StringData name, ServerParameterType spt)
     : ServerParameter(fmt::format("{}{}", kFailPointServerParameterPrefix, name), spt),
-      _data(globalFailPointRegistry().find(name.toString())) {
+      _data(globalFailPointRegistry().find(std::string{name})) {
     invariant(name != "failpoint.*", "Failpoint prototype was auto-registered from IDL");
     invariant(_data != nullptr, fmt::format("Unknown failpoint: {}", name));
 }

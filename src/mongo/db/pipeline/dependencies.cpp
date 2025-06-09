@@ -60,8 +60,8 @@ OrderedPathSet DepsTracker::simplifyDependencies(const OrderedPathSet& dependenc
         FieldPath fp(path);
 
         if (truncateToRootLevel == TruncateToRootLevel::yes) {
-            last = fp.front().toString() + '.';
-            returnSet.insert(fp.front().toString());
+            last = std::string{fp.front()} + '.';
+            returnSet.insert(std::string{fp.front()});
         } else {
             last = path + '.';
             returnSet.insert(path);

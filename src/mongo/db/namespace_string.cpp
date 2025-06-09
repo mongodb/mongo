@@ -250,7 +250,7 @@ NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName
 
 std::string NamespaceString::getSisterNS(StringData local) const {
     MONGO_verify(local.size() && local[0] != '.');
-    return db_deprecated().toString() + "." + local.toString();
+    return std::string{db_deprecated()} + "." + std::string{local};
 }
 
 void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const {
@@ -361,7 +361,7 @@ bool NamespaceString::isOutTmpBucketsCollection() const {
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
-    return {dbName(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
+    return {dbName(), std::string{kTimeseriesBucketsCollectionPrefix} + coll()};
 }
 
 NamespaceString NamespaceString::getTimeseriesViewNamespace() const {

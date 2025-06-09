@@ -482,7 +482,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
 bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
     DepsTracker columnDeps;
     match_expression::addDependencies(expr, &columnDeps);
-    return !columnDeps.needWholeDocument && columnDeps.fields == OrderedPathSet{key.toString()};
+    return !columnDeps.needWholeDocument && columnDeps.fields == OrderedPathSet{std::string{key}};
 }
 
 void addExpr(StringData path,
@@ -1126,7 +1126,7 @@ bool isIndependentOfImpl(E&& expr,
                 path = path.substr(0, dotPos);
             }
             if (auto it = truncated.find(path); it == truncated.end()) {
-                truncated.insert(path.toString());
+                truncated.insert(std::string{path});
             }
         }
         return areIndependent(truncated, depsTracker.fields);
@@ -1252,7 +1252,7 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {
             path += ".";
         }
 
-        path += expr->path().toString();
+        path += std::string{expr->path()};
     }
 
     for (size_t i = 0; i < expr->numChildren(); i++) {

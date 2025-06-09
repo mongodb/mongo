@@ -69,7 +69,7 @@ StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pw
 
     const auto decodedSalt = base64::decode(scram.salt);
     scram::Secrets<HashBlock, scram::UnlockedSecretsPolicy> secrets(scram::Presecrets<HashBlock>(
-        pwd.toString(),
+        std::string{pwd},
         std::vector<std::uint8_t>(reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()),
                                   reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()) +
                                       decodedSalt.size()),
@@ -95,7 +95,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getService());
 
     // Expecting user input on the form: [authz-id]\0authn-id\0pwd
-    std::string input = inputData.toString();
+    std::string input = std::string{inputData};
 
     SecureAllocatorAuthDomain::SecureString pwd = "";
     try {

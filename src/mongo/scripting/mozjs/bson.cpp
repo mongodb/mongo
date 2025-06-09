@@ -218,7 +218,7 @@ void BSONInfo::enumerate(JSContext* cx,
         // TODO: when we get heterogenous set lookup, switch to StringData
         // rather than involving the temporary string
         auto fieldNameStringData = e.fieldNameStringData();
-        if (holder->_removed.find(fieldNameStringData.toString()) != holder->_removed.end())
+        if (holder->_removed.find(std::string{fieldNameStringData}) != holder->_removed.end())
             continue;
 
         ValueReader(cx, &val).fromStringData(fieldNameStringData);
@@ -306,7 +306,7 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     auto sname = idw.toStringData(&jsstr);
     if (sname.find('\0') != std::string::npos)
         return;
-    if (!holder->_readOnly && holder->_removed.find(sname.toString()) != holder->_removed.end())
+    if (!holder->_readOnly && holder->_removed.find(std::string{sname}) != holder->_removed.end())
         return;
     if (!holder->_obj.hasField(sname))
         return;

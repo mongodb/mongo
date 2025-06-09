@@ -58,14 +58,14 @@ TEST(Construction, FromStdString) {
     std::string base("aaa");
     StringData strData(base);
     ASSERT_EQUALS(strData.size(), base.size());
-    ASSERT_EQUALS(strData.toString(), base);
+    ASSERT_EQUALS(std::string{strData}, base);
 }
 
 TEST(Construction, FromCString) {
     std::string base("aaa");
     StringData strData(base.c_str());
     ASSERT_EQUALS(strData.size(), base.size());
-    ASSERT_EQUALS(strData.toString(), base);
+    ASSERT_EQUALS(std::string{strData}, base);
 }
 
 TEST(Construction, FromNullCString) {
@@ -78,19 +78,19 @@ TEST(Construction, FromNullCString) {
 TEST(Construction, FromUserDefinedLiteral) {
     const auto strData = "cc\0c"_sd;
     ASSERT_EQUALS(strData.size(), 4U);
-    ASSERT_EQUALS(strData.toString(), std::string("cc\0c", 4));
+    ASSERT_EQUALS(std::string{strData}, std::string("cc\0c", 4));
 }
 
 TEST(Construction, FromUserDefinedRawLiteral) {
     const auto strData = R"("")"_sd;
     ASSERT_EQUALS(strData.size(), 2U);
-    ASSERT_EQUALS(strData.toString(), std::string("\"\"", 2));
+    ASSERT_EQUALS(std::string{strData}, std::string("\"\"", 2));
 }
 
 TEST(Construction, FromEmptyUserDefinedLiteral) {
     const auto strData = ""_sd;
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_EQUALS(strData.toString(), std::string(""));
+    ASSERT_EQUALS(std::string{strData}, std::string(""));
 }
 
 // Try some constexpr initializations
@@ -296,21 +296,22 @@ TEST(Rfind, Char1) {
 
 // this is to verify we match std::string
 void SUBSTR_TEST_HELP(StringData big, StringData small, size_t start, size_t len) {
-    ASSERT_EQUALS(small.toString(), big.toString().substr(start, len));
+    ASSERT_EQUALS(std::string{small}, std::string{big}.substr(start, len));
     ASSERT_EQUALS(small, StringData(big).substr(start, len));
 }
 void SUBSTR_TEST_HELP(StringData big, StringData small, size_t start) {
-    ASSERT_EQUALS(small.toString(), big.toString().substr(start));
+    ASSERT_EQUALS(std::string{small}, std::string{big}.substr(start));
     ASSERT_EQUALS(small, StringData(big).substr(start));
 }
 
 // [12] is number of args to substr
-#define SUBSTR_1_TEST_HELP(big, small, start)                                              \
-    ASSERT_EQUALS(StringData(small).toString(), StringData(big).toString().substr(start)); \
+#define SUBSTR_1_TEST_HELP(big, small, start)                                                  \
+    ASSERT_EQUALS(std::string{StringData(small)}, std::string{StringData(big)}.substr(start)); \
     ASSERT_EQUALS(StringData(small), StringData(big).substr(start));
 
-#define SUBSTR_2_TEST_HELP(big, small, start, len)                                              \
-    ASSERT_EQUALS(StringData(small).toString(), StringData(big).toString().substr(start, len)); \
+#define SUBSTR_2_TEST_HELP(big, small, start, len)                  \
+    ASSERT_EQUALS(std::string{StringData(small)},                   \
+                  std::string{StringData(big)}.substr(start, len)); \
     ASSERT_EQUALS(StringData(small), StringData(big).substr(start, len));
 
 TEST(Substr, Simple1) {

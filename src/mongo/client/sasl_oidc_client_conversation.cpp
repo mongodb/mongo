@@ -126,7 +126,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
             clientId && !clientId->empty());
 
     // Cache clientId for potential refresh flow uses in the future.
-    oidcClientGlobalParams.oidcClientId = clientId->toString();
+    oidcClientGlobalParams.oidcClientId = std::string{*clientId};
 
     // Construct body of POST request to device authorization endpoint based on provided
     // parameters.
@@ -183,11 +183,11 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
                 hasAccessToken || hasError);
 
         if (hasAccessToken) {
-            auto accessToken = tokenResponse.getAccessToken()->toString();
+            auto accessToken = std::string{*tokenResponse.getAccessToken()};
 
             // If a refresh token was also provided, cache that as well.
             if (tokenResponse.getRefreshToken()) {
-                return {accessToken, tokenResponse.getRefreshToken()->toString()};
+                return {accessToken, std::string{*tokenResponse.getRefreshToken()}};
             }
 
             return {accessToken, ""};
@@ -196,7 +196,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
         // Assert that the error returned with "authorization pending", which indicates that
         // the token endpoint has not perceived end-user authentication yet and we should
         // poll again.
-        auto error = tokenResponse.getError()->toString();
+        auto error = std::string{*tokenResponse.getError()};
         uassert(ErrorCodes::UnknownError,
                 fmt::format("Received unexpected error from token endpoint: {}", error),
                 error == "authorization pending");
@@ -255,10 +255,10 @@ StatusWith<std::string> SaslOIDCClientConversation::doRefreshFlow() try {
             "Failed to retrieve refreshed access token",
             refreshResponse.getAccessToken());
     if (refreshResponse.getRefreshToken()) {
-        oidcClientGlobalParams.oidcRefreshToken = refreshResponse.getRefreshToken()->toString();
+        oidcClientGlobalParams.oidcRefreshToken = std::string{*refreshResponse.getRefreshToken()};
     }
 
-    return refreshResponse.getAccessToken()->toString();
+    return std::string{*refreshResponse.getAccessToken()};
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -315,7 +315,7 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
                      tokenEndpoint->starts_with("http://localhost"_sd)));
 
         // Cache the token endpoint for potential reuse during the refresh flow.
-        oidcClientGlobalParams.oidcTokenEndpoint = tokenEndpoint->toString();
+        oidcClientGlobalParams.oidcTokenEndpoint = std::string{*tokenEndpoint};
 
         // Try device authorization grant flow first if provided, falling back to authorization code
         // flow.

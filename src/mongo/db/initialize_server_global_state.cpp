@@ -533,7 +533,7 @@ Status ProcessUMaskServerParameter::setFromString(StringData value,
     }
 
     // Convert base from octal
-    auto vstr = value.toString();
+    auto vstr = std::string{value};
     const char* val = vstr.c_str();
     char* end = nullptr;
 

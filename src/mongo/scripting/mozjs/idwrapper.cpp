@@ -46,7 +46,7 @@ IdWrapper::IdWrapper(JSContext* cx, JS::HandleId value) : _context(cx), _value(c
 
 std::string IdWrapper::toString() const {
     JSStringWrapper jsstr;
-    return toStringData(&jsstr).toString();
+    return std::string{toStringData(&jsstr)};
 }
 
 StringData IdWrapper::toStringData(JSStringWrapper* jsstr) const {

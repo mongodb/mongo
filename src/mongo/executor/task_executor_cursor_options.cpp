@@ -38,7 +38,7 @@ BSONObj DefaultTaskExecutorCursorGetMoreStrategy::createGetMoreRequest(
     const NamespaceString& nss,
     long long prevBatchNumReceived,
     long long totalNumReceived) {
-    GetMoreCommandRequest getMoreRequest(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreRequest(cursorId, std::string{nss.coll()});
     getMoreRequest.setBatchSize(_batchSize);
     return getMoreRequest.toBSON();
 }

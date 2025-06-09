@@ -432,7 +432,7 @@ RecordStore::Options MDBCatalog::_parseRecordStoreOptions(const NamespaceString&
                 uassert(10455501,
                         "Timeseries options must be a document",
                         timeseriesElement.type() == mongo::BSONType::object);
-                recordStoreOptions.customBlockCompressor = "zstd"_sd.toString();
+                recordStoreOptions.customBlockCompressor = std::string{"zstd"_sd};
                 recordStoreOptions.forceUpdateWithFullDocument = true;
             }
 

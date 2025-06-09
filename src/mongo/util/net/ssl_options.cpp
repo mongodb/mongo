@@ -132,7 +132,7 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
 
     auto key = value.substr(0, delim);
     if (key == "subject") {
-        selector->subject = value.substr(delim + 1).toString();
+        selector->subject = std::string{value.substr(delim + 1)};
         return Status::OK();
     }
 

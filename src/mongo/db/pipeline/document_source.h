@@ -568,7 +568,7 @@ public:
                 case Type::kFiniteSet:
                     // If there's a subpath that is modified this path may be modified.
                     for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
-                        if (paths.count(fieldPath.getSubpath(i).toString()))
+                        if (paths.count(std::string{fieldPath.getSubpath(i)}))
                             return true;
                     }
 
@@ -583,7 +583,7 @@ public:
                 case Type::kAllExcept:
                     // If one of the subpaths is unmodified return false.
                     for (size_t i = 0; i < fieldPath.getPathLength(); i++) {
-                        if (paths.count(fieldPath.getSubpath(i).toString()))
+                        if (paths.count(std::string{fieldPath.getSubpath(i)}))
                             return false;
                     }
 

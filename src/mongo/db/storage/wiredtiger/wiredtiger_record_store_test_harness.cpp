@@ -62,7 +62,7 @@ WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData ext
     : _dbpath("wt_test") {
     WiredTigerKVEngineBase::WiredTigerConfig wtConfig = getWiredTigerConfigFromStartupOptions();
     wtConfig.cacheSizeMB = 1;
-    wtConfig.extraOpenOptions = _testLoggingSettings(extraStrings.toString());
+    wtConfig.extraOpenOptions = _testLoggingSettings(std::string{extraStrings});
     _isReplSet = options == Options::ReplicationEnabled;
     auto shouldRecoverFromOplogAsStandalone = false;
     auto replSetMemberInStandaloneMode = false;
@@ -96,7 +96,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
-    std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();
+    std::string ident = std::string{redactTenant(NamespaceString::kRsOplogNamespace)};
     RecordStore::Options oplogRecordStoreOptions;
     oplogRecordStoreOptions.isOplog = true;
     oplogRecordStoreOptions.isCapped = true;

@@ -384,7 +384,7 @@ void DocumentSourceOut::renameTemporaryCollection() {
             pExpCtx->getMongoProcessInterface()->fetchCollectionUUIDFromPrimary(
                 pExpCtx->getOperationContext(), _tempNs);
         uassert((CollectionUUIDMismatchInfo{
-                    _tempNs.dbName(), currentTempNsUUID, _tempNs.coll().toString(), boost::none}),
+                    _tempNs.dbName(), currentTempNsUUID, std::string{_tempNs.coll()}, boost::none}),
                 "$out cannot complete as the temp collection was dropped while executing",
                 currentTempNsUUID == _tempNsUUID);
     }

@@ -2150,7 +2150,7 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
             auto abortReason = persistedDoc.getMutableState().getAbortReason();
             ASSERT(abortReason);
             ASSERT_EQ(abortReason->getIntField("code"), ErrorCodes::ReshardCollectionAborted);
-            ASSERT_EQ(abortReason->getStringField("errmsg").toString(), abortErrMsg);
+            ASSERT_EQ(abortReason->getStringField("errmsg"), abortErrMsg);
         }
 
         stepDown();

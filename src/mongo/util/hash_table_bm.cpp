@@ -127,7 +127,7 @@ absl::string_view BaseGenerator::generate<absl::string_view>() {
 
 template <>
 std::string BaseGenerator::generate<std::string>() {
-    return generate<StringData>().toString();
+    return std::string{generate<StringData>()};
 }
 
 class Sequence : public BaseGenerator {

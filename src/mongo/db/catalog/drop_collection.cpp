@@ -412,7 +412,7 @@ Status _dropCollection(OperationContext* opCtx,
             if (!db) {
                 return expectedUUID
                     ? Status{CollectionUUIDMismatchInfo(
-                                 nss.dbName(), *expectedUUID, nss.coll().toString(), boost::none),
+                                 nss.dbName(), *expectedUUID, std::string{nss.coll()}, boost::none),
                              "Database does not exist"}
                     : Status::OK();
             }

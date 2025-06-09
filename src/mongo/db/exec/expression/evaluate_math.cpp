@@ -1322,7 +1322,7 @@ private:
                     uassert(
                         4341119, str::stream() << "Invalid UTF-8: " << input, isValidUTF8(input));
 
-                    auto decoded = input.toString();
+                    auto decoded = std::string{input};
                     return Value(BSONBinData(decoded.data(), decoded.size(), binDataType));
                 }
                 case BinDataFormat::kUuid: {

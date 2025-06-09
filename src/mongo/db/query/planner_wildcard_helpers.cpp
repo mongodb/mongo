@@ -521,7 +521,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         if (WildcardNames::isWildcardFieldName(fieldName)) {
             break;
         }
-        if (fields.count(fieldName.toString())) {
+        if (fields.count(std::string{fieldName})) {
             shouldExpand = true;
             break;
         }
@@ -618,7 +618,7 @@ void finalizeWildcardIndexScanConfiguration(
     static const char subPathStart = '.', subPathEnd = static_cast<char>('.' + 1);
     auto& pathIntervals = bounds->fields[index->wildcardFieldPos - 1].intervals;
     for (const auto& fieldPath : paths) {
-        auto path = fieldPath.dottedField().toString();
+        auto path = std::string{fieldPath.dottedField()};
         pathIntervals.push_back(IndexBoundsBuilder::makePointInterval(path));
         if (requiresSubpathBounds) {
             pathIntervals.push_back(IndexBoundsBuilder::makeRangeInterval(

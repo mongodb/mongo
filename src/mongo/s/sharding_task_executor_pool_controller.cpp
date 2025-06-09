@@ -364,7 +364,7 @@ size_t ShardingTaskExecutorPoolController::connectionRequestsMaxQueueDepth() con
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
     cps->matchingStrategy =
-        matchingStrategyToString(gParameters.matchingStrategy.load()).toString();
+        std::string{matchingStrategyToString(gParameters.matchingStrategy.load())};
 }
 
 }  // namespace mongo

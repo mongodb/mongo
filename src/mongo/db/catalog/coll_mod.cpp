@@ -530,7 +530,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         if (!isView) {
             return getOnlySupportedOnViewError(CollMod::kViewOnFieldName);
         }
-        parsed.viewOn = viewOn->toString();
+        parsed.viewOn = std::string{*viewOn};
         oplogEntryBuilder.append(CollMod::kViewOnFieldName, *viewOn);
     }
 

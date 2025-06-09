@@ -193,9 +193,9 @@ const std::vector<std::unique_ptr<FieldRef>>& TimeseriesModifyStage::_getUserLev
             _immutablePaths.emplace_back(std::move(userMetaFieldRef));
         } else if (auto timeField = tsFields->getTimeField();
                    shardKeyField->isPrefixOfOrEqualTo(
-                       FieldRef{timeseries::kControlMinFieldNamePrefix + timeField.toString()}) ||
+                       FieldRef{timeseries::kControlMinFieldNamePrefix + std::string{timeField}}) ||
                    shardKeyField->isPrefixOfOrEqualTo(
-                       FieldRef{timeseries::kControlMaxFieldNamePrefix + timeField.toString()})) {
+                       FieldRef{timeseries::kControlMaxFieldNamePrefix + std::string{timeField}})) {
             _immutablePaths.emplace_back(std::make_unique<FieldRef>(timeField));
         } else {
             tasserted(7687100,

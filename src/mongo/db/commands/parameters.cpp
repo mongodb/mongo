@@ -593,7 +593,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(StringData str,
 
     {
         const stdx::lock_guard<stdx::mutex> lock(autoServiceDescriptorMutex);
-        autoServiceDescriptorValue = str.toString();
+        autoServiceDescriptorValue = std::string{str};
     }
 
     return Status::OK();

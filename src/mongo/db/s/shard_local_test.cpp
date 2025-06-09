@@ -139,7 +139,7 @@ protected:
             _opCtx.get(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             nss.dbName(),
-            BSON("listIndexes" << nss.coll().toString()),
+            BSON("listIndexes" << nss.coll()),
             Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();

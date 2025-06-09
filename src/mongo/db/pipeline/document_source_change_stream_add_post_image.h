@@ -87,9 +87,9 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final {
         return {GetModPathsReturn::Type::kFiniteSet,
-                {kFullDocumentFieldName.toString(),
-                 kRawOplogUpdateSpecFieldName.toString(),
-                 kPreImageIdFieldName.toString()},
+                {std::string{kFullDocumentFieldName},
+                 std::string{kRawOplogUpdateSpecFieldName},
+                 std::string{kPreImageIdFieldName}},
                 {}};
     }
 
@@ -117,17 +117,17 @@ public:
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         // The namespace is not technically needed yet, but we will if there is more than one
         // collection involved.
-        deps->fields.insert(DocumentSourceChangeStream::kNamespaceField.toString());
-        deps->fields.insert(DocumentSourceChangeStream::kDocumentKeyField.toString());
-        deps->fields.insert(DocumentSourceChangeStream::kOperationTypeField.toString());
-        deps->fields.insert(DocumentSourceChangeStream::kIdField.toString());
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kNamespaceField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kDocumentKeyField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kOperationTypeField});
+        deps->fields.insert(std::string{DocumentSourceChangeStream::kIdField});
 
         // Fields needed for post-image computation.
         if (_fullDocumentMode != FullDocumentModeEnum::kUpdateLookup) {
             deps->fields.insert(
-                DocumentSourceChangeStream::kFullDocumentBeforeChangeField.toString());
-            deps->fields.insert(DocumentSourceChangeStream::kRawOplogUpdateSpecField.toString());
-            deps->fields.insert(DocumentSourceChangeStream::kPreImageIdField.toString());
+                std::string{DocumentSourceChangeStream::kFullDocumentBeforeChangeField});
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kRawOplogUpdateSpecField});
+            deps->fields.insert(std::string{DocumentSourceChangeStream::kPreImageIdField});
         }
 
         // This stage does not restrict the output fields to a finite set, and has no impact on

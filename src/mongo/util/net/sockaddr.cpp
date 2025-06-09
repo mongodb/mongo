@@ -213,7 +213,7 @@ SockAddr::SockAddr(const sockaddr* other, socklen_t size) : addressSize(size), _
 }
 
 SockAddr::SockAddr(const sockaddr* other, socklen_t size, StringData hostOrIp)
-    : addressSize(size), _hostOrIp(hostOrIp.toString()), sa() {
+    : addressSize(size), _hostOrIp(std::string{hostOrIp}), sa() {
     memcpy(&sa, other, size);
     _isValid = true;
 }

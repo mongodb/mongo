@@ -216,7 +216,7 @@ StatusWith<std::unique_ptr<InternalSchemaTypeExpression>> parseType(
         path,
         std::move(typeSet.getValue()),
         doc_validation_error::createAnnotation(
-            expCtx, typeElt.fieldNameStringData().toString(), typeElt.wrap()));
+            expCtx, std::string{typeElt.fieldNameStringData()}, typeElt.wrap()));
 
     return {std::move(typeExpr)};
 }
@@ -237,11 +237,11 @@ StatusWithMatchExpression parseMaximum(const boost::intrusive_ptr<ExpressionCont
     if (isExclusiveMaximum) {
         annotation =
             doc_validation_error::createAnnotation(expCtx,
-                                                   maximum.fieldNameStringData().toString(),
+                                                   std::string{maximum.fieldNameStringData()},
                                                    BSON(maximum << "exclusiveMaximum" << true));
     } else {
         annotation = doc_validation_error::createAnnotation(
-            expCtx, maximum.fieldNameStringData().toString(), maximum.wrap());
+            expCtx, std::string{maximum.fieldNameStringData()}, maximum.wrap());
     }
 
     if (!path) {
@@ -277,11 +277,11 @@ StatusWithMatchExpression parseMinimum(const boost::intrusive_ptr<ExpressionCont
     if (isExclusiveMinimum) {
         annotation =
             doc_validation_error::createAnnotation(expCtx,
-                                                   minimum.fieldNameStringData().toString(),
+                                                   std::string{minimum.fieldNameStringData()},
                                                    BSON(minimum << "exclusiveMinimum" << true));
     } else {
         annotation = doc_validation_error::createAnnotation(
-            expCtx, minimum.fieldNameStringData().toString(), minimum.wrap());
+            expCtx, std::string{minimum.fieldNameStringData()}, minimum.wrap());
     }
 
     if (!path) {
@@ -316,7 +316,7 @@ StatusWithMatchExpression parseLength(const boost::intrusive_ptr<ExpressionConte
     }
 
     auto annotation = doc_validation_error::createAnnotation(
-        expCtx, length.fieldNameStringData().toString(), length.wrap());
+        expCtx, std::string{length.fieldNameStringData()}, length.wrap());
     if (!path) {
         return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
@@ -337,7 +337,7 @@ StatusWithMatchExpression parsePattern(const boost::intrusive_ptr<ExpressionCont
     }
 
     auto annotation = doc_validation_error::createAnnotation(
-        expCtx, pattern.fieldNameStringData().toString(), pattern.wrap());
+        expCtx, std::string{pattern.fieldNameStringData()}, pattern.wrap());
     if (!path) {
         return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
@@ -368,7 +368,7 @@ StatusWithMatchExpression parseMultipleOf(const boost::intrusive_ptr<ExpressionC
                            << "' must have a positive value")};
     }
     auto annotation = doc_validation_error::createAnnotation(
-        expCtx, multipleOf.fieldNameStringData().toString(), multipleOf.wrap());
+        expCtx, std::string{multipleOf.fieldNameStringData()}, multipleOf.wrap());
     if (!path) {
         return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
     }
@@ -401,7 +401,7 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
     }
 
     std::unique_ptr<T> listOfExpr = std::make_unique<T>(doc_validation_error::createAnnotation(
-        expCtx, logicalElement.fieldNameStringData().toString(), BSONObj()));
+        expCtx, std::string{logicalElement.fieldNameStringData()}, BSONObj()));
     for (const auto& elem : logicalElementObj) {
         if (elem.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
@@ -440,7 +440,7 @@ StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext
     }
 
     auto orExpr = std::make_unique<OrMatchExpression>(doc_validation_error::createAnnotation(
-        expCtx, enumElement.fieldNameStringData().toString(), enumElement.wrap()));
+        expCtx, std::string{enumElement.fieldNameStringData()}, enumElement.wrap()));
     UnorderedFieldsBSONElementComparator eltComp;
     BSONEltSet eqSet = eltComp.makeBSONEltSet();
     for (auto&& arrayElem : enumArray) {
@@ -473,7 +473,7 @@ StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext
     // Make sure that the OR expression has at least 1 child.
     if (orExpr->numChildren() == 0) {
         return {std::make_unique<AlwaysFalseMatchExpression>(doc_validation_error::createAnnotation(
-            expCtx, enumElement.fieldNameStringData().toString(), enumElement.wrap()))};
+            expCtx, std::string{enumElement.fieldNameStringData()}, enumElement.wrap()))};
     }
 
     return {std::move(orExpr)};
@@ -572,7 +572,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
     auto propertiesObj = propertiesElt.embeddedObject();
 
     auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
-        expCtx, propertiesElt.fieldNameStringData().toString(), BSONObj()));
+        expCtx, std::string{propertiesElt.fieldNameStringData()}, BSONObj()));
     for (auto&& property : propertiesObj) {
         if (property.type() != BSONType::object) {
             return {ErrorCodes::TypeMismatch,
@@ -592,7 +592,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
         nestedSchemaMatch.getValue()->setErrorAnnotation(doc_validation_error::createAnnotation(
             expCtx,
             "_property",
-            BSON("propertyName" << property.fieldNameStringData().toString()),
+            BSON("propertyName" << property.fieldNameStringData()),
             property.Obj()));
         if (requiredProperties.find(property.fieldNameStringData()) != requiredProperties.end()) {
             // The field name for which we created the nested schema is a required property. This
@@ -671,7 +671,7 @@ StatusWith<std::vector<PatternSchema>> parsePatternProperties(
         }
 
         auto exprWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
-            kNamePlaceholder.toString(), std::move(nestedSchemaMatch.getValue()));
+            std::string{kNamePlaceholder}, std::move(nestedSchemaMatch.getValue()));
         Pattern pattern{patternSchema.fieldNameStringData()};
         patternProperties.emplace_back(std::move(pattern), std::move(exprWithPlaceholder));
     }
@@ -778,7 +778,7 @@ StatusWithMatchExpression parseAllowedProperties(
         return otherwiseExpr.getStatus();
     }
     auto otherwiseWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
-        kNamePlaceholder.toString(), std::move(otherwiseExpr.getValue()));
+        std::string{kNamePlaceholder}, std::move(otherwiseExpr.getValue()));
 
     clonable_ptr<ErrorAnnotation> annotation;
     // In the case of no 'additionalProperties' keyword, but a 'patternProperties' keyword is
@@ -827,7 +827,7 @@ StatusWithMatchExpression parseNumProperties(const boost::intrusive_ptr<Expressi
     auto expr = std::make_unique<T>(
         parsedNumProps.getValue(),
         doc_validation_error::createAnnotation(
-            expCtx, numProperties.fieldNameStringData().toString(), numProperties.wrap()));
+            expCtx, std::string{numProperties.fieldNameStringData()}, numProperties.wrap()));
 
     if (!path) {
         // This is a top-level schema.
@@ -977,7 +977,7 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
     }
 
     auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
-        expCtx, dependencies.fieldNameStringData().toString(), BSONObj(), dependencies.Obj()));
+        expCtx, std::string{dependencies.fieldNameStringData()}, BSONObj(), dependencies.Obj()));
     for (auto&& dependency : dependencies.embeddedObject()) {
         if (dependency.type() != BSONType::object && dependency.type() != BSONType::array) {
             // Allow JSON Schema annotations under "dependency" keyword.
@@ -1014,7 +1014,7 @@ StatusWithMatchExpression parseUniqueItems(const boost::intrusive_ptr<Expression
                                            boost::optional<StringData> path,
                                            InternalSchemaTypeExpression* typeExpr) {
     auto errorAnnotation = doc_validation_error::createAnnotation(
-        expCtx, uniqueItemsElt.fieldNameStringData().toString(), uniqueItemsElt.wrap());
+        expCtx, std::string{uniqueItemsElt.fieldNameStringData()}, uniqueItemsElt.wrap());
     if (!uniqueItemsElt.isBoolean()) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '"
@@ -1051,7 +1051,7 @@ StatusWith<boost::optional<long long>> parseItems(
         // user visible JSON Schema "items" keyword.
         auto andExprForSubschemas =
             std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
-                expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap()));
+                expCtx, std::string{itemsElt.fieldNameStringData()}, itemsElt.wrap()));
         auto index = 0LL;
         for (auto subschema : itemsElt.embeddedObject()) {
             if (subschema.type() != BSONType::object) {
@@ -1074,7 +1074,7 @@ StatusWith<boost::optional<long long>> parseItems(
                 return parsedSubschema.getStatus();
             }
             auto exprWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
-                kNamePlaceholder.toString(), std::move(parsedSubschema.getValue()));
+                std::string{kNamePlaceholder}, std::move(parsedSubschema.getValue()));
             auto matchArrayIndex = std::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
                 path,
                 index,
@@ -1091,7 +1091,7 @@ StatusWith<boost::optional<long long>> parseItems(
         if (!path) {
             andExpr->add(
                 std::make_unique<AlwaysTrueMatchExpression>(doc_validation_error::createAnnotation(
-                    expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap())));
+                    expCtx, std::string{itemsElt.fieldNameStringData()}, itemsElt.wrap())));
         } else {
             andExpr->add(makeRestriction(
                 expCtx, BSONType::array, path, std::move(andExprForSubschemas), typeExpr));
@@ -1109,10 +1109,10 @@ StatusWith<boost::optional<long long>> parseItems(
             return nestedItemsSchema.getStatus();
         }
         auto exprWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
-            kNamePlaceholder.toString(), std::move(nestedItemsSchema.getValue()));
+            std::string{kNamePlaceholder}, std::move(nestedItemsSchema.getValue()));
 
         auto errorAnnotation = doc_validation_error::createAnnotation(
-            expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap());
+            expCtx, std::string{itemsElt.fieldNameStringData()}, itemsElt.wrap());
         if (!path) {
             andExpr->add(std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)));
         } else {
@@ -1169,7 +1169,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
             return parsedOtherwiseExpr.getStatus();
         }
         otherwiseExpr = std::make_unique<ExpressionWithPlaceholder>(
-            kNamePlaceholder.toString(), std::move(parsedOtherwiseExpr.getValue()));
+            std::string{kNamePlaceholder}, std::move(parsedOtherwiseExpr.getValue()));
     } else {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "$jsonSchema keyword '"
@@ -1181,7 +1181,9 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
     // Only generate a match expression if needed.
     if (startIndexForAdditionalItems) {
         auto errorAnnotation = doc_validation_error::createAnnotation(
-            expCtx, additionalItemsElt.fieldNameStringData().toString(), additionalItemsElt.wrap());
+            expCtx,
+            std::string{additionalItemsElt.fieldNameStringData()},
+            additionalItemsElt.wrap());
         if (!path) {
             andExpr->add(std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)));
         } else {
@@ -1638,14 +1640,14 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
                 path,
                 BinDataType::Encrypt,
                 doc_validation_error::createAnnotation(
-                    expCtx, encryptElt.fieldNameStringData().toString(), BSONObj())));
+                    expCtx, std::string{encryptElt.fieldNameStringData()}, BSONObj())));
 
             if (auto typeOptional = infoType) {
                 andExpr->add(std::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(
                     path,
                     typeOptional->typeSet(),
                     doc_validation_error::createAnnotation(
-                        expCtx, encryptElt.fieldNameStringData().toString(), BSONObj())));
+                        expCtx, std::string{encryptElt.fieldNameStringData()}, BSONObj())));
             }
         } catch (const AssertionException&) {
             return exceptionToStatus();

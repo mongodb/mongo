@@ -109,7 +109,7 @@ void extractRegexAndOptions(const Value& regexPattern,
                     << ": found regex option(s) specified in both 'regex' and 'option' fields",
                 regexOptions.nullish() || regexFlags.empty());
         if (!regexFlags.empty()) {
-            extractedOptions = regexFlags.toString();
+            extractedOptions = std::string{regexFlags};
         }
     } else if (regexPattern.getType() == BSONType::string) {
         // ...or it can be a string field with options specified separately.

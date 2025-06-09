@@ -532,7 +532,7 @@ public:
     ExplainPrinterImpl& fieldName(const StrongStringAlias<TagType>& name,
                                   const ExplainVersion minVersion = ExplainVersion::V2,
                                   const ExplainVersion maxVersion = ExplainVersion::Vmax) {
-        fieldNameInternal(name.value().toString(), minVersion, maxVersion);
+        fieldNameInternal(std::string{name.value()}, minVersion, maxVersion);
         return *this;
     }
 

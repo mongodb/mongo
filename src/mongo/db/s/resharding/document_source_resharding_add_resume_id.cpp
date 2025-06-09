@@ -116,15 +116,15 @@ Value DocumentSourceReshardingAddResumeId::serialize(const SerializationOptions&
 }
 
 DepsTracker::State DocumentSourceReshardingAddResumeId::getDependencies(DepsTracker* deps) const {
-    deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(CommitTransactionOplogObject::kCommitTimestampFieldName.toString());
+    deps->fields.insert(std::string{repl::OplogEntry::kTimestampFieldName});
+    deps->fields.insert(std::string{CommitTransactionOplogObject::kCommitTimestampFieldName});
     return DepsTracker::State::SEE_NEXT;
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceReshardingAddResumeId::getModifiedPaths() const {
     return {GetModPathsReturn::Type::kFiniteSet,
-            {repl::OplogEntry::k_idFieldName.toString(),
-             CommitTransactionOplogObject::kCommitTimestampFieldName.toString()},
+            {std::string{repl::OplogEntry::k_idFieldName},
+             std::string{CommitTransactionOplogObject::kCommitTimestampFieldName}},
             {}};
 }
 

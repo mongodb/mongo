@@ -110,7 +110,7 @@ MessageCompressorBase* MessageCompressorRegistry::getCompressor(MessageCompresso
 }
 
 MessageCompressorBase* MessageCompressorRegistry::getCompressor(StringData name) const {
-    auto it = _compressorsByName.find(name.toString());
+    auto it = _compressorsByName.find(std::string{name});
     if (it == _compressorsByName.end())
         return nullptr;
     return it->second;

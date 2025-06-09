@@ -61,7 +61,7 @@ struct BitsetTerm {
     BitsetTerm(Bitset bitset, Bitset mask) : predicates(bitset), mask(mask) {}
 
     BitsetTerm(StringData bits, StringData mask)
-        : BitsetTerm{Bitset{bits.toString()}, Bitset{mask.toString()}} {}
+        : BitsetTerm{Bitset{std::string{bits}}, Bitset{std::string{mask}}} {}
 
     BitsetTerm(size_t nbits, size_t bitIndex, bool val) : predicates(nbits), mask(nbits) {
         set(bitIndex, val);

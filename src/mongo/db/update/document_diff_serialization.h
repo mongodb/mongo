@@ -354,7 +354,7 @@ public:
         invariant(node->type() == NodeType::kInsert || node->type() == NodeType::kDocumentInsert);
 
         auto* nodePtr = node.get();
-        auto result = children.insert({fieldName.toString(), std::move(node)});
+        auto result = children.insert({std::string{fieldName}, std::move(node)});
         invariant(result.second);
         inserts.push_back({result.first->first, nodePtr});
         return nodePtr;

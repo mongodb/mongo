@@ -118,7 +118,7 @@ FTSSpec::FTSSpec(const BSONObj& indexInfo) {
                                    " correct options.");
     }
 
-    _languageOverrideField = indexInfo.getStringField("language_override").toString();
+    _languageOverrideField = std::string{indexInfo.getStringField("language_override")};
 
     _wildcard = false;
 

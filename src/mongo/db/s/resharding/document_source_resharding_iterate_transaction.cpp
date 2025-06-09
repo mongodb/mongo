@@ -140,13 +140,13 @@ Value DocumentSourceReshardingIterateTransaction::serialize(
 
 DepsTracker::State DocumentSourceReshardingIterateTransaction::getDependencies(
     DepsTracker* deps) const {
-    deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kSessionIdFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kTermFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kTxnNumberFieldName.toString());
+    deps->fields.insert(std::string{repl::OplogEntry::kOpTypeFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kTimestampFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kObjectFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kSessionIdFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kTermFieldName});
+    deps->fields.insert(std::string{repl::OplogEntry::kTxnNumberFieldName});
 
     return DepsTracker::State::SEE_NEXT;
 }

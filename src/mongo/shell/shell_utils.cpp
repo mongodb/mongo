@@ -507,7 +507,7 @@ BSONObj replMonitorStats(const BSONObj& a, void* data) {
             a.nFields() == 1 && a.firstElement().type() == BSONType::string);
 
     auto name = a.firstElement().valueStringDataSafe();
-    auto rsm = ReplicaSetMonitor::get(name.toString());
+    auto rsm = ReplicaSetMonitor::get(std::string{name});
     if (!rsm) {
         return BSON("" << "no ReplSetMonitor exists by that name");
     }
@@ -681,7 +681,7 @@ BSONObj _openGoldenData(const BSONObj& input, void*) {
     auto config = configArg.Obj();
     goldenTestConfig = unittest::GoldenTestConfig::parseFromBson(config);
 
-    goldenTestContext.emplace(&goldenTestConfig, testPath.toString(), true /*validateOnClose*/);
+    goldenTestContext.emplace(&goldenTestConfig, std::string{testPath}, true /*validateOnClose*/);
 
     return {};
 }
@@ -1266,7 +1266,7 @@ void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri
 
     if (client.runCommand(DatabaseName::kAdmin, command, info)) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _connectionUris[uri.toString()].insert(info["you"].str());
+        _connectionUris[std::string{uri}].insert(info["you"].str());
     }
 }
 

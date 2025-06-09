@@ -434,7 +434,7 @@ void CurOp::setMessage(WithLock, StringData message) {
             20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
         MONGO_verify(!_progressMeter->isActive());
     }
-    _message = message.toString();  // copy
+    _message = std::string{message};  // copy
 }
 
 ProgressMeter& CurOp::setProgress(WithLock lk,
@@ -446,7 +446,7 @@ ProgressMeter& CurOp::setProgress(WithLock lk,
         _progressMeter->reset(progressMeterTotal, secondsBetween);
         _progressMeter->setName(message);
     } else {
-        _progressMeter.emplace(progressMeterTotal, secondsBetween, 100, "", message.toString());
+        _progressMeter.emplace(progressMeterTotal, secondsBetween, 100, "", std::string{message});
     }
 
     return _progressMeter.value();

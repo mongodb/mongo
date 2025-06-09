@@ -423,16 +423,16 @@ TEST(SplitHorizonTesting, toBSON) {
         std::vector<std::string> visitedHorizons;
 
         for (const auto& element : horizons) {
-            ASSERT_TRUE(expectedKeys.count(element.fieldNameStringData().toString()))
+            ASSERT_TRUE(expectedKeys.count(element.fieldNameStringData()))
                 << "Test #" << testNumber << " Failing because we found a horizon with the name "
                 << element.fieldNameStringData() << " which shouldn't exist.";
 
             ASSERT_TRUE(
-                expectedKeys.find(element.fieldNameStringData().toString())->second.toString() ==
+                expectedKeys.find(std::string{element.fieldNameStringData()})->second.toString() ==
                 element.valueStringData())
                 << "Test #" << testNumber << " failing because horizon "
                 << element.fieldNameStringData() << " had an incorrect HostAndPort";
-            visitedHorizons.push_back(element.fieldNameStringData().toString());
+            visitedHorizons.push_back(std::string{element.fieldNameStringData()});
         }
 
         ASSERT_EQUALS(visitedHorizons.size(), expectedKeys.size());

@@ -285,7 +285,7 @@ public:
             if (saslMechsElem.type() == BSONType::array) {
                 auto array = saslMechsElem.Array();
                 for (const auto& elem : array) {
-                    _saslMechsForInternalAuth.push_back(elem.checkAndGetStringData().toString());
+                    _saslMechsForInternalAuth.push_back(std::string{elem.checkAndGetStringData()});
                 }
             }
         }

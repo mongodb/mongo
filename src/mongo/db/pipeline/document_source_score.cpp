@@ -165,7 +165,7 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
             "Expected normalization to be minMaxScaler",
             spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
 
-    const std::string score = kInternalMinMaxScalerNormalizationField.toString();
+    const std::string score = std::string{kInternalMinMaxScalerNormalizationField};
     SortPattern sortPattern{BSON(score << -1), expCtx};
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(

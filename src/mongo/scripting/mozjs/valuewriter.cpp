@@ -221,7 +221,7 @@ BSONObj ValueWriter::toBSON() {
 
 std::string ValueWriter::toString() {
     JSStringWrapper jsstr;
-    return toStringData(&jsstr).toString();
+    return std::string{toStringData(&jsstr)};
 }
 
 StringData ValueWriter::toStringData(JSStringWrapper* jsstr) {

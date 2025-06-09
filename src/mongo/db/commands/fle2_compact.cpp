@@ -317,9 +317,9 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     }
 
     namespaces.ecocRenameNss = NamespaceStringUtil::deserialize(
-        dbName, namespaces.ecocNss.coll().toString().append(".compact"));
+        dbName, std::string{namespaces.ecocNss.coll()}.append(".compact"));
     namespaces.ecocLockNss = NamespaceStringUtil::deserialize(
-        dbName, namespaces.ecocNss.coll().toString().append(".lock"));
+        dbName, std::string{namespaces.ecocNss.coll()}.append(".lock"));
     return namespaces;
 }
 
@@ -781,7 +781,7 @@ void processFLECompactV2(OperationContext* opCtx,
             // The function that handles the transaction may outlive this function so we need to use
             // shared_ptrs
             auto argsBlock = std::make_tuple(
-                namespaces.escNss, anchorPaddingFactor, rangeField, fieldPath.toString());
+                namespaces.escNss, anchorPaddingFactor, rangeField, std::string{fieldPath});
             auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
             auto service = opCtx->getService();
 
@@ -895,7 +895,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
         std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
         auto argsBlock = std::make_tuple(namespaces.escNss,
                                          pqMaxEntries - pq.size(),
-                                         rangeFieldIt.first.toString(),
+                                         std::string{rangeFieldIt.first},
                                          rangeFieldIt.second);
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto result = uassertStatusOK(trun->runNoThrow(

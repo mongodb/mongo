@@ -2293,8 +2293,7 @@ protected:
             RemoteCommandRequest request = noi->getRequest();
 
             // Only process heartbeat requests.
-            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData().toString(),
-                      "replSetHeartbeat");
+            ASSERT_EQ(request.cmdObj.firstElement().fieldNameStringData(), "replSetHeartbeat");
 
             ReplSetHeartbeatArgsV1 hbArgs;
             ASSERT_OK(hbArgs.initialize(request.cmdObj));
