@@ -55,16 +55,6 @@ const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonitor>();
 }  // namespace
 
 void DiskSpaceMonitor::start(ServiceContext* svcCtx) {
-    auto storageEngine = svcCtx->getStorageEngine();
-    const bool filesNotAllInSameDirectory =
-        storageEngine->isUsingDirectoryPerDb() || storageEngine->isUsingDirectoryForIndexes();
-    if (filesNotAllInSameDirectory) {
-        LOGV2(7333400,
-              "The DiskSpaceMonitor will not run when the storage engine stores data files in "
-              "different directories");
-        return;
-    }
-
     _decoration(svcCtx)._start(svcCtx);
 }
 

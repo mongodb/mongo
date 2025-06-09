@@ -1023,8 +1023,17 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         startFLECrud(serviceContext);
 
         DiskSpaceMonitor::start(serviceContext);
-        auto diskMonitor = DiskSpaceMonitor::get(serviceContext);
-        IndexBuildsCoordinator::get(serviceContext)->registerKillIndexBuildAction(*diskMonitor);
+        const bool filesNotAllInSameDirectory =
+            storageEngine->isUsingDirectoryPerDb() || storageEngine->isUsingDirectoryForIndexes();
+        if (filesNotAllInSameDirectory) {
+            LOGV2(7333400,
+                  "The index builds DiskSpaceMonitor action which periodically checks if we "
+                  "have enough disk space to build indexes will not run when the storage engine "
+                  "stores data files in different directories");
+        } else {
+            auto diskMonitor = DiskSpaceMonitor::get(serviceContext);
+            IndexBuildsCoordinator::get(serviceContext)->registerKillIndexBuildAction(*diskMonitor);
+        }
     }
 
     startClientCursorMonitor();
