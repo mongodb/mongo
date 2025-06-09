@@ -84,10 +84,10 @@
  * EDCTextSubstringToken = HMAC(EDCToken, 2) = Fs[f,1,1,2]
  * EDCTextSuffixToken = HMAC(EDCToken, 3) = Fs[f,1,1,3]
  * EDCTextPrefixToken = HMAC(EDCToken, 4) = Fs[f,1,1,4]
- * ESCTextExactToken = HMAC(EDCToken, 1) = Fs[f,1,2,1]
- * ESCTextSubstringToken = HMAC(EDCToken, 1) = Fs[f,1,2,2]
- * ESCTextSuffixToken = HMAC(EDCToken, 1) = Fs[f,1,2,3]
- * ESCTextPrefixToken = HMAC(EDCToken, 1) = Fs[f,1,2,4]
+ * ESCTextExactToken = HMAC(ESCToken, 1) = Fs[f,1,2,1]
+ * ESCTextSubstringToken = HMAC(ESCToken, 1) = Fs[f,1,2,2]
+ * ESCTextSuffixToken = HMAC(ESCToken, 1) = Fs[f,1,2,3]
+ * ESCTextPrefixToken = HMAC(ESCToken, 1) = Fs[f,1,2,4]
  * ServerTextExactToken = HMAC(ServerTokenDerivationLevel1Token, 1)
  * ServerTextSubstringToken = HMAC(ServerTokenDerivationLevel1Token, 2)
  * ServerTextSuffixToken = HMAC(ServerTokenDerivationLevel1Token, 3)

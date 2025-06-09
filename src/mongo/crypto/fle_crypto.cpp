@@ -3427,10 +3427,10 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
     const std::vector<uint64_t>& counters) {
 
     uassert(9784102,
-            "Non-text search InsertUpdatePayload supplied for FLE2IndexedTextEncryptedValueV2",
+            "Non-text search InsertUpdatePayload supplied for FLE2IndexedTextEncryptedValue",
             payload.getTextSearchTokenSets().has_value());
     uassert(9784103,
-            "InsertUpdatePayload has bad BSON type for FLE2IndexedTextEncryptedValueV2",
+            "InsertUpdatePayload has bad BSON type for FLE2IndexedTextEncryptedValue",
             static_cast<BSONType>(payload.getType()) == BSONType::string);
 
     auto& tsts = payload.getTextSearchTokenSets().value();
@@ -3458,16 +3458,16 @@ FLE2IndexedTextEncryptedValue FLE2IndexedTextEncryptedValue::fromUnencrypted(
         static_cast<uint32_t>(tsts.getPrefixTokenSets().size());
 
     uassert(9784113,
-            "FLE2IndexedTextEncryptedValueV2 tags length must equal the total number of text "
+            "FLE2IndexedTextEncryptedValue tags length must equal the total number of text "
             "search token sets",
             tags.size() == totalTagCount);
     uassert(9784107,
-            "FLE2IndexedTextEncryptedValueV2 counters length must equal the total number of text "
+            "FLE2IndexedTextEncryptedValue counters length must equal the total number of text "
             "search token sets",
             counters.size() == totalTagCount);
     auto clientEncryptedValue(FLEUtil::vectorFromCDR(payload.getValue()));
     uassert(9784108,
-            "Invalid client encrypted value length for FLE2IndexedTextEncryptedValueV2",
+            "Invalid client encrypted value length for FLE2IndexedTextEncryptedValue",
             !clientEncryptedValue.empty());
 
     FLE2IndexedTextEncryptedValue value;
