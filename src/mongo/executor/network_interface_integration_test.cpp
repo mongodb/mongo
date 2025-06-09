@@ -1452,7 +1452,7 @@ TEST_F(NetworkInterfaceIntegrationFixture, BasicRejectConnection) {
 
     auto result = fut2.get(interruptible());
     ASSERT_NOT_OK(result.status);
-    ASSERT_EQ(ErrorCodes::TemporarilyUnavailable, result.status);
+    ASSERT_EQ(ErrorCodes::PooledConnectionAcquisitionRejected, result.status);
 }
 
 TEST_F(NetworkInterfaceIntegrationFixture, RejectConnection) {
@@ -1480,7 +1480,7 @@ TEST_F(NetworkInterfaceIntegrationFixture, RejectConnection) {
 
     auto result = fut2.get(interruptible());
     ASSERT_NOT_OK(result.status);
-    ASSERT_EQ(ErrorCodes::TemporarilyUnavailable, result.status);
+    ASSERT_EQ(ErrorCodes::PooledConnectionAcquisitionRejected, result.status);
 }
 
 

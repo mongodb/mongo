@@ -570,6 +570,7 @@ public:
     virtual Milliseconds toRefreshTimeout() const = 0;
 
     virtual size_t connectionRequestsMaxQueueDepth() const = 0;
+    virtual size_t maxConnections() const = 0;
 
     /**
      * Get the name for this controller

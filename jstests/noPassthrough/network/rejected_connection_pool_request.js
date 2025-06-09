@@ -74,7 +74,7 @@ assert.soon(() => getPendingCount() == kMaxQueueDepth,
             1000);
 
 const res = database.runCommand({find: collectionName});
-assert(res.code == ErrorCodes.TemporarilyUnavailable);
+assert(res.code == ErrorCodes.PooledConnectionAcquisitionRejected);
 assert("errorLabels" in res);
 const errorLabels = res["errorLabels"];
 assert(errorLabels.includes("SystemOverloadedError"));

@@ -93,6 +93,10 @@ public:
         return getPoolOptions().connectionRequestsMaxQueueDepth;
     }
 
+    size_t maxConnections() const override {
+        return _maxLoader();
+    }
+
     StringData name() const override {
         return _name;
     }

@@ -881,6 +881,11 @@ error_codes:
       categories: [StreamProcessorUserError],
     }
   - {code: 449, name: RateLimitExceeded, categories: [SystemOverloadedError]}
+  - {
+      code: 450,
+      name: PooledConnectionAcquisitionRejected,
+      categories: [SystemOverloadedError],
+    }
 
   # Error codes 4000-8999 are reserved.
 

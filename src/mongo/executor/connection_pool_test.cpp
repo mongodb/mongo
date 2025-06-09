@@ -173,7 +173,8 @@ TEST_F(ConnectionPoolTest, CheckRejectedConnectionRequest) {
 
     auto fut = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
     ASSERT_TRUE(fut.isReady());
-    ASSERT_THROWS_CODE(std::move(fut).get(), DBException, ErrorCodes::TemporarilyUnavailable);
+    ASSERT_THROWS_CODE(
+        std::move(fut).get(), DBException, ErrorCodes::PooledConnectionAcquisitionRejected);
 }
 
 /**
@@ -185,7 +186,8 @@ TEST_F(ConnectionPoolTest, CheckRejectedConnectionRequestBasic) {
     FailPointEnableBlock fpb("connectionPoolRejectsConnectionRequests");
     auto fut = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
     ASSERT_TRUE(fut.isReady());
-    ASSERT_THROWS_CODE(std::move(fut).get(), DBException, ErrorCodes::TemporarilyUnavailable);
+    ASSERT_THROWS_CODE(
+        std::move(fut).get(), DBException, ErrorCodes::PooledConnectionAcquisitionRejected);
 }
 
 TEST_F(ConnectionPoolTest, StatsTest) {

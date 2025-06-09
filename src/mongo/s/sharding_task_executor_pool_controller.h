@@ -163,6 +163,7 @@ public:
     Milliseconds toRefreshTimeout() const override;
 
     size_t connectionRequestsMaxQueueDepth() const override;
+    size_t maxConnections() const override;
 
     StringData name() const override {
         return "ShardingTaskExecutorPoolController"_sd;

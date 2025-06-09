@@ -361,6 +361,10 @@ size_t ShardingTaskExecutorPoolController::connectionRequestsMaxQueueDepth() con
     return gParameters.connectionRequestsMaxQueueDepth.load();
 }
 
+size_t ShardingTaskExecutorPoolController::maxConnections() const {
+    return gParameters.maxConnections.load();
+}
+
 void ShardingTaskExecutorPoolController::updateConnectionPoolStats(
     executor::ConnectionPoolStats* cps) const {
     cps->matchingStrategy =

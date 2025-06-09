@@ -231,6 +231,9 @@ public:
     size_t connectionRequestsMaxQueueDepth() const override {
         return getPool()->_options.connectionRequestsMaxQueueDepth;
     }
+    size_t maxConnections() const override {
+        return getPool()->_options.maxConnections;
+    }
 
     StringData name() const override {
         return "LimitController"_sd;
@@ -544,7 +547,11 @@ private:
     void updateController(stdx::unique_lock<stdx::mutex>& lk);
 
 private:
-    bool _shouldRejectRequest(WithLock);
+    /**
+     * Returns Status::OK if the request can be serviced.
+     * Returns a non-OK Status if the request should be rejected instead.
+     */
+    Status _verifyCanServiceRequest(WithLock);
 
     const std::shared_ptr<ConnectionPool> _parent;
 
@@ -937,9 +944,11 @@ size_t ConnectionPool::SpecificPool::rejectedConnectionsRequests(WithLock) const
     return _numberRejectedConnections;
 }
 
-bool ConnectionPool::SpecificPool::_shouldRejectRequest(WithLock) {
+Status ConnectionPool::SpecificPool::_verifyCanServiceRequest(WithLock) {
     if (MONGO_unlikely(connectionPoolRejectsConnectionRequests.shouldFail())) {
-        return true;
+        return Status(
+            ErrorCodes::PooledConnectionAcquisitionRejected,
+            "Rejecting request due to 'connectionPoolRejectsConnectionRequests' failpoint");
     }
 
     const size_t connectionRequestsMaxQueueDepth =
@@ -947,11 +956,18 @@ bool ConnectionPool::SpecificPool::_shouldRejectRequest(WithLock) {
 
     // If the value of connectionRequestsMaxQueueDepth is 0, then the feature is disabled and no
     // further checks should be performed here: the request should NOT be rejected.
-    if (connectionRequestsMaxQueueDepth == 0) {
-        return false;
+    if (connectionRequestsMaxQueueDepth > 0 &&
+        _requests.size() >= connectionRequestsMaxQueueDepth) {
+        return Status{ErrorCodes::PooledConnectionAcquisitionRejected,
+                      fmt::format("Maximum request queue depth for host '{}' in pool '{}' was "
+                                  "exceeded (max queue depth = {}, max connections = {})",
+                                  _hostAndPort,
+                                  _parent->getName(),
+                                  connectionRequestsMaxQueueDepth,
+                                  _parent->_controller->maxConnections())};
     }
 
-    return (_requests.size() >= connectionRequestsMaxQueueDepth);
+    return Status::OK();
 }
 
 void ConnectionPool::SpecificPool::updateCachedCreatedConnections(WithLock lk) {
@@ -1017,24 +1033,17 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
 
     // If a queue of requests for connections exceeds a certain size, do not accept
     // new requests and reject them.
-    if (MONGO_unlikely(_shouldRejectRequest(lk))) {
+    if (auto s = _verifyCanServiceRequest(lk); MONGO_unlikely(!s.isOK())) {
         _numberRejectedConnections++;
 
         LOGV2_DEBUG(9147901,
                     _rejectedConnectionsLogSeverity().toInt(),
-                    "Connection acquisition attempt was rejected because the pool is overloaded.",
+                    "Rejecting connection acquisition attempt",
                     "name"_attr = _parent->getName(),
                     "hostAndPort"_attr = _hostAndPort,
+                    "reason"_attr = s,
                     "totalRejectedRequests"_attr = _numberRejectedConnections);
-
-        const Status rejectedStatus{
-            ErrorCodes::TemporarilyUnavailable,
-            fmt::format(
-                "Connection acquisition attempt was rejected because the pool is overloaded."
-                " ConnectionPool: {}, HostAndPort: {}",
-                _parent->getName(),
-                _hostAndPort)};
-        return Future<ConnectionPool::ConnectionHandle>::makeReady(rejectedStatus);
+        return s;
     }
 
     if (_requests.size() == 0) {
