@@ -1442,7 +1442,7 @@ tasks:
           suite: rollback_fuzzer_clean_shutdowns
           # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
           # index build commit quorum.
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## rollback generational fuzzer to ensure stability in patch builds ##
   - <<: *jstestfuzz_template
@@ -1466,7 +1466,7 @@ tasks:
           suite: rollback_fuzzer
           # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
           # index build commit quorum.
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## rollback generational fuzzer ##
   - <<: *jstestfuzz_template
@@ -1508,7 +1508,7 @@ tasks:
           suite: rollback_fuzzer_unclean_shutdowns
           # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
           # index build commit quorum.
-          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
   ## rollback multiversion fuzzer ##
   - <<: *jstestfuzz_template
@@ -1536,7 +1536,7 @@ tasks:
           # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
           # index build commit quorum.
           resmoke_args: >-
-            --mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
 
   - <<: *gen_task_template

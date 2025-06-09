@@ -20,5 +20,3 @@ executor:
               rollback: 2
             storage:
               recovery: 3
-          setParameters:
-            enableIndexBuildCommitQuorum: false

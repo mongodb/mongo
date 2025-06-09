@@ -23,8 +23,6 @@ executor:
               recovery: 3
               verbosity: 1
           rollbackShutdowns: true
-          setParameters:
-            enableIndexBuildCommitQuorum: false
           syncdelay: 5
           useRandomBinVersionsWithinReplicaSet: last-continuous
       nodb: ""
