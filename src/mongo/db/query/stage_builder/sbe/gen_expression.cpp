@@ -4432,11 +4432,15 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
             return b.makeNothingConstant();
         } else {
             auto slot = state.getBuiltinVarSlot(varId);
-            uassert(5611301,
-                    str::stream() << "Builtin variable '$$" << fieldPath.fullPath()
-                                  << "' (id=" << varId << ") is not available",
-                    slot.has_value());
-
+            if (!slot.has_value()) {
+                std::stringstream message;
+                message << "Builtin variable '$$" << fieldPath.fullPath() << "' (id=" << varId
+                        << ") is not available";
+                if (varId == Variables::kUserRolesId && !enableAccessToUserRoles.load()) {
+                    message << " as the server is not configured to accept it";
+                }
+                uasserted(5611301, message.str());
+            }
             inputExpr = SbExpr{SbSlot{*slot}};
         }
     } else {

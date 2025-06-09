@@ -49,11 +49,10 @@ function runTest(conn, disableAtRunTime) {
     db.auth("user", "pwd");
 
     let res = db.runCommand({find: "coll_view", filter: {}});
-    assert(
-        res["errmsg"].includes(
-            "Builtin variable '$$USER_ROLES' is not available as the server is not configured to accept it"),
-        "Error message did not match expected message");
-    assert.eq(res["code"], varNotAvailableErr);
+    assert(res["errmsg"].includes("Builtin variable") && res["errmsg"].includes("$$USER_ROLES") &&
+               res["errmsg"].includes("as the server is not configured to accept it"),
+           "Error message did not match expected message");
+    assert.commandFailedWithCode(res, varNotAvailableErr);
 
     db.logout();
 }
