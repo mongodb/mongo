@@ -121,9 +121,12 @@ MultiPlanTokens::MultiPlanTokens(MultiPlanTokens&& other) {
 }
 
 MultiPlanTokens& MultiPlanTokens::operator=(MultiPlanTokens&& other) {
-    _tokensCount = other._tokensCount;
-    other._tokensCount = 0;
-    _bucket = std::move(other._bucket);
+    if (this != &other) {
+        _tokensCount = other._tokensCount;
+        other._tokensCount = 0;
+        _bucket = std::move(other._bucket);
+    }
+
     return *this;
 }
 
