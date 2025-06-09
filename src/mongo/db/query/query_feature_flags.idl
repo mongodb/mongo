@@ -237,7 +237,7 @@ feature_flags:
         incremental_rollout_phase: rollout
 
     featureFlagUUIDExpression:
-        description: "Feature flag to enable $uuid expression"
+        description: "Feature flag to enable $createUUID expression"
         cpp_varname: gFeatureFlagUUIDExpression
         default: false
         shouldBeFCVGated: true

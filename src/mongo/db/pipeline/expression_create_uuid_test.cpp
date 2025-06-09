@@ -48,33 +48,33 @@
 
 namespace mongo {
 
-class ExpressionUUIDTest : public AggregationContextFixture {
+class ExpressionCreateUUIDTest : public AggregationContextFixture {
 public:
-    ExpressionUUIDTest() {
+    ExpressionCreateUUIDTest() {
         // TODO(SERVER-101162): Delete this once the feature flag defaults to true.
-        // Use logic similar to registerSigmoidExpression to register the $uuid expression
+        // Use logic similar to registerSigmoidExpression to register the $createUUID expression
         // even though the feature falg defaults to off.
-        // $uuid is gated behind a feature flag and does
+        // $createUUID is gated behind a feature flag and does
         // not get put into the map as the flag is off by default. Changing the value of the feature
         // flag with RAIIServerParameterControllerForTest() does not solve the issue because the
         // registration logic is not re-hit.
         try {
-            Expression::registerExpression("$uuid",
-                                           ExpressionUUID::parse,
+            Expression::registerExpression("$createUUID",
+                                           ExpressionCreateUUID::parse,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            AllowedWithClientType::kAny,
                                            nullptr /* featureFlag */);
         } catch (const DBException& e) {
-            // Allow this exception, to allow multiple ExpressionUUIDTest instances
+            // Allow this exception, to allow multiple ExpressionCreateUUIDTest instances
             // to be created in this process.
-            ASSERT(e.reason() == "Duplicate expression ($uuid) registered.");
+            ASSERT(e.reason() == "Duplicate expression ($createUUID) registered.");
         }
     }
 };
 
-TEST_F(ExpressionUUIDTest, Basic) {
+TEST_F(ExpressionCreateUUIDTest, Basic) {
     auto expCtx = getExpCtx();
-    BSONObj spec = BSON("$uuid" << BSONObj());
+    BSONObj spec = BSON("$createUUID" << BSONObj());
     auto exp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     auto validateIsBindata = [](const Value& value) {
@@ -103,14 +103,14 @@ TEST_F(ExpressionUUIDTest, Basic) {
     ASSERT_VALUE_NE(result1, result3);
 }
 
-TEST_F(ExpressionUUIDTest, ParseError) {
+TEST_F(ExpressionCreateUUIDTest, ParseError) {
     auto expCtx = getExpCtx();
-    BSONObj spec = BSON("$uuid" << BSON("some" << "argument"));
+    BSONObj spec = BSON("$createUUID" << BSON("some" << "argument"));
     ASSERT_THROWS_CODE_AND_WHAT(
         Expression::parseExpression(getExpCtxRaw(), spec, expCtx->variablesParseState),
         AssertionException,
         10081901,
-        "$uuid does not accept arguments");
+        "$createUUID does not accept arguments");
 }
 
 }  // namespace mongo

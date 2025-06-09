@@ -236,7 +236,7 @@ public:
         _deps->needRandomGenerator = true;
     }
 
-    void visit(const ExpressionUUID* expr) final {
+    void visit(const ExpressionCreateUUID* expr) final {
         _deps->needRandomGenerator = true;
     }
 
@@ -301,7 +301,7 @@ public:
     void visit(const ExpressionLet* expr) final {}
     void visit(const ExpressionMeta* expr) final {}
     void visit(const ExpressionRandom* expr) final {}
-    void visit(const ExpressionUUID* expr) final {}
+    void visit(const ExpressionCreateUUID* expr) final {}
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {}
 
 private:

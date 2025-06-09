@@ -4816,42 +4816,42 @@ Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables
     return exec::expression::evaluate(*this, root, variables);
 }
 
-/* -------------------------- ExpressionUUID ------------------------------ */
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(uuid,
-                                      ExpressionUUID::parse,
+/* -------------------------- ExpressionCreateUUID ------------------------------ */
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(createUUID,
+                                      ExpressionCreateUUID::parse,
                                       AllowedWithApiStrict::kNeverInVersion1,
                                       AllowedWithClientType::kAny,
                                       &feature_flags::gFeatureFlagUUIDExpression);
 
-ExpressionUUID::ExpressionUUID(ExpressionContext* const expCtx) : Expression(expCtx) {
+ExpressionCreateUUID::ExpressionCreateUUID(ExpressionContext* const expCtx) : Expression(expCtx) {
     expCtx->setSbeCompatibility(SbeCompatibility::notCompatible);
 }
 
-intrusive_ptr<Expression> ExpressionUUID::parse(ExpressionContext* const expCtx,
-                                                BSONElement exprElement,
-                                                const VariablesParseState& vps) {
+intrusive_ptr<Expression> ExpressionCreateUUID::parse(ExpressionContext* const expCtx,
+                                                      BSONElement exprElement,
+                                                      const VariablesParseState& vps) {
     uassert(10081900,
-            "$uuid not allowed inside collection validators",
+            "$createUUID not allowed inside collection validators",
             !expCtx->getIsParsingCollectionValidator());
 
-    uassert(10081901, "$uuid does not accept arguments", exprElement.Obj().isEmpty());
+    uassert(10081901, "$createUUID does not accept arguments", exprElement.Obj().isEmpty());
 
-    return new ExpressionUUID(expCtx);
+    return new ExpressionCreateUUID(expCtx);
 }
 
-const char* ExpressionUUID::getOpName() const {
-    return "$uuid";
+const char* ExpressionCreateUUID::getOpName() const {
+    return "$createUUID";
 }
 
-Value ExpressionUUID::evaluate(const Document& root, Variables* variables) const {
+Value ExpressionCreateUUID::evaluate(const Document& root, Variables* variables) const {
     return Value(UUID::gen());
 }
 
-intrusive_ptr<Expression> ExpressionUUID::optimize() {
+intrusive_ptr<Expression> ExpressionCreateUUID::optimize() {
     return intrusive_ptr<Expression>(this);
 }
 
-Value ExpressionUUID::serialize(const SerializationOptions& options) const {
+Value ExpressionCreateUUID::serialize(const SerializationOptions& options) const {
     return Value(DOC(getOpName() << Document()));
 }
 

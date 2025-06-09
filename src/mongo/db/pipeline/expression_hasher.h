@@ -845,7 +845,7 @@ public:
         combine(OpType::kInternalKeyStringValue);
     }
 
-    void visit(const ExpressionUUID* expr) final {
+    void visit(const ExpressionCreateUUID* expr) final {
         combine(OpType::kUUID);
     }
 

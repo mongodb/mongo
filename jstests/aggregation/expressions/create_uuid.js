@@ -1,5 +1,5 @@
 /**
- * Test the $uuid expression.
+ * Test the $createUUID expression.
  * @tags: [
  *  featureFlagUUIDExpression,
  *  requires_fcv_81
@@ -20,13 +20,13 @@ function setupCollection() {
     assert.commandWorked(bulk.execute());
 }
 
-// Validate the $uuid expression works and returns a different
+// Validate the $createUUID expression works and returns a different
 // value each time it is executed.
 function basicTest() {
     setupCollection();
 
     const pipeline = [
-        {$addFields: {uuidField: {$uuid: {}}}},
+        {$addFields: {uuidField: {$createUUID: {}}}},
         {$project: {uuidStrField: {$toString: "$uuidField"}, uuidField: 1}},
         {$project: {_id: 0}}
     ];
@@ -49,8 +49,8 @@ function basicTest() {
     }
 }
 
-// Validate $uuid inside a lookup pipeline. The $lookup pipeline
-// result should not be cached and each $uuid evaluation inside it should
+// Validate $createUUID inside a lookup pipeline. The $lookup pipeline
+// result should not be cached and each $createUUID evaluation inside it should
 // return a unique value.
 function lookupTest() {
     setupCollection();
@@ -62,8 +62,7 @@ function lookupTest() {
                 docId: "$_id"
             },
             pipeline: [
-                // {$match: {_id: "$$docId"}},
-                {$addFields: {uuid: {$uuid: {}}}}
+                {$addFields: {uuid: {$createUUID: {}}}}
             ],
             as: "result"
         }},

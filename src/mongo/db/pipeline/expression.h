@@ -4872,7 +4872,7 @@ private:
 /**
  * Returns a UUID.
  */
-class ExpressionUUID final : public Expression {
+class ExpressionCreateUUID final : public Expression {
 public:
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement exprElement,
@@ -4895,7 +4895,7 @@ public:
     }
 
 private:
-    explicit ExpressionUUID(ExpressionContext* expCtx);
+    explicit ExpressionCreateUUID(ExpressionContext* expCtx);
 };
 
 /**
