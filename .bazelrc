@@ -153,6 +153,7 @@ common --flag_alias=mongo_toolchain_version=//bazel/config:mongo_toolchain_versi
 common --flag_alias=simple_build_id=//bazel/config:simple_build_id
 common --flag_alias=create_dwp=//bazel/config:create_dwp
 common --flag_alias=use_apple_clang=//bazel/config:apple_clang
+common --flag_alias=win_min_version=//bazel/config:win_min_version
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -399,11 +400,6 @@ common:macos -c dbg
 # MacOS do not use the custom toolchain config, so the compiler flag need to be set here.
 common:macos --cxxopt=-std=c++20
 
-# Set the windows version to win10 by default
-# TODO(SERVER-87654): We may want to add support for other Windows versions in the future.
-common:windows --cxxopt=-D_WIN32_WINNT=0x0A00
-common:windows --cxxopt=-DBOOST_USE_WINAPI_VERSION=0x0A00
-common:windows --cxxopt=-DNTDDI_VERSION=0x0A000000
 # TODO(SERVER-93585): Remove this and fix s2 to work with Bazel's default which
 #                     sets COMPILER_MSVC on windows.
 common:windows --cxxopt=-UCOMPILER_MSVC

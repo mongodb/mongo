@@ -18,6 +18,7 @@
 #    https://github.com/bazelbuild/rules_cc/blob/b1c049c65c7ffa4dfa175e29b6af75d5e08486d5/cc/private/toolchain/windows_cc_toolchain_config.bzl
 ###
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "@rules_cc//cc:cc_toolchain_config_lib.bzl",
@@ -82,6 +83,56 @@ all_link_actions = [
     ACTION_NAMES.cpp_link_dynamic_library,
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
+
+def get_windows_mimimun_version_feature(ctx):
+    # The values are populated from the following link:
+    #    https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt?view=msvc-170
+    # For future versions, please add it in the map.
+    min_ver_map = {
+        "10": {
+            "win": "0x0A00",
+            "ddi": "0x0A000000",
+        },
+    }
+
+    if BuildSettingInfo not in ctx.attr.windows_version_minimal:
+        fail("windows_version_minimal attribute value is not a build flag.")
+
+    ver = ctx.attr.windows_version_minimal[BuildSettingInfo].value
+    if ver not in min_ver_map:
+        error_msg = "Windows mininum version {} does not exist. These are the minimum versions that are supported: {}".format(ver, min_ver_map.keys())
+        fail(error_msg)
+
+    min_ver = min_ver_map[ver]
+    return feature(
+        name = "windows_version_minimum",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.assemble,
+                    ACTION_NAMES.preprocess_assemble,
+                    ACTION_NAMES.linkstamp_compile,
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.cpp_header_parsing,
+                    ACTION_NAMES.cpp_module_compile,
+                    ACTION_NAMES.cpp_module_codegen,
+                    ACTION_NAMES.lto_backend,
+                    ACTION_NAMES.clif_match,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "/D_WIN32_WINNT=%s" % min_ver["win"],
+                            "/DBOOST_USE_WINAPI_VERSION=%s" % min_ver["win"],
+                            "/DNTDDI_VERSION=%s" % min_ver["ddi"],
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
 
 def _use_msvc_toolchain(ctx):
     return ctx.attr.cpu in ["x64_windows", "arm64_windows"] and (ctx.attr.compiler == "msvc-cl" or ctx.attr.compiler == "clang-cl")
@@ -670,7 +721,6 @@ def _impl(ctx):
                         flag_group(
                             flags = [
                                 "/DNOMINMAX",
-                                "/D_WIN32_WINNT=0x0601",
                                 "/D_CRT_SECURE_NO_DEPRECATE",
                                 "/D_CRT_SECURE_NO_WARNINGS",
                                 "/bigobj",
@@ -1485,9 +1535,16 @@ def _impl(ctx):
         ],
         enabled = True,
     )
+
+    features = features + [
+        cpp_modules_feature,
+        cpp_module_modmap_file_feature,
+        get_windows_mimimun_version_feature(ctx),
+    ]
+
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
-        features = features + [cpp_modules_feature, cpp_module_modmap_file_feature],
+        features = features,
         action_configs = action_configs,
         artifact_name_patterns = artifact_name_patterns,
         cxx_builtin_include_directories = ctx.attr.cxx_builtin_include_directories,
@@ -1531,6 +1588,7 @@ mongo_windows_cc_toolchain_config = rule(
         "tool_bin_path": attr.string(default = "not_found"),
         "tool_paths": attr.string_dict(),
         "toolchain_identifier": attr.string(),
+        "windows_version_minimal": attr.label(default = "//bazel/config:win_min_version"),
     },
     provides = [CcToolchainConfigInfo],
 )
