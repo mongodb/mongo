@@ -13,12 +13,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig, waitForState} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
-const rst = new ReplSetTest({
-    name,
-    nodes: [{}, {rsConfig: {priority: 0}}],
-    settings: {electionTimeoutMillis: 3000, heartbeatIntervalMillis: 250},
-    useBridge: true
-});
+const rst = new ReplSetTest({name, nodes: [{}, {rsConfig: {priority: 0}}], useBridge: true});
 rst.startSet();
 rst.initiate();
 
@@ -36,6 +31,8 @@ rst.reInitiate();
 // where a node is in initial sync with 1 vote.
 let nextConfig = rst.getReplSetConfigFromNode(0);
 nextConfig.members[2].votes = 1;
+nextConfig.settings.electionTimeoutMillis = 3000;
+nextConfig.settings.heartbeatIntervalMillis = 250;
 reconfig(rst, nextConfig, false /* force */, true /* wait */);
 
 assert.commandWorked(initialSyncSecondary.adminCommand({
