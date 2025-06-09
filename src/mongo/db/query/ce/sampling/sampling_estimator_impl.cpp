@@ -169,15 +169,33 @@ std::vector<BSONObj> SamplingEstimatorImpl::getIndexKeys(const IndexBounds& boun
 
 bool SamplingEstimatorImpl::matches(const Interval& interval, BSONElement val) {
     int startCmp = val.woCompare(interval.start, 0 /*ignoreFieldNames*/);
+    int endCmp = val.woCompare(interval.end, 0 /*ignoreFieldNames*/);
+
     if (startCmp == 0) {
+        /**
+         * The document value is equal to the starting point of the interval; the document is inside
+         * the bounds of this index interval if the starting point is included in the interval.
+         */
         return interval.startInclusive;
-    } else if (startCmp < 0) {
+    } else if (startCmp < 0 && endCmp < 0) {
+        /**
+         * The document value is less than both the starting point and the end point and is thus
+         * not inside the bounds of this index interval.
+         */
         return false;
     }
-    int endCmp = val.woCompare(interval.end, 0 /*ignoreFieldNames*/);
+
     if (endCmp == 0) {
+        /**
+         * The document value is equal to the end point of the interval; the document is inside the
+         * bounds of this index interval if the end point is included in the interval.
+         */
         return interval.endInclusive;
-    } else if (endCmp > 0) {
+    } else if (endCmp > 0 && startCmp > 0) {
+        /**
+         * The document value is greater than both the starting point and the end point and is thus
+         * not inside the bounds of this index interval.
+         */
         return false;
     }
     return true;
