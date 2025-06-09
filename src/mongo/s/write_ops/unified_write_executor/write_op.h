@@ -49,51 +49,46 @@ using WriteOpId = size_t;
 
 class WriteOp {
 public:
-    WriteOp(const BulkWriteCommandRequest& request, int index) : _request(request), _index(index) {}
+    WriteOp(const BulkWriteCommandRequest& request, int index)
+        : _bulkWriteRequest(&request), _batchedRequest(nullptr), _index(index) {}
+    WriteOp(const BatchedCommandRequest& request, int index)
+        : _bulkWriteRequest(nullptr), _batchedRequest(&request), _index(index) {}
 
-    // copy/move constructor/operators so that _request can only be modified via by changing which
-    // op this is referencing or making a new reference to the same op.
-    WriteOp(const WriteOp& other) : _request(other._request), _index(other._index) {}
-    WriteOp(WriteOp&& other) : _request(other._request), _index(other._index) {}
-    WriteOp& operator=(const WriteOp& other) {
-        const_cast<BulkWriteCommandRequest&>(_request) = other._request;
-        _index = other._index;
-        return *this;
-    }
-    WriteOp& operator=(WriteOp&& other) {
-        const_cast<BulkWriteCommandRequest&>(_request) =
-            const_cast<BulkWriteCommandRequest&>(other._request);
-        _index = other._index;
-        return *this;
-    }
     ~WriteOp() = default;
 
     WriteOpId getId() const {
         return _index;
     }
 
+    BatchItemRef getRef() const {
+        if (_bulkWriteRequest) {
+            return BatchItemRef(_bulkWriteRequest, _index);
+        } else {
+            return BatchItemRef(_batchedRequest, _index);
+        }
+    }
+
     const NamespaceString& getNss() const {
-        return BatchItemRef(&_request, _index).getNss();
+        return getRef().getNss();
     }
 
     WriteType getType() const {
-        return WriteType(BatchItemRef(&_request, _index).getOpType());
-    }
-
-    BatchItemRef getRef() const {
-        return BatchItemRef(&_request, _index);
+        return WriteType(getRef().getOpType());
     }
 
     BulkWriteOpVariant getBulkWriteOp() const {
-        return _request.getOps()[_index];
+        tassert(10412802, "_bulkWriteRequest is not initialized", _bulkWriteRequest != nullptr);
+        return _bulkWriteRequest->getOps()[_index];
     }
 
     bool isMulti() const {
-        return BatchItemRef(&_request, _index).isMulti();
+        return getRef().isMulti();
     }
 
 private:
-    const BulkWriteCommandRequest& _request;
+    // TODO SERVER-104262 refactor the WriteOp implementation to not use raw pointers
+    const BulkWriteCommandRequest* _bulkWriteRequest{nullptr};
+    const BatchedCommandRequest* _batchedRequest{nullptr};
     int _index;
 };
 

@@ -55,30 +55,55 @@ public:
      * Mark the current write op as inactive and advance the internal pointer to the next active
      * write op.
      */
-    virtual void advance() = 0;
+    virtual void advance();
 
     /**
      * Mark a write op as active. The internal pointer will be updated to the active write op with
      * the lowest id.
      */
-    virtual void markOpReprocess(const WriteOp& op) = 0;
+    virtual void markOpReprocess(const WriteOp& op);
+
+protected:
+    absl::btree_set<size_t> _activeIndices;
 };
 
-class BulkWriteOpProducer : public WriteOpProducer {
+template <typename RequestType>
+class MultiWriteOpProducer : public WriteOpProducer {
 public:
-    BulkWriteOpProducer(const BulkWriteCommandRequest& request) : _request(request) {
-        for (size_t i = 0; i < request.getOps().size(); i++) {
+    MultiWriteOpProducer(const RequestType& request) : _request(request) {
+        size_t numOps = extractNumOperations(_request);
+        populateActiveIndices(numOps);
+    }
+
+    boost::optional<WriteOp> peekNext() override {
+        if (_activeIndices.empty()) {
+            return boost::none;
+        }
+        return WriteOp(_request, *_activeIndices.begin());
+    }
+
+private:
+    size_t extractNumOperations(const BulkWriteCommandRequest& request) const {
+        return request.getOps().size();
+    }
+    size_t extractNumOperations(const BatchedCommandRequest& request) const {
+        switch (request.getBatchType()) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return request.getInsertRequest().getDocuments().size();
+            case BatchedCommandRequest::BatchType_Update:
+                return request.getUpdateRequest().getUpdates().size();
+            case BatchedCommandRequest::BatchType_Delete:
+                return request.getDeleteRequest().getDeletes().size();
+            default:
+                uasserted(ErrorCodes::BadValue, "Unknown operation type");
+        }
+    }
+    void populateActiveIndices(size_t numOps) {
+        for (size_t i = 0; i < numOps; ++i) {
             _activeIndices.insert(i);
         }
     }
-
-    boost::optional<WriteOp> peekNext() override;
-    void advance() override;
-    void markOpReprocess(const WriteOp& op) override;
-
-private:
-    const BulkWriteCommandRequest& _request;
-    absl::btree_set<size_t> _activeIndices;
+    const RequestType& _request;
 };
 
 }  // namespace unified_write_executor

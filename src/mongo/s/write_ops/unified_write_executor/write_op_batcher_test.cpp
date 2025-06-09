@@ -172,7 +172,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                      BulkWriteInsertOp(0, BSONObj()),
                                      BulkWriteInsertOp(0, BSONObj())},
                                     {NamespaceInfoEntry(nss0)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -207,7 +207,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                      BulkWriteInsertOp(0, BSONObj()),
                                      BulkWriteInsertOp(1, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -239,7 +239,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesSingleShardO
                                      BulkWriteInsertOp(1, BSONObj()),
                                      BulkWriteInsertOp(0, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -273,7 +273,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherBatchesMultiShardOp
     BulkWriteCommandRequest request(
         {BulkWriteInsertOp(0, BSONObj()), BulkWriteInsertOp(0, BSONObj())},
         {NamespaceInfoEntry(nss0)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kMultiShard, {nss0Shard0, nss0Shard1}}},
@@ -302,7 +302,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherReprocessesWriteOps
                                      BulkWriteInsertOp(0, BSONObj()),
                                      BulkWriteInsertOp(1, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -339,7 +339,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
                                      BulkWriteInsertOp(1, BSONObj()),
                                      BulkWriteInsertOp(0, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -376,7 +376,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
                                      BulkWriteInsertOp(0, BSONObj()),
                                      BulkWriteInsertOp(1, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -414,7 +414,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherBatchesMultiSha
             BulkWriteInsertOp(1, BSONObj()),
         },
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kMultiShard, {nss0Shard0, nss0Shard1}}},
@@ -455,7 +455,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
             BulkWriteInsertOp(0, BSONObj()),
         },
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
@@ -492,7 +492,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherReprocessesWrit
                                      BulkWriteInsertOp(1, BSONObj()),
                                      BulkWriteInsertOp(1, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     std::map<WriteOpId, Analysis> ops = {{0, {kMultiShard, {nss0Shard0, nss0Shard1}}},
                                          {1, {kSingleShard, {nss0Shard0}}},
@@ -537,7 +537,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
                                      BulkWriteInsertOp(1, BSONObj()),
                                      BulkWriteInsertOp(0, BSONObj())},
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
-    BulkWriteOpProducer producer(request);
+    MultiWriteOpProducer<BulkWriteCommandRequest> producer(request);
 
     MockWriteOpAnalyzer analyzer({
         {0, {kSingleShard, {nss0Shard0}}},
