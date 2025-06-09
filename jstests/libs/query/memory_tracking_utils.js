@@ -4,6 +4,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
+import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 /******************************************************************************************************
  * Constants for the regexes used to extract memory tracking metrics from the slow query log.
@@ -26,15 +27,6 @@ function getMetricFromLog(logLine, regex) {
 function assertNoMatchInLog(logLine, regex) {
     const match = logLine.match(regex);
     assert.eq(null, match, `Unexpected match for ${regex} in ${logLine}`);
-}
-
-function findStageInExplain(explainRes, stageName) {
-    for (let i = 0; i < explainRes.stages.length; i++) {
-        if (explainRes.stages[i].hasOwnProperty("$" + stageName)) {
-            return explainRes.stages[i];
-        }
-    }
-    return null;
 }
 
 /**
@@ -218,10 +210,42 @@ function verifyProfilerMetrics(
     }
 }
 
-function verifyExplainMetrics(db, collName, pipeline, stageName, featureFlagEnabled) {
+function verifyExplainMetrics({db, collName, pipeline, stageName, featureFlagEnabled, numStages}) {
     const stageKey = '$' + stageName;
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline);
-    let stage;
+
+    function assertNoMemoryMetricsInStages(explainRes, stageKey) {
+        let stages = getAggPlanStages(explainRes, stageKey);
+        assert.eq(stages.length,
+                  numStages,
+                  " Found " + stages.length + " but expected to find " + numStages + " " +
+                      stageKey + " stages " +
+                      "in explain: " + tojson(explainRes));
+        for (let stage of stages) {
+            assert(!stage.hasOwnProperty("maxUsedMemBytes"),
+                   `Unexpected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+        }
+    }
+
+    function assertHasMemoryMetricsInStages(explainRes, stageKey) {
+        let stages = getAggPlanStages(explainRes, stageKey);
+        assert.eq(stages.length,
+                  numStages,
+                  " Found " + stages.length + " but expected to find " + numStages + " " +
+                      stageKey + " stages " +
+                      "in explain: " + tojson(explainRes));
+        for (let stage of stages) {
+            assert(stage.hasOwnProperty("maxUsedMemBytes"),
+                   `Expected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+            // TODO SERVER-106000 Remove explicit check for $_internalSetWindowFields.
+            if (stageKey != "$_internalSetWindowFields") {
+                assert.gt(stage.maxUsedMemBytes,
+                          0,
+                          `Expected maxUsedMemBytes to be positive in ${stageKey} stage: ` +
+                              tojson(explainRes));
+            }
+        }
+    }
 
     if (!featureFlagEnabled) {
         jsTestLog(
@@ -231,39 +255,31 @@ function verifyExplainMetrics(db, collName, pipeline, stageName, featureFlagEnab
 
         // Memory usage metrics do not appear in the stage's statistics. Verify that the stage
         // exists in the explain output.
-        stage = findStageInExplain(explainRes, stageName);
-        assert(stage, `Expected to find ${stageKey} stage in explain: ` + tojson(explainRes));
-        assert(!stage.hasOwnProperty("maxUsedMemBytes"),
-               `Unexpected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+        assertNoMemoryMetricsInStages(explainRes, stageKey);
         return;
     }
 
     jsTestLog(
         "Test that memory usage metrics appear in the explain output when the feature flag is on.");
 
-    // Memory usage metrics appear in the top-level explain.
-    assert(explainRes.hasOwnProperty("maxUsedMemBytes"),
-           "Expected maxUsedMemBytes in explain: " + tojson(explainRes));
-    assert.gt(explainRes.maxUsedMemBytes,
-              0,
-              "Expected maxUsedMemBytes to be positive: " + tojson(explainRes));
+    // Memory usage metrics should appear in the top-level explain for unsharded explains.
+    if (!explainRes.hasOwnProperty("shards")) {
+        assert(explainRes.hasOwnProperty("maxUsedMemBytes"),
+               "Expected maxUsedMemBytes in explain: " + tojson(explainRes));
+        assert.gt(explainRes.maxUsedMemBytes,
+                  0,
+                  "Expected maxUsedMemBytes to be positive: " + tojson(explainRes));
+    }
 
     // Memory usage metrics appear within the stage's statistics.
-    stage = findStageInExplain(explainRes, stageName);
-    assert(stage, `Expected to find ${stageKey} stage in explain: ` + tojson(explainRes));
-    assert(stage.hasOwnProperty("maxUsedMemBytes"),
-           `Unexpected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainRes));
+    assertHasMemoryMetricsInStages(explainRes, stageKey);
 
     jsTestLog(
         "Test that memory usage metrics do not appear in the explain output when the verbosity is lower than executionStats.");
     const explainQueryPlannerRes = db[collName].explain("queryPlanner").aggregate(pipeline);
     assert(!explainQueryPlannerRes.hasOwnProperty("maxUsedMemBytes"),
            "Unexpected maxUsedMemBytes in explain: " + tojson(explainQueryPlannerRes));
-    stage = findStageInExplain(explainQueryPlannerRes, stageName);
-    assert(stage,
-           `Expected to find ${stageKey} stage in explain: ` + tojson(explainQueryPlannerRes));
-    assert(!stage.hasOwnProperty("maxUsedMemBytes"),
-           `Unexpected maxUsedMemBytes in ${stageKey} stage: ` + tojson(explainQueryPlannerRes));
+    assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageKey);
 }
 
 /**
@@ -294,5 +310,37 @@ export function runMemoryStatsTest(
     verifyProfilerMetrics(
         profilerEntries, expectedNumGetMores, featureFlagEnabled, checkInUseMemBytesResets);
 
-    verifyExplainMetrics(db, collName, pipeline, stageName, featureFlagEnabled);
+    verifyExplainMetrics({
+        db: db,
+        collName: collName,
+        pipeline: pipeline,
+        stageName: stageName,
+        featureFlagEnabled: featureFlagEnabled,
+        numStages: 1
+    });
+}
+
+/**
+ * For a given pipeline in a sharded cluster, verify that memory tracking statistics are correctly
+ * reported to the slow query log and explain("executionStats").  We don't check profiler
+ * metrics as the profiler doesn't exist for mongos so we don't test it here.
+ */
+export function runShardedMemoryStatsTest(
+    {db, collName, pipeline, pipelineComment, stageName, expectedNumGetMores, numShards}) {
+    const featureFlagEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
+    jsTestLog("QueryMemoryTracking feature flag is " + featureFlagEnabled);
+
+    // Record every operation in the slow query log.
+    db.setProfilingLevel(0, {slowms: -1});
+    const logLines = runPipelineAndGetDiagnostics(db, collName, pipeline, pipelineComment, "log");
+    verifySlowQueryLogMetrics(logLines, expectedNumGetMores, featureFlagEnabled);
+
+    verifyExplainMetrics({
+        db: db,
+        collName: collName,
+        pipeline: pipeline,
+        stageName: stageName,
+        featureFlagEnabled: featureFlagEnabled,
+        numStages: numShards
+    });
 }
