@@ -128,7 +128,7 @@ buildNormalizationCalculationStagesForSigmoidNormalization(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460009,
             "Expected normalization to be sigmoid",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kSigmoid);
+            spec.getNormalization() == ScoreNormalizationEnum::kSigmoid);
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
@@ -150,7 +150,7 @@ boost::intrusive_ptr<DocumentSource> buildReplaceRootStage(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460002,
             "Expected normalization to be minMaxScaler",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
     return DocumentSourceReplaceRoot::createFromBson(
         BSON("$replaceWith" << BSON("docs" << "$$ROOT")).firstElement(), expCtx);
@@ -163,7 +163,7 @@ boost::intrusive_ptr<DocumentSource> buildSetWindowFieldsStage(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460005,
             "Expected normalization to be minMaxScaler",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
     const std::string score = std::string{kInternalMinMaxScalerNormalizationField};
     SortPattern sortPattern{BSON(score << -1), expCtx};
@@ -191,7 +191,7 @@ boost::intrusive_ptr<DocumentSource> buildSetMetadataStageForMinMaxScalerOutput(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460007,
             "Expected normalization to be minMaxScaler",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
     const std::string dollarScore = "$" + kInternalMinMaxScalerNormalizationField;
     auto scoreExpression = Expression::parseOperand(
@@ -207,7 +207,7 @@ boost::intrusive_ptr<DocumentSource> buildRestoreRootStage(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460003,
             "Expected normalization to be minMaxScaler",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
     return DocumentSourceReplaceRoot::create(expCtx,
                                              ExpressionFieldPath::createPathFromString(
@@ -229,7 +229,7 @@ buildNormalizationCalculationStagesForMinMaxScalerNormalization(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     tassert(9460008,
             "Expected normalization to be minMaxScaler",
-            spec.getNormalizeFunction() == ScoreNormalizeFunctionEnum::kMinMaxScaler);
+            spec.getNormalization() == ScoreNormalizationEnum::kMinMaxScaler);
 
     std::list<boost::intrusive_ptr<DocumentSource>> outputStages;
 
@@ -246,14 +246,14 @@ buildNormalizationCalculationStagesForMinMaxScalerNormalization(
  */
 std::list<boost::intrusive_ptr<DocumentSource>> buildNormalizationCalculationStages(
     const ScoreSpec& spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    switch (spec.getNormalizeFunction()) {
-        case ScoreNormalizeFunctionEnum::kNone: {
+    switch (spec.getNormalization()) {
+        case ScoreNormalizationEnum::kNone: {
             return {};
         }
-        case ScoreNormalizeFunctionEnum::kSigmoid: {
+        case ScoreNormalizationEnum::kSigmoid: {
             return buildNormalizationCalculationStagesForSigmoidNormalization(spec, expCtx);
         }
-        case ScoreNormalizeFunctionEnum::kMinMaxScaler: {
+        case ScoreNormalizationEnum::kMinMaxScaler: {
             return buildNormalizationCalculationStagesForMinMaxScalerNormalization(spec, expCtx);
         }
     }
@@ -299,13 +299,13 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildWeightCalculationStages(
     return outputStages;
 }
 
-std::string getNormalizationString(ScoreNormalizeFunctionEnum normalization) {
+std::string getNormalizationString(ScoreNormalizationEnum normalization) {
     switch (normalization) {
-        case ScoreNormalizeFunctionEnum::kSigmoid:
+        case ScoreNormalizationEnum::kSigmoid:
             return "sigmoid";
-        case ScoreNormalizeFunctionEnum::kMinMaxScaler:
+        case ScoreNormalizationEnum::kMinMaxScaler:
             return "minMaxScaler";
-        case ScoreNormalizeFunctionEnum::kNone:
+        case ScoreNormalizationEnum::kNone:
             return "none";
         default:
             // Only one of the above options can be specified for normalization.
@@ -342,7 +342,7 @@ boost::intrusive_ptr<DocumentSource> setScoreDetailsMetadata(
             BSON("value" << BSON("$meta" << "score") << "description"
                          << scoreScoreDetailsDescription << "rawScore"
                          << spec.getScore().getElement() << "normalization"
-                         << getNormalizationString(spec.getNormalizeFunction()) << "weight"
+                         << getNormalizationString(spec.getNormalization()) << "weight"
                          << spec.getWeight() << "expression"
                          << hybrid_scoring_util::score_details::stringifyExpression(spec.getScore())
                          << "details" << BSONArrayBuilder().arr()),

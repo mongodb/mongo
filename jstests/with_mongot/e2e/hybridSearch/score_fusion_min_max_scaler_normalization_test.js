@@ -42,8 +42,7 @@ function scoreInRange(score, min, max) {
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                bigScore:
-                                    [{$score: {score: "$big_score", normalizeFunction: "none"}}]
+                                bigScore: [{$score: {score: "$big_score", normalization: "none"}}]
                             },
                             normalization: "minMaxScaler"
                         }
@@ -109,8 +108,8 @@ function scoreInRange(score, min, max) {
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                single: [{$score: {score: "$single", normalizeFunction: "none"}}],
-                                double: [{$score: {score: "$double", normalizeFunction: "none"}}]
+                                single: [{$score: {score: "$single", normalization: "none"}}],
+                                double: [{$score: {score: "$double", normalization: "none"}}]
                             },
                             normalization: "minMaxScaler"
                         }

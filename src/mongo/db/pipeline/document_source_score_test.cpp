@@ -94,7 +94,7 @@ TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
     auto spec = fromjson(R"({
          $score: {
              score: "expression",
-             normalizeFunction: "none",
+             normalization: "none",
              weight: 1.0
          }
      })");
@@ -102,11 +102,11 @@ TEST_F(DocumentSourceScoreTest, CheckAllOptionalArgsIncluded) {
     ASSERT_DOES_NOT_THROW(DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
-TEST_F(DocumentSourceScoreTest, CheckOnlyNormalizeFunctionSpecified) {
+TEST_F(DocumentSourceScoreTest, CheckOnlynormalizationSpecified) {
     auto spec = fromjson(R"({
          $score: {
              score: "expression",
-             normalizeFunction: "none"
+             normalization: "none"
          }
      })");
 
@@ -133,11 +133,11 @@ TEST_F(DocumentSourceScoreTest, CheckOnlyWeightSpecified) {
     ASSERT_DOES_NOT_THROW(stage->setSource(mock.get()));
 }
 
-TEST_F(DocumentSourceScoreTest, ErrorsIfWrongNormalizeFunctionType) {
+TEST_F(DocumentSourceScoreTest, ErrorsIfWrongnormalizationType) {
     auto spec = fromjson(R"({
          $score: {
              score: "expression",
-             normalizeFunction: 1.0
+             normalization: 1.0
          }
      })");
 
@@ -163,7 +163,7 @@ TEST_F(DocumentSourceScoreTest, CheckIntScoreMetadataUpdated) {
     auto spec = fromjson(R"({
          $score: {
              score: "$myScore",
-             normalizeFunction: "none",
+             normalization: "none",
              weight: 1.0
          }
      })");
@@ -188,7 +188,7 @@ TEST_F(DocumentSourceScoreTest, CheckDoubleScoreMetadataUpdated) {
     auto spec = fromjson(R"({
          $score: {
              score: "$myScore",
-             normalizeFunction: "none",
+             normalization: "none",
              weight: 1.0
          }
      })");
@@ -213,7 +213,7 @@ TEST_F(DocumentSourceScoreTest, CheckLengthyDocScoreMetadataUpdated) {
     auto spec = fromjson(R"({
           $score: {
               score: "$myScore",
-              normalizeFunction: "none"
+              normalization: "none"
           }
       })");
     Document inputDoc =
@@ -238,7 +238,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreNotDouble) {
     auto spec = fromjson(R"({
           $score: {
               score: "$myScore",
-              normalizeFunction: "none"
+              normalization: "none"
           }
       })");
     Document inputDoc =
@@ -260,7 +260,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfExpressionFieldPathDoesNotExist) {
     auto spec = fromjson(R"({
           $score: {
               score: "$myScore",
-              normalizeFunction: "none"
+              normalization: "none"
           }
       })");
     Document inputDoc = Document{{"field1", "hello"_sd}, {"field2", 10}, {"field3", true}};
@@ -281,7 +281,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsIfScoreInvalidExpression) {
     auto spec = fromjson(R"({
           $score: {
               score: { $ad: ['$myScore', '$otherScore'] },
-              normalizeFunction: "none"
+              normalization: "none"
           }
       })");
     Document inputDoc =
@@ -297,7 +297,7 @@ TEST_F(DocumentSourceScoreTest, ChecksScoreMetadatUpdatedValidExpression) {
     auto spec = fromjson(R"({
           $score: {
               score: { $add: ['$myScore', '$otherScore'] },
-              normalizeFunction: "none"
+              normalization: "none"
           }
       })");
     Document inputDoc =
@@ -322,7 +322,7 @@ TEST_F(DocumentSourceScoreTest, ErrorsNormFuncSigmoidInvalidWeight) {
     auto spec = fromjson(R"({
           $score: {
               score: "$myScore",
-              normalizeFunction: "sigmoid",
+              normalization: "sigmoid",
               weight: -0.5
           }
       })");
@@ -345,11 +345,11 @@ TEST_F(DocumentSourceScoreTest, ErrorsInvalidWeight) {
                        ErrorCodes::BadValue);
 }
 
-TEST_F(DocumentSourceScoreTest, ErrorsInvalidNormalizeFunction) {
+TEST_F(DocumentSourceScoreTest, ErrorsInvalidnormalization) {
     auto spec = fromjson(R"({
           $score: {
               score: "$myScore",
-              normalizeFunction: "Sigmoid",
+              normalization: "Sigmoid",
               weight: 0.5
           }
       })");
@@ -374,7 +374,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionNoNormalizatio
     auto spec = fromjson(R"({
         $score: {
             score: {$multiply: ["$myScore", "$myScore"]},
-            normalizeFunction: "none"
+            normalization: "none"
         }
     })");
 
@@ -399,7 +399,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeNoNormalizationUnweighte
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "none"
+            normalization: "none"
         }
     })");
 
@@ -419,7 +419,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeNoNormalizationWeighted)
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "none",
+            normalization: "none",
             weight: 0.5
         }
     })");
@@ -450,7 +450,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalization) {
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "sigmoid"
+            normalization: "sigmoid"
         }
     })");
 
@@ -494,7 +494,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeSigmoidNormalizationWeig
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "sigmoid",
+            normalization: "sigmoid",
             weight: 0.5
         }
     })");
@@ -549,7 +549,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionSigmoidNormali
     auto spec = fromjson(R"({
         $score: {
             score: {$multiply: ["$myScore", "$myScore"]},
-            normalizeFunction: "sigmoid"
+            normalization: "sigmoid"
         }
     })");
 
@@ -598,7 +598,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "minMaxScaler"
+            normalization: "minMaxScaler"
         }
     })");
 
@@ -655,7 +655,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeMinMaxScalerNormalizatio
     auto spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "minMaxScaler",
+            normalization: "minMaxScaler",
             weight: 0.5
         }
     })");
@@ -723,7 +723,7 @@ TEST_F(DocumentSourceScoreTest, RepresentativeQueryShapeExpressionMinMaxScalerNo
     auto spec = fromjson(R"({
         $score: {
             score: {$multiply: ["$myScore", "$myScore"]},
-            normalizeFunction: "minMaxScaler"
+            normalization: "minMaxScaler"
         }
     })");
 
@@ -802,7 +802,7 @@ void runQueryShapeDebugStringTest(boost::intrusive_ptr<ExpressionContextForTest>
 }
 
 TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringNoNormalization) {
-    BSONObj spec = fromjson("{$score: {score: \"$myScore\", normalizeFunction: \"none\"}}");
+    BSONObj spec = fromjson("{$score: {score: \"$myScore\", normalization: \"none\"}}");
     std::vector<std::string> expectedValues = {
         R"({
             $setMetadata: {
@@ -818,7 +818,7 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringSigmoidNormalizationWeighte
     BSONObj spec = fromjson(R"({
         $score: {
             score: "$myScore",
-            normalizeFunction: "sigmoid",
+            normalization: "sigmoid",
             weight: 0.5
         }
     })");
@@ -872,7 +872,7 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringExpressionMinMaxScalerNorma
     BSONObj spec = fromjson(R"({
         $score: {
             score: {$multiply: ["$myScore", 2]},
-            normalizeFunction: "minMaxScaler",
+            normalization: "minMaxScaler",
             weight: .75
         }
     })");
@@ -943,7 +943,7 @@ TEST_F(DocumentSourceScoreTest, QueryShapeDebugStringExpressionMinMaxScalerNorma
 TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
     {
         BSONObj spec = fromjson(
-            "{$score: {score: \"$myScore\", normalizeFunction: \"none\", scoreDetails: true}}");
+            "{$score: {score: \"$myScore\", normalization: \"none\", scoreDetails: true}}");
         const auto desugaredList =
             DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());
         ASSERT_EQ(desugaredList.size(), 2);
@@ -991,7 +991,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
                     score: {
                         $add: ['$myScore', '$otherScore']
                     },
-                    normalizeFunction: 'sigmoid',
+                    normalization: 'sigmoid',
                     weight: 0.5,
                     scoreDetails: true
                 }
@@ -1094,7 +1094,7 @@ TEST_F(DocumentSourceScoreTest, ScoreDetailsDesugaring) {
     }
     {
         BSONObj spec = fromjson(
-            "{$score: {score: \"$myScore\", normalizeFunction: \"minMaxScaler\", weight: 0.5, "
+            "{$score: {score: \"$myScore\", normalization: \"minMaxScaler\", weight: 0.5, "
             "scoreDetails: true}}");
         const auto desugaredList =
             DocumentSourceScore::createFromBson(spec.firstElement(), getExpCtx());

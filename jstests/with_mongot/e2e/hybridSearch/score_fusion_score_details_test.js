@@ -608,14 +608,14 @@ function checkScoreDetailsNormalizationCombinationMethod(
     const scoreGeoNearMetadata = {
         $score: {
             score: {$meta: "geoNearDistance"},
-            normalizeFunction: "none",
+            normalization: "none",
             scoreDetails: scorePipeline1ScoreDetails
         }
     };
     const scoreAdd = {
         $score: {
             score: {$add: [10, 2]},
-            normalizeFunction: "none",
+            normalization: "none",
             scoreDetails: scorePipeline2ScoreDetails
         }
     };

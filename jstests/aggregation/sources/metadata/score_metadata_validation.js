@@ -23,7 +23,7 @@ assert.commandWorked(
 const kUnavailableMetadataErrCode = 40218;
 
 const scoreStage = {
-    $score: {score: 7, normalizeFunction: "none"}
+    $score: {score: 7, normalization: "none"}
 };
 const metaProjectScoreStage = {
     $project: {myScore: {$meta: "score"}}
@@ -111,7 +111,7 @@ function runPipelineAndCheckExpectedMetaScoreResult(scorePipeline, expectedResul
 (function projectScoreWhenScoreStageIsNotConstant() {
     runPipelineAndCheckExpectedMetaScoreResult(
         [
-            {$score: {score: "$a", normalizeFunction: "none"}},
+            {$score: {score: "$a", normalization: "none"}},
             matchStage,
             skipStage,
             limitStage,

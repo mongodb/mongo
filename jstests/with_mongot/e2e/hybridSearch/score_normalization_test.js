@@ -18,13 +18,12 @@ assert.commandWorked(bulk.execute());
 
 // Test that basic $score with no normalization works.
 (function testBasicScoreWithNoNormalization() {
-    const actualResults =
-        coll.aggregate([
-                {$score: {score: dollar_test_field_name, normalizeFunction: "none"}},
-                {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
-                {$sort: {_id: 1}}
-            ])
-            .toArray();
+    const actualResults = coll.aggregate([
+                                  {$score: {score: dollar_test_field_name, normalization: "none"}},
+                                  {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
+                                  {$sort: {_id: 1}}
+                              ])
+                              .toArray();
 
     const expectedResults = coll.aggregate([
                                     {$project: {_id: 1, counter: 1, score: dollar_test_field_name}},
@@ -39,10 +38,7 @@ assert.commandWorked(bulk.execute());
 (function testExpressionScoreWithNoNormalization() {
     const actualResults =
         coll.aggregate([
-                {
-                    $score:
-                        {score: {$multiply: [dollar_test_field_name, 2]}, normalizeFunction: "none"}
-                },
+                {$score: {score: {$multiply: [dollar_test_field_name, 2]}, normalization: "none"}},
                 {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
                 {$sort: {_id: 1}}
             ])
@@ -62,7 +58,7 @@ assert.commandWorked(bulk.execute());
 (function testWeightedScoreWithNoNormalization() {
     const actualResults =
         coll.aggregate([
-                {$score: {score: dollar_test_field_name, normalizeFunction: "none", weight: 0.5}},
+                {$score: {score: dollar_test_field_name, normalization: "none", weight: 0.5}},
                 {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
                 {$sort: {_id: 1}}
             ])
@@ -87,7 +83,7 @@ assert.commandWorked(bulk.execute());
                 {
                     $score: {
                         score: {$multiply: [dollar_test_field_name, dollar_test_field_name]},
-                        normalizeFunction: "none",
+                        normalization: "none",
                         weight: 0.5
                     }
                 },
@@ -116,7 +112,7 @@ assert.commandWorked(bulk.execute());
 (function testBasicScoreWithSigmoidNormalization() {
     const actualResults =
         coll.aggregate([
-                {$score: {score: dollar_test_field_name, normalizeFunction: "sigmoid"}},
+                {$score: {score: dollar_test_field_name, normalization: "sigmoid"}},
                 {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
                 {$sort: {_id: 1}}
             ])
@@ -134,17 +130,16 @@ assert.commandWorked(bulk.execute());
 
 // Test that an expression $score with sigmoid normalization works.
 (function testExpressionScoreWithSigmoidNormalization() {
-    const actualResults = coll.aggregate([
-                                  {
-                                      $score: {
-                                          score: {$multiply: [dollar_test_field_name, 2]},
-                                          normalizeFunction: "sigmoid"
-                                      }
-                                  },
-                                  {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
-                                  {$sort: {_id: 1}}
-                              ])
-                              .toArray();
+    const actualResults =
+        coll.aggregate([
+                {
+                    $score:
+                        {score: {$multiply: [dollar_test_field_name, 2]}, normalization: "sigmoid"}
+                },
+                {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
+                {$sort: {_id: 1}}
+            ])
+            .toArray();
 
     const expectedResults =
         coll.aggregate([
@@ -166,10 +161,7 @@ assert.commandWorked(bulk.execute());
 (function testWeightedScoreWithSigmoidNormalization() {
     const actualResults =
         coll.aggregate([
-                {
-                    $score:
-                        {score: dollar_test_field_name, normalizeFunction: "sigmoid", weight: 0.3}
-                },
+                {$score: {score: dollar_test_field_name, normalization: "sigmoid", weight: 0.3}},
                 {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
                 {$sort: {_id: 1}}
             ])
@@ -198,7 +190,7 @@ assert.commandWorked(bulk.execute());
                 {
                     $score: {
                         score: {$multiply: [dollar_test_field_name, dollar_test_field_name]},
-                        normalizeFunction: "sigmoid",
+                        normalization: "sigmoid",
                         weight: 0.3
                     }
                 },
@@ -236,7 +228,7 @@ assert.commandWorked(bulk.execute());
 (function testBasicScoreWithMinMaxScalerNormalization() {
     const actualResults =
         coll.aggregate([
-                {$score: {score: dollar_test_field_name, normalizeFunction: "minMaxScaler"}},
+                {$score: {score: dollar_test_field_name, normalization: "minMaxScaler"}},
                 {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
                 {$sort: {_id: 1}}
             ])
@@ -268,7 +260,7 @@ assert.commandWorked(bulk.execute());
                                   {
                                       $score: {
                                           score: {$multiply: [dollar_test_field_name, 2]},
-                                          normalizeFunction: "minMaxScaler"
+                                          normalization: "minMaxScaler"
                                       }
                                   },
                                   {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
@@ -298,18 +290,16 @@ assert.commandWorked(bulk.execute());
 
 // Test that $score with a weight with minMaxScaler normalization works.
 (function testWeightedScoreWithMinMaxScalerNormalization() {
-    const actualResults = coll.aggregate([
-                                  {
-                                      $score: {
-                                          score: dollar_test_field_name,
-                                          normalizeFunction: "minMaxScaler",
-                                          weight: 0.75
-                                      }
-                                  },
-                                  {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
-                                  {$sort: {_id: 1}}
-                              ])
-                              .toArray();
+    const actualResults =
+        coll.aggregate([
+                {
+                    $score:
+                        {score: dollar_test_field_name, normalization: "minMaxScaler", weight: 0.75}
+                },
+                {$project: {_id: 1, counter: 1, score: {$meta: "score"}}},
+                {$sort: {_id: 1}}
+            ])
+            .toArray();
 
     const expectedResults =
         coll.aggregate([
@@ -338,7 +328,7 @@ assert.commandWorked(bulk.execute());
                 {
                     $score: {
                         score: {$multiply: [dollar_test_field_name, dollar_test_field_name]},
-                        normalizeFunction: "minMaxScaler",
+                        normalization: "minMaxScaler",
                         weight: 0.75
                     }
                 },

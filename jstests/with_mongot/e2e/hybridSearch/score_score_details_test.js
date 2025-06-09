@@ -44,7 +44,7 @@ const scoreDetailsDescription =
 function testScoreDetails(normalization, weight, expectedScoreResults) {
     let score = {
         score: {$add: ["$single", "$double"]},
-        normalizeFunction: normalization,
+        normalization: normalization,
         weight: weight,
         scoreDetails: true,
     };
@@ -52,7 +52,7 @@ function testScoreDetails(normalization, weight, expectedScoreResults) {
         weight = 1.0;
         score = {
             score: {$add: ["$single", "$double"]},
-            normalizeFunction: normalization,
+            normalization: normalization,
             scoreDetails: true,
         };
     }

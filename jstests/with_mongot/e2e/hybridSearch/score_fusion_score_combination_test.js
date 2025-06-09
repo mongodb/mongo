@@ -23,8 +23,8 @@ function runPipelineWithLetCommandVars(pipeline, letVars) {
 }
 
 const pipelines = {
-    single: [{$score: {score: "$single", normalizeFunction: "none"}}],
-    double: [{$score: {score: "$double", normalizeFunction: "none"}}]
+    single: [{$score: {score: "$single", normalization: "none"}}],
+    double: [{$score: {score: "$double", normalization: "none"}}]
 };
 
 const coll = db[jsTestName()];
@@ -47,8 +47,8 @@ const coll = db[jsTestName()];
 
 (function testScorePipelinesWithMinMaxScalerNormalization() {
     const pipelines = {
-        single: [{$score: {score: "$single", normalizeFunction: "minMaxScaler"}}],
-        double: [{$score: {score: "$double", normalizeFunction: "none"}}]
+        single: [{$score: {score: "$single", normalization: "minMaxScaler"}}],
+        double: [{$score: {score: "$double", normalization: "none"}}]
     };
 
     const actualResults =
@@ -89,9 +89,8 @@ const coll = db[jsTestName()];
 
 (function testScorePipelinesWithMinMaxScalerNormalizationAndScoreDetails() {
     const pipelines = {
-        single:
-            [{$score: {score: "$single", normalizeFunction: "minMaxScaler", scoreDetails: true}}],
-        double: [{$score: {score: "$double", normalizeFunction: "none", scoreDetails: true}}]
+        single: [{$score: {score: "$single", normalization: "minMaxScaler", scoreDetails: true}}],
+        double: [{$score: {score: "$double", normalization: "none", scoreDetails: true}}]
     };
 
     const actualResults =

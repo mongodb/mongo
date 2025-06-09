@@ -129,8 +129,7 @@ assert.commandFailedWithCode(
         $scoreFusion: {
             input: {
                 pipelines: {
-                    pipeOne:
-                        [{$score: {score: 2, normalizeFunction: "none"}}, {$project: {score3: 1}}]
+                    pipeOne: [{$score: {score: 2, normalization: "none"}}, {$project: {score3: 1}}]
                 },
                 normalization: "none"
             },

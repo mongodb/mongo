@@ -47,9 +47,8 @@ const coll = db[jsTestName()];
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                negativeScore: [{
-                                    $score: {score: "$negative_score", normalizeFunction: "sigmoid"}
-                                }]
+                                negativeScore:
+                                    [{$score: {score: "$negative_score", normalization: "sigmoid"}}]
                             },
                             normalization: "sigmoid"
                         }
@@ -117,8 +116,7 @@ const coll = db[jsTestName()];
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                scoreVal:
-                                    [{$score: {score: "$score_val", normalizeFunction: "none"}}]
+                                scoreVal: [{$score: {score: "$score_val", normalization: "none"}}]
                             },
                             normalization: "sigmoid"
                         }
@@ -180,8 +178,8 @@ const coll = db[jsTestName()];
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                single: [{$score: {score: "$single", normalizeFunction: "none"}}],
-                                double: [{$score: {score: "$double", normalizeFunction: "none"}}]
+                                single: [{$score: {score: "$single", normalization: "none"}}],
+                                double: [{$score: {score: "$double", normalization: "none"}}]
                             },
                             normalization: "sigmoid"
                         }
@@ -258,10 +256,8 @@ const coll = db[jsTestName()];
                     $scoreFusion: {
                         input: {
                             pipelines: {
-                                score50:
-                                    [{$score: {score: "$score_50", normalizeFunction: "sigmoid"}}],
-                                score10:
-                                    [{$score: {score: "$score_10", normalizeFunction: "sigmoid"}}]
+                                score50: [{$score: {score: "$score_50", normalization: "sigmoid"}}],
+                                score10: [{$score: {score: "$score_10", normalization: "sigmoid"}}]
                             },
                             normalization: "sigmoid"
                         }
