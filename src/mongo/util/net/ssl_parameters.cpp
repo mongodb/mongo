@@ -68,12 +68,19 @@ StatusWith<SSLParams::SSLModes> checkTLSModeTransition(T modeToString,
     }
 }
 
+std::once_flag warnForSSLMode;
+
 }  // namespace
 
 void SSLModeServerParameter::append(OperationContext*,
                                     BSONObjBuilder* builder,
                                     StringData fieldName,
                                     const boost::optional<TenantId>&) {
+    std::call_once(warnForSSLMode, [] {
+        LOGV2_WARNING(
+            23803, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
+    });
+
     builder->append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
 }
 
@@ -87,6 +94,11 @@ void TLSModeServerParameter::append(OperationContext*,
 }
 
 Status SSLModeServerParameter::setFromString(StringData strMode, const boost::optional<TenantId>&) {
+    std::call_once(warnForSSLMode, [] {
+        LOGV2_WARNING(
+            23804, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
+    });
+
     auto swNewMode = checkTLSModeTransition(
         SSLParams::sslModeFormat, SSLParams::sslModeParse, "sslMode", strMode);
     if (!swNewMode.isOK()) {

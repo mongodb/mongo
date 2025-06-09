@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/static_immortal.h"
@@ -208,43 +207,48 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
     }
 }
 
-void IDLServerParameterDeprecatedAlias::_warnOnUse(StringData action, OperationContext* opCtx) {
-    std::call_once(_warnOnce, [&] {
-        // Internal processing, including FTDC, sets EnforcingConstraints to false on
-        // OperationContext. Turn off printing log messages for deprecated server parameters when
-        // they accessed by internal processing procedures.
-        if (opCtx && !opCtx->isEnforcingConstraints())
-            return;
-        LOGV2_WARNING(636300,
-                      "Use of deprecated server parameter name",
-                      "deprecatedName"_attr = name(),
-                      "canonicalName"_attr = _sp->name(),
-                      "action"_attr = action);
-    });
-}
-
 void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,
                                                BSONObjBuilder* b,
                                                StringData fieldName,
                                                const boost::optional<TenantId>& tenantId) {
-    _warnOnUse("append", opCtx);
+    std::call_once(_warnOnce, [&] {
+        LOGV2_WARNING(636300,
+                      "Use of deprecated server parameter name",
+                      "deprecatedName"_attr = name(),
+                      "canonicalName"_attr = _sp->name());
+    });
     _sp->append(opCtx, b, fieldName, tenantId);
 }
 
 Status IDLServerParameterDeprecatedAlias::reset(const boost::optional<TenantId>& tenantId) {
-    _warnOnUse("reset");
+    std::call_once(_warnOnce, [&] {
+        LOGV2_WARNING(636301,
+                      "Use of deprecated server parameter name",
+                      "deprecatedName"_attr = name(),
+                      "canonicalName"_attr = _sp->name());
+    });
     return _sp->reset(tenantId);
 }
 
 Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement,
                                               const boost::optional<TenantId>& tenantId) {
-    _warnOnUse("set");
+    std::call_once(_warnOnce, [&] {
+        LOGV2_WARNING(636302,
+                      "Use of deprecated server parameter name",
+                      "deprecatedName"_attr = name(),
+                      "canonicalName"_attr = _sp->name());
+    });
     return _sp->set(newValueElement, tenantId);
 }
 
 Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
                                                         const boost::optional<TenantId>& tenantId) {
-    _warnOnUse("setFromString");
+    std::call_once(_warnOnce, [&] {
+        LOGV2_WARNING(636303,
+                      "Use of deprecated server parameter name",
+                      "deprecatedName"_attr = name(),
+                      "canonicalName"_attr = _sp->name());
+    });
     return _sp->setFromString(str, tenantId);
 }
 

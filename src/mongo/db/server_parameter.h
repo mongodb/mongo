@@ -430,8 +430,6 @@ public:
     Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final;
 
 private:
-    void _warnOnUse(StringData action, OperationContext* opCtx = nullptr);
-
     std::once_flag _warnOnce;
     ServerParameter* _sp;
 };
