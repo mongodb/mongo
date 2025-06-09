@@ -108,16 +108,11 @@ public:
                                      LookupRequirement::kNotAllowed,
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
-        // TODO: SERVER-85426 The constraint should now always be UnionRequirement::kAllowed.
-        // TODO: BACKPORT-22945 (8.0) Ensure that using this feature inside a view definition is not
-        // permitted.
-        if (enableUnionWithVectorSearch.load()) {
-            constraints.unionRequirement = UnionRequirement::kAllowed;
-        }
+        constraints.unionRequirement = UnionRequirement::kAllowed;
         constraints.requiresInputDocSource = false;
         constraints.noFieldModifications = true;
         return constraints;
-    };
+    }
 
 protected:
     Value serialize(const SerializationOptions& opts) const override;
