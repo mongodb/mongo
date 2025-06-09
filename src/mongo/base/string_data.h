@@ -36,6 +36,7 @@
 #include "mongo/util/debug_util.h"
 
 #include <algorithm>
+#include <concepts>
 #include <cstring>
 #include <functional>
 #include <iosfwd>
@@ -50,9 +51,6 @@
 
 namespace mongo {
 
-// Set to 1 if XCode supports `std::string_view` c++20 features.
-#define MONGO_STRING_DATA_CXX20 0
-
 /**
  * A StringData object refers to an array of `char` without owning it.
  * The most common usage is as a function argument.
@@ -65,9 +63,6 @@ namespace mongo {
  *
  * The iterator is not always a raw pointer. On Windows, it is a class,
  * which enables useful integrity checks in debug builds.
- *
- * XCode is basically implementing at the C++17 level. There's no `operator<=>`,
- * no range constructors, and no `contains` member.
  *
  * The string data to which StringData refers must outlive it.
  *
@@ -115,24 +110,19 @@ public:
      */
     constexpr StringData(const char* c, size_type len) : StringData(_checkedView(c, len)) {}
 
-#if MONGO_STRING_DATA_CXX20
     /**
      * Constructs a StringData with iterator range [first, last). `first` points to the beginning of
      * the string. `last` points to the position past the end of the string.
      *
-     * We template the second parameter to ensure if StringData is called with literal 0 in the
-     * second parameter, the (const char*, size_t) constructor is chosen instead.
+     * The constraint on `End` avoids competing with the `(ptr, len)` constructor.
      *
-     * `std::string_view` already does advanced concepts checks on these arguments, so we
-     * use `std::is_constructible` to just accept whatever `std::string_view` accepts.
+     * We accept whatever `std::string_view` accepts, as `std::string_view` already does advanced
+     * concepts checks on these arguments.
      */
-    template <typename It,
-              typename End,
-              std::enable_if_t<std::is_constructible_v<std::string_view, It, End> &&
-                                   !std::is_convertible_v<End, size_type>,
-                               int> = 0>
+    template <typename It, typename End>
+    requires(std::constructible_from<std::string_view, It, End> &&
+             !std::convertible_to<End, size_type>)
     constexpr StringData(It first, End last) : _sv{first, last} {}
-#endif  // MONGO_STRING_DATA_CXX20
 
     explicit operator std::string() const {
         return std::string{_sv};
@@ -287,7 +277,6 @@ public:
         return _sv.ends_with(s);
     }
 
-#if MONGO_STRING_DATA_CXX20
     constexpr bool contains(StringData v) const noexcept {
         return _sv.find(v._sv) != npos;
     }
@@ -297,7 +286,6 @@ public:
     constexpr bool contains(const char* s) const {
         return _sv.find(s) != npos;
     }
-#endif  // MONGO_STRING_DATA_CXX20
 
 /** The "find" family of functions have identical overload sets. */
 #define STRING_DATA_DEFINE_FIND_OVERLOADS_(func, posDefault)                            \
@@ -326,6 +314,9 @@ public:
         return std::string{_sv};
     }
 
+    friend constexpr auto operator<=>(StringData a, StringData b) = default;
+    friend constexpr bool operator==(StringData a, StringData b) = default;
+
     /** absl::Hash ADL hook (behave exactly as std::string_view). */
     template <typename H>
     friend H AbslHashValue(H h, StringData sd) {
@@ -348,31 +339,6 @@ private:
 
 // Adds support for boost::Hash.
 size_t hash_value(StringData sd);
-
-#if MONGO_STRING_DATA_CXX20
-inline constexpr auto operator<=>(StringData a, StringData b) noexcept {
-    return std::string_view{a} <=> std::string_view{b};
-}
-#else   // !MONGO_STRING_DATA_CXX20
-inline constexpr bool operator==(StringData a, StringData b) noexcept {
-    return std::string_view{a} == std::string_view{b};
-}
-inline constexpr bool operator!=(StringData a, StringData b) noexcept {
-    return std::string_view{a} != std::string_view{b};
-}
-inline constexpr bool operator<(StringData a, StringData b) noexcept {
-    return std::string_view{a} < std::string_view{b};
-}
-inline constexpr bool operator>(StringData a, StringData b) noexcept {
-    return std::string_view{a} > std::string_view{b};
-}
-inline constexpr bool operator<=(StringData a, StringData b) noexcept {
-    return std::string_view{a} <= std::string_view{b};
-}
-inline constexpr bool operator>=(StringData a, StringData b) noexcept {
-    return std::string_view{a} >= std::string_view{b};
-}
-#endif  // !MONGO_STRING_DATA_CXX20
 
 std::ostream& operator<<(std::ostream& os, StringData v);
 
