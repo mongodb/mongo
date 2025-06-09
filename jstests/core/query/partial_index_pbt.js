@@ -28,6 +28,7 @@ import {
     getPartialFilterPredicateArb
 } from "jstests/libs/property_test_helpers/models/match_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {partialIndexCounterexamples} from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
 import {
     concreteQueryFromFamily,
     testProperty
@@ -82,5 +83,9 @@ const workloadModel =
     });
 
 // Test with a regular collection.
-testProperty(correctnessProperty, {controlColl, experimentColl}, workloadModel, numRuns);
+testProperty(correctnessProperty,
+             {controlColl, experimentColl},
+             workloadModel,
+             numRuns,
+             partialIndexCounterexamples);
 // TODO SERVER-103381 extend this test to use time-series collections.

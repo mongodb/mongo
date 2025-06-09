@@ -448,6 +448,8 @@ last-continuous:
       ticket: SERVER-102477
     - test_file: jstests/noPassthrough/network/set_step_params.js
       ticket: SERVER-102477
+    - test_file: jstests/core/query/partial_index_pbt.js
+      ticket: SERVER-102825
   suites: null
 last-lts:
   all:
@@ -951,4 +953,6 @@ last-lts:
       ticket: SERVER-102477
     - test_file: jstests/noPassthrough/network/set_step_params.js
       ticket: SERVER-102477
+    - test_file: jstests/core/query/partial_index_pbt.js
+      ticket: SERVER-102825
   suites: null

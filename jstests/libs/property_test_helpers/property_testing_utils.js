@@ -149,7 +149,7 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
     assert.eq(typeof propertyFn, 'function');
     assert(Object.keys(namespaces)
                .every(collName => collName === 'controlColl' || collName === 'experimentColl'));
@@ -182,7 +182,7 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns) {
             alwaysPassed = false;
         }
         return result.passed;
-    }), {seed, numRuns, reporter: reporter(propertyFn, namespaces)});
+    }), {seed, numRuns, reporter: reporter(propertyFn, namespaces), examples});
 }
 
 function isCollTS(collName) {
