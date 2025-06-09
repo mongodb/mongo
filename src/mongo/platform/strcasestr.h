@@ -29,7 +29,7 @@
 
 #pragma once
 
-#if defined(_WIN32) || defined(__sun)
+#if defined(_WIN32)
 
 namespace mongo {
 namespace pal {
