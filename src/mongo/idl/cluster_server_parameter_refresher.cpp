@@ -332,20 +332,22 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
         updatedParameters.reserve(tenantParamDocs.size());
         for (const auto& [name, sp] : clusterParameterCache->getMap()) {
             if (fcvChanged) {
-                // Determine whether the parameter should have been enabled before the FCV change
-                // and whether it should be enabled after the FCV change.
-                auto [enabledBefore, enabledAfter] =
-                    sp->canBeEnabledBeforeAndAfterFCVChange(_lastFcv, fcv);
+                auto parameterState = sp->getState();
 
                 // Execute any change in enabled/disabled status that should result from the FCV
-                // change and then move on to the next parameter if this one is disabled.
-                if (enabledBefore && !enabledAfter) {
+                // change and then move on to the next parameter if this one is disabled. We avoid
+                // using `isEnabledOnVersion()` check (preferring `canBeEnabledOnVersion()`) so that
+                // we can determine the _new_ enabled status of the parameter without it being
+                // affected by the current status.
+                if (sp->canBeEnabledOnVersion(parameterState, _lastFcv) &&
+                    !sp->canBeEnabledOnVersion(parameterState, fcv)) {
                     // Parameter is newly disabled on cluster
                     LOGV2_DEBUG(
                         7410703, 3, "Disabling parameter during refresh", "name"_attr = name);
                     sp->disable(false /* permanent */);
                     continue;
-                } else if (!enabledBefore && enabledAfter) {
+                } else if (!sp->canBeEnabledOnVersion(parameterState, _lastFcv) &&
+                           sp->canBeEnabledOnVersion(parameterState, fcv)) {
                     // Parameter is newly enabled on cluster
                     LOGV2_DEBUG(
                         7410704, 3, "Enabling parameter during refresh", "name"_attr = name);

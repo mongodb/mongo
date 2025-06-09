@@ -117,6 +117,17 @@ template <typename U>
 using TenantIdMap = std::map<boost::optional<TenantId>, U>;
 
 class ServerParameter {
+private:
+    enum class EnableState {
+        enabled,
+
+        // Disabled but may become enabled in the future.
+        disabled,
+
+        // Disabled and can never become enabled or even enter the 'disabled' state.
+        prohibited,
+    };
+
 public:
     using Map = std::map<std::string, std::unique_ptr<ServerParameter>, std::less<>>;
 
@@ -164,7 +175,7 @@ public:
 
     virtual void appendDetails(OperationContext* opCtx,
                                BSONObjBuilder* detailsBuilder,
-                               const boost::optional<TenantId>& tenantId) {};
+                               const boost::optional<TenantId>& tenantId) {}
 
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
                                            BSONObjBuilder* b,
@@ -182,8 +193,10 @@ public:
         return validate(BSON("" << newValueObj).firstElement(), tenantId);
     }
 
-    // This base implementation calls `setFromString(coerceToString(newValueElement))`.
-    // Derived classes may customize the behavior by specifying `override_set` in IDL.
+    /**
+     * This base implementation calls `setFromString(coerceToString(newValueElement))`.
+     * Derived classes may customize the behavior by specifying `override_set` in IDL.
+     */
     virtual Status set(const BSONElement& newValueElement,
                        const boost::optional<TenantId>& tenantId);
 
@@ -236,97 +249,124 @@ public:
     }
 
     bool isTestOnly() const {
-        stdx::lock_guard lk(_mutex);
         return _testOnly;
     }
 
+    /**
+     * Mark this parameter as "test only." For thread safety, this method should only be called as
+     * part of a `ServerParameter`'s initialization.
+     */
     void setTestOnly() {
-        stdx::lock_guard lk(_mutex);
         _testOnly = true;
     }
 
     bool isRedact() const {
-        stdx::lock_guard lk(_mutex);
         return _redact;
     }
 
+    /**
+     * Mark this parameter as "redacted" for the purposes of logging. For thread safety, this method
+     * should only be called as part of a `ServerParameter`'s initialization.
+     */
     void setRedact() {
-        stdx::lock_guard lk(_mutex);
         _redact = true;
     }
 
-    bool isOmittedInFTDC() {
-        stdx::lock_guard lk(_mutex);
+    bool isOmittedInFTDC() const {
         return _isOmittedInFTDC;
     }
 
+    /**
+     * Mark this parameter as one that should not be recorded in FTDC. For thread safety, this
+     * method should only be called as part of a `ServerParameter`'s initialization.
+     */
     void setOmitInFTDC() {
-        stdx::lock_guard lk(_mutex);
         _isOmittedInFTDC = true;
     }
 
-private:
-    enum DisableState { Enabled = 0, TemporarilyDisabled = 1, PermanentlyDisabled = 2 };
+    void disable(bool permanent);
 
-public:
-    void disable(bool permanent) {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState != DisableState::PermanentlyDisabled) {
-            _disableState =
-                permanent ? DisableState::PermanentlyDisabled : DisableState::TemporarilyDisabled;
-        }
+    /**
+     * Enables the parameter unless it has been permanently disabled. Returns whether the
+     * parameter is enabled after the operation completes.
+     */
+    bool enable();
+
+    bool isEnabled() const {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        return isEnabledOnVersion(
+            fcvSnapshot.isVersionInitialized()
+                ? fcvSnapshot.getVersion()
+                : multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
     }
 
     /**
-     * Enables the parameter unless it has been permanently disabled. Returns whether the parameter
-     * is enabled after the operation completes.
+     * Returns whether this server parameter would be enabled with the given FCV.
      */
-    bool enable() {
-        stdx::lock_guard lk(_mutex);
-        if (_disableState == DisableState::PermanentlyDisabled) {
-            return false;
-        }
-
-        _disableState = DisableState::Enabled;
-        return true;
+    bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+        return isEnabledOnVersion(_state.load(), targetFCV);
     }
 
-    bool isEnabled() const;
-
-    // Return whether this server parameter would be enabled with the given FCV
-    bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+    /**
+     * This overload of `isEnabledOnVersion()` does not read any `ServerParameter` state that can be
+     * modified by another thread but instead reads its state from the caller-provided `state`
+     * snapshot. The snapshotted state allows the caller to make multiple calls without the risk of
+     * inconsistent results caused by concurrent calls to the `disable()` or `enable()` methods.
+     *
+     * Use the `getState()` method to obtain the snapshot.
+     */
+    bool isEnabledOnVersion(EnableState state,
+                            const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+        return state == EnableState::enabled && _meetsFCVAndFlagRequirements(targetFCV);
+    }
 
     /**
-     * Returns a pair of
-     *   1) whether the flag is enabled with the `beforeFCV` value and
-     *   2) whether the flag should be enabled after an upgrade/downgrade to `afterFCV` is done.
+     * Returns whether this server parameter is compatible with the given FCV, regardless of if
+     * it is temporarily disabled.
      */
-    std::pair<bool, bool> isEnabledBeforeAndAfterFCVChange(
-        const multiversion::FeatureCompatibilityVersion& before,
-        const multiversion::FeatureCompatibilityVersion& after) const;
+    bool canBeEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+        return canBeEnabledOnVersion(_state.load(), targetFCV);
+    }
 
     /**
-     * Returns a pair of
-     *   1) whether the flag would have been enabled with the `beforeFCV` value and
-     *   2) whether the flag could have remained enabled after a previous upgrade/downgrade to
-     *      `afterFCV` finished.
+     * This overload of `canBeEnabledOnVersion()` does not read any `ServerParameter` state that can
+     * be modified by another thread but instead reads its state from the caller-provided `state`
+     * snapshot. The snapshotted state allows the caller to make multiple calls without the risk of
+     * inconsistent results caused by concurrent calls to the `disable()` or `enable()` methods.
+     *
+     * Use the `getState()` method to obtain the snapshot.
      */
-    std::pair<bool, bool> canBeEnabledBeforeAndAfterFCVChange(
-        const multiversion::FeatureCompatibilityVersion& before,
-        const multiversion::FeatureCompatibilityVersion& after) const;
+    bool canBeEnabledOnVersion(EnableState state,
+                               const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+        return state != EnableState::prohibited && _meetsFCVAndFlagRequirements(targetFCV);
+    }
 
+    /**
+     * Mark this parameter as dependent on `featureFlag`, making it only enabled when `featureFlag`
+     * is enabled. For thread safety, this method should only be called as part of a
+     * `ServerParameter`'s initialization.
+     */
     void setFeatureFlag(ParameterGatingFeatureFlag* featureFlag) {
-        stdx::lock_guard lk(_mutex);
         _featureFlag = featureFlag;
     }
 
+    /**
+     * Set a minimum Feature Compatibility Version (FCV) requirement for this parameter to be
+     * enabled. For thread safety, this method should only be called as part of a
+     * `ServerParameter`'s initialization.
+     */
     void setMinFCV(const multiversion::FeatureCompatibilityVersion& minFCV) {
-        stdx::lock_guard lk(_mutex);
         _minFCV = minFCV;
     }
 
-    // Called during process initialization before the ServerParameter gets registered with the
-    // global ServerParameterSet singleton.
+    EnableState getState() const {
+        return _state.load();
+    }
+
+    /**
+     * Called during process initialization before the ServerParameter gets registered with the
+     * global ServerParameterSet singleton.
+     */
     virtual void onRegistrationWithProcessGlobalParameterList() {}
 
 protected:
@@ -336,26 +376,27 @@ protected:
 private:
     /**
      * Returns true unless there is a minimum FCV requirement that is not met by the `targetFCV`
-     * value or a feature flag condition on a flag that is disabled for the 'targetFCV' value.
+     * value or a feature flag condition on a flag that is disabled for the `targetFCV` value.
      */
-    bool _meetsFCVAndFlagRequirements_inLock(
-        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+    bool _meetsFCVAndFlagRequirements(
+        const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+        return (!_minFCV || targetFCV >= *_minFCV) &&
+            (!_featureFlag || _featureFlag->isServerParameterEnabled(targetFCV));
+    }
 
     std::string _name;
     ServerParameterType _type;
-
-    mutable stdx::mutex _mutex;
 
     bool _testOnly = false;
     bool _redact = false;
     bool _isOmittedInFTDC = false;
     ParameterGatingFeatureFlag* _featureFlag = nullptr;
-    boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV = boost::none;
+    boost::optional<multiversion::FeatureCompatibilityVersion> _minFCV;
 
     // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is
     // used when disabling (permanently) test-only parameters, and when enabling/disabling
     // (temporarily) cluster parameters on the mongos based on the cluster's FCV.
-    DisableState _disableState = DisableState::Enabled;
+    Atomic<EnableState> _state = EnableState::enabled;
 };
 
 class ServerParameterSet {

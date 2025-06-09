@@ -56,9 +56,6 @@ ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
 ServerParameter::ServerParameter(const ServerParameter& other) {
-    // Since there is a mutex stored as a member variable, we need to explicitly write a copy
-    // constructor because a mutex has it's default copy constructor deleted.
-    stdx::lock_guard lk(other._mutex);
     this->_name = other._name;
     this->_type = other._type;
     this->_testOnly = other._testOnly;
@@ -66,7 +63,7 @@ ServerParameter::ServerParameter(const ServerParameter& other) {
     this->_isOmittedInFTDC = other._isOmittedInFTDC;
     this->_featureFlag = other._featureFlag;
     this->_minFCV = other._minFCV;
-    this->_disableState = other._disableState;
+    this->_state.store(other._state.load());
 }
 
 Status ServerParameter::set(const BSONElement& newValueElement,
@@ -97,46 +94,24 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
     return &*obj;
 }
 
-bool ServerParameter::isEnabled() const {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return isEnabledOnVersion(
-        fcvSnapshot.isVersionInitialized()
-            ? fcvSnapshot.getVersion()
-            : multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
+void ServerParameter::disable(bool permanent) {
+    if (permanent) {
+        _state.store(EnableState::prohibited);
+    } else {
+        // This operation only has an effect when the parameter is enabled.
+        auto expected = EnableState::enabled;
+        _state.compareAndSwap(&expected, EnableState::disabled);
+    }
 }
 
-bool ServerParameter::isEnabledOnVersion(
-    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    stdx::lock_guard lk(_mutex);
-    if (_disableState != DisableState::Enabled) {
-        return false;
-    }
-
-    return _meetsFCVAndFlagRequirements_inLock(targetFCV);
-}
-
-std::pair<bool, bool> ServerParameter::isEnabledBeforeAndAfterFCVChange(
-    const multiversion::FeatureCompatibilityVersion& before,
-    const multiversion::FeatureCompatibilityVersion& after) const {
-    stdx::lock_guard lk(_mutex);
-    if (_disableState != DisableState::Enabled) {
-        return {false, false};
-    }
-
-    return {_meetsFCVAndFlagRequirements_inLock(before),
-            _meetsFCVAndFlagRequirements_inLock(after)};
-}
-
-std::pair<bool, bool> ServerParameter::canBeEnabledBeforeAndAfterFCVChange(
-    const multiversion::FeatureCompatibilityVersion& before,
-    const multiversion::FeatureCompatibilityVersion& after) const {
-    stdx::lock_guard lk(_mutex);
-    if (_disableState == DisableState::PermanentlyDisabled) {
-        return {false, false};
-    }
-
-    return {_meetsFCVAndFlagRequirements_inLock(before),
-            _meetsFCVAndFlagRequirements_inLock(after)};
+bool ServerParameter::enable() {
+    // This 'compareAndSwap` operation will not modify the parameter's state when it is either
+    // enabled already or disabled permanently.  Instead, the state gets loaded into the 'expected'
+    // variable, so we can use it to return to the caller whether or not the parameter is now
+    // enabled.
+    auto expected = EnableState::disabled;
+    return _state.compareAndSwap(&expected, EnableState::enabled) ||
+        expected == EnableState::enabled;
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {
@@ -178,7 +153,7 @@ StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& elem
             return dateToISOStringLocal(element.Date());
         default:
             std::string diag;
-            if (isRedact()) {
+            if (_redact) {
                 diag = "###";
             } else {
                 diag = element.toString();
@@ -191,12 +166,6 @@ StatusWith<std::string> ServerParameter::_coerceToString(const BSONElement& elem
 
 void ServerParameterSet::remove(const std::string& name) {
     invariant(1 == _map.erase(name), fmt::format("Failed to erase key \"{}\"", name));
-}
-
-bool ServerParameter::_meetsFCVAndFlagRequirements_inLock(
-    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
-    return (!_minFCV || targetFCV >= *_minFCV) &&
-        (!_featureFlag || _featureFlag->isServerParameterEnabled(targetFCV));
 }
 
 IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData name,

@@ -1265,9 +1265,9 @@ private:
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
         std::vector<write_ops::DeleteOpEntry> deletes;
         for (const auto& [name, sp] : clusterParameters->getMap()) {
-            auto [enabledBefore, enabledAfter] =
-                sp->isEnabledBeforeAndAfterFCVChange(originalVersion, requestedVersion);
-            if (enabledBefore && !enabledAfter) {
+            auto parameterState = sp->getState();
+            if (sp->isEnabledOnVersion(parameterState, originalVersion) &&
+                !sp->isEnabledOnVersion(parameterState, requestedVersion)) {
                 deletes.emplace_back(
                     write_ops::DeleteOpEntry(BSON("_id" << name), false /*multi*/));
             }
