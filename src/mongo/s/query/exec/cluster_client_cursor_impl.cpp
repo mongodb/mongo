@@ -160,12 +160,7 @@ Status ClusterClientCursorImpl::releaseMemory() {
     if (!interruptStatus.isOK()) {
         return interruptStatus;
     }
-
-    auto res = _root->releaseMemory();
-    if (res.isOK()) {
-        ++_numReturnedSoFar;
-    }
-    return res;
+    return _root->releaseMemory();
 }
 
 void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
