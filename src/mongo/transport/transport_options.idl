@@ -82,47 +82,52 @@ server_parameters:
     redact: false
 
   ingressConnectionEstablishmentRateLimiterBypass:
-      description: "A list of CIDRs to be exempted from the ingress connection establishment rate limit"
-      set_at: [startup, runtime]
-      cpp_class:
-          name: "MaxEstablishingConnectionsOverrideServerParameter"
-          # Expects the payload to be an instance of `ConnectionListParameters`.
-          override_set: true
-      redact: false
+    description: "A list of CIDRs to be exempted from the ingress connection establishment rate limit"
+    set_at: [startup, runtime]
+    cpp_class:
+        name: "MaxEstablishingConnectionsOverrideServerParameter"
+        # Expects the payload to be an instance of `ConnectionListParameters`.
+        override_set: true
+    redact: false
+
   ingressConnectionEstablishmentRateLimiterEnabled:
-      description: "Whether the ingress connection establishment rate limiter is enabled or not"
-      set_at: [startup, runtime]
-      cpp_varname: gIngressConnectionEstablishmentRateLimiterEnabled
-      cpp_vartype: Atomic<bool>
-      default: false
-      redact: false
+    description: "Whether the ingress connection establishment rate limiter is enabled or not"
+    set_at: [startup, runtime]
+    cpp_varname: gIngressConnectionEstablishmentRateLimiterEnabled
+    cpp_vartype: Atomic<bool>
+    default: false
+    redact: false
+
   ingressConnectionEstablishmentRatePerSec:
-      description: "The number of new ingress connections that will be allowed to establish per second"
-      set_at: [startup, runtime]
-      cpp_varname: gIngressConnectionEstablishmentRatePerSec
-      cpp_vartype: Atomic<int32_t>
-      on_update: transport::onUpdateEstablishmentRefreshRate
-      default:
-          expr: std::numeric_limits<int>::max()
-      validator: {gte: 1}
-      redact: false
-  ingressConnectionEstablishmentBurstSize:
-      description: >-
-          The maximum number of ingress connection establishments that will be admitted before rate-limiting 
-          kicks in (ie, the burst size of the bucket)
-      set_at: [startup, runtime]
-      cpp_varname: gIngressConnectionEstablishmentBurstSize
-      cpp_vartype: Atomic<int32_t>
-      on_update: transport::onUpdateEstablishmentBurstSize
-      default:
-          expr: std::numeric_limits<int>::max()
-      validator: {gte: 1}
-      redact: false
+    description: "The number of new ingress connections that will be allowed to establish per second"
+    set_at: [startup, runtime]
+    cpp_varname: gIngressConnectionEstablishmentRatePerSec
+    cpp_vartype: Atomic<int32_t>
+    on_update: transport::onUpdateEstablishmentRefreshRate
+    default:
+        expr: std::numeric_limits<int>::max()
+    validator: {gte: 1}
+    redact: false
+
+  ingressConnectionEstablishmentBurstCapacitySecs:
+    description: >-
+        Describes how many seconds worth of unutilized rate limit can be stored away for use 
+        to admit additional connection establishment requests during periods where the rate 
+        limit is temporarily exceeded.
+    set_at: [startup, runtime]
+    cpp_varname: gIngressConnectionEstablishmentBurstCapacitySecs
+    cpp_vartype: Atomic<double>
+    on_update: transport::onUpdateEstablishmentBurstCapacitySecs
+    default:
+        expr: std::numeric_limits<double>::max()
+    validator: {gt: 0}
+    redact: false
+
   ingressConnectionEstablishmentMaxQueueDepth:
     description: >-
         The maximum size of the connection establishment queue, after which the server will begin 
-        rejecting new connections. A queue size of 0 indicates that connections will be rejected if 
-        they cannot immediately be admitted.
+        rejecting new ingress connections. A queue size of 0 indicates that connections will be 
+        rejected if they cannot immediately be admitted.
     set_at: [startup, runtime]
     cpp_varname: gIngressConnectionEstablishmentMaxQueueDepth
     cpp_vartype: Atomic<int32_t>

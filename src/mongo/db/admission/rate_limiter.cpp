@@ -162,20 +162,14 @@ void RateLimiter::recordExemption() {
     _impl->stats.exemptedAdmissions.incrementRelaxed();
 }
 
-void RateLimiter::setRefreshRatePerSec(double refreshRatePerSec) {
-    auto lk = _impl->rwMutex.writeLock();
-    _impl->tokenBucket.reset(refreshRatePerSec, _impl->tokenBucket.burst());
-}
-
-void RateLimiter::setBurstSize(double burstSize) {
+void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstSize) {
     uassert(ErrorCodes::InvalidOptions,
             fmt::format("burstSize cannot be less than 1.0. burstSize={}; rateLimiterName={}",
                         burstSize,
                         _impl->name),
             burstSize >= 1.0);
-
     auto lk = _impl->rwMutex.writeLock();
-    _impl->tokenBucket.reset(_impl->tokenBucket.rate(), burstSize);
+    _impl->tokenBucket.reset(refreshRatePerSec, burstSize);
 }
 
 void RateLimiter::setMaxQueueDepth(int64_t maxQueueDepth) {

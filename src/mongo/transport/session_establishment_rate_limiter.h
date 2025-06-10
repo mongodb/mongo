@@ -49,7 +49,7 @@ namespace mongo::transport {
  * parameters:
  *
  * - ingressConnectionEstablishmentRatePerSec
- * - ingressConnectionEstablishmentBurstSize
+ * - ingressConnectionEstablishmentBurstCapacitySecs
  * - ingressConnectionEstablishmentMaxQueueDepth
  *
  * SessionEstablishmentRateLimiter is used in SessionWorkflow if the following feature flag
@@ -95,12 +95,8 @@ public:
 
     // Configuration Options
 
-    void setRefreshRatePerSec(double refreshRatePerSec) {
-        _rateLimiter.setRefreshRatePerSec(refreshRatePerSec);
-    }
-
-    void setBurstSize(double burstSize) {
-        _rateLimiter.setBurstSize(burstSize);
+    void updateRateParameters(double refreshRatePerSec, double burstSize) {
+        _rateLimiter.updateRateParameters(refreshRatePerSec, burstSize);
     }
 
     void setMaxQueueDepth(int64_t maxQueueDepth) {
