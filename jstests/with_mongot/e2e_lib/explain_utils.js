@@ -2,6 +2,7 @@
  * Utility functions for explain() results of search + non-search queries.
  */
 
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     getAggPlanStages,
     getLookupStage,
@@ -288,4 +289,41 @@ export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, li
             isE2E: true
         });
     }
+}
+
+/**
+ * This function checks that the explain output for two queries contains the same stages, regardless
+ * of whether the test is sharded and ignoring irrelevant fields like 'optimizationTimeMillis'.
+ * @param {Object} realExplainOutput The results from running explain() on the feature being tested,
+ *     e.g. $rankFusion.
+ * @param {string} expectedExplainOutput The results from running explain() on the baseline query,
+ *     e.g. the verbose version of a ranked fusion query.
+ */
+export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOutput) {
+    let realExplainOutputStages, expectedExplainStages;
+    if (realExplainOutput.hasOwnProperty("splitPipeline")) {
+        if (realExplainOutput["splitPipeline"] != null) {
+            // Case for sharded collection.
+            realExplainOutputStages = realExplainOutput["splitPipeline"]["shardsPart"].concat(
+                realExplainOutput["splitPipeline"]["mergerPart"]);
+            expectedExplainStages = expectedExplainOutput["splitPipeline"]["shardsPart"].concat(
+                expectedExplainOutput["splitPipeline"]["mergerPart"]);
+        } else {
+            // Case for single shard.
+            const firstShard = Object.keys(realExplainOutput["shards"])[0];
+            realExplainOutputStages = realExplainOutput["shards"][firstShard]["stages"];
+            expectedExplainStages = expectedExplainOutput["shards"][firstShard]["stages"];
+        }
+    } else {
+        realExplainOutputStages = realExplainOutput["stages"];
+        expectedExplainStages = expectedExplainOutput["stages"];
+    }
+
+    assert(arrayEq(realExplainOutputStages,
+                   expectedExplainStages,
+                   true /* verbose */,
+                   null /* valueComparator */,
+                   ['optimizationTimeMillis'] /* fieldsToSkip */),
+           "Explains did not match in 'stages'. Expected:\n" + tojson(realExplainOutput) +
+               "\nView:\n" + tojson(expectedExplainOutput));
 }

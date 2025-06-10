@@ -64,12 +64,16 @@ public:
      * May throw a AssertionException if there is an invalid stage specification, although full
      * validation happens later, during Pipeline construction.
      */
-    LiteParsedPipeline(const AggregateCommandRequest& request)
-        : LiteParsedPipeline(request.getNamespace(), request.getPipeline()) {}
+    LiteParsedPipeline(const AggregateCommandRequest& request,
+                       const bool isRunningAgainstViewForRankFusion = false)
+        : LiteParsedPipeline(
+              request.getNamespace(), request.getPipeline(), isRunningAgainstViewForRankFusion) {}
 
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
-                       const LiteParserOptions& options = LiteParserOptions{}) {
+                       const bool isRunningAgainstViewForRankFusion = false,
+                       const LiteParserOptions& options = LiteParserOptions{})
+        : _isRunningAgainstViewForRankFusion(isRunningAgainstViewForRankFusion) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
             _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
@@ -161,10 +165,21 @@ public:
     }
 
     /**
-     * Returns true iff the pipeline begins with a $rankFusion stage.
+     * Returns true iff the pipeline has a $rankFusion stage.
      */
-    bool startsWithRankFusionStage() const {
-        return !_stageSpecs.empty() && _stageSpecs.front()->isRankFusionStage();
+    bool hasRankFusionStage() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->isRankFusionStage();
+        });
+    }
+    /**
+     * Returns true if the pipeline has a $rankFusion stage with a mongot input pipeline.
+     * TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
+     */
+    bool hasRankFusionStageWithMongotInputPipelines() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return (spec->isRankFusionStage() && spec->hasMongotInputPipeline());
+        });
     }
 
     /**
@@ -262,10 +277,20 @@ public:
      */
     void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
+    // TODO SERVER-101722: Remove this once the validation is changed.
+    bool isRunningAgainstViewForRankFusion() const {
+        return _isRunningAgainstViewForRankFusion;
+    }
+
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
+
+    // This variable specifies whether the pipeline is running on a view's namespace. This is
+    // currently needed for $rankFusion positional validation.
+    // TODO SERVER-101722: Remove this once the validation is changed.
+    bool _isRunningAgainstViewForRankFusion = false;
 
     Deferred<bool (*)(const decltype(_stageSpecs)&)> _hasChangeStream{[](const auto& stageSpecs) {
         return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {

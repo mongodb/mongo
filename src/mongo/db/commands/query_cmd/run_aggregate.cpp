@@ -871,6 +871,27 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // if none is found, will then check for the view using the expCtx. As such, it's necessary to
     // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
     if (aggExState.isView()) {
+        expCtx->addResolvedNamespace(aggExState.getOriginalNss(),
+                                     ResolvedNamespace(aggExState.getResolvedView().getNamespace(),
+                                                       aggExState.getResolvedView().getPipeline(),
+                                                       aggCatalogState.getUUID(),
+                                                       true /*involvedNamespaceIsAView*/));
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion is currently unsupported on views",
+                (!aggExState.isRankFusionPipeline() ||
+                 feature_flags::gFeatureFlagSearchHybridScoringFull
+                     .isEnabledUseLatestFCVWhenUninitialized(
+                         VersionContext::getDecoration(expCtx->getOperationContext()),
+                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())));
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion is unsupported on timeseries collections",
+                !(aggExState.isRankFusionPipeline() && aggExState.isTimeseries()));
+        // TODO SERVER-105862: Remove this uassert.
+        uassert(
+            ErrorCodes::OptionNotSupportedOnView,
+            "$rankFusion is unsupported on a view with $geoNear",
+            !(aggExState.isRankFusionPipeline() &&
+              aggExState.getResolvedView().getPipeline()[0][DocumentSourceGeoNear::kStageName]));
         search_helpers::checkAndSetViewOnExpCtx(expCtx,
                                                 aggExState.getOriginalRequest().getPipeline(),
                                                 aggExState.getResolvedView(),
@@ -1103,11 +1124,6 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
         bool shouldViewBeExpanded =
             !aggExState.startsWithCollStats() || view.getViewDefinition().timeseries();
         if (shouldViewBeExpanded) {
-            // TODO SERVER-101661 Enable $rankFusion run on views.
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "$rankFusion is currently unsupported on views",
-                    !aggExState.isRankFusionStage());
-
             // "Convert" aggExState into resolvedViewAggExState. Note that this will make the
             // initial aggExState object unusable.
             auto resolvedViewAggExState =

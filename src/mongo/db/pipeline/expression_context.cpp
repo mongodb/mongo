@@ -368,6 +368,11 @@ ExpressionContextBuilder& ExpressionContextBuilder::view(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::originalNs(NamespaceString originalNs) {
+    params.originalNs = std::move(originalNs);
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::withReplicationResolvedNamespaces() {
     ResolvedNamespaceMap resolvedNamespaces;
 
@@ -563,6 +568,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
     return ExpressionContextBuilder{}
         .opCtx(opCtx)
         .ns(nss)
+        .originalNs(nss)
         .letParameters(std::move(shapifiedLet))
         .blankExpressionContext(true)
         .build();
@@ -608,7 +614,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             .ifrContext(_params.ifrContext)
             .collator(std::move(collator))
             .mongoProcessInterface(_params.mongoProcessInterface)
-            .ns(std::move(ns))
+            .ns(ns)
             .resolvedNamespace(_params.resolvedNamespaces)
             .mayDbProfile(_params.mayDbProfile)
             .fromRouter(_params.fromRouter)
@@ -633,6 +639,11 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
             .initialPostBatchResumeToken(_params.initialPostBatchResumeToken.getOwned())
             .view(view)
             .requiresTimeseriesExtendedRangeSupport(_params.requiresTimeseriesExtendedRangeSupport)
+            // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we
+            // want to pass the namespace of the spec (aka the executionNs) to avoid running against
+            // an incorrect namespace, e.g.
+            // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
+            .originalNs(std::move(ns))
             .build();
 
     if (_collator.getIgnore()) {

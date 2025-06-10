@@ -74,6 +74,7 @@ public:
         : ExpressionContext(ExpressionContextParams{
               .vCtx = VersionContext(fcv),
               .ns = nss,
+              .originalNs = nss,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0))}) {
         // If there is an existing global ServiceContext, adopt it. Otherwise, create a new context.
         // Similarly, we create a new OperationContext or adopt an existing context as appropriate.
@@ -119,6 +120,7 @@ public:
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
               .ns = nss,
+              .originalNs = nss,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0))}),
           _serviceContext(opCtx->getServiceContext()) {
         // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
@@ -140,6 +142,7 @@ public:
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
               .ns = nss,
+              .originalNs = nss,
               .serializationContext = sc,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
           }),
@@ -161,6 +164,7 @@ public:
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
               .ns = request.getNamespace(),
+              .originalNs = request.getNamespace(),
               .serializationContext = request.getSerializationContext(),
               .runtimeConstants = request.getLegacyRuntimeConstants(),
               .letParameters = request.getLet(),
@@ -196,6 +200,7 @@ public:
               .vCtx = VersionContext(fcv),
               .collator = std::move(collator),
               .ns = nss,
+              .originalNs = nss,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
               .letParameters = letParameters}),
           _serviceContext(opCtx->getServiceContext()) {

@@ -355,12 +355,23 @@ commands:
                 description: "Determines whether or not to include query stats metrics in the response."
                 type: optionalBool
                 stability: internal
-            # TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
+            # TODO SERVER-104725 Figure out if this can be generalized to hybrid search or removed
+            # entirely.
             $_isRankFusion:
                 description: >-
                     Internal usage only. If present, indicates that the pipeline is the 
-                    desugared representation of a user's $rankFusion pipeline. This is necessary 
-                    for guarding that $rankFusion is not yet allowed to be run over views.
+                    desugared representation of a user's $rankFusion pipeline.
                 cpp_name: isRankFusion
+                type: optionalBool
+                stability: internal
+            # TODO SERVER-103504 Remove this internal flag once $rankFusion works on views with
+            # mongot input pipelines.
+            $_isRankFusionWithMongotInputPipelines:
+                description: >-
+                    Internal usage only. If present, indicates that the pipeline is the 
+                    desugared representation of a user's $rankFusion pipeline that used mongot input
+                    pipelines. This is necessary for guarding that this type of query is not yet
+                    allowed to be run over views.
+                cpp_name: isRankFusionWithMongotInputPipelines
                 type: optionalBool
                 stability: internal

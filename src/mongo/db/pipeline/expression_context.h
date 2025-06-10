@@ -337,6 +337,11 @@ public:
         return it->second;
     }
 
+    bool hasResolvedNamespace(const NamespaceString& nss) const {
+        auto it = _params.resolvedNamespaces.find(nss);
+        return it != _params.resolvedNamespaces.end();
+    }
+
     /**
      * Returns true if there are no namespaces in the query other than the namespace the query was
      * issued against. eg if there is no $out, $lookup ect. If namespaces have not yet been resolved
@@ -578,7 +583,7 @@ public:
     }
 
     const NamespaceString& getUserNss() const {
-        return _params.view ? _params.view->first : getNamespaceString();
+        return _params.originalNs;
     }
 
     void setNamespaceString(NamespaceString ns) {
@@ -991,10 +996,14 @@ public:
         return _params.isMapReduceCommand;
     }
 
+    // TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if it can be
+    // deleted.
     void setIsRankFusion() {
         _params.isRankFusion = true;
     }
 
+    // TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if it can be
+    // deleted.
     bool isRankFusion() const {
         return _params.isRankFusion;
     }
@@ -1020,6 +1029,7 @@ protected:
         // libraries from having large numbers of dependencies. This pointer is always non-null.
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface = nullptr;
         NamespaceString ns;
+        NamespaceString originalNs;
         // A map from the user namespace to the resolved namespace (underlying nss and resolved view
         // pipeline), in case any views are involved. This map is only for *secondary* namespaces.
         // See `view` below for information on the resolved *primary* namespace.
@@ -1130,9 +1140,7 @@ protected:
         bool allowGenericForeignDbLookup = false;
 
         // Indicates that the pipeline is a desugared representation of a user's $rankFusion
-        // pipeline. This is necessary for guarding that $rankFusion is not yet allowed to be run
-        // over views.
-        // TODO SERVER-101661 Remove this internal flag once $rankFusion works on views.
+        // pipeline.
         bool isRankFusion = false;
 
         bool requiresTimeseriesExtendedRangeSupport = false;
@@ -1351,6 +1359,7 @@ public:
     ExpressionContextBuilder& tailableMode(TailableModeEnum);
     ExpressionContextBuilder& view(
         boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
+    ExpressionContextBuilder& originalNs(NamespaceString);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace

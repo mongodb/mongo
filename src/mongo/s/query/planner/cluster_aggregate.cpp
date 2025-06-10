@@ -47,6 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
@@ -176,6 +177,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const AggregateCommandRequest& request,
     const boost::optional<CollectionRoutingInfo>& cri,
     const NamespaceString& executionNs,
+    const NamespaceString& requestNs,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     ResolvedNamespaceMap resolvedNamespaces,
@@ -199,6 +201,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                         .mongoProcessInterface(std::make_shared<MongosProcessInterface>(
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()))
                         .resolvedNamespace(std::move(resolvedNamespaces))
+                        .originalNs(requestNs)
                         .mayDbProfile(true)
                         .inRouter(true)
                         .collUUID(uuid)
@@ -423,6 +426,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               request,
                               cri,
                               nsStruct.executionNss,
+                              nsStruct.requestedNss,
                               collationObj,
                               boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
@@ -438,6 +442,29 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
         // Pipeline::parse().
         search_helpers::checkAndSetViewOnExpCtx(
             expCtx, request.getPipeline(), *resolvedView, nsStruct.requestedNss);
+
+        // Nested $unionWiths running on views will add an entry to the ResolvedNamespacesMap that
+        // looks like
+        //      {'viewName': ResolvedNamespace('viewName', ..., /*involvedNamespaceIsAView*/=false)}
+        // which doesn't hold any reference to the underlying collection. This means that if we try
+        // to addResolvedNamespace() properly, the check will fail because the entry is different.
+        // Since we currently disallow these nested $unionWiths with $rankFusion, there won't be a
+        // collision of namespaces that actually matters.
+        // TODO SERVER-103507: Remove this condition.
+        if (!expCtx->hasResolvedNamespace(nsStruct.requestedNss)) {
+            expCtx->addResolvedNamespace(nsStruct.requestedNss,
+                                         ResolvedNamespace(resolvedView->getNamespace(),
+                                                           resolvedView->getPipeline(),
+                                                           boost::none,
+                                                           true /*involvedNamespaceIsAView*/));
+        }
+        uassert(ErrorCodes::OptionNotSupportedOnView,
+                "$rankFusion is currently unsupported on views",
+                (!request.getIsRankFusion() ||
+                 feature_flags::gFeatureFlagSearchHybridScoringFull
+                     .isEnabledUseLatestFCVWhenUninitialized(
+                         VersionContext::getDecoration(opCtx),
+                         serverGlobalParams.featureCompatibility.acquireFCVSnapshot())));
     }
 
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
@@ -530,6 +557,19 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       boost::optional<ResolvedView> resolvedView,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result) {
+    // Given that in single shard/sharded cluster unsharded collection scenarios the query doesn't
+    // go through retryOnViewError mongos doesn't know it's running against a view, and then it
+    // passes the desugared query to the shard, so the shard knows it is running against a view but
+    // it doesn't know it used to be $rankFusion. This means that we need the request to persist
+    // this flag in order to do LiteParsedPipeline validation.
+    if (liteParsedPipeline.hasRankFusionStage()) {
+        request.setIsRankFusion(true);
+    }
+
+    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
+    if (liteParsedPipeline.hasRankFusionStageWithMongotInputPipelines()) {
+        request.setIsRankFusionWithMongotInputPipelines(true);
+    }
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
@@ -890,6 +930,10 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     auto resolvedAggRequest =
         resolvedView.asExpandedViewAggregation(VersionContext::getDecoration(opCtx), request);
 
+    if (request.getIsRankFusion()) {
+        resolvedAggRequest.setIsRankFusion(true);
+    }
+
     result->resetToEmpty();
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
@@ -903,6 +947,16 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     Namespaces nsStruct;
     nsStruct.requestedNss = requestedNss;
     nsStruct.executionNss = resolvedView.getNamespace();
+
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "$rankFusion is unsupported on timeseries collections",
+            !(nsStruct.executionNss.isTimeseriesBucketsCollection() && request.getIsRankFusion()));
+    // TODO SERVER-105862: Remove this uassert.
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "$rankFusion is unsupported on a view with $geoNear",
+            !(!resolvedView.getPipeline().empty() &&
+              resolvedView.getPipeline()[0][DocumentSourceGeoNear::kStageName] &&
+              request.getIsRankFusion()));
 
     // For a sharded time-series collection, the routing is based on both routing table and the
     // bucketMaxSpanSeconds value. We need to make sure we use the bucketMaxSpanSeconds of the same
@@ -936,7 +990,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     auto status = ClusterAggregate::runAggregate(opCtx,
                                                  nsStruct,
                                                  resolvedAggRequest,
-                                                 {resolvedAggRequest},
+                                                 LiteParsedPipeline(resolvedAggRequest, true),
                                                  privileges,
                                                  snapshotCri,
                                                  boost::make_optional(resolvedView),

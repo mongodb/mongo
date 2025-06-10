@@ -82,13 +82,12 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     //     - the view pipeline can have stages that are not allowed in stable API version '1' eg.
     //       '$_internalUnpackBucket'.
     bool performApiVersionChecks = !viewDef.timeseries();
-
     liteParsedPipeline.validate(opCtx, performApiVersionChecks);
 
     // TODO SERVER-101721 Enable $rankFusion run in a view definition.
     uassert(ErrorCodes::OptionNotSupportedOnView,
             "$rankFusion is currently unsupported in a view definition",
-            !liteParsedPipeline.startsWithRankFusionStage());
+            !liteParsedPipeline.hasRankFusionStage());
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a

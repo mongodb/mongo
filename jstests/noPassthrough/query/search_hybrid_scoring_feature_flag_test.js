@@ -3,6 +3,11 @@
  * feature flags are turned off.
  */
 
+import {
+    assertCreateCollection,
+    assertDropCollection
+} from "jstests/libs/collection_drop_recreate.js";
+
 // TODO SERVER-85426 Remove this test when 'featureFlagRankFusionBasic',
 // 'featureFlagRankFusionFull' and 'featureFlagSearchHybridScoringFull' are removed.
 {
@@ -38,7 +43,8 @@
     MongoRunner.stopMongod(conn);
 }
 
-// Confirm that when only the rankFusion flag is set to true, $score & $scoreFusion are disabled.
+// Confirm that when only the first rankFusion flag is set to true, $score & $scoreFusion are
+// disabled.
 {
     const conn = MongoRunner.runMongod({
         setParameter: {
@@ -68,10 +74,26 @@
         testDB.runCommand({aggregate: 1, pipeline: [{$scoreFusion: {}}], cursor: {}}),
         ErrorCodes.QueryFeatureNotAllowed);
 
+    // Running $rankFusion against a view only works when 'featureFlagSearchHybridScoringFull' is
+    // enabled.
+    assertCreateCollection(testDB, "test_coll");
+    assert.commandWorked(testDB.createView("test_view", "test_coll", [{$match: {a: 1}}]));
+
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: "test_view",
+        pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+
+    assertDropCollection(testDB, "test_view");
+    assertDropCollection(testDB, "test_coll");
+
     MongoRunner.stopMongod(conn);
 }
 
-// Confirm that when only the main hybrid search flag is disabled, $scoreFusion is still disabled.
+// Confirm that when only the main hybrid search flag is disabled, $scoreFusion is still disabled,
+// same as $rankFusion on views.
 {
     const conn = MongoRunner.runMongod({
         setParameter: {
@@ -86,6 +108,21 @@
     assert.commandFailedWithCode(
         testDB.runCommand({aggregate: 1, pipeline: [{$scoreFusion: {}}], cursor: {}}),
         ErrorCodes.QueryFeatureNotAllowed);
+
+    assertCreateCollection(testDB, "test_coll");
+    assert.commandWorked(testDB.createView("test_view", "test_coll", [{$match: {a: 1}}]));
+
+    // Running $rankFusion against a view only works when 'featureFlagSearchHybridScoringFull' is
+    // enabled.
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: "test_view",
+        pipeline: [{$rankFusion: {input: {pipelines: {a: [{$sort: {a: 1}}]}}}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.OptionNotSupportedOnView);
+
+    assertDropCollection(testDB, "test_view");
+    assertDropCollection(testDB, "test_coll");
 
     MongoRunner.stopMongod(conn);
 }

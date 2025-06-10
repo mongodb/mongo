@@ -1,35 +1,57 @@
 /**
- * Tests that $rankFusion on a view namespace is always rejected.
+ * Tests that $rankFusion can't be used on a view namespace if the namespace is timeseries, or if
+ * the $rankFusion query has mongot input pipelines.
  *
- * TODO SERVER-101661 Enable $rankFusion to be run on views.
- *
- * @tags: [featureFlagRankFusionBasic, requires_fcv_81]
+ * @tags: [featureFlagSearchHybridScoringFull, requires_fcv_81]
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 
 const collName = jsTestName();
-const nonSearchViewName = jsTestName() + "_view";
-const searchViewName = jsTestName() + "_search_view";
 const coll = db.getCollection(collName);
 coll.drop();
-
-const nDocs = 50;
-let bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < nDocs; i++) {
-    if (i % 2 === 0) {
-        bulk.insert({_id: i, a: "foo", x: i / 3});
-    } else {
-        bulk.insert({_id: i, a: "bar", x: i / 3});
-    }
-}
-assert.commandWorked(bulk.execute());
+assert.commandWorked(db.createCollection(coll.getName()));
 
 const searchIndexName = "searchIndex";
 createSearchIndex(coll, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}});
+const vectorSearchIndexName = "vectorSearchIndex";
+createSearchIndex(coll, {
+    name: vectorSearchIndexName,
+    type: "vectorSearch",
+    definition: {
+        "fields": [{
+            "type": "vector",
+            "numDimensions": 1536,
+            "path": "plot_embedding",
+            "similarity": "euclidean"
+        }]
+    }
+});
 
-const rankFusionPipelineOneInput = [{$rankFusion: {input: {pipelines: {a: [{$sort: {x: 1}}]}}}}];
-const rankFusionPipelineTwoInputs = [{
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+
+const matchViewName = "match_view";
+const matchViewPipeline = {
+    $match: {a: "foo"}
+};
+
+const geoNearViewName = "geo_near_view";
+const geoNearViewPipeline = {
+    $geoNear: {near: {type: "Point", coordinates: [0, 0]}, key: "loc", spherical: true}
+};
+
+const rankFusionPipeline = [{
+    $rankFusion: {
+        input: {
+            pipelines: {
+                a: [{$sort: {x: -1}}],
+                b: [{$sort: {x: 1}}],
+            }
+        }
+    }
+}];
+
+const rankFusionPipelineWithSearchFirst = [{
     $rankFusion: {
         input: {
             pipelines: {
@@ -40,35 +62,61 @@ const rankFusionPipelineTwoInputs = [{
     }
 }];
 
-// Create a view with a $search stage and a view without a $search stage.
-assert.commandWorked(db.createView(nonSearchViewName, coll.getName(), [{$match: {a: "foo"}}]));
-assert.commandWorked(db.createView(searchViewName, coll.getName(), [{$search: {}}]));
+const rankFusionPipelineWithSearchSecond = [{
+    $rankFusion: {
+        input: {
+            pipelines: {
+                a: [{$sort: {x: -1}}],
+                b: [{$search: {index: searchIndexName, text: {query: "fo", path: "a"}}}],
+            }
+        }
+    }
+}];
 
-// Running a $rankFusion over the main collection (non-view) succeeds.
-assert.commandWorked(
-    coll.runCommand("aggregate", {pipeline: rankFusionPipelineOneInput, cursor: {}}));
-assert.commandWorked(
-    coll.runCommand("aggregate", {pipeline: rankFusionPipelineTwoInputs, cursor: {}}));
+const rankFusionPipelineOnlyOneVectorSearch = [{
+    $rankFusion: {
+        input: {
+            pipelines: {
+                a: [{
+                    $vectorSearch: {
+                        queryVector: null,
+                        path: "plot_embedding",
+                        exact: true,
+                        index: vectorSearchIndexName,
+                        limit: 10,
+                    }
+                }],
+            }
+        }
+    }
+}];
 
-// Running $rankFusion over either view should fail.
-const nonSearchView = db[nonSearchViewName];
-const searchView = db[searchViewName];
-assert.commandFailedWithCode(
-    nonSearchView.runCommand("aggregate", {pipeline: rankFusionPipelineOneInput, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
-assert.commandFailedWithCode(
-    searchView.runCommand("aggregate", {pipeline: rankFusionPipelineOneInput, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+// TODO SERVER-103504: Move the mongot queries to the allowed test.
+// Create a view with $match.
+assert.commandWorked(db.createView(matchViewName, coll.getName(), [matchViewPipeline]));
 
-// Same with a $rankFusion with two input pipelines. Running this query over the search view is a
-// malformed query since the post-view resolution pipeline would have 2 search stages. Regardless,
-// it should first error since $rankFusion is banned on views.
+// Create a view with $geoNear.
+assert.commandWorked(db.createView(geoNearViewName, coll.getName(), [geoNearViewPipeline]));
+
+// Running a $rankFusion with mongot subpipelines fails if the query is on a view.
 assert.commandFailedWithCode(
-    nonSearchView.runCommand("aggregate", {pipeline: rankFusionPipelineTwoInputs, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+    db.runCommand(
+        {aggregate: matchViewName, pipeline: rankFusionPipelineWithSearchSecond, cursor: {}}),
+    ErrorCodes.OptionNotSupportedOnView);
 assert.commandFailedWithCode(
-    searchView.runCommand("aggregate", {pipeline: rankFusionPipelineTwoInputs, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+    db.runCommand(
+        {aggregate: matchViewName, pipeline: rankFusionPipelineWithSearchFirst, cursor: {}}),
+    ErrorCodes.OptionNotSupportedOnView);
+assert.commandFailedWithCode(
+    db.runCommand(
+        {aggregate: matchViewName, pipeline: rankFusionPipelineOnlyOneVectorSearch, cursor: {}}),
+    ErrorCodes.OptionNotSupportedOnView);
+
+// TODO SERVER-105682: Add tests for $geoNear in the input pipelines.
+// TODO SERVER-105862: Move this test to the allowed test.
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: geoNearViewName, pipeline: rankFusionPipeline, cursor: {}}),
+    ErrorCodes.OptionNotSupportedOnView);
 
 // Now test on a timeseries collection (which is modeled as a view under-the-hood).
 const timeFieldName = "time";
@@ -79,7 +127,8 @@ assert.commandWorked(db.createCollection(
     timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 const tsColl = db.getCollection(timeseriesCollName);
 
-bulk = tsColl.initializeUnorderedBulkOp();
+const nDocs = 50;
+const bulk = tsColl.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
     const docToInsert = {
         time: ISODate(),
@@ -90,18 +139,9 @@ for (let i = 0; i < nDocs; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-// Running $rankFusion on timeseries collection fails.
+// Running $rankFusion on timeseries collection is disallowed.
 assert.commandFailedWithCode(
-    tsColl.runCommand("aggregate", {pipeline: rankFusionPipelineOneInput, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
-assert.commandFailedWithCode(
-    tsColl.runCommand("aggregate", {pipeline: rankFusionPipelineTwoInputs, cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
-
-// Running a $rankFusion over the main collection (non-view) still succeeds.
-assert.commandWorked(
-    coll.runCommand("aggregate", {pipeline: rankFusionPipelineOneInput, cursor: {}}));
-assert.commandWorked(
-    coll.runCommand("aggregate", {pipeline: rankFusionPipelineTwoInputs, cursor: {}}));
+    tsColl.runCommand("aggregate", {pipeline: rankFusionPipeline, cursor: {}}),
+    ErrorCodes.OptionNotSupportedOnView);
 
 dropSearchIndex(coll, {name: searchIndexName});

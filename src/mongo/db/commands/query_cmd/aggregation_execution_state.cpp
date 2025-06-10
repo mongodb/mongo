@@ -457,6 +457,11 @@ void AggExState::performValidationChecks() {
     auto request = getRequest();
     auto& liteParsedPipeline = _aggReqDerivatives->liteParsedPipeline;
 
+    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "Cannot use mongot input pipelines inside of a $rankFusion running on a view",
+            !(isRankFusionPipelineWithMongotInputPipelines() && isView()));
+
     liteParsedPipeline.validate(_opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(_opCtx, request);
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
@@ -610,7 +615,7 @@ ResolvedViewAggExState::ResolvedViewAggExState(AggExState&& baseState,
           view.timeseries() ? _originalAggReqDerivatives->request.getCollation() : boost::none))),
       _resolvedViewRequest(_resolvedView.asExpandedViewAggregation(
           VersionContext::getDecoration(_opCtx), _originalAggReqDerivatives->request)),
-      _resolvedViewLiteParsedPipeline(_resolvedViewRequest) {
+      _resolvedViewLiteParsedPipeline(_resolvedViewRequest, true) {
     bool isExplain = _originalAggReqDerivatives->request.getExplain().get_value_or(false);
     uassert(std::move(_resolvedView),
             "Explain of a resolved view must be executed by mongos",
@@ -771,6 +776,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
                                                         : _aggExState.getExecutionNss())
                       .resolvedNamespace(std::move(resolvedNamespaces))
+                      .originalNs(_aggExState.getOriginalNss())
                       .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
                       .tmpDir(storageGlobalParams.dbpath + "/_tmp")
                       .collationMatchesDefault(collationMatchesDefault)

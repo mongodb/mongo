@@ -357,7 +357,7 @@ boost::intrusive_ptr<DocumentSource> buildUnionWithPipeline(
     }
     std::vector<BSONObj> bsonPipeline = oneInputPipeline->serializeToBson();
 
-    auto collName = expCtx->getNamespaceString().coll();
+    auto collName = expCtx->getUserNss().coll();
 
     BSONObj inputToUnionWith =
         BSON("$unionWith" << BSON("coll" << collName << "pipeline" << bsonPipeline));

@@ -198,12 +198,18 @@ public:
      * the router (which is necessary to distinguish it as $rankFusion since the pipeline dispatched
      * will be the desugared representation). If the $rankFusion request came straight from the
      * user, we'll identify via the lite-parsed pipeline.
-     *
-     * TODO SERVER-101661 Remove once $rankFusion works on views.
      */
-    bool isRankFusionStage() const {
+    virtual bool isRankFusionPipeline() const {
+        // Use the original request as we want this assert to work during/after view resolution.
         return _aggReqDerivatives->request.getIsRankFusion() ||
-            _aggReqDerivatives->liteParsedPipeline.startsWithRankFusionStage();
+            _aggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
+    }
+
+    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
+    virtual bool isRankFusionPipelineWithMongotInputPipelines() const {
+        // Use the original request as we want this assert to work during/after view resolution.
+        return _aggReqDerivatives->request.getIsRankFusionWithMongotInputPipelines() ||
+            _aggReqDerivatives->liteParsedPipeline.hasRankFusionStageWithMongotInputPipelines();
     }
 
     /**
@@ -426,6 +432,31 @@ public:
 
     boost::optional<NamespaceString> getViewNss() const override {
         return boost::make_optional(getOriginalNss());
+    }
+
+    /**
+     * True if aggregation represents a $rankFusion pipeline.
+     *
+     * If the $rankFusion request came from the router, that will get annotated on the request from
+     * the router (which is necessary to distinguish it as $rankFusion since the pipeline dispatched
+     * will be the desugared representation). If the $rankFusion request came straight from the
+     * user, we'll identify via the lite-parsed pipeline.
+     *
+     * TODO SERVER-104725 Generalize this to hybrid search. Optionally figure out if there's a way
+     * to get rid of this check.
+     */
+    bool isRankFusionPipeline() const override {
+        // Use the original request as we want this assert to work during/after view resolution.
+        return _originalAggReqDerivatives->request.getIsRankFusion() ||
+            _originalAggReqDerivatives->liteParsedPipeline.hasRankFusionStage();
+    }
+
+    // TODO SERVER-103504 Remove once $rankFusion with mongot input pipelines is enabled on views.
+    bool isRankFusionPipelineWithMongotInputPipelines() const override {
+        // Use the original request as we want this assert to work during/after view resolution.
+        return _originalAggReqDerivatives->request.getIsRankFusionWithMongotInputPipelines() ||
+            _originalAggReqDerivatives->liteParsedPipeline
+                .hasRankFusionStageWithMongotInputPipelines();
     }
 
 private:

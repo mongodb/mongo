@@ -141,13 +141,18 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
 void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
 
+    uassert(ErrorCodes::OptionNotSupportedOnView,
+            "Cannot use mongot input pipelines inside of a $rankFusion running on a view",
+            !(hasRankFusionStageWithMongotInputPipelines() && isRunningAgainstViewForRankFusion()));
+
     for (auto stage_it = _stageSpecs.begin(); stage_it != _stageSpecs.end(); stage_it++) {
         const auto& stage = *stage_it;
         // TODO SERVER-101722: Re-implement this validation with a more generic
         // StageConstraints-like validation.
         uassert(10170100,
                 "$rankFusion can only be the first stage of an aggregation pipeline.",
-                !((stage_it != _stageSpecs.begin()) && stage->isRankFusionStage()));
+                !((stage_it != _stageSpecs.begin()) && stage->isRankFusionStage() &&
+                  !isRunningAgainstViewForRankFusion()));
 
         const auto& stageName = (*stage_it)->getParseTimeName();
         const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);
