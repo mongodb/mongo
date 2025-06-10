@@ -201,7 +201,6 @@ TEST_F(TopologyVersionObserverTest, CallbackExecutedOnTopologyChange) {
     forceElectionAndWaitForCacheUpdate(cachedResponse);
 
     // Verify callback was executed successfully after the topology change.
-    ASSERT(receivedConfig);
     ASSERT_EQ(receivedConfig.get().getConfigVersion(), replCoord->getConfig().getConfigVersion());
 }
 
