@@ -664,7 +664,7 @@ server_parameters:
             The number of retries that be made by writeConflictRetry(). It is used in secondary
             oplog application to catch unexpected behavior.
         set_at: [ startup, runtime ]
-        cpp_vartype: int
+        cpp_vartype: AtomicWord<int>
         cpp_varname: writeConflictRetryLimit
         default: 10000
         validator:
