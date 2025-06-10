@@ -3472,7 +3472,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
@@ -3485,8 +3485,7 @@ const wcTimeseriesViewsCommandsTests = {
                 stopAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
             confirmFunc: (res, coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
-                assert.commandWorkedIgnoringWriteConcernErrors(res);
-                assert.eq(coll.getDB().getCollectionInfos({name: collName}).length, 1);
+                assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
                 restartAdditionalSecondariesIfSharded(clusterType, cluster, secondariesRunning);
             },
         },
