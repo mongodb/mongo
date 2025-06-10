@@ -55,46 +55,8 @@ WINDOWS_RUNTIME_ERROR_CHECK_COPTS = select({
 
 WINDOWS_GENERAL_COPTS = select({
     "@platforms//os:windows": [
-        # /EHsc exception handling style for visual studio
-        "/EHsc",
-
         # /W3 warning level
         "/W3",
-
-        # Support large object files since some unit-test sources contain a lot
-        # of code
-        "/bigobj",
-
-        # Set Source and Executable character sets to UTF-8, this will produce a
-        # warning C4828 if the file contains invalid UTF-8.
-        "/utf-8",
-
-        # Specify standards conformance mode to the compiler.
-        "/permissive-",
-
-        # Enables the __cplusplus preprocessor macro to report an updated value
-        # for recent C++ language standards support.
-        "/Zc:__cplusplus",
-
-        # Tells the compiler to preferentially call global operator delete or
-        # operator delete[] functions that have a second parameter of type
-        # size_t when the size of the object is available.
-        "/Zc:sizedDealloc",
-
-        # Treat volatile according to the ISO standard and do not guarantee
-        # acquire/release semantics.
-        "/volatile:iso",
-
-        # Tell CL to produce more useful error messages.
-        "/diagnostics:caret",
-
-        # Don't send error reports in case of internal compiler error
-        "/errorReport:none",
-
-        # msvc defaults to /fp:precise. Visual Studio 2022 does not emit
-        # floating-point contractions with /fp:precise, but previous versions can.
-        # Disable contractions altogether by using /fp:strict.
-        "/fp:strict",
     ],
     "//conditions:default": [],
 })

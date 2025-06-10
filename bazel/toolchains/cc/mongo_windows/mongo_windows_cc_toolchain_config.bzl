@@ -731,6 +731,37 @@ def _impl(ctx):
                                 "/wd4250",
                                 "/wd4996",
                                 "/std:c++20",
+
+                                # Set Source and Executable character sets to UTF-8, this will produce a
+                                # warning C4828 if the file contains invalid UTF-8.
+                                "/utf-8",
+
+                                # Tell CL to produce more useful error messages.
+                                "/diagnostics:caret",
+
+                                # Don't send error reports in case of internal compiler error
+                                "/errorReport:none",
+
+                                # Specify standards conformance mode to the compiler.
+                                "/permissive-",
+
+                                # Enables the __cplusplus preprocessor macro to report an updated value
+                                # for recent C++ language standards support.
+                                "/Zc:__cplusplus",
+
+                                # Tells the compiler to preferentially call global operator delete or
+                                # operator delete[] functions that have a second parameter of type
+                                # size_t when the size of the object is available.
+                                "/Zc:sizedDealloc",
+
+                                # Treat volatile according to the ISO standard and do not guarantee
+                                # acquire/release semantics.
+                                "/volatile:iso",
+
+                                # msvc defaults to /fp:precise. Visual Studio 2022 does not emit
+                                # floating-point contractions with /fp:precise, but previous versions can.
+                                # Disable contractions altogether by using /fp:strict.
+                                "/fp:strict",
                             ],
                         ),
                     ],
