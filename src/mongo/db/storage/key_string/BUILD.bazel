@@ -87,7 +87,7 @@ mongo_cc_binary(
     ],
     deps = [
         "key_string",
-        "//src/mongo/db:server_base",
+        "//src/mongo:base",
         "//src/mongo/util/options_parser",
     ],
 )
