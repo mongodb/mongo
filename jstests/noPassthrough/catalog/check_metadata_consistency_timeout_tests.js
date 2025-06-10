@@ -13,8 +13,8 @@ const kNss = kDbName + '.' + kCollName;
 const st = new ShardingTest({shards: 1});
 
 // Creates a thread that expects checkMetadataConsistency to fail with the error passed as argument.
-function createCMCThread({host, dbName, error, dbMetadataLockMaxTimeMS, maxTimeMS}) {
-    return new Thread(function(host, dbName, error, dbMetadataLockMaxTimeMS, maxTimeMS) {
+function createCMCThread({host, dbName, dbMetadataLockMaxTimeMS, maxTimeMS}) {
+    return new Thread(function(host, dbName, dbMetadataLockMaxTimeMS, maxTimeMS) {
         let mongos = new Mongo(host);
         let command = {checkMetadataConsistency: 1};
         if (dbMetadataLockMaxTimeMS > -1) {
@@ -23,24 +23,49 @@ function createCMCThread({host, dbName, error, dbMetadataLockMaxTimeMS, maxTimeM
         if (maxTimeMS > -1) {
             command['maxTimeMS'] = maxTimeMS;
         }
-        const checkMetadataResult = mongos.getDB(dbName).runCommand(command);
-        assert.commandFailedWithCode(checkMetadataResult, error);
-    }, host, dbName, error, dbMetadataLockMaxTimeMS, maxTimeMS);
+        return mongos.getDB(dbName).runCommand(command);
+    }, host, dbName, dbMetadataLockMaxTimeMS, maxTimeMS);
 }
 
-function testCMCCommandWithFailpoint(threadParams, failpoint) {
-    let asyncCMC = createCMCThread(threadParams);
-    const blockCMCPoint = configureFailPoint(st.getPrimaryShard(kDbName), failpoint);
-    asyncCMC.start();
-    blockCMCPoint.wait();
-    // Wait enough time until the timeout happens.
-    sleep(1000);
-    // Turn off failpoint, it will not be interrupted otherwise.
-    blockCMCPoint.off();
-    asyncCMC.join();
+function testCMCCommandWithFailpoint(threadParams, expectedError, failpoint) {
+    let maxTimeMS = threadParams.maxTimeMS;
+    const isMaxTimeMSLessThanLockMaxTimeMS = maxTimeMS < threadParams.dbMetadataLockMaxTimeMS;
+    const maxRetries = maxTimeMS > -1 ? 5 : 1;
+    let retries = 0;
+    // On slow variants, the `checkMetadataConsistency` command may timeout with
+    // `ErrorCodes.MaxTimeMSExpired` before the failpoint can be reached.
+    // To address this, we retry the CMC command, doubling the `maxTimeMS`
+    // value on each iteration.
+    while (retries < maxRetries) {
+        assert.eq(
+            isMaxTimeMSLessThanLockMaxTimeMS,
+            maxTimeMS < threadParams.dbMetadataLockMaxTimeMS,
+            'The relationship between the initially provided maxTimeMS and dbMetadataLockMaxTimeMS ' +
+                'parameters must remain consistent across retries.');
+        let asyncCMC = createCMCThread({...threadParams, maxTimeMS});
+        const blockCMCPoint = configureFailPoint(st.getPrimaryShard(kDbName), failpoint);
+        asyncCMC.start();
+        // Wait 60s for the failpoint to be reached
+        if (blockCMCPoint.waitWithTimeout(60 * 1000)) {
+            // Wait enough time until the CMC timeout happens.
+            sleep(1000);
+            blockCMCPoint.off();
+            asyncCMC.join();
+            assert.commandFailedWithCode(asyncCMC.returnData(), expectedError);
+            break;
+        }
+        blockCMCPoint.off();
+        asyncCMC.join();
+        assert.commandFailedWithCode(asyncCMC.returnData(), ErrorCodes.MaxTimeMSExpired);
+        maxTimeMS *= 2;
+        retries++;
+    }
+    assert.lt(retries,
+              maxRetries,
+              `Failed to reach ${failpoint} failpoint after ${maxRetries} attempts.`);
 }
 
-function testCMCCommandWithAsyncDrop(threadParams) {
+function testCMCCommandWithAsyncDrop(threadParams, expectedError) {
     const blockDDLFailPoint =
         configureFailPoint(st.getPrimaryShard(kDbName), 'hangBeforeRunningCoordinatorInstance');
     // Launch drop database operation and use a failpoint to make it block after taking the DDL lock
@@ -53,9 +78,10 @@ function testCMCCommandWithAsyncDrop(threadParams) {
     blockDDLFailPoint.wait();
     let asyncCMC = createCMCThread(threadParams);
     asyncCMC.start();
-    // Wait enough time until the timeout happens.
+    // Wait enough time until the CMC timeout happens.
     sleep(1000);
     asyncCMC.join();
+    assert.commandFailedWithCode(asyncCMC.returnData(), expectedError);
     blockDDLFailPoint.off();
     asyncDropDatabase.join();
     assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
@@ -65,140 +91,90 @@ assert.commandWorked(st.s.adminCommand({shardCollection: kNss, key: {_id: 1}}));
 
 {
     jsTestLog('Checks that maxTimeMS works when dealing with database lock contention');
-    testCMCCommandWithAsyncDrop({
-        host: st.s.host,
-        dbName: 'admin',
-        error: ErrorCodes.MaxTimeMSExpired,
-        dbMetadataLockMaxTimeMS: -1,
-        maxTimeMS: 100
-    });
+    testCMCCommandWithAsyncDrop(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: -1, maxTimeMS: 100},
+        ErrorCodes.MaxTimeMSExpired);
 }
 {
     jsTestLog(
         'Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention');
-    testCMCCommandWithAsyncDrop({
-        host: st.s.host,
-        dbName: 'admin',
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: -1
-    });
+    testCMCCommandWithAsyncDrop(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1}, 9944001);
 }
 {
     jsTestLog(
         'Checks that dbMetadataLockMaxTimeMS does not cover up other ExceededTimedLimit errors');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: 'admin',
-        error: ErrorCodes.ExceededTimeLimit,
-        dbMetadataLockMaxTimeMS: 10000,
-        maxTimeMS: -1
-    },
-                                'throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: 10000, maxTimeMS: -1},
+        ErrorCodes.ExceededTimeLimit,
+        'throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog('Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: 'admin',
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: -1
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1},
+        9944001,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error when used with maxTimeMS');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: 'admin',
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: 10000
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: 100, maxTimeMS: 10000},
+        9944001,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that the maxTimeMS timeout fails with expected error when used with dbMetadataLockMaxTimeMS');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: 'admin',
-        error: ErrorCodes.MaxTimeMSExpired,
-        dbMetadataLockMaxTimeMS: 10000,
-        maxTimeMS: 100
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: 'admin', dbMetadataLockMaxTimeMS: 10000, maxTimeMS: 100},
+        ErrorCodes.MaxTimeMSExpired,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that maxTimeMS works when dealing with database lock contention for a specific db');
-    testCMCCommandWithAsyncDrop({
-        host: st.s.host,
-        dbName: kDbName,
-        error: ErrorCodes.MaxTimeMSExpired,
-        dbMetadataLockMaxTimeMS: -1,
-        maxTimeMS: 300
-    });
+    testCMCCommandWithAsyncDrop(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: -1, maxTimeMS: 300},
+        ErrorCodes.MaxTimeMSExpired);
 }
 {
     jsTestLog(
         'Checks that dbMetadataLockMaxTimeMS works when dealing with database lock contention for a specific db');
-    testCMCCommandWithAsyncDrop({
-        host: st.s.host,
-        dbName: kDbName,
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: -1
-    });
+    testCMCCommandWithAsyncDrop(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1}, 9944001);
 }
 {
     jsTestLog(
         'Checks that dbMetadataLockMaxTimeMS does not cover up other ExceededTimedLimit errors for a specific db');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: kDbName,
-        error: ErrorCodes.ExceededTimeLimit,
-        dbMetadataLockMaxTimeMS: 10000,
-        maxTimeMS: -1
-    },
-                                'throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 10000, maxTimeMS: -1},
+        ErrorCodes.ExceededTimeLimit,
+        'throwExceededTimeLimitOnCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error for a specific db');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: kDbName,
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: -1
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 100, maxTimeMS: -1},
+        9944001,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that the dbMetadataLockMaxTimeMS timeout fails with expected error when used with maxTimeMS for a specific db');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: kDbName,
-        error: 9944001,
-        dbMetadataLockMaxTimeMS: 100,
-        maxTimeMS: 10000
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 100, maxTimeMS: 10000},
+        9944001,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 {
     jsTestLog(
         'Checks that the maxTimeMS timeout fails with expected error when used with dbMetadataLockMaxTimeMS for a specific db');
-    testCMCCommandWithFailpoint({
-        host: st.s.host,
-        dbName: kDbName,
-        error: ErrorCodes.MaxTimeMSExpired,
-        dbMetadataLockMaxTimeMS: 10000,
-        maxTimeMS: 100
-    },
-                                'hangShardCheckMetadataBeforeEstablishCursors');
+    testCMCCommandWithFailpoint(
+        {host: st.s.host, dbName: kDbName, dbMetadataLockMaxTimeMS: 10000, maxTimeMS: 100},
+        ErrorCodes.MaxTimeMSExpired,
+        'hangShardCheckMetadataBeforeEstablishCursors');
 }
 st.stop();
