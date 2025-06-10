@@ -1,9 +1,9 @@
 /**
- * Tests with concurrent DDL operation during release memory yield.
+ * Tests that release memory doesn't prevent DDL operation and can be interrupted.
  */
 
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {findMatchingLogLine} from "jstests/libs/log.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -17,11 +17,11 @@ function initCollection(coll) {
     assert.commandWorked(coll.insert(Array.from({length: 10}, (_, i) => ({_id: i, a: i, b: i}))));
 }
 
-function initCursorId(coll) {
+function initCursor(coll) {
     const cursor =
         coll.find({a: {$gte: 0}, b: {$gte: 0}}, {_id: 0, b: 0}).sort({a: 1}).batchSize(1);
     assert(cursor.hasNext());
-    return cursor.getId();
+    return cursor;
 }
 
 // Set it to a low value so release memory will yield.
@@ -34,21 +34,22 @@ initCollection(db.coll2);
  * Drop the collection during release memory yield.
  */
 {
-    const cursor1 = initCursorId(db.coll1);
-    const cursor2 = initCursorId(db.coll2);
+    const expectedResult = initCursor(db.coll2).toArray();
 
-    const fp =
-        configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll1.getFullName()});
+    const cursor1 = initCursor(db.coll1);
+    const cursor2 = initCursor(db.coll2);
+
+    const fp = configureFailPoint(
+        conn, "setInterruptOnlyPlansCheckForInterruptHang", {namespace: db.coll1.getFullName()});
 
     const awaitShell = startParallelShell(`
     import {assertReleaseMemoryFailedWithCode, assertReleaseMemoryWorked} from "jstests/libs/release_memory_util.js";
 
-    const res = db.runCommand({releaseMemory: [${cursor1}, ${cursor2}]});
+    const res = db.runCommand({releaseMemory: [${cursor1.getId()}, ${cursor2.getId()}]});
     jsTest.log("Release memory result: " + tojson(res));
 
-    assertReleaseMemoryFailedWithCode(
-        res, ${cursor1}, [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
-    assertReleaseMemoryWorked(res, ${cursor2});
+    assertReleaseMemoryWorked(res, ${cursor1.getId()});
+    assertReleaseMemoryWorked(res, ${cursor2.getId()});
     `, conn.port);
 
     fp.wait();
@@ -56,11 +57,9 @@ initCollection(db.coll2);
     fp.off();
     awaitShell();
 
-    const globalLog = assert.commandWorked(db.adminCommand({getLog: "global"}));
-    const slowQueryLogLine =
-        findMatchingLogLine(globalLog.log, {msg: "Slow query", command: "releaseMemory"});
-    assert(slowQueryLogLine, "Failed to find a log line for releaseMemory command");
-    assert.gt(JSON.parse(slowQueryLogLine).attr.numYields, 0, slowQueryLogLine);
+    assert.throwsWithCode(() => cursor1.toArray(),
+                          [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
+    assertArrayEq({actual: cursor2.toArray(), expected: expectedResult});
 }
 
 /*
@@ -68,20 +67,22 @@ initCollection(db.coll2);
  */
 {
     initCollection(db.coll1);
-    const cursor1 = initCursorId(db.coll1);
-    const cursor2 = initCursorId(db.coll2);
 
-    const fp =
-        configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll1.getFullName()});
+    const expectedResult = initCursor(db.coll1).toArray();
+
+    const cursor1 = initCursor(db.coll1);
+    const cursor2 = initCursor(db.coll2);
+
+    const fp = configureFailPoint(
+        conn, "setInterruptOnlyPlansCheckForInterruptHang", {namespace: db.coll1.getFullName()});
 
     const awaitShell = startParallelShell(`
     import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
 
-    const res = db.runCommand({releaseMemory: [${cursor1}, ${cursor2}]});
+    const res = db.runCommand({releaseMemory: [${cursor1.getId()}, ${cursor2.getId()}]});
     jsTest.log("Release memory result: " + tojson(res));
 
-    assertReleaseMemoryFailedWithCode(res, ${cursor1}, [ErrorCodes.Interrupted]);
-    assertReleaseMemoryFailedWithCode(res, ${cursor2}, [ErrorCodes.Interrupted]);
+    assertReleaseMemoryFailedWithCode(res, ${cursor1.getId()}, [ErrorCodes.Interrupted]);
     `, conn.port);
 
     fp.wait();
@@ -93,7 +94,6 @@ initCollection(db.coll2);
                             {$currentOp: {allUsers: true, localOps: true}},
                             {
                                 $match: {
-                                    numYields: {$gt: 0},
                                     op: "command",
                                     "command.releaseMemory": {$exists: true},
                                 }
@@ -113,6 +113,11 @@ initCollection(db.coll2);
 
     fp.off();
     awaitShell();
+
+    // releaseMemory was interrupted when working on cursor1, so it should be destroyed.
+    assert.throwsWithCode(() => cursor1.toArray(), [ErrorCodes.CursorNotFound]);
+    // cursor2 should still be valid, because releaseMemory never pinned it.
+    assertArrayEq({actual: cursor2.toArray(), expected: expectedResult});
 }
 
 MongoRunner.stopMongod(conn);

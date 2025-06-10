@@ -28,8 +28,6 @@
  */
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/acquire_locks.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/release_memory_gen.h"
 #include "mongo/db/query/client_cursor/release_memory_util.h"
@@ -91,6 +89,11 @@ public:
             };
 
             for (CursorId cursorId : request().getCommandParameter()) {
+                if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
+                    handleError(cursorId, status);
+                    break;
+                }
+
                 auto cursorPin =
                     CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, definition()->getName());
                 if (cursorPin.isOK()) {
@@ -122,13 +125,16 @@ public:
                         });
 
                     if (response.isOK()) {
-                        response = acquireLocksAndReleaseMemory(opCtx, cursorPin.getValue());
+                        response = releaseMemory(opCtx, cursorPin.getValue());
                     }
 
                     if (response.isOK()) {
                         released.push_back(cursorId);
                     } else {
                         handleError(cursorId, response);
+                        if (response.code() == ErrorCodes::Interrupted) {
+                            break;
+                        }
                     }
                 } else if (cursorPin.getStatus().code() == ErrorCodes::CursorNotFound) {
                     notFound.push_back(cursorId);
@@ -172,28 +178,18 @@ public:
             return request().getGenericArguments();
         }
 
-        Status acquireLocksAndReleaseMemory(OperationContext* opCtx, ClientCursorPin& cursorPin) {
+        Status releaseMemory(OperationContext* opCtx, ClientCursorPin& cursorPin) {
             try {
-                applyConcernsAndReadPreference(opCtx, *cursorPin.getCursor());
-                CursorLocks locks{opCtx, cursorPin.getCursor()->nss(), cursorPin};
-
-                if (!cursorPin->isAwaitData()) {
-                    auto status = opCtx->checkForInterruptNoAssert();
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                }
-
                 PlanExecutor* exec = cursorPin->getExecutor();
 
                 std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr;
                 if (cursorPin->getExecutor()->lockPolicy() ==
                     PlanExecutor::LockPolicy::kLockExternally) {
-                    yieldPolicy =
-                        PlanYieldPolicyReleaseMemory::make(opCtx,
-                                                           PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                                                           locks.readLock,
-                                                           exec->nss());
+                    yieldPolicy = PlanYieldPolicyReleaseMemory::make(
+                        opCtx,
+                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                        boost::none,
+                        exec->nss());
                 }
 
                 exec->reattachToOperationContext(opCtx);

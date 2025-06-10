@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
@@ -63,6 +64,16 @@ static void storageUnavailableRetry(OperationContext* opCtx,
     // writeConflictRetry already implements a retryBackoff for storage unavailable.
     writeConflictRetry(opCtx, opStr, NamespaceString::kEmpty, f, retryLimit);
 }
+
+[[nodiscard]] Lock::GlobalLock acquireLock(OperationContext* opCtx) {
+    return Lock::GlobalLock(
+        opCtx,
+        LockMode::MODE_IS,
+        Date_t::max(),
+        Lock::InterruptBehavior::kThrow,
+        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+}
+
 }  // namespace
 
 void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
@@ -89,6 +100,7 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
 }
 
 SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
+    auto lk = acquireLock(opCtx);
     if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled() && !gDisableSpillKVEngine) {
         _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(opCtx, format);
         return;
@@ -154,6 +166,7 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
     auto result = mongo::Status::OK();
 
     storageUnavailableRetry(opCtx, "SpillingStore::upsertToRecordStore", [&] {
+        auto lk = acquireLock(opCtx);
         boost::optional<WriteUnitOfWork> wuow;
         if (_originalUnit) {
             wuow.emplace(opCtx);
@@ -184,6 +197,7 @@ Status SpillingStore::insertRecords(OperationContext* opCtx, std::vector<Record>
     auto status = Status::OK();
 
     storageUnavailableRetry(opCtx, "SpillingStore::insertRecords", [&] {
+        auto lk = acquireLock(opCtx);
         boost::optional<WriteUnitOfWork> wuow;
         if (_originalUnit) {
             wuow.emplace(opCtx);
@@ -206,6 +220,7 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
     storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", [&] {
+        auto lk = acquireLock(opCtx);
         found = _spillTable->findRecord(opCtx, rid, &record);
     });
 
@@ -223,6 +238,7 @@ bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, Rec
     // Because we impose a timeout for storage engine operations, we need to handle errors and retry
     // reads too.
     storageUnavailableRetry(opCtx, "SpillingStore::findRecord", [&] {
+        auto lk = acquireLock(opCtx);
         found = _spillTable->findRecord(opCtx, loc, out);
     });
     return found;
@@ -256,7 +272,7 @@ void SpillingStore::switchToOriginal(OperationContext* opCtx) {
 int64_t SpillingStore::storageSize(OperationContext* opCtx) {
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-
+    auto lk = acquireLock(opCtx);
     return _spillTable->storageSize(*shard_role_details::getRecoveryUnit(opCtx));
 }
 
