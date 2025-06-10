@@ -295,6 +295,13 @@ kv_table::truncate(kv_transaction_ptr txn, const data_value &start, const data_v
         }
 
         for (auto i = start_iter; i != stop_iter; i++) {
+            /*
+             * The key does not exist for this transaction, so deletion is invalid; skip processing
+             * this key.
+             */
+            if (!i->second.exists(txn))
+                continue;
+
             std::shared_ptr<kv_update> update = fix_timestamps(std::make_shared<kv_update>(
               _config.type == kv_table_type::column_fix ? ZERO : NONE, txn));
             i->second.add_update(update, false, false);

@@ -125,9 +125,14 @@ restart:
         WT_RET(__wt_page_release(session, current, 0));
     }
 
-    /* Search the internal pages of the tree. */
+    /*
+     * Search the internal pages of the tree.
+     *
+     * This loop starts with the root page and iterates down the tree until it has the correct leaf
+     * page. So we can track the depth of tree by counting the number of iterations.
+     */
     current = &btree->root;
-    for (depth = 2, pindex = NULL;; ++depth) {
+    for (depth = 1, pindex = NULL;; ++depth) {
         parent_pindex = pindex;
         page = current->page;
         if (page->type != WT_PAGE_COL_INT)
