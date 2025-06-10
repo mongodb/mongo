@@ -19,14 +19,15 @@ export var FeatureFlagUtil = (function() {
                 return db;
             }
 
-            // For sharded cluster get a connection to the first replicaset through a Mongo
+            // For sharded cluster get a connection to the config server through a Mongo
             // object. We may fail to connect if we are in a stepdown/terminate passthrough, so
             // retry on retryable errors. After the connection is established, runCommand overrides
             // should guarantee that subsequent operations on the connection are retried in the
             // event of network errors in suites where that possibility exists.
             return retryOnRetryableError(() => {
-                return new Mongo(
-                    FixtureHelpers.getAllReplicas(db)[0].getURL(), undefined, {gRPC: false});
+                return new Mongo(FixtureHelpers.getConfigServerConnString(db),
+                                 undefined /*encryptedDBClientCallback */,
+                                 {gRPC: false});
             });
         };
         try {

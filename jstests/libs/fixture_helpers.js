@@ -3,6 +3,7 @@
  * replica set, a sharded cluster, etc.
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var FixtureHelpers = (function() {
@@ -27,6 +28,13 @@ export var FixtureHelpers = (function() {
             replicas = [new ReplSetTest(_getHostStringForReplSet(db.getMongo()))];
         }
         return replicas;
+    }
+
+    /**
+     * Returns the config server connection string.
+     */
+    function getConfigServerConnString(routerConn) {
+        return assert.commandWorked(routerConn.adminCommand({getShardMap: 1})).map.config;
     }
 
     /**
@@ -292,6 +300,7 @@ export var FixtureHelpers = (function() {
         runCommandOnAllShards: runCommandOnAllShards,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getAllReplicas: getAllReplicas,
+        getConfigServerConnString: getConfigServerConnString,
         getPrimaries: getPrimaries,
         getSecondaries: getSecondaries,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,

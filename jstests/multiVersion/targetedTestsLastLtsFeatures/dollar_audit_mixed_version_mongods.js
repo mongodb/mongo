@@ -73,10 +73,14 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
     checkFCV(adminDB, fcv);
 
     // TODO SERVER-83990: remove.
+    // During an upgrade, the FCV is first changed on the the shard and then on the config server.
+    // Thus, since we are checking the $audit field metadata propagation across different FCVs in a
+    // sharded cluster, we need to check the feature flag directly on the shard.
+    const shardAdminDB = st.shard0.getDB("admin");
     if (fcv === latestFCV) {
-        assert(FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
+        assert(FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "ExposeClientIpInAuditLogs"));
     } else {
-        assert(!FeatureFlagUtil.isPresentAndEnabled(adminDB, "ExposeClientIpInAuditLogs"));
+        assert(!FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "ExposeClientIpInAuditLogs"));
     }
 
     forceMetadataPropagation(testDB, profilerComment);
