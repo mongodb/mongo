@@ -39,7 +39,8 @@ namespace transport {
 
 SessionEstablishmentRateLimiter::SessionEstablishmentRateLimiter()
     : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
-                   gIngressConnectionEstablishmentBurstSize.load(),
+                   gIngressConnectionEstablishmentRatePerSec.load() *
+                       gIngressConnectionEstablishmentBurstCapacitySecs.load(),
                    gIngressConnectionEstablishmentMaxQueueDepth.load(),
                    "SessionEstablishmentRateLimiter") {}
 
@@ -62,7 +63,6 @@ SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceCon
     }
     return rateLimiter;
 }
-
 
 Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
     // Check if the session is exempt from rate limiting based on its IP.
@@ -88,7 +88,6 @@ Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
 
     return s;
 }
-
 
 void SessionEstablishmentRateLimiter::appendStatsConnections(BSONObjBuilder* bob) const {
     bob->append("queuedForEstablishment", queued());

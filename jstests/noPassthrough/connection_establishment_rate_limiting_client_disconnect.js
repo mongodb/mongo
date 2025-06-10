@@ -53,7 +53,7 @@ const testKillOnClientDisconnect = (conn) => {
 const testKillOnClientDisconnectOpts = {
     ingressConnectionEstablishmentRateLimiterEnabled: true,
     ingressConnectionEstablishmentRatePerSec: 1,
-    ingressConnectionEstablishmentBurstSize: 1,
+    ingressConnectionEstablishmentBurstCapacitySecs: 1,
     ingressConnectionEstablishmentMaxQueueDepth: maxQueueSize,
 };
 runTestStandaloneParamsSetAtStartup(testKillOnClientDisconnectOpts, testKillOnClientDisconnect);

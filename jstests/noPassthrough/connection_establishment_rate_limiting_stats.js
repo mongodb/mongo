@@ -95,7 +95,7 @@ const testRateLimiterStats = (conn) => {
 const testRateLimiterStatsOpts = {
     ingressConnectionEstablishmentRateLimiterEnabled: true,
     ingressConnectionEstablishmentRatePerSec: 1,
-    ingressConnectionEstablishmentBurstSize: 1,
+    ingressConnectionEstablishmentBurstCapacitySecs: 1,
     ingressConnectionEstablishmentMaxQueueDepth: maxQueueSize,
 };
 runTestStandaloneParamsSetAtStartup(testRateLimiterStatsOpts, testRateLimiterStats);
