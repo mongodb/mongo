@@ -3,6 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/query-integration-extensions
-  - "json1.js":
-    approvers:
-      - 10gen/query-optimization

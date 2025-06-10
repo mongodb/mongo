@@ -29,8 +29,12 @@ describe("Timestamp shims and polyfills", function() {
     });
 
     it("tojson", function() {
+        const ts0 = new Timestamp();
+        assert.eq(ts0.tojson(), "Timestamp(0, 0)");
+
         const ts = new Timestamp(1, 2);
         assert.eq(ts.tojson(), "Timestamp(1, 2)");
+        assert.eq(toJsonForLog(ts, '', true), '{"$timestamp":{"t":1,"i":2}}');
     });
 
     it("toStringIncomparable", function() {

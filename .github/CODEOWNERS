@@ -536,7 +536,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/js/OWNERS.yml
 /jstests/core/js/**/* @10gen/query-integration-extensions @svc-auto-approve-bot
-/jstests/core/js/**/json1.js @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/memory_tracking/OWNERS.yml
 /jstests/core/memory_tracking/**/* @10gen/query-integration-observability @svc-auto-approve-bot
