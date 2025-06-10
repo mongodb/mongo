@@ -168,11 +168,6 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
     invariant(_scheduler, "TransactionCoordinator shutdown before starting");
     invariant(_sendPrepareScheduler, "TransactionCoordinator shutdown before starting");
 
-    onCompletion().unsafeToInlineFuture().getAsync([this, self = shared_from_this()](auto) {
-        auto* tcs = TransactionCoordinatorService::get(_serviceContext);
-        tcs->notifyCoordinatorFinished(self);
-    });
-
     auto apiParams = APIParameters::get(operationContext);
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);
@@ -457,6 +452,16 @@ void TransactionCoordinator::start(OperationContext* operationContext) {
         })
         .getAsync([this, self = shared_from_this(), deadlineFuture = std::move(deadlineFuture)](
                       Status s) mutable {
+            // Prior to initiating the shutdown phases of the TransactionCoordinator lifecycle,
+            // inform our parent service that it can remove its references to this instance. This
+            // must be done strictly after all other logic except the shutdown phases which are
+            // initiated later in this continuation.
+            {
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
+                auto* tcs = TransactionCoordinatorService::get(_serviceContext);
+                tcs->notifyCoordinatorFinished(self);
+            }
+
             // Interrupt this coordinator's scheduler hierarchy and join the deadline task's future
             // in order to guarantee that there are no more threads running within the coordinator.
             _scheduler->shutdown(
