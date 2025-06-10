@@ -190,6 +190,10 @@ public:
         // changed. If a subsequent collMod operation changes either 'bucketRoundingSeconds' or
         // 'bucketMaxSpanSeconds', we set the flag to true.
         boost::optional<bool> timeseriesBucketingParametersHaveChanged;
+
+        // Parsed value of the time-series mixed-schema flag stored in the backwards-compatible
+        // field in the collection options (md.options.storageEngine.wiredTiger.configString).
+        boost::optional<bool> _durableTimeseriesBucketsMayHaveMixedSchemaData;
     };
 };
 }  // namespace mongo
