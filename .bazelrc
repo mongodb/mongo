@@ -395,10 +395,6 @@ common:macos --macos_minimum_os=11.0
 # TODO(SERVER-102959): Find out why tests fail when mac is not in compilation mode dbg
 common:macos -c dbg
 
-# TODO(SERVER-93585): Remove this and fix s2 to work with Bazel's default which
-#                     sets COMPILER_MSVC on windows.
-common:windows --cxxopt=-UCOMPILER_MSVC
-
 # Remote execution and caching is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the --config=local option
 
