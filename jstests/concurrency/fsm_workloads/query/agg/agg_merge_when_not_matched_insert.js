@@ -27,9 +27,23 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const res = db[collName].aggregate([
             {
                 $project: {
-                    "_id.tid": {$literal: this.tid},
-                    "_id.count": {$literal: this.threadRunCount},
-                    "_id.doc": "$_id"
+                    // The code below originally wrote `this.tid`, `this.threadRunCount`, and `$_id`
+                    // into an object and used this as _id field. However, using an object as id led
+                    // to poor performance when sharding (see SERVER-94976). Therefore, we create
+                    // a numerical _id by combining these components to a single number. We use the
+                    // formula below to have a stable _id without collisions with existing documents
+                    // using ids 0..99.
+                    "_id": {
+                        $add: [
+                            100,
+                            {$multiply: [this.tid, 100_000_000]},
+                            {$multiply: [this.threadRunCount, 1_000_000]},
+                            {$mod: ["$_id", 1_000_000]}
+                        ]
+                    },
+                    "meta.tid": {$literal: this.tid},
+                    "meta.count": {$literal: this.threadRunCount},
+                    "meta.doc": "$_id"
                 }
             },
             {
@@ -46,7 +60,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             let count;
             try {
                 count = db[this.collWithMigrations]
-                            .find({"_id.tid": this.tid, "_id.count": this.threadRunCount})
+                            .find({"meta.tid": this.tid, "meta.count": this.threadRunCount})
                             .itcount();
             } catch (e) {
                 if (e.code != ErrorCodes.QueryPlanKilled) {

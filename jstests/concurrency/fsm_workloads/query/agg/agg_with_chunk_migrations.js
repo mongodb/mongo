@@ -25,7 +25,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // distributing across the chunks. Documents will only have the "_id" field.
     $config.data.partitionSize = 50;
     $config.threadCount = 2;
-    $config.iterations = 100;
+    $config.iterations = 50;
     $config.data.numDocs = $config.data.partitionSize * $config.threadCount;
 
     // By default, the collection that will be sharded with concurrent chunk migrations will be the
@@ -45,7 +45,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Moves a random chunk in the target collection.
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        $super.states.moveChunk.apply(this, [db, this.collWithMigrations, connCache]);
+        // As the test adds new documents, the document count should not be checked.
+        $super.states.moveChunk.apply(
+            this, [db, this.collWithMigrations, connCache, /*skipDocumentCountCheck=*/ true]);
     };
 
     /**

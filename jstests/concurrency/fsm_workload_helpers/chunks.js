@@ -195,6 +195,8 @@ export var ChunkHelper = (function() {
     }
 
     // Return the number of docs in [lower, upper) as seen by conn.
+    // Note it will ignore those documents whose shardKey value type does not match the type of
+    // lower/upper.
     function getNumDocs(conn, collName, lower, upper) {
         var coll = conn.getCollection(collName);
         var query = {$and: [{_id: {$gte: lower}}, {_id: {$lt: upper}}]};

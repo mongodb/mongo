@@ -25,7 +25,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Re-assign a chunk from this thread's partition to a random shard, and
     // verify that each node in the cluster affected by the moveChunk operation sees
     // the appropriate after-state regardless of whether the operation succeeded or failed.
-    $config.states.moveChunk = function moveChunk(db, collName, connCache) {
+    // Set `skipDocumentCountCheck` to true to skip verifying the number of documents in the chunk
+    // before and after the migration.
+    $config.states.moveChunk = function moveChunk(
+        db, collName, connCache, skipDocumentCountCheck = false) {
         // Committing a chunk migration requires acquiring the global X lock on the CSRS primary.
         // This state function is unsafe to automatically run inside a multi-statement transaction
         // because it'll have left an idle transaction on the CSRS primary before attempting to run
@@ -100,17 +103,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
                 assert.eq(fromShardNumDocsAfter, 0, msg);
             }
-            msg = 'moveChunk succeeded but new shard did not contain all documents.\n' + msgBase +
-                ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assert.eq(toShardNumDocsAfter, numDocsBefore, msg);
+            if (!skipDocumentCountCheck) {
+                msg = 'moveChunk succeeded but new shard did not contain all documents.\n' +
+                    msgBase + ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
+                assert.eq(toShardNumDocsAfter, numDocsBefore, msg);
+            }
         }
         // If the moveChunk operation failed, verify that the shard the chunk was
         // originally on returns all data for the chunk, and the shard the chunk
         // was supposed to be moved to returns no data for the chunk.
         else {
-            msg = 'moveChunk failed but original shard did not contain all documents.\n' + msgBase +
-                ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assert.eq(fromShardNumDocsAfter, numDocsBefore, msg);
+            if (!skipDocumentCountCheck) {
+                msg = 'moveChunk failed but original shard did not contain all documents.\n' +
+                    msgBase + ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
+                assert.eq(fromShardNumDocsAfter, numDocsBefore, msg);
+            }
         }
 
         // Verify that all config servers have the correct after-state.
@@ -140,10 +147,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Regardless of if the moveChunk operation succeeded or failed,
             // verify that each mongos sees as many documents in the chunk's
             // range after the move as there were before.
-            var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
-            msg = 'Number of documents in range seen by mongos changed with moveChunk, range: ' +
-                tojson(bounds) + '.\n' + msgBase;
-            assert.eq(numDocsAfter, numDocsBefore, msg);
+            if (!skipDocumentCountCheck) {
+                var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
+                msg =
+                    'Number of documents in range seen by mongos changed with moveChunk, range: ' +
+                    tojson(bounds) + '.\n' + msgBase;
+                assert.eq(numDocsAfter, numDocsBefore, msg);
+            }
 
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
             // chunk's range on only the toShard. If the operation failed, verify that each mongos
