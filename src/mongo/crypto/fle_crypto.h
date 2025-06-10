@@ -357,13 +357,6 @@ public:
     static StatusWith<ESCNullDocument> decryptNullDocument(
         const ESCTwiceDerivedValueToken& valueToken, BSONObj&& doc);
 
-    /**
-     * Search for the highest document id for a given field/value pair based on the token.
-     */
-    static boost::optional<uint64_t> emuBinary(const FLEStateCollectionReader& reader,
-                                               const ESCTwiceDerivedTagToken& tagToken,
-                                               const ESCTwiceDerivedValueToken& valueToken);
-
     // ===== Protocol Version 2 =====
     /**
      * Generate the _id value for a non-anchor record
