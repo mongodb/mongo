@@ -31,21 +31,6 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
-/**
- * Overflow a capped collection 'coll' by continuously inserting a given document,
- * 'docToInsert'.
- */
-function overflowCappedColl(coll, docToInsert) {
-    // Insert one document and save its _id.
-    assert.commandWorked(coll.insert(docToInsert));
-    var origFirstDocId = coll.findOne()["_id"];
-
-    // Detect overflow by seeing if the original first doc of the collection is still present.
-    while (coll.findOne({_id: origFirstDocId})) {
-        assert.commandWorked(coll.insert(docToInsert));
-    }
-}
-
 // Set up replica set.
 var testName = "initial_sync_capped_index";
 var dbName = testName;
@@ -58,27 +43,25 @@ var primaryDB = primary.getDB(dbName);
 var cappedCollName = "capped_coll";
 var primaryCappedColl = primaryDB[cappedCollName];
 
-// Create a capped collection of the minimum allowed size.
-var cappedCollSize = 4096;
+const cappedMaxCount = 5;
+const additionalDocumentCount = 2;
 
-jsTestLog("Creating capped collection of size " + cappedCollSize + " bytes.");
+jsTestLog(`Creating capped collection with max ${cappedMaxCount} documents`);
 assert.commandWorked(
-    primaryDB.createCollection(cappedCollName, {capped: true, size: cappedCollSize}));
+    primaryDB.createCollection(cappedCollName, {capped: true, size: 4096, max: cappedMaxCount}));
+assert.commandWorked(primaryCappedColl.createIndex({a: 1}));
 
-// Overflow the capped collection.
-jsTestLog("Overflowing the capped collection.");
+jsTestLog(
+    `Inserting ${cappedMaxCount} documents so that the next insertion will delete a document`);
+for (let i = 0; i < cappedMaxCount; ++i) {
+    assert.commandWorked(primaryCappedColl.insert({_id: i, a: i}));
+}
 
-var docSize = cappedCollSize / 8;
-var largeDoc = {a: "*".repeat(docSize)};
-overflowCappedColl(primaryCappedColl, largeDoc);
-
-// Check that there are more than two documents in the collection. This will ensure the
-// secondary's collection cloner will send a getMore.
-assert.gt(primaryCappedColl.find().itcount(), 2);
-
-// Add a SECONDARY node. It should use batchSize=2 for its initial sync queries.
+// Add a SECONDARY node. It should use batchSize=3 for its initial sync queries. The batch size
+// needs to be greater than `additionalDocumentCount` or the initial sync will fail and restart
+// rather than inserting too many documents.
 jsTestLog("Adding secondary node.");
-replTest.add({rsConfig: {votes: 0, priority: 0}, setParameter: "collectionClonerBatchSize=2"});
+replTest.add({rsConfig: {votes: 0, priority: 0}, setParameter: "collectionClonerBatchSize=3"});
 
 var secondary = replTest.getSecondary();
 var collectionClonerFailPoint = "initialSyncHangCollectionClonerAfterHandlingBatchResponse";
@@ -97,9 +80,8 @@ failPoint.wait();
 
 // Append documents to the capped collection so that the SECONDARY will clone these
 // additional documents.
-var docsToAppend = 2;
-for (var i = 0; i < docsToAppend; i++) {
-    assert.commandWorked(primaryDB[cappedCollName].insert(largeDoc));
+for (let i = cappedMaxCount; i < cappedMaxCount + additionalDocumentCount; ++i) {
+    assert.commandWorked(primaryCappedColl.insert({_id: i, a: i}));
 }
 
 // Let the 'getMore' requests for the capped collection clone continue.
@@ -119,4 +101,16 @@ var validate_result = secondaryCappedColl.validate({full: true});
 var failMsg =
     "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
 assert(validate_result.valid, failMsg);
+
+// Verify that the replicated collection has the expected documents and querying on the indexes
+// works
+for (let i = 0; i < additionalDocumentCount; ++i) {
+    assert(!secondaryCappedColl.findOne({_id: i}));
+    assert(!secondaryCappedColl.findOne({a: i}));
+}
+for (let i = additionalDocumentCount; i < cappedMaxCount + additionalDocumentCount; ++i) {
+    assert(secondaryCappedColl.findOne({_id: i}));
+    assert(secondaryCappedColl.findOne({a: i}));
+}
+
 replTest.stopSet();

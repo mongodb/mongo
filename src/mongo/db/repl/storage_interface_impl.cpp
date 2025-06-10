@@ -261,78 +261,45 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         .setFlags(DocumentValidationSettings::kDisableSchemaValidation |
                   DocumentValidationSettings::kDisableInternalValidation);
 
-    std::unique_ptr<CollectionBulkLoader> loader;
     // Retry if WCE.
-    Status status = writeConflictRetry(opCtx.get(), "beginCollectionClone", nss, [&] {
-        UnreplicatedWritesBlock uwb(opCtx.get());
+    auto loader = writeConflictRetry(
+        opCtx.get(),
+        "beginCollectionClone",
+        nss,
+        [&]() -> StatusWith<std::unique_ptr<CollectionBulkLoaderImpl>> {
+            UnreplicatedWritesBlock uwb(opCtx.get());
 
-        // Get locks and create the collection.
-        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_IX);
-        AutoGetCollection coll(opCtx.get(), nss, MODE_X);
-        if (coll) {
-            return Status(ErrorCodes::NamespaceExists,
-                          str::stream()
-                              << "Collection " << nss.toStringForErrorMsg() << " already exists.");
-        }
-        {
-            // Create the collection.
-            WriteUnitOfWork wunit(opCtx.get());
-            auto db = autoDb.ensureDbExists(opCtx.get());
-            fassert(40332, db->createCollection(opCtx.get(), nss, options, false));
-            wunit.commit();
-        }
-
-        // Build empty capped indexes.  Capped indexes cannot be built by the MultiIndexBlock
-        // because the cap might delete documents off the back while we are inserting them into
-        // the front.
-        if (options.capped) {
-            WriteUnitOfWork wunit(opCtx.get());
-            CollectionWriter collWriter{opCtx.get(), coll};
-            if (!idIndexSpec.isEmpty()) {
-                auto status = collWriter.getWritableCollection(opCtx.get())
-                                  ->getIndexCatalog()
-                                  ->createIndexOnEmptyCollection(
-                                      opCtx.get(),
-                                      collWriter.getWritableCollection(opCtx.get()),
-                                      idIndexSpec);
-                if (!status.getStatus().isOK()) {
-                    return status.getStatus();
-                }
+            // Get locks and create the collection.
+            AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_IX);
+            AutoGetCollection coll(opCtx.get(), nss, MODE_X);
+            if (coll) {
+                return Status(ErrorCodes::NamespaceExists,
+                              str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                            << " already exists.");
             }
-            for (auto&& spec : secondaryIndexSpecs) {
-                auto status =
-                    collWriter.getWritableCollection(opCtx.get())
-                        ->getIndexCatalog()
-                        ->createIndexOnEmptyCollection(
-                            opCtx.get(), collWriter.getWritableCollection(opCtx.get()), spec);
-                if (!status.getStatus().isOK()) {
-                    return status.getStatus();
-                }
+            {
+                // Create the collection.
+                WriteUnitOfWork wunit(opCtx.get());
+                auto db = autoDb.ensureDbExists(opCtx.get());
+                fassert(40332, db->createCollection(opCtx.get(), nss, options, false));
+                wunit.commit();
             }
-            wunit.commit();
+
+            // Instantiate the CollectionBulkLoader here so that it acquires the same MODE_X lock
+            // we've used in this scope. The BulkLoader will manage an AutoGet of its own to control
+            // the lifetime of the lock. This is safe to do as we're in the initial sync phase and
+            // the node isn't yet available to users.
+            return std::make_unique<CollectionBulkLoaderImpl>(
+                Client::releaseCurrent(), std::move(opCtx), nss);
+        });
+
+    if (loader.isOK()) {
+        if (auto status = loader.getValue()->init(idIndexSpec, secondaryIndexSpecs);
+            !status.isOK()) {
+            return status;
         }
-
-        // Instantiate the CollectionBulkLoader here so that it acquires the same MODE_X lock we've
-        // used in this scope. The BulkLoader will manage an AutoGet of its own to control the
-        // lifetime of the lock. This is safe to do as we're in the initial sync phase and the node
-        // isn't yet available to users.
-        loader =
-            std::make_unique<CollectionBulkLoaderImpl>(Client::releaseCurrent(),
-                                                       std::move(opCtx),
-                                                       nss,
-                                                       options.capped ? BSONObj() : idIndexSpec);
-        return Status::OK();
-    });
-
-    if (!status.isOK()) {
-        return status;
     }
-
-    status = loader->init(options.capped ? std::vector<BSONObj>() : secondaryIndexSpecs);
-    if (!status.isOK()) {
-        return status;
-    }
-    return {std::move(loader)};
+    return loader;
 }
 
 Status StorageInterfaceImpl::insertDocument(OperationContext* opCtx,

@@ -61,16 +61,14 @@ namespace repl {
 
 CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient client,
                                                    ServiceContext::UniqueOperationContext opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& idIndexSpec)
+                                                   const NamespaceString& nss)
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
       _acquisition(
           acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(_opCtx.get(), nss, MODE_X)),
       _nss{nss},
       _idIndexBlock(std::make_unique<MultiIndexBlock>()),
-      _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()),
-      _idIndexSpec(idIndexSpec.getOwned()) {
+      _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()) {
     invariant(_opCtx);
 }
 
@@ -83,8 +81,9 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
     }
 }
 
-Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
-    return _runTaskReleaseResourcesOnFailure([&secondaryIndexSpecs, this]() -> Status {
+Status CollectionBulkLoaderImpl::init(const BSONObj& idIndexSpec,
+                                      const std::vector<BSONObj>& secondaryIndexSpecs) {
+    return _runTaskReleaseResourcesOnFailure([&] {
         // This method is called during initial sync of a replica set member, so we can safely tell
         // the index builders to build in the foreground instead of using the hybrid approach. The
         // member won't be available to be queried by anyone until it's caught up with the primary.
@@ -93,10 +92,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
         _secondaryIndexesBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
         _idIndexBlock->setIndexBuildMethod(IndexBuildMethod::kForeground);
         return writeConflictRetry(
-            _opCtx.get(),
-            "CollectionBulkLoader::init",
-            _acquisition.nss(),
-            [&secondaryIndexSpecs, this] {
+            _opCtx.get(), "CollectionBulkLoader::init", _acquisition.nss(), [&] {
                 CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                 WriteUnitOfWork wuow(_opCtx.get());
                 // All writes in CollectionBulkLoaderImpl should be unreplicated.
@@ -108,7 +104,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
                     _opCtx.get(), collWriter.get(), secondaryIndexSpecs);
                 auto totalIndexBuildsIncludingIdIndex =
-                    specs.size() + (_idIndexSpec.isEmpty() ? 0 : 1);
+                    specs.size() + (idIndexSpec.isEmpty() ? 0 : 1);
                 auto maxInitialSyncIndexBuildMemoryUsageBytes =
                     static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 *
                     1024;
@@ -132,13 +128,13 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                 } else {
                     _secondaryIndexesBlock.reset();
                 }
-                if (!_idIndexSpec.isEmpty()) {
+                if (!idIndexSpec.isEmpty()) {
                     auto maxIdIndexMemoryUsageBytes =
                         maxInitialSyncIndexBuildMemoryUsageBytes / totalIndexBuildsIncludingIdIndex;
                     auto status = _idIndexBlock
                                       ->init(_opCtx.get(),
                                              collWriter,
-                                             _idIndexSpec,
+                                             idIndexSpec,
                                              MultiIndexBlock::kNoopOnInitFn,
                                              maxIdIndexMemoryUsageBytes)
                                       .getStatus();
@@ -155,113 +151,59 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
     });
 }
 
-Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
-    const std::vector<BSONObj>::const_iterator begin,
-    const std::vector<BSONObj>::const_iterator end,
-    ParseRecordIdAndDocFunc fn) {
-    auto iter = begin;
-    while (iter != end) {
-        std::vector<RecordId> locs;
-        Status status = writeConflictRetry(
-            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsUncapped", _nss, [&] {
-                WriteUnitOfWork wunit(_opCtx.get());
-                auto insertIter = iter;
-                int bytesInBlock = 0;
-                locs.clear();
-
-                auto onRecordInserted = [&](const RecordId& location) {
-                    locs.emplace_back(location);
-                    return Status::OK();
-                };
-
-                while (insertIter != end && bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
-                    const auto& [replRid, doc] = fn(*insertIter++);
-                    bytesInBlock += doc.objsize();
-                    // This version of insert will not update any indexes.
-                    auto status = collection_internal::insertDocumentForBulkLoader(
-                        _opCtx.get(),
-                        _acquisition.getCollectionPtr(),
-                        doc,
-                        replRid,
-                        onRecordInserted);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                }
-
-                wunit.commit();
+Status CollectionBulkLoaderImpl::insertDocuments(std::span<BSONObj> objs,
+                                                 ParseRecordIdAndDocFunc fn) {
+    UnreplicatedWritesBlock uwb(_opCtx.get());
+    return _runTaskReleaseResourcesOnFailure([&] {
+        auto iter = objs.begin();
+        while (iter != objs.end()) {
+            std::vector<RecordId> locs;
+            auto onRecordInserted = [&](const RecordId& location) {
+                locs.emplace_back(location);
                 return Status::OK();
-            });
+            };
 
-        if (!status.isOK()) {
-            return status;
-        }
+            Status status = writeConflictRetry(
+                _opCtx.get(), "CollectionBulkLoaderImpl/insertDocuments", _nss, [&] {
+                    WriteUnitOfWork wunit(_opCtx.get());
+                    auto insertIter = iter;
+                    int bytesInBlock = 0;
+                    locs.clear();
 
-        // Inserts index entries into the external sorter. This will not update pre-existing
-        // indexes. Wrap this in a WUOW since the index entry insertion may modify the durable
-        // record store which can throw a write conflict exception.
-        status = writeConflictRetry(_opCtx.get(), "_addDocumentToIndexBlocks", _nss, [&] {
-            WriteUnitOfWork wunit(_opCtx.get());
-            for (size_t index = 0; index < locs.size(); ++index) {
+                    while (insertIter != objs.end() &&
+                           bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
+                        const auto& [replRid, doc] = fn(*insertIter++);
+                        bytesInBlock += doc.objsize();
+                        // Insert the documents without updating indexes because we're building the
+                        // indexes separately via the bulk builder.
+                        auto status = collection_internal::insertDocumentForBulkLoader(
+                            _opCtx.get(),
+                            _acquisition.getCollectionPtr(),
+                            doc,
+                            replRid,
+                            onRecordInserted);
+                        if (!status.isOK()) {
+                            return status;
+                        }
+                    }
+
+                    wunit.commit();
+                    return Status::OK();
+                });
+
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // Insert index entries into the external sorter for bulk building.
+            for (auto& loc : locs) {
                 const auto& [_, doc] = fn(*iter++);
-                status = _addDocumentToIndexBlocks(doc, locs.at(index));
-                if (!status.isOK()) {
+                if (auto status = _addDocumentToIndexBlocks(doc, loc); !status.isOK()) {
                     return status;
                 }
             }
-            wunit.commit();
-            return Status::OK();
-        });
-
-        if (!status.isOK()) {
-            return status;
         }
-    }
-    return Status::OK();
-}
-
-Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
-    const std::vector<BSONObj>::const_iterator begin,
-    const std::vector<BSONObj>::const_iterator end,
-    ParseRecordIdAndDocFunc fn) {
-    for (auto iter = begin; iter != end; ++iter) {
-        RecordId rid;
-        BSONObj doc;
-        std::tie(rid, doc) = fn(*iter);
-
-        invariant(rid.isNull(),
-                  str::stream() << "Expected null recordId to be returned by parser but was "
-                                << rid);
-        Status status = writeConflictRetry(
-            _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsCapped", _nss, [&] {
-                WriteUnitOfWork wunit(_opCtx.get());
-                // For capped collections, we use regular insertDocument, which
-                // will update pre-existing indexes.
-                auto status = collection_internal::insertDocument(
-                    _opCtx.get(), _acquisition.getCollectionPtr(), InsertStatement(doc), nullptr);
-                if (!status.isOK()) {
-                    return status;
-                }
-                wunit.commit();
-                return Status::OK();
-            });
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                                 const std::vector<BSONObj>::const_iterator end,
-                                                 ParseRecordIdAndDocFunc fn) {
-    return _runTaskReleaseResourcesOnFailure([&] {
-        UnreplicatedWritesBlock uwb(_opCtx.get());
-        if (_idIndexBlock || _secondaryIndexesBlock) {
-            return _insertDocumentsForUncappedCollection(begin, end, fn);
-        } else {
-            return _insertDocumentsForCappedCollection(begin, end, fn);
-        }
+        return Status::OK();
     });
 }
 

@@ -532,7 +532,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
             : ([](const BSONObj& doc) { return std::make_pair(RecordId(0), doc); });
         // The insert must be done within the lock, because CollectionBulkLoader is not
         // thread safe.
-        uassertStatusOK(_collLoader->insertDocuments(docs.cbegin(), docs.cend(), fn));
+        uassertStatusOK(_collLoader->insertDocuments(docs, fn));
     }
 
     initialSyncHangDuringCollectionClone.executeIf(

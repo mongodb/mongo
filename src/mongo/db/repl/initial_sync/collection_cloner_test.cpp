@@ -544,8 +544,7 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsFailed) {
 
     // Modify the loader so insert documents fails.
     ASSERT(_loader != nullptr);
-    _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
-                               const std::vector<BSONObj>::const_iterator end,
+    _loader->insertDocsFn = [](std::span<BSONObj> docs,
                                CollectionBulkLoader::ParseRecordIdAndDocFunc fn) {
         return Status(ErrorCodes::OperationFailed, "");
     };
@@ -1094,13 +1093,12 @@ TEST_F(CollectionClonerTestResumable, RecordIdsReplicatedFindProjects) {
 
     // Intercept the loader's attempt to insert documents.
     ASSERT(_loader != nullptr);
-    _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
-                               const std::vector<BSONObj>::const_iterator end,
+    _loader->insertDocsFn = [](std::span<BSONObj> docs,
                                CollectionBulkLoader::ParseRecordIdAndDocFunc fn) {
-        for (auto iter = begin; iter != end; iter++) {
-            LOGV2(8613800, "Processing projected document", "doc"_attr = *iter);
-            ASSERT(iter->nFields() == 1);
-            ASSERT(iter->hasField("d"));
+        for (auto&& doc : docs) {
+            LOGV2(8613800, "Processing projected document", "doc"_attr = doc);
+            ASSERT(doc.nFields() == 1);
+            ASSERT(doc.hasField("d"));
         }
 
         // Assert that the correct parsing function was passed in, i.e. a function
