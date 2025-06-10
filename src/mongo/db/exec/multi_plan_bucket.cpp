@@ -114,22 +114,6 @@ private:
 const auto bucketTableDecoration = Collection::declareDecoration<BucketTablePointer>();
 }  // namespace
 
-MultiPlanTokens::MultiPlanTokens(MultiPlanTokens&& other) {
-    _tokensCount = other._tokensCount;
-    other._tokensCount = 0;
-    _bucket = std::move(other._bucket);
-}
-
-MultiPlanTokens& MultiPlanTokens::operator=(MultiPlanTokens&& other) {
-    if (this != &other) {
-        _tokensCount = other._tokensCount;
-        other._tokensCount = 0;
-        _bucket = std::move(other._bucket);
-    }
-
-    return *this;
-}
-
 MultiPlanTokens::~MultiPlanTokens() {
     if (_tokensCount == 0) {
         return;

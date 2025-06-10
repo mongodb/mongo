@@ -110,14 +110,24 @@ private:
 class MultiPlanTokens {
 public:
     MultiPlanTokens(size_t tokensCount, std::weak_ptr<MultiPlanBucket> bucket)
-        : _tokensCount(tokensCount), _bucket(bucket) {}
+        : _tokensCount(tokensCount), _bucket(std::move(bucket)) {}
 
     MultiPlanTokens(const MultiPlanTokens&) = delete;
-    MultiPlanTokens(MultiPlanTokens&& other);
+
+    MultiPlanTokens(MultiPlanTokens&& other) noexcept
+        : _tokensCount(std::exchange(other._tokensCount, 0)),
+          _bucket(std::exchange(other._bucket, {})) {}
 
 
     MultiPlanTokens& operator=(const MultiPlanTokens&) = delete;
-    MultiPlanTokens& operator=(MultiPlanTokens&& other);
+
+    MultiPlanTokens& operator=(MultiPlanTokens&& other) noexcept {
+        if (this != &other) {
+            _tokensCount = std::exchange(other._tokensCount, 0);
+            _bucket = std::exchange(other._bucket, {});
+        }
+        return *this;
+    }
 
     ~MultiPlanTokens();
 
