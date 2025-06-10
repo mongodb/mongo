@@ -282,11 +282,12 @@ void GroupProcessor::spill() {
     }
     _sortedFiles.emplace_back(writer.done());
 
-    int64_t spilledBytes =
-        _spillStats->bytesSpilled() - _stats.spillingStats.getSpilledDataStorageSize();
-    groupCounters.incrementPerSpilling(1 /* spills */, spilledBytes, spilledRecords, spilledBytes);
-    _stats.spillingStats.updateSpillingStats(
+    auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
         1, _memoryTracker.currentMemoryBytes(), spilledRecords, _spillStats->bytesSpilled());
+    groupCounters.incrementPerSpilling(1 /* spills */,
+                                       _memoryTracker.currentMemoryBytes(),
+                                       spilledRecords,
+                                       spilledDataStorageIncrease);
 
     // Zero out the current per-accumulation statement memory consumption, as the memory has been
     // freed by spilling.

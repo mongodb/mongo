@@ -186,7 +186,7 @@ testSpillingMetrics({
 });
 testSpillingMetrics({
     stageName: 'group',
-    expectedSpillingMetrics: {spills: 10, spilledBytes: 410},
+    expectedSpillingMetrics: {spills: 10, spilledBytes: 1920},
     expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 450}
 });
 testSpillingMetrics({

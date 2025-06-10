@@ -56,9 +56,14 @@ public:
     }
 
     void incrementSpilledDataStorageSize(uint64_t spilledDataStorageSize);
-    void updateSpilledDataStorageSize(uint64_t totalSpilledDataStorageSize) {
+
+    // Updates the spilled data storage size and returns the incremental change.
+    uint64_t updateSpilledDataStorageSize(uint64_t totalSpilledDataStorageSize) {
+        uint64_t currentSpilledDataStorageSize = _spilledDataStorageSize;
         _spilledDataStorageSize = std::max(_spilledDataStorageSize, totalSpilledDataStorageSize);
+        return _spilledDataStorageSize - currentSpilledDataStorageSize;
     }
+
     uint64_t getSpilledDataStorageSize() const {
         return _spilledDataStorageSize;
     }
@@ -71,14 +76,15 @@ public:
         _spilledRecords = spilledRecords;
     }
 
-    void updateSpillingStats(uint64_t additionalSpills,
-                             uint64_t additionalSpilledBytes,
-                             uint64_t additionalSpilledRecords,
-                             uint64_t currentSpilledDataStorageSize) {
+    // Updates the spilling stats and returns the incremental change in spilled data storage size.
+    uint64_t updateSpillingStats(uint64_t additionalSpills,
+                                 uint64_t additionalSpilledBytes,
+                                 uint64_t additionalSpilledRecords,
+                                 uint64_t currentSpilledDataStorageSize) {
         incrementSpills(additionalSpills);
         incrementSpilledBytes(additionalSpilledBytes);
         incrementSpilledRecords(additionalSpilledRecords);
-        updateSpilledDataStorageSize(currentSpilledDataStorageSize);
+        return updateSpilledDataStorageSize(currentSpilledDataStorageSize);
     }
 
     void accumulate(const SpillingStats& rhs) {

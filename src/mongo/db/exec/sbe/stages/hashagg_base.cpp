@@ -210,16 +210,11 @@ void HashAggBaseStage<Derived>::spill() {
     _ht->clear();
     _htIt = _ht->end();
 
-    auto storageSizeBeforeSpillUpdate =
-        static_cast<Derived*>(this)->getHashAggStats()->spillingStats.getSpilledDataStorageSize();
-    static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
-        1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
-    auto storageSizeAfterSpillUpdate =
-        static_cast<Derived*>(this)->getHashAggStats()->spillingStats.getSpilledDataStorageSize();
-    groupCounters.incrementPerSpilling(1 /* spills */,
-                                       spilledBytes,
-                                       spilledRecords,
-                                       storageSizeAfterSpillUpdate - storageSizeBeforeSpillUpdate);
+    auto spilledDataStorageIncrease =
+        static_cast<Derived*>(this)->getHashAggStats()->spillingStats.updateSpillingStats(
+            1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
+    groupCounters.incrementPerSpilling(
+        1 /* spills */, spilledBytes, spilledRecords, spilledDataStorageIncrease);
 }
 
 template <class Derived>

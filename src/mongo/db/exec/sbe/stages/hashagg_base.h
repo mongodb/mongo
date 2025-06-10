@@ -140,6 +140,8 @@ protected:
      * Note that the 'typeBits' are needed to reconstruct the spilled 'key' to a 'MaterializedRow',
      * but are not necessary for comparison purposes. Therefore, we carry the type bits separately
      * from the record id, instead appending them to the end of the serialized 'val' buffer.
+     *
+     * Returns the size in bytes of the record that is spilled to disk.
      */
     int64_t spillRowToDisk(const value::MaterializedRow& key, const value::MaterializedRow& val);
     void spill(MemoryCheckData& mcd);

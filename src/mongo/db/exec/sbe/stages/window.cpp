@@ -202,15 +202,10 @@ void WindowStage::spill() {
     }
 
     // Record spilling statistics.
-    auto storageSizeBeforeSpillUpdate = _specificStats.spillingStats.getSpilledDataStorageSize();
-    _specificStats.spillingStats.updateSpillingStats(
+    auto spilledDataStorageIncrease = _specificStats.spillingStats.updateSpillingStats(
         1 /* spills */, spilledBytes, spilledRecords, _recordStore->storageSize(_opCtx));
-    auto storageSizeAfterSpillUpdate = _specificStats.spillingStats.getSpilledDataStorageSize();
-    setWindowFieldsCounters.incrementPerSpilling(1 /* spills */,
-                                                 spilledBytes,
-                                                 _rows.size(),
-                                                 storageSizeAfterSpillUpdate -
-                                                     storageSizeBeforeSpillUpdate);
+    setWindowFieldsCounters.incrementPerSpilling(
+        1 /* spills */, spilledBytes, _rows.size(), spilledDataStorageIncrease);
 
     // Clear the in memory window buffer.
     _rows.clear();

@@ -400,12 +400,10 @@ void TextOrStage::doForceSpill() {
     }
     _sorter->spill();
 
-    int64_t currentSpillDataStorageSize =
-        _sorterStats->bytesSpilled() - _specificStats.spillingStats.getSpilledDataStorageSize();
-    textOrCounters.incrementPerSpilling(
-        1 /*spills*/, _currentMemoryBytes, recordsToSpill, currentSpillDataStorageSize);
-    _specificStats.spillingStats.updateSpillingStats(
+    auto spilledDataStorageIncrease = _specificStats.spillingStats.updateSpillingStats(
         1 /*spills*/, _currentMemoryBytes, recordsToSpill, _sorterStats->bytesSpilled());
+    textOrCounters.incrementPerSpilling(
+        1 /*spills*/, _currentMemoryBytes, recordsToSpill, spilledDataStorageIncrease);
 
     _currentMemoryBytes = 0;
 

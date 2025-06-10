@@ -419,20 +419,19 @@ void DocumentSourceBucketAuto::doForceSpill() {
         opts.sorterTracker = &tracker;
 
         auto previousSpilledBytes = _sorterFileStats.bytesSpilledUncompressed();
-        auto previousSpilledDataStorageSize = _sorterFileStats.bytesSpilled();
 
         _sortedInput = _sortedInput->spill(opts, Sorter<Value, Document>::Settings{});
 
-        _stats.spillingStats.updateSpillingStats(1,
-                                                 _sorterFileStats.bytesSpilledUncompressed() -
-                                                     previousSpilledBytes,
-                                                 tracker.spilledKeyValuePairs.loadRelaxed(),
-                                                 _sorterFileStats.bytesSpilled());
-        bucketAutoCounters.incrementPerSpilling(
+        auto spilledDataStorageIncrease = _stats.spillingStats.updateSpillingStats(
             1,
             _sorterFileStats.bytesSpilledUncompressed() - previousSpilledBytes,
             tracker.spilledKeyValuePairs.loadRelaxed(),
-            _sorterFileStats.bytesSpilled() - previousSpilledDataStorageSize);
+            _sorterFileStats.bytesSpilled());
+        bucketAutoCounters.incrementPerSpilling(1,
+                                                _sorterFileStats.bytesSpilledUncompressed() -
+                                                    previousSpilledBytes,
+                                                tracker.spilledKeyValuePairs.loadRelaxed(),
+                                                spilledDataStorageIncrease);
     }
 }
 

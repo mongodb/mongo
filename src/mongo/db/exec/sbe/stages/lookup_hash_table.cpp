@@ -271,17 +271,10 @@ void LookupHashTable::spillBufferedValueToDisk(SpillingStore* rs,
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
 
-    auto storageSizeBeforeSpillUpdate =
-        _hashLookupStats.spillingBuffStats.getSpilledDataStorageSize();
-    _hashLookupStats.spillingBuffStats.updateSpillingStats(
+    auto spilledDataStorageIncrease = _hashLookupStats.spillingBuffStats.updateSpillingStats(
         1, spillToDiskBytes, 1, _recordStoreBuf->storageSize(_opCtx));
-    auto storageSizeAfterSpillUpdate =
-        _hashLookupStats.spillingBuffStats.getSpilledDataStorageSize();
-    lookupPushdownCounters.incrementPerSpilling(1 /* spills */,
-                                                spillToDiskBytes,
-                                                1,
-                                                storageSizeAfterSpillUpdate -
-                                                    storageSizeBeforeSpillUpdate);
+    lookupPushdownCounters.incrementPerSpilling(
+        1 /* spills */, spillToDiskBytes, 1, spilledDataStorageIncrease);
 }
 
 size_t LookupHashTable::bufferValueOrSpill(value::MaterializedRow& value) {
@@ -364,16 +357,10 @@ void LookupHashTable::spillIndicesToRecordStore(SpillingStore* rs,
     opDebug.hashLookupSpillToDisk += 1;
     opDebug.hashLookupSpillToDiskBytes += spillToDiskBytes;
 
-    auto storageSizeBeforeSpillUpdate =
-        _hashLookupStats.spillingHtStats.getSpilledDataStorageSize();
-    _hashLookupStats.spillingHtStats.updateSpillingStats(
+    auto spilledDataStorageIncrease = _hashLookupStats.spillingHtStats.updateSpillingStats(
         1 /*spills*/, spillToDiskBytes, update ? 0 : 1, _recordStoreHt->storageSize(_opCtx));
-    auto storageSizeAfterSpillUpdate = _hashLookupStats.spillingHtStats.getSpilledDataStorageSize();
-    lookupPushdownCounters.incrementPerSpilling(1 /* spills */,
-                                                spillToDiskBytes,
-                                                update ? 0 : 1,
-                                                storageSizeAfterSpillUpdate -
-                                                    storageSizeBeforeSpillUpdate);
+    lookupPushdownCounters.incrementPerSpilling(
+        1 /* spills */, spillToDiskBytes, update ? 0 : 1, spilledDataStorageIncrease);
 }
 
 void LookupHashTable::makeTemporaryRecordStore() {
