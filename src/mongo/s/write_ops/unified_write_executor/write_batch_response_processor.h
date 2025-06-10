@@ -49,7 +49,7 @@ namespace mongo::unified_write_executor {
  * // It is important that the lifetime of RoutingContext has ended, since creating collections will
  * start a new routing operation
  * // Process more rounds of batches...
- * // Generate a response based on the original command we received.
+ * // Generate a response based on the original command we recieved.
  * auto = generateClientResponse<CmdResponse>()
  */
 class WriteBatchResponseProcessor {
