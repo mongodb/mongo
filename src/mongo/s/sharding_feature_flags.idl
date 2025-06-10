@@ -158,7 +158,8 @@ feature_flags:
     featureFlagUseTopologyChangeCoordinators:
         description: "Feature flag for enabling the coordinator based topology changes."
         cpp_varname: feature_flags::gUseTopologyChangeCoordinators
-        default: false
+        default: true
+        version: 8.2
         shouldBeFCVGated: true
     # TODO (SERVER-98118): remove once 9.0 becomes last LTS.
     featureFlagShardAuthoritativeDbMetadataCRUD:
