@@ -301,13 +301,38 @@ buildvariants:
     display_name: "* Shared Library Enterprise RHEL 8 (all feature flags) Experimental"
     tags: ["suggested"]
     tasks:
-      # TODO(SERVER-90936): Remove this once streams_kafka* and streams_lambda tests can work with the "default" tag.
+      &experimental-task-list # TODO(SERVER-90936): Remove streams_kafka* and streams_lambda tests when they work with the "default" tag.
       - name: streams_kafka
       - name: streams_kafka_gwproxy
       - name: streams_lambda
       - name: streams_s3
       - name: product_limits
         cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+
+  - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    name: enterprise-rhel-8-64-bit-dynamic-all-non-rollback-feature-flags
+    display_name: "Shared Library Enterprise RHEL 8 (all non-rollback feature flags)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      test_flags: >-
+        --runAllFeatureFlagTests --disableUnreleasedIFRFlags
+
+  - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    name: enterprise-rhel-8-64-bit-dynamic-all-non-rollback-feature-flags-experimental
+    display_name: "Shared Library Enterprise RHEL 8 (all non-rollback feature flags) Experimental"
+    tags: []
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      # To force disable feature flags even on the all feature flags variant, please use this file:
+      # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+      test_flags: >-
+        --runAllFeatureFlagTests --disableUnreleasedIFRFlags
+    tasks: *experimental-task-list
 
   - name: &enterprise-rhel-8-benchmarks enterprise-rhel-8-benchmarks
     display_name: "* Enterprise RHEL 8 (Benchmarks)"
@@ -629,6 +654,26 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --runAllFeatureFlagTests
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+    tasks:
+      - name: .aggfuzzer
+      - name: .change_stream_fuzzer !.serverless
+      - name: .query_fuzzer
+      - name: .updatefuzzer
+      - name: .jstestfuzz
+
+  - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-non-rollback-feature-flags-fuzzers
+    <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
+    display_name: "Shared Library Enterprise RHEL 8 (Classic Engine all non-rollback feature flags) Fuzzers"
+    tags: []
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
+      target_resmoke_time: 30
+      max_sub_suites: 3
+      test_flags: >-
+        --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+        --runAllFeatureFlagTests --disableUnreleasedIFRFlags
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
     tasks:
       - name: .aggfuzzer

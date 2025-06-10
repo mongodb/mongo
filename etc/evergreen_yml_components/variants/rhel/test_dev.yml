@@ -121,15 +121,7 @@ buildvariants:
       - rhel8.8-small
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
-    depends_on:
-      - name: archive_dist_test
-        variant: *linux_x86_dynamic_compile_variant_name
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-    tasks:
+    tasks: &enterprise-rhel-8-64-bit-dynamic-task-list
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
@@ -142,6 +134,18 @@ buildvariants:
       - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.requires_all_feature_flags
         distros:
           - rhel8.8-medium
+
+  - <<: *linux_x86_dynamic_compile_variant_dependency
+    name: enterprise-rhel-8-64-bit-dynamic-roll-back-incremental-feature-flags
+    display_name: "Shared Library Enterprise RHEL 8 (roll back incremental feature flags)"
+    tags: ["forbid_tasks_tagged_with_experimental"]
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
+    run_on:
+      - rhel8.8-small
+    expansions:
+      <<: *enterprise-rhel-8-64-bit-dynamic-expansions
+      test_flags: --disableUnreleasedIFRFlags
+    tasks: *enterprise-rhel-8-64-bit-dynamic-task-list
 
   # TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
   # This build variant is used to test suites that use sharded cluster fixture with config shard mode.
