@@ -1770,6 +1770,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/exec/sbe/OWNERS.yml
 /src/mongo/db/exec/sbe/**/* @10gen/query-execution-sbe @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/extension/host/OWNERS.yml
+/src/mongo/db/extension/host/**/* @10gen/query-integration-extensions-api @svc-auto-approve-bot
+/src/mongo/db/extension/host/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/extension/public/OWNERS.yml
+/src/mongo/db/extension/public/**/* @10gen/query-integration-extensions-api @svc-auto-approve-bot
+/src/mongo/db/extension/public/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
 /src/mongo/db/ftdc/**/* @10gen/server-networking-and-observability @markbenvenuto @svc-auto-approve-bot
 

@@ -170,6 +170,7 @@ query:
     - src/mongo/db/commands/shardsvr_resolve_view_command*
     - src/mongo/db/commands/top_command*
     - src/mongo/db/exec/
+    - src/mongo/db/extension/
     - src/mongo/db/change_collection*
     - src/mongo/db/change_stream*
     - src/mongo/db/op_observer/change_stream_pre_images_op_observer*

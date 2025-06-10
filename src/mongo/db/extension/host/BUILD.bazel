@@ -1,0 +1,8 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)

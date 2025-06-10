@@ -1,0 +1,7 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+mongo_cc_library(
+    name = "api",
+    hdrs = ["api.h"],
+    visibility = ["//visibility:public"],
+)
