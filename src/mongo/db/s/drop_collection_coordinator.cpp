@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -296,7 +297,11 @@ void DropCollectionCoordinator::_commitDropCollection(
     const auto changeStreamsNotifierShardId = [&]() {
         auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
-        if (!_doc.getChangeStreamPreciseShardTargetingEnabled() || !collIsSharded) {
+        // TODO SERVER-73741 remove the feature flag once 9.0 becomes last LTS.
+        if (!feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+            !collIsSharded) {
             return primaryShardId;
         }
 

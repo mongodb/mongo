@@ -1722,56 +1722,16 @@ private:
     void _finalizeUpgrade(OperationContext* opCtx, const FCV requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
+        // Drain outstanding DDL operations that are incompatible with the target FCV.
         if (role && role->has(ClusterRole::ShardServer)) {
-            // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled
-            // on the lastLTS
-            if (feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(requestedVersion)) {
-                ShardingDDLCoordinatorService::getService(opCtx)
-                    ->waitForCoordinatorsOfGivenOfcvToComplete(
-                        opCtx, [requestedVersion](boost::optional<FCV> ofcv) -> bool {
-                            return ofcv != requestedVersion;
-                        });
-            } else {
-                // TODO SERVER-77915: Remove once v8.0 branches out.
-                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
-                }
-
-                // TODO SERVER-77915: Remove once v8.0 branches out.
-                if (feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
-                }
-
-                // TODO SERVER-94362: Remove once create database coordinator becomes last lts.
-                if (feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kDropDatabase);
-                }
-
-                // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
-                if (feature_flags::gSessionsCollectionCoordinatorOnConfigServer.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCreateCollection);
-                }
-
-                // TODO (SERVER-73741): Remove once 9.0 becomes last lts.
-                if (feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabledOnVersion(
-                        requestedVersion)) {
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kDropCollection);
-                }
-            }
+            // TODO SERVER-99655: remove the comment below.
+            // The draining logic relies on the OFCV infrastructure, which has been introduced in
+            // FCV 8.2 and may behave sub-optimally when requestedVersion is lower than 8.2.
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenOfcvToComplete(
+                    opCtx, [requestedVersion](boost::optional<FCV> ofcv) -> bool {
+                        return ofcv != requestedVersion;
+                    });
         }
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
@@ -1800,10 +1760,9 @@ private:
                             const multiversion::FeatureCompatibilityVersion requestedVersion) {
         auto role = ShardingState::get(opCtx)->pollClusterRole();
 
-        // TODO SERVER-99655: update once gSnapshotFCVInDDLCoordinators is enabled on the lastLTS
-        // (Ignore FCV check): Skip draining by OFCV if the feature flag is not enabled on any FCV
-        if (role && role->has(ClusterRole::ShardServer) &&
-            feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledAndIgnoreFCVUnsafe()) {
+        if (role && role->has(ClusterRole::ShardServer)) {
+            // TODO SERVER-99655: always use requestedVersion as expectedOfcv - and remove the note
+            // above about sub-optimal behavior.
             auto expectedOfcv =
                 feature_flags::gSnapshotFCVInDDLCoordinators.isEnabledOnVersion(requestedVersion)
                 ? boost::make_optional(requestedVersion)
@@ -1815,50 +1774,9 @@ private:
                     });
         }
 
-        // TODO (SERVER-73741): Remove once 9.0 becomes last lts.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabledOnVersion(
-                requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropCollection);
-        }
-
-        // The following draining of DDL coordinators are redundant if their feature flag is enabled
-        // on a version greater than or equal to that of featureFlagSnapshotFCVInDDLCoordinators.
-        // Keeping them has the purpose of allowing those features to be released independently.
-
-        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
-        if (role && role->has(ClusterRole::ConfigServer) &&
-            !feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kCreateDatabase);
-        }
-
-        // TODO (SERVER-94362) Remove once create database coordinator becomes last lts.
-        if (role && role->has(ClusterRole::ShardServer) &&
-            !feature_flags::gCreateDatabaseDDLCoordinator.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)
-                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
-                                                           DDLCoordinatorTypeEnum::kDropDatabase);
-        }
-
         // TODO (SERVER-98118): remove once 9.0 becomes last LTS.
         if (role && role->has(ClusterRole::ShardServer) &&
             !feature_flags::gShardAuthoritativeDbMetadataDDL.isEnabledOnVersion(requestedVersion)) {
-            ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
-                opCtx, [](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
-                    static constexpr std::array drainCoordinatorTypes{
-                        DDLCoordinatorTypeEnum::kMovePrimary,
-                        DDLCoordinatorTypeEnum::kDropDatabase,
-                        DDLCoordinatorTypeEnum::kCreateDatabase,
-                    };
-                    const auto opType = coordinatorInstance.operationType();
-                    return std::ranges::any_of(drainCoordinatorTypes,
-                                               [&](auto&& type) { return opType == type; });
-                });
-
             // Dropping the authoritative collections (config.shard.catalog.X) as the final step of
             // the downgrade ensures that no leftover data remains. This guarantees a clean
             // downgrade and makes it safe to upgrade again.
