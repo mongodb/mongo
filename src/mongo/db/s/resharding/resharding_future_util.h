@@ -55,6 +55,9 @@ const auto kRetryabilityPredicateIncludeWriteConcernTimeout = [](const Status& s
     return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::WriteConcernTimeout;
 };
 
+const auto kRetryabilityPredicateIncludeLockTimeout = [](const Status& status) {
+    return kDefaultRetryabilityPredicate(status) || status == ErrorCodes::LockTimeout;
+};
 
 /**
  * Converts a vector of SharedSemiFutures into a vector of ExecutorFutures.

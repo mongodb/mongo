@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator_mock.h"
@@ -358,6 +359,31 @@ BSONObj makeTestDocumentForInsert(int i) {
 
 BSONObj makeTestDocumentUpdateStatement() {
     return BSON("$inc" << BSON("x" << 1));
+}
+
+void runRandomizedLocking(OperationContext* opCtx,
+                          Locker& locker,
+                          const ResourceId& resId,
+                          AtomicWord<bool>& keepRunning) {
+    PseudoRandom random = PseudoRandom(123456);
+
+    while (keepRunning.load()) {
+        try {
+            locker.lockGlobal(opCtx, MODE_IX);
+            locker.lock(opCtx, resId, MODE_X);
+
+            // The migrationLockAcquisitionMaxWaitMS is 500 by default. Ensure the lock is held long
+            // enough to trigger the lockTimeout.
+            sleepFor(Milliseconds(500 + random.nextInt32(500)));
+
+            ASSERT(locker.unlock(resId));
+            ASSERT(locker.unlockGlobal());
+
+            sleepFor(Milliseconds(random.nextInt32(5)));
+        } catch (const DBException& ex) {
+            LOGV2(10568801, "Error during locking/unlocking", "error"_attr = ex.toString());
+        }
+    }
 }
 
 struct RecipientMetricsCommon {
@@ -1070,8 +1096,6 @@ protected:
                 recipientDoc.getTempReshardingNss(), BSON("_id" << idsInserted[i].toBSON()), false);
         }
     }
-
-    PseudoRandom _random = PseudoRandom(123456);
 
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
@@ -2332,6 +2356,51 @@ TEST_F(ReshardingRecipientServiceTest,
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 
         tempReshardingCollectionOptions = BSONObj();
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError) {
+    const std::vector<RecipientStateEnum> recipientPhases{RecipientStateEnum::kCreatingCollection,
+                                                          RecipientStateEnum::kCloning,
+                                                          RecipientStateEnum::kBuildingIndex,
+                                                          RecipientStateEnum::kApplying,
+                                                          RecipientStateEnum::kStrictConsistency};
+
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(10568802,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        PauseDuringStateTransitions phaseTransitionsGuard{controller(), {recipientPhases}};
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        // Start a thread to create randomized lock/unlock contention.
+        const ResourceId resId(RESOURCE_COLLECTION, doc.getTempReshardingNss());
+        Locker locker(opCtx->getServiceContext());
+        AtomicWord<bool> keepRunning{true};
+        stdx::thread lockThread(
+            [&] { runRandomizedLocking(opCtx.get(), locker, resId, keepRunning); });
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        for (const auto& phase : recipientPhases) {
+            phaseTransitionsGuard.wait(phase);
+            sleepFor(Milliseconds(100));
+            phaseTransitionsGuard.unset(phase);
+        }
+
+        // Signal the thread to stop and wait for its completion.
+        keepRunning.store(false);
+        lockThread.join();
+
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
 }
 

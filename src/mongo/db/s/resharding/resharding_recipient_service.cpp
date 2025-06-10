@@ -389,7 +389,11 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
                   "Recipient _runUntilStrictConsistencyOrErrored encountered transient error",
                   "error"_attr = redact(status));
         })
-        .onUnrecoverableError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(10568800,
+                  "Recipient _runUntilStrictConsistencyOrErrored encountered unrecoverable error",
+                  "error"_attr = redact(status));
+        })
         .until<Status>([abortToken](const Status& status) { return status.isOK(); })
         .on(**executor, abortToken)
         .onError([this, executor, abortToken](Status status) {
@@ -613,7 +617,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
     _markKilledExecutor->startup();
-    _retryingCancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
+    _retryingCancelableOpCtxFactory.emplace(
+        abortToken, _markKilledExecutor, resharding::kRetryabilityPredicateIncludeLockTimeout);
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor, abortToken] { return _startMetrics(executor, abortToken); })
@@ -624,7 +629,10 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
         })
         .onCompletion([this, executor, stepdownToken, abortToken](Status status) {
-            _retryingCancelableOpCtxFactory.emplace(stepdownToken, _markKilledExecutor);
+            _retryingCancelableOpCtxFactory.emplace(
+                stepdownToken,
+                _markKilledExecutor,
+                resharding::kRetryabilityPredicateIncludeLockTimeout);
             if (stepdownToken.isCanceled()) {
                 // Propagate any errors from the recipient stepping down.
                 return ExecutorFuture<bool>(**executor, status);
