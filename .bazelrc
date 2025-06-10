@@ -395,9 +395,6 @@ common:macos --macos_minimum_os=11.0
 # TODO(SERVER-102959): Find out why tests fail when mac is not in compilation mode dbg
 common:macos -c dbg
 
-# MacOS do not use the custom toolchain config, so the compiler flag need to be set here.
-common:macos --cxxopt=-std=c++20
-
 # TODO(SERVER-93585): Remove this and fix s2 to work with Bazel's default which
 #                     sets COMPILER_MSVC on windows.
 common:windows --cxxopt=-UCOMPILER_MSVC
