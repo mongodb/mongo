@@ -67,7 +67,6 @@ class HmacContext {
 public:
     HmacContext();
     ~HmacContext();
-    int reset();
     HMAC_CTX* get();
 
 private:

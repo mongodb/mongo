@@ -256,17 +256,18 @@ public:
     /**
      * Generate the _id value for an anchor record
      */
-    static PrfBlock generateAnchorId(const TagToken& tagToken, uint64_t apos);
+    static PrfBlock generateAnchorId(HmacContext* context, const TagToken& tagToken, uint64_t apos);
 
     /**
      * Generate the _id value for a null anchor record
      */
-    static PrfBlock generateNullAnchorId(const TagToken& tagToken);
+    static PrfBlock generateNullAnchorId(HmacContext* context, const TagToken& tagToken);
 
     /**
      * Calculate AnchorBinaryHops as described in OST.
      */
-    static boost::optional<uint64_t> anchorBinaryHops(const FLEStateCollectionReader& reader,
+    static boost::optional<uint64_t> anchorBinaryHops(HmacContext* context,
+                                                      const FLEStateCollectionReader& reader,
                                                       const TagToken& tagToken,
                                                       const ValueToken& valueToken,
                                                       FLEStatusSection::EmuBinaryTracker& tracker);
@@ -295,6 +296,7 @@ public:
      * padding cleanup.
      */
     static FLEEdgeCountInfo getEdgeCountInfoForPaddingCleanupCommon(
+        HmacContext* hmacCtx,
         const FLEStateCollectionReader& reader,
         const TagToken& tagToken,
         const ValueToken& valueToken,
@@ -311,13 +313,15 @@ public:
     /**
      * Generate the _id value
      */
-    static PrfBlock generateId(const ESCTwiceDerivedTagToken& tagToken,
+    static PrfBlock generateId(HmacContext* context,
+                               const ESCTwiceDerivedTagToken& tagToken,
                                boost::optional<uint64_t> index);
 
     /**
      * Generate a null document which will be the "first" document for a given field.
      */
-    static BSONObj generateNullDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateNullDocument(HmacContext* context,
+                                        const ESCTwiceDerivedTagToken& tagToken,
                                         const ESCTwiceDerivedValueToken& valueToken,
                                         uint64_t pos,
                                         uint64_t count);
@@ -325,7 +329,8 @@ public:
     /**
      * Generate a insert ESC document.
      */
-    static BSONObj generateInsertDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateInsertDocument(HmacContext* context,
+                                          const ESCTwiceDerivedTagToken& tagToken,
                                           const ESCTwiceDerivedValueToken& valueToken,
                                           uint64_t index,
                                           uint64_t count);
@@ -334,6 +339,7 @@ public:
      * Generate a compaction placeholder ESC document.
      */
     static BSONObj generateCompactionPlaceholderDocument(
+        HmacContext* context,
         const ESCTwiceDerivedTagToken& tagToken,
         const ESCTwiceDerivedValueToken& valueToken,
         uint64_t index,
@@ -362,18 +368,22 @@ public:
     /**
      * Generate the _id value for a non-anchor record
      */
-    static PrfBlock generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t cpos);
+    static PrfBlock generateNonAnchorId(HmacContext* context,
+                                        const ESCTwiceDerivedTagToken& tagToken,
+                                        uint64_t cpos);
 
     /**
      * Generate a non-anchor ESC document for inserts.
      */
-    static BSONObj generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateNonAnchorDocument(HmacContext* context,
+                                             const ESCTwiceDerivedTagToken& tagToken,
                                              uint64_t cpos);
 
     /**
      * Generate an anchor ESC document for compacts.
      */
-    static BSONObj generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateAnchorDocument(HmacContext* context,
+                                          const ESCTwiceDerivedTagToken& tagToken,
                                           const ESCTwiceDerivedValueToken& valueToken,
                                           uint64_t apos,
                                           uint64_t cpos);
@@ -381,7 +391,8 @@ public:
     /**
      * Generate a null anchor ESC document for cleanups.
      */
-    static BSONObj generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+    static BSONObj generateNullAnchorDocument(HmacContext* context,
+                                              const ESCTwiceDerivedTagToken& tagToken,
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos);
@@ -402,10 +413,12 @@ public:
      *    (x > 0) means non-null anchors exist without a null anchor OR new non-null anchors
      *            have been added since the last-recorded apos in the null anchor.
      */
-    static EmuBinaryResult emuBinaryV2(const FLEStateCollectionReader& reader,
+    static EmuBinaryResult emuBinaryV2(HmacContext* context,
+                                       const FLEStateCollectionReader& reader,
                                        const ESCTwiceDerivedTagToken& tagToken,
                                        const ESCTwiceDerivedValueToken& valueToken);
-    static boost::optional<uint64_t> binaryHops(const FLEStateCollectionReader& reader,
+    static boost::optional<uint64_t> binaryHops(HmacContext* context,
+                                                const FLEStateCollectionReader& reader,
                                                 const ESCTwiceDerivedTagToken& tagToken,
                                                 const ESCTwiceDerivedValueToken& valueToken,
                                                 boost::optional<uint64_t> x,
@@ -430,15 +443,20 @@ public:
 class ESCCollectionAnchorPadding
     : public ESCCollectionCommon<AnchorPaddingKeyToken, AnchorPaddingValueToken> {
 public:
-    static PrfBlock generateNullAnchorId(const AnchorPaddingKeyToken& tagToken);
-    static PrfBlock generateAnchorId(const AnchorPaddingKeyToken& tagToken, uint64_t apos);
+    static PrfBlock generateNullAnchorId(HmacContext* context,
+                                         const AnchorPaddingKeyToken& tagToken);
+    static PrfBlock generateAnchorId(HmacContext* context,
+                                     const AnchorPaddingKeyToken& tagToken,
+                                     uint64_t apos);
 
-    static BSONObj generateNullAnchorDocument(const AnchorPaddingKeyToken& keyToken,
+    static BSONObj generateNullAnchorDocument(HmacContext* context,
+                                              const AnchorPaddingKeyToken& keyToken,
                                               const AnchorPaddingValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t /* cpos ignored */);
 
-    static BSONObj generatePaddingDocument(const AnchorPaddingKeyToken& keyToken,
+    static BSONObj generatePaddingDocument(HmacContext* context,
+                                           const AnchorPaddingKeyToken& keyToken,
                                            const AnchorPaddingValueToken& valueToken,
                                            uint64_t apos);
 };
@@ -1327,6 +1345,8 @@ public:
     /**
      * Compute HMAC-SHA-256
      */
+    static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value, int64_t value2);
+
     static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, ConstDataRange cdr);
 
     static PrfBlock prf(HmacContext* hmacCtx, ConstDataRange key, uint64_t value);

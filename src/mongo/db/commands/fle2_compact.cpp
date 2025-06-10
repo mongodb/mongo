@@ -366,6 +366,7 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
 }
 
 void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                HmacContext* hmacCtx,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats) {
@@ -414,8 +415,12 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
     auto valueToken = ESCTwiceDerivedValueToken::deriveFrom(ecocDoc.esc);
     auto latestCpos = emuBinaryResult.cpos.value();
 
-    auto anchorDoc = ESCCollection::generateAnchorDocument(
-        ESCTwiceDerivedTagToken(countInfo.tagTokenData), valueToken, countInfo.count, latestCpos);
+    auto anchorDoc =
+        ESCCollection::generateAnchorDocument(hmacCtx,
+                                              ESCTwiceDerivedTagToken(countInfo.tagTokenData),
+                                              valueToken,
+                                              countInfo.count,
+                                              latestCpos);
 
     StmtId stmtId = kUninitializedStmtId;
 
@@ -432,6 +437,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 
 
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
+                             HmacContext* hmacCtx,
                              const NamespaceString& escNss,
                              StringData fieldPath,
                              BSONType fieldType,
@@ -495,7 +501,7 @@ void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
 
         for (; i <= numPads && batchWrite.size() < maxDocsPerInsert; i++) {
             batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
-                anchorPaddingKeyToken, anchorPaddingValueToken, apos + i));
+                hmacCtx, anchorPaddingKeyToken, anchorPaddingValueToken, apos + i));
         }
         const auto docsCount = batchWrite.size();
         checkWriteErrors(uassertStatusOK(
@@ -518,6 +524,7 @@ auto generateCompactionTokenPair(const AnchorPaddingRootToken& rootToken) {
 
 template <typename Generator, typename T>
 std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
+                                                   HmacContext* hmacCtx,
                                                    StringData fieldName,
                                                    const T& rootToken,
                                                    const NamespaceString& escNss,
@@ -588,8 +595,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
         auto latestCpos = countInfo.count;
 
         // Update null anchor with the latest positions
-        auto newAnchor =
-            Generator::generateNullAnchorDocument(tagToken, valueToken, latestApos, latestCpos);
+        auto newAnchor = Generator::generateNullAnchorDocument(
+            hmacCtx, tagToken, valueToken, latestApos, latestCpos);
         upsertNullAnchor(queryImpl, true, newAnchor, escNss, escStats);
 
     } else if (emuBinaryResult.apos.value() == 0) {
@@ -600,8 +607,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
         auto latestCpos = countInfo.count;
 
         // Insert a new null anchor.
-        auto newAnchor =
-            Generator::generateNullAnchorDocument(tagToken, valueToken, latestApos, latestCpos);
+        auto newAnchor = Generator::generateNullAnchorDocument(
+            hmacCtx, tagToken, valueToken, latestApos, latestCpos);
         upsertNullAnchor(queryImpl, false, newAnchor, escNss, escStats);
 
     } else /* (apos > 0) */ {
@@ -615,8 +622,8 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
         bool nullAnchorExists = countInfo.nullAnchorCounts.has_value();
 
         // upsert the null anchor with the latest positions
-        auto newAnchor =
-            Generator::generateNullAnchorDocument(tagToken, valueToken, latestApos, latestCpos);
+        auto newAnchor = Generator::generateNullAnchorDocument(
+            hmacCtx, tagToken, valueToken, latestApos, latestCpos);
         upsertNullAnchor(queryImpl, nullAnchorExists, newAnchor, escNss, escStats);
 
         // insert the _id of stale anchors (anchors in range [bottomApos + 1, latestApos])
@@ -626,11 +633,12 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
             bottomApos = countInfo.nullAnchorCounts->apos;
         }
 
+        HmacContext context;
         for (auto i = bottomApos + 1; i <= latestApos; i++) {
             if (anchorsToDelete.size() >= maxAnchorListLength) {
                 break;
             }
-            anchorsToDelete.push_back(Generator::generateAnchorId(tagToken, i));
+            anchorsToDelete.push_back(Generator::generateAnchorId(&context, tagToken, i));
         }
     }
     return anchorsToDelete;
@@ -638,6 +646,7 @@ std::vector<PrfBlock> cleanupOneFieldValuePairImpl(FLEQueryInterface* queryImpl,
 }  // namespace
 
 std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                                               HmacContext* hmacCtx,
                                                const ECOCCompactionDocumentV2& ecocDoc,
                                                const NamespaceString& escNss,
                                                std::size_t maxAnchorListLength,
@@ -646,6 +655,7 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
     if (mode == FLECleanupOneMode::kNormal) {
         return cleanupOneFieldValuePairImpl<ESCCollection>(
             queryImpl,
+            hmacCtx,
             ecocDoc.fieldName,
             ecocDoc.esc,
             escNss,
@@ -659,6 +669,7 @@ std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
         }
         return cleanupOneFieldValuePairImpl<ESCCollectionAnchorPadding>(
             queryImpl,
+            hmacCtx,
             ecocDoc.fieldName,
             *ecocDoc.anchorPaddingRootToken,
             escNss,
@@ -747,18 +758,20 @@ void processFLECompactV2(OperationContext* opCtx,
         auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
         auto service = opCtx->getService();
 
-        auto swResult = trun->runNoThrow(
-            opCtx,
-            [service, sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
-                                                  ExecutorPtr txnExec) {
-                FLEQueryInterfaceImpl queryImpl(txnClient, service);
+        auto swResult =
+            trun->runNoThrow(opCtx,
+                             [service, sharedBlock, innerEscStats](
+                                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                                 HmacContext hmacCtx;
+                                 FLEQueryInterfaceImpl queryImpl(txnClient, service);
 
-                auto [ecocDoc2, escNss] = *sharedBlock.get();
+                                 auto [ecocDoc2, escNss] = *sharedBlock.get();
 
-                compactOneFieldValuePairV2(&queryImpl, ecocDoc2, escNss, innerEscStats.get());
+                                 compactOneFieldValuePairV2(
+                                     &queryImpl, &hmacCtx, ecocDoc2, escNss, innerEscStats.get());
 
-                return SemiFuture<void>::makeReady();
-            });
+                                 return SemiFuture<void>::makeReady();
+                             });
 
         uassertStatusOK(swResult);
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
@@ -793,10 +806,12 @@ void processFLECompactV2(OperationContext* opCtx,
                         [service, sharedBlock, innerEscStats](
                             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                             FLEQueryInterfaceImpl queryImpl(txnClient, service);
+                            HmacContext hmacCtx;
 
                             auto [escNss, anchorPaddingFactor, rangeField, fieldPath] =
                                 *sharedBlock.get();
                             compactOneRangeFieldPad(&queryImpl,
+                                                    &hmacCtx,
                                                     escNss,
                                                     fieldPath,
                                                     rangeField.fieldType,
@@ -862,6 +877,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
                              [service, sharedBlock, innerEscStats, anchorsToRemove](
                                  const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                                  FLEQueryInterfaceImpl queryImpl(txnClient, service);
+                                 HmacContext hmacCtx;
 
                                  auto [ecocDoc2, escNss, maxAnchors2] = *sharedBlock.get();
 
@@ -869,6 +885,7 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
 
                                  *anchorsToRemove =
                                      cleanupOneFieldValuePair(&queryImpl,
+                                                              &hmacCtx,
                                                               ecocDoc2,
                                                               escNss,
                                                               maxAnchors2,
@@ -906,12 +923,14 @@ FLECleanupESCDeleteQueue processFLECleanup(OperationContext* opCtx,
              sharedBlock,
              anchorsToRemove](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
                 FLEQueryInterfaceImpl queryImpl(txnClient, service);
+                HmacContext hmacCtx;
 
                 auto [escNss, maxAnchors, fieldName, anchorPaddingRootToken] = *sharedBlock.get();
 
                 anchorsToRemove->clear();
                 *anchorsToRemove = cleanupOneFieldValuePairImpl<ESCCollectionAnchorPadding>(
                     &queryImpl,
+                    &hmacCtx,
                     fieldName,
                     anchorPaddingRootToken,
                     escNss,

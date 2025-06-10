@@ -108,6 +108,7 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
  * Used by unit tests.
  */
 void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                HmacContext* hmacCtx,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats);
@@ -117,6 +118,7 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
  * Performs compaction for Range fields to add additional padding edges.
  */
 void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
+                             HmacContext* hmacCtx,
                              const NamespaceString& escNss,
                              StringData fieldPath,
                              BSONType fieldType,
@@ -141,6 +143,7 @@ enum class FLECleanupOneMode {
 };
 
 std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                                               HmacContext* hmacCtx,
                                                const ECOCCompactionDocumentV2& ecocDoc,
                                                const NamespaceString& escNss,
                                                std::size_t maxAnchorListLength,
