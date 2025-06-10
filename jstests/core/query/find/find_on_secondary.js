@@ -7,11 +7,11 @@
  *
  * @tags: [
  *   requires_getmore,
- *   # Error: Cowardly refusing to override read preference to { "mode" : "secondary" }
- *   # TODO (SERVER-102915): Check the possibility to remove these tags.
- *   assumes_read_preference_unchanged,
- *   assumes_read_concern_unchanged,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   # It's not safe to retry any operation if the variable
+ *   # TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions is true.
+ *   # TODO remove after SERVER-103880 fixed.
+ *   does_not_support_transactions
  * ]
  */
 
@@ -27,17 +27,42 @@ const expectedDocuments = Array.from({length: documentsToInsert}).map((_, i) => 
 
 assert.commandWorked(sessionColl.insertMany(expectedDocuments));
 
-// The query can be retried on a RetryableError and the following additional errors:
-// * The ErrorCodes.QueryPlanKilled error can occur when a query is terminated on a
-// secondary during a range deletion.
-// * The ErrorCodes.CursorNotFound error can occur during query execution in test suites, typically
-// happening when, for example, the getMore command cannot be continued after simulating a crash.
-retryOnRetryableError(() => {
-    const arr = sessionColl.find().batchSize(5).readPref('secondaryPreferred').toArray();
-    assert.gt(arr.length, 0, "Failed to retrieve documents");
-    assert(arrayEq(expectedDocuments, arr), () => arrayDiff(expectedDocuments, arr));
-}, 100 /* numRetries */, 0 /* sleepMs */, [ErrorCodes.QueryPlanKilled, ErrorCodes.CursorNotFound]);
+// Skip the execution of the test from suites that directly set a read concern via
+// jstests/libs/override_methods/set_read_and_write_concerns.js if it is not supported in
+// causal consistency.
+if (TestData.defaultReadConcernLevel === "available" ||
+    TestData.defaultReadConcernLevel === "linearizable") {
+    jsTestLog("Skipping the test find_on_secondary.js because the read concern " +
+              TestData.defaultReadConcernLevel + " is not supported with causal consistency");
+    quit();
+}
 
-assert(sessionColl.drop());
+// Disable the setting of a read preference to 'secondary' for suites that directly set it via
+// jstests/libs/override_methods/set_read_preference_secondary.js, which causes
+// the error: "Cowardly refusing to override read preference to { 'mode' : 'secondary' }".
+const testDataDoNotOverrideReadPreferenceOriginal = TestData.doNotOverrideReadPreference;
+TestData.doNotOverrideReadPreference = true;
 
-session.endSession();
+try {
+    // The query can be retried on a RetryableError and the following additional errors:
+    // * The ErrorCodes.QueryPlanKilled error can occur when a query is terminated on a
+    // secondary during a range deletion.
+    // * The ErrorCodes.CursorNotFound error can occur during query execution in test suites,
+    // typically happening when, for example, the getMore command cannot be continued after
+    // simulating a crash.
+    //
+    // TODO remove retry after SERVER-103880 fixed.
+    retryOnRetryableError(
+        () => {
+            const arr = sessionColl.find().batchSize(5).readPref('secondaryPreferred').toArray();
+            assert.gt(arr.length, 0, "Failed to retrieve documents");
+            assert(arrayEq(expectedDocuments, arr), () => arrayDiff(expectedDocuments, arr));
+        },
+        100 /* numRetries */,
+        0 /* sleepMs */,
+        [ErrorCodes.QueryPlanKilled, ErrorCodes.CursorNotFound]);
+    assert(sessionColl.drop());
+    session.endSession();
+} finally {
+    TestData.doNotOverrideReadPreference = testDataDoNotOverrideReadPreferenceOriginal;
+}
