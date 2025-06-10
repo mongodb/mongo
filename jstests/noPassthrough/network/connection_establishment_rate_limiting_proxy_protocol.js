@@ -35,7 +35,7 @@ let rs = new ReplSetTest({
         setParameter: {
             ingressConnectionEstablishmentRateLimiterEnabled: true,
             ingressConnectionEstablishmentRatePerSec: 1,
-            ingressConnectionEstablishmentBurstSize: 1,
+            ingressConnectionEstablishmentBurstCapacitySecs: 1,
             ingressConnectionEstablishmentMaxQueueDepth: 0,
             ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
             featureFlagRateLimitIngressConnectionEstablishment: true

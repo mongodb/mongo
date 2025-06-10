@@ -113,16 +113,12 @@ public:
     void recordExemption();
 
     /**
-     * The number of tokens issued per second when rate-limiting has kicked in. Tokens will be
-     * issued smoothly, rather than all at once every 1 second.
+     * refreshRate is the number of tokens issued per second when rate-limiting has kicked in.
+     * Tokens will be issued smoothly, rather than all at once every 1 second. The burstSize is the
+     * maximum number of tokens that will be issued before rate-limiting kicks in (ie, the maximum
+     * number of tokens that can accumulate in the bucket).
      */
-    void setRefreshRatePerSec(double refreshRatePerSec);
-
-    /**
-     * The maximum number of tokens that will be issued before rate-limiting kicks in (ie, the
-     * maximum number of tokens that can accumulate in the bucket).
-     */
-    void setBurstSize(double burstSize);
+    void updateRateParameters(double refreshRatePerSec, double burstSize);
 
     /**
      * The maximum number of requests enqueued waiting for a token. Token requests that come in and

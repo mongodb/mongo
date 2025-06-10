@@ -65,7 +65,7 @@ IngressRequestRateLimiter::IngressRequestRateLimiter()
                    0,
                    "ingressRequestRateLimiter"} {
     if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-        _rateLimiter.setRefreshRatePerSec(kSlowest);
+        _rateLimiter.updateRateParameters(kSlowest, gIngressRequestRateLimiterBurstSize.load());
     }
 }
 
@@ -94,14 +94,15 @@ Status IngressRequestRateLimiter::admitRequest(OperationContext* opCtx,
 
 void IngressRequestRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
     if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-        _rateLimiter.setRefreshRatePerSec(kSlowest);
+        _rateLimiter.updateRateParameters(kSlowest, gIngressRequestRateLimiterBurstSize.load());
         return;
     }
-    _rateLimiter.setRefreshRatePerSec(refreshRatePerSec);
+    _rateLimiter.updateRateParameters(refreshRatePerSec,
+                                      gIngressRequestRateLimiterBurstSize.load());
 }
 
 void IngressRequestRateLimiter::setAdmissionBurstSize(std::int32_t burstSize) {
-    _rateLimiter.setBurstSize(burstSize);
+    _rateLimiter.updateRateParameters(gIngressRequestRateLimiterRatePerSec.load(), burstSize);
 }
 
 Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec) {
@@ -109,7 +110,8 @@ Status IngressRequestRateLimiter::onUpdateAdmissionRatePerSec(std::int32_t refre
         auto& instance = getIngressRequestRateLimiter(client->getServiceContext());
 
         if (MONGO_unlikely(ingressRateLimiterVerySlowRate.shouldFail())) {
-            instance->_rateLimiter.setRefreshRatePerSec(kSlowest);
+            instance->_rateLimiter.updateRateParameters(kSlowest,
+                                                        gIngressRequestRateLimiterBurstSize.load());
             return Status::OK();
         }
 

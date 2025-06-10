@@ -50,7 +50,7 @@ const testExemptIPsFromRateLimit = (conn) => {
 const testExemptIPsFromRateLimitOpts = {
     ingressConnectionEstablishmentRateLimiterEnabled: true,
     ingressConnectionEstablishmentRatePerSec: 1,
-    ingressConnectionEstablishmentBurstSize: 1,
+    ingressConnectionEstablishmentBurstCapacitySecs: 1,
     ingressConnectionEstablishmentMaxQueueDepth: 0,
     ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
 };

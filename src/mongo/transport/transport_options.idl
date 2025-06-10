@@ -109,17 +109,18 @@ server_parameters:
         validator: {gte: 1}
         redact: false
 
-    ingressConnectionEstablishmentBurstSize:
+    ingressConnectionEstablishmentBurstCapacitySecs:
         description: >-
-            The maximum number of ingress connection establishments that will be admitted before rate-limiting 
-            kicks in (ie, the burst size of the bucket)
+            Describes how many seconds worth of unutilized rate limit can be stored away for use 
+            to admit additional connection establishment requests during periods where the rate 
+            limit is temporarily exceeded.
         set_at: [startup, runtime]
-        cpp_varname: gIngressConnectionEstablishmentBurstSize
-        cpp_vartype: Atomic<int32_t>
-        on_update: transport::onUpdateEstablishmentBurstSize
+        cpp_varname: gIngressConnectionEstablishmentBurstCapacitySecs
+        cpp_vartype: Atomic<double>
+        on_update: transport::onUpdateEstablishmentBurstCapacitySecs
         default:
-            expr: std::numeric_limits<int>::max()
-        validator: {gte: 1}
+            expr: std::numeric_limits<double>::max()
+        validator: {gt: 0}
         redact: false
 
     ingressConnectionEstablishmentMaxQueueDepth:

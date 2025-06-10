@@ -147,13 +147,16 @@ Status forEachSessionManager(Callback&& updateFunc) try {
 
 Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
     return forEachSessionManager([newValue](SessionManager* sm) {
-        sm->getSessionEstablishmentRateLimiter().setRefreshRatePerSec(newValue);
+        sm->getSessionEstablishmentRateLimiter().updateRateParameters(
+            newValue, newValue * gIngressConnectionEstablishmentBurstCapacitySecs.load());
     });
 }
 
-Status onUpdateEstablishmentBurstSize(int32_t newValue) {
-    return forEachSessionManager([newValue](SessionManager* sm) {
-        sm->getSessionEstablishmentRateLimiter().setBurstSize(newValue);
+Status onUpdateEstablishmentBurstCapacitySecs(double newValue) {
+    auto refreshRate = gIngressConnectionEstablishmentRatePerSec.load();
+    return forEachSessionManager([refreshRate, burstSize = newValue](SessionManager* sm) {
+        sm->getSessionEstablishmentRateLimiter().updateRateParameters(refreshRate,
+                                                                      refreshRate * burstSize);
     });
 }
 

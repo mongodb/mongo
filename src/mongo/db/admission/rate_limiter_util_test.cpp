@@ -94,7 +94,8 @@ TEST_F(RateLimiterTest, InvalidBurstSize) {
         RateLimiter(1.0, 0, 0, "InvalidBurstSize"), DBException, ErrorCodes::InvalidOptions);
 
     RateLimiter rateLimiter(DBL_MAX, DBL_MAX, INT_MAX, "InvalidBurstSize");
-    ASSERT_THROWS_CODE(rateLimiter.setBurstSize(0), DBException, ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        rateLimiter.updateRateParameters(1.0, 0), DBException, ErrorCodes::InvalidOptions);
 }
 
 // Verify that a newly initialized RateLimiter can immediately dispense up to its burst rate of
