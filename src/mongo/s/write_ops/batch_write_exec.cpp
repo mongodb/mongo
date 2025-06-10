@@ -192,8 +192,13 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
 
         // If we already have a batch for this shard, wait until the next time
         const auto& targetShardId = nextBatch->getShardId();
-        if (pendingBatches.count(targetShardId))
+        if (pendingBatches.count(targetShardId)) {
+            LOGV2_DEBUG(9986808,
+                        4,
+                        "Waiting to send batch to shard as it already has one pending",
+                        "target shard"_attr = targetShardId);
             continue;
+        }
 
         stats->noteTargetedShard(targetShardId);
 
@@ -381,6 +386,7 @@ void executeChildBatches(OperationContext* opCtx,
             isRetryableWriteNotInInternalTxn ? Shard::RetryPolicy::kIdempotent
                                              : Shard::RetryPolicy::kNoRetry);
         numSent += pendingBatches.size();
+        LOGV2_DEBUG(9986806, 5, "Sent child batches", "numSent"_attr = numSent);
 
         std::vector<BatchedCommandResponse> batchResponses;
         batchResponses.reserve(pendingBatches.size());
@@ -773,6 +779,13 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         //    deliver in this case, since for all the client knows we may have gotten the batch
         //    exactly when the metadata changed.
         //
+        LOGV2_DEBUG(9986800,
+                    4,
+                    "Starting attempt at executing write batch",
+                    logAttrs(nss),
+                    "rounds"_attr = rounds,
+                    "numCompletedOps"_attr = numCompletedOps,
+                    "numRoundsWithoutProgress"_attr = numRoundsWithoutProgress);
 
         TargetedBatchMap childBatches;
 
@@ -781,6 +794,12 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         bool recordTargetErrors = refreshedTargeter;
         auto statusWithWriteType = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
         if (!statusWithWriteType.isOK()) {
+            LOGV2_DEBUG(9986801,
+                        4,
+                        "Encountered a targeter error",
+                        "error"_attr = statusWithWriteType.getStatus(),
+                        "will refresh"_attr = !refreshedTargeter);
+
             // Don't do anything until a targeter refresh
             targeter.noteCouldNotTarget();
             refreshedTargeter = true;
@@ -825,6 +844,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         ++rounds;
         ++stats->numRounds;
+        LOGV2_DEBUG(9986810, 4, "Completed round", "rounds completed"_attr = rounds);
 
         // If we're done, get out
         if (batchOp.isFinished())
@@ -874,6 +894,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         int currCompletedOps = batchOp.numWriteOpsIn(WriteOpState_Completed);
         if (currCompletedOps == numCompletedOps && !targeterChanged) {
+            LOGV2_DEBUG(9986809,
+                        5,
+                        "No progress made this round",
+                        "num rounds without progress"_attr = numRoundsWithoutProgress);
             ++numRoundsWithoutProgress;
         } else {
             numRoundsWithoutProgress = 0;
