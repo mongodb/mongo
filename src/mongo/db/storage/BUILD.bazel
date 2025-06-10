@@ -762,7 +762,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sorted_data_interface_bm",
     srcs = [
-        "sorted_data_interface_bm_cursor.cpp",
+        "sorted_data_interface_bm.cpp",
     ],
     deps = [
         ":sorted_data_interface_test_harness",

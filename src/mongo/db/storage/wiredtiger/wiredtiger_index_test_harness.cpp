@@ -65,7 +65,7 @@ static constexpr bool kIsLogged = false;
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
     WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        const char* config = "create,cache_size=1G,";
+        const char* config = "create,cache_size=64M,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret, nullptr);
 

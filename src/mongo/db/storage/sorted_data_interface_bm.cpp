@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/storage/sorted_data_interface.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -34,7 +36,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/unittest.h"
@@ -104,6 +105,100 @@ struct Fixture {
     size_t itemsProcessed = 0;
 };
 
+// Benchmark inserting a large number of entries into a WiredTiger table in fully sorted order using
+// a bulk cursor.
+void BM_SDIInsertionBulk(benchmark::State& state, int64_t numDocs) {
+    std::unique_ptr<SortedDataInterfaceHarnessHelper> harness =
+        newSortedDataInterfaceHarnessHelper();
+    ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
+    std::unique_ptr<SortedDataInterface> sorted =
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+
+    for (auto _ : state) {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+        auto builder = sorted->makeBulkBuilder(opCtx.get(), ru);
+
+        int64_t numDocsInserted = 0;
+        while (numDocsInserted < numDocs) {
+            for (int i = 0; i < 1000; i++) {
+                int64_t val = numDocsInserted * 1000 + i + 1;
+                BSONObj key = BSON("" << val);
+                RecordId loc(val);
+
+                WriteUnitOfWork wunit(opCtx.get());
+                builder->addKey(ru, makeKeyString(sorted.get(), key, loc));
+                wunit.commit();
+            }
+            numDocsInserted += 1000;
+            state.SetItemsProcessed(numDocsInserted);
+        }
+    }
+};
+
+// Benchmark inserting a large number of entries into a WiredTiger table in fully sorted order, in
+// batches of 1000 docs using StorageWriteTransaction.
+void BM_SDIInsertion(benchmark::State& state, int64_t numDocs) {
+    std::unique_ptr<SortedDataInterfaceHarnessHelper> harness =
+        newSortedDataInterfaceHarnessHelper();
+    ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
+    std::unique_ptr<SortedDataInterface> sorted =
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+
+    for (auto _ : state) {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+        int64_t numDocsInserted = 0;
+        while (numDocsInserted < numDocs) {
+            StorageWriteTransaction txn(ru);
+            for (int i = 0; i < 1000; i++) {
+                int64_t val = numDocsInserted * 1000 + i + 1;
+                BSONObj key = BSON("" << val);
+                RecordId loc(val);
+                ASSERT_SDI_INSERT_OK(
+                    sorted->insert(opCtx.get(), ru, makeKeyString(sorted.get(), key, loc), true));
+            }
+            txn.commit();
+            numDocsInserted += 1000;
+            state.SetItemsProcessed(numDocsInserted);
+        }
+    }
+};
+
+// Benchmark inserting multiple sorted ranges into a WiredTiger table. This benchmark, compared to
+// the one above, should inform our decision on whether and how to partition the collection scan
+// phase during index builds.
+void BM_SDIInsertionChunked(benchmark::State& state, int64_t numDocs, int numChunks) {
+    std::unique_ptr<SortedDataInterfaceHarnessHelper> harness =
+        newSortedDataInterfaceHarnessHelper();
+    ServiceContext::UniqueOperationContext opCtx = harness->newOperationContext();
+    std::unique_ptr<SortedDataInterface> sorted =
+        harness->newSortedDataInterface(opCtx.get(), false, /*partial*/ false, KeyFormat::Long);
+
+    for (auto _ : state) {
+        auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+        int64_t numDocsInserted = 0;
+        int64_t chunkSize = numDocs / numChunks;
+        for (int chunk = 0; chunk < numChunks; chunk++) {
+            int64_t numBatches = chunkSize / 1000;
+            for (int batch = 0; batch < numBatches; batch++) {
+                StorageWriteTransaction txn(ru);
+                for (int i = 0; i < 1000; i++) {
+                    int64_t val = chunkSize * (batch * 1000 + i) + chunk + 1;
+                    BSONObj key = BSON("" << val);
+                    RecordId loc(val);
+                    ASSERT_SDI_INSERT_OK(sorted->insert(
+                        opCtx.get(), ru, makeKeyString(sorted.get(), key, loc), true));
+                }
+                txn.commit();
+
+                numDocsInserted += 1000;
+                state.SetItemsProcessed(numDocsInserted);
+            }
+        }
+    }
+};
+
 void BM_SDIAdvance(benchmark::State& state,
                    Direction direction,
                    Cursor::KeyInclusion keyInclusion,
@@ -171,6 +266,12 @@ void BM_SDIAdvanceWithEnd(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
+BENCHMARK_CAPTURE(BM_SDIInsertionBulk, FullySorted, 10'000'000);
+BENCHMARK_CAPTURE(BM_SDIInsertion, FullySorted, 10'000'000);
+BENCHMARK_CAPTURE(BM_SDIInsertionChunked, With50Chunks, 10'000'000, 50);
+BENCHMARK_CAPTURE(BM_SDIInsertionChunked, With10Chunks, 10'000'000, 10);
+BENCHMARK_CAPTURE(BM_SDIInsertionChunked, With5Chunks, 10'000'000, 5);
+BENCHMARK_CAPTURE(BM_SDIInsertionChunked, With2Chunks, 10'000'000, 2);
 
 BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardLoc, kForward, kRecordId, kNonUnique);
 BENCHMARK_CAPTURE(BM_SDIAdvance, AdvanceForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
