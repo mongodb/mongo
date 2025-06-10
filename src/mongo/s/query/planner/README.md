@@ -106,7 +106,7 @@ Agg commands are more expressive and thus have stage-specific logic that determi
 
 > ### Aside: Exchange Operator
 >
-> In certain cases, an additional [check](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L1079) is performed to see if the `mergePipeline` is eligible for the `$exchange` operator. This is useful for queries that send results to different remote hosts, such as `$out` to a sharded collection. The goal is to shuffle documents with the exchange such that the merging can be done on multiple shards, rather than selecting a single merger. There will be an exchange producer on each shard generating results, as well as an exchange consumer on each output shard. This increases parallelism during the merging stage.
+> In certain cases, an additional [check](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/sharded_agg_helpers.cpp#L1116) is performed to see if the `mergePipeline` is eligible for the `$exchange` operator. This is useful for queries that send results to different remote hosts, such as `$out` to a sharded collection. The goal is to shuffle documents with the exchange such that the merging can be done on multiple shards, rather than selecting a single merger. There will be an exchange producer on each shard generating results, as well as an exchange consumer on each output shard. This increases parallelism during the merging stage.
 >
 > For example, the pipeline
 >
@@ -150,26 +150,26 @@ Agg commands are more expressive and thus have stage-specific logic that determi
 > 1. `kRoundRobin` - each produced document is sent to one producer in a round-robin fashion.
 > 1. `kKeyRange` - the data is routed to consumers based on ranges of values. This can be beneficial for merge pipelines that preserve the shard key.
 >
-> For more information about `$exchange`, refer to [`exchange_spec.idl`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/exchange_spec.idl) or [`document_source_exchange.h`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/document_source_exchange.h).
+> For more information about `$exchange`, refer to [`exchange_spec.idl`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/exchange_spec.idl) or [`document_source_exchange.h`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/document_source_exchange.h).
 
 **Top-Level Entrypoints**:
 
 _Find_:
 
-- [`cluster_find_cmd::run()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/s/commands/query_cmd/cluster_find_cmd.h#L336)
-  - Builds a `CanonicalQuery` from the command request and sends it to [`cluster_find::runQuery()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/s/query/planner/cluster_find.cpp#L632).
+- [`cluster_find_cmd::run()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/commands/query_cmd/cluster_find_cmd.h#L353)
+  - Builds a `CanonicalQuery` from the command request and sends it to [`cluster_find::runQuery()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query/planner/cluster_find.cpp#L680).
   - This function targets remote hosts according to the provided `readPreference`, returning the first batch of results and a cursor id for subsequent `getMore` requests on success.
 
 _Aggregate_:
 
-- [`cluster_aggregate::runAggregate()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/s/query/planner/cluster_aggregate.cpp#L514)
+- [`cluster_aggregate::runAggregate()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query/planner/cluster_aggregate.cpp#L524)
   - Standard entrypoint for most sharded aggregations.
-  - Called from [`ClusterPipelineCommandBase::_runAggCommand()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/s/commands/query_cmd/cluster_pipeline_cmd.h#L131).
+  - Called from [`ClusterPipelineCommandBase::_runAggCommand()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/commands/query_cmd/cluster_pipeline_cmd.h#L146).
   - Processes full aggregation pipelines issued from the cluster.
-- [`MongosProcessInterface::preparePipelineForExecution()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/process_interface/mongos_process_interface.cpp#L160).
+- [`MongosProcessInterface::preparePipelineForExecution()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/process_interface/mongos_process_interface.cpp#L159).
   - Handles pipelines issued from a `mongos` router.
   - Prepares and optimizes pipelines, splitting them as needed for execution across shards.
-- [`ShardServerProcessInterface::preparePipelineForExecution()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/process_interface/shardsvr_process_interface.cpp#L636)
+- [`ShardServerProcessInterface::preparePipelineForExecution()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/process_interface/shardsvr_process_interface.cpp#L621)
   - Handles pipelines issued from a `mongod` node that acts as a shard server.
   - Typically processes subpipelines for stages like `$lookup` and `$unionWith`.
 
@@ -238,7 +238,7 @@ This reduces the amount of data transferred over the network between shards and 
 
 As part of optimization on the router, query commands (find and agg alike) build a `CanonicalQuery` containing all the information needed to figure out which nodes should run the shards part of the query.
 
-Given a filter from a `CanonicalQuery` and a `ChunkManager` that's a wrapper around a routing table at a specific point in time, we can calculate the relevant shard ids ([`shard_key_pattern_query_util::getShardIdsAndChunksForCanonicalQuery()`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/s/shard_key_pattern_query_util.cpp#L515)). The process varies depending on how much shard key information is present in the filter.
+Given a filter from a `CanonicalQuery` and a `ChunkManager` that's a wrapper around a routing table at a specific point in time, we can calculate the relevant shard ids ([`shard_key_pattern_query_util::getShardIdsAndChunksForCanonicalQuery()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/shard_key_pattern_query_util.cpp#L515)). The process varies depending on how much shard key information is present in the filter.
 
 > ### Aside: Shard Key Pattern
 >
@@ -313,7 +313,7 @@ flowchart LR
     C --> B
 ```
 
-> ### Aside: [`ShardTargetingPolicy`](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h#L33)
+> ### Aside: [`ShardTargetingPolicy`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h#L33)
 >
 > The `ShardTargetingPolicy` defines policies that determine whether and how a query or operation can target shards.
 >

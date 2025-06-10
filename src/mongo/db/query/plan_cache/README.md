@@ -38,15 +38,15 @@ In both cases, logically, the plan cache is an in-memory `map<PlanCacheKey, Plan
 >
 > See the [docs](https://www.mongodb.com/docs/manual/reference/operator/aggregation/planCacheStats/#output) for an in-depth explanation of the output.
 
-## Classic [`PlanCache`](https://github.com/10gen/mongo/blob/5a7b38893864b45173c4cb14ffd2861a96519044/src/mongo/db/query/plan_cache/classic_plan_cache.h#L290)
+## Classic [`PlanCache`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/plan_cache/classic_plan_cache.h#L289)
 
 Each collection has its own instance of the Classic plan cache. The plan cache only exists on `mongod`.
 
-### [`PlanCacheKey`](https://github.com/10gen/mongo/blob/5a7b38893864b45173c4cb14ffd2861a96519044/src/mongo/db/query/plan_cache/classic_plan_cache.h#L55)
+### [`PlanCacheKey`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/plan_cache/classic_plan_cache.h#L54)
 
 A `PlanCacheKey` is a hash value that encodes the [query shape](#aside-query-shapes).
 
-[`encodeClassic()`](https://github.com/10gen/mongo/blob/b95aadb5481b5fa62abed45005bcdfc0d873be72/src/mongo/db/query/canonical_query_encoder.cpp#L1294) is used to convert a `CanonicalQuery` into a hexadecimal string representation of the query shape: the `PlanCacheKey`.
+[`encodeClassic()`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/canonical_query_encoder.cpp#L1287) is used to convert a `CanonicalQuery` into a hexadecimal string representation of the query shape: the `PlanCacheKey`.
 
 For example, given this query:
 
@@ -61,12 +61,12 @@ The classic encoding is "`an[eqa,eqb]|ac|||fc`".
 - `an` represents the implicit `MatchExpression::AND`
 - `[eqa, eqb]` represents the two children of the `AND`, "equals a" and "equals b".
 - `ac` represents an _ascending_ sort on `c`.
-- `f` [indicates](https://github.com/10gen/mongo/blob/0dc113aab55b08990c4e52c6ff21c7f2c7f93b4d/src/mongo/db/query/canonical_query_encoder.cpp#L1305-L1309) `apiStrict`=_false_.
-- `c` [indicates](https://github.com/10gen/mongo/blob/0dc113aab55b08990c4e52c6ff21c7f2c7f93b4d/src/mongo/db/query/canonical_query_encoder.cpp#L1312-L1343) _classic_ execution.
+- `f` [indicates](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/canonical_query_encoder.cpp#L1298-L1302) `apiStrict`=_false_.
+- `c` [indicates](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/canonical_query_encoder.cpp#L1305-L1336) _classic_ execution.
 
-Note that `db.c.find({a: 1, b: 2}, {a: 0}).sort({c: 1})` has the same encoding as above, since the projection section is [left empty](https://github.com/10gen/mongo/blob/0dc113aab55b08990c4e52c6ff21c7f2c7f93b4d/src/mongo/db/query/canonical_query_encoder.cpp#L678-L682) when the entire document is required to complete the projection regardless.
+Note that `db.c.find({a: 1, b: 2}, {a: 0}).sort({c: 1})` has the same encoding as above, since the projection section is [left empty](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/canonical_query_encoder.cpp#L671-L675) when the entire document is required to complete the projection regardless.
 
-### [`PlanCacheEntry`](https://github.com/10gen/mongo/blob/5a7b38893864b45173c4cb14ffd2861a96519044/src/mongo/db/query/plan_cache/classic_plan_cache.h#L275)
+### [`PlanCacheEntry`](https://github.com/mongodb/mongo/blob/0765809bf08f0c55e37ab6d7ef496568b662cc33/src/mongo/db/query/plan_cache/classic_plan_cache.h#L274)
 
 A `PlanCacheEntry` is a wrapper for [`SolutionCacheData`](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/src/mongo/db/query/plan_cache/classic_plan_cache.h#L223), which is a member of the winning `QuerySolution`. This `SolutionCacheData` is a "hint" that when joined with an actual query can be used to reconstruct a copy of the original `QuerySolution`. This is done by traversing `SolutionCacheData`'s internal [`PlanCacheIndexTree`](https://github.com/mongodb/mongo/blob/0a68308f0d39a928ed551f285ba72ca560c38576/src/mongo/db/query/plan_cache/classic_plan_cache.h#L242), which consists of [index tags](../plan_enumerator/README.md#i-index-tagging) that assign specific indexes to the `MatchExpression`'s leaf predicates.
 
@@ -74,15 +74,15 @@ For example, `SolutionCacheData` does not store index _bounds_, but it does stor
 
 See [here](https://github.com/mongodb/mongo/blob/bc7d24c035466c435ade89b62f958a6fa4e22333/src/mongo/db/query/classic_plan_cache.h#L93-L112) for more information.
 
-## SBE [`PlanCache`](https://github.com/10gen/mongo/blob/4ddb7f36ebc4e1060824416a5759f8eae6a6c77f/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L248)
+## SBE [`PlanCache`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L248)
 
-Unlike the classic plan cache, the SBE plan cache exists as one instance for the entire `mongod` process, rather than on a per-collection basis; it [decorates](https://github.com/10gen/mongo/blob/c9dec03c3d51fe4c8161678bbbc846c08b63df16/src/mongo/db/query/plan_cache/sbe_plan_cache.cpp#L50) the [`ServiceContext`](https://github.com/10gen/mongo/blob/c9dec03c3d51fe4c8161678bbbc846c08b63df16/src/mongo/db/service_context.h#L356).
+Unlike the classic plan cache, the SBE plan cache exists as one instance for the entire `mongod` process, rather than on a per-collection basis; it [decorates](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/sbe_plan_cache.cpp#L50) the [`ServiceContext`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/service_context.h#L357).
 
 This approach is beneficial to SBE's design because SBE is intended to execute queries that span multiple collections, thus avoiding the classic plan cache's restriction to one collection per instance.
 
-### [`PlanCacheKey`](https://github.com/10gen/mongo/blob/4ddb7f36ebc4e1060824416a5759f8eae6a6c77f/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L114)
+### [`PlanCacheKey`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L114)
 
-The SBE Plan Cache's `PlanCacheKey`s are conceptually equivalent to the [Classic Plan Cache's](#plancachekey), but [`encodeSBE()`](https://github.com/10gen/mongo/blob/b95aadb5481b5fa62abed45005bcdfc0d873be72/src/mongo/db/query/canonical_query_encoder.cpp#L1348) is used to generate `PlanCacheKey`s.
+The SBE Plan Cache's `PlanCacheKey`s are conceptually equivalent to the [Classic Plan Cache's](#plancachekey), but [`encodeSBE()`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/canonical_query_encoder.cpp#L1341) is used to generate `PlanCacheKey`s.
 
 For example, the same query:
 
@@ -90,17 +90,17 @@ For example, the same query:
 db.c.find({a: 1, b: 2}).sort({c: 1})
 ```
 
-after undergoing `encodeSBE()` looks like this: `an[eqa?,eqb?]|ac|||nnnnf|`. The encoding accounts for the auto-parameterization of the `MatchExpression` component, ensuring that identical expression trees have the same key. See [`encodeSBE()`](https://github.com/10gen/mongo/blob/b95aadb5481b5fa62abed45005bcdfc0d873be72/src/mongo/db/query/canonical_query_encoder.cpp#L1348) for details.
+after undergoing `encodeSBE()` looks like this: `an[eqa?,eqb?]|ac|||nnnnf|`. The encoding accounts for the auto-parameterization of the `MatchExpression` component, ensuring that identical expression trees have the same key. See [`encodeSBE()`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/canonical_query_encoder.cpp#L1341) for details.
 
-### [`PlanCacheEntry`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L233)
+### [`PlanCacheEntry`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L233)
 
-Unlike the Classic Plan Cache, the SBE Plan Cache directly stores [`CachedSbePlan`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L210)s. Each `CachedSbePlan` is a wrapper for an entire `sbe::PlanStage` execution tree. See [below](#building-cached-plans) for more information.
+Unlike the Classic Plan Cache, the SBE Plan Cache directly stores [`CachedSbePlan`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/sbe_plan_cache.h#L210)s. Each `CachedSbePlan` is a wrapper for an entire `sbe::PlanStage` execution tree. See [below](#building-cached-plans) for more information.
 
 ## General Plan Cache Behavior
 
 ### Initial Writes
 
-When a query is planned for the first time and a winning solution is selected, the [`ClassicPlanCacheWriter`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/exec/plan_cache_util.h#L148) [adds](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/exec/plan_cache_util.cpp#L382) the winning query plan to the plan cache for future use. When plans are initially added to the cache, they are marked as **inactive**.
+When a query is planned for the first time and a winning solution is selected, the [`ClassicPlanCacheWriter`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/exec/plan_cache_util.h#L148) [adds](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/exec/plan_cache_util.cpp#L380) the winning query plan to the plan cache for future use. When plans are initially added to the cache, they are marked as **inactive**.
 
 > ### Aside: Inactive vs. Active Cache Entries
 >
@@ -108,14 +108,14 @@ When a query is planned for the first time and a winning solution is selected, t
 
 > ### Aside: Plan Cache "Works"
 >
-> The plan cache stores a [`ReadsOrWorks`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/plan_cache/plan_cache.h#L111) value for each entry, equivalent to the amount of ["work"](../classic_runtime_planner/README.md#aside-works) associated with the plan at the time of caching.
+> The plan cache stores a [`ReadsOrWorks`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L112) value for each entry, equivalent to the amount of ["work"](../classic_runtime_planner/README.md#aside-works) associated with the plan at the time of caching.
 >
 > - For Classic, this is the number of calls to `PlanStage::work()`
 > - For SBE, this is the number of individual _reads_ done from storage-level cursors.
 
 ### Updating the Plan Cache
 
-If after multiplanning, a query's shape matches an existing entry, a few possible scenarios may occur, as described in [`getNewEntryState()`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/plan_cache/plan_cache.h#L762).
+If after multiplanning, a query's shape matches an existing entry, a few possible scenarios may occur, as described in [`getNewEntryState()`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/plan_cache/plan_cache.h#L763).
 
 1. If the existing entry is **inactive**:
    1. If the new winning plan's efficiency is greater than or equal to the existing entry (fewer or equal works), the plan is believed to be "valuable" and it replaces the existing entry. This new entry is given _active_ state.
@@ -130,7 +130,7 @@ When a query is issued and an **active** plan cache entry already exists for the
 
 > ### Aside: Replanning
 >
-> If we've decided to use a cached plan, a trial execution period is run to gather the first batch of results. If the number of works required exceeds the [`internalQueryCacheEvictionRatio`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/query_knobs.idl#L269) (10x by default), this cache entry is deactivated and the query [replans](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/exec/cached_plan.h#L113) using standard multiplanning.
+> If we've decided to use a cached plan, a trial execution period is run to gather the first batch of results. If the number of works required exceeds the [`internalQueryCacheEvictionRatio`](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/query_knobs.idl#L288) (10x by default), this cache entry is deactivated and the query [replans](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/exec/cached_plan.h#L112) using standard multiplanning.
 
 ```mermaid
 %%{ init: {'themeVariables':{'fontSize': '32px'}}}%%
@@ -160,7 +160,7 @@ flowchart LR
 
 ### Classic
 
-After a query command is converted into a `CanonicalQuery`, the plan cache is immediately consulted to confirm whether a `PlanCacheEntry` for this query already exists, using `encodeClassic()` to check if a `PlanCacheKey` is already in the cache. If an active cache entry already exists, the index tags from the `PlanCacheEntry`'s `PlanCacheIndexTree` are applied to the query's `MatchExpression` filter to [reconstruct](https://github.com/10gen/mongo/blob/4ddb7f36ebc4e1060824416a5759f8eae6a6c77f/src/mongo/db/query/query_planner.cpp#L730) the corresponding `QuerySolution` and `PlanStage` trees, entirely bypassing plan enumeration and ranking.
+After a query command is converted into a `CanonicalQuery`, the plan cache is immediately consulted to confirm whether a `PlanCacheEntry` for this query already exists, using `encodeClassic()` to check if a `PlanCacheKey` is already in the cache. If an active cache entry already exists, the index tags from the `PlanCacheEntry`'s `PlanCacheIndexTree` are applied to the query's `MatchExpression` filter to [reconstruct](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/query_planner.cpp#L692) the corresponding `QuerySolution` and `PlanStage` trees, entirely bypassing plan enumeration and ranking.
 
 ### SBE
 
@@ -168,22 +168,22 @@ Building an SBE `PlanCacheEntry` is more complex. The process is as follows:
 
 1. Clone the original `CachedSbePlan` so that each query can have its own `sbe::PlanStage` tree, while the plan cache holds the original.
 1. Compile any expressions in the execution tree to SBE bytecode.
-1. Queries are [auto-parameterized](https://github.com/10gen/mongo/blob/10b4fb7d8c56161da2a64f87cbae697412b22e65/src/mongo/db/query/canonical_query.cpp#L231-L237), meaning that eligible constants in the incoming `MatchExpression` are automatically assigned input parameter ids.
+1. Queries are [auto-parameterized](https://github.com/mongodb/mongo/blob/aaef082f46f3a48a1134ae870b25da28f4d94e08/src/mongo/db/query/canonical_query.cpp#L227-L233), meaning that eligible constants in the incoming `MatchExpression` are automatically assigned input parameter ids.
    - Only the `filter` of the query is auto-parameterized.
 1. Now as an `sbe::PlanStage` tree, replace any constants with references to slots in the SBE `RuntimeEnvironment`.
-   - The resulting plan is now parameterized; it can be rebound to new constants by assigning new values to `RuntimeEnvironment` slots via a [`inputParamToSlotMap`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/stage_builder/sbe/builder_data.h#L229), a map from input parameter id to runtime environment slot.
+   - The resulting plan is now parameterized; it can be rebound to new constants by assigning new values to `RuntimeEnvironment` slots via a [`inputParamToSlotMap`](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/stage_builder/sbe/builder_data.h#L229), a map from input parameter id to runtime environment slot.
 
 > ### Aside: `IntervalEvaluationTree`
 >
-> The [Interval Evaluation Tree](https://github.com/10gen/mongo/blob/bd2434b59205b0780aad299f30367599e3d971ce/src/mongo/db/query/interval_evaluation_tree.h#L59) (IET) is used to restore index bounds from a cached SBE plan, allowing index bounds to be evaluated dynamically from [`_inputParamIdToExpressionMap`](https://github.com/10gen/mongo/blob/10b4fb7d8c56161da2a64f87cbae697412b22e65/src/mongo/db/query/canonical_query.h#L436-L437), generated by [`MatchExpression::parameterize()`](https://github.com/10gen/mongo/blob/10b4fb7d8c56161da2a64f87cbae697412b22e65/src/mongo/db/matcher/expression.h#L346-L350).
+> The [Interval Evaluation Tree](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/interval_evaluation_tree.h#L59) (IET) is used to restore index bounds from a cached SBE plan, allowing index bounds to be evaluated dynamically from [`_inputParamIdToExpressionMap`](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/canonical_query.h#L429-L430), generated by [`MatchExpression::parameterize()`](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/matcher/expression.h#L343-L347).
 >
-> `translate()` has two function definitions, [one](https://github.com/10gen/mongo/blob/a7894be6e73fc70c7a72ae4e5c903da2ccb7fc92/src/mongo/db/query/index_bounds_builder.h#L121-L138) for generating an IET and [another](https://github.com/10gen/mongo/blob/a7894be6e73fc70c7a72ae4e5c903da2ccb7fc92/src/mongo/db/query/index_bounds_builder.h#L140-L148) for generating index bounds from a cached IET.
+> `translate()` has two function definitions, [one](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/index_bounds_builder.h#L118-L135) for generating an IET and [another](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/index_bounds_builder.h#L137-L145) for generating index bounds from a cached IET.
 
-See [here](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/stage_builder/sbe/builder_data.h#L217-L228) for an example.
+See [here](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/stage_builder/sbe/builder_data.h#L217-L228) for an example.
 
 ## Cache Eviction and Invalidation
 
-The Plan Cache supports a least-recently used (LRU) [eviction policy](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/lru_key_value.h#L75) in order to avoid growing too large. This value is controlled by [`internalQueryCacheMaxEntriesPerCollection`](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/query_knobs.idl#L241)
+The Plan Cache supports a least-recently used (LRU) [eviction policy](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/lru_key_value.h#L76) in order to avoid growing too large. This value is controlled by [`internalQueryCacheMaxEntriesPerCollection`](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/query_knobs.idl#L258)
 
 Any DDL event (e.g. collection drop or index creation, deletion, or hiding) empties the plan cache for the relevant collection. In the Classic case, this is a full flush.
 
@@ -201,9 +201,9 @@ There is a long-standing request ([SERVER-13341](https://jira.mongodb.org/browse
 
 ## Subplanning
 
-Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/10gen/mongo/blob/5572a230b88cc32ffdd5230f71a63c3ab5f601e6/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../classic_runtime_planner/README#subplanning).
+Rooted `$or` queries (queries that include a `$or` at the top level) interact differently with the [plan cache](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L188-L203). For an introduction to subplanning, refer to [Classic Runtime Planning](../classic_runtime_planner/README#subplanning).
 
-Rooted `$or` queries interact with the plan cache on a [_per-clause basis_](https://github.com/10gen/mongo/blob/5572a230b88cc32ffdd5230f71a63c3ab5f601e6/src/mongo/db/exec/subplan.cpp#L247-L249); each branch of the `$or` uses the plan cache separately.
+Rooted `$or` queries interact with the plan cache on a [_per-clause basis_](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/exec/subplan.cpp#L247-L249); each branch of the `$or` uses the plan cache separately.
 
 For each `$or` branch:
 
@@ -226,7 +226,7 @@ Assuming all four predicates justify more than one solution, the plan cache will
 
 ## Plan Pinning
 
-The SBE plan cache supports ["plan pinning"](https://github.com/10gen/mongo/blob/7ee9b14b9bed83a8d8870684679174e648968104/src/mongo/db/query/plan_cache/plan_cache.h#L182-L184), which gives pinned plans no works value and therefore does not subject them to replanning. For example, [single-solution queries](#single-solution-queries) and [rooted `$or`](#subplanning) queries are pinned. These plans can still be invalidated via [standard cache eviction](#cache-eviction-and-invalidation), however.
+The SBE plan cache supports ["plan pinning"](https://github.com/mongodb/mongo/blob/17f71567688c266de1f9a4cfc20ef6a42570ba03/src/mongo/db/query/plan_cache/plan_cache.h#L183-L185), which gives pinned plans no works value and therefore does not subject them to replanning. For example, [single-solution queries](#single-solution-queries) and [rooted `$or`](#subplanning) queries are pinned. These plans can still be invalidated via [standard cache eviction](#cache-eviction-and-invalidation), however.
 
 ---
 

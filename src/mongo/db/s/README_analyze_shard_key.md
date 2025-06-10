@@ -37,9 +37,9 @@ The settings are stored in collection `config.queryAnalyzer`, one document per c
 ### Selecting Queries to Sample
 
 Selection of queries to sample is implemented in
-[`QueryAnalysisSampler::tryGenerateSampleId()`](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/s/query_analysis_sampler.cpp#L404).
+[`QueryAnalysisSampler::tryGenerateSampleId()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query_analysis_sampler.cpp#L453).
 A rate limiter on each sampler is implemented using a
-[token bucket algorithm](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/s/query_analysis_sampler.cpp#L251),
+[token bucket algorithm](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query_analysis_sampler.cpp#L303),
 where a certain number of tokens (may be fractional) are made available each second,
 according to the configured sample rate.
 Sampling a query requires 1.0 token;
@@ -63,12 +63,12 @@ proportional to the number of queries that each mongos handles,
 so a mongos that handles proportionally more queries than other mongoses
 also samples proportionally more frequently.
 Every query sampler on a mongos maintains an
-[exponential moving average](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/s/query_analysis_sampler.cpp#L183) of
+[exponential moving average](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query_analysis_sampler.cpp#L220) of
 the number of samples collected over a defined period of time.
-This average is [periodically sent](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/s/query_analysis_sampler.cpp#L131C48-L131C48) to the config server via the internal command
+This average is [periodically sent](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query_analysis_sampler.cpp#L166) to the config server via the internal command
 `_refreshQueryAnalyzerConfiguration`
 which in turn responds with the mongos's updated sampling rate.
-The per-mongos sampling rate is [computed](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/db/s/query_analysis_coordinator.cpp#L252) by the config server using weighted fair queueing,
+The per-mongos sampling rate is [computed](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/s/query_analysis_coordinator.cpp#L278) by the config server using weighted fair queueing,
 weighted by the number of queries each mongos routes.
 
 For a standalone replica set, the primary mongod controls the sampling rate on each mongod
@@ -79,8 +79,8 @@ its sample rate from the primary.
 
 Recording and persisting of sampled queries is designed to minimize the performance impact of
 writing sampled queries on the customer's query workload.
-Sampled queries are persisted by `QueryAnalysisWriter` by [buffering](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/db/s/query_analysis_writer.cpp#L522) them in memory and then
-periodically [inserting](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/db/s/query_analysis_writer.cpp#L422) them in batches to the collections,
+Sampled queries are persisted by `QueryAnalysisWriter` by [buffering](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/s/query_analysis_writer.cpp#L652) them in memory and then
+periodically [inserting](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/s/query_analysis_writer.cpp#L613) them in batches to the collections,
 `config.sampledQueries` and `config.sampledQueriesDiff`.
 
 Sampled queries can be fetched via the new aggregation stage called `$listSampledQueries`.
@@ -89,8 +89,8 @@ Sampled queries have a TTL of seven days from the insertion time
 
 ### Code references
 
-[**QueryAnalysisSampler class**](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/s/query_analysis_sampler.h#L58)
+[**QueryAnalysisSampler class**](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/s/query_analysis_sampler.h#L68)
 
-[**QueryAnalysisWriter class**](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/db/s/query_analysis_writer.h#L66)
+[**QueryAnalysisWriter class**](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/s/query_analysis_writer.h#L86)
 
-[**QueryAnalysisCoordinator class**](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc405f56708d41ec3d34b550/src/mongo/db/s/query_analysis_coordinator.h#L53)
+[**QueryAnalysisCoordinator class**](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/s/query_analysis_coordinator.h#L66)

@@ -20,13 +20,13 @@ The first step of query planning will take a `CanonicalQuery` as input, but the 
 > | `{field: "value"}` | `{field: {$eq: "value"}}` |
 > | `{a: {$gte: 0}, b: {$lt: 5}}` | `{$and: [{a: {$gte: 0}}, {b: {$lt: 5}}]}` |
 >
-> During desugaring, the parser interprets the shorthand notation and [converts](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression_parser.cpp#L282) it into the explicit form that it processes internally.
+> During desugaring, the parser interprets the shorthand notation and [converts](https://github.com/mongodb/mongo/blob/8e6b2afd632cbcc67a2a129da0b1393d7576367e/src/mongo/db/matcher/expression_parser.cpp#L284) it into the explicit form that it processes internally.
 
 By converting all instances of syntactic sugar into their explicit forms, we simplify later optimization steps. For example, rather than including logic to handle both implicit and explicit `$eq` separately, we convert all implicit `$eq`s to explicit `$eq`s, and therefore can handle both cases in the same logic path.
 
 ## `CanonicalQuery`
 
-A [`CanonicalQuery`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.h#L79) is a container that represents a parsed and normalized query. It contains the filter, projection, and sort components of the original query message. Each of these components is generated via the [`CanonicalQuery` constructor](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.cpp#L98). In order to create the `CanonicalQuery` in its "base" form, the `CanonicalQuery` delegates to three more processes and related data structures: `MatchExpression`, `Projection`, and `SortPattern` to handle the simplification, each of which is discussed in detail below.
+A [`CanonicalQuery`](https://github.com/mongodb/mongo/blob/8e6b2afd632cbcc67a2a129da0b1393d7576367e/src/mongo/db/query/canonical_query.h#L72) is a container that represents a parsed and normalized query. It contains the filter, projection, and sort components of the original query message. Each of these components is generated via the [`CanonicalQuery` constructor](https://github.com/mongodb/mongo/blob/8e6b2afd632cbcc67a2a129da0b1393d7576367e/src/mongo/db/query/canonical_query.cpp#L94). In order to create the `CanonicalQuery` in its "base" form, the `CanonicalQuery` delegates to three more processes and related data structures: `MatchExpression`, `Projection`, and `SortPattern` to handle the simplification, each of which is discussed in detail below.
 
 If a `CanonicalQuery` [cannot be generated](../commands/query_cmd/README.md#parsing-aggregations) after parsing, we move the query straight to the Query Execution layer without optimization.
 
@@ -42,16 +42,16 @@ If a `CanonicalQuery` [cannot be generated](../commands/query_cmd/README.md#pars
 
 ## `MatchExpression`
 
-The `CanonicalQuery` holds a reference to an abstract syntax tree (AST) called a [`MatchExpression`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression.h#L78), a representation of the query's `filter` component.
+The `CanonicalQuery` holds a reference to an abstract syntax tree (AST) called a [`MatchExpression`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/matcher/expression.h#L72), a representation of the query's `filter` component.
 
 > ### Aside: Abstract Syntax Trees
 >
 > An Abstract Syntax Tree (AST) is a tree representation of a program's syntax. While a Concrete Syntax Tree (CST) models the exact grammar of a language, an AST _abstracts_ away unnecessary syntax details and models logical structure. Using an AST generally makes it easier to perform optimizations and static analysis. For an example of how we model `MatchExpression`s as ASTs, see below.
 
-`MatchExpression` is also the abstract type from which all nodes inherit. All possible `MatchExpression` nodes are enumerated by the [`MatchType`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression.h#L83) enum. For each of these types, there exists a subclass that inherits from `MatchExpression`. For example:
+`MatchExpression` is also the abstract type from which all nodes inherit. All possible `MatchExpression` nodes are enumerated by the [`MatchType`](https://github.com/mongodb/mongo/blob/8e6b2afd632cbcc67a2a129da0b1393d7576367e/src/mongo/db/matcher/expression.h#L80) enum. For each of these types, there exists a subclass that inherits from `MatchExpression`. For example:
 
-- [`EqualityMatchExpression`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression_leaf.h#L313) corresponds to `MatchType::EQ` and the `$eq` operator; it must have 0 children nodes, also known as a `LeafMatchExpression`.
-- [`AndMatchExpression`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression_tree.h#L138) corresponds to `MatchType::AND` and the `$and` operator; it has N children nodes, where N is the number of conjuncts of the `$and`.
+- [`EqualityMatchExpression`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/matcher/expression_leaf.h#L314) corresponds to `MatchType::EQ` and the `$eq` operator; it must have 0 children nodes, also known as a `LeafMatchExpression`.
+- [`AndMatchExpression`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/matcher/expression_tree.h#L139) corresponds to `MatchType::AND` and the `$and` operator; it has N children nodes, where N is the number of conjuncts of the `$and`.
 
 Let's take a look at how this query would be modeled as an AST:
 
@@ -73,7 +73,7 @@ During `MatchExpressionParser::parse()`, the request's `filter` component (in th
 
 is broken up as 3 `BSONElement`s, each with their own `MatchExpression`. See below for the tree representation.
 
-In this case, the structure becomes an `AndMatchExpression` with two children: `GTEMatchExpression` and `LTMatchExpression`. This process occurs in [`parseSub()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/matcher/expression_parser.cpp#L2130) for each element. If something doesn't fit the expected `BSONElement` pattern for `MatchExpression` conversion, [desugaring](#aside-desugaring) can be performed to convert the `filter` component into a parser-compatible form.
+In this case, the structure becomes an `AndMatchExpression` with two children: `GTEMatchExpression` and `LTMatchExpression`. This process occurs in [`parseSub()`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/matcher/expression_parser.cpp#L2132) for each element. If something doesn't fit the expected `BSONElement` pattern for `MatchExpression` conversion, [desugaring](#aside-desugaring) can be performed to convert the `filter` component into a parser-compatible form.
 
 After `MatchExpressionParser::parse()`, the underlying AST for our query looks like this:
 
@@ -83,7 +83,7 @@ flowchart TD
     n4 --> n5["GTEMatchExpression<br>b >= 0"] & n6["LTMatchExpression<br>c < 5"]
 ```
 
-While `MatchExpressionParser::parse()` creates the initial `MatchExpression` and `ParsedFindCommand` holds the AST in its unoptimized form, `CanonicalQuery` calls [`MatchExpression::normalize()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_query.cpp#L170), which begins the simplification process. The goal of normalization is to convert the `MatchExpression` AST into its most simple form. By simplifying `MatchExpression`s as much as possible, we ensure that:
+While `MatchExpressionParser::parse()` creates the initial `MatchExpression` and `ParsedFindCommand` holds the AST in its unoptimized form, `CanonicalQuery` calls [`MatchExpression::normalize()`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/query/canonical_query.cpp#L166), which begins the simplification process. The goal of normalization is to convert the `MatchExpression` AST into its most simple form. By simplifying `MatchExpression`s as much as possible, we ensure that:
 
 1. Any resulting `QuerySolution`s will be as simple as possible
 1. The [plan cache](plan_cache/README.md) will recognize logically equivalent queries as equivalent and reuse a cached plan when possible, even if the initial queries are different.
@@ -100,7 +100,7 @@ This simplified `MatchExpression` AST could stem from an infinite number of quer
 
 ## `Projection`
 
-Much like `MatchExpression`, [`Projection`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/projection.h#L73) is also represented as an AST. From the initial `BSONObj` of the projection, [`parseAndAnalyze()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/projection_parser.h#L52) is called to convert the raw `BSONObj` representation of the projection into an AST. By representing the `Projection` as an AST, we can traverse the tree and optimize each node based on its necessary dependencies.
+Much like `MatchExpression`, [`Projection`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/query/projection.h#L74) is also represented as an AST. From the initial `BSONObj` of the projection, [`parseAndAnalyze()`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/query/projection_parser.h#L52) is called to convert the raw `BSONObj` representation of the projection into an AST. By representing the `Projection` as an AST, we can traverse the tree and optimize each node based on its necessary dependencies.
 
 > ### Aside: Inclusion and Exclusion Projections
 >
@@ -133,7 +133,7 @@ flowchart TD
 
 Here, each `BooleanConstantASTNode` represents whether our final result will contain the field that points to it.
 
-A more complex projection that involves nested fields or arrays may require substantially more complex syntax. This may involve many recursive children nodes for nested fields, or uses of the `$`, `$elemMatch` or `$slice` operators for arrays. Each of these is defined as its own node in [`projection_ast.h`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/projection_ast.h#L66).
+A more complex projection that involves nested fields or arrays may require substantially more complex syntax. This may involve many recursive children nodes for nested fields, or uses of the `$`, `$elemMatch` or `$slice` operators for arrays. Each of these is defined as its own node in [`projection_ast.h`](https://github.com/mongodb/mongo/blob/b0816f32f1eff965ffe069fc556ea968cc8533a6/src/mongo/db/query/projection_ast.h#L61).
 
 For example, given this more complex query:
 
@@ -155,7 +155,7 @@ flowchart TD
 
 Note that in this example, the `a.d` field is a new field that is created by the projection as the result of an expression. This is a third type of projection beyond inclusion and exclusion, called addition.
 
-After parsing, [`optimizeProjection()`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/projection.cpp#L241) walks the AST to find areas for optimization. This optimization has the potential to modify the AST in-place in simplifying it. For this reason, a `ProjectionASTMutableVisitor` recursively traverses the AST, calling `preVisit`, `inVisit`, and `postVisit` on each node in the AST.
+After parsing, [`optimizeProjection()`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/projection.cpp#L241) walks the AST to find areas for optimization. This optimization has the potential to modify the AST in-place in simplifying it. For this reason, a `ProjectionASTMutableVisitor` recursively traverses the AST, calling `preVisit`, `inVisit`, and `postVisit` on each node in the AST.
 
 For example, given this `ExpressionASTNode`:
 
@@ -167,7 +167,7 @@ the initial construction of the AST would imply that `x` is dependent on `b`. Af
 
 ## `SortPattern`
 
-If a query contains a sort specification, the `CanonicalQuery` will store the sort as a [`SortPattern`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/sort_pattern.h#L55), which is a vector of [`SortPatternPart`s](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/sort_pattern.h#L66). Each `SortPatternPart` represents one field and its sort order. This data structure can be used for reference throughout the optimization process and accessed via the `CanonicalQuery`. This is generally as simple as:
+If a query contains a sort specification, the `CanonicalQuery` will store the sort as a [`SortPattern`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/sort_pattern.h#L53), which is a vector of [`SortPatternPart`s](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/sort_pattern.h#L64). Each `SortPatternPart` represents one field and its sort order. This data structure can be used for reference throughout the optimization process and accessed via the `CanonicalQuery`. This is generally as simple as:
 
 ```
 db.c.find({}).sort({"a": 1, "b.c": -1})
@@ -190,7 +190,7 @@ SortPattern: [
 
 ## `CanonicalDistinct`
 
-When a `distinct()` query is run or an aggregation pipeline is eligible to use a `DISTINCT_SCAN`, the `CanonicalQuery` holds a [`CanonicalDistinct`](https://github.com/10gen/mongo/blob/57a6678467d3819a48f630e45fbfc2edb07d31af/src/mongo/db/query/canonical_distinct.h#L52). The `CanonicalDistinct` is effectively a container that holds all the data regarding a distinct query, just as `CanonicalQuery` is for find. Note that data such as the distinct command's `filter` is still maintained by the `CanonicalQuery`, however. For example, in this query:
+When a `distinct()` query is run or an aggregation pipeline is eligible to use a `DISTINCT_SCAN`, the `CanonicalQuery` holds a [`CanonicalDistinct`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/canonical_distinct.h#L52). The `CanonicalDistinct` is effectively a container that holds all the data regarding a distinct query, just as `CanonicalQuery` is for find. Note that data such as the distinct command's `filter` is still maintained by the `CanonicalQuery`, however. For example, in this query:
 
 ```
 db.c.distinct("x", {x: {$gt: 0}})

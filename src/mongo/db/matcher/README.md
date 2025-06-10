@@ -8,7 +8,7 @@ This README will cover rewrites on the `MatchExpression` component of a find que
 
 ## MatchExpression Optimization
 
-The entrypoint to [`MatchExpression`](../query/README_logical_models.md#matchexpression) optimization is the [`MatchExpression::optimize()`](https://github.com/10gen/mongo/blob/de0f8aaf46a2a31315c19e7a46111055805228c8/src/mongo/db/matcher/expression.cpp#L139) function, which is called by [`MatchExpression::normalize()`](https://github.com/10gen/mongo/blob/de0f8aaf46a2a31315c19e7a46111055805228c8/src/mongo/db/matcher/expression.cpp#L184). This is called on the root of the `MatchExpression` tree and makes simplifying changes to the tree's structure without altering its semantics, returning one of the following:
+The entrypoint to [`MatchExpression`](../query/README_logical_models.md#matchexpression) optimization is the [`MatchExpression::optimize()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression.cpp#L138) function, which is called by [`MatchExpression::normalize()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression.h#L619). This is called on the root of the `MatchExpression` tree and makes simplifying changes to the tree's structure without altering its semantics, returning one of the following:
 
 1. The original, unmodified `MatchExpression`,
 1. The original `MatchExpression` that has been mutated,
@@ -31,13 +31,13 @@ The entrypoint to [`MatchExpression`](../query/README_logical_models.md#matchexp
 
 ### Expression-specific Optimizations
 
-Subclasses of `MatchExpression` that represent different types define specific optimization behavior by overriding the [`MatchExpression::getOptimizer()`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression.h#L628) function, which takes in an input `MatchExpression` and passes the same `MatchExpression` to the resulting `ExpressionOptimizerFunc`. If the subclass holds children `MatchExpression` objects, it is responsible for returning an `ExpressionOptimizerFunc` that recursively calls `MatchExpression::optimize()` on those children.
+Subclasses of `MatchExpression` that represent different types define specific optimization behavior by overriding the [`MatchExpression::getOptimizer()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression.h#L619) function, which takes in an input `MatchExpression` and passes the same `MatchExpression` to the resulting `ExpressionOptimizerFunc`. If the subclass holds children `MatchExpression` objects, it is responsible for returning an `ExpressionOptimizerFunc` that recursively calls `MatchExpression::optimize()` on those children.
 
 Generally, we optimize the logical representation through a bottom-up approach. This is more efficient: by handling subtrees first and potentially eliminating redundant child nodes, unnecessary work is avoided at the parent level. However, this isn't always enforced. It is permissible for an implementation to optimize itself first (e.g. pruning child expressions) before optimizing the children themselves.
 
 **Example 1: `ListOfMatchExpression`**
 
-Let's examine how a [`ListOfMatchExpression`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_tree.h#L55), such as `$and` and `$or`, is rewritten. Consider the following query:
+Let's examine how a [`ListOfMatchExpression`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_tree.h#L56), such as `$and` and `$or`, is rewritten. Consider the following query:
 
 ```
 {
@@ -107,7 +107,7 @@ At the root, the AND in Child 1 can now be absorbed into the top-most AND. The f
 
 **Example 2: `InMatchExpression`**
 
-For an [`InMatchExpression`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_leaf.h#L763), we perform the following optimizations:
+For an [`InMatchExpression`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_leaf.h#L764), we perform the following optimizations:
 
 1. An IN with exactly one regex becomes a `RegexMatchExpression`.
 2. An IN of exactly one equality becomes an `EqualityMatchExpression`.
@@ -161,7 +161,7 @@ into
 
 Notice that `{ $eq: ['$x', 1] }` is representable as a `MatchExpression`, whereas `{ $eq: ['$y', '$z'] }` compares multiple field path references, requiring their values from each input document. `MatchExpression`s don't allow for more than one local document field path, so this part cannot be extracted.
 
-Unlike regular comparison operators, `$_internalExpr` operators have non-type bracketed semantics to match non-type bracketed comparison operators inside `$expr`. It will match either an identical set or superset of the documents matched by `$expr` due to semantic differences between the rewritten `MatchExpression` and the [`ExprMatchExpression`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_expr.h#L66).
+Unlike regular comparison operators, `$_internalExpr` operators have non-type bracketed semantics to match non-type bracketed comparison operators inside `$expr`. It will match either an identical set or superset of the documents matched by `$expr` due to semantic differences between the rewritten `MatchExpression` and the [`ExprMatchExpression`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_expr.h#L67).
 
 > ### Aside: Type Bracketing
 >
@@ -169,7 +169,7 @@ Unlike regular comparison operators, `$_internalExpr` operators have non-type br
 >
 > On the other hand, without type bracketing, we would consider all types in the comparison. For instance, strings are higher in the [`BSON` sort order](https://www.mongodb.com/docs/manual/reference/bson-type-comparison-order/) than numerics, so the document `{field: "string"}` would also match the query above. This is the default comparison mode for `$expr`.
 
-For example, `$_internalExprEq` in `MatchExpression` reaches into arrays, whereas `$eq` in `ExprMatchExpression` does not. Thus, the original `$expr` is still included as a second level of filtering to ensure that the returned results match expected `$expr` semantics. For the full description of `InternalExprMatchExpression` semantics, refer to [`expression_internal_expr_comparison.h`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_internal_expr_comparison.h#L71).
+For example, `$_internalExprEq` in `MatchExpression` reaches into arrays, whereas `$eq` in `ExprMatchExpression` does not. Thus, the original `$expr` is still included as a second level of filtering to ensure that the returned results match expected `$expr` semantics. For the full description of `InternalExprMatchExpression` semantics, refer to [`expression_internal_expr_comparison.h`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_internal_expr_comparison.h#L71).
 
 > ### Aside: Array Traversal Semantics
 >
@@ -177,7 +177,7 @@ For example, `$_internalExprEq` in `MatchExpression` reaches into arrays, wherea
 >
 > Generally, traversing arrays means that the elements of the array are considered along with the entire array object. When walking through the path `f` in the document `{f: [1, 2]}`, the path iterator would return 1, 2, and [1, 2].
 >
-> If the behavior is no array traversal, then only the entire array object (`[1, 2]`) will be returned. There is also a mode where only the array elements are returned, while the array itself is omitted. For the full definition of array traversal modes, refer to [`LeafArrayBehavior`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/path.h#L52) and [`NonLeafArrayBehavior`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/path.h#L76).
+> If the behavior is no array traversal, then only the entire array object (`[1, 2]`) will be returned. There is also a mode where only the array elements are returned, while the array itself is omitted. For the full definition of array traversal modes, refer to [`LeafArrayBehavior`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/path.h#L53) and [`NonLeafArrayBehavior`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/path.h#L77).
 >
 > For `MatchExpression`s, the default mode is to traverse arrays, while for `$expr`, the default mode is not to traverse arrays. For instance, `{$expr: {$eq: ["$f", [1, 2]]}}` will only match documents where the value at `f` is the entire array `[1, 2]`.
 
@@ -193,9 +193,9 @@ After calling `MatchExpression::getOptimizer()`, it may be that we still have a 
 > - **maximumNumberOfMinterms** - maximum number of minterms allowed during boolean transformations.
 > - **maxSizeFactor** - if the simplified expression is larger than the original expression's size \* `maxSizeFactor`, the simplified one will be rejected.
 >
-> For the full list of settings, refer to [expression_simplifier.h](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_simplifier.h#L38).
+> For the full list of settings, refer to [expression_simplifier.h](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_simplifier.h#L38).
 
-The entrypoint into Boolean simplification is the [`simplifyMatchExpression()`](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_simplifier.cpp#L227) function. Broadly, it is implemented in the following steps:
+The entrypoint into Boolean simplification is the [`simplifyMatchExpression()`](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_simplifier.cpp#L229) function. Broadly, it is implemented in the following steps:
 
 1. **Convert the `MatchExpression` to a bitset tree.**
 
@@ -209,7 +209,7 @@ The entrypoint into Boolean simplification is the [`simplifyMatchExpression()`](
 > Bitset operations tend to be faster and more straightforward than working with a complex AST structure.
 
 - The query filter is transformed into a bitset tree where predicates are in leaf nodes stored as bitsets, while internal nodes represent the tree structure. An internal node may be a conjunction (AND) or disjunction (OR) of its children.
-- MQL logical operators are represented like `BitsetTreeNode{ type: <conjunction or disjunction>, isNegated: <are children negated> }`. For specific representations of each [logical operator](https://www.mongodb.com/docs/manual/reference/operator/query-logical/), refer to [bitset_tree.h](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/query/boolean_simplification/bitset_tree.h#L49).
+- MQL logical operators are represented like `BitsetTreeNode{ type: <conjunction or disjunction>, isNegated: <are children negated> }`. For specific representations of each [logical operator](https://www.mongodb.com/docs/manual/reference/operator/query-logical/), refer to [bitset_tree.h](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/boolean_simplification/bitset_tree.h#L50).
 
 2. **Simplify the bitset tree to DNF.**
 
@@ -223,11 +223,11 @@ The entrypoint into Boolean simplification is the [`simplifyMatchExpression()`](
 
 - Once the bitset tree is in DNF, it can be further reduced to a minimal set of minterms, or sum of products.
 
-3. **Apply the [Quine McCluskey](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification/quine_mccluskey.h) reduction operation of DNF terms**: (x ∧ y) ∨ (x ∧ ~y) = x
-4. **Apply [Absorption's Law](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/query/boolean_simplification/bitset_algebra.h#L117)**: x ∨ (x ∧ y) = x
-5. **Use [Petrick's method](https://github.com/10gen/mongo/blob/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification/petrick.h) for further simplification**: This is used to find the minimal "coverage", or the smallest set of minterms such that the predicates evaluate to true.
+3. **Apply the [Quine McCluskey](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/boolean_simplification/quine_mccluskey.h) reduction operation of DNF terms**: (x ∧ y) ∨ (x ∧ ~y) = x
+4. **Apply [Absorption's Law](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/boolean_simplification/bitset_algebra.h#L117)**: x ∨ (x ∧ y) = x
+5. **Use [Petrick's method](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/boolean_simplification/petrick.h) for further simplification**: This is used to find the minimal "coverage", or the smallest set of minterms such that the predicates evaluate to true.
    - For example, given the input list of minterms `[[0, 1, 2], [2, 3], [0, 3]]`, we can derive two minimal coverages: `[0, 1]` and `[0, 2]`. The result is a vector of indices to the required minterms. We can "cover" the predicates 0, 1, 2, and 3 with either pairs of the original list of minterms.
-6. **Restore the original MatchExpression**: Finally, we [restore](https://github.com/10gen/mongo/blob/7648462976d6f4b29b76e25956c8e62eb133ffb0/src/mongo/db/matcher/expression_simplifier.cpp#L257) the `MatchExpression` tree from the bitset tree and a list of expressions representing bits in the bitset tree.
+6. **Restore the original MatchExpression**: Finally, we [restore](https://github.com/mongodb/mongo/blob/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/matcher/expression_simplifier.cpp#L259) the `MatchExpression` tree from the bitset tree and a list of expressions representing bits in the bitset tree.
 
 **Example**:
 
@@ -336,7 +336,7 @@ Finally, at the end of Boolean simplification, we restore the original `MatchExp
 
 ```
 
-For more information on the design of the Boolean simplifier, refer to the blog post: [Improving MongoDB Queries by Simplifying Boolean Expressions](https://www.mongodb.com/blog/post/improving-mongodb-queries-by-simplifying-boolean-expressions). Libraries can be found in the [`boolean_simplification`](https://github.com/10gen/mongo/tree/868afa0e0f3f1a547103b1805d5610ec831b8c3f/src/mongo/db/query/boolean_simplification) directory.
+For more information on the design of the Boolean simplifier, refer to the blog post: [Improving MongoDB Queries by Simplifying Boolean Expressions](https://www.mongodb.com/blog/post/improving-mongodb-queries-by-simplifying-boolean-expressions). Libraries can be found in the [`boolean_simplification`](https://github.com/mongodb/mongo/tree/28df8e56046e44f5977671e85fef7bcd38ffbea1/src/mongo/db/query/boolean_simplification) directory.
 
 ```mermaid
 graph TD
