@@ -170,8 +170,10 @@ boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
     // The simplifications using Absorption law.
     maxterm->removeRedundancies();
 
-    LOGV2_DEBUG(
-        7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm->toString());
+    LOGV2_DEBUG(7767001,
+                5,
+                "MatchExpression in DNF representation",
+                "maxterm"_attr = redact(maxterm->toString()));
 
     // The simplifications using the Quine-McCluskey algorithm (x&y | x&~y = x). The QMC works only
     // for expressions with negations.
@@ -229,7 +231,7 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
     LOGV2_DEBUG(7767000,
                 5,
                 "Converting MatchExpression to corresponding DNF",
-                "expression"_attr = root->debugString());
+                "expression"_attr = redact(root->debugString()));
 
     auto bitsetAndExpressions =
         transformToBitsetTree(root, settings.maximumNumberOfUniquePredicates);
@@ -264,14 +266,14 @@ boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
             8163001,
             5,
             "Failed to simplify the expression since the simplified expression is not valid.",
-            "simplifiedExpression"_attr = root->debugString());
+            "simplifiedExpression"_attr = redact(root->debugString()));
         return boost::none;
     }
 
     LOGV2_DEBUG(7767002,
                 5,
                 "Simplified MatchExpression",
-                "expression"_attr = simplifiedExpression->debugString());
+                "expression"_attr = redact(simplifiedExpression->debugString()));
     return simplifiedExpression;
 }
 }  // namespace mongo

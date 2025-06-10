@@ -55,7 +55,7 @@ FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
     if (!m && m.error() != pcre::Errc::ERROR_NOMATCH) {
         LOGV2_ERROR(5073414,
                     "Error occurred while executing regular expression.",
-                    "execResult"_attr = errorMessage(m.error()));
+                    "execResult"_attr = redact(errorMessage(m.error())));
         return {false, value::TypeTags::Nothing, 0};
     }
 

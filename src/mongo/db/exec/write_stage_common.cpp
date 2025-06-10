@@ -126,7 +126,7 @@ void PreWriteFilter::logSkippingDocument(const Document& doc,
                 "stream event",
                 "op"_attr = opKind,
                 logAttrs(collNs),
-                "record"_attr = doc);
+                "record"_attr = redact(doc.toString()));
 }
 
 void PreWriteFilter::logFromMigrate(const Document& doc,
@@ -138,7 +138,7 @@ void PreWriteFilter::logFromMigrate(const Document& doc,
                 "prevent a wrong change stream event",
                 "op"_attr = opKind,
                 logAttrs(collNs),
-                "record"_attr = doc);
+                "record"_attr = redact(doc.toString()));
 }
 
 bool ensureStillMatches(const CollectionPtr& collection,
