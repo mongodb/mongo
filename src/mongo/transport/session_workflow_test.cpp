@@ -537,7 +537,8 @@ private:
 TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisabled) {
     RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
                                                      1.0};
-    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
+    RAIIServerParameterControllerForTest burstCapacitySecs{
+        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
     startSession();
@@ -567,7 +568,8 @@ TEST_F(ConnectionEstablishmentQueueingTest, RejectEstablishmentWhenQueueingDisab
 TEST_F(ConnectionEstablishmentQueueingTest, InterruptQueuedEstablishments) {
     RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
                                                      1.0};
-    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
+    RAIIServerParameterControllerForTest burstCapacitySecs{
+        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
     RAIIServerParameterControllerForTest maxQueueDepth{
         "ingressConnectionEstablishmentMaxQueueDepth", 10};
     const auto initialAvailable = getConnectionStats()["available"].numberLong();
@@ -608,7 +610,8 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
         BSON("ranges" << BSONArray(BSON("0" << ip))));
     RAIIServerParameterControllerForTest refreshRate{"ingressConnectionEstablishmentRatePerSec",
                                                      1.0};
-    RAIIServerParameterControllerForTest burstSize{"ingressConnectionEstablishmentBurstSize", 1};
+    RAIIServerParameterControllerForTest burstCapacitySecs{
+        "ingressConnectionEstablishmentBurstCapacitySecs", 1};
 
     // The first session gets a token successfully and calls sourceMessage.
     startSession();

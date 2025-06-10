@@ -127,13 +127,17 @@ Status runWithSessionEstablishmentRateLimiter(Callback&& updateFunc) try {
 Status onUpdateEstablishmentRefreshRate(int32_t newValue) {
     return runWithSessionEstablishmentRateLimiter(
         [newValue](SessionEstablishmentRateLimiter* limiter) {
-            limiter->setRefreshRatePerSec(newValue);
+            limiter->updateRateParameters(
+                newValue, newValue * gIngressConnectionEstablishmentBurstCapacitySecs.load());
         });
 }
 
-Status onUpdateEstablishmentBurstSize(int32_t newValue) {
+Status onUpdateEstablishmentBurstCapacitySecs(double newValue) {
+    auto refreshRate = gIngressConnectionEstablishmentRatePerSec.load();
     return runWithSessionEstablishmentRateLimiter(
-        [newValue](SessionEstablishmentRateLimiter* limiter) { limiter->setBurstSize(newValue); });
+        [refreshRate, burstSize = newValue](SessionEstablishmentRateLimiter* limiter) {
+            limiter->updateRateParameters(refreshRate, refreshRate * burstSize);
+        });
 }
 
 Status onUpdateEstablishmentMaxQueueDepth(int32_t newValue) {

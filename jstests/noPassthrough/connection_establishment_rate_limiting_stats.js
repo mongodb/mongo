@@ -9,6 +9,10 @@
 (function() {
 'use strict';
 
+if (_isWindows()) {
+    quit();
+}
+
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallelTester.js');
 load('jstests/noPassthrough/libs/conn_establishment_rate_limiter_helpers.js');
@@ -22,14 +26,14 @@ const equal = (left, right) => {
 };
 
 const maxQueueSize = 3;
+const extraConns = 3;
 // Hardcoded so that we can assert on "available" connections in serverStatus.
 const maxIncomingConnections = 1000;
 
-const testRateLimiterStats = (conn) => {
+const testRateLimiterStats = (conn, expected) => {
     // Start maxQueueSize + 3 threads that will all try to connect to the server. The rate limiter
     // should allow maxQueueSize connections to be queued, and the rest should be rejected.
     let connDelayFailPoint = configureFailPoint(conn, 'hangInRateLimiter');
-    const extraConns = 3;
     const threads = [];
     for (let i = 0; i < maxQueueSize + extraConns; i++) {
         threads.push(new Thread((host, threadId) => {
@@ -53,14 +57,15 @@ const testRateLimiterStats = (conn) => {
         const checks = [
             // Queued connections should be counted in "queuedForEstablishment", "totalCreated", and
             // "available" stats.
-            () => equal(cstats["queuedForEstablishment"], maxQueueSize),
-            () => cstats["totalCreated"] >= maxQueueSize,
-            () => cstats["available"] <= maxIncomingConnections - maxQueueSize,
+            () => equal(cstats["queuedForEstablishment"], expected.queuedForEstablishment),
+            () => cstats["totalCreated"] >= expected.totalCreated,
+            () => cstats["available"] <= expected.available,
             // "extraConns" connections should be rejected because we create more than the rate
             // limit can handle-- they should be counted as rejected in the establishmentRateLimit
             // subsection and the overall "rejected" count.
-            () => equal(cstats["rejected"], extraConns),
-            () => equal(cstats["establishmentRateLimit"]["rejected"], extraConns),
+            () => equal(cstats["rejected"], expected.rejected),
+            () => equal(cstats["establishmentRateLimit"]["rejected"],
+                        expected.establishmentRateLimit.rejected),
             // There is a correspondence between the connections stats and the session
             // establishment queue stats, because they use the same underlying rate limiter.
             () => equal(cstats["establishmentRateLimit"]["rejected"], qstats["rejectedAdmissions"]),
@@ -88,14 +93,38 @@ const testRateLimiterStats = (conn) => {
     }
 };
 
+const expectedStatsWithRateLimitingEnabled = {
+    queuedForEstablishment: maxQueueSize,
+    totalCreated: maxQueueSize,
+    available: maxIncomingConnections - maxQueueSize,
+    rejected: extraConns,
+    establishmentRateLimit: {
+        rejected: extraConns,
+    },
+};
+
 const testRateLimiterStatsOpts = {
     ingressConnectionEstablishmentRateLimiterEnabled: true,
     ingressConnectionEstablishmentRatePerSec: 1,
-    ingressConnectionEstablishmentBurstSize: 1,
+    ingressConnectionEstablishmentBurstCapacitySecs: 1,
     ingressConnectionEstablishmentMaxQueueDepth: maxQueueSize,
 };
-runTestStandaloneParamsSetAtStartup(testRateLimiterStatsOpts, testRateLimiterStats);
-runTestStandaloneParamsSetAtRuntime(testRateLimiterStatsOpts, testRateLimiterStats);
-runTestReplSet(testRateLimiterStatsOpts, testRateLimiterStats);
-runTestShardedCluster(testRateLimiterStatsOpts, testRateLimiterStats);
+
+const runTest = (conn) => {
+    testRateLimiterStats(conn, expectedStatsWithRateLimitingEnabled);
+
+    jsTestLog("Disabling rate limiting to verify that connections no longer queue.");
+    assert.commandWorked(conn.adminCommand(
+        {setParameter: 1, ingressConnectionEstablishmentRateLimiterEnabled: false}));
+
+    let disabledStats = expectedStatsWithRateLimitingEnabled;
+    disabledStats.queuedForEstablishment = 0;
+    disabledStats.available = maxIncomingConnections;
+    testRateLimiterStats(conn, disabledStats);
+};
+
+runTestStandaloneParamsSetAtStartup(testRateLimiterStatsOpts, runTest);
+runTestStandaloneParamsSetAtRuntime(testRateLimiterStatsOpts, runTest);
+runTestReplSet(testRateLimiterStatsOpts, runTest);
+runTestShardedCluster(testRateLimiterStatsOpts, runTest);
 })();

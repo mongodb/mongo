@@ -32,7 +32,7 @@ const runTestStandaloneParamsSetAtStartup = (setParams, testCase) => {
     mongod.adminCommand({
         setParameter: 1,
         ingressConnectionEstablishmentRatePerSec: 10.0,
-        ingressConnectionEstablishmentBurstSize: 500.0,
+        ingressConnectionEstablishmentBurstCapacitySecs: 500.0,
     });
 
     MongoRunner.stopMongod(mongod);
@@ -57,7 +57,7 @@ const runTestStandaloneParamsSetAtRuntime = (setParams, testCase) => {
     mongod.adminCommand({
         setParameter: 1,
         ingressConnectionEstablishmentRatePerSec: 10.0,
-        ingressConnectionEstablishmentBurstSize: 500.0,
+        ingressConnectionEstablishmentBurstCapacitySecs: 500.0,
     });
 
     MongoRunner.stopMongod(mongod);
@@ -83,7 +83,7 @@ const runTestReplSet = (setParams, testCase) => {
     replSet.getPrimary().adminCommand({
         setParameter: 1,
         ingressConnectionEstablishmentRatePerSec: 10.0,
-        ingressConnectionEstablishmentBurstSize: 500.0,
+        ingressConnectionEstablishmentBurstCapacitySecs: 500.0,
     });
 
     replSet.stopSet();
@@ -118,7 +118,7 @@ const runTestShardedCluster = (setParams, testCase) => {
     st.s0.adminCommand({
         setParameter: 1,
         ingressConnectionEstablishmentRatePerSec: 1000.0,
-        ingressConnectionEstablishmentBurstSize: 500.0,
+        ingressConnectionEstablishmentBurstCapacitySecs: 500.0,
         ingressConnectionEstablishmentMaxQueueDepth: 100,
     });
 

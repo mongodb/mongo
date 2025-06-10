@@ -44,7 +44,8 @@ const auto getGlobalSessionEstablishmentRateLimiter =
 
 SessionEstablishmentRateLimiter::SessionEstablishmentRateLimiter()
     : _rateLimiter(gIngressConnectionEstablishmentRatePerSec.load(),
-                   gIngressConnectionEstablishmentBurstSize.load(),
+                   gIngressConnectionEstablishmentRatePerSec.load() *
+                       gIngressConnectionEstablishmentBurstCapacitySecs.load(),
                    gIngressConnectionEstablishmentMaxQueueDepth.load(),
                    "SessionEstablishmentRateLimiter") {}
 

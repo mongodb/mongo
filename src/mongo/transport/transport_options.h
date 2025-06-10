@@ -32,7 +32,7 @@
 namespace mongo::transport {
 Status onUpdateEstablishmentRefreshRate(int32_t newValue);
 
-Status onUpdateEstablishmentBurstSize(int32_t newValue);
+Status onUpdateEstablishmentBurstCapacitySecs(double newValue);
 
 Status onUpdateEstablishmentMaxQueueDepth(int32_t newValue);
 }  // namespace mongo::transport
