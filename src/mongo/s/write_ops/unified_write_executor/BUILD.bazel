@@ -12,22 +12,26 @@ exports_files(
 mongo_cc_library(
     name = "unified_write_executor",
     srcs = [
+        "unified_write_executor.cpp",
         "write_batch_executor.cpp",
         "write_batch_response_processor.cpp",
+        "write_batch_scheduler.cpp",
         "write_op_analyzer.cpp",
         "write_op_batcher.cpp",
         "write_op_producer.cpp",
     ],
     hdrs = [
+        "unified_write_executor.h",
         "write_batch_executor.h",
         "write_batch_response_processor.h",
+        "write_batch_scheduler.h",
         "write_op.h",
         "write_op_analyzer.h",
         "write_op_batcher.h",
         "write_op_producer.h",
     ],
     deps = [
-        "//src/mongo/s:sharding_api",
+        "//src/mongo/s:sharding_collection_routing_info_targeter",
         "//src/mongo/s:sharding_router_api",
         "//src/mongo/s/write_ops:batch_write_types",
     ],
@@ -36,6 +40,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "unified_write_executor_test",
     srcs = [
+        "unified_write_executor_test.cpp",
         "write_batch_executor_test.cpp",
         "write_batch_response_processor_test.cpp",
         "write_op_analyzer_test.cpp",
