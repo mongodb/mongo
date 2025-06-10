@@ -886,6 +886,11 @@ error_codes:
       name: PooledConnectionAcquisitionRejected,
       categories: [SystemOverloadedError],
     }
+  - {
+      code: 451,
+      name: StreamProcessorS3TokenExpired,
+      categories: [StreamProcessorRetryableError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
