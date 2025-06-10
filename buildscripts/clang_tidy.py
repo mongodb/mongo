@@ -22,15 +22,13 @@ import yaml
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from clang_tidy_vscode import CHECKS_SO
 from mongo_toolchain import get_mongo_toolchain
 from simple_report import make_report, put_report, try_combine_reports
 
-checks_so = ""
-for module in CHECKS_SO:
-    if os.path.exists(module):
-        checks_so = module
-        break
+checks_so = None
+if os.path.exists(".mongo_checks_module_path"):
+    with open(".mongo_checks_module_path") as f:
+        checks_so = f.read().strip()
 
 
 config_file = ""
