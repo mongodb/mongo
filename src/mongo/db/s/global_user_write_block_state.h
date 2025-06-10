@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <array>
+
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/user_writes_block_reason_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -47,8 +50,15 @@ public:
     /**
      * Methods to control the global user write blocking state.
      */
-    void enableUserWriteBlocking(OperationContext* opCtx);
+    void enableUserWriteBlocking(OperationContext* opCtx, UserWritesBlockReasonEnum reason);
     void disableUserWriteBlocking(OperationContext* opCtx);
+
+    /**
+     * Gets the reason why the user writes are blocked globally.
+     */
+    UserWritesBlockReasonEnum getUserWriteBlockingReason(OperationContext* opCtx) const {
+        return _globalUserWritesBlockedReason.load();
+    }
 
     /**
      * Checks that user writes are allowed on the specified namespace. Callers must hold the
@@ -61,6 +71,11 @@ public:
      * state of WriteBlockBypass. Used for serverStatus.
      */
     bool isUserWriteBlockingEnabled(OperationContext* opCtx) const;
+
+    /**
+     * Reports the user write blocking counters.
+     */
+    void appendUserWriteBlockModeCounters(BSONObjBuilder& bob) const;
 
     /**
      * Methods to enable/disable blocking new sharded DDL operations.
@@ -90,6 +105,10 @@ public:
 
 private:
     AtomicWord<bool> _globalUserWritesBlocked{false};
+    AtomicWord<UserWritesBlockReasonEnum> _globalUserWritesBlockedReason{
+        UserWritesBlockReasonEnum::kUnspecified};
+    std::array<AtomicWord<size_t>, idlEnumCount<UserWritesBlockReasonEnum>>
+        _globalUserWriteBlockCounters{};
     AtomicWord<bool> _userShardedDDLBlocked{false};
     AtomicWord<bool> _userIndexBuildsBlocked{false};
 };
