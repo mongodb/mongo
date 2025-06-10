@@ -4,6 +4,8 @@ load("@npm//:eslint/package_json.bzl", "bin")
 exports_files([
     "cheetah_source_generator.py",
     "clang_tidy_config_gen.py",
+    "symbols.orderfile",
+    "symbols-al2023.orderfile",
 ])
 
 py_binary(

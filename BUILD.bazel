@@ -18,7 +18,6 @@ exports_files([
     ".prettierrc",
     "pyproject.toml",
     "poetry.lock",
-    "symbols.orderfile",
     "codeowners-validator",
 ])
 

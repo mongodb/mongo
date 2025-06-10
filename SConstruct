@@ -4777,7 +4777,7 @@ def doConfigure(myenv):
                 myenv.AppendUnique(
                     CCFLAGS=["-ffunction-sections"],
                     LINKFLAGS=[
-                        "-Wl,--symbol-ordering-file=symbols.orderfile",
+                        "-Wl,--symbol-ordering-file=buildscripts/symbols.orderfile",
                         "-Wl,--no-warn-symbol-ordering",
                     ],
                 )

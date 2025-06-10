@@ -1358,12 +1358,17 @@ THIN_LTO_FLAGS = select({
 
 SYMBOL_ORDER_COPTS = select({
     "//bazel/config:symbol_ordering_file_enabled": ["-ffunction-sections"],
+    "//bazel/config:symbol_ordering_file_enabled_al2023": ["-ffunction-sections"],
     "//conditions:default": [],
 })
 
 SYMBOL_ORDER_LINKFLAGS = select({
     "//bazel/config:symbol_ordering_file_enabled": [
-        "-Wl,--symbol-ordering-file=$(location //:symbols.orderfile)",
+        "-Wl,--symbol-ordering-file=$(location //buildscripts:symbols.orderfile)",
+        "-Wl,--no-warn-symbol-ordering",
+    ],
+    "//bazel/config:symbol_ordering_file_enabled_al2023": [
+        "-Wl,--symbol-ordering-file=$(location //buildscripts:symbols-al2023.orderfile)",
         "-Wl,--no-warn-symbol-ordering",
     ],
     "//conditions:default": [],
@@ -1385,7 +1390,8 @@ SHARED_ARCHIVE_LINKFLAGS = select({
 })
 
 SYMBOL_ORDER_FILES = [
-    "//:symbols.orderfile",
+    "//buildscripts:symbols.orderfile",
+    "//buildscripts:symbols-al2023.orderfile",
 ]
 
 # Passed to both the compiler and linker
