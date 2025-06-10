@@ -1819,7 +1819,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_text* @10gen/query-integration-search @svc-auto-approve-bot
 /src/mongo/db/matcher/**/expression_where* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/matcher/**/extensions_callback* @10gen/query-integration-search @svc-auto-approve-bot
-/src/mongo/db/matcher/**/expression_internal_bucket_geo* @10gen/query-integration-geo @svc-auto-approve-bot
+/src/mongo/db/matcher/**/expression_internal_bucket_geo* @10gen/query-integration-extensions @svc-auto-approve-bot
 /src/mongo/db/matcher/**/match_expression_util* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/matcher/**/matchable* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/matcher/**/matcher.cpp @10gen/query-execution @svc-auto-approve-bot

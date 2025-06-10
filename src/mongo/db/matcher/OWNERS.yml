@@ -27,7 +27,7 @@ filters:
       - 10gen/query-integration-search
   - "expression_internal_bucket_geo*":
     approvers:
-      - 10gen/query-integration-geo
+      - 10gen/query-integration-extensions
   - "match_expression_util*":
     approvers:
       - 10gen/query-execution
