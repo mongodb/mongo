@@ -82,6 +82,7 @@ void HistoricalIdentTracker::unpin() {
 }
 
 void HistoricalIdentTracker::removeEntriesOlderThan(Timestamp timestamp) {
+    stdx::lock_guard<Latch> lk(_mutex);
     Timestamp removeOlderThan =
         _pinnedTimestamp.isNull() ? timestamp : std::min(timestamp, _pinnedTimestamp);
 
@@ -89,7 +90,6 @@ void HistoricalIdentTracker::removeEntriesOlderThan(Timestamp timestamp) {
         6321801, 2, "Removing historical entries older than", "timestamp"_attr = removeOlderThan);
 
     std::vector<std::string> keysToRemove;
-    stdx::lock_guard<Latch> lk(_mutex);
     for (auto mapIt = _historicalIdents.begin(); mapIt != _historicalIdents.end(); mapIt++) {
 
         auto listIt = mapIt->second.begin();
@@ -127,13 +127,13 @@ void HistoricalIdentTracker::removeEntriesOlderThan(Timestamp timestamp) {
 }
 
 void HistoricalIdentTracker::rollbackTo(Timestamp timestamp) {
+    stdx::lock_guard<Latch> lk(_mutex);
     Timestamp rollbackTo =
         _pinnedTimestamp.isNull() ? timestamp : std::max(timestamp, _pinnedTimestamp);
 
     LOGV2_DEBUG(6321803, 2, "Rolling back historical entries to", "timestamp"_attr = rollbackTo);
 
     std::vector<std::string> keysToRemove;
-    stdx::lock_guard<Latch> lk(_mutex);
     for (auto mapIt = _historicalIdents.begin(); mapIt != _historicalIdents.end(); mapIt++) {
 
         auto listIt = mapIt->second.begin();
