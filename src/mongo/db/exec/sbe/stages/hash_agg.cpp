@@ -261,6 +261,7 @@ void HashAggStage::open(bool reOpen) {
     _commonStats.opens++;
 
     if (!reOpen || _seekKeysAccessors.empty()) {
+        tassert(10226701, "Expecting _opCtx to be populated", _opCtx);
         _children[0]->open(_childOpened);
         _childOpened = true;
         if (_collatorAccessor) {
@@ -287,6 +288,7 @@ void HashAggStage::open(bool reOpen) {
         if (_recordStore) {
             _recordStore->resetCursor(_opCtx, _rsCursor);
         }
+        _rsCursor.reset();
         _recordStore.reset();
         _outKeyRowRecordStore = {0};
         _outAggRowRecordStore = {0};
@@ -432,6 +434,7 @@ PlanState HashAggStage::getNextSpilled() {
             return deserializeSpilledRecord(record, _gbs.size(), keyBuffer);
         };
 
+    tassert(10226700, "Expecting _rsCursor to be populated", _rsCursor);
     if (_stashedNextRow.first.isEmpty()) {
         auto nextRecord = _rsCursor->next();
         if (!nextRecord) {
