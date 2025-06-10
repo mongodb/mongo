@@ -329,139 +329,157 @@ class _StepdownThread(threading.Thread):
             self._step_down(rs_fixture)
 
     def _step_down(self, rs_fixture):
-        try:
-            old_primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
-        except errors.ServerFailure:
-            # We ignore the ServerFailure exception because it means a primary wasn't available.
-            # We'll try again after self._stepdown_interval_secs seconds.
-            return
-
-        secondaries = rs_fixture.get_secondaries()
-
-        self.logger.info(
-            "Stepping down primary on port %d of replica set '%s'",
-            old_primary.port,
-            rs_fixture.replset_name,
-        )
-
-        kill_method = ContinuousStepdown.STEPDOWN
-        if self._randomize_kill:
-            kill_method = random.choice(
-                [ContinuousStepdown.STEPDOWN, ContinuousStepdown.TERMINATE, ContinuousStepdown.KILL]
-            )
-        elif self._kill:
-            kill_method = random.choice([ContinuousStepdown.TERMINATE, ContinuousStepdown.KILL])
-        elif self._terminate:
-            kill_method = ContinuousStepdown.TERMINATE
-
-        if kill_method == ContinuousStepdown.KILL or kill_method == ContinuousStepdown.TERMINATE:
-            if not rs_fixture.stop_primary(
-                old_primary, self._background_reconfig, kill_method == ContinuousStepdown.KILL
-            ):
+        with rs_fixture.removeshard_teardown_mutex:
+            if rs_fixture.removeshard_teardown_marker:
                 return
 
-        if self._should_downgrade:
-            new_primary = rs_fixture.change_version_and_restart_node(
-                old_primary, self._auth_options
-            )
-        else:
+            try:
+                old_primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
+            except errors.ServerFailure:
+                # We ignore the ServerFailure exception because it means a primary wasn't available.
+                # We'll try again after self._stepdown_interval_secs seconds.
+                return
 
-            def step_up_secondary():
-                while secondaries:
-                    chosen = random.choice(secondaries)
-                    self.logger.info(
-                        "Chose secondary on port %d of replica set '%s' for step up attempt.",
-                        chosen.port,
-                        rs_fixture.replset_name,
-                    )
-                    if not rs_fixture.stepup_node(chosen, self._auth_options):
-                        self.logger.info(
-                            "Attempt to step up secondary on port %d of replica set '%s' failed.",
-                            chosen.port,
-                            rs_fixture.replset_name,
-                        )
-                        secondaries.remove(chosen)
-                    else:
-                        return chosen
+            secondaries = rs_fixture.get_secondaries()
 
-            new_primary = step_up_secondary()
-
-        if kill_method == ContinuousStepdown.KILL or kill_method == ContinuousStepdown.TERMINATE:
-            rs_fixture.restart_node(old_primary)
-
-        if secondaries:
-            # We successfully stepped up a secondary, wait for the former primary to step down via
-            # heartbeats. We need to wait for the former primary to step down to complete this step
-            # down round and to avoid races between the ContinuousStepdown hook and other test hooks
-            # that may depend on the health of the replica set.
             self.logger.info(
-                "Successfully stepped up the secondary on port %d of replica set '%s'.",
-                new_primary.port,
-                rs_fixture.replset_name,
-            )
-            retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
-            retry_start_time = time.time()
-            while True:
-                try:
-                    client = self._create_client(old_primary)
-                    is_secondary = client.admin.command("isMaster")["secondary"]
-                    if is_secondary:
-                        break
-                except pymongo.errors.AutoReconnect:
-                    pass
-                if time.time() - retry_start_time > retry_time_secs:
-                    raise errors.ServerFailure(
-                        "The old primary on port {} of replica set {} did not step down in"
-                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
-                    )
-                self.logger.info(
-                    "Waiting for primary on port %d of replica set '%s' to step down.",
-                    old_primary.port,
-                    rs_fixture.replset_name,
-                )
-                time.sleep(0.2)  # Wait a little bit before trying again.
-            self.logger.info(
-                "Primary on port %d of replica set '%s' stepped down.",
+                "Stepping down primary on port %d of replica set '%s'",
                 old_primary.port,
                 rs_fixture.replset_name,
             )
 
-        if not secondaries:
-            # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
-            # and elect the former primary again. This way we don't need to wait
-            # self._stepdown_duration_secs seconds to restore write availability to the cluster.
-            # Since the former primary may have been killed, we need to wait until it has been
-            # restarted by retrying replSetStepUp.
+            kill_method = ContinuousStepdown.STEPDOWN
+            if self._randomize_kill:
+                kill_method = random.choice(
+                    [
+                        ContinuousStepdown.STEPDOWN,
+                        ContinuousStepdown.TERMINATE,
+                        ContinuousStepdown.KILL,
+                    ]
+                )
+            elif self._kill:
+                kill_method = random.choice([ContinuousStepdown.TERMINATE, ContinuousStepdown.KILL])
+            elif self._terminate:
+                kill_method = ContinuousStepdown.TERMINATE
 
-            retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
-            retry_start_time = time.time()
-            while True:
-                try:
-                    client = self._create_client(old_primary)
-                    client.admin.command("replSetStepUp")
-                    is_primary = client.admin.command("isMaster")["ismaster"]
-                    # There is a chance that the old master is still in catchup stage when we issue replSetStepUp
-                    # then it will step down due to term change in the previous election failure. We should ensure the old
-                    # primary becomes a writable primary here, or there will have no primary for a day.
-                    if is_primary:
-                        break
-                    else:
-                        self._wait(0.2)
-                except pymongo.errors.AutoReconnect:
-                    self.logger.info("AutoReconnect exception thrown, retrying...")
-                    time.sleep(0.1)
-                except pymongo.errors.OperationFailure:
-                    self._wait(0.2)
-                if time.time() - retry_start_time > retry_time_secs:
-                    raise errors.ServerFailure(
-                        "The old primary on port {} of replica set {} did not step up in"
-                        " {} seconds.".format(client.port, rs_fixture.replset_name, retry_time_secs)
+            if (
+                kill_method == ContinuousStepdown.KILL
+                or kill_method == ContinuousStepdown.TERMINATE
+            ):
+                if not rs_fixture.stop_primary(
+                    old_primary, self._background_reconfig, kill_method == ContinuousStepdown.KILL
+                ):
+                    return
+
+            if self._should_downgrade:
+                new_primary = rs_fixture.change_version_and_restart_node(
+                    old_primary, self._auth_options
+                )
+            else:
+
+                def step_up_secondary():
+                    while secondaries:
+                        chosen = random.choice(secondaries)
+                        self.logger.info(
+                            "Chose secondary on port %d of replica set '%s' for step up attempt.",
+                            chosen.port,
+                            rs_fixture.replset_name,
+                        )
+                        if not rs_fixture.stepup_node(chosen, self._auth_options):
+                            self.logger.info(
+                                "Attempt to step up secondary on port %d of replica set '%s' failed.",
+                                chosen.port,
+                                rs_fixture.replset_name,
+                            )
+                            secondaries.remove(chosen)
+                        else:
+                            return chosen
+
+                new_primary = step_up_secondary()
+
+            if (
+                kill_method == ContinuousStepdown.KILL
+                or kill_method == ContinuousStepdown.TERMINATE
+            ):
+                rs_fixture.restart_node(old_primary)
+
+            if secondaries:
+                # We successfully stepped up a secondary, wait for the former primary to step down via
+                # heartbeats. We need to wait for the former primary to step down to complete this step
+                # down round and to avoid races between the ContinuousStepdown hook and other test hooks
+                # that may depend on the health of the replica set.
+                self.logger.info(
+                    "Successfully stepped up the secondary on port %d of replica set '%s'.",
+                    new_primary.port,
+                    rs_fixture.replset_name,
+                )
+                retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+                retry_start_time = time.time()
+                while True:
+                    try:
+                        client = self._create_client(old_primary)
+                        is_secondary = client.admin.command("isMaster")["secondary"]
+                        if is_secondary:
+                            break
+                    except pymongo.errors.AutoReconnect:
+                        pass
+                    if time.time() - retry_start_time > retry_time_secs:
+                        raise errors.ServerFailure(
+                            "The old primary on port {} of replica set {} did not step down in"
+                            " {} seconds.".format(
+                                client.port, rs_fixture.replset_name, retry_time_secs
+                            )
+                        )
+                    self.logger.info(
+                        "Waiting for primary on port %d of replica set '%s' to step down.",
+                        old_primary.port,
+                        rs_fixture.replset_name,
                     )
+                    time.sleep(0.2)  # Wait a little bit before trying again.
+                self.logger.info(
+                    "Primary on port %d of replica set '%s' stepped down.",
+                    old_primary.port,
+                    rs_fixture.replset_name,
+                )
 
-        # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
-        # executed successfully.
-        key = "{}/{}".format(
-            rs_fixture.replset_name,
-            new_primary.get_internal_connection_string() if secondaries else "none",
-        )
-        self._step_up_stats[key] += 1
+            if not secondaries:
+                # If we failed to step up one of the secondaries, then we run the replSetStepUp to try
+                # and elect the former primary again. This way we don't need to wait
+                # self._stepdown_duration_secs seconds to restore write availability to the cluster.
+                # Since the former primary may have been killed, we need to wait until it has been
+                # restarted by retrying replSetStepUp.
+
+                retry_time_secs = rs_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+                retry_start_time = time.time()
+                while True:
+                    try:
+                        client = self._create_client(old_primary)
+                        client.admin.command("replSetStepUp")
+                        is_primary = client.admin.command("isMaster")["ismaster"]
+                        # There is a chance that the old master is still in catchup stage when we issue replSetStepUp
+                        # then it will step down due to term change in the previous election failure. We should ensure the old
+                        # primary becomes a writable primary here, or there will have no primary for a day.
+                        if is_primary:
+                            break
+                        else:
+                            self._wait(0.2)
+                    except pymongo.errors.AutoReconnect:
+                        self.logger.info("AutoReconnect exception thrown, retrying...")
+                        time.sleep(0.1)
+                    except pymongo.errors.OperationFailure:
+                        self._wait(0.2)
+                    if time.time() - retry_start_time > retry_time_secs:
+                        raise errors.ServerFailure(
+                            "The old primary on port {} of replica set {} did not step up in"
+                            " {} seconds.".format(
+                                client.port, rs_fixture.replset_name, retry_time_secs
+                            )
+                        )
+
+            # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
+            # executed successfully.
+            key = "{}/{}".format(
+                rs_fixture.replset_name,
+                new_primary.get_internal_connection_string() if secondaries else "none",
+            )
+            self._step_up_stats[key] += 1

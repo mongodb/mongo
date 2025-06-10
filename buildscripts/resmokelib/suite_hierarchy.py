@@ -45,7 +45,7 @@ SUITE_HIERARCHY = {
     "concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary": {
         "concurrency_sharded_multi_stmt_txn": {}
     },
-    "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions": {
+    "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard": {
         "concurrency_sharded_stepdown_terminate_kill_primary_with_balancer": {
             # The stepdown suite is not considered a superset of concurrency_sharded_replication
             # because the stepdown suite uses retryable writes whereas the vanilla suite does not.

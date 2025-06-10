@@ -474,12 +474,13 @@ class _AddRemoveShardThread(threading.Thread):
             self.logger.info(f"Successfully dropped database: {db_name}")
 
         teardown_handler = fixture_interface.FixtureTeardownHandler(self.logger)
-        shard_obj.removeshard_teardown_marker = True
-        teardown_handler.teardown(shard_obj, "shard")
-        if not teardown_handler.was_successful():
-            msg = "Error when decomissioning shard."
-            self.logger.error(msg)
-            raise errors.ServerFailure(teardown_handler.get_error_message())
+        with shard_obj.removeshard_teardown_mutex:
+            shard_obj.removeshard_teardown_marker = True
+            teardown_handler.teardown(shard_obj, "shard")
+            if not teardown_handler.was_successful():
+                msg = "Error when decomissioning shard."
+                self.logger.error(msg)
+                raise errors.ServerFailure(teardown_handler.get_error_message())
 
     def _get_tracked_collections_on_shard(self, shard_id):
         return list(

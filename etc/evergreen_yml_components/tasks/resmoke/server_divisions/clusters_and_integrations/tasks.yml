@@ -2112,7 +2112,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_gen
+    name: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_and_add_remove_shard_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",

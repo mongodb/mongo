@@ -3,6 +3,7 @@
 import os.path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 from typing import Optional
 
 import bson
@@ -159,6 +160,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # when the evergeen job performs the final teardown. Therefore if the fixture was
         # teared down earlier, it must be skipped during those final checks.
         self.removeshard_teardown_marker = False
+        self.removeshard_teardown_mutex = Lock()
 
     def setup(self):
         """Set up the replica set."""
