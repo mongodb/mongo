@@ -97,7 +97,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::CellBlock::Path>& 
         // Array elements have a field that is their index in the array. We shouldn't
         // append that field in the 'Path'.
         if (!previousIsArray) {
-            path.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+            path.push_back(sbe::value::CellBlock::Get{std::string{elem.fieldNameStringData()}});
         }
         path.push_back(sbe::value::CellBlock::Id{});
         paths.push_back(path);
@@ -118,7 +118,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::CellBlock::Path>& 
         // manually track when the element is an array element or an object.
         // If the next element is an object
         if (!previousIsArray) {
-            path.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+            path.push_back(sbe::value::CellBlock::Get{std::string{elem.fieldNameStringData()}});
         }
         path.push_back(sbe::value::CellBlock::Traverse{});
         findAllScalarPaths(paths, obj.firstElement(), path, true);
@@ -129,7 +129,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::CellBlock::Path>& 
     for (auto&& newElem : obj) {
         auto nPath = path;
         if (!previousIsArray) {
-            nPath.push_back(sbe::value::CellBlock::Get{elem.fieldNameStringData().toString()});
+            nPath.push_back(sbe::value::CellBlock::Get{std::string{elem.fieldNameStringData()}});
             nPath.push_back(sbe::value::CellBlock::Traverse{});
         }
         findAllScalarPaths(paths, newElem, nPath, false);

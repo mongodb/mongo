@@ -55,7 +55,7 @@ MONGO_COMPILER_NOINLINE Status makeError(StringData baseMsg,
 
     if (!elemName.empty()) {
         msg << " in element with field name '";
-        msg << elemName.toString();
+        msg << elemName;
         msg << "'";
     }
 
