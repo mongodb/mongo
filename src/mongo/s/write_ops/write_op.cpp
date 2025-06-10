@@ -291,7 +291,9 @@ WriteOp::TargetWritesResult WriteOp::targetWrites(OperationContext* opCtx,
             // TODO SERVER-101167: For WithoutShardKeyWithId write ops, we should only target the
             // shards that are needed (instead of targeting all shards).
             endpoints = targeter.targetAllShards(opCtx);
-        } else if (targetAllShards && writeType == WriteType::Ordinary) {
+        }
+
+        if (targetAllShards && writeType == WriteType::Ordinary) {
             // For Ordinary WriteOps running outside of a transaction that need to target more than
             // one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
             // endpoints. Currently there are two cases where this block of code is reached:

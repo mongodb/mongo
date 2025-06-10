@@ -450,15 +450,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             }
         });
 
-        // If the WriteType of 'writeOp' is different than the current batch's WriteType, then
-        // 'writeOp' cannot be added to the current batch. Also, if 'writeOp' doesn't support
-        // grouping, then 'writeOp' cannot be added to the current batch because it must be in
-        // a batch by itself.
-        if (writeType &&
-            (result.writeType != *writeType || !writeTypeSupportsGrouping(result.writeType))) {
-            break;
-        }
-
         // If writes are ordered and we have a targeted endpoint, make sure we don't need to send
         // these targeted writes to any other endpoints.
         if (ordered && !batchMap.empty()) {
@@ -486,6 +477,19 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             invariant(!batchMap.empty());
             LOGV2_DEBUG(9986804, 5, "Making a new batch to avoid making batch size too large");
             break;
+        }
+
+        // If the WriteType of 'writeOp' is different than the current batch's WriteType, then
+        // 'writeOp' cannot be added to the current batch. Also, if 'writeOp' doesn't support
+        // grouping, then 'writeOp' cannot be added to the current batch because it must be in
+        // a batch by itself.
+        if (writeType &&
+            (result.writeType != *writeType || !writeTypeSupportsGrouping(result.writeType))) {
+            if (ordered) {
+                break;
+            } else {
+                continue;
+            }
         }
 
         // Targeting succeeded.
