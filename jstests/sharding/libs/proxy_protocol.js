@@ -104,33 +104,42 @@ export class ProxyProtocolServer {
 
     /**
      * Get the proxy server port used to connect to the egress port provided.
+     * That is, return port3 in the following:
+     *
+     *     [client] port1 <-----> ingress_port [proxy] port3 <------> egress_port [mongo(s|d)]
      */
     getServerPort() {
-        let args = ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`];
-        clearRawMongoProgramOutput();
-        _startMongoProgram({args: args});
+        const tools = [
+            {
+                args: ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`],
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`
+            },
+            {
+                args: ["netstat", "-nt"],
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}\\s*ESTABLISHED`
+            },
+        ];
 
-        sleep(1000);
-
-        let output = rawMongoProgramOutput(".*");
-
-        // Some variants like UBI 8 do not have ss installed
-        if (output.match("(?:not found|No such file or directory)")) {
-            args = ["netstat", "-nt"];
+        for (const {args, regex} of tools) {
             clearRawMongoProgramOutput();
-            _startMongoProgram({args: args});
+            const exitStatus = waitProgram(_startMongoProgram({args: args}));
+            if (exitStatus !== 0) {
+                print(`Attempt to use command "${args[0]}" failed with exit status ${exitStatus}`);
+                continue;
+            }
 
-            sleep(1000);
+            const match = rawMongoProgramOutput(".*").match(regex);
+            if (match === null) {
+                throw Error(`The output of ${args[0]} did not contain a connection to egress port ${
+                    this.egress_port}`);
+            }
 
-            output = rawMongoProgramOutput(".*");
+            return parseInt(match[1], 10);
         }
 
-        const regexMatch = `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`;
-        const match = output.match(regexMatch);
-        if (!match) {
-            throw Error("Could not find connection to egress port");
-        }
-        return parseInt(match[1]);
+        const commandsJson = JSON.stringify(tools.map(tool => tool.args[0]));
+        throw Error(`Could not find connection to egress port ${
+            this.egress_port}: all of the following commands failed: ${commandsJson}`);
     }
 
     /**
