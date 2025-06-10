@@ -1500,55 +1500,29 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     bool hasPipeline = false;
     bool hasLet = false;
 
-    for (auto&& argument : elem.Obj()) {
-        const auto argName = argument.fieldNameStringData();
+    auto lookupSpec = DocumentSourceLookupSpec::parse(IDLParserContext(kStageName), elem.Obj());
 
-        if (argName == kPipelineField) {
-            pipeline = parsePipelineFromBSON(argument);
-            hasPipeline = true;
-            continue;
-        }
 
-        if (argName == "let"_sd) {
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << "$lookup argument '" << argument
-                                  << "' must be an object, is type " << argument.type(),
-                    argument.type() == BSONType::object);
-            letVariables = argument.Obj();
-            hasLet = true;
-            continue;
-        }
+    if (lookupSpec.getFrom().has_value()) {
+        fromNs = parseLookupFromAndResolveNamespace(lookupSpec.getFrom().value().getElement(),
+                                                    pExpCtx->getNamespaceString().dbName(),
+                                                    pExpCtx->getAllowGenericForeignDbLookup());
+    }
 
-        if (argName == kFromField) {
-            fromNs = parseLookupFromAndResolveNamespace(argument,
-                                                        pExpCtx->getNamespaceString().dbName(),
-                                                        pExpCtx->getAllowGenericForeignDbLookup());
-            continue;
-        }
+    as = std::string{lookupSpec.getAs()};
 
-        if (argName == "$_internalUnwind"_sd) {
-            tassert(8725002,
-                    "Invalid BSON type for $_internalUnwind.",
-                    argument.type() == BSONType::object);
-            unwindSpec = argument.Obj();
-            continue;
-        }
-
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "$lookup argument '" << argName << "' must be a string, found "
-                              << argument << ": " << argument.type(),
-                argument.type() == BSONType::string);
-
-        if (argName == kAsField) {
-            as = argument.String();
-        } else if (argName == kLocalField) {
-            localField = argument.String();
-        } else if (argName == kForeignField) {
-            foreignField = argument.String();
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "unknown argument to $lookup: " << argument.fieldName());
-        }
+    if (lookupSpec.getPipeline().has_value()) {
+        hasPipeline = true;
+        pipeline = lookupSpec.getPipeline().value();
+    }
+    if (lookupSpec.getLetVars().has_value()) {
+        hasLet = true;
+        letVariables = lookupSpec.getLetVars().value();
+    }
+    localField = std::string{lookupSpec.getLocalField().value_or("")};
+    foreignField = std::string{lookupSpec.getForeignField().value_or("")};
+    if (lookupSpec.getUnwindSpec().has_value()) {
+        unwindSpec = lookupSpec.getUnwindSpec().value();
     }
 
     if (fromNs.isEmpty()) {
@@ -1556,8 +1530,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         fromNs =
             NamespaceString::makeCollectionlessAggregateNSS(pExpCtx->getNamespaceString().dbName());
     }
-    uassert(ErrorCodes::FailedToParse, "must specify 'as' field for a $lookup", !as.empty());
-
     boost::intrusive_ptr<DocumentSourceLookUp> lookupStage = nullptr;
     if (hasPipeline) {
         if (localField.empty() && foreignField.empty()) {
@@ -1586,7 +1558,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
     } else {
         // $lookup specified with only local/foreignField syntax.
         uassert(ErrorCodes::FailedToParse,
-                "$lookup requires either 'pipeline' or both 'localField' and 'foreignField' to be "
+                "$lookup requires both or neither of 'localField' and 'foreignField' to be "
                 "specified",
                 !localField.empty() && !foreignField.empty());
         uassert(ErrorCodes::FailedToParse,

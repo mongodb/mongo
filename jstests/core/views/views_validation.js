@@ -191,11 +191,16 @@ assert.commandFailedWithCode(viewsDb.runCommand({collMod: "a", expireAfterSecond
                              ErrorCodes.InvalidOptions);
 clear();
 
+// For the assert below with multiple error codes, SERVER-93055 changes the parse error codes to an
+// IDL code, as these errors are now caught during IDL parsing. However, due to these tests being
+// run across multiple versions, we need to allow both types of errors.
+
 // Check that invalid pipelines are disallowed. The following $lookup is missing the 'as' field.
+// TODO SERVER-106081: Remove ErrorCodes.FailedToParse.
 makeView("a",
          "b",
          [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
-         ErrorCodes.FailedToParse);
+         [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse]);
 
 // Check that free variables in view pipeline are disallowed.
 makeView("a", "b", [{"$project": {field: "$$undef"}}], 17276);

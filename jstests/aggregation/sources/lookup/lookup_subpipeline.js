@@ -566,10 +566,21 @@ testPipeline(pipeline, expectedResults, coll);
 // Error cases.
 //
 
+// For the asserts with multiple error codes, SERVER-93055 changes the parse error codes to an IDL
+// code, as these errors are now caught during IDL parsing. However, due to these tests being
+// run across multiple versions, we need to allow both types of errors.
+
+// TODO SERVER-106081: Remove ErrorCodes.FailedToParse in the test cases below.
 // 'pipeline' and 'let' must be of expected type.
-assertErrorCode(coll, [{$lookup: {pipeline: 1, from: "from", as: "as"}}], ErrorCodes.TypeMismatch);
-assertErrorCode(coll, [{$lookup: {pipeline: {}, from: "from", as: "as"}}], ErrorCodes.TypeMismatch);
-assertErrorCode(
-    coll, [{$lookup: {let : 1, pipeline: [], from: "from", as: "as"}}], ErrorCodes.FailedToParse);
-assertErrorCode(
-    coll, [{$lookup: {let : [], pipeline: [], from: "from", as: "as"}}], ErrorCodes.FailedToParse);
+assertErrorCode(coll,
+                [{$lookup: {pipeline: 1, from: "from", as: "as"}}],
+                [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+assertErrorCode(coll,
+                [{$lookup: {pipeline: {}, from: "from", as: "as"}}],
+                [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+assertErrorCode(coll,
+                [{$lookup: {let : 1, pipeline: [], from: "from", as: "as"}}],
+                [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+assertErrorCode(coll,
+                [{$lookup: {let : [], pipeline: [], from: "from", as: "as"}}],
+                [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);

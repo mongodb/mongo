@@ -123,6 +123,7 @@ mongo_cc_library(
         "document_source_list_mql_entities_gen",
         "document_source_list_sampled_queries_gen",
         "document_source_list_sessions_gen",
+        "document_source_lookup_gen",
         "document_source_merge_gen",
         "document_source_merge_modes_gen",
         "document_source_merge_spec.cpp",
@@ -868,6 +869,15 @@ idl_generator(
     name = "document_source_list_sessions_gen",
     src = "document_source_list_sessions.idl",
     deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_lookup_gen",
+    src = "document_source_lookup.idl",
+    deps = [
+        ":aggregate_command_gen",
         "//src/mongo/db:basic_types_gen",
     ],
 )

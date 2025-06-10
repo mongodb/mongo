@@ -463,6 +463,10 @@ function runTest(coll, from, thirdColl, fourthColl) {
     // Error cases.
     //
 
+    // For the asserts with multiple error codes, SERVER-93055 changes the parse error codes to an
+    // IDL code, as these errors are now caught during IDL parsing. However, due to these tests
+    // being run across multiple versions, we need to allow both types of errors.
+
     // 'from', 'as', 'localField' and 'foreignField' must all be specified when run with
     // localField/foreignField syntax.
     assertErrorCode(
@@ -472,9 +476,10 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: "b", as: "same"}}],
                     ErrorCodes.FailedToParse);
+    // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test case.
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: "b", from: "from"}}],
-                    ErrorCodes.FailedToParse);
+                    [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse]);
     assertErrorCode(coll,
                     [{$lookup: {pipeline: [], foreignField: "b", from: "from", as: "as"}}],
                     ErrorCodes.FailedToParse);
@@ -493,18 +498,22 @@ function runTest(coll, from, thirdColl, fourthColl) {
         ErrorCodes.FailedToParse);
 
     // 'from', 'as', 'localField' and 'foreignField' must all be of type string.
+    // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test cases.
+    // ----------------------------------------------------------------------------------
     assertErrorCode(coll,
                     [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
+                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
+                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+    // ----------------------------------------------------------------------------------
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}],
                     ErrorCodes.FailedToParse);
+    // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test case.
     assertErrorCode(coll,
                     [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}],
-                    ErrorCodes.FailedToParse);
+                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
 
     // The foreign collection must be a valid namespace.
     assertErrorCode(coll,
