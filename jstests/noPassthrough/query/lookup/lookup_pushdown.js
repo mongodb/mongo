@@ -287,84 +287,6 @@ function setLookupPushdownDisabled(value) {
             {allowDiskUse: false});
 }());
 
-// Test basic cases of push down based on existence of compatible indexes.
-(function testLookupPushdownDependsOnIndex() {
-    assert.commandWorked(foreignColl.dropIndexes());
-
-    // Do not create an index in the foreign collation. This should push the lookup to SBE using HJ.
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true});
-
-    // Build an index on the foreign collection on the foreignField using the default collation.
-    assert.commandWorked(foreignColl.createIndex({b: 1}));
-
-    // Query with compatible collation. Lookup should be pushed to SBE using ILJ.
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: 1} /* indexKeyPattern */);
-
-    // Query with incompatible collation. Lookup should not be pushed to SBE.
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.Classic,
-            null /* indexKeyPattern */,
-            {collation: {locale: "fr"}});
-
-    // Delete index.
-    assert.commandWorked(foreignColl.dropIndexes());
-
-    // Build an index on the foreign collection on a field different to the foreignField. Run a
-    // query with incompatible query. This should push lookup to SBE using HJ.
-    assert.commandWorked(foreignColl.createIndex({c: 1}));
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.HJ /* expectedJoinAlgorithm */,
-            null /* indexKeyPattern */,
-            {allowDiskUse: true, collation: {locale: "fr"}});
-    assert.commandWorked(foreignColl.dropIndexes());
-
-    // Build a multikey index on the foreign collection having foreignField as the first field. Run
-    // a query with compatible collations. This should push lookup to SBE using ILJ.
-    assert.commandWorked(foreignColl.createIndex({b: 1, c: 1}));
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: 1, c: 1} /* indexKeyPattern */);
-
-    // Build a second index on the foreign collection on the foreignField with incompatible
-    // collation.
-    assert.commandWorked(foreignColl.createIndex({b: 1}, {collation: {locale: "fr"}}));
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: 1, c: 1} /* indexKeyPattern */);
-
-    // Delete indexes.
-    assert.commandWorked(foreignColl.dropIndexes());
-
-    // Build an index on the foreign collection on the foreignField using a collation that is
-    // incompatible to the collation used in the query. This should not push lookup to SBE.
-    assert.commandWorked(foreignColl.createIndex({b: 1}, {collation: {locale: "fr"}}));
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.Classic);
-    assert.commandWorked(foreignColl.dropIndexes());
-
-    // Build an index on the foreign collection on the foreignField using a collation that is
-    // compatible to the collation used in the query. This should push lookup to SBE usinj INL.
-    assert.commandWorked(foreignColl.createIndex({b: 1}, {collation: {locale: "fr"}}));
-    runTest(coll,
-            [{$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "out"}}],
-            JoinAlgorithm.INLJ /* expectedJoinAlgorithm */,
-            {b: 1}, /* indexKeyPattern */
-            {collation: {locale: "fr"}});
-    assert.commandWorked(foreignColl.dropIndexes());
-})();
-
 // Build an index on the foreign collection that matches the foreignField. This should cause us
 // to choose an indexed nested loop join.
 (function testIndexNestedLoopJoinRegularIndex() {
@@ -686,9 +608,9 @@ function setLookupPushdownDisabled(value) {
                 }
             ],
             JoinAlgorithm.HJ, /* expectedJoinAlgorithm */
-            null,             /* indexKeyPattern */
-            {},               /* aggOptions */
-            null,             /* errMsgRegex */
+            null, /* indexKeyPattern */
+            {},                /* aggOptions */
+            null,              /* errMsgRegex */
             true /* checkMultiplanning */);
 
         runTest(

@@ -35,6 +35,7 @@ const lookupStrategy = {
     nestedLoopJoin: "nestedLoopJoin",
     indexedLoopJoin: "indexedLoopJoin",
     hashLookup: "hashLookup",
+    dynamicIndexedLoopJoin: "dynamicIndexedLoopJoin",
     nonSbe: "nonSbe"
 };
 
@@ -50,6 +51,9 @@ function generateExpectedCounters(
             break;
         case lookupStrategy.indexedLoopJoin:
             expected.indexedLoopJoin = NumberLong(expected.indexedLoopJoin + 1);
+            break;
+        case lookupStrategy.dynamicIndexedLoopJoin:
+            expected.dynamicIndexedLoopJoin = NumberLong(expected.dynamicIndexedLoopJoin + 1);
             break;
         case lookupStrategy.hashLookup: {
             expected.hashLookup = NumberLong(expected.hashLookup + 1);
@@ -113,6 +117,20 @@ compareLookupCounters(expectedCounters);
 assert.commandWorked(db["students"].createIndex({name: 1}));
 expectedCounters = generateExpectedCounters(lookupStrategy.indexedLoopJoin);
 assert.eq(db.people.aggregate(pipeline).itcount(), 4 /* Matching results */);
+compareLookupCounters(expectedCounters);
+
+// Change the collation of the query to be incompatible with the collation of the foreign
+// collection.
+expectedCounters = generateExpectedCounters(lookupStrategy.dynamicIndexedLoopJoin);
+assert.eq(
+    db.people
+        .aggregate(
+            [{
+                $lookup: {from: "students", localField: "name", foreignField: "name", as: "matches"}
+            }],
+            {collation: {locale: "fr"}, allowDiskUse: false})
+        .itcount(),
+    4 /* Matching results */);
 compareLookupCounters(expectedCounters);
 
 assert.commandWorked(db["students"].dropIndexes());

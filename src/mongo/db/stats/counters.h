@@ -449,10 +449,14 @@ public:
     LookupPushdownCounters(LookupPushdownCounters&) = delete;
     LookupPushdownCounters& operator=(const LookupPushdownCounters&) = delete;
 
-    void incrementLookupCountersPerQuery(int nestedLoopJoin, int indexedLoopJoin, int hashLookup) {
+    void incrementLookupCountersPerQuery(int nestedLoopJoin,
+                                         int indexedLoopJoin,
+                                         int hashLookup,
+                                         int dynamicIndexedLoopJoin) {
         nestedLoopJoinCounter.incrementRelaxed(nestedLoopJoin);
         indexedLoopJoinCounter.incrementRelaxed(indexedLoopJoin);
         hashLookupCounter.incrementRelaxed(hashLookup);
+        dynamicIndexedLoopJoinCounter.incrementRelaxed(dynamicIndexedLoopJoin);
     }
 
     void incrementPerSpilling(int64_t spills,
@@ -472,7 +476,8 @@ public:
     Counter64& nestedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
     Counter64& indexedLoopJoinCounter = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
     Counter64& hashLookupCounter = *MetricBuilder<Counter64>{"query.lookup.hashLookup"};
-
+    Counter64& dynamicIndexedLoopJoinCounter =
+        *MetricBuilder<Counter64>{"query.lookup.dynamicIndexedLoopJoin"};
 
     Counter64& hashLookupSpills = *MetricBuilder<Counter64>{"query.lookup.hashLookupSpills"};
     // The spilled storage size after compression might be different from the bytes spilled.

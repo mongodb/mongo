@@ -305,8 +305,7 @@ struct QueryPlannerParams {
      */
     void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
                                                   const CanonicalQuery& canonicalQuery,
-                                                  const MultipleCollectionAccessor& collections,
-                                                  bool checkPipelineExistence = true);
+                                                  const MultipleCollectionAccessor& collections);
 
     /**
      * This method updates this QueryPlannerParams object as needed so that it can be used with

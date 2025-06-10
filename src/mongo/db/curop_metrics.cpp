@@ -139,8 +139,10 @@ private:
     static void _updateExternalStats(const OperationContext* opCtx) {
         auto* curOp = CurOp::get(opCtx);
         auto& debug = curOp->debug();
-        lookupPushdownCounters.incrementLookupCountersPerQuery(
-            debug.nestedLoopJoin, debug.indexedLoopJoin, debug.hashLookup);
+        lookupPushdownCounters.incrementLookupCountersPerQuery(debug.nestedLoopJoin,
+                                                               debug.indexedLoopJoin,
+                                                               debug.hashLookup,
+                                                               debug.dynamicIndexedLoopJoin);
         sortCounters.incrementSortCountersPerQuery(debug.sortTotalDataSizeBytes, debug.keysSorted);
         queryFrameworkCounters.incrementQueryEngineCounters(curOp);
     }

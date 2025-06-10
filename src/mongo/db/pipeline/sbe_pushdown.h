@@ -30,8 +30,6 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_knob_configuration.h"
-#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 class CanonicalQuery;
@@ -52,14 +50,7 @@ void finalizePipelineStages(Pipeline* pipeline, CanonicalQuery* canonicalQuery);
 void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           const Pipeline* pipeline,
                           bool needsMerge,
-                          CanonicalQuery* canonicalQuery,
-                          const std::map<NamespaceString, CollectionInfo>& collectionsInfo);
-
-/**
- * Returns true if the pipeline has a $lookup stage. It does not match nested $lookup stages, e.g.
- * those inside $unionWith or $facet.
- */
-bool pipelineHasLookup(const Pipeline* pipeline);
+                          CanonicalQuery* canonicalQuery);
 
 /**
  * Set the minimum required compatibility based on the 'featureFlagSbeFull' and the

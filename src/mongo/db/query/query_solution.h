@@ -1718,6 +1718,11 @@ struct EqLookupNode : public QuerySolutionNode {
 
         // Create a plan for a non existent foreign collection.
         kNonExistentForeignCollection,
+
+        // There is an index but it has an incompatible collation. Decide at run time (on a
+        // per-document basis) whether the index can be used to perform the lookup, or whether a
+        // collection scan must be used instead.
+        kDynamicIndexedLoopJoin,
     };
 
     static StringData serializeLookupStrategy(LookupStrategy strategy) {
@@ -1730,6 +1735,8 @@ struct EqLookupNode : public QuerySolutionNode {
                 return "NestedLoopJoin";
             case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
                 return "NonExistentForeignCollection";
+            case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin:
+                return "DynamicIndexedLoopJoin";
             default:
                 uasserted(6357204, "Unknown $lookup strategy type");
         }

@@ -404,6 +404,9 @@ public:
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
 
+    // Tracks the amount of dynamic indexed loop joins in a pushed down stage.
+    int dynamicIndexedLoopJoin{0};
+
     // Tracks the amount of indexed loop joins in a pushed down lookup stage.
     int indexedLoopJoin{0};
 

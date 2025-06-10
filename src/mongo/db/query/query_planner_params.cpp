@@ -441,12 +441,10 @@ void QueryPlannerParams::applyQuerySettingsOrIndexFiltersForMainCollection(
 void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
     OperationContext* opCtx,
     const CanonicalQuery& canonicalQuery,
-    const MultipleCollectionAccessor& collections,
-    bool checkPipelineExistence) {
-    if (checkPipelineExistence && canonicalQuery.cqPipeline().empty()) {
+    const MultipleCollectionAccessor& collections) {
+    if (canonicalQuery.cqPipeline().empty()) {
         return;
     }
-
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
                                     const CollectionPtr& secondaryColl) {
         CollectionInfo secondaryInfo;

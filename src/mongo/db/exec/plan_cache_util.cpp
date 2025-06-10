@@ -359,13 +359,28 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
             case STAGE_EQ_LOOKUP: {
                 auto eln = static_cast<const EqLookupNode*>(node);
                 auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection];
-                if (eln->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin) {
-                    tassert(6466200, "Index join lookup should have an index entry", eln->idxEntry);
-                    secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
-                } else {
-                    secondaryStats.collectionScans++;
+                switch (eln->lookupStrategy) {
+                    case EqLookupNode::LookupStrategy::kNonExistentForeignCollection:
+                    case EqLookupNode::LookupStrategy::kHashJoin:
+                    case EqLookupNode::LookupStrategy::kNestedLoopJoin:
+                        secondaryStats.collectionScans++;
+                        break;
+                    case EqLookupNode::LookupStrategy::kDynamicIndexedLoopJoin: {
+                        tassert(8155502,
+                                "Dynamic indexed loop join lookup should have an index entry",
+                                eln->idxEntry);
+                        secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
+                        secondaryStats.collectionScans++;
+                        break;
+                    }
+                    case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
+                        tassert(
+                            6466200, "Index join lookup should have an index entry", eln->idxEntry);
+                        secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);
+                        break;
+                    }
                 }
-                [[fallthrough]];
+                break;
             }
             default:
                 break;

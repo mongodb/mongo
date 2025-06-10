@@ -250,66 +250,63 @@ function runLookupQuery(options = {}) {
               coll.aggregate(avoidReplanLookupPipeline, options).toArray());
 }
 
+// When there is no cached entry, we expect the following transitions:
+// 1. The first run of the query will use the multiplanner and will create a cached entry that is
+// not active.
+// 2. The second run of the query will use the multiplanner and will set the cached entry to active.
+// 3. Every subsequent run of the query will use the cached entry.
+function verifyLookupCacheTransitions(
+    coll, avoidReplanLookupPipeline, expectedVersion, cachedIndexName, options = {}) {
+    for (let i = 0; i < 4; i++) {
+        runLookupQuery(options);
+
+        let isMultiPlanning = (i <= 1) ? true : false;
+        let isActive = (i === 0) ? false : true;
+
+        assertCacheUsage({
+            queryColl: coll,
+            pipeline: avoidReplanLookupPipeline,
+            fromMultiPlanning: isMultiPlanning,
+            cacheEntryVersion: expectedVersion,
+            cacheEntryIsActive: isActive,
+            cachedIndexName: cachedIndexName,
+            aggOptions: options
+        });
+    }
+}
+
 // Verify that we are using IndexedLoopJoin.
 verifyCorrectLookupAlgorithmUsed(
     "IndexedLoopJoin", avoidReplanLookupPipeline, {allowDiskUse: false});
+// Verify the cache transitions.
+verifyLookupCacheTransitions(
+    coll, avoidReplanLookupPipeline, expectedVersion, "b_1", {allowDiskUse: false});
 
-runLookupQuery({allowDiskUse: false});
-assertCacheUsage({
-    queryColl: coll,
-    pipeline: avoidReplanLookupPipeline,
-    fromMultiPlanning: true,
-    cacheEntryVersion: expectedVersion,
-    cacheEntryIsActive: false,
-    cachedIndexName: "b_1",
-    aggOptions: {allowDiskUse: false}
-});
+// Verify that we are using DynamicIndexedLoopJoin. Changing the collation will create a new plan
+// cache key and the multiplanner will be used
+verifyCorrectLookupAlgorithmUsed("DynamicIndexedLoopJoin",
+                                 avoidReplanLookupPipeline,
+                                 {allowDiskUse: false, collation: {locale: "fr"}});
+// Verify the cache transitions.
+verifyLookupCacheTransitions(coll,
+                             avoidReplanLookupPipeline,
+                             expectedVersion,
+                             "b_1",
+                             {allowDiskUse: false, collation: {locale: "fr"}});
 
-runLookupQuery({allowDiskUse: false});
-assertCacheUsage({
-    queryColl: coll,
-    pipeline: avoidReplanLookupPipeline,
-    fromMultiPlanning: true,
-    cacheEntryVersion: expectedVersion,
-    cacheEntryIsActive: true,
-    cachedIndexName: "b_1",
-    aggOptions: {allowDiskUse: false}
-});
-
-// After dropping the index on the right-hand side, we should NOT replan the cached query. We
-// will, however, choose a different join algorithm.
+// Drop the index and verify that we are using NestedLoopJoin. If classic plan cache is used, after
+// dropping the index, the $lookup plan cache will stay active and will be re-used. If SBE plan
+// cache is enabled, after dropping index, the $lookup plan cache will be invalidated and the
+// mulitplanner will be used.
 assert.commandWorked(foreignColl.dropIndex({c: 1}));
-
-// Verify that we are now using NestedLoopJoin.
 verifyCorrectLookupAlgorithmUsed(
     "NestedLoopJoin", avoidReplanLookupPipeline, {allowDiskUse: false});
 
-// If SBE plan cache is enabled, after dropping index, the $lookup plan cache will be invalidated.
-// We will need to rerun the multi-planner.
 if (sbePlanCacheEnabled) {
-    runLookupQuery({allowDiskUse: false});
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanLookupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 2,
-        cacheEntryIsActive: false,
-        cachedIndexName: "b_1",
-        aggOptions: {allowDiskUse: false}
-    });
-
-    runLookupQuery({allowDiskUse: false});
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanLookupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 2,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-        aggOptions: {allowDiskUse: false}
-    });
+    verifyLookupCacheTransitions(
+        coll, avoidReplanLookupPipeline, expectedVersion, "b_1", {allowDiskUse: false});
 }
-
+// Verify that the cached entry is used.
 runLookupQuery({allowDiskUse: false});
 assertCacheUsage({
     queryColl: coll,
@@ -321,66 +318,25 @@ assertCacheUsage({
     aggOptions: {allowDiskUse: false}
 });
 
-runLookupQuery({allowDiskUse: false});
-assertCacheUsage({
-    queryColl: coll,
-    pipeline: avoidReplanLookupPipeline,
-    fromMultiPlanning: false,
-    cacheEntryVersion: expectedVersion,
-    cacheEntryIsActive: true,
-    cachedIndexName: "b_1",
-    aggOptions: {allowDiskUse: false}
-});
-
-// Run with 'allowDiskUse: true'. This should now use HashJoin, and we should still avoid
-// replanning the cached query.
+// Run with 'allowDiskUse: true'. This should now use HashJoin. If classic plan cache is used, the
+// cache entry will stay active and will be re-used. If SBE plan cache is enabled, using different
+// 'allowDiskUse' option will result in different plan cache key and the multiplanner will be used.
 verifyCorrectLookupAlgorithmUsed("HashJoin", avoidReplanLookupPipeline, {allowDiskUse: true});
 
-// If SBE plan cache is enabled, using different 'allowDiskUse' option will result in
-// different plan cache key.
 if (sbePlanCacheEnabled) {
-    runLookupQuery({allowDiskUse: true});
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanLookupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 2,
-        cacheEntryIsActive: false,
-        cachedIndexName: "b_1",
-        aggOptions: {allowDiskUse: true}
-    });
-
-    runLookupQuery({allowDiskUse: true});
-    assertCacheUsage({
-        queryColl: coll,
-        pipeline: avoidReplanLookupPipeline,
-        fromMultiPlanning: true,
-        cacheEntryVersion: 2,
-        cacheEntryIsActive: true,
-        cachedIndexName: "b_1",
-        aggOptions: {allowDiskUse: true}
-    });
+    verifyLookupCacheTransitions(
+        coll, avoidReplanLookupPipeline, expectedVersion, "", {allowDiskUse: true});
 }
-
-runLookupQuery({allowDiskUse: true});
+// Verify that the cached entry is used.
+runLookupQuery({allowDiskUse: false});
 assertCacheUsage({
     queryColl: coll,
     pipeline: avoidReplanLookupPipeline,
     fromMultiPlanning: false,
     cacheEntryVersion: expectedVersion,
     cacheEntryIsActive: true,
-    cachedIndexName: "b_1",
-    aggOptions: {allowDiskUse: true}
-});
-runLookupQuery({allowDiskUse: true});
-assertCacheUsage({
-    queryColl: coll,
-    pipeline: avoidReplanLookupPipeline,
-    fromMultiPlanning: false,
-    cacheEntryVersion: expectedVersion,
-    cacheEntryIsActive: true,
-    cachedIndexName: "b_1",
-    aggOptions: {allowDiskUse: true}
+    cachedIndexName: "",
+    aggOptions: {allowDiskUse: false}
 });
 
 // Verify that disabling $lookup pushdown into SBE does not trigger a replan, and uses the

@@ -13,6 +13,10 @@ import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
+// ToDo: SERVER-103530. Remove multiversion check when 9.0 becomes last-lts
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
+    Boolean(TestData.multiversionBinVersion);
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -120,31 +124,28 @@ let explain;
     }
 })();
 
-// In presense of indexes lookup might choose a different strategy for the join, that relies on the
-// index (INLJ). It should respect the effective collation of $lookup.
+// In presence of indexes, lookup might choose a different strategy for the join, that relies on the
+// index (INLJ). It should respect the effective collation of $lookup. If there is an index with
+// compatible collation, it should select an IndexedLoopJoin otherwise, if the index does not have
+// compatible collation, it should select DynamicIndexedLoopJoin. If there is no index and disk
+// usage is allowed it should select HashLookup. In all other cases it should select NestedLoopJoin.
 (function testCollationWithIndexes() {
-    function assertIndexJoinStrategy(explain) {
+    function assertJoinStrategy(explain, strategyName, indexName) {
         // Check join strategy when $lookup is pushed down.
         if (getAggPlanStages(explain, "$cursor").length === 0) {
             const winningPlan = getWinningPlanFromExplain(explain);
-            assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
-            assert.eq("IndexedLoopJoin", winningPlan.strategy, explain);
-            // Will choose the index with the matching collation.
-            assert.eq("key_1_x_1", winningPlan.indexName, explain);
-        }
-    }
-
-    function assertNestedLoopJoinStrategy(explain) {
-        // Check join strategy when $lookup is pushed down.
-        if (getAggPlanStages(explain, "$cursor").length === 0) {
-            const winningPlan = getWinningPlanFromExplain(explain);
-            assert.eq("EQ_LOOKUP", winningPlan.stage, explain);
-            assert.eq("NestedLoopJoin", winningPlan.strategy, explain);
+            if (winningPlan.stage === "EQ_LOOKUP") {
+                assert.eq(strategyName, winningPlan.strategy, explain);
+                if (indexName !== null) {
+                    assert.eq(indexName, winningPlan.indexName, explain);
+                }
+            }
         }
     }
 
     for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
-        // Local and foreign have different collations.
+        // Local is case insensitive and foreign has an index with compatible collation (case
+        // insensitive).
         results = collAA.aggregate([lookupInto(collAa_indexed)]).toArray();
         assertArrayEq({
             actual: results,
@@ -152,48 +153,112 @@ let explain;
             extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
                 tojson(lookupInto)
         });
-
-        let areCollectionsColocated =
+        let areCollectionsCollocated =
             FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-        let areCollectionsStillColocated;
-        if (areCollectionsColocated) {
+        if (areCollectionsCollocated) {
             explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
-            areCollectionsStillColocated =
-                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-            if (areCollectionsStillColocated) {
-                assertIndexJoinStrategy(explain);
-            }
+            assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
         }
 
-        // Command-level collation overrides collection-level collation.
+        // Command-level collation overrides the local collation and foreign has an index with
+        // compatible collation (case insensitive).
         results =
             collAa.aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running: " +
+            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running:" +
                 tojson(lookupInto)
         });
-
-        areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
-        if (areCollectionsColocated) {
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsCollocated) {
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {collation: caseInsensitive});
-            areCollectionsStillColocated =
-                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-            if (areCollectionsStillColocated) {
-                assertIndexJoinStrategy(explain);
-            }
+            assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
+        }
 
-            // If no index is compatible with the requested collation and disk use is not allowed,
-            // nested loop join will be chosen instead.
+        // Command-level collation, {locale: "fr"}, overrides the local collation and foreign has an
+        // index with incompatible collation.
+        results =
+            collAa.aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}}).toArray();
+        assertArrayEq({
+            actual: results,
+            expected: resultCaseSensitive,
+            extraErrorMsg:
+                " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto)
+        });
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsCollocated) {
+            // If there is an index but it is not compatible with the requested collation and disk
+            // usage is not allowed, dynamic indexed loop join will be chosen.
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
-                                                 {collation: {locale: "fr"}, allowDiskUse: false});
-            areCollectionsStillColocated =
-                FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
-            if (areCollectionsStillColocated) {
-                assertNestedLoopJoinStrategy(explain);
+                                                 {allowDiskUse: false, collation: {locale: "fr"}});
+            if (isMultiversion) {
+                assertJoinStrategy(explain, "NestedLoopJoin", null);
+            } else {
+                assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
             }
+        }
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
+        if (areCollectionsCollocated) {
+            // If there is an index but it is not compatible with the requested collation and disk
+            // usage is allowed, dynamic indexed loop join will be chosen.
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
+                                                 {allowDiskUse: true, collation: {locale: "fr"}});
+            if (isMultiversion) {
+                assertJoinStrategy(explain, "HashJoin", null);
+            } else {
+                assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
+            }
+        }
+
+        // There is no compatible index.
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+        if (areCollectionsCollocated) {
+            // If no index is compatible with the requested collation and disk use is
+            // allowed, hash join will be chosen.
+            explain = collAa.explain().aggregate([lookupInto(collAA)], {allowDiskUse: true});
+            assertJoinStrategy(explain, "HashJoin", null);
+        }
+        areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+        if (areCollectionsCollocated) {
+            // If no index is compatible with the requested collation and disk use is not
+            // allowed, nested loop join will be chosen.
+            explain = collAa.explain().aggregate([lookupInto(collAA)], {allowDiskUse: false});
+            assertJoinStrategy(explain, "NestedLoopJoin", null);
+        }
+    }
+
+    // The compatible index is the _id index
+    let pipeline = {
+        $lookup: {
+            from: collAA.getName(),
+            as: "matched",
+            let: {l_key: "$_id"},
+            pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_key"]}}}]
+        }
+    };
+    let areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+    if (areCollectionsCollocated) {
+        explain = collAa.explain().aggregate([pipeline]);
+        if (isMultiversion) {
+            assertJoinStrategy(explain, "HashJoin", null);
+        } else {
+            assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
+        }
+    }
+
+    pipeline = {
+        $lookup: {from: collAA.getName(), localField: "_id", foreignField: "_id", as: "matched"}
+    };
+    jsTest.log.info("Running pipeline: ", pipeline);
+    areCollectionsCollocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
+    if (areCollectionsCollocated) {
+        explain = collAa.explain().aggregate([pipeline]);
+        if (isMultiversion) {
+            assertJoinStrategy(explain, "HashJoin", null);
+        } else {
+            assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
         }
     }
 })();
