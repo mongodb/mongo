@@ -22,10 +22,6 @@ var st = new ShardingTest({shards: 2});
 assert.commandWorked(
     st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 
-// TODO SERVER-87189 Remove this helper as starting from 8.0 we always pass from the coordinator to
-// create a collection.
-const isTrackUnshardedCollectionsEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
 const tsOptions = {
     timeField: "timestamp",
     metaField: "metadata"
@@ -179,13 +175,9 @@ function runTest(testCase, minRequiredVersion = null) {
     jsTest.log("Case collection: sharded standard / collection: bucket timeseries.");
     runTest(() => {
         shardCollectionWorked(kColl);
-        if (isTrackUnshardedCollectionsEnabled) {
-            createFailed(kBucket, tsOptions, ErrorCodes.NamespaceExists);
-        } else {
-            // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
-            // and is not timeseries should fail
-            createWorked(kBucket, tsOptions);
-        }
+        // TODO SERVER-85855 creating a bucket timeseries when the main namespace already exists
+        // and is not timeseries should fail
+        createWorked(kBucket, tsOptions);
     });
 
     jsTest.log("Case collection: sharded standard / collection: sharded standard.");

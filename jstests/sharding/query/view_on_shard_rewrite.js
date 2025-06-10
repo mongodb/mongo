@@ -76,65 +76,60 @@ assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {_id: 1}})
 // Read view on sharded collection.
 assertReadOnView(mongosView, true /* expectKickBackToMongos */);
 
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, 'TrackUnshardedCollectionsUponCreation')) {
-    // Recreate the collection as unsplittable on the db-primary shard.
-    mongosDB[collName].drop();
-    mongosDB.runCommand({createUnsplittableCollection: collName});
-    insertDocumentsAndCreateView();
+// Recreate the collection as unsplittable on the db-primary shard.
+mongosDB[collName].drop();
+mongosDB.runCommand({createUnsplittableCollection: collName});
+insertDocumentsAndCreateView();
 
-    // Read view on unsharded collection on the db-primary shard.
-    assertReadOnView(mongosView, false /* expectKickBackToMongos */);
+// Read view on unsharded collection on the db-primary shard.
+assertReadOnView(mongosView, false /* expectKickBackToMongos */);
 
-    // Move the collection to the other shard.
-    assert.commandWorked(st.s.adminCommand({moveCollection: collNS, toShard: st.shard1.shardName}));
+// Move the collection to the other shard.
+assert.commandWorked(st.s.adminCommand({moveCollection: collNS, toShard: st.shard1.shardName}));
+mongosView.find().itcount();  // Make sure the mongos updates its routing info.
+
+// Read view on unsharded collection on a shard other than the db-primary.
+assertReadOnView(mongosView, true /* expectKickBackToMongos */);
+
+// Test that when reading from views within a multi-document transaction, the shard considers
+// the transaction timestamp to decide whether it can read locally.
+{
+    mongosDB.getSiblingDB('otherDb').runCommand({createUnsplittableCollection: 'otherColl'});
+
+    let session1 = st.s.startSession();
+    session1.startTransaction({readConcern: {level: 'snapshot'}});
+    session1.getDatabase('otherDb')['otherColl'].find().itcount();
+
+    let session2 = st.s.startSession();
+    session2.startTransaction({readConcern: {level: 'majority'}});
+    session2.getDatabase('otherDb')['otherColl'].find().itcount();
+
+    // Move back to db-primary shard.
+    assert.commandWorked(st.s.adminCommand({moveCollection: collNS, toShard: st.shard0.shardName}));
     mongosView.find().itcount();  // Make sure the mongos updates its routing info.
 
-    // Read view on unsharded collection on a shard other than the db-primary.
-    assertReadOnView(mongosView, true /* expectKickBackToMongos */);
+    // MoveCollection results in a new instance of the collection (different uuid), so the
+    // transaction fails with a TransientTransactionError. We'd otherwise expect to have
+    // kicked-back to mongos, since shard1 owned the underlying collection at the transaction
+    // snapshot.
+    assert.throwsWithCode(() => assertReadOnView(session1.getDatabase(dbName)[viewName],
+                                                 true /* expectKickBackToMongos */),
+                          ErrorCodes.StaleChunkHistory);
+    assert.throwsWithCode(() => assertReadOnView(session2.getDatabase(dbName)[viewName],
+                                                 true /* expectKickBackToMongos */),
+                          ErrorCodes.MigrationConflict);
 
-    // Test that when reading from views within a multi-document transaction, the shard considers
-    // the transaction timestamp to decide whether it can read locally.
-    {
-        mongosDB.getSiblingDB('otherDb').runCommand({createUnsplittableCollection: 'otherColl'});
+    session1.abortTransaction();
+    session2.abortTransaction();
 
-        let session1 = st.s.startSession();
-        session1.startTransaction({readConcern: {level: 'snapshot'}});
-        session1.getDatabase('otherDb')['otherColl'].find().itcount();
-
-        let session2 = st.s.startSession();
-        session2.startTransaction({readConcern: {level: 'majority'}});
-        session2.getDatabase('otherDb')['otherColl'].find().itcount();
-
-        // Move back to db-primary shard.
-        assert.commandWorked(
-            st.s.adminCommand({moveCollection: collNS, toShard: st.shard0.shardName}));
-        mongosView.find().itcount();  // Make sure the mongos updates its routing info.
-
-        // MoveCollection results in a new instance of the collection (different uuid), so the
-        // transaction fails with a TransientTransactionError. We'd otherwise expect to have
-        // kicked-back to mongos, since shard1 owned the underlying collection at the transaction
-        // snapshot.
-        assert.throwsWithCode(() => assertReadOnView(session1.getDatabase(dbName)[viewName],
-                                                     true /* expectKickBackToMongos */),
-                              ErrorCodes.StaleChunkHistory);
-        assert.throwsWithCode(() => assertReadOnView(session2.getDatabase(dbName)[viewName],
-                                                     true /* expectKickBackToMongos */),
-                              ErrorCodes.MigrationConflict);
-
-        session1.abortTransaction();
-        session2.abortTransaction();
-
-        // Try the transactions again, with the underlying collection now living on the db-primary
-        // shard.
-        session1.startTransaction({readConcern: {level: 'snapshot'}});
-        session2.startTransaction({readConcern: {level: 'majority'}});
-        assertReadOnView(session1.getDatabase(dbName)[viewName],
-                         false /* expectKickBackToMongos */);
-        assertReadOnView(session1.getDatabase(dbName)[viewName],
-                         false /* expectKickBackToMongos */);
-        session1.commitTransaction();
-        session2.commitTransaction();
-    }
+    // Try the transactions again, with the underlying collection now living on the db-primary
+    // shard.
+    session1.startTransaction({readConcern: {level: 'snapshot'}});
+    session2.startTransaction({readConcern: {level: 'majority'}});
+    assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */);
+    assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */);
+    session1.commitTransaction();
+    session2.commitTransaction();
 }
 
 st.stop();

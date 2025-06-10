@@ -84,19 +84,12 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}, mongos: 2});
 const sourceCollName = "sourceFoo";
 const targetCollName = "targetFoo";
 
-const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-
 //
 // Verify database versions are used to detect when the primary shard changes for an unsharded
 // target collection.
 //
 
 (() => {
-    // Database versioning tests only make sense when all collections are not tracked.
-    if (isTrackUnshardedUponCreationEnabled) {
-        return;
-    }
     const dbName = "testMovedPrimarySuccess";
     jsTestLog("Running test on database: " + dbName);
 
@@ -128,10 +121,6 @@ const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
 })();
 
 (() => {
-    // Database versioning tests only make sense when all collections are not tracked.
-    if (isTrackUnshardedUponCreationEnabled) {
-        return;
-    }
     const dbName = "testMovedPrimaryFailure";
     jsTestLog("Running test on database: " + dbName);
 
@@ -276,10 +265,6 @@ const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
 })();
 
 (() => {
-    // Database versioning tests only make sense when all collections are not tracked.
-    if (isTrackUnshardedUponCreationEnabled) {
-        return;
-    }
     const dbName = "testBecomeUnshardedFailure";
     jsTestLog("Running test on database: " + dbName);
 

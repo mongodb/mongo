@@ -34,11 +34,6 @@ const replicaSetByShardId = {
     [shard2]: st.rs2,
 };
 
-// TODO SERVER-77915 Remove unshardedCollectionAreTrackedUponCreation once 8.0 becomes last LTS.
-// Update the test as this variable is now always "true"
-const unshardedCollectionsAreTrackedUponCreation = FeatureFlagUtil.isPresentAndEnabled(
-    st.shard0.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-
 // Creates a database + a sharded collection with a single chunk; the DB primary shard and the
 // location of the chunk are randomly chosen.
 function setupDbWithShardedCollection(
@@ -465,12 +460,10 @@ function testDropCollection() {
 
     // 3. Verify that the creation and drop of an untracked collection leaves no trace in
     // config.placementHistory.
-    if (!unshardedCollectionsAreTrackedUponCreation) {
-        const unshardedCollName = 'unshardedColl';
-        assert.commandWorked(db.createCollection(unshardedCollName));
-        assert.commandWorked(db.runCommand({drop: unshardedCollName}));
-        assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
-    }
+    const unshardedCollName = 'unshardedColl';
+    assert.commandWorked(db.createCollection(unshardedCollName));
+    assert.commandWorked(db.runCommand({drop: unshardedCollName}));
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
 }
 
 function testRenameCollection() {
@@ -521,35 +514,18 @@ function testRenameCollection() {
     assert.sameMembers(initialPlacementForOldColl.shards,
                        targetCollPlacementInfoWhenRenamed.shards);
 
-    if (unshardedCollectionsAreTrackedUponCreation) {
-        jsTest.log(
-            'Testing that placement entries are added by rename() for unsharded collections involved in the DDL');
-        const unshardedOldCollName = 'unshardedOld';
-        const unshardedTargetCollName = 'unshardedTarget';
-        assert.commandWorked(db.createCollection(unshardedOldCollName));
-        assert.commandWorked(db.createCollection(unshardedTargetCollName));
+    jsTest.log(
+        'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
+    const unshardedOldCollName = 'unshardedOld';
+    const unshardedTargetCollName = 'unshardedTarget';
+    assert.commandWorked(db.createCollection(unshardedOldCollName));
+    assert.commandWorked(db.createCollection(unshardedTargetCollName));
 
-        assert.commandWorked(db[unshardedOldCollName].renameCollection(unshardedTargetCollName,
-                                                                       true /*dropTarget*/));
+    assert.commandWorked(
+        db[unshardedOldCollName].renameCollection(unshardedTargetCollName, true /*dropTarget*/));
 
-        assert.eq(2, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
-        assert.eq(3,
-                  configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
-    } else {
-        jsTest.log(
-            'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
-        const unshardedOldCollName = 'unshardedOld';
-        const unshardedTargetCollName = 'unshardedTarget';
-        assert.commandWorked(db.createCollection(unshardedOldCollName));
-        assert.commandWorked(db.createCollection(unshardedTargetCollName));
-
-        assert.commandWorked(db[unshardedOldCollName].renameCollection(unshardedTargetCollName,
-                                                                       true /*dropTarget*/));
-
-        assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
-        assert.eq(0,
-                  configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
-    }
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
 }
 
 function testDropDatabase() {
@@ -619,51 +595,47 @@ function testDropDatabase() {
     }
 
     // Test case 2 : a database containing an unsharded collection.
-    if (!unshardedCollectionsAreTrackedUponCreation) {
-        const unshardedCollName = 'unshardedColl';
-        const unshardedCollNss = dbName + '.' + unshardedCollName;
-        const primaryShard = shards[0];
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+    const unshardedCollName = 'unshardedColl';
+    const unshardedCollNss = dbName + '.' + unshardedCollName;
+    const primaryShard = shards[0];
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
 
-        assert.commandWorked(db.createCollection(unshardedCollName));
+    assert.commandWorked(db.createCollection(unshardedCollName));
 
-        assert.commandWorked(db.dropDatabase());
+    assert.commandWorked(db.dropDatabase());
 
-        // Verify that a placement change doc has been generated for the dropped database
-        const dbDropTimeInPlacementHistory =
-            getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
+    // Verify that a placement change doc has been generated for the dropped database
+    const dbDropTimeInPlacementHistory = getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
 
-        // ... but no placement change doc has been generated for the unsharded collection.
-        assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
+    // ... but no placement change doc has been generated for the unsharded collection.
+    assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
 
-        // The drop of the unsharded collection should have generated no placement change event.
-        let expectedEntryTemplates = [
-            makeDropCollectionEntryTemplate(dbName, unshardedCollName),
-            makeDropDatabaseEntryTemplate(dbName),
-            makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName)
-        ];
+    // The drop of the unsharded collection should have generated no placement change event.
+    let expectedEntryTemplates = [
+        makeDropCollectionEntryTemplate(dbName, unshardedCollName),
+        makeDropDatabaseEntryTemplate(dbName),
+        makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName)
+    ];
 
-        const [commitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
+    const [commitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] =
+        verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
 
-        // Each commit entry must be visible to the end user.
-        assert(!commitCollDropEntry.fromMigrate || commitCollDropEntry.fromMigrate === false);
-        assert(!commitDbOpEntry.fromMigrate || commitDbOpEntry.fromMigrate === false);
+    // Each commit entry must be visible to the end user.
+    assert(!commitCollDropEntry.fromMigrate || commitCollDropEntry.fromMigrate === false);
+    assert(!commitDbOpEntry.fromMigrate || commitDbOpEntry.fromMigrate === false);
 
-        assert(timestampCmp(commitDbOpEntry.ts, dbDropTimeInPlacementHistory) < 0);
-        assert(timestampCmp(dbDropTimeInPlacementHistory, dbPlacementChangedEntry.ts) <= 0);
+    assert(timestampCmp(commitDbOpEntry.ts, dbDropTimeInPlacementHistory) < 0);
+    assert(timestampCmp(dbDropTimeInPlacementHistory, dbPlacementChangedEntry.ts) <= 0);
 
-        // Non-primary shards have only generated one non-visible commit op entry for the dropped
-        // database.
-        const nonDataBearingShards = shards.filter((shard) => shard !== primaryShard);
-        expectedEntryTemplates = [makeDropDatabaseEntryTemplate(dbName)];
-        const retrievedEntriesByShard =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
-        for (const shardId in retrievedEntriesByShard) {
-            const commitDropDatabaseEntry = retrievedEntriesByShard[shardId][0];
-            assert.eq(commitDropDatabaseEntry.fromMigrate, true);
-        }
+    // Non-primary shards have only generated one non-visible commit op entry for the dropped
+    // database.
+    const nonDataBearingShards = shards.filter((shard) => shard !== primaryShard);
+    expectedEntryTemplates = [makeDropDatabaseEntryTemplate(dbName)];
+    const retrievedEntriesByShard =
+        verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
+    for (const shardId in retrievedEntriesByShard) {
+        const commitDropDatabaseEntry = retrievedEntriesByShard[shardId][0];
+        assert.eq(commitDropDatabaseEntry.fromMigrate, true);
     }
 
     // Test case 3: a database containing an unsplittable collection, located outside its primary
@@ -842,11 +814,8 @@ assert.commandWorked(st.s.adminCommand({addShard: newReplicaSet.getURL(), name: 
 configDB = st.s.getDB('config');
 
 for (const dbName of dbsOnNewReplicaSet) {
-    if (unshardedCollectionsAreTrackedUponCreation) {
-        getValidatedPlacementInfoForCollection(dbName, preExistingCollName, [newShardName], true);
-    } else {
-        assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
-    }
+    assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
+
     const dbPlacementEntry = getValidatedPlacementInfoForDB(dbName);
     assert.sameMembers([newShardName], dbPlacementEntry.shards);
 }

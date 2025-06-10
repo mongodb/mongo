@@ -32,24 +32,11 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 let coll = mongos.getDB(dbName)[collName];
 assert.commandWorked(coll.insert({oldKey: 50}));
 
-// Fail if unsharded collection and unsharded collections are untracked. Otherwise, expect success
-// (no-op).
-const trackUnshardedEnabled =
-    FeatureFlagUtil.isEnabled(st.s.getDB("admin"), "TrackUnshardedCollectionsUponCreation");
 const unshardedCollName = "foo_unsharded";
 const unshardedCollNS = dbName + '.' + unshardedCollName;
 assert.commandWorked(st.s.getDB(dbName).runCommand({create: unshardedCollName}));
 let res = mongos.adminCommand({unshardCollection: unshardedCollNS});
-if (!trackUnshardedEnabled) {
-    assert.commandFailedWithCode(res,
-                                 [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
-} else {
-    const collInfo = mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0];
-    const prevCollUUID = collInfo.info.uuid;
-    assert.commandWorked(res);
-    assert.eq(mongos.getDB(dbName).getCollectionInfos({name: coll.getName()})[0].info.uuid,
-              prevCollUUID);
-}
+assert.commandFailedWithCode(res, [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
 
 assert.commandWorked(coll.createIndex({oldKey: 1}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));

@@ -308,34 +308,19 @@ for (const targetDBExists of [true, false]) {
         }),
         ErrorCodes.CollectionUUIDMismatch);
 
-    if (!FeatureFlagUtil.isEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
-        assert.commandWorked(assertSerializedOrError({
-            desc: "Concurrent $out and drop tracked source collection" + targetDBDesc,
-            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-            setupFn() {
-                setup();
-                st.s.adminCommand(
-                    {moveCollection: sourceColl.getFullName(), toShard: st.shard0.shardName});
-                maybeCreateTargetDB();
-            },
-            ddlFn() {
-                assert(sourceColl.drop());
-            }
-        }));
-    } else {
-        assert.commandWorked(assertSerializedOrError({
-            desc: "Concurrent $out and drop untracked source collection" + targetDBDesc,
-            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-            setupFn() {
-                setup();
-                st.s.adminCommand({untrackUnshardedCollection: sourceColl.getFullName()});
-                maybeCreateTargetDB();
-            },
-            ddlFn() {
-                assert(sourceColl.drop());
-            }
-        }));
-    }
+    assert.commandWorked(assertSerializedOrError({
+        desc: "Concurrent $out and drop tracked source collection" + targetDBDesc,
+        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+        setupFn() {
+            setup();
+            st.s.adminCommand(
+                {moveCollection: sourceColl.getFullName(), toShard: st.shard0.shardName});
+            maybeCreateTargetDB();
+        },
+        ddlFn() {
+            assert(sourceColl.drop());
+        }
+    }));
 }
 
 st.stop();

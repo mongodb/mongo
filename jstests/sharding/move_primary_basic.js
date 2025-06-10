@@ -1,4 +1,3 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -23,23 +22,17 @@ const coll2NS = dbName + '.' + coll2Name;
 const coll3NS = dbName + '.' + coll3Name;
 const coll4NS = dbName + '.' + coll4Name;
 
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
-const ffTrackUnsharded = !isMultiversion &&
-    FeatureFlagUtil.isEnabled(st.configRS.getPrimary(), "TrackUnshardedCollectionsUponCreation");
-
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
 assert.commandWorked(mongos.getCollection(coll1NS).insert({name: 'Tom'}));
 assert.commandWorked(mongos.getCollection(coll1NS).insert({name: 'Dick'}));
 assert.commandWorked(mongos.getCollection(coll2NS).insert({name: 'Harry'}));
-if (ffTrackUnsharded) {
-    assert.commandWorked(
-        mongos.getDB(dbName).runCommand({createUnsplittableCollection: coll3Name}));
-    assert.commandWorked(mongos.getCollection(coll3NS).insert({name: 'Peter'}));
 
-    assert.commandWorked(mongos.getDB(dbName).runCommand(
-        {createUnsplittableCollection: coll4Name, dataShard: shard1.shardName}));
-    assert.commandWorked(mongos.getCollection(coll4NS).insert({name: 'Jack'}));
-}
+assert.commandWorked(mongos.getDB(dbName).runCommand({createUnsplittableCollection: coll3Name}));
+assert.commandWorked(mongos.getCollection(coll3NS).insert({name: 'Peter'}));
+
+assert.commandWorked(mongos.getDB(dbName).runCommand(
+    {createUnsplittableCollection: coll4Name, dataShard: shard1.shardName}));
+assert.commandWorked(mongos.getCollection(coll4NS).insert({name: 'Jack'}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: coll2NS, key: {_id: 1}}));
 
@@ -80,8 +73,7 @@ jsTest.log('Test that orphaned documents on recipient causes the operation to fa
     // If the collection is being cloned by the movePrimary operation, this will fail with
     // NamespaceExists. Otherwise, when the collection is being cloned, it will fail with
     // InvalidOptions due to the UUIDS not matching.
-    let expectedErrorCode =
-        ffTrackUnsharded ? ErrorCodes.InvalidOptions : ErrorCodes.NamespaceExists;
+    let expectedErrorCode = ErrorCodes.NamespaceExists;
     assert.commandFailedWithCode(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}),
                                  expectedErrorCode);
 
@@ -110,15 +102,14 @@ jsTest.log('Test that unsharded, untracked collections are moved');
         assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
         assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
         // Unsharded, tracked collection (3)'s documents are on shard 0.
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-        }
+
+        assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+
         // Unsharded, tracked collection (4)'s documents are on shard 1.
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
-            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
-        }
+
+        assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
+        assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
     }
 
     assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}));
@@ -137,15 +128,14 @@ jsTest.log('Test that unsharded, untracked collections are moved');
         assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
         assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
         // Unsharded, tracked collection (3)'s documents are on shard 0
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-        }
+
+        assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+
         // Unsharded, tracked collection (4)'s documents are on shard 1
-        if (ffTrackUnsharded) {
-            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
-            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
-        }
+
+        assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
+        assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
     }
 
     assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard0.shardName}));
@@ -158,15 +148,14 @@ jsTest.log('Test that unsharded, untracked collections are moved');
         assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
         assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
         // Unsharded, tracked collection (3)'s documents are on shard 0
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-        }
+
+        assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+
         // Unsharded, tracked collection (4)'s documents are on shard 1
-        if (ffTrackUnsharded) {
-            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
-            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
-        }
+
+        assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
+        assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
     }
 }
 

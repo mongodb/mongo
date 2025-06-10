@@ -90,12 +90,6 @@ function assertCollectionAuxiliaryMetadataMismatch(inconsistencies, expectedMeta
                tojson(expectedMetadataWithShards) + ", but got " + tojson(inconsistencies));
 }
 
-// TODO SERVER-77915 We can get rid of isTrackedByConfigServer method once all unsharded collections
-// are being tracked by the config server
-function isTrackedByConfigServer(nss) {
-    return configDB.collections.countDocuments({_id: nss}, {limit: 1}) !== 0;
-}
-
 function isFcvGraterOrEqualTo(fcvRequired) {
     // Requires all primary shard nodes to be running the fcvRequired version.
     let isFcvGreater = true;
@@ -755,17 +749,15 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const localCollation = db.getCollectionInfos({name: kSourceCollName})[0].options.collation;
     assertNoInconsistencies();
 
-    if (!isTrackedByConfigServer(kNss)) {
-        // Shard the collection to make it tracked.
-        // Note: we need to specify a simple collation on shardCollection command to make clear that
-        // chunks will be sorted using a simple collation, however, the default collation for the
-        // collection is preserved to {'locale':'ca'}.
-        assert.commandWorked(
-            db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}));
+    // Shard the collection to make it tracked.
+    // Note: we need to specify a simple collation on shardCollection command to make clear that
+    // chunks will be sorted using a simple collation, however, the default collation for the
+    // collection is preserved to {'locale':'ca'}.
+    assert.commandWorked(
+        db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}));
 
-        const no_inconsistency = db.checkMetadataConsistency().toArray();
-        assert.eq(0, no_inconsistency.length);
-    }
+    const no_inconsistency = db.checkMetadataConsistency().toArray();
+    assert.eq(0, no_inconsistency.length);
 
     // Update the default collation on the sharding catalog only and catch the inconsistency.
     assert.commandWorked(
@@ -799,37 +791,32 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     assert.commandWorked(db.runCommand({create: kSourceCollName, capped: true, size: 1000}));
     assertNoInconsistencies();
 
-    if (isTrackedByConfigServer(kNss)) {
-        configDB.collections.update({_id: kNss}, {$set: {unsplittable: false}});
+    // Register another collection as sharded to be able to get a config.collections document as
+    // a reference.
+    const kNssSharded = db.getName() + ".sharded_collection";
+    assert.commandWorked(db.adminCommand({shardCollection: kNssSharded, key: {_id: 1}}));
 
-    } else {
-        // Register another collection as sharded to be able to get a config.collections document as
-        // a reference.
-        const kNssSharded = db.getName() + ".sharded_collection";
-        assert.commandWorked(db.adminCommand({shardCollection: kNssSharded, key: {_id: 1}}));
+    let collEntry = configDB.collections.findOne({_id: kNssSharded});
+    const shardedCollUuid = collEntry.uuid;
 
-        let collEntry = configDB.collections.findOne({_id: kNssSharded});
-        const shardedCollUuid = collEntry.uuid;
+    // Insert a new collection into config.collections with the nss and uuid from the unsharded
+    // capped collection previously created.
+    const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+    collEntry._id = kNss;
+    collEntry.uuid = uuid;
+    configDB.collections.insert(collEntry);
 
-        // Insert a new collection into config.collections with the nss and uuid from the unsharded
-        // capped collection previously created.
-        const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
-        collEntry._id = kNss;
-        collEntry.uuid = uuid;
-        configDB.collections.insert(collEntry);
-
-        // Insert a chunk entry for the tracked unsharded collection.
-        const chunkEntry = {
-            "uuid": uuid,
-            "min": {"_id": MinKey},
-            "max": {"_id": MaxKey},
-            "shard": primaryShard.shardName,
-            "lastmod": Timestamp(0, 1),
-            "onCurrentShardSince": Timestamp(0, 1),
-            "history": [{"validAfter": Timestamp(0, 1), "shard": primaryShard.shardName}]
-        };
-        configDB.chunks.insert(chunkEntry);
-    }
+    // Insert a chunk entry for the tracked unsharded collection.
+    const chunkEntry = {
+        "uuid": uuid,
+        "min": {"_id": MinKey},
+        "max": {"_id": MaxKey},
+        "shard": primaryShard.shardName,
+        "lastmod": Timestamp(0, 1),
+        "onCurrentShardSince": Timestamp(0, 1),
+        "history": [{"validAfter": Timestamp(0, 1), "shard": primaryShard.shardName}]
+    };
+    configDB.chunks.insert(chunkEntry);
 
     // Catch the inconsistency.
     const inconsistencies = db.checkMetadataConsistency().toArray();

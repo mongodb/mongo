@@ -290,18 +290,10 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
     }
 };
 
-const nodeOptions = {
-    setParameter: {
-        // TODO: SERVER-90040 Remove when PM-3670 (track unsharded collections) fixes the issue
-        // with direct to shard operations after addShard has run.
-        featureFlagTrackUnshardedCollectionsUponCreation: false
-    }
-};
 const numShards = 0;
 
 const st = new ShardingTest({
     shards: numShards,
-    other: {configOptions: nodeOptions, rsOptions: nodeOptions},
 });
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
@@ -311,7 +303,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
     quit();
 }
 
-const replShard = new ReplSetTest({nodes: NUM_NODES, nodeOptions: nodeOptions});
+const replShard = new ReplSetTest({nodes: NUM_NODES});
 
 replShard.startSet({verbose: 1});
 replShard.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -389,8 +381,8 @@ ddlStage.countDown();
 crudStage.countDown();
 
 jsTestLog("Adding a second shard.");
-const newShard = new ReplSetTest(
-    {name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: "", ...nodeOptions}});
+const newShard =
+    new ReplSetTest({name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: ""}});
 newShard.startSet();
 newShard.initiate();
 assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: 'toRemoveLater'}));

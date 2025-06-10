@@ -241,18 +241,12 @@ public:
                         return _createUntrackedCollection(opCtx);
                     }
 
-                    bool isTrackUnshardedUponCreationEnabled =
-                        feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-                            VersionContext::getDecoration(opCtx),
-                            (*optFixedFcvRegion)->acquireFCVSnapshot());
-
                     bool mustTrackOnMoveCollection =
                         feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabled(
                             (*optFixedFcvRegion)->acquireFCVSnapshot()) &&
                         request().getRegisterExistingCollectionInGlobalCatalog();
 
-                    if (!isTrackUnshardedUponCreationEnabled && !mustTrackOnMoveCollection &&
-                        !isFromCreateUnsplittableCommand) {
+                    if (!mustTrackOnMoveCollection && !isFromCreateUnsplittableCommand) {
                         optFixedFcvRegion.reset();
                         return _createUntrackedCollection(opCtx);
                     }

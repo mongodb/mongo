@@ -17,7 +17,6 @@
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
-- featureFlagTrackUnshardedCollectionsUponCreation
 - featureFlagTSBucketingParametersUnchanged
 # TODO SERVER-99433: Delete featureFlagReplicaSetEndpoint.
 - featureFlagReplicaSetEndpoint

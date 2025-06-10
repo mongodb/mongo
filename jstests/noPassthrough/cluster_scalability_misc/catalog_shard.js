@@ -237,11 +237,7 @@ const newShardName =
     // Blocked because of the sharded and unsharded databases and the remaining chunk.
     removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
-    // TODO SERVER-77915 remove feature flag and set remaining chunks to 3 (before tracking
-    // unsharded collections, only sharded collection had associated chunks)
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    assert.eq(isTrackUnshardedUponCreationEnabled ? 3 : 1, removeRes.remaining.chunks);
+    assert.eq(1, removeRes.remaining.chunks);
     assert.eq(3, removeRes.remaining.dbs);
 
     moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);

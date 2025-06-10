@@ -109,8 +109,12 @@ export const $config = (function() {
                 // in multi-document transactions.
                 return;
             }
-            if (!FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
-                // TODO SERVER-90862 (or SERVER-90742): Remove the early exit.
+
+            if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
+                // TODO SERVER-101595 once CreateViewlessTimeseriesCollections is enabled by default
+                // we can safely execute this state. Before that, this test case is likely to create
+                // orphaned bucket collections even without stepdowns. This can cause a number of
+                // problems including index inconsistencies (see SERVER-90862)
                 return;
             }
             const coll = getRandomCollection(db);

@@ -231,13 +231,6 @@ function testMerge(
     });
 }
 
-// The expectedDestShard from $out command will depend on the state of the
-// TrackUnshardedCollectionsUponCreation feature flag. If the feature flag is enabled, the output
-// collection will be located on same shard where the already existing dest collection is placed.
-// If the feature flag is disabled, the output collection won't be tracked and will be located on
-// the DB Primary shard regardless of the placement of the already existing dest collection.
-const isTrackUnshardedUponCreationEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation");
 const dbPrimaryShard = st.shard0;
 const dbPrimaryShardName = st.shard0.shardName;
 
@@ -252,7 +245,7 @@ testOut({
     destCollName: kUnsplittable3CollName,
     destExists: true,
     expectedShards: [shard1],
-    expectedDestShard: isTrackUnshardedUponCreationEnabled ? st.shard1 : dbPrimaryShard
+    expectedDestShard: dbPrimaryShard
 });
 
 // Input and output collection both exist and are unsharded but reside on different non-primary
@@ -263,7 +256,7 @@ testOut({
     destExists: true,
     expectedMergeShardId: shard2,
     expectedShards: [shard1],
-    expectedDestShard: isTrackUnshardedUponCreationEnabled ? st.shard2 : dbPrimaryShard
+    expectedDestShard: dbPrimaryShard
 });
 
 // Input collection is sharded. Output collection exists and resides on a non-primary shard.
@@ -273,7 +266,7 @@ testOut({
     destExists: true,
     expectedMergeShardId: shard1,
     expectedShards: [shard0, shard1, shard2],
-    expectedDestShard: isTrackUnshardedUponCreationEnabled ? st.shard1 : dbPrimaryShard
+    expectedDestShard: dbPrimaryShard
 });
 
 // Output collection does not exist. Input collection is unsharded and resides on a non-primary
@@ -282,14 +275,14 @@ testOut({
     sourceCollName: kUnsplittable1CollName,
     destCollName: kCollDoesNotExistName,
     destExists: false,
-    expectedMergeShardId: isTrackUnshardedUponCreationEnabled ? dbPrimaryShardName : undefined,
-    expectedShards: isTrackUnshardedUponCreationEnabled ? [shard1] : [dbPrimaryShardName],
+    expectedMergeShardId: undefined,
+    expectedShards: [dbPrimaryShardName],
     expectedDestShard: dbPrimaryShard
 });
 
 // Input is not a collection, but $documents, so we should run on the shard that owns output
 // collection (if present)
-const destShard = isTrackUnshardedUponCreationEnabled ? st.shard1 : dbPrimaryShard;
+const destShard = dbPrimaryShard;
 testDocumentsTargeting({$out: coll3.getName()}, destShard);
 
 resetData(coll1);
@@ -301,8 +294,8 @@ testConcurrentWriteAgg({
     failpointName: "hangWhileBuildingDocumentSourceOutBatch",
     writeAggSpec: {$out: kUnsplittable3CollName},
     nameOfCollToMove: coll3.getFullName(),
-    expectedDestShard: isTrackUnshardedUponCreationEnabled ? st.shard1 : dbPrimaryShard,
-    mergeShard: isTrackUnshardedUponCreationEnabled ? st.shard1 : dbPrimaryShard
+    expectedDestShard: dbPrimaryShard,
+    mergeShard: dbPrimaryShard
 });
 
 // $merge tests

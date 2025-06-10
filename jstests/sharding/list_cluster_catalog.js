@@ -206,21 +206,12 @@ function cacheCatalog(conn, dbName, collName, primaryShard, shards, isTimeseries
 }
 
 function setupUnshardedCollections(conn, dbName, primaryShard) {
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        conn.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-
     conn.adminCommand({enablesharding: dbName, primaryShard: primaryShard});
 
     const kViewCollName = "view";
     const kTimeseriesCollName = "timeseries";
     let collList = ["coll1", "coll2", kTimeseriesCollName, kViewCollName];
 
-    // Do not test unsharded collection in case of TrackUnshardedCollectionsUponCreation or any
-    // unsharded collection is otherwise tracked. An equivalent test is performed later. Test only
-    // the view.
-    if (isTrackUnshardedUponCreationEnabled) {
-        collList = [kViewCollName];
-    }
     // Create all the collections
     collList.forEach((collName) => {
         let nss = ns(dbName, collName);

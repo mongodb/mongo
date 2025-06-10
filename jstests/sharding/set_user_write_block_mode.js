@@ -191,28 +191,21 @@ newShard.initiate();
     const toShard = st.getOther(fromShard);
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toShard.name}));
 
-    // Check that the new primary has cloned the data. The data will only be moved if the collection
-    // is untracked.
-    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedDisabled) {
-        assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
-    }
+    // Check that the new primary has cloned the data.
+    assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
 
-    if (isTrackUnshardedDisabled) {
-        // Check that the collection has been removed from the former primary.
-        assert.eq(0,
-                  fromShard.getDB(dbName)
-                      .runCommand({listCollections: 1, filter: {name: unshardedCollName}})
-                      .cursor.firstBatch.length);
-    } else {
-        // Check that the database primary has been changed to the new primary.
-        assert.eq(1,
-                  st.s.getDB("config")
-                      .getCollection("databases")
-                      .find({_id: dbName, primary: toShard.shardName})
-                      .itcount());
-    }
+    // Check that the collection has been removed from the former primary.
+    assert.eq(0,
+              fromShard.getDB(dbName)
+                  .runCommand({listCollections: 1, filter: {name: unshardedCollName}})
+                  .cursor.firstBatch.length);
+
+    // Check that the database primary has been changed to the new primary.
+    assert.eq(1,
+              st.s.getDB("config")
+                  .getCollection("databases")
+                  .find({_id: dbName, primary: toShard.shardName})
+                  .itcount());
 
     assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
 }

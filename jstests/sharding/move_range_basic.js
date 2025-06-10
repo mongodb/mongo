@@ -149,17 +149,13 @@ function test(collName, skPattern) {
 }
 
 // Test running running moveRange on an unsplittable collection will fail
-if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsUponCreation")) {
-    const collName = "unsplittable_collection";
-    const ns = kDbName + '.' + collName;
+const collName = "unsplittable_collection";
+const ns = kDbName + '.' + collName;
 
-    jsTest.log("Testing on unsplittable namespace");
-    assert.commandWorked(
-        mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
-    assert.commandFailedWithCode(
-        mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
-        ErrorCodes.NamespaceNotSharded);
-}
+jsTest.log("Testing on unsplittable namespace");
+assert.commandWorked(mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
+assert.commandFailedWithCode(mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
+                             ErrorCodes.NamespaceNotSharded);
 
 test('nonHashedShardKey', {a: 1});
 

@@ -729,15 +729,6 @@ private:
 
 
     /**
-     * Runs the listCollections command for every database provided on the specified host and
-     * returns the namespaces of all collections.
-     */
-    StatusWith<std::vector<CollectionType>> _getCollListFromShard(
-        OperationContext* opCtx,
-        const std::vector<DatabaseName>& dbNames,
-        std::shared_ptr<RemoteCommandTargeter> targeter);
-
-    /**
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
      */

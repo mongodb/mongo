@@ -336,101 +336,6 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
     }
 }
 
-StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFromShard(
-    OperationContext* opCtx,
-    const std::vector<DatabaseName>& dbNames,
-    std::shared_ptr<RemoteCommandTargeter> targeter) {
-    std::vector<CollectionType> nssList;
-
-    for (auto& dbName : dbNames) {
-        Status fetchStatus =
-            Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-        auto host = uassertStatusOK(
-            targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
-        const Milliseconds maxTimeMS =
-            std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
-
-        auto fetcherCallback = [&](const Fetcher::QueryResponseStatus& dataStatus,
-                                   Fetcher::NextAction* nextAction,
-                                   BSONObjBuilder* getMoreBob) {
-            // Throw out any accumulated results on error.
-            if (!dataStatus.isOK()) {
-                fetchStatus = dataStatus.getStatus();
-                return;
-            }
-            const auto& data = dataStatus.getValue();
-
-            try {
-                for (const BSONObj& doc : data.documents) {
-                    auto collInfo = ListCollectionsReplyItem::parse(
-                        IDLParserContext("ListCollectionReply"), doc);
-                    // Skip views and special collections.
-                    if (!collInfo.getInfo() || !collInfo.getInfo()->getUuid()) {
-                        continue;
-                    }
-
-                    const auto nss = NamespaceStringUtil::deserialize(dbName, collInfo.getName());
-
-                    if (nss.isNamespaceAlwaysUntracked()) {
-                        continue;
-                    }
-
-                    auto coll = CollectionType(nss,
-                                               OID::gen(),
-                                               Timestamp(Date_t::now()),
-                                               Date_t::now(),
-                                               collInfo.getInfo()->getUuid().get(),
-                                               sharding_ddl_util::unsplittableCollectionShardKey());
-                    coll.setUnsplittable(true);
-                    if (!doc["options"].eoo() && !doc["options"]["timeseries"].eoo()) {
-                        coll.setTimeseriesFields(TypeCollectionTimeseriesFields::parse(
-                            IDLParserContext("AddShardContext"),
-                            doc["options"]["timeseries"].Obj()));
-                    }
-                    nssList.push_back(coll);
-                }
-                *nextAction = Fetcher::NextAction::kNoAction;
-            } catch (DBException& ex) {
-                fetchStatus = ex.toStatus();
-                return;
-            }
-            fetchStatus = Status::OK();
-
-            if (!getMoreBob) {
-                return;
-            }
-            getMoreBob->append("getMore", data.cursorId);
-            getMoreBob->append("collection", data.nss.coll());
-        };
-        ListCollections listCollections;
-        listCollections.setDbName(dbName);
-        auto fetcher =
-            std::make_unique<Fetcher>(_executorForAddShard.get(),
-                                      host,
-                                      dbName,
-                                      listCollections.toBSON(),
-                                      fetcherCallback,
-                                      BSONObj() /* metadata tracking, only used for shards */,
-                                      maxTimeMS /* command network timeout */,
-                                      maxTimeMS /* getMore network timeout */);
-
-        auto scheduleStatus = fetcher->schedule();
-        if (!scheduleStatus.isOK()) {
-            return scheduleStatus;
-        }
-
-        auto joinStatus = fetcher->join(opCtx);
-        if (!joinStatus.isOK()) {
-            return joinStatus;
-        }
-        if (!fetchStatus.isOK()) {
-            return fetchStatus;
-        }
-    }
-
-    return nssList;
-}
-
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx) {
     invariant(!ShardingState::get(opCtx)->enabled());
     const auto identity =
@@ -665,19 +570,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
 
-    std::vector<CollectionType> collList;
-
-    if (feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-            VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-        // TODO SERVER-80532: the sharding catalog might lose some collections.
-        auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
-        if (!listStatus.isOK()) {
-            return listStatus.getStatus();
-        }
-
-        collList = std::move(listStatus.getValue());
-    }
-
     // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
     const auto currentFCV = fcvSnapshot.getVersion();
     invariant(currentFCV == multiversion::GenericFCV::kLatest ||
@@ -741,7 +633,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
         auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
         topology_change_helpers::addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList), executor);
+            opCtx, shardType, std::move(dbNamesStatus.getValue()), {}, executor);
     }
     // Once the transaction has committed, we must immediately dismiss the guard to avoid
     // incorrectly removing the RSM after persisting the shard addition.

@@ -58,7 +58,8 @@ public:
     MigrateInfoVector selectCollectionsToMove(
         OperationContext* opCtx,
         const std::vector<ClusterStatistics::ShardStatistics>& allShards,
-        stdx::unordered_set<ShardId>* availableShards);
+        stdx::unordered_set<ShardId>* availableShards,
+        bool onlyTrackedCollection = false);
 
 private:
     FailPoint* fpBalancerShouldReturnRandomMigrations;

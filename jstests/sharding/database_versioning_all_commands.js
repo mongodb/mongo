@@ -823,14 +823,6 @@ commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 
-// Database versioning tests only make sense when all collections are not tracked.
-const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-if (isTrackUnshardedUponCreationEnabled) {
-    st.stop();
-    quit();
-}
-
 // TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
 // shards that are not the primary shard. This test shuld be re-written thinking about that shards
 // are database authoritative and don't need to refresh anymore.

@@ -146,9 +146,7 @@ for (let [scenarioName, scenario] of Object.entries(shardingScenarios)) {
             }
         }
 
-        // TODO SERVER-77915: remove once 8.0 becomes last-lts
-        if (!FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation") &&
-            collName == unshardedCollName) {
+        if (collName == unshardedCollName) {
             // Skip testing with untracked unsharded collections because reads at a point-in-time
             // earlier than the latest catalog change (including index DDL) will throw conflicts.
             jsTestLog('Skip unsharded collection scenario');

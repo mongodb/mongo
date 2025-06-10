@@ -329,19 +329,17 @@ boost::optional<MigrateInfo> selectUnsplittableCollectionToMove(
     OperationContext* opCtx,
     stdx::unordered_set<ShardId>* availableShards,
     const std::vector<ShardId>& availableDonors,
-    const std::vector<ShardId>& availableRecipients) {
+    const std::vector<ShardId>& availableRecipients,
+    bool onlyTrackedCollection = false) {
     auto collectionAndChunks = [&]() -> boost::optional<std::pair<NamespaceString, ChunkType>> {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
 
-        if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-                VersionContext::getDecoration(opCtx), fcvSnapshot) &&
-            !feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabled(fcvSnapshot)) {
+        if (!feature_flags::gTrackUnshardedCollectionsUponMoveCollection.isEnabled(fcvSnapshot)) {
             return boost::none;
         }
 
         for (const auto& shardId : availableDonors) {
-            if (!feature_flags::gTrackUnshardedCollectionsUponCreation.isEnabled(
-                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+            if (!onlyTrackedCollection) {
                 auto randomUntrackedColl = getRandomUntrackedCollectionOnShard(opCtx, shardId);
                 if (randomUntrackedColl) {
                     return randomUntrackedColl;
@@ -397,7 +395,8 @@ boost::optional<MigrateInfo> selectUnsplittableCollectionToMove(
 MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
     OperationContext* opCtx,
     const std::vector<ClusterStatistics::ShardStatistics>& allShards,
-    stdx::unordered_set<ShardId>* availableShards) {
+    stdx::unordered_set<ShardId>* availableShards,
+    bool onlyTrackedCollection) {
     MigrateInfoVector result;
 
     if (auto sfp = fpBalancerShouldReturnRandomMigrations->scoped();
@@ -432,8 +431,11 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
                      opCtx->getClient()->getPrng().urbg());
 
         // Try to move collections off draining shards first.
-        auto drainingShardMigration = selectUnsplittableCollectionToMove(
-            opCtx, availableShards, randomizedDrainingShards, randomizedAvailableShards);
+        auto drainingShardMigration = selectUnsplittableCollectionToMove(opCtx,
+                                                                         availableShards,
+                                                                         randomizedDrainingShards,
+                                                                         randomizedAvailableShards,
+                                                                         onlyTrackedCollection);
         if (drainingShardMigration) {
             result.emplace_back(*drainingShardMigration);
             return result;
@@ -449,8 +451,11 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
             return result;
         }
 
-        auto migration = selectUnsplittableCollectionToMove(
-            opCtx, availableShards, randomizedAvailableShards, randomizedAvailableShards);
+        auto migration = selectUnsplittableCollectionToMove(opCtx,
+                                                            availableShards,
+                                                            randomizedAvailableShards,
+                                                            randomizedAvailableShards,
+                                                            onlyTrackedCollection);
         if (migration) {
             result.emplace_back(*migration);
         }

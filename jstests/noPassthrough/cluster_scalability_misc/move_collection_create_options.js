@@ -298,11 +298,7 @@ const testCases = [
             insertDocuments(conn, dbName, collName);
         },
         validateCollection: (conn, dbName, collName, shardKey) => {
-            validateCollection(conn, dbName, collName, shardKey, {
-                // TODO (SERVER-86443): Enable featureFlagTrackUnshardedCollectionsUponCreation.
-                expectNoShardingMetadata:
-                    !FeatureFlagUtil.isEnabled(conn, "TrackUnshardedCollectionsUponCreation")
-            });
+            validateCollection(conn, dbName, collName, shardKey, {expectNoShardingMetadata: true});
         },
         // Cannot move or shard a view.
         expectedMoveCollectionError: ErrorCodes.NamespaceNotFound,
@@ -323,11 +319,7 @@ const testCases = [
             insertDocuments(conn, dbName, collName);
         },
         validateCollection: (conn, dbName, collName, shardKey) => {
-            validateCollection(conn, dbName, collName, shardKey, {
-                // TODO (SERVER-86443): Enable featureFlagTrackUnshardedCollectionsUponCreation.
-                expectNoShardingMetadata:
-                    !FeatureFlagUtil.isEnabled(conn, "TrackUnshardedCollectionsUponCreation")
-            });
+            validateCollection(conn, dbName, collName, shardKey, {expectNoShardingMetadata: true});
         },
         // Cannot move or shard a view.
         expectedShardCollectionError: ErrorCodes.CommandNotSupportedOnView,

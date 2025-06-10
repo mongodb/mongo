@@ -134,30 +134,16 @@ newShard = new ReplSetTest({nodes: 1});
 newShard.startSet({shardsvr: ''});
 newShard.initiate();
 
-// TODO SERVER-77915: remove once 8.0 becomes last-lts
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
-    // changePrimary
-    checkCommandMongos({changePrimary: dbName, to: st.shard0.shardName},
-                       function() {
-                           setupFuncs.addShard();
-                           setupFuncs.createDatabase();
-                       },
-                       function() {
-                           cleanupFuncs.dropDatabase();
-                           cleanupFuncs.removeShardIfExists();
-                       });
-} else {
-    // movePrimary
-    checkCommandMongos({movePrimary: dbName, to: st.shard0.shardName},
-                       function() {
-                           setupFuncs.addShard();
-                           setupFuncs.createDatabase();
-                       },
-                       function() {
-                           cleanupFuncs.dropDatabase();
-                           cleanupFuncs.removeShardIfExists();
-                       });
-}
+// movePrimary
+checkCommandMongos({movePrimary: dbName, to: st.shard0.shardName},
+                   function() {
+                       setupFuncs.addShard();
+                       setupFuncs.createDatabase();
+                   },
+                   function() {
+                       cleanupFuncs.dropDatabase();
+                       cleanupFuncs.removeShardIfExists();
+                   });
 
 // shardCollection
 checkCommandMongos(

@@ -50,12 +50,6 @@ feature_flags:
         cpp_varname: feature_flags::gMultiServiceLogAndFTDCFormat
         default: true
         shouldBeFCVGated: false
-    # TODO (SERVER-87189): Remove once 9.0 becomes last LTS.
-    featureFlagTrackUnshardedCollectionsUponCreation:
-        description: "Feature flag for enabling the tracking of user unsharded collection on creation"
-        cpp_varname: feature_flags::gTrackUnshardedCollectionsUponCreation
-        default: false
-        shouldBeFCVGated: true
     # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
     featureFlagClusterFsyncLock:
         description: "Feature flag to enable locking of a cluster through mongos"

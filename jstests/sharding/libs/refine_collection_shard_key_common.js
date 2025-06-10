@@ -242,21 +242,17 @@ export function simpleValidationTests(mongosConn, dbName) {
         {refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 'hashed'}}));
 
     // Make sure split is correctly disabled for unsplittable collection
-    (() => {
-        if (FeatureFlagUtil.isPresentAndEnabled(mongosConn,
-                                                "TrackUnshardedCollectionsUponCreation")) {
-            jsTest.log(
-                "Make sure refine shard key for unsplittable collection is correctly disabled");
-            const kCollNameUnsplittable = "unsplittable_bar";
-            const kNsNameUnsplittable = dbName + "." + kCollNameUnsplittable;
-            assert.commandWorked(mongosConn.getDB(dbName).runCommand(
-                {createUnsplittableCollection: kCollNameUnsplittable}));
-            assert.commandFailedWithCode(
-                mongosConn.adminCommand(
-                    {refineCollectionShardKey: kNsNameUnsplittable, key: {a: 1, b: 1}}),
-                ErrorCodes.NamespaceNotSharded);
-        }
-    })();
+    {
+        jsTest.log("Make sure refine shard key for unsplittable collection is correctly disabled");
+        const kCollNameUnsplittable = "unsplittable_bar";
+        const kNsNameUnsplittable = dbName + "." + kCollNameUnsplittable;
+        assert.commandWorked(mongosConn.getDB(dbName).runCommand(
+            {createUnsplittableCollection: kCollNameUnsplittable}));
+        assert.commandFailedWithCode(
+            mongosConn.adminCommand(
+                {refineCollectionShardKey: kNsNameUnsplittable, key: {a: 1, b: 1}}),
+            ErrorCodes.NamespaceNotSharded);
+    }
 
     assert.commandWorked(mongosConn.getDB(dbName).dropDatabase());
 }

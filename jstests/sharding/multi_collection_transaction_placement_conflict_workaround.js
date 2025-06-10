@@ -154,19 +154,13 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
         }
     }
 
-    // These tests only make sense with untracked collections since movePrimary does not affect
-    // tracked collections
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (!isTrackUnshardedUponCreationEnabled) {
-        commands.forEach((command) => {
-            runTest('majority', command);
-        });
+    commands.forEach((command) => {
+        runTest('majority', command);
+    });
 
-        commands.forEach((command) => {
-            runTest('snapshot', command);
-        });
-    }
+    commands.forEach((command) => {
+        runTest('snapshot', command);
+    });
 }
 
 // Test transaction with concurrent move collection.
@@ -183,6 +177,13 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
 
         st.adminCommand({enableSharding: dbName1, primaryShard: st.shard0.shardName});
         st.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName});
+
+        // These tests only make sense with untracked collections since movePrimary does not affect
+        // tracked collections
+        assert.commandWorked(
+            st.getDB(dbName1).runCommand({createUnsplittableCollection: collName1}));
+        assert.commandWorked(
+            st.getDB(dbName2).runCommand({createUnsplittableCollection: collName2}));
 
         const coll1 = st.getDB(dbName1)[collName1];
         coll1.insert({x: 1, c: 0});
@@ -235,19 +236,13 @@ if (MongoRunner.compareBinVersions(res.version, "8.2") >= 0) {
         }
     }
 
-    // These tests only make sense with tracked, unsharded collections since moveCollection does not
-    // affect untracked collections
-    const isTrackUnshardedUponCreationEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsUponCreation");
-    if (isTrackUnshardedUponCreationEnabled) {
-        commands.forEach((command) => {
-            runTest('majority', command);
-        });
+    commands.forEach((command) => {
+        runTest('majority', command);
+    });
 
-        commands.forEach((command) => {
-            runTest('snapshot', command);
-        });
-    }
+    commands.forEach((command) => {
+        runTest('snapshot', command);
+    });
 }
 
 // Tests transactions with concurrent DDL operations.
