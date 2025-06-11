@@ -906,7 +906,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
 /**
  * Returns a WiredTigerTableConfig populated with config values provided at startup.
  */
-WiredTigerRecordStoreBase::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
+WiredTigerRecordStore::WiredTigerTableConfig getWiredTigerTableConfigFromStartupOptions(
     bool usingSpillWiredTigerKVEngine = false);
 
 }  // namespace mongo

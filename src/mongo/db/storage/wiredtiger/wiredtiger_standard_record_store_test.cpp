@@ -112,12 +112,12 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
         WiredTigerRecordStore::Params params;
-        params.baseParams.ident = ident;
-        params.baseParams.engineName = std::string{kWiredTigerEngineName};
-        params.baseParams.keyFormat = KeyFormat::Long;
-        params.baseParams.overwrite = true;
-        params.baseParams.isLogged = false;
-        params.baseParams.forceUpdateWithFullDocument = false;
+        params.ident = ident;
+        params.engineName = std::string{kWiredTigerEngineName};
+        params.keyFormat = KeyFormat::Long;
+        params.overwrite = true;
+        params.isLogged = false;
+        params.forceUpdateWithFullDocument = false;
         params.inMemory = false;
         params.sizeStorer = &ss;
         params.tracksSizeAdjustments = true;

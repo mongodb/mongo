@@ -111,14 +111,14 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(Re
                                                                               StringData ident,
                                                                               KeyFormat keyFormat) {
     WiredTigerRecordStore::Params params;
-    params.baseParams.uuid = boost::none;
-    params.baseParams.ident = std::string{ident};
-    params.baseParams.engineName = _canonicalName;
-    params.baseParams.keyFormat = keyFormat;
-    params.baseParams.overwrite = true;
+    params.uuid = boost::none;
+    params.ident = std::string{ident};
+    params.engineName = _canonicalName;
+    params.keyFormat = keyFormat;
+    params.overwrite = true;
     // We don't log writes to spill tables.
-    params.baseParams.isLogged = false;
-    params.baseParams.forceUpdateWithFullDocument = false;
+    params.isLogged = false;
+    params.forceUpdateWithFullDocument = false;
     params.inMemory = false;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = false;
@@ -130,13 +130,13 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     RecoveryUnit& ru, StringData ident, KeyFormat keyFormat) {
     WiredTigerSession session(_connection.get());
 
-    WiredTigerRecordStoreBase::WiredTigerTableConfig wtTableConfig =
+    WiredTigerRecordStore::WiredTigerTableConfig wtTableConfig =
         getWiredTigerTableConfigFromStartupOptions(true /* usingSpillWiredTigerKVEngine */);
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
     std::string config =
-        WiredTigerRecordStoreBase::generateCreateString({} /* internal table */, wtTableConfig);
+        WiredTigerRecordStore::generateCreateString({} /* internal table */, wtTableConfig);
 
     std::string uri = WiredTigerUtil::buildTableUri(ident);
     LOGV2_DEBUG(10158008,

@@ -89,8 +89,11 @@ class WiredTigerConnection;
 class WiredTigerKVEngine;
 class WiredTigerSizeStorer;
 
-class WiredTigerRecordStoreBase : public RecordStoreBase {
+class WiredTigerRecordStore : public RecordStoreBase {
 public:
+    class Capped;
+    class Oplog;
+
     // Encapsulates configuration parameters to configure a WiredTiger table.
     struct WiredTigerTableConfig {
         // This specifies the value for the key_format configuration parameter.
@@ -117,6 +120,10 @@ public:
         // TODO (SERVER-57482): Remove special handling of skipping "wiredtiger_calc_modify()".
         // True if force to update with the full document, and false otherwise.
         bool forceUpdateWithFullDocument;
+        // True if the storage engine is an in-memory storage engine
+        bool inMemory;
+        WiredTigerSizeStorer* sizeStorer;
+        bool tracksSizeAdjustments;
     };
 
     typedef std::variant<int64_t, WiredTigerItem> CursorKey;
@@ -136,10 +143,14 @@ public:
      */
     static std::string generateCreateString(
         StringData tableName,
-        const WiredTigerRecordStoreBase::WiredTigerTableConfig& wtTableConfig,
+        const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
         bool isOplog = false);
 
-    WiredTigerRecordStoreBase(Params params);
+    WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
+                          WiredTigerRecoveryUnitBase&,
+                          Params params);
+
+    ~WiredTigerRecordStore() override;
 
     const char* name() const override {
         return _engineName.c_str();
@@ -156,94 +167,6 @@ public:
     uint64_t tableId() const {
         return _tableId;
     }
-
-protected:
-    // Encapsulates statistics for an operation performed on this RecordStore instance.
-    struct OpStats {
-        int64_t keyLength{0};
-        int64_t oldValueLength{0};
-        int64_t newValueLength{0};
-    };
-
-    virtual RecoveryUnit& getRecoveryUnit(RecoveryUnit&) const = 0;
-
-    /**
-     * Deletes the specified record from this WiredTiger table. Resets 'opStats' before populating
-     * it with statistics corresponding to this operation.
-     */
-    void wtDeleteRecord(OperationContext*,
-                        WiredTigerRecoveryUnitBase& wtRu,
-                        const RecordId&,
-                        OpStats& opStats);
-
-    /**
-     * Inserts the given record into this WiredTiger table. Returns error if the record could not be
-     * inserted due to errors like duplicate key error. Resets 'opStats' before populating it with
-     * statistics corresponding to this operation.
-     */
-    Status wtInsertRecord(OperationContext*,
-                          WiredTigerRecoveryUnitBase& wtRu,
-                          WT_CURSOR* c,
-                          const Record& record,
-                          OpStats& opStats);
-
-    /**
-     * Updates the given record in this WiredTiger table. Resets 'opStats' before populating it with
-     * statistics corresponding to this operation.
-     */
-    Status wtUpdateRecord(OperationContext* opCtx,
-                          WiredTigerRecoveryUnitBase& wtRu,
-                          const RecordId& id,
-                          const char* data,
-                          int len,
-                          OpStats& opStats);
-
-    /**
-     * Deletes all records in this WiredTiger table.
-     */
-    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnitBase& wtRu);
-
-    /**
-     * Deletes all Records in the range [minRecordId, maxRecordId].
-     */
-    Status wtRangeTruncate(OperationContext* opCtx,
-                           WiredTigerRecoveryUnitBase& wtRu,
-                           const RecordId& minRecordId = RecordId(),
-                           const RecordId& maxRecordId = RecordId());
-
-    /**
-     * Compacts this WiredTiger table to attempt to reduce its storage space.
-     */
-    StatusWith<int64_t> wtCompact(OperationContext* opCtx,
-                                  WiredTigerRecoveryUnitBase& wtRu,
-                                  const CompactOptions& options);
-
-    const std::string _uri;
-    const uint64_t _tableId;  // not persisted
-    const std::string _engineName;
-    const KeyFormat _keyFormat;
-    const bool _overwrite;
-    const bool _isLogged;
-    const bool _forceUpdateWithFullDocument;
-};
-
-class WiredTigerRecordStore : public WiredTigerRecordStoreBase {
-public:
-    class Capped;
-    class Oplog;
-
-    struct Params {
-        WiredTigerRecordStoreBase::Params baseParams;
-        bool inMemory;
-        WiredTigerSizeStorer* sizeStorer;
-        bool tracksSizeAdjustments;
-    };
-
-    WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
-                          WiredTigerRecoveryUnitBase&,
-                          Params params);
-
-    ~WiredTigerRecordStore() override;
 
     long long dataSize() const override;
 
@@ -322,7 +245,65 @@ public:
     void setDataSize(long long dataSize);
 
 protected:
-    RecoveryUnit& getRecoveryUnit(RecoveryUnit&) const override;
+    // Encapsulates statistics for an operation performed on this RecordStore instance.
+    struct OpStats {
+        int64_t keyLength{0};
+        int64_t oldValueLength{0};
+        int64_t newValueLength{0};
+    };
+
+    RecoveryUnit& getRecoveryUnit(RecoveryUnit&) const;
+
+    /**
+     * Deletes the specified record from this WiredTiger table. Resets 'opStats' before populating
+     * it with statistics corresponding to this operation.
+     */
+    void wtDeleteRecord(OperationContext*,
+                        WiredTigerRecoveryUnitBase& wtRu,
+                        const RecordId&,
+                        OpStats& opStats);
+
+    /**
+     * Inserts the given record into this WiredTiger table. Returns error if the record could not be
+     * inserted due to errors like duplicate key error. Resets 'opStats' before populating it with
+     * statistics corresponding to this operation.
+     */
+    Status wtInsertRecord(OperationContext*,
+                          WiredTigerRecoveryUnitBase& wtRu,
+                          WT_CURSOR* c,
+                          const Record& record,
+                          OpStats& opStats);
+
+    /**
+     * Updates the given record in this WiredTiger table. Resets 'opStats' before populating it with
+     * statistics corresponding to this operation.
+     */
+    Status wtUpdateRecord(OperationContext* opCtx,
+                          WiredTigerRecoveryUnitBase& wtRu,
+                          const RecordId& id,
+                          const char* data,
+                          int len,
+                          OpStats& opStats);
+
+    /**
+     * Deletes all records in this WiredTiger table.
+     */
+    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnitBase& wtRu);
+
+    /**
+     * Deletes all Records in the range [minRecordId, maxRecordId].
+     */
+    Status wtRangeTruncate(OperationContext* opCtx,
+                           WiredTigerRecoveryUnitBase& wtRu,
+                           const RecordId& minRecordId = RecordId(),
+                           const RecordId& maxRecordId = RecordId());
+
+    /**
+     * Compacts this WiredTiger table to attempt to reduce its storage space.
+     */
+    StatusWith<int64_t> wtCompact(OperationContext* opCtx,
+                                  WiredTigerRecoveryUnitBase& wtRu,
+                                  const CompactOptions& options);
 
     void _deleteRecord(OperationContext*, RecoveryUnit&, const RecordId&) override;
 
@@ -394,7 +375,13 @@ protected:
      */
     void _updateLargestRecordId(OperationContext* opCtx, RecoveryUnit& ru, long long largestSeen);
 
-    // True if the storage engine is an in-memory storage engine
+    const std::string _uri;
+    const uint64_t _tableId;  // not persisted
+    const std::string _engineName;
+    const KeyFormat _keyFormat;
+    const bool _overwrite;
+    const bool _isLogged;
+    const bool _forceUpdateWithFullDocument;
     const bool _inMemory;
 
     // Protects initialization of the _nextIdNum.
@@ -490,7 +477,7 @@ class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {
 public:
     WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
                                     RecoveryUnit& ru,
-                                    const WiredTigerRecordStoreBase& rs,
+                                    const WiredTigerRecordStore& rs,
                                     bool forward);
 
     /**

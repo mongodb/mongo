@@ -205,7 +205,7 @@ public:
     }
 
     Status validateCollectionStorageOptions(const BSONObj& options) const override {
-        return WiredTigerRecordStoreBase::parseOptionsField(options).getStatus();
+        return WiredTigerRecordStore::parseOptionsField(options).getStatus();
     }
 
     Status validateIndexStorageOptions(const BSONObj& options) const override {

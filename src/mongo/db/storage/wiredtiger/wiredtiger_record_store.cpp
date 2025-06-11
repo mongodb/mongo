@@ -181,7 +181,7 @@ MONGO_FAIL_POINT_DEFINE(WTRecordStoreUassertOutOfOrder);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
-StatusWith<std::string> WiredTigerRecordStoreBase::parseOptionsField(const BSONObj options) {
+StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
     StringBuilder ss;
     for (auto&& elem : options) {
         if (elem.fieldNameStringData() == WiredTigerUtil::kConfigStringField) {
@@ -200,9 +200,9 @@ StatusWith<std::string> WiredTigerRecordStoreBase::parseOptionsField(const BSONO
     return StatusWith<std::string>(ss.str());
 }
 
-std::string WiredTigerRecordStoreBase::generateCreateString(
+std::string WiredTigerRecordStore::generateCreateString(
     StringData tableName,
-    const WiredTigerRecordStoreBase::WiredTigerTableConfig& wtTableConfig,
+    const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
     bool isOplog) {
 
     // Separate out a prefix and suffix in the default string. User configuration will
@@ -265,22 +265,10 @@ std::string WiredTigerRecordStoreBase::generateCreateString(
     return ss;
 }
 
-WiredTigerRecordStoreBase::WiredTigerRecordStoreBase(Params params)
-    : RecordStoreBase(params.uuid, params.ident),
-      _uri(WiredTigerUtil::kTableUriPrefix + params.ident),
-      _tableId(WiredTigerUtil::genTableId()),
-      _engineName(params.engineName),
-      _keyFormat(params.keyFormat),
-      _overwrite(params.overwrite),
-      _isLogged(params.isLogged),
-      _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument) {
-    invariant(getIdent().size() > 0);
-}
-
-void WiredTigerRecordStoreBase::wtDeleteRecord(OperationContext* opCtx,
-                                               WiredTigerRecoveryUnitBase& wtRu,
-                                               const RecordId& id,
-                                               OpStats& opStats) {
+void WiredTigerRecordStore::wtDeleteRecord(OperationContext* opCtx,
+                                           WiredTigerRecoveryUnitBase& wtRu,
+                                           const RecordId& id,
+                                           OpStats& opStats) {
     opStats = OpStats{};
     opStats.keyLength = computeRecordIdSize(id);
 
@@ -321,11 +309,11 @@ void WiredTigerRecordStoreBase::wtDeleteRecord(OperationContext* opCtx,
     invariantWTOK(ret, c->session);
 }
 
-Status WiredTigerRecordStoreBase::wtInsertRecord(OperationContext* opCtx,
-                                                 WiredTigerRecoveryUnitBase& wtRu,
-                                                 WT_CURSOR* c,
-                                                 const Record& record,
-                                                 OpStats& opStats) {
+Status WiredTigerRecordStore::wtInsertRecord(OperationContext* opCtx,
+                                             WiredTigerRecoveryUnitBase& wtRu,
+                                             WT_CURSOR* c,
+                                             const Record& record,
+                                             OpStats& opStats) {
     opStats = OpStats{};
 
     CursorKey key = makeCursorKey(record.id, _keyFormat);
@@ -360,12 +348,12 @@ Status WiredTigerRecordStoreBase::wtInsertRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStoreBase::wtUpdateRecord(OperationContext* opCtx,
-                                                 WiredTigerRecoveryUnitBase& wtRu,
-                                                 const RecordId& id,
-                                                 const char* data,
-                                                 int len,
-                                                 OpStats& opStats) {
+Status WiredTigerRecordStore::wtUpdateRecord(OperationContext* opCtx,
+                                             WiredTigerRecoveryUnitBase& wtRu,
+                                             const RecordId& id,
+                                             const char* data,
+                                             int len,
+                                             OpStats& opStats) {
     opStats = OpStats{};
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
@@ -438,8 +426,8 @@ Status WiredTigerRecordStoreBase::wtUpdateRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStoreBase::wtTruncate(OperationContext* opCtx,
-                                             WiredTigerRecoveryUnitBase& wtRu) {
+Status WiredTigerRecordStore::wtTruncate(OperationContext* opCtx,
+                                         WiredTigerRecoveryUnitBase& wtRu) {
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor startWrap(std::move(cursorParams), _uri, *wtRu.getSession());
     WT_CURSOR* start = startWrap.get();
@@ -459,10 +447,10 @@ Status WiredTigerRecordStoreBase::wtTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStoreBase::wtRangeTruncate(OperationContext* opCtx,
-                                                  WiredTigerRecoveryUnitBase& wtRu,
-                                                  const RecordId& minRecordId,
-                                                  const RecordId& maxRecordId) {
+Status WiredTigerRecordStore::wtRangeTruncate(OperationContext* opCtx,
+                                              WiredTigerRecoveryUnitBase& wtRu,
+                                              const RecordId& minRecordId,
+                                              const RecordId& maxRecordId) {
     auto cursorParams = getWiredTigerCursorParams(wtRu, _tableId, true /* allowOverwrite */);
     WiredTigerCursor startWrap(std::move(cursorParams), _uri, *wtRu.getSession());
     WT_CURSOR* start = startWrap.get();
@@ -503,9 +491,9 @@ Status WiredTigerRecordStoreBase::wtRangeTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<int64_t> WiredTigerRecordStoreBase::wtCompact(OperationContext* opCtx,
-                                                         WiredTigerRecoveryUnitBase& wtRu,
-                                                         const CompactOptions& options) {
+StatusWith<int64_t> WiredTigerRecordStore::wtCompact(OperationContext* opCtx,
+                                                     WiredTigerRecoveryUnitBase& wtRu,
+                                                     const CompactOptions& options) {
     WiredTigerConnection* connection = wtRu.getConnection();
     if (connection->isEphemeral()) {
         return 0;
@@ -638,7 +626,14 @@ private:
 WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
                                              WiredTigerRecoveryUnitBase& ru,
                                              Params params)
-    : WiredTigerRecordStoreBase(std::move(params.baseParams)),
+    : RecordStoreBase(params.uuid, params.ident),
+      _uri(WiredTigerUtil::kTableUriPrefix + params.ident),
+      _tableId(WiredTigerUtil::genTableId()),
+      _engineName(params.engineName),
+      _keyFormat(params.keyFormat),
+      _overwrite(params.overwrite),
+      _isLogged(params.isLogged),
+      _forceUpdateWithFullDocument(params.forceUpdateWithFullDocument),
       _inMemory(params.inMemory),
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
@@ -1460,13 +1455,13 @@ WiredTigerRecordStore::Oplog::Oplog(WiredTigerKVEngine* engine,
                                     Params oplogParams)
     : Capped(engine,
              ru,
-             {.baseParams{.uuid = oplogParams.uuid,
-                          .ident = oplogParams.ident,
-                          .engineName = oplogParams.engineName,
-                          .keyFormat = KeyFormat::Long,
-                          .overwrite = true,
-                          .isLogged = true,
-                          .forceUpdateWithFullDocument = oplogParams.forceUpdateWithFullDocument},
+             {.uuid = oplogParams.uuid,
+              .ident = oplogParams.ident,
+              .engineName = oplogParams.engineName,
+              .keyFormat = KeyFormat::Long,
+              .overwrite = true,
+              .isLogged = true,
+              .forceUpdateWithFullDocument = oplogParams.forceUpdateWithFullDocument,
               .inMemory = oplogParams.inMemory,
               .sizeStorer = oplogParams.sizeStorer,
               .tracksSizeAdjustments = oplogParams.tracksSizeAdjustments}),
@@ -1667,8 +1662,10 @@ Status WiredTigerRecordStore::Oplog::_insertRecords(OperationContext* opCtx,
     return Status::OK();
 }
 
-WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(
-    OperationContext* opCtx, RecoveryUnit& ru, const WiredTigerRecordStoreBase& rs, bool forward)
+WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
+                                                                 RecoveryUnit& ru,
+                                                                 const WiredTigerRecordStore& rs,
+                                                                 bool forward)
     : _tableId(rs.tableId()),
       _opCtx(opCtx),
       _ru(&ru),
