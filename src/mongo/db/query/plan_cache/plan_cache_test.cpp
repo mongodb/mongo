@@ -2146,7 +2146,8 @@ TEST_F(PlanCacheTest, PlanCacheMaxSizeParameterCanBeZero) {
 // QS hashing.
 //
 
-TEST_F(CachePlanSelectionTest, RecoveredSolutionWithMatchExpressionHasTaggedMatchExpressionHash) {
+TEST_F(CachePlanSelectionTest,
+       RecoveredSolutionWithMatchExpressionHasTheSameTaggedMatchExpressionHash) {
     addIndex(BSON("x" << 1), "x_1");
     addIndex(BSON("y" << 1), "y_1");
 
@@ -2159,11 +2160,6 @@ TEST_F(CachePlanSelectionTest, RecoveredSolutionWithMatchExpressionHasTaggedMatc
     ASSERT_NE(0, bestSoln->taggedMatchExpressionHash);
 
     auto planSoln = planQueryFromCache(query, {}, {}, {}, *bestSoln);
-
-    // TODO (SERVER-101922): Change this to be an equality check against bestSoln.
-    // Ensure that the taggedMatchExpressionHash is set. Since the index order can change, we cannot
-    // assert that bestSoln->taggedMatchExpressionHash == planSoln->taggedMatchExpressionHash, just
-    // that planSoln->taggedMatchExpressionHash is set to something.
     ASSERT_EQ(bestSoln->taggedMatchExpressionHash, planSoln->taggedMatchExpressionHash);
 }
 
