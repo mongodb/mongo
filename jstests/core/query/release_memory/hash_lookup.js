@@ -44,6 +44,16 @@ const sbeIncreasedSpillingInitialValue = getServerParameter(sbeIncreasedSpilling
 // HashLookup in SBE might use HashAgg. We want to control spilling. Disable increased spilling.
 setServerParameter(sbeIncreasedSpillingKnob, "never");
 
+// For _internalInhibitOptimization tests, prevent DSCursor from reading all the data in a single
+// batch.
+const dsCursorKnobs =
+    ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
+const dsCursorKnobValues = [];
+for (const knob of dsCursorKnobs) {
+    dsCursorKnobValues.push(getServerParameter(knob));
+    setServerParameter(knob, 1);
+}
+
 const students = db[jsTestName() + "_students"];
 students.drop();
 const people = db[jsTestName() + "_people"];
@@ -82,8 +92,15 @@ const lookupWithoutPipeline = [
     {$lookup: {from: students.getName(), localField: "name", foreignField: "name", as: "matched"}}
 ];
 
-for (let {localColl, pipeline} of [{localColl: people, pipeline: lookupWithPipeline},
-                                   {localColl: people, pipeline: lookupWithoutPipeline}]) {
+const tests = [];
+for (let pipeline of [lookupWithPipeline, lookupWithoutPipeline]) {
+    tests.push({localColl: people, pipeline: pipeline});
+    // Add {$_internalInhibitOptimization: {}} to avoid pipeline elimination.
+    tests.push(
+        {localColl: students, pipeline: pipeline.concat([{$_internalInhibitOptimization: {}}])});
+}
+
+for (let {localColl, pipeline} of tests) {
     jsTest.log.info("Running pipeline: ", pipeline[0]);
 
     const explain = localColl.explain().aggregate(pipeline);
@@ -165,3 +182,6 @@ for (let {localColl, pipeline} of [{localColl: people, pipeline: lookupWithPipel
 }
 
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);
+for (let i = 0; i < dsCursorKnobs.length; i++) {
+    setServerParameter(dsCursorKnobs[i], dsCursorKnobValues[i]);
+}

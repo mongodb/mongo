@@ -1341,6 +1341,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:pipeline_visitor",
         "//src/mongo/db/query:plan_executor",
         "//src/mongo/db/query:plan_yield_policy",
+        "//src/mongo/db/query:plan_yield_policy_release_memory",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/ce/sampling:sampling_estimator_interface",

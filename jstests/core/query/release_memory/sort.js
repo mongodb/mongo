@@ -69,6 +69,11 @@ const pipelines = [
         {$sort: {index: 1, padding: 1}},
         {$project: {padding: 0}},  // Secondary sort on padding prevents projection pushdown.
     ],
+    [
+        {$sort: {index: 1, padding: 1}},  // Will be pushed down to find.
+        {$project: {padding: 0}},         // Secondary sort on padding prevents projection pushdown.
+        {$_internalInhibitOptimization: {}},  // Prevents the pipeline from being eliminated.
+    ],
 ];
 
 for (let pipeline of pipelines) {

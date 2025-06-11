@@ -183,8 +183,7 @@ public:
                 PlanExecutor* exec = cursorPin->getExecutor();
 
                 std::unique_ptr<PlanYieldPolicy> yieldPolicy = nullptr;
-                if (cursorPin->getExecutor()->lockPolicy() ==
-                    PlanExecutor::LockPolicy::kLockExternally) {
+                if (exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
                     yieldPolicy = PlanYieldPolicyReleaseMemory::make(
                         opCtx,
                         PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,

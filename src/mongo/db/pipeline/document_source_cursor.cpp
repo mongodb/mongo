@@ -41,6 +41,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_yield_policy_release_memory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -147,6 +148,16 @@ DocumentSource::GetNextResult DocumentSourceCursor::doGetNext() {
     }
 
     return _currentBatch.dequeue();
+}
+
+void DocumentSourceCursor::doForceSpill() {
+    if (!_exec || _exec->isDisposed()) {
+        return;
+    }
+    auto opCtx = pExpCtx->getOperationContext();
+    std::unique_ptr<PlanYieldPolicy> yieldPolicy = PlanYieldPolicyReleaseMemory::make(
+        opCtx, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, boost::none, _exec->nss());
+    _exec->forceSpill(yieldPolicy.get());
 }
 
 bool DocumentSourceCursor::pullDataFromExecutor(OperationContext* opCtx) {

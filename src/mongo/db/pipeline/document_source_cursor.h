@@ -211,6 +211,8 @@ protected:
 
     GetNextResult doGetNext() final;
 
+    void doForceSpill() final;
+
     ~DocumentSourceCursor() override;
 
     /**
