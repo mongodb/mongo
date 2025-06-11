@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/generic_cursor_utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -81,6 +82,35 @@ Status cursorInUseStatus(CursorId cursorId, StringData commandUsingCursor) {
     } else {
         return {ErrorCodes::CursorInUse, std::move(reason)};
     }
+}
+
+// TODO SPM-4207 This function should not need to take a CursorId and a namespace, when it already
+// takes a cursor.
+GenericCursor cursorToGenericCursor(ClusterClientCursor* cursor,
+                                    CursorId cursorId,
+                                    const NamespaceString& nss) {
+    invariant(cursor);
+    GenericCursor gc;
+    gc.setCursorId(cursorId);
+    gc.setNs(nss);
+    gc.setLsid(cursor->getLsid());
+    gc.setTxnNumber(cursor->getTxnNumber());
+    gc.setNDocsReturned(cursor->getNumReturnedSoFar());
+    gc.setTailable(cursor->isTailable());
+    gc.setAwaitData(cursor->isTailableAndAwaitData());
+    gc.setOriginatingCommand(cursor->getOriginatingCommand());
+    gc.setLastAccessDate(cursor->getLastUseDate());
+    gc.setCreatedDate(cursor->getCreatedDate());
+    gc.setNBatchesReturned(cursor->getNBatches());
+    if (auto memoryTracker = cursor->getMemoryUsageTracker()) {
+        if (auto inUseMemBytes = memoryTracker->currentMemoryBytes()) {
+            gc.setInUseMemBytes(inUseMemBytes);
+        }
+        if (auto maxUsedMemBytes = memoryTracker->maxMemoryBytes()) {
+            gc.setMaxUsedMemBytes(maxUsedMemBytes);
+        }
+    }
+    return gc;
 }
 
 }  // namespace
@@ -140,20 +170,7 @@ CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
 }
 
 GenericCursor ClusterCursorManager::PinnedCursor::toGenericCursor() const {
-    invariant(_cursor);
-    GenericCursor gc;
-    gc.setCursorId(getCursorId());
-    gc.setNs(_nss);
-    gc.setLsid(_cursor->getLsid());
-    gc.setTxnNumber(_cursor->getTxnNumber());
-    gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
-    gc.setTailable(_cursor->isTailable());
-    gc.setAwaitData(_cursor->isTailableAndAwaitData());
-    gc.setOriginatingCommand(_cursor->getOriginatingCommand());
-    gc.setLastAccessDate(_cursor->getLastUseDate());
-    gc.setCreatedDate(_cursor->getCreatedDate());
-    gc.setNBatchesReturned(_cursor->getNBatches());
-    return gc;
+    return cursorToGenericCursor(_cursor.get(), getCursorId(), _nss);
 }
 
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
@@ -548,20 +565,8 @@ void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) cons
 
 GenericCursor ClusterCursorManager::CursorEntry::cursorToGenericCursor(
     CursorId cursorId, const NamespaceString& ns) const {
-    invariant(_cursor);
-    GenericCursor gc;
-    gc.setCursorId(cursorId);
-    gc.setNs(ns);
-    gc.setCreatedDate(_cursor->getCreatedDate());
-    gc.setLastAccessDate(_cursor->getLastUseDate());
-    gc.setLsid(_cursor->getLsid());
-    gc.setTxnNumber(_cursor->getTxnNumber());
-    gc.setNDocsReturned(_cursor->getNumReturnedSoFar());
-    gc.setTailable(_cursor->isTailable());
-    gc.setAwaitData(_cursor->isTailableAndAwaitData());
-    gc.setOriginatingCommand(_cursor->getOriginatingCommand());
+    GenericCursor gc = ::mongo::cursorToGenericCursor(_cursor.get(), cursorId, ns);
     gc.setNoCursorTimeout(getLifetimeType() == CursorLifetime::Immortal);
-    gc.setNBatchesReturned(_cursor->getNBatches());
     return gc;
 }
 

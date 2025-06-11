@@ -209,6 +209,14 @@ GenericCursor ClientCursor::toGenericCursor() const {
     gc.setLastAccessDate(getLastUseDate());
     gc.setCreatedDate(getCreatedDate());
     gc.setNBatchesReturned(getNBatches());
+    if (_memoryUsageTracker) {
+        if (auto inUseMemBytes = _memoryUsageTracker->currentMemoryBytes()) {
+            gc.setInUseMemBytes(inUseMemBytes);
+        }
+        if (auto maxUsedMemBytes = _memoryUsageTracker->maxMemoryBytes()) {
+            gc.setMaxUsedMemBytes(maxUsedMemBytes);
+        }
+    }
     gc.setPlanSummary(getPlanSummary());
     if (auto opCtx = _operationUsingCursor) {
         gc.setOperationUsingCursorId(opCtx->getOpID());

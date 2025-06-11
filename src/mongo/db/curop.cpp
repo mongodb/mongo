@@ -816,6 +816,8 @@ BSONObj CurOp::truncateAndSerializeGenericCursor(GenericCursor cursor,
     cursor.setLsid(boost::none);
     cursor.setNs(boost::none);
     cursor.setPlanSummary(boost::none);
+    cursor.setInUseMemBytes(boost::none);
+    cursor.setMaxUsedMemBytes(boost::none);
     return cursor.toBSON();
 }
 

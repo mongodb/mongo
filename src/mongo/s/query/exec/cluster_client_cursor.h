@@ -295,6 +295,10 @@ public:
         return std::move(_memoryTracker);
     }
 
+    OperationMemoryUsageTracker* getMemoryUsageTracker() const {
+        return _memoryTracker.get();
+    }
+
     void setMemoryUsageTracker(std::unique_ptr<OperationMemoryUsageTracker> memoryTracker) {
         _memoryTracker = std::move(memoryTracker);
     }

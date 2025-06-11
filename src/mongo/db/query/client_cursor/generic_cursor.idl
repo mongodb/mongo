@@ -104,3 +104,13 @@ structs:
                     returned."
                 type: optime
                 optional: true
+            inUseMemBytes:
+                description: The number of bytes in use by the query associated with the cursor.
+                type: long
+                optional: true
+            maxUsedMemBytes:
+                description:
+                    "The most number of bytes observed in use at any one time by the query
+                    associated with the cursor."
+                type: long
+                optional: true

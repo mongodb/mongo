@@ -67,6 +67,18 @@ function runTest(conn, db, coll) {
     ]);
 }
 
+function assertCurrentOpOutput(memoryTrackingEnabled, curOpDoc) {
+    if (memoryTrackingEnabled) {
+        assert(curOpDoc.hasOwnProperty("inUseMemBytes"), tojson(curOpDoc));
+        assert.gt(curOpDoc.inUseMemBytes, 0);
+        assert(curOpDoc.hasOwnProperty("maxUsedMemBytes"), tojson(curOpDoc));
+        assert.gt(curOpDoc.maxUsedMemBytes, 0);
+    } else {
+        assert(!curOpDoc.hasOwnProperty("inUseMemBytes"), tojson(curOpDoc));
+        assert(!curOpDoc.hasOwnProperty("maxUsedMemBytes"), tojson(curOpDoc));
+    }
+}
+
 function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
     const memoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
     jsTestLog(`Checking $currentOp for stage ${stageName} with memory tracking ` +
@@ -90,8 +102,8 @@ function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
     let getMoreShell = startParallelShell(
         funWithArgs(function(dbName, cursorId, collName, sessionId) {
             const testDb = db.getSiblingDB(dbName);
-            assert.commandWorked(
-                testDb.runCommand({getMore: cursorId, collection: collName, lsid: sessionId}));
+            assert.commandWorked(testDb.runCommand(
+                {getMore: cursorId, collection: collName, lsid: sessionId, batchSize: 1}));
         }, db.getName(), NumberLong(cursorId), coll.getName(), sessionId), conn.port);
 
     // Wait for the getMore to be blocked on the failpoint
@@ -99,26 +111,28 @@ function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
 
     // Find the current operation for the getMore blocked command. We need to specify "localOps" to
     // see operations on mongos. This flag has no effect on a standalone mongod.
-    const curOpDocs =
+    let curOpDocs =
         db.getSiblingDB("admin")
             .aggregate([{$currentOp: {localOps: true}}, {$match: {"lsid.id": sessionId.id}}])
             .toArray();
     assert.eq(curOpDocs.length, 1, "Expected one current operation for the getMore command");
 
-    let curOp = curOpDocs[0];
-    if (memoryTrackingEnabled) {
-        assert(curOp.hasOwnProperty("inUseMemBytes"), tojson(curOp));
-        assert.gt(curOp.inUseMemBytes, 0);
-        assert(curOp.hasOwnProperty("maxUsedMemBytes"), tojson(curOp));
-        assert.gt(curOp.maxUsedMemBytes, 0);
-    } else {
-        assert(!curOp.hasOwnProperty("inUseMemBytes"), tojson(curOp));
-        assert(!curOp.hasOwnProperty("maxUsedMemBytes"), tojson(curOp));
-    }
+    assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
 
     // Unblock the getMore command and wait for it to finish.
     failPoint.off();
     getMoreShell();
+
+    // Now check that we also report memory stats for an idle cursor.
+    curOpDocs = db.getSiblingDB("admin")
+                    .aggregate([
+                        {$currentOp: {localOps: true, idleCursors: true}},
+                        {$match: {"lsid.id": sessionId.id, "type": "idleCursor"}}
+                    ])
+                    .toArray();
+    assert.eq(curOpDocs.length, 1, "Expected one idle cursor for unfinished query");
+    assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
+
     session.endSession();
 }
 
