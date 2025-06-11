@@ -401,15 +401,18 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
         tassert(
             6515700, "Expected document to have an _id field present", bsonObjDoc.hasField("_id"));
         applyOpsBytes += bsonObjDoc.getField("_id").size();
-        if (applyOpsBytes > BSONObjMaxUserSize) {
+        if (applyOpsBytes > BSONObjMaxUserSize && ((*bufferOffset) > 0)) {
             // There's no room to fit this deletion in the current batch, as doing so
             // would exceed 16MB of oplog entry: put this deletion back into the staging
-            // buffer and commit the batch.
-            invariant(*bufferOffset > 0);
+            // buffer and commit the batch. Very large _id fields may exceed this threshold. In that
+            // case, put them in their own batch.
             (*bufferOffset)--;
             wuow.commit();
             return batchTimer.millis();
         }
+        tassert(10118000,
+                "batch size may only exceed BSON cap for single, large documents",
+                applyOpsBytes <= BSONObjMaxUserSize || ((*bufferOffset) == 0));
 
         collection_internal::deleteDocument(
             opCtx(),
