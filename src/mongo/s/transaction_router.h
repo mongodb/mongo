@@ -157,6 +157,15 @@ public:
         bool isSubRouter{false};
     };
 
+    /**
+     * Struct containing the parsed response status and the metadata containing potential additional
+     * transaction participants.
+     */
+    struct ParsedParticipantResponseMetadata {
+        Status status;
+        TxnResponseMetadata txnResponseMetadata;
+    };
+
     // Container for timing stats for the current transaction. Includes helpers for calculating some
     // metrics like transaction duration.
     struct TimingStats {
@@ -402,12 +411,22 @@ public:
                                         const BSONObj& cmdObj);
 
         /**
+         * Parse the transaction metadata from the response.
+         * This can be used to extract just the response status and the response metadata containing
+         * transaction participants, so it can be stored elsewhere for further processing. This is
+         * advantageous to storing the complete, unparsed response in memory because the status and
+         * transaction participants metadata will typically be much smaller.
+         */
+        static ParsedParticipantResponseMetadata parseParticipantResponseMetadata(
+            const BSONObj& responseObj);
+
+        /**
          * Processes the transaction metadata in the response from the participant if the response
          * indicates the operation succeeded.
          */
         void processParticipantResponse(OperationContext* opCtx,
                                         const ShardId& shardId,
-                                        const BSONObj& responseObj,
+                                        const ParsedParticipantResponseMetadata& parsedMetadata,
                                         bool forAsyncGetMore = false);
 
         /**

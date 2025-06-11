@@ -82,12 +82,11 @@ int compareSortKeys(const BSONObj& leftSortKey,
 
 void processAdditionalTransactionParticipantFromResponse(
     OperationContext* opCtx,
-    const ShardId& shardId,
-    const BSONObj& originalResponse,
+    const AsyncResultsMerger::RemoteResponse& response,
     const ServerGlobalParams::FCVSnapshot& fcvSnapshot) {
     if (gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
         transaction_request_sender_details::processReplyMetadataForAsyncGetMore(
-            opCtx, shardId, originalResponse);
+            opCtx, response.shardId, response.parsedMetadata);
     }
 }
 
@@ -580,8 +579,7 @@ void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationCont
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     while (!_remoteResponses.empty()) {
         const auto& response = _remoteResponses.front();
-        processAdditionalTransactionParticipantFromResponse(
-            opCtx, response.shardId, response.originalResponse, fcvSnapshot);
+        processAdditionalTransactionParticipantFromResponse(opCtx, response, fcvSnapshot);
         _remoteResponses.pop();
     }
 }
@@ -1052,16 +1050,14 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     if (parsedResponse.isOK()) {
         if (const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             gFeatureFlagAllowAdditionalParticipants.isEnabled(fcvSnapshot)) {
-            // We store the original unprocessed response in order to process additional/
-            // transaction participants when reading it. Additional transaction participants
-            // processing cannot occur here since access to the underlying transaction router is not
-            // thread-safe.
-            //
-            // To avoid memory issues we delay processing until the actual owner thread of the
-            // TransactionRouter reads the responses. As this operation can occur after a while
-            // the BSON must be owned since otherwise we would be pointing to invalid memory.
-            invariant(cbData.response.data.isOwned());
-            _remoteResponses.emplace(remote->shardId, cbData.response.data);
+            // Here we buffer the parsed parts of the response pertaining to additional transaction
+            // participants. Additional transaction participants processing cannot occur here
+            // directly since access to the underlying transaction router is not thread-safe.
+            _remoteResponses.push(
+                {.shardId = remote->shardId,
+                 .parsedMetadata = TransactionRouter::Router::parseParticipantResponseMetadata(
+                     cbData.response.data)});
+            // To avoid data race issues we delay processing until the actual owner thread of the
         }
     }
 

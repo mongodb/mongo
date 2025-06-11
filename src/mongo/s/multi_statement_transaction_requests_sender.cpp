@@ -36,9 +36,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 
 #include <utility>
 
@@ -46,16 +44,18 @@ namespace mongo {
 
 namespace transaction_request_sender_details {
 namespace {
-void processReplyMetadata(OperationContext* opCtx,
-                          const ShardId& shardId,
-                          const BSONObj& responseBson,
-                          bool forAsyncGetMore = false) {
+
+void processReplyMetadata(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse,
+    bool forAsyncGetMore = false) {
     auto txnRouter = TransactionRouter::get(opCtx);
     if (!txnRouter) {
         return;
     }
 
-    txnRouter.processParticipantResponse(opCtx, shardId, responseBson, forAsyncGetMore);
+    txnRouter.processParticipantResponse(opCtx, shardId, parsedResponse, forAsyncGetMore);
 }
 }  // namespace
 
@@ -96,14 +96,18 @@ void processReplyMetadata(OperationContext* opCtx,
         return;
     }
 
-    processReplyMetadata(
-        opCtx, response.shardId, response.swResponse.getValue().data, forAsyncGetMore);
+    processReplyMetadata(opCtx,
+                         response.shardId,
+                         TransactionRouter::Router::parseParticipantResponseMetadata(
+                             response.swResponse.getValue().data),
+                         forAsyncGetMore);
 }
 
-void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
-                                         const ShardId& shardId,
-                                         const BSONObj& responseBson) {
-    processReplyMetadata(opCtx, shardId, responseBson, true /* forAsyncGetMore */);
+void processReplyMetadataForAsyncGetMore(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse) {
+    processReplyMetadata(opCtx, shardId, parsedResponse, true /* forAsyncGetMore */);
 }
 
 }  // namespace transaction_request_sender_details

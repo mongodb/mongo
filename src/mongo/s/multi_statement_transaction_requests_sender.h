@@ -35,6 +35,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/transaction_router.h"
 
 #include <memory>
 #include <vector>
@@ -48,9 +49,17 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
 void processReplyMetadata(OperationContext* opCtx,
                           const AsyncRequestsSender::Response& response,
                           bool forAsyncGetMore = false);
-void processReplyMetadataForAsyncGetMore(OperationContext* opCtx,
-                                         const ShardId& shardId,
-                                         const BSONObj& responseBson);
+
+/**
+ * Process metadata for an asynchronous getMore reply of type 'ParsedParticipantResponseMetadata'.
+ * This will add additional transaction participants to the transaction router in case the reply
+ * contains additional participants in its metadata.
+ */
+void processReplyMetadataForAsyncGetMore(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const TransactionRouter::ParsedParticipantResponseMetadata& parsedResponse);
+
 }  // namespace transaction_request_sender_details
 
 /**

@@ -66,23 +66,52 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
             }
             if (swResponse.isOK()) {
                 ReplyType reply = swResponse.getValue();
-                GenericReplyFields gens = reply.genericReplyFields;
-                // The TransactionRouter expects a raw-BSON command-response
-                // in its API for processing transaction metadata. The async_rpc API
-                // doesn't expose the raw-BSON of the response in the case of command-success,
-                // so we construct a fake one for now to appease the TxnRouter API.
-                auto fakeResponseObj = [&] {
-                    BSONObjBuilder bob;
-                    gens.serialize(&bob);
-                    return bob.obj();
-                }();
-                txnRouter.processParticipantResponse(opCtx, shardId, fakeResponseObj);
+                const GenericReplyFields& gens = reply.genericReplyFields;
+
+                // Extract the transaction-related metadata from the response.
+                // TODO SERVER-106098: remove this implicit coupling between this file and the
+                // 'TxnResponseMetadata'. It would be better if 'TransactionRouter' provided a
+                // function that creates a 'TxnResponseMetadata' object from the generic reply
+                // fields, so that all knowledge about what makes a 'TxnResponseMetadata' stays
+                // within the 'TransactionRouter'.
+                TxnResponseMetadata txnResponseMetadata;
+                txnResponseMetadata.setReadOnly(gens.getReadOnly());
+
+                // If the response contains additional transaction participants, we need to convert
+                // them from their BSON representation to the internal representation first.
+                if (const auto& additionalParticipants = gens.getAdditionalParticipants()) {
+                    if (!additionalParticipants->empty()) {
+                        std::vector<AdditionalParticipantInfo> converted;
+                        std::transform(additionalParticipants->begin(),
+                                       additionalParticipants->end(),
+                                       std::back_inserter(converted),
+                                       [](const BSONObj& participantBSON) {
+                                           return AdditionalParticipantInfo::parse(
+                                               IDLParserContext("AdditionalTransactionParticipant"),
+                                               participantBSON);
+                                       });
+                        txnResponseMetadata.setAdditionalParticipants(std::move(converted));
+                    }
+                }
+
+                // We only get here after the API has already unrolled the response object and has
+                // verified that the response has an OK status. That means we can assume successful
+                // execution of the RPC, and can use 'Status::OK()' as the only possible status when
+                // constructing the additional participant metadata below.
+                txnRouter.processParticipantResponse(
+                    opCtx,
+                    shardId,
+                    {.status = Status::OK(),
+                     .txnResponseMetadata = std::move(txnResponseMetadata)});
             } else {
                 auto extraInfo = swResponse.getStatus().template extraInfo<AsyncRPCErrorInfo>();
                 if (extraInfo->isRemote()) {
                     auto remoteError = extraInfo->asRemote();
                     txnRouter.processParticipantResponse(
-                        opCtx, shardId, remoteError.getResponseObj());
+                        opCtx,
+                        shardId,
+                        TransactionRouter::Router::parseParticipantResponseMetadata(
+                            remoteError.getResponseObj()));
                 }
             }
             return swResponse;

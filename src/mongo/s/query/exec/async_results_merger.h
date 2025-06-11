@@ -46,6 +46,7 @@
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/s/query/exec/cluster_query_result.h"
 #include "mongo/s/query/exec/next_high_watermark_determining_strategy.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
@@ -103,6 +104,19 @@ public:
 
     // The expected sort key pattern when 'compareWholeSortKey' is true.
     static const BSONObj kWholeSortKeySortPattern;
+
+    /**
+     * Helper type for storing the additional transaction participants extracted from a shard
+     * response. We need to first buffer the metadata about additional transaction participants when
+     * we receive an async response in the network thread. This is because the async callback that
+     * runs in the network thread cannot access the OperationContext nor the transaction router in a
+     * safe way. The buffered metadata will be processed whenever the 'AsyncResultsMerger' is
+     * detached from the OperationContext or when the next ready event is consumed.
+     */
+    struct RemoteResponse {
+        ShardId shardId;
+        TransactionRouter::ParsedParticipantResponseMetadata parsedMetadata;
+    };
 
     /**
      * Factory function to create an 'AsyncResultsMerger' instance. Calling this method is the only
@@ -367,18 +381,6 @@ private:
     AsyncResultsMerger(OperationContext* opCtx,
                        std::shared_ptr<executor::TaskExecutor> executor,
                        AsyncResultsMergerParams params);
-
-    /**
-     * Contains the original response received by the shard. This is necessary for processing
-     * additional transaction participants.
-     */
-    struct RemoteResponse {
-        RemoteResponse(ShardId shardId, BSONObj originalResponse)
-            : shardId(std::move(shardId)), originalResponse(std::move(originalResponse)) {}
-
-        ShardId shardId;
-        BSONObj originalResponse;
-    };
 
     /**
      * We instantiate one of these per remote host. It contains the buffer of results we've
