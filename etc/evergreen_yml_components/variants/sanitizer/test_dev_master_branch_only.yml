@@ -340,8 +340,6 @@ buildvariants:
         --dbg=True
         --opt=on
         --build_enterprise=False
-        --developer_dir=/Applications/Xcode15.app
-        --use_apple_clang
     tasks:
       - name: compile_test_serial_TG
       - name: run_unit_tests_TG
@@ -356,64 +354,6 @@ buildvariants:
 
   - name: &enterprise-macos enterprise-macos
     display_name: "Enterprise macOS arm64 DEBUG"
-    tags: []
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    run_on:
-      - macos-14-arm64
-    expansions:
-      compile_variant: *enterprise-macos
-      test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-        --excludeWithAnyTags=incompatible_with_macos,requires_gcm
-      bazel_compile_flags: >-
-        --dbg=True
-        --opt=on
-        --developer_dir=/Applications/Xcode15.app
-        --use_apple_clang
-      resmoke_jobs_max: 6
-    tasks:
-      - name: compile_test_serial_TG
-      - name: run_unit_tests_TG
-      - name: audit
-      - name: auth_audit_gen
-      - name: fle
-      - name: fle2
-      - name: .jscore .common !.decimal !.sharding
-      - name: replica_sets_auth_gen
-      - name: sasl
-      - name: .crypt
-
-  - name: macos-oss-llvm-clang-debug-suggested
-    display_name: "* macOS arm64 DEBUG OSS LLVM Clang"
-    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
-    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
-    run_on:
-      - macos-14-arm64
-    expansions:
-      compile_variant: *macos-debug-suggested
-      test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos
-        --enableEnterpriseTests=off
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-      resmoke_jobs_max: 6
-      bazel_compile_flags: >-
-        --dbg=True
-        --opt=on
-        --build_enterprise=False
-    tasks:
-      - name: compile_test_serial_TG
-      - name: run_unit_tests_TG
-      - name: .development_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
-      - name: .development_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
-        distros:
-          - macos-14-arm64
-      - name: .release_critical !.requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
-      - name: .release_critical .requires_large_host !.incompatible_development_variant !.incompatible_community !.incompatible_mac !.requires_all_feature_flags
-        distros:
-          - macos-14-arm64
-
-  - name: enterprise-macos-oss-llvm-clang
-    display_name: "Enterprise macOS arm64 DEBUG OSS LLVM Clang"
     tags: []
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:

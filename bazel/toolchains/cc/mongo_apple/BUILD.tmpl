@@ -67,3 +67,20 @@ feature_attrs = get_common_features_attrs()
     )
     for arch, cpu in get_supported_apple_archs().items()
 ]
+
+[
+    toolchain(
+        name = "mongo_apple_" + arch + "_toolchain",
+        exec_compatible_with = [
+            "@platforms//os:macos",
+            "@platforms//cpu:" + cpu,
+        ],
+        target_compatible_with = [
+            "@platforms//os:macos",
+            "@platforms//cpu:" + cpu,
+        ],
+        toolchain = "@mongo_apple_toolchain//:cc-compiler-" + arch,
+        toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+    )
+    for arch, cpu in get_supported_apple_archs().items()
+]

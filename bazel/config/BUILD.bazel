@@ -17,7 +17,6 @@ load(
     "dbg_level",
     "debug_symbols",
     "detect_odr_violations",
-    "developer_dir",
     "disable_streams",
     "disable_warnings_as_errors",
     "dwarf_version",
@@ -92,18 +91,6 @@ config_setting(
     name = "compiler_type_msvc",
     flag_values = {
         "//bazel/config:compiler_type": "msvc",
-    },
-)
-
-bool_flag(
-    name = "apple_clang",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "use_apple_clang",
-    flag_values = {
-        ":apple_clang": "true",
     },
 )
 
@@ -2363,15 +2350,6 @@ selects.config_setting_group(
         ":linker_lld",
         "//bazel/config:not_amazon_linux_2023",
     ],
-)
-
-# --------------------------------------
-# developer dir
-# --------------------------------------
-
-developer_dir(
-    name = "developer_dir",
-    build_setting_default = "/Applications/Xcode.app",
 )
 
 # --------------------------------------
