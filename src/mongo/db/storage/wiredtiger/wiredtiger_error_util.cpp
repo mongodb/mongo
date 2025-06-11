@@ -164,7 +164,18 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
     fassert(28559, retCode != WT_PANIC || storageGlobalParams.repair);
 
-    auto s = generateContextStrStream(prefix, wiredtiger_strerror(retCode), retCode);
+    int err = 0;
+    int subLevelErr = WT_NONE;
+    const char* reason = "";
+    const char* strerror = wiredtiger_strerror(retCode);
+
+    if (session) {
+        session->get_last_error(session, &err, &subLevelErr, &reason);
+    }
+
+    // Combine the sublevel err context with the generic context
+    std::string errContext = std::string(strerror) + (reason ? " - " : "") + reason;
+    auto s = generateContextStrStream(prefix, errContext.c_str(), retCode);
 
     if (retCode == EINVAL) {
         return Status(ErrorCodes::BadValue, s);
