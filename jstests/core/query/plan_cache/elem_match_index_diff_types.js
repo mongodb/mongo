@@ -4,6 +4,8 @@
  * when the entry and predicate have different data types which affect index compatibility.
  *  @tags: [
  *    requires_getmore,
+ *    # explain command, used by the test, does not support majority read concern.
+ *    assumes_read_concern_local,
  *  ]
  */
 
