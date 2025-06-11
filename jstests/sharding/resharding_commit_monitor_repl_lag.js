@@ -17,6 +17,10 @@ import {ShardingTest} from 'jstests/libs/shardingtest.js';
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
+// To account for other writes, when checking that there is no majority replication lag, instead
+// of asserting that the lag is 0, we assert that it is less than the value below.
+const maxMajorityReplicationLagMillis = 25;
+
 function validateShardsvrReshardingOperationTimeResponse(res, isRecipient) {
     assert.eq(res.hasOwnProperty("majorityReplicationLagMillis"), true, res);
     assert.eq(res.hasOwnProperty("elapsedMillis"), isRecipient, res);
@@ -27,11 +31,13 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     const primary = participantRst.getPrimary();
 
     jsTest.log("Test the case where there is no replication lag on " + participantRst.name);
-    participantRst.awaitReplication();
-    const res0 = assert.commandWorked(
-        primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
-    validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
-    assert(res0.majorityReplicationLagMillis, 0, res0);
+    assert.soon(() => {
+        const res0 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res0));
+        validateShardsvrReshardingOperationTimeResponse(res0, isRecipient);
+        return res0.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+    });
 
     jsTest.log("Test the case where there is replication lag on only one secondary on " +
                participantRst.name);
@@ -44,7 +50,13 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     const res1 = assert.commandWorked(
         primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
     validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
-    assert(res1.majorityReplicationLagMillis, 0, res1);
+    assert.soon(() => {
+        const res1 = assert.commandWorked(
+            primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res1));
+        validateShardsvrReshardingOperationTimeResponse(res1, isRecipient);
+        return res1.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
+    });
 
     jsTest.log("Test the case where there is replication lag on both secondaries on " +
                participantRst.name);
@@ -68,8 +80,9 @@ function testShardsvrReshardingOperationTimeCmd(reshardingNs, participantRst, {i
     assert.soon(() => {
         const res3 = assert.commandWorked(
             primary.adminCommand({_shardsvrReshardingOperationTime: reshardingNs}));
+        jsTest.log("The latest _shardsvrReshardingOperationTime response: " + tojsononeline(res3));
         validateShardsvrReshardingOperationTimeResponse(res3, isRecipient);
-        return res3.majorityReplicationLagMillis == 0;
+        return res3.majorityReplicationLagMillis <= maxMajorityReplicationLagMillis;
     });
 
     restartServerReplication(participantRst.getSecondaries()[1]);
@@ -83,8 +96,9 @@ const st = new ShardingTest({
         // of the test cases below disables replication on one of the secondaries,
         // with chaining that would effectively disable replication on both
         // secondaries, causing the test case to to fail since writeConcern of w:
-        // majority is unsatisfiable.
-        settings: {chainingAllowed: false},
+        // majority is unsatisfiable. Also, lower the heartbeat interval to reduce the time it takes
+        // to wait for the majority commit point to advance.
+        settings: {chainingAllowed: false, heartbeatIntervalMillis: 100},
     }
 });
 
