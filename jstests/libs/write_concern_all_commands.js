@@ -5855,17 +5855,14 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
 
         // TODO SERVER-100938 createIndexes does not return WCE
 
-        // TODO SERVER-98461 findOneAndUpdate when query does not have shard key does not return WCE
-        // TODO SERVER-9XXXX findAndModify when query has shard key does not return WCE
-
         // TODO SERVER-100940 enableSharding does not return WCE
         if (clusterType == "sharded" &&
                 shardedDDLCommandsRequiringMajorityCommit.includes(command) ||
             command == "createIndexes" || command == "createRole" || command == "createUser" ||
             command == "dropRole" || command == "dropUser" || command == "grantRolesToUser" ||
             command == "updateRole" || command == "updateUser" ||
-            command == "setDefaultRWConcern" || (command == "findOneAndUpdate") ||
-            (command == "findAndModify") || (TestData.configShard && command == "enableSharding")) {
+            command == "setDefaultRWConcern" ||
+            (TestData.configShard && command == "enableSharding")) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
