@@ -192,7 +192,11 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
     if (const auto avg = stats().averageTimeQueuedMicros.get()) {
         bob->append("averageTimeQueuedMicros", *avg);
     }
-    bob->append("totalAvailableTokens", tokensAvailable());
+
+    // FTDC consumers may not handle infinity, and so we append INT64_MAX instead.
+    bob->append("totalAvailableTokens",
+                static_cast<double>(std::min(static_cast<long double>(INT64_MAX),
+                                             static_cast<long double>(tokensAvailable()))));
 }
 
 double RateLimiter::tokensAvailable() const {
