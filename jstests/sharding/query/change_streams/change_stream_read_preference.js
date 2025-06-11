@@ -9,6 +9,7 @@ import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasSingleMatchingEntryOrThrow,
 } from "jstests/libs/profiler.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -53,17 +54,20 @@ assert.commandWorked(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}
 assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 // Test that change streams go to the primary by default.
+let primaryStreamTest = new ChangeStreamTest(mongosDB);
 let changeStreamComment = "change stream against primary";
-const primaryStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}],
-                                           {comment: changeStreamComment});
+const primaryStream = primaryStreamTest.startWatchingChanges({
+    collection: mongosColl,
+    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+    aggregateOptions: {comment: changeStreamComment},
+});
 
 assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updated: true}}));
 assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updated: true}}));
 
-assert.soon(() => primaryStream.hasNext());
-assert.eq(primaryStream.next().fullDocument, {_id: -1, updated: true});
-assert.soon(() => primaryStream.hasNext());
-assert.eq(primaryStream.next().fullDocument, {_id: 1, updated: true});
+let primaryUpdates = primaryStreamTest.getNextChanges(primaryStream, 2);
+assert.eq(primaryUpdates[0].fullDocument, {_id: -1, updated: true});
+assert.eq(primaryUpdates[1].fullDocument, {_id: 1, updated: true});
 
 for (let rs of [st.rs0, st.rs1]) {
     const primaryDB = rs.getPrimary().getDB(dbName);
@@ -90,21 +94,23 @@ for (let rs of [st.rs0, st.rs1]) {
     }
 }
 
-primaryStream.close();
+primaryStreamTest.cleanUp();
 
 // Test that change streams go to the secondary when the readPreference is {mode: "secondary"}.
+let secondaryStreamTest = new ChangeStreamTest(mongosDB);
 changeStreamComment = 'change stream against secondary';
-const secondaryStream =
-    mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}],
-                         {comment: changeStreamComment, $readPreference: {mode: "secondary"}});
+let secondaryStream = secondaryStreamTest.startWatchingChanges({
+    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+    collection: mongosColl,
+    aggregateOptions: {comment: changeStreamComment, $readPreference: {mode: "secondary"}},
+});
 
 assert.commandWorked(mongosColl.update({_id: -1}, {$set: {updatedCount: 2}}));
 assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 
-assert.soon(() => secondaryStream.hasNext());
-assert.eq(secondaryStream.next().fullDocument, {_id: -1, updated: true, updatedCount: 2});
-assert.soon(() => secondaryStream.hasNext());
-assert.eq(secondaryStream.next().fullDocument, {_id: 1, updated: true, updatedCount: 2});
+let secondaryUpdates = secondaryStreamTest.getNextChanges(secondaryStream, 2);
+assert.eq(secondaryUpdates[0].fullDocument, {_id: -1, updated: true, updatedCount: 2});
+assert.eq(secondaryUpdates[1].fullDocument, {_id: 1, updated: true, updatedCount: 2});
 
 for (let rs of [st.rs0, st.rs1]) {
     const secondaryDB = rs.getSecondary().getDB(dbName);
@@ -133,5 +139,5 @@ for (let rs of [st.rs0, st.rs1]) {
     }
 }
 
-secondaryStream.close();
+secondaryStreamTest.cleanUp();
 st.stop();

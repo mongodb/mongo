@@ -4,14 +4,13 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
-import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function checkEvents(changeStream, expectedEvents) {
+function checkEvents(changeStream, cursor, expectedEvents) {
     expectedEvents.forEach((event) => {
-        assert.soon(() => changeStream.hasNext());
-        let next = changeStream.next();
+        let next = changeStream.getOneChange(cursor);
         assert.eq(next.operationType, event["operationType"]);
         assert.eq(next.documentKey, {_id: event["_id"]});
     });
@@ -46,18 +45,26 @@ assert.commandWorked(
     mongos.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Open a change stream cursor before the collection is sharded.
-const changeStreamShardZero = st.shard0.getCollection('test.chunk_mig').aggregate([
-    {$changeStream: {showMigrationEvents: true}}
-]);
-const changeStreamShardOne = st.shard1.getCollection('test.chunk_mig').aggregate([
-    {$changeStream: {showMigrationEvents: true}}
-]);
+const changeStreamTestShardZero = new ChangeStreamTest(st.shard0.getDB("test"));
+const changeStreamShardZero = changeStreamTestShardZero.startWatchingChanges({
+    pipeline: [{$changeStream: {showMigrationEvents: true}}],
+    collection: st.shard0.getCollection('test.chunk_mig')
+});
+const changeStreamTestShardOne = new ChangeStreamTest(st.shard1.getDB("test"));
+const changeStreamShardOne = changeStreamTestShardOne.startWatchingChanges({
+    pipeline: [{$changeStream: {showMigrationEvents: true}}],
+    collection: st.shard1.getCollection('test.chunk_mig')
+});
 
 // Change streams opened on mongos do not allow showMigrationEvents to be set to true.
-assertErrorCode(mongosColl, [{$changeStream: {showMigrationEvents: true}}], 31123);
+const changeStreamTestMongos = new ChangeStreamTest(mongosDB);
+assert.throwsWithCode(() => {
+    changeStreamTestMongos.startWatchingChanges(
+        {pipeline: [{$changeStream: {showMigrationEvents: true}}], collection: mongosColl});
+}, 31123);
 
-assert(!changeStreamShardZero.hasNext(), "Do not expect any results yet");
-assert(!changeStreamShardOne.hasNext(), "Do not expect any results yet");
+changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
+changeStreamTestShardOne.assertNoChange(changeStreamShardOne);
 
 jsTestLog("Sharding collection");
 // Once we have a cursor, actually shard the collection.
@@ -84,9 +91,9 @@ var shardZeroEventsAfterNewShard = [makeEvent(20, "delete")];
 var shardOneEvents = [makeEvent(20, "insert")];
 
 // Check that each change stream returns the expected events.
-checkEvents(changeStreamShardZero, shardZeroEventsBeforeNewShard);
-checkEvents(changeStreamShardZero, shardZeroEventsAfterNewShard);
-checkEvents(changeStreamShardOne, shardOneEvents);
+checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEventsBeforeNewShard);
+checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEventsAfterNewShard);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEvents);
 
 // Insert into both the chunks.
 assert.commandWorked(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
@@ -123,12 +130,12 @@ shardOneEvents = [
 ];
 
 // Check that each change stream returns the expected events.
-checkEvents(changeStreamShardZero, shardZeroEvents);
-checkEvents(changeStreamShardOne, shardOneEvents);
+checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEvents);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEvents);
 
 // Make sure we're at the end of the stream.
-assert(!changeStreamShardZero.hasNext());
-assert(!changeStreamShardOne.hasNext());
+changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
+changeStreamTestShardOne.assertNoChange(changeStreamShardOne);
 
 // Test that migrating the last chunk to shard 1 (meaning all chunks are now on the same shard)
 // will not invalidate the change stream.
@@ -180,8 +187,8 @@ shardOneEvents = clustered ? [
     makeEvent(24, "insert"),
 ];
 
-checkEvents(changeStreamShardZero, shardZeroEvents);
-checkEvents(changeStreamShardOne, shardOneEvents);
+checkEvents(changeStreamTestShardZero, changeStreamShardZero, shardZeroEvents);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEvents);
 
 // Now test that adding a new shard and migrating a chunk to it will continue to
 // return the correct results.
@@ -189,9 +196,12 @@ const newShard = new ReplSetTest({name: "newShard", nodes: 1, nodeOptions: rsNod
 newShard.startSet({shardsvr: ''});
 newShard.initiate();
 assert.commandWorked(mongos.adminCommand({addShard: newShard.getURL(), name: "newShard"}));
-const changeStreamNewShard = newShard.getPrimary().getCollection('test.chunk_mig').aggregate([
-    {$changeStream: {showMigrationEvents: true}}
-]);
+
+const changeStreamTestNewShard = new ChangeStreamTest(newShard.getPrimary().getDB("test"));
+const changeStreamNewShard = changeStreamTestNewShard.startWatchingChanges({
+    pipeline: [{$changeStream: {showMigrationEvents: true}}],
+    collection: newShard.getPrimary().getCollection('test.chunk_mig')
+});
 
 // At this point, there haven't been any migrations to that shard; check that the changeStream
 // works normally.
@@ -205,9 +215,9 @@ shardOneEvents = [
     makeEvent(25, "insert"),
 ];
 
-assert(!changeStreamShardZero.hasNext(), "Do not expect any results");
-checkEvents(changeStreamShardOne, shardOneEvents);
-assert(!changeStreamNewShard.hasNext(), "Do not expect any results yet");
+changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEvents);
+changeStreamTestNewShard.assertNoChange(changeStreamNewShard);
 
 assert.commandWorked(mongosColl.insert({_id: 16}, {writeConcern: {w: "majority"}}));
 
@@ -255,15 +265,19 @@ let newShardEvents = clustered ? [
 ];
 
 // Check that each change stream returns the expected events.
-assert(!changeStreamShardZero.hasNext(), "Do not expect any results");
-checkEvents(changeStreamShardOne, shardOneEventsBeforeNewShard);
-checkEvents(changeStreamShardOne, shardOneEventsAfterNewShard);
-checkEvents(changeStreamNewShard, newShardEvents);
+changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEventsBeforeNewShard);
+checkEvents(changeStreamTestShardOne, changeStreamShardOne, shardOneEventsAfterNewShard);
+checkEvents(changeStreamTestNewShard, changeStreamNewShard, newShardEvents);
 
 // Make sure all change streams are empty.
-assert(!changeStreamShardZero.hasNext());
-assert(!changeStreamShardOne.hasNext());
-assert(!changeStreamNewShard.hasNext());
+changeStreamTestShardZero.assertNoChange(changeStreamShardZero);
+changeStreamTestShardOne.assertNoChange(changeStreamShardOne);
+changeStreamTestNewShard.assertNoChange(changeStreamNewShard);
+
+changeStreamTestShardZero.cleanUp();
+changeStreamTestShardOne.cleanUp();
+changeStreamTestNewShard.cleanUp();
 
 st.stop();
 newShard.stopSet();

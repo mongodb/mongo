@@ -6,6 +6,7 @@
 //   uses_change_streams,
 // ]
 
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = 'testDB';
@@ -22,7 +23,10 @@ const st = new ShardingTest({
 
 const db = st.s.getDB(dbName);
 const coll = db.getCollection(collName);
-const changeStream = coll.watch();
+const cst = new ChangeStreamTest(db);
+
+// Start watching changes using the ChangeStreamTest utility.
+const csCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
 
 const docs = [
     {_id: 0, shardField1: 0, shardField2: 0},
@@ -62,23 +66,20 @@ assert.commandWorked(coll.insert(docs[2]));
 // event following the resume points we wish to test.
 assert.commandWorked(coll.insert(docs[3]));
 
-const verifyChanges = (changeStream, startingIndex) => {
-    const changes = [];
-    assert.soon(() => {
-        while (changeStream.hasNext()) {
-            changes.push(changeStream.next());
-        }
-        return changes.length === docs.length - startingIndex;
-    });
+const verifyChanges = (cursor, startingIndex) => {
+    const changes = cst.getNextChanges(cursor, docs.length - startingIndex);
     assert.docEq(docs.slice(startingIndex), changes.map(x => x.fullDocument));
     assert.docEq(docKeys.slice(startingIndex), changes.map(x => x.documentKey));
     return changes;
 };
 
 // Verify that we can resume from each change point.
-const changes = verifyChanges(changeStream, 0);
+const changes = verifyChanges(csCursor, 0);
 changes.forEach((change, i) => {
-    verifyChanges(coll.watch([], {resumeAfter: change._id}), i + 1);
+    const resumeCursor = cst.startWatchingChanges(
+        {pipeline: [{$changeStream: {resumeAfter: change._id}}], collection: collName});
+    verifyChanges(resumeCursor, i + 1);
 });
 
+cst.cleanUp();
 st.stop();

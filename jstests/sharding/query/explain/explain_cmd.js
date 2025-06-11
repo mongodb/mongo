@@ -4,6 +4,7 @@
  * ]
  */
 
+import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create a cluster with 3 shards.
@@ -169,16 +170,20 @@ assert.eq(0, collSharded.count({b: 10}));
 // Explain a changeStream, ensure an error is thrown under snapshot read concern.
 const session = db.getMongo().startSession();
 const sessionDB = session.getDatabase(db.getName());
-explain = sessionDB.runCommand({
-    aggregate: "coll",
-    pipeline: [{$changeStream: {}}],
-    explain: true,
-    readConcern: {level: "snapshot"},
-    txnNumber: NumberLong(0),
-    startTransaction: true,
-    autocommit: false
-});
-assert.commandFailedWithCode(
-    explain, ErrorCodes.OperationNotSupportedInTransaction, tojson(explain));
+const cst = new ChangeStreamTest(sessionDB);
+assert.throwsWithCode(() => {
+    explain = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: "coll",
+        aggregateOptions: {
+            explain: true,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(0),
+            autocommit: false,
+            startTransaction: true
+        }
+    });
+}, ErrorCodes.OperationNotSupportedInTransaction);
 
+cst.cleanUp();
 st.stop();
