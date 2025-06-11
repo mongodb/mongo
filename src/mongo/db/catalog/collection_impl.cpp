@@ -1189,8 +1189,8 @@ int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
 
     int64_t size = getRecordStore()->storageSize(ru);
-    auto it = getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    auto it = getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady |
+                                                  IndexCatalog::InclusionPolicy::kUnfinished);
     while (it->more()) {
         size += storageEngine.getIdentSize(ru, it->next()->getIdent());
     }
@@ -1227,8 +1227,8 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
                                       int scale) const {
     const IndexCatalog* idxCatalog = getIndexCatalog();
 
-    auto ii = idxCatalog->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    auto ii = idxCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady |
+                                           IndexCatalog::InclusionPolicy::kUnfinished);
 
     uint64_t totalSize = 0;
 
@@ -1260,7 +1260,7 @@ uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx)
     //  anyways as the build is in progress.
     // - Once the index build is finished, this will be eventually accounted for.
     const auto idxCatalog = getIndexCatalog();
-    auto indexIt = idxCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto indexIt = idxCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
 
     uint64_t totalSize = 0;
     while (indexIt->more()) {
@@ -1285,7 +1285,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
     // 1) store index specs
     std::vector<BSONObj> indexSpecs;
     {
-        auto ii = _indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+        auto ii = _indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
         while (ii->more()) {
             const IndexDescriptor* idx = ii->next()->descriptor();
             indexSpecs.push_back(idx->infoObj().getOwned());

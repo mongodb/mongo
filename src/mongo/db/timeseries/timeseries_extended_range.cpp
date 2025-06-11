@@ -128,7 +128,7 @@ bool collectionHasTimeIndex(OperationContext* opCtx, const Collection& collectio
     auto indexCatalog = collection.getIndexCatalog();
     // The IndexIterator is initialized lazily, so the first call to 'next' positions it to the
     // first entry.
-    for (auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    for (auto it = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
          it->more();) {
         auto index = it->next();
         auto desc = index->descriptor();

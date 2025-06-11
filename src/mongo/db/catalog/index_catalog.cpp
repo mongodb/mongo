@@ -40,8 +40,6 @@
 
 namespace mongo {
 using IndexIterator = IndexCatalog::IndexIterator;
-using ReadyIndexesIterator = IndexCatalog::ReadyIndexesIterator;
-using AllIndexesIterator = IndexCatalog::AllIndexesIterator;
 
 bool IndexIterator::more() {
     if (_start) {
@@ -57,40 +55,6 @@ const IndexCatalogEntry* IndexIterator::next() {
     _prev = _next;
     _next = _advance();
     return _prev;
-}
-
-ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
-                                           IndexCatalogEntryContainer::const_iterator beginIterator,
-                                           IndexCatalogEntryContainer::const_iterator endIterator)
-    : _opCtx(opCtx), _iterator(beginIterator), _endIterator(endIterator) {}
-
-const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
-    while (_iterator != _endIterator) {
-        const IndexCatalogEntry* entry = _iterator->get();
-        ++_iterator;
-        return entry;
-    }
-
-    return nullptr;
-}
-
-AllIndexesIterator::AllIndexesIterator(
-    OperationContext* const opCtx,
-    std::unique_ptr<std::vector<const IndexCatalogEntry*>> ownedContainer)
-    : _opCtx(opCtx), _ownedContainer(std::move(ownedContainer)) {
-    // Explicitly order calls onto the ownedContainer with respect to its move.
-    _iterator = _ownedContainer->begin();
-    _endIterator = _ownedContainer->end();
-}
-
-const IndexCatalogEntry* AllIndexesIterator::_advance() {
-    if (_iterator == _endIterator) {
-        return nullptr;
-    }
-
-    const IndexCatalogEntry* entry = *_iterator;
-    ++_iterator;
-    return entry;
 }
 
 StringData toString(IndexBuildMethod method) {

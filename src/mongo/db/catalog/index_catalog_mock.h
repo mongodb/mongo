@@ -87,10 +87,9 @@ public:
 
     // Note that the inclusion policy is currently ignored for this mock implementation (all added
     // indexes are considered).
-    const IndexDescriptor* findIndexByName(
-        OperationContext*,
-        StringData name,
-        InclusionPolicy = InclusionPolicy::kReady) const override {
+    const IndexDescriptor* findIndexByName(OperationContext*,
+                                           StringData name,
+                                           InclusionPolicy) const override {
         for (const auto& entry : _indexEntries) {
             if (entry->descriptor()->indexName() == name) {
                 return entry->descriptor();
@@ -99,11 +98,10 @@ public:
         return nullptr;
     }
 
-    const IndexDescriptor* findIndexByKeyPatternAndOptions(
-        OperationContext*,
-        const BSONObj&,
-        const BSONObj&,
-        InclusionPolicy = InclusionPolicy::kReady) const override {
+    const IndexDescriptor* findIndexByKeyPatternAndOptions(OperationContext*,
+                                                           const BSONObj&,
+                                                           const BSONObj&,
+                                                           InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -117,12 +115,13 @@ public:
     void findIndexByType(OperationContext*,
                          const std::string&,
                          std::vector<const IndexDescriptor*>&,
-                         InclusionPolicy = InclusionPolicy::kReady) const override {
+                         InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
-    const IndexDescriptor* findIndexByIdent(
-        OperationContext*, StringData, InclusionPolicy = InclusionPolicy::kReady) const override {
+    const IndexDescriptor* findIndexByIdent(OperationContext*,
+                                            StringData,
+                                            InclusionPolicy) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -139,15 +138,14 @@ public:
 
     IndexCatalogEntry* getWritableEntryByName(OperationContext*,
                                               StringData,
-                                              InclusionPolicy = InclusionPolicy::kReady) override {
+                                              InclusionPolicy) override {
         MONGO_UNREACHABLE;
     }
 
-    IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(
-        OperationContext*,
-        const BSONObj&,
-        const BSONObj&,
-        InclusionPolicy = InclusionPolicy::kReady) override {
+    IndexCatalogEntry* getWritableEntryByKeyPatternAndOptions(OperationContext*,
+                                                              const BSONObj&,
+                                                              const BSONObj&,
+                                                              InclusionPolicy) override {
         MONGO_UNREACHABLE;
     }
 
@@ -160,11 +158,14 @@ public:
         return {};
     }
 
-    using IndexIterator = IndexCatalog::IndexIterator;
-    std::unique_ptr<IndexIterator> getIndexIterator(OperationContext* opCtx,
-                                                    InclusionPolicy) const override {
-        return std::make_unique<AllIndexesIterator>(
-            opCtx, std::make_unique<std::vector<const IndexCatalogEntry*>>());
+    class IteratorMock : public IndexIterator {
+        const IndexCatalogEntry* _advance() override {
+            return nullptr;
+        }
+    };
+
+    std::unique_ptr<IndexIterator> getIndexIterator(InclusionPolicy) const override {
+        return std::make_unique<IteratorMock>();
     }
 
     IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,

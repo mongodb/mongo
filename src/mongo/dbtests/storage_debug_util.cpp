@@ -81,7 +81,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
 
     // Iterate and print each index's table of documents.
     const auto indexCatalog = coll->getIndexCatalog();
-    const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    const auto it = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
     while (it->more()) {
         const auto indexCatalogEntry = it->next();

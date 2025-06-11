@@ -1273,8 +1273,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
             auto writableEntry = indexCatalog->getWritableEntryByName(
                 opCtx,
                 indexSpec.getStringField(IndexDescriptor::kIndexNameFieldName),
-                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                    IndexCatalog::InclusionPolicy::kFrozen);
+                IndexCatalog::InclusionPolicy::kAll);
 
             LOGV2(6455400,
                   "Dropping unfinished index during oplog recovery as standalone",

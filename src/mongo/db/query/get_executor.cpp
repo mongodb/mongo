@@ -1202,7 +1202,7 @@ bool collectionHasIndexWithHashedPathPrefixOfNonHashedPath(const CollectionPtr& 
     OperationContext* opCtx = expCtx->getOperationContext();
     tassert(10230201, "'ExpressionContext' does not have an 'OperationContext'", opCtx);
     std::unique_ptr<IndexCatalog::IndexIterator> indexIter =
-        indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+        indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIter->more()) {
         const IndexCatalogEntry* entry = indexIter->next();
         if (indexHasHashedPathPrefixOfNonHashedPath(entry->descriptor())) {

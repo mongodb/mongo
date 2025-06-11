@@ -200,6 +200,37 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     return Status(ErrorCodes::IndexAlreadyExists,
                   "The index already exists implicitly as the collection's clustered index");
 };
+
+using IndexIterator = IndexCatalog::IndexIterator;
+
+class ReadyIndexesIterator : public IndexIterator {
+public:
+    ReadyIndexesIterator(IndexCatalogEntryContainer::const_iterator beginIterator,
+                         IndexCatalogEntryContainer::const_iterator endIterator)
+        : _iterator(beginIterator), _endIterator(endIterator) {}
+
+private:
+    IndexCatalogEntryContainer::const_iterator _iterator;
+    IndexCatalogEntryContainer::const_iterator _endIterator;
+
+    const IndexCatalogEntry* _advance() override {
+        return _iterator == _endIterator ? nullptr : _iterator++->get();
+    }
+};
+
+class AllIndexesIterator : public IndexIterator {
+public:
+    AllIndexesIterator(std::vector<const IndexCatalogEntry*> container)
+        : _container(std::move(container)), _iterator(_container.begin()) {}
+
+private:
+    std::vector<const IndexCatalogEntry*> _container;
+    std::vector<const IndexCatalogEntry*>::const_iterator _iterator;
+
+    const IndexCatalogEntry* _advance() override {
+        return _iterator == _container.end() ? nullptr : *_iterator++;
+    }
+};
 }  // namespace
 
 // -------------
@@ -343,40 +374,38 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
 }
 
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
-    OperationContext* const opCtx, InclusionPolicy inclusionPolicy) const {
+    InclusionPolicy inclusionPolicy) const {
     if (inclusionPolicy == InclusionPolicy::kReady) {
-        // If the caller only wants the ready indexes, we return an iterator over the catalog's
-        // ready indexes vector. When the user advances this iterator, it will filter out any
-        // indexes that were not ready at the OperationContext's read timestamp.
-        return std::make_unique<ReadyIndexesIterator>(
-            opCtx, _readyIndexes.begin(), _readyIndexes.end());
+        // Queries need to be able to efficiently iterate over ready indexes, so special-case that
+        // with a more efficient version that doesn't need to copy anything
+        return std::make_unique<ReadyIndexesIterator>(_readyIndexes.begin(), _readyIndexes.end());
     }
 
     // If the caller doesn't only want the ready indexes, for simplicity of implementation, we copy
     // the pointers to a new vector. The vector's ownership is passed to the iterator. The query
     // code path from an external client is not expected to hit this case so the cost isn't paid by
     // the important code path.
-    auto allIndexes = std::make_unique<std::vector<const IndexCatalogEntry*>>();
+    std::vector<const IndexCatalogEntry*> allIndexes;
 
     if (inclusionPolicy & InclusionPolicy::kReady) {
         for (const auto& entry : _readyIndexes) {
-            allIndexes->push_back(entry.get());
+            allIndexes.push_back(entry.get());
         }
     }
 
     if (inclusionPolicy & InclusionPolicy::kUnfinished) {
         for (const auto& entry : _buildingIndexes) {
-            allIndexes->push_back(entry.get());
+            allIndexes.push_back(entry.get());
         }
     }
 
     if (inclusionPolicy & InclusionPolicy::kFrozen) {
         for (const auto& entry : _frozenIndexes) {
-            allIndexes->push_back(entry.get());
+            allIndexes.push_back(entry.get());
         }
     }
 
-    return std::make_unique<AllIndexesIterator>(opCtx, std::move(allIndexes));
+    return std::make_unique<AllIndexesIterator>(std::move(allIndexes));
 }
 
 std::string IndexCatalogImpl::_getAccessMethodName(const BSONObj& keyPattern) const {
@@ -534,12 +563,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     // The index catalog cannot currently iterate over only in-progress indexes. So by previously
     // checking against only ready indexes without error, we know that any errors encountered
     // checking against all indexes occurred due to an in-progress index.
-    status = _doesSpecConflictWithExisting(opCtx,
-                                           collection,
-                                           validatedSpec,
-                                           IndexCatalog::InclusionPolicy::kReady |
-                                               IndexCatalog::InclusionPolicy::kUnfinished |
-                                               IndexCatalog::InclusionPolicy::kFrozen);
+    status = _doesSpecConflictWithExisting(opCtx, collection, validatedSpec, InclusionPolicy::kAll);
     if (!status.isOK()) {
         if (ErrorCodes::IndexAlreadyExists == status.code()) {
             // Callers need to be able to distinguish conflicts against ready indexes versus
@@ -570,8 +594,8 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
         // interested in the index already exists error.
 
         auto inclusionPolicy = flags.removeInProgressIndexBuilds
-            ? IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished
-            : IndexCatalog::InclusionPolicy::kReady;
+            ? InclusionPolicy::kReady | InclusionPolicy::kUnfinished
+            : InclusionPolicy::kReady;
         if (ErrorCodes::IndexAlreadyExists ==
             _doesSpecConflictWithExisting(
                 opCtx, collection, spec, inclusionPolicy, flags.fieldsToUseForComparison)) {
@@ -1286,10 +1310,7 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
     std::vector<std::string> indexNamesToDrop;
     {
         int seen = 0;
-        auto ii = getIndexIterator(opCtx,
-                                   IndexCatalog::InclusionPolicy::kReady |
-                                       IndexCatalog::InclusionPolicy::kUnfinished |
-                                       IndexCatalog::InclusionPolicy::kFrozen);
+        auto ii = getIndexIterator(InclusionPolicy::kAll);
         while (ii->more()) {
             seen++;
             const IndexDescriptor* desc = ii->next()->descriptor();
@@ -1303,11 +1324,8 @@ void IndexCatalogImpl::dropIndexes(OperationContext* opCtx,
     }
 
     for (const std::string& indexName : indexNamesToDrop) {
-        IndexCatalogEntry* writableEntry = getWritableEntryByName(
-            opCtx,
-            indexName,
-            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                IndexCatalog::InclusionPolicy::kFrozen);
+        IndexCatalogEntry* writableEntry =
+            getWritableEntryByName(opCtx, indexName, InclusionPolicy::kAll);
         invariant(writableEntry);
         LOGV2_DEBUG(20355,
                     1,
@@ -1483,11 +1501,7 @@ void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
                                             Collection* collection,
                                             const std::string& indexName,
                                             std::shared_ptr<IndexCatalogEntry> entry) {
-    invariant(!findIndexByName(opCtx,
-                               indexName,
-                               IndexCatalog::InclusionPolicy::kReady |
-                                   IndexCatalog::InclusionPolicy::kUnfinished |
-                                   IndexCatalog::InclusionPolicy::kFrozen));
+    invariant(!findIndexByName(opCtx, indexName, InclusionPolicy::kAll));
 
     catalog::DataRemoval dataRemoval = catalog::DataRemoval::kTwoPhase;
     if (!entry || !entry->getSharedIdent()) {
@@ -1541,7 +1555,7 @@ const IndexDescriptor* IndexCatalogImpl::findIdIndex(OperationContext* opCtx) co
 const IndexDescriptor* IndexCatalogImpl::findIndexByName(OperationContext* opCtx,
                                                          StringData name,
                                                          InclusionPolicy inclusionPolicy) const {
-    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         if (desc->indexName() == name)
@@ -1555,7 +1569,7 @@ const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
     const BSONObj& key,
     const BSONObj& indexSpec,
     InclusionPolicy inclusionPolicy) const {
-    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    auto ii = getIndexIterator(inclusionPolicy);
     IndexDescriptor needle(_getAccessMethodName(key), indexSpec);
     while (ii->more()) {
         const auto* entry = ii->next();
@@ -1572,7 +1586,7 @@ void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
                                                InclusionPolicy inclusionPolicy,
                                                std::vector<const IndexDescriptor*>* matches) const {
     invariant(matches);
-    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() == key)) {
@@ -1585,7 +1599,7 @@ void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
                                        const std::string& type,
                                        std::vector<const IndexDescriptor*>& matches,
                                        InclusionPolicy inclusionPolicy) const {
-    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
         if (IndexNames::findPluginName(desc->keyPattern()) == type) {
@@ -1597,7 +1611,7 @@ void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
 const IndexDescriptor* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
                                                           StringData ident,
                                                           InclusionPolicy inclusionPolicy) const {
-    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    auto ii = getIndexIterator(inclusionPolicy);
     while (ii->more()) {
         const IndexCatalogEntry* entry = ii->next();
         if (ident == entry->getIdent()) {
@@ -1925,10 +1939,8 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
 
     for (const MultikeyPathInfo& newPath : newPaths) {
         invariant(newPath.nss == coll->ns());
-        auto idx = findIndexByName(opCtx,
-                                   newPath.indexName,
-                                   IndexCatalog::InclusionPolicy::kReady |
-                                       IndexCatalog::InclusionPolicy::kUnfinished);
+        auto idx = findIndexByName(
+            opCtx, newPath.indexName, InclusionPolicy::kReady | InclusionPolicy::kUnfinished);
         if (!idx) {
             return Status(ErrorCodes::IndexNotFound,
                           str::stream() << "Could not find index " << newPath.indexName << " in "
@@ -2072,10 +2084,7 @@ StatusWith<int64_t> IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
 }
 
 std::string::size_type IndexCatalogImpl::getLongestIndexNameLength(OperationContext* opCtx) const {
-    auto it = getIndexIterator(opCtx,
-                               IndexCatalog::InclusionPolicy::kReady |
-                                   IndexCatalog::InclusionPolicy::kUnfinished |
-                                   IndexCatalog::InclusionPolicy::kFrozen);
+    auto it = getIndexIterator(InclusionPolicy::kAll);
     std::string::size_type longestIndexNameLength = 0;
     while (it->more()) {
         auto thisLength = it->next()->descriptor()->indexName().length();

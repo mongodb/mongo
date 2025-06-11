@@ -266,8 +266,7 @@ Status CollectionBulkLoaderImpl::commit() {
                             auto indexIt =
                                 _acquisition.getCollectionPtr()
                                     ->getIndexCatalog()
-                                    ->getIndexIterator(_opCtx.get(),
-                                                       IndexCatalog::InclusionPolicy::kReady);
+                                    ->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
                             while (auto entry = indexIt->next()) {
                                 if (entry->descriptor()->isIdIndex()) {
                                     continue;

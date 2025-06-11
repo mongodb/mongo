@@ -461,8 +461,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
     // Go through the indexes in the index catalog to find the most compatible index.
     boost::optional<IndexSpec> compatibleIndexSpec;
 
-    auto indexIterator =
-        indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto indexIterator = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIterator->more()) {
         auto indexEntry = indexIterator->next();
         auto indexDesc = indexEntry->descriptor();

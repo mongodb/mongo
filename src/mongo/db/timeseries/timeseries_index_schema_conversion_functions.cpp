@@ -661,7 +661,7 @@ boost::optional<BSONObj> getIndexSupportingReopeningQuery(OperationContext* opCt
     }
     expectedPrefix.push_back(controlTimeField);
 
-    auto indexIt = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto indexIt = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIt->more()) {
         auto indexEntry = indexIt->next();
         auto indexDesc = indexEntry->descriptor();

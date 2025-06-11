@@ -917,7 +917,7 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
                                                         : SupportingUniqueIndex::None;
     }
     auto indexIterator = collection.getCollectionPtr()->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady);
+        IndexCatalog::InclusionPolicy::kReady);
     auto result = SupportingUniqueIndex::None;
     while (indexIterator->more()) {
         const IndexCatalogEntry* entry = indexIterator->next();

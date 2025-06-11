@@ -261,8 +261,8 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
     }
     result->append("nindexes", numIndexes);
 
-    auto it = indexCatalog->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+    auto it = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady |
+                                             IndexCatalog::InclusionPolicy::kUnfinished);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* descriptor = entry->descriptor();

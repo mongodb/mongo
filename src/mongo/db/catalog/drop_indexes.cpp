@@ -125,12 +125,8 @@ StatusWith<const IndexDescriptor*> getDescriptorByKeyPattern(OperationContext* o
                                                              const IndexCatalog* indexCatalog,
                                                              const BSONObj& keyPattern) {
     std::vector<const IndexDescriptor*> indexes;
-    indexCatalog->findIndexesByKeyPattern(opCtx,
-                                          keyPattern,
-                                          IndexCatalog::InclusionPolicy::kReady |
-                                              IndexCatalog::InclusionPolicy::kUnfinished |
-                                              IndexCatalog::InclusionPolicy::kFrozen,
-                                          &indexes);
+    indexCatalog->findIndexesByKeyPattern(
+        opCtx, keyPattern, IndexCatalog::InclusionPolicy::kAll, &indexes);
     if (indexes.empty()) {
         return Status(ErrorCodes::IndexNotFound,
                       str::stream() << "can't find index with key: " << keyPattern);
@@ -388,10 +384,7 @@ void dropReadyIndexes(OperationContext* opCtx,
         }
 
         auto writableEntry = indexCatalog->getWritableEntryByName(
-            opCtx,
-            indexName,
-            IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                IndexCatalog::InclusionPolicy::kFrozen);
+            opCtx, indexName, IndexCatalog::InclusionPolicy::kAll);
         if (!writableEntry) {
             uasserted(ErrorCodes::IndexNotFound,
                       str::stream() << "index not found with name [" << indexName << "]");
@@ -617,11 +610,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                 }
 
                 auto writableEntry = indexCatalog->getWritableEntryByName(
-                    opCtx,
-                    indexName,
-                    IndexCatalog::InclusionPolicy::kReady |
-                        IndexCatalog::InclusionPolicy::kUnfinished |
-                        IndexCatalog::InclusionPolicy::kFrozen);
+                    opCtx, indexName, IndexCatalog::InclusionPolicy::kAll);
                 if (!writableEntry) {
                     // A similar index wasn't created while we yielded the locks during abort.
                     continue;

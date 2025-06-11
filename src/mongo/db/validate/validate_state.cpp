@@ -249,7 +249,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     // The index iterator for ready indexes is timestamp-aware and will only return indexes that
     // are visible at our read time.
-    const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    const auto it = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
         const IndexDescriptor* desc = entry->descriptor();

@@ -448,7 +448,7 @@ DbCheckHasher::DbCheckHasher(
         _secondaryIndexCheckParameters.value().getValidateMode() ==
             DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
         for (auto indexIterator = collection->getIndexCatalog()->getIndexIterator(
-                 opCtx, IndexCatalog::InclusionPolicy::kReady);
+                 IndexCatalog::InclusionPolicy::kReady);
              indexIterator->more();) {
             const auto entry = indexIterator->next();
             auto descriptor = entry->descriptor();

@@ -65,8 +65,7 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
 
     const IndexDescriptor* best = nullptr;
 
-    auto indexIterator =
-        indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto indexIterator = indexCatalog->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (indexIterator->more()) {
         auto indexEntry = indexIterator->next();
         auto indexDescriptor = indexEntry->descriptor();

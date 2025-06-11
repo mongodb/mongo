@@ -105,7 +105,7 @@ CollectionQueryInfo::PlanCacheState::PlanCacheState(OperationContext* opCtx,
     // TODO We shouldn't need to include unfinished indexes, but we must here because the index
     // catalog may be in an inconsistent state.  SERVER-18346.
     auto ii = collection->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
+        IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         if (ice->accessMethod()) {
@@ -177,8 +177,7 @@ void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
         return;
     }
 
-    auto ii =
-        coll->getIndexCatalog()->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto ii = coll->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     auto& collectionIndexUsageTracker = CollectionIndexUsageTrackerDecoration::write(coll);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();

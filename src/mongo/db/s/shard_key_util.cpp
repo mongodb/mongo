@@ -464,8 +464,8 @@ ValidationBehaviorsLocalRefineShardKey::ValidationBehaviorsLocalRefineShardKey(
 std::vector<BSONObj> ValidationBehaviorsLocalRefineShardKey::loadIndexes(
     const NamespaceString& nss) const {
     std::vector<BSONObj> indexes;
-    auto it = _coll->getIndexCatalog()->getIndexIterator(
-        _opCtx, mongo::IndexCatalog::InclusionPolicy::kReady);
+    auto it =
+        _coll->getIndexCatalog()->getIndexIterator(mongo::IndexCatalog::InclusionPolicy::kReady);
     while (it->more()) {
         auto entry = it->next();
         indexes.push_back(entry->descriptor()->toBSON());
