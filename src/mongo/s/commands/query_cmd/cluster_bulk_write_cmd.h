@@ -72,6 +72,7 @@
 #include "mongo/s/query/exec/router_stage_queued_data.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -384,35 +385,38 @@ public:
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }
 
-            // Dispatch the bulk write through the cluster.
-            // - To ensure that possible writeErrors are properly managed, a "fire and forget"
-            //   request needs to be temporarily upgraded to 'w:1'(unless the request belongs to a
-            //   transaction, where per-operation WC settings are not supported);
-            // - Once done, The original WC is re-established to allow _populateCursorReply
-            //   evaluating whether a reply needs to be returned to the external client.
-            auto bulkWriteReply = [&] {
-                WriteConcernOptions originalWC = opCtx->getWriteConcern();
-                ScopeGuard resetWriteConcernGuard(
-                    [opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
-                if (auto wc = opCtx->getWriteConcern();
-                    !wc.requiresWriteAcknowledgement() && !opCtx->inMultiDocumentTransaction()) {
-                    wc.w = 1;
-                    opCtx->setWriteConcern(wc);
-                }
-                return cluster::bulkWrite(opCtx, bulkRequest, targeters);
-            }();
+            if (internalQueryUnifiedWriteExecutor.load()) {
+                response = unified_write_executor::bulkWrite(opCtx, bulkRequest);
+            } else {
+                // Dispatch the bulk write through the cluster.
+                // - To ensure that possible writeErrors are properly managed, a "fire and forget"
+                //   request needs to be temporarily upgraded to 'w:1'(unless the request belongs to
+                //   a transaction, where per-operation WC settings are not supported);
+                // - Once done, The original WC is re-established to allow _populateCursorReply
+                //   evaluating whether a reply needs to be returned to the external client.
+                auto bulkWriteReply = [&] {
+                    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+                    ScopeGuard resetWriteConcernGuard(
+                        [opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
+                    if (auto wc = opCtx->getWriteConcern(); !wc.requiresWriteAcknowledgement() &&
+                        !opCtx->inMultiDocumentTransaction()) {
+                        wc.w = 1;
+                        opCtx->setWriteConcern(wc);
+                    }
+                    return cluster::bulkWrite(opCtx, bulkRequest, targeters);
+                }();
 
-            bool updatedShardKey =
-                handleWouldChangeOwningShardError(opCtx, bulkRequest, bulkWriteReply, targeters);
-            bulk_write_exec::BulkWriteExecStats execStats = std::move(bulkWriteReply.execStats);
+                bool updatedShardKey = handleWouldChangeOwningShardError(
+                    opCtx, bulkRequest, bulkWriteReply, targeters);
+                bulk_write_exec::BulkWriteExecStats execStats = std::move(bulkWriteReply.execStats);
+                // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
+                // updates that modify a document’s owning shard.
+                execStats.updateMetrics(opCtx, targeters, updatedShardKey);
 
-            response = _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
+                response =
+                    _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
+            }
             result.appendElements(response.toBSON());
-
-            // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
-            // updates that modify a document’s owning shard.
-            execStats.updateMetrics(opCtx, targeters, updatedShardKey);
-
             return true;
         }
 

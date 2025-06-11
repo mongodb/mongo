@@ -21,8 +21,12 @@ function bulkWriteBasicTest(ordered) {
         mongos: 2,
         config: 1,
         rs: {nodes: 1},
-        mongosOptions: {setParameter: {logComponentVerbosity: tojson({sharding: 4})}}
+        mongosOptions: {setParameter: {logComponentVerbosity: tojson({query: 4, sharding: 4})}}
     });
+
+    const isUnifiedWriteExecutor =
+        st.s0.adminCommand({getParameter: 1, internalQueryUnifiedWriteExecutor: 1})
+            .internalQueryUnifiedWriteExecutor;
 
     function getCollection(ns) {
         const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(ns);
@@ -32,8 +36,8 @@ function bulkWriteBasicTest(ordered) {
     const banana = "test.banana";
     const orange = "test2.orange";
 
-    const staleConfigBananaLog = /7279201.*Noting stale config response.*banana/;
-    const staleConfigOrangeLog = /7279201.*Noting stale config response.*orange/;
+    const staleConfigBananaLog = /(7279201|10346900).*Noting stale config response.*banana/;
+    const staleConfigOrangeLog = /(7279201|10346900).*Noting stale config response.*orange/;
     const staleDbTest2Log = /7279202.*Noting stale database response.*test2/;
 
     jsTestLog("Case 1: Collection does't exist yet.");
@@ -54,10 +58,18 @@ function bulkWriteBasicTest(ordered) {
     let insertedDocs = getCollection(banana).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
     assert(checkLog.checkContainsOnce(st.s0, staleConfigBananaLog));
-    if (!ordered) {
-        // Check that the error for the 0th op was duplicated and used for the 1st op as well.
+    if (!ordered && !isUnifiedWriteExecutor) {
+        // Check that the error for the 0th op was duplicated and used for the 1st op as well. This
+        // logic is currently not ported to the UWE project so skip the assertion.
         assert(
             checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":1.*banana/));
+    }
+
+    // TODO SERVER-104114: Skip the following test cases until stale config errors are handled
+    // properly by the response processor.
+    if (isUnifiedWriteExecutor) {
+        st.stop();
+        return;
     }
 
     jsTestLog("Case 2: The collection exists for some of writes, but not for others.");

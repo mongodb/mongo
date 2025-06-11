@@ -79,7 +79,7 @@ Result WriteBatchResponseProcessor::onShardResponse(const ShardResponse& respons
             str::stream() << "cluster write results unavailable from " << shardResponse.target);
         LOGV2_DEBUG(10347001,
                     4,
-                    "Unable to recieve cluster write results from shard",
+                    "Unable to receive cluster write results from shard",
                     "host"_attr = shardResponse.target);
         return {};
     }
@@ -115,7 +115,11 @@ Result WriteBatchResponseProcessor::processOpsInReplyItems(
                 static_cast<WriteOpId>(item.getIdx()) < ops.size());
         const auto& op = ops[item.getIdx()];
 
-        if (item.getStatus().code() == ErrorCodes::CannotImplicitlyCreateCollection) {
+        if (item.getStatus().code() == ErrorCodes::StaleConfig) {
+            LOGV2_DEBUG(
+                10346900, 4, "Noting stale config response", "status"_attr = item.getStatus());
+            toRetry.push_back(op);
+        } else if (item.getStatus().code() == ErrorCodes::CannotImplicitlyCreateCollection) {
             // Stage the collection to be created if it was found to not exist.
             auto info = item.getStatus().extraInfo<CannotImplicitlyCreateCollectionInfo>();
             if (auto it = collectionsToCreate.find(info->getNss());

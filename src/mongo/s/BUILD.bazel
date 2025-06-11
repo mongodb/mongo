@@ -717,6 +717,23 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "sharding_collection_routing_info_targeter",
+    srcs = [
+        "cluster_ddl.cpp",
+        "collection_routing_info_targeter.cpp",
+    ],
+    hdrs = [
+        "cluster_ddl.h",
+        "collection_routing_info_targeter.h",
+        "ns_targeter.h",
+    ],
+    deps = [
+        ":sharding_router_api",
+        "//src/mongo/db/timeseries:timeseries_metadata",
+    ],
+)
+
 # This is the main library to use for consumers of sharding. It will pull the
 # routing and targeting functionality.
 #
@@ -725,9 +742,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "sharding_api",
     srcs = [
-        "cluster_ddl.cpp",
         "cluster_write.cpp",
-        "collection_routing_info_targeter.cpp",
         "//src/mongo/s/write_ops:batch_write_exec.cpp",
         "//src/mongo/s/write_ops:batch_write_op.cpp",
         "//src/mongo/s/write_ops:bulk_write_exec.cpp",
@@ -737,9 +752,7 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:write_without_shard_key_util.cpp",
     ],
     hdrs = [
-        "cluster_ddl.h",
         "cluster_write.h",
-        "collection_routing_info_targeter.h",
         "//src/mongo/s/write_ops:batch_write_exec.h",
         "//src/mongo/s/write_ops:batch_write_op.h",
         "//src/mongo/s/write_ops:bulk_write_exec.h",
@@ -747,9 +760,11 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:pause_migrations_during_multi_updates_enablement.h",
         "//src/mongo/s/write_ops:write_op.h",
         "//src/mongo/s/write_ops:write_without_shard_key_util.h",
+        "//src/mongo/s/write_ops/unified_write_executor:unified_write_executor.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
+        ":sharding_collection_routing_info_targeter",
         ":sharding_router_api",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:internal_transactions_feature_flag",
@@ -768,6 +783,7 @@ mongo_cc_library(
         "//src/mongo/executor:inline_executor",
         "//src/mongo/s/query/planner:cluster_find",
         "//src/mongo/s/write_ops:batch_write_types",
+        "//src/mongo/s/write_ops/unified_write_executor",
     ],
 )
 

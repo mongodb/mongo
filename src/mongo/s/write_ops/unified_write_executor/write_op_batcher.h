@@ -59,6 +59,8 @@ public:
     WriteOpBatcher(WriteOpProducer& producer, WriteOpAnalyzer& analyzer)
         : _producer(producer), _analyzer(analyzer) {}
 
+    virtual ~WriteOpBatcher() = default;
+
     /**
      * Get the next batch from the list of write ops returned by the producer. Based on the analysis
      * results, the batches may be of different write types. If there are no more write ops to be
