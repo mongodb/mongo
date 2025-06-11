@@ -233,15 +233,6 @@ server_parameters:
         validator: {gte: 0, lte: 1}
         redact: false
 
-    # TODO (SERVER-102036): Remove this parameter.
-    disableSpillKVEngine:
-        description: "Temporary parameter to disable spill kv engine."
-        cpp_vartype: bool
-        cpp_varname: gDisableSpillKVEngine
-        set_at: startup
-        default: false
-        redact: false
-
 feature_flags:
     featureFlagLargeBatchedOperations:
         description: >-

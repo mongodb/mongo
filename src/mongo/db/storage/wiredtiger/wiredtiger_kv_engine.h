@@ -893,7 +893,8 @@ private:
 /**
  * Generates config string for wiredtiger_open() from the given config options.
  */
-std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig);
+std::string generateWTOpenConfigString(const WiredTigerKVEngineBase::WiredTigerConfig& wtConfig,
+                                       StringData extensionsConfig);
 
 /**
  * Returns a WiredTigerKVEngineBase::WiredTigerConfig populated with config values provided at

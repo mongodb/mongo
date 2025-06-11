@@ -39,15 +39,33 @@ class ServiceContext;
 
 class WiredTigerExtensions {
 public:
-    static WiredTigerExtensions* get(ServiceContext* service);
+    static WiredTigerExtensions& get(ServiceContext* service);
 
     /**
-     * Return the `extensions=[...]` piece for a `wiredtiger_open` call.
+     * Returns the `extensions=[...]` piece for a `wiredtiger_open` call.
      */
     std::string getOpenExtensionsConfig() const;
 
     /**
-     * Add an item to the `wiredtiger_open` extensions list.
+     * Adds an item to the `wiredtiger_open` extensions list.
+     */
+    void addExtension(StringData extensionConfigStr);
+
+private:
+    std::vector<std::string> _wtExtensions;
+};
+
+class SpillWiredTigerExtensions {
+public:
+    static SpillWiredTigerExtensions& get(ServiceContext* service);
+
+    /**
+     * Returns the `extensions=[...]` piece for a `wiredtiger_open` call.
+     */
+    std::string getOpenExtensionsConfig() const;
+
+    /**
+     * Adds an item to the `wiredtiger_open` extensions list.
      */
     void addExtension(StringData extensionConfigStr);
 

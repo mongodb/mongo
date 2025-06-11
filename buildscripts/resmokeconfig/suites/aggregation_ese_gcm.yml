@@ -29,4 +29,3 @@ executor:
       encryptionCipherMode: "AES256-GCM"
       set_parameters:
         enableTestCommands: 1
-        disableSpillKVEngine: true

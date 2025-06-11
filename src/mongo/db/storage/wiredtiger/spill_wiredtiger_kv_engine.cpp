@@ -33,6 +33,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_connection.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -65,7 +66,9 @@ SpillWiredTigerKVEngine::SpillWiredTigerKVEngine(const std::string& canonicalNam
         }
     }
 
-    std::string config = generateWTOpenConfigString(_wtConfig);
+    std::string config = generateWTOpenConfigString(
+        _wtConfig,
+        SpillWiredTigerExtensions::get(getGlobalServiceContext()).getOpenExtensionsConfig());
     LOGV2(10158000, "Opening spill WiredTiger", "config"_attr = config);
 
     auto startTime = Date_t::now();

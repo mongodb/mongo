@@ -26,10 +26,6 @@ executor:
           setParametersMongos:
             opportunisticSecondaryTargeting: true
       nodb: ""
-  fixture:
-    mongod_options:
-      set_parameters:
-        disableSpillKVEngine: true
 matrix_suite: true
 selector:
   exclude_files:

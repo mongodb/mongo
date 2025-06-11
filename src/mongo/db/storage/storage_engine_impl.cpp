@@ -480,11 +480,13 @@ void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx, bool memLeakAllowe
     if (RUNNING_ON_VALGRIND) {  // NOLINT
         memLeakAllowed = false;
     }
-    _engine->cleanShutdown(memLeakAllowed);
-    // intentionally not deleting _engine
+
     if (_spillKVEngine) {
         _spillKVEngine->cleanShutdown(memLeakAllowed);
     }
+
+    _engine->cleanShutdown(memLeakAllowed);
+    // intentionally not deleting _engine
 }
 
 StorageEngineImpl::~StorageEngineImpl() {}

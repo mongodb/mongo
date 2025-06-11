@@ -8,10 +8,6 @@
             TestData:
               enableEncryption: ""
               encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
-      fixture:
-        mongod_options:
-          set_parameters:
-            disableSpillKVEngine: true
 
 - name: testdata_gcm
   value:
@@ -29,8 +25,6 @@
         mongod_options:
           enableEncryption: ""
           encryptionKeyFile: "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
-          set_parameters:
-            disableSpillKVEngine: true
 
 - name: mongodfixture_gcm
   value:

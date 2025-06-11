@@ -39,10 +39,15 @@ namespace mongo {
 
 namespace {
 const auto getConfigHooks = ServiceContext::declareDecoration<WiredTigerExtensions>();
+const auto getSpillConfigHooks = ServiceContext::declareDecoration<SpillWiredTigerExtensions>();
 }  // namespace
 
-WiredTigerExtensions* WiredTigerExtensions::get(ServiceContext* service) {
-    return &getConfigHooks(service);
+WiredTigerExtensions& WiredTigerExtensions::get(ServiceContext* service) {
+    return getConfigHooks(service);
+}
+
+SpillWiredTigerExtensions& SpillWiredTigerExtensions::get(ServiceContext* service) {
+    return getSpillConfigHooks(service);
 }
 
 std::string WiredTigerExtensions::getOpenExtensionsConfig() const {
@@ -61,6 +66,25 @@ std::string WiredTigerExtensions::getOpenExtensionsConfig() const {
 }
 
 void WiredTigerExtensions::addExtension(StringData extensionConfigStr) {
+    _wtExtensions.emplace_back(std::string{extensionConfigStr});
+}
+
+std::string SpillWiredTigerExtensions::getOpenExtensionsConfig() const {
+    if (_wtExtensions.size() == 0) {
+        return "";
+    }
+
+    StringBuilder extensions;
+    extensions << "extensions=[";
+    for (const auto& ext : _wtExtensions) {
+        extensions << ext << ",";
+    }
+    extensions << "],";
+
+    return extensions.str();
+}
+
+void SpillWiredTigerExtensions::addExtension(StringData extensionConfigStr) {
     _wtExtensions.emplace_back(std::string{extensionConfigStr});
 }
 
