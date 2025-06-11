@@ -1,0 +1,16 @@
+package(default_visibility = ["//visibility:public"])
+
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+)
+
+py_binary(
+    name = "extract_failed_test_to_pickle",
+    srcs = ["extract_failed_test_to_pickle.py"],
+)
+
+py_binary(
+    name = "extract_pickle_to_json",
+    srcs = ["extract_pickle_to_json.py"],
+)

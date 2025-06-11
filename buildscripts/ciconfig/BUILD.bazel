@@ -3,6 +3,7 @@ load("@poetry//:dependencies.bzl", "dependency")
 py_library(
     name = "ciconfig",
     srcs = [
+        "__init__.py",
         "evergreen.py",
     ],
     visibility = ["//visibility:public"],

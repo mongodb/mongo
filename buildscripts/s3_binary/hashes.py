@@ -11,4 +11,11 @@ S3_SHA256_HASHES = {
     "https://mdb-build-public.s3.amazonaws.com/buildozer/v7.3.1/buildozer-linux-amd64": "3305e287b3fcc68b9a35fd8515ee617452cd4e018f9e6886b6c7cdbcba8710d4",
     "https://mdb-build-public.s3.amazonaws.com/buildozer/v7.3.1/buildozer-linux-arm64": "0b5a2a717ac4fc911e1fec8d92af71dbb4fe95b10e5213da0cc3d56cea64a328",
     "https://mdb-build-public.s3.amazonaws.com/buildozer/v7.3.1/buildozer-windows-amd64.exe": "58d41ce53257c5594c9bc86d769f580909269f68de114297f46284fbb9023dcf",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-aarch64-apple-darwin.tar.gz": "b94562393a4bf23f1a48521f5495a8e48de885b7c173bd7ea8206d6d09921633",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-aarch64-unknown-linux-musl.tar.gz": "73df3729a3381d0918e4640aac4b2653c542f74c7b7843dee8310e2c877e6f2e",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-powerpc64le-unknown-linux-gnu.tar.gz": "6eedb853553ee52309e9519af775b3359a12227ec342404b6a033308cdd48b1b",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-s390x-unknown-linux-gnu.tar.gz": "b4f93af861c1b3e1956df08e0d9f20b7e55cd7beb37c9df09b659908e920ebe6",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-apple-darwin.tar.gz": "34aa37643e30dcb81a3c0e011c3a8df552465ea7580ba92ca727a3b7c6de25d1",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-pc-windows-msvc.zip": "9d10e1282c5f695b2130cf593d55e37266513fc6d497edc4a30a6ed6d8ba4067",
+    "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-unknown-linux-musl.tar.gz": "39a1cd878962ebc88322b4f6d33cae2292454563028f93a3f1f8ce58e3025b07",
 }

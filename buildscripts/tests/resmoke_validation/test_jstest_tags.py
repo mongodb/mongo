@@ -1,5 +1,6 @@
 import glob
 import json
+import os
 import unittest
 from collections import defaultdict
 from typing import Optional
@@ -57,6 +58,7 @@ class RequiresFcvTagRule(JstestTagRule):
 
 class TestJstestTags(unittest.TestCase):
     def test_jstest_tags(self):
+        os.chdir(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "."))
         globs = ["src/mongo/db/modules/enterprise/jstests/**/*.js", "jstests/**/*.js"]
 
         tag_rules = [

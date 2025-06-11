@@ -11,3 +11,8 @@ sh_binary(
     srcs = ["lint.sh"],
     visibility = ["//visibility:public"],
 )
+
+py_binary(
+    name = "bazelisk",
+    srcs = ["bazelisk.py"],
+)

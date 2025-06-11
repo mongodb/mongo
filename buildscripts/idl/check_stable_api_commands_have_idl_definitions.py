@@ -41,7 +41,6 @@ from pymongo import MongoClient
 
 # Permit imports from "buildscripts".
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
-
 from idl import syntax
 
 from buildscripts.idl.lib import list_idls, parse_idl

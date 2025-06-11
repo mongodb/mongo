@@ -62,12 +62,6 @@ config_setting(
     flag_values = {":with_cxx_stdlib": "best"},
 )
 
-bool_flag(
-    name = "with_abseil",
-    build_setting_default = False,
-    deprecation = "The value of this flag is ignored. Bazel builds always depend on Abseil for its pre-adopted `std::` types. You should remove this flag from your build command.",
-)
-
 int_flag(
     name = "abi_version_no",
     build_setting_default = 1,

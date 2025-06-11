@@ -110,7 +110,7 @@ def in_spawn_host():
     return False
 
 
-if in_git_root_dir() and not in_spawn_host():
+if (in_git_root_dir() or "BUILD_WORKSPACE_DIRECTORY" in os.environ) and not in_spawn_host():
     generate_mongo_version_file()
 else:
     LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")

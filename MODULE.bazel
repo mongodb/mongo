@@ -129,6 +129,12 @@ single_version_override(
     version = "6.4.0",
 )
 
+bazel_dep(name = "rules_multitool", version = "0.4.0")
+
+multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitool")
+multitool.hub(lockfile = "//tools/lint:multitool.lock.json")
+use_repo(multitool, "multitool")
+
 # TODO port over from WORKSPACE
 # currently breaks pyright
 ##node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node", dev_dependency = True)

@@ -3051,5 +3051,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/third_party/libmongocrypt/OWNERS.yml
 /src/third_party/libmongocrypt/**/* @10gen/server-security @svc-auto-approve-bot
 
+# The following patterns are parsed from ./tools/lint/OWNERS.yml
+/tools/lint/**/* @10gen/devprod-build @svc-auto-approve-bot
+
 # The following patterns are parsed from ./x509/OWNERS.yml
 /x509/**/* @10gen/server-security @svc-auto-approve-bot

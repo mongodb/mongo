@@ -1,0 +1,5 @@
+py_test(
+    name = "python_test",
+    srcs = ["python_test.py"],
+    visibility = ["//visibility:public"],
+)

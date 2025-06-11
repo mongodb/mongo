@@ -146,3 +146,9 @@ platform(
         ":rhel9",
     ],
 )
+
+py_binary(
+    name = "remote_execution_containers_generator",
+    srcs = ["remote_execution_containers_generator.py"],
+    visibility = ["//visibility:public"],
+)

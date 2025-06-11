@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json",
+  "ruff": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-aarch64-unknown-linux-musl.tar.gz",
+        "file": "ruff-aarch64-unknown-linux-musl/ruff",
+        "sha256": "73df3729a3381d0918e4640aac4b2653c542f74c7b7843dee8310e2c877e6f2e",
+        "os": "linux",
+        "cpu": "arm64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-unknown-linux-musl.tar.gz",
+        "file": "ruff-x86_64-unknown-linux-musl/ruff",
+        "sha256": "39a1cd878962ebc88322b4f6d33cae2292454563028f93a3f1f8ce58e3025b07",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-aarch64-apple-darwin.tar.gz",
+        "file": "ruff-aarch64-apple-darwin/ruff",
+        "sha256": "b94562393a4bf23f1a48521f5495a8e48de885b7c173bd7ea8206d6d09921633",
+        "os": "macos",
+        "cpu": "arm64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://mdb-build-public.s3.amazonaws.com/ruff/0.6.9/ruff-x86_64-apple-darwin.tar.gz",
+        "file": "ruff-x86_64-apple-darwin/ruff",
+        "sha256": "34aa37643e30dcb81a3c0e011c3a8df552465ea7580ba92ca727a3b7c6de25d1",
+        "os": "macos",
+        "cpu": "x86_64"
+      }
+    ]
+  }
+}

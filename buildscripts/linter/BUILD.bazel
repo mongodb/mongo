@@ -3,6 +3,7 @@ load("@poetry//:dependencies.bzl", "dependency")
 py_library(
     name = "linter",
     srcs = [
+        "__init__.py",
         "base.py",
         "filediff.py",
         "git.py",

@@ -104,6 +104,10 @@ def list_files_without_targets(
     new_list = []
     for file in all_typed_files:
         if file not in typed_files_in_targets_set and file not in exempt_list:
+            if "bazel_rules_mongo" in file:
+                # Skip files in bazel_rules_mongo, since it has its own Bazel repo
+                continue
+
             new_list.append(file)
 
     if len(new_list) != 0:
@@ -139,6 +143,11 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     ):
         return False
 
+    if not list_files_without_targets(
+        files_with_targets, "python", "py", ["src/mongo", "buildscripts", "evergreen"]
+    ):
+        return False
+
     # Default to linting everything if no path was passed in
     if len([arg for arg in args if not arg.startswith("--")]) == 0:
         args = ["//..."] + args
@@ -147,7 +156,8 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
     with tempfile.NamedTemporaryFile(delete=False) as buildevents:
         buildevents_path = buildevents.name
 
-    args.append("--aspects=//tools/lint:linters.bzl%eslint")
+    for linter in ["eslint", "ruff"]:
+        args.append(f"--aspects=//tools/lint:linters.bzl%{linter}")
 
     args.extend(
         [
@@ -210,11 +220,16 @@ def run_rules_lint(bazel_bin: str, args: List[str]) -> bool:
         if "coverage.dat" in report or not os.path.exists(report) or not os.path.getsize(report):
             # Report is empty. No linting errors.
             continue
-        failing_reports += 1
-        print(f"From {report}:")
         with open(report, "r", encoding="utf-8") as f:
-            print(f.read())
-        print()
+            file_contents = f.read().strip()
+            if file_contents == "All checks passed!":
+                # Report is successful. No linting errors.
+                continue
+
+            print(f"From {report}:")
+            print(file_contents)
+            print()
+            failing_reports += 1
 
     # Apply fixes if requested
     if fix:

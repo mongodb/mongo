@@ -1275,3 +1275,9 @@ mongo_cc_library(
         "packaged_task.h",
     ],
 )
+
+py_binary(
+    name = "pretty_printer_test",
+    srcs = ["pretty_printer_test.py"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,49 @@
+load("@poetry//:dependencies.bzl", "dependency")
+
+py_test(
+    name = "test_suites_configurations",
+    srcs = ["test_suites_configurations.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_find_suites",
+    srcs = ["test_find_suites.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_generated_matrix_suites",
+    srcs = ["test_generated_matrix_suites.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/logging",
+    ],
+)
+
+py_test(
+    name = "test_jstest_tags",
+    srcs = ["test_jstest_tags.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/idl",
+        "//buildscripts/resmokelib",
+    ],
+)
+
+py_test(
+    name = "test_matrix_suite_generation",
+    srcs = ["test_matrix_suite_generation.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/logging",
+    ],
+)

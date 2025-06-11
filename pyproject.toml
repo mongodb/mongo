@@ -213,6 +213,9 @@ ignore = [
     "F822", # undefined-export
     ]
 
+[tool.ruff.lint.isort]
+known-first-party = ["buildscripts", "buildscripts/idl", "evergreen"]
+
 [tool.pyright]
 include = [
     "buildscripts",

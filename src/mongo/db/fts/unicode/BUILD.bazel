@@ -92,3 +92,8 @@ mongo_cc_unit_test(
         ":unicode",
     ],
 )
+
+py_binary(
+    name = "gen_diacritic_map",
+    srcs = ["gen_diacritic_map.py"],
+)

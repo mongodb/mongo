@@ -1,0 +1,12 @@
+py_test(
+    name = "test_discovery",
+    srcs = [
+        "__init__.py",
+        "test_discovery.py",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts/resmokelib",
+        "//buildscripts/resmokelib/logging",
+    ],
+)

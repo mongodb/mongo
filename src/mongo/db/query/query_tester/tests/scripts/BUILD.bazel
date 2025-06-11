@@ -1,0 +1,17 @@
+py_binary(
+    name = "overwrite_results",
+    srcs = [
+        "overwrite_results.py",
+    ],
+    main = "overwrite_results.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "setup_repro_env",
+    srcs = [
+        "setup_repro_env.py",
+    ],
+    main = "setup_repro_env.py",
+    visibility = ["//visibility:public"],
+)

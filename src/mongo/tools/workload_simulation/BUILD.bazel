@@ -75,3 +75,9 @@ mongo_cc_unit_test(
         "//src/mongo/unittest",
     ],
 )
+
+py_binary(
+    name = "process_logs",
+    srcs = ["process_logs.py"],
+    visibility = ["//visibility:public"],
+)

@@ -164,3 +164,8 @@ mongo_cc_benchmark(
         "//src/mongo/db:service_context",
     ],
 )
+
+py_binary(
+    name = "lock_gdb_test",
+    srcs = ["lock_gdb_test.py"],
+)
