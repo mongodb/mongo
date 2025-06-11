@@ -18,6 +18,7 @@ function getIngressConnectionEstablishmentMaxQueueDepthDefault(mongo) {
 // Check the default values are used if not set explicitly
 let mongo = MongoRunner.runMongod();
 const maxInt32 = Math.pow(2, 31) - 1;
+const maxInt64 = Math.pow(2, 63) - 1;
 
 let ingressConnectionEstablishmentRatePerSecDefault =
     getIngressConnectionEstablishmentRatePerSec(mongo);
@@ -27,10 +28,10 @@ let ingressConnectionEstablishmentBurstCapacitySecsDefault =
     getingressConnectionEstablishmentBurstCapacitySecs(mongo);
 assert.eq(ingressConnectionEstablishmentBurstCapacitySecsDefault, Number.MAX_VALUE);
 
-// There are infinite tokens available by default.
+// There are infinite tokens available by default, and we append that as INT64_MAX.
 let availableTokens =
     mongo.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment.totalAvailableTokens;
-assert.eq(availableTokens, Infinity);
+assert.eq(availableTokens, maxInt64);
 
 let ingressConnectionEstablishmentMaxQueueDepthDefault =
     getIngressConnectionEstablishmentMaxQueueDepthDefault(mongo);
