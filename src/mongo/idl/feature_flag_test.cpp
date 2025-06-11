@@ -150,7 +150,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
             BSON("blender" << BSON("value"
                                    << true << "version"
                                    << multiversion::toString(multiversion::GenericFCV::kLatest)
-                                   << "shouldBeFCVGated" << true << "currentlyEnabled" << true)));
+                                   << "fcv_gated" << true << "currentlyEnabled" << true)));
     }
 
     {
@@ -162,7 +162,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
         _featureFlagBlender->append(nullptr, &builder, "blender", boost::none);
 
         ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON("blender" << BSON("value" << false << "shouldBeFCVGated" << true
+                          BSON("blender" << BSON("value" << false << "fcv_gated" << true
                                                          << "currentlyEnabled" << false)));
     }
 
@@ -179,8 +179,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
             builder.obj(),
             BSON("fork" << BSON("value" << true << "version"
                                         << multiversion::toString(multiversion::GenericFCV::kLatest)
-                                        << "shouldBeFCVGated" << false << "currentlyEnabled"
-                                        << true)));
+                                        << "fcv_gated" << false << "currentlyEnabled" << true)));
     }
 
     {
@@ -192,7 +191,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
         _featureFlagFork->append(nullptr, &builder, "fork", boost::none);
 
         ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON("fork" << BSON("value" << false << "shouldBeFCVGated" << false
+                          BSON("fork" << BSON("value" << false << "fcv_gated" << false
                                                       << "currentlyEnabled" << false)));
     }
 }

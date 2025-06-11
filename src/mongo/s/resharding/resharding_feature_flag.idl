@@ -40,28 +40,28 @@ feature_flags:
         cpp_varname: gFeatureFlagMoveCollection
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
     featureFlagUnshardCollection:
         description: "Feature flag for implementing unshard collection."
         cpp_varname: gFeatureFlagUnshardCollection
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
     featureFlagReshardingForTimeseries:
         description: "Feature flag for enabling resharding a timeseries collection."
         cpp_varname: gFeatureFlagReshardingForTimeseries
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
     featureFlagRelaxedMode:
         description: "Feature flag for implmenting relaxed resharding mode."
         cpp_varname: gFeatureFlagReshardingRelaxedMode
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagReshardingSkipCloningAndApplyingIfApplicable:
         description:
             "Feature flag to make recipient shards that are not going to own any chunks for
@@ -70,7 +70,7 @@ feature_flags:
             for it). Currently, only the primary shard can be such a recipient shard."
         cpp_varname: gFeatureFlagReshardingSkipCloningAndApplyingIfApplicable
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         description:
             "Feature flag to make recipient shards store the count of oplog entries fetched
@@ -78,23 +78,23 @@ feature_flags:
             metrics upon recovery."
         cpp_varname: gFeatureFlagReshardingStoreOplogFetcherProgress
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagReshardingNumSamplesPerChunk:
         description: "Feature flag for adding numSamplesPerChunk as a field in reshardCollection."
         cpp_varname: gfeatureFlagReshardingNumSamplesPerChunk
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagReshardingVerification:
         description:
             "Feature flag to enable data loss and consistency verification steps during
             resharding to ensure correctness."
         cpp_varname: gFeatureFlagReshardingVerification
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagReshardingCloneNoRefresh:
         description: "Feature flag to enable not using shard version refresh for resharding."
         cpp_varname: gFeatureFlagReshardingCloneNoRefresh
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true

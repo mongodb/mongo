@@ -37,8 +37,8 @@ export function isBinaryCompatibleFlagEnabledAndStable(db, flagName) {
         return false;
     }
 
-    assert.hasFields(flagDoc, ['shouldBeFCVGated', 'version']);
-    assert(!flagDoc.shouldBeFCVGated);
+    assert.hasFields(flagDoc, ['fcv_gated', 'version']);
+    assert(!flagDoc.fcv_gated);
 
     const flagEnabledInLastContinuous =
         MongoRunner.compareBinVersions(flagDoc.version, lastContinuousFCV) <= 0;

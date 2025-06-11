@@ -1761,7 +1761,7 @@ class TestParser(testcase.IDLTestcase):
         # type: () -> None
         """Test feature flag."""
 
-        # Missing shouldBeFCVGated
+        # Missing fcv_gated
         self.assert_parse_fail(
             textwrap.dedent("""
             feature_flags:

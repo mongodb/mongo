@@ -39,9 +39,9 @@ feature_flags:
         description: "Feature flag to enable listening for ingress gRPC connections"
         cpp_varname: gFeatureFlagGRPC
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
     featureFlagEgressGrpcForSearch:
         description: "Feature flag to use egress gRPC for search communication"
         cpp_varname: gEgressGrpcForSearch
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false

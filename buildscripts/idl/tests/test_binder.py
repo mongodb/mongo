@@ -2757,7 +2757,7 @@ class TestBinder(testcase.IDLTestcase):
         # type: () -> None
         """Test feature flag checks around version."""
 
-        # feature flag can default to false without a version (shouldBeFCVGated can be true or false)
+        # feature flag can default to false without a version (fcv_gated can be true or false)
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2765,7 +2765,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: false
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """)
         )
 
@@ -2776,11 +2776,11 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: false
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """)
         )
 
-        # if shouldBeFCVGated: true, feature flag can default to true with a version
+        # if fcv_gated: true, feature flag can default to true with a version
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2789,11 +2789,11 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     version: 123
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """)
         )
 
-        # if shouldBeFCVGated: false, we do not need a version
+        # if fcv_gated: false, we do not need a version
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2801,7 +2801,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """)
         )
 
@@ -2813,7 +2813,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     incremental_rollout_phase: released
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """)
         )
 
@@ -2826,7 +2826,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     incremental_rollout_phase: released
                     default: true
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """)
         )
 
@@ -2840,11 +2840,11 @@ class TestBinder(testcase.IDLTestcase):
                     incremental_rollout_phase: not_for_incremental_rollout
                     default: true
                     version: 123
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """)
         )
 
-        # if shouldBeFCVGated: true and default: true, a version is required
+        # if fcv_gated: true and default: true, a version is required
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2852,12 +2852,12 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION,
         )
 
-        # false is not allowed with a version and shouldBeFCVGated: true
+        # false is not allowed with a version and fcv_gated: true
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2866,12 +2866,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     version: 123
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
         )
 
-        # false is not allowed with a version and shouldBeFCVGated: false
+        # false is not allowed with a version and fcv_gated: false
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2880,12 +2880,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     version: 123
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
         )
 
-        # if shouldBeFCVGated is false, a version is not allowed
+        # if fcv_gated is false, a version is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2894,12 +2894,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     version: 123
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if shouldBeFCVGated is false, enable_on_transitional_fcv is not allowed
+        # if fcv_gated is false, enable_on_transitional_fcv is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2907,13 +2907,13 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
-                    shouldBeFCVGated: false
+                    fcv_gated: false
                     enable_on_transitional_fcv: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if shouldBeFCVGated: true, enable_on_transitional_fcv is allowed
+        # if fcv_gated: true, enable_on_transitional_fcv is allowed
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2922,12 +2922,12 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     version: 123
-                    shouldBeFCVGated: true
+                    fcv_gated: true
                     enable_on_transitional_fcv: true
             """)
         )
 
-        # if shouldBeFCVGated is false, fcv_context_unaware is not allowed
+        # if fcv_gated is false, fcv_context_unaware is not allowed
         self.assert_bind_fail(
             textwrap.dedent("""
             feature_flags:
@@ -2935,13 +2935,13 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: true
-                    shouldBeFCVGated: false
+                    fcv_gated: false
                     fcv_context_unaware: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_UNSUPPORTED_OPTION,
         )
 
-        # if shouldBeFCVGated: true, fcv_context_unaware is allowed
+        # if fcv_gated: true, fcv_context_unaware is allowed
         self.assert_bind(
             textwrap.dedent("""
             feature_flags:
@@ -2949,7 +2949,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     default: false
-                    shouldBeFCVGated: true
+                    fcv_gated: true
                     fcv_context_unaware: true
             """)
         )
@@ -2962,7 +2962,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: "Make toast"
                     cpp_varname: gToaster
                     incremental_rollout_phase: waning_gibbous
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """),
             idl.errors.ERROR_ID_INCREMENTAL_ROLLOUT_PHASE_INVALID_VALUE,
         )
@@ -2976,7 +2976,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     incremental_rollout_phase: released
                     default: true
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """),
             idl.errors.ERROR_ID_ILLEGALLY_FCV_GATED_FEATURE_FLAG,
         )
@@ -2990,7 +2990,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     incremental_rollout_phase: in_development
                     default: true
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """),
             idl.errors.ERROR_ID_INCREMENTAL_FEATURE_FLAG_DEFAULT_VALUE,
         )
@@ -3002,7 +3002,7 @@ class TestBinder(testcase.IDLTestcase):
                 featureFlagToaster:
                     description: "Make toast"
                     cpp_varname: gToaster
-                    shouldBeFCVGated: true
+                    fcv_gated: true
             """),
             idl.errors.ERROR_ID_FEATURE_FLAG_WITHOUT_DEFAULT_VALUE,
         )
@@ -3015,7 +3015,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     incremental_rollout_phase: rollout
                     version: 123
-                    shouldBeFCVGated: false
+                    fcv_gated: false
             """),
             idl.errors.ERROR_ID_IFR_FLAG_WITH_VERSION,
         )

@@ -1117,7 +1117,7 @@ class ParserContext(object):
             ERROR_ID_ILLEGALLY_FCV_GATED_FEATURE_FLAG,
             (
                 "A feature flag in any phase other than the default ('not_for_incremental_rollout') "
-                "must not also set 'shouldBeFCVGated' to true."
+                "must not also set 'fcv_gated' to true."
             ),
         )
 

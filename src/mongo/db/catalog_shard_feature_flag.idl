@@ -35,4 +35,4 @@ feature_flags:
         cpp_varname: gFeatureFlagTransitionToCatalogShard
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true

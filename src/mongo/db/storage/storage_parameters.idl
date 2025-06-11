@@ -244,48 +244,48 @@ feature_flags:
         cpp_varname: gFeatureFlagLargeBatchedOperations
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagDocumentSourceListCatalog:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
         default: true
         version: 6.0
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagInternalWritesAreReplicatedTransactionally:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagTimeseriesDeletesSupport:
         description: "Enable support for arbitrary deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesDeletesSupport
         default: true
         version: 7.0
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagTimeseriesUpdatesSupport:
         description: "Enable support for arbitrary updates on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagTSBucketingParametersUnchanged:
         description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
     featureFlagStorageEngineInterruptibility:
         description: "Enable support for interrupting user operations in storage engines and rolling back transactions immediately that are targeted by the storage engine."
         cpp_varname: feature_flags::gStorageEngineInterruptibility
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
     featureFlagCreateSpillKVEngine:
         description: "When enabled, create a second storage engine instance that is used for creating SpillTables."
         cpp_varname: feature_flags::gFeatureFlagCreateSpillKVEngine
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
     featureFlagReplicateLocalCatalogIdentifiers:
         description: >-
             Enable replication of local catalog identifiers across replica set nodes, ensuring the
             _mdb_catalog and its associated storage table 'ident' mappings remain consistent.
         cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true

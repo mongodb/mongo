@@ -911,14 +911,14 @@ properties:
           version:
             type: number
             description: MongoDB version in which the feature flag is introduced.
-          shouldBeFCVGated:
+          fcv_gated:
             type: boolean
             description: Whether or not the feature flag should be FCV gated
           enable_on_transitional_fcv:
             type: boolean
             description: >
               Also enable this feature flag during the transitional FCV state (kUpgrade,
-              kDowngrade). Can only appear along with shouldBeFCVGated: true.
+              kDowngrade). Can only appear along with fcv_gated: true.
           incremental_rollout_phase:
             type: string
             description: >
@@ -943,7 +943,7 @@ properties:
               property on new flags.
         required:
           - description
-          - shouldBeFCVGated
+          - fcv_gated
   global:
     description: Global settings that affect code generation
     type: object

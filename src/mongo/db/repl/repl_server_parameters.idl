@@ -687,17 +687,17 @@ feature_flags:
         cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
 
     featureFlagReduceMajorityWriteLatency:
         description: When enabled, Secondaries acknowledge writes as durable after an oplog entry is written durably to disk, without waiting for it to be applied.
         cpp_varname: feature_flags::gReduceMajorityWriteLatency
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagOplogVisibility:
         description: When enabled, the Oplog visibility will be tracked at the Replication layer.
         cpp_varname: feature_flags::gFeatureFlagOplogVisibility
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false

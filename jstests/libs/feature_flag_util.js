@@ -83,7 +83,7 @@ export var FeatureFlagUtil = (function() {
             MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
                                            flagDoc.version) >= 0;
 
-        const flagShouldBeFCVGated = flagDoc.shouldBeFCVGated;
+        const flagShouldBeFCVGated = flagDoc.fcv_gated;
 
         if (flagIsEnabled && (!flagShouldBeFCVGated || ignoreFCV || flagVersionIsValid)) {
             return FlagStatus.kEnabled;
@@ -94,7 +94,7 @@ export var FeatureFlagUtil = (function() {
     function _getStatus(ignoreFCV, flagDoc) {
         assert(flagDoc.hasOwnProperty("currentlyEnabled"));
 
-        if (flagDoc.shouldBeFCVGated && ignoreFCV) {
+        if (flagDoc.fcv_gated && ignoreFCV) {
             return flagDoc.value ? FlagStatus.kEnabled : FlagStatus.kDisabled;
         } else {
             return flagDoc.currentlyEnabled ? FlagStatus.kEnabled : FlagStatus.kDisabled;

@@ -34,13 +34,13 @@ feature_flags:
         description: "Feature flag to enable reading change events from the change collection rather than the oplog"
         cpp_varname: gFeatureFlagServerlessChangeStreams
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagChangeStreamPreciseShardTargeting:
         description: "Feature flag to enable improved handling of cluster topology changes in change streams"
         cpp_varname: gFeatureFlagChangeStreamPreciseShardTargeting
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagSbeFull:
         description:
@@ -48,133 +48,133 @@ feature_flags:
             by default"
         cpp_varname: gFeatureFlagSbeFull
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagQueryStats:
         description: "Feature flag for enabling full queryStats collection."
         cpp_varname: gFeatureFlagQueryStats
         default: true
         version: 7.2
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
 
     featureFlagAggOutTimeseries:
         description: "Feature flag for enabling support for $out to write to time-series collections"
         cpp_varname: gFeatureFlagAggOutTimeseries
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagQuerySettings:
         description: "Feature flag for enabling persistent query settings"
         cpp_varname: gFeatureFlagQuerySettings
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
 
     featureFlagVectorSearchPublicPreview:
         description: "Feature flag to enable vector search for public preview."
         cpp_varname: gFeatureFlagVectorSearchPublicPreview
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagSearchInSbe:
         description: "Feature flag to enable $search execution in SBE"
         cpp_varname: gFeatureFlagSearchInSbe
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagTimeSeriesInSbe:
         description: "Feature flag to enable queries against time-series collections to execute in SBE"
         cpp_varname: gFeatureFlagTimeSeriesInSbe
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagSbeBlockHashAgg:
         description: "Feature flag to enable Block Hash Aggregation for TS queries SBE"
         cpp_varname: gFeatureFlagSbeBlockHashAgg
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagBinDataConvert:
         description: "Feature flag to enable BinData support in $convert."
         cpp_varname: gFeatureFlagBinDataConvert
         default: true
         version: 8.0
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
 
     featureFlagSearchBatchSizeTuning:
         description: "Feature flag to enable batchSize tuning for search queries."
         cpp_varname: gFeatureFlagSearchBatchSizeTuning
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagAllowMergeOnNullishValues:
         description: "Feature flag to support null and missing values for 'on' fields in $merge."
         cpp_varname: gFeatureFlagAllowMergeOnNullishValues
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagBinDataConvertNumeric:
         description: "Feature flag to enable extended BinData support for int, double and long in $convert."
         cpp_varname: gFeatureFlagBinDataConvertNumeric
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagAccuratePercentiles:
         description: "Feature flag to enable accurate continuous and discrete $percentile accumulator/expression."
         cpp_varname: gFeatureFlagAccuratePercentiles
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagCursorBasedTop:
         description: "Feature flag to enable cursor-based top command."
         cpp_varname: gFeatureFlagCursorBasedTop
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagSearchExplainExecutionStats:
         description: "Feature flag to enable executing search queries for explain."
         cpp_varname: gFeatureFlagSearchExplainExecutionStats
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagShardFilteringDistinctScan:
         description: "Feature flag to support shard filtering in distinct scan optimization"
         cpp_varname: gFeatureFlagShardFilteringDistinctScan
         default: true
         version: 8.2
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagArrayAccumulators:
         description: "Feature flag to enable the $concatArrays and $setUnion accumulators."
         cpp_varname: gFeatureFlagArrayAccumulators
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagQueryStatsCountDistinct:
         description: "Feature flag to enable query stats for the count and distinct commands."
         cpp_varname: gFeatureFlagQueryStatsCountDistinct
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
     # TODO SERVER-95358 remove once 9.0 becomes last LTS
     featureFlagAggMongosToRouter:
         description: "Feature flag to switch from 'fromMongos' to 'fromRouter' field on aggregate commands."
         cpp_varname: gFeatureFlagAggMongosToRouter
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagLookupEncryptionSchemasFLE:
         description: "Feature flag to support multiple FLE schemas with $lookup"
         cpp_varname: gFeatureFlagLookupEncryptionSchemasFLE
         default: true
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagRankFusionBasic:
         description:
@@ -183,7 +183,7 @@ feature_flags:
         cpp_varname: gFeatureFlagRankFusionBasic
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagRankFusionFull:
         description:
@@ -192,7 +192,7 @@ feature_flags:
         cpp_varname: gFeatureFlagRankFusionFull
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
 
     featureFlagSearchHybridScoringFull:
@@ -201,7 +201,7 @@ feature_flags:
             hybrid scoring features. (Final milestone of Vector Search Hybrid Scoring)"
         cpp_varname: gFeatureFlagSearchHybridScoringFull
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagQueryMemoryTracking:
         description:
@@ -209,41 +209,41 @@ feature_flags:
             queries' blocking stages."
         cpp_varname: gFeatureFlagQueryMemoryTracking
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagMongotIndexedViews:
         description: "Feature flag to enable issuing mongot index commands on views and running mongot queries on said mongot indexed views."
         cpp_varname: gFeatureFlagMongotIndexedViews
         default: true
         version: 8.1
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagCurrentDate:
         description: "Feature flag to enable $currentDate expression"
         cpp_varname: gFeatureFlagCurrentDate
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagMultiPlanLimiter:
         description: "Feature flag to enable MultiPlan rate limiter."
         cpp_varname: gfeatureFlagMultiPlanLimiter
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false
 
     featureFlagSbeUpgradeBinaryTrees:
         description: "Feature flag to enable N-ary ABT nodes"
         cpp_varname: gFeatureFlagSbeUpgradeBinaryTrees
-        shouldBeFCVGated: false
+        fcv_gated: false
         incremental_rollout_phase: rollout
 
     featureFlagUUIDExpression:
         description: "Feature flag to enable $createUUID expression"
         cpp_varname: gFeatureFlagUUIDExpression
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
     featureFlagPQSBackfill:
         description: "Enables PQS representative query backfilling"
         cpp_varname: gFeatureFlagPQSBackfill
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true

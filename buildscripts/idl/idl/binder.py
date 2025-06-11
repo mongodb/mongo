@@ -1639,7 +1639,7 @@ def _bind_non_ifr_feature_flag_default(ctxt, param):
     expr_for_default = syntax.Expression(
         param.default.file_name, param.default.line, param.default.column
     )
-    if param.shouldBeFCVGated.literal == "true":
+    if param.fcv_gated.literal == "true":
         expr_for_default.expr = f'{param.default.literal}, "{param.version or ""}"_sd'
         if param.enable_on_transitional_fcv:
             expr_for_default.expr += ", true"
@@ -1653,7 +1653,7 @@ def _bind_non_ifr_feature_flag_default(ctxt, param):
 
 def _bind_feature_flag_cpp_vartype(ctxt, param, feature_flag_phase):
     # type: (errors.ParserContext, syntax.FeatureFlag, ast.FeatureFlagRolloutPhase) -> str
-    if param.shouldBeFCVGated.literal == "true":
+    if param.fcv_gated.literal == "true":
         # FCV flags must not also be IFR flags.
         if feature_flag_phase != ast.FeatureFlagRolloutPhase.NOT_FOR_INCREMENTAL_ROLLOUT:
             ctxt.add_illegally_fcv_gated_feature_flag(param)
@@ -1710,7 +1710,7 @@ def _bind_feature_flags(ctxt, param):
             ctxt.add_feature_flag_default_false_has_version(param)
             return None
 
-        if param.shouldBeFCVGated.literal == "true":
+        if param.fcv_gated.literal == "true":
             # Feature flags that default to true and should be FCV gated are required to have a
             # version.
             if param.default.literal == "true" and not param.version:

@@ -39,4 +39,4 @@ feature_flags:
         description: "Feature flag to enable gapless FTDC."
         cpp_varname: gFeatureFlagGaplessFTDC
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false

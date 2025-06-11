@@ -5,4 +5,4 @@ feature_flags:
         description: "Create a feature flag"
         cpp_varname: gFeatureFlagToaster
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true

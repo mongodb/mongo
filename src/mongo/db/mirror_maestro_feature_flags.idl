@@ -33,4 +33,4 @@ feature_flags:
         description: "Enables targeting hosts for read mirroring"
         cpp_varname: gFeatureFlagTargetedMirrorReads
         default: false
-        shouldBeFCVGated: false
+        fcv_gated: false

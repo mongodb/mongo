@@ -973,7 +973,7 @@ def _parse_feature_flag(ctxt, spec, name, node):
             "cpp_varname": _RuleDesc("scalar"),
             "default": _RuleDesc("scalar_or_mapping", mapping_parser_func=_parse_expression),
             "version": _RuleDesc("scalar"),
-            "shouldBeFCVGated": _RuleDesc(
+            "fcv_gated": _RuleDesc(
                 "scalar_or_mapping", _RuleDesc.REQUIRED, mapping_parser_func=_parse_expression
             ),
             "enable_on_transitional_fcv": _RuleDesc("bool_scalar"),

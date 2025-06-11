@@ -91,7 +91,7 @@ feature_flags:
         description: Feature flag for testing use of feature flags with CW server params
         cpp_varname: gFeatureFlagClusterWideToaster
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
 
 server_parameters:
     testIntClusterParameter:

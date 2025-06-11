@@ -651,7 +651,7 @@ feature_flags:
     description: "Fork feature flag"
     cpp_varname: feature_flags::gFeatureFlagFork
     default: true
-    shouldBeFCVGated: false
+    fcv_gated: false
 
   # featureFlagToaster is an FCV-gated feature flag that is under development and off by default.
   # This feature flag can be enabled only after associating it with the latest FCV (eg. 4.9.0).
@@ -659,7 +659,7 @@ feature_flags:
     description: "Toaster feature flag"
     cpp_varname: feature_flags::gFeatureFlagToaster
     default: false
-    shouldBeFCVGated: true
+    fcv_gated: true
 ```
 
 A feature flag has the following properties:
@@ -683,24 +683,24 @@ A feature flag has the following properties:
   - When the feature is fully tested and ready for release, we can change the default to true.
     At that time, a `version` must be specified.
 - Version: string - a string for the FCV version
-  - Required field if `default` is true and `shouldBeFCVGated` is true
+  - Required field if `default` is true and `fcv_gated` is true
   - Must be a string acceptable to FeatureCompatibilityVersionParser.
-- shouldBeFCVGated: boolean
+- fcv_gated: boolean
   - When set to `true`, an FCV-gated feature flag will be created. Thus, it will only be enabled once the FCV is reaches the version
-    set in the `version` field, unless `enable_on_transitional_fcv: true` is specified (see below). For example, if a feature flag has `shouldBeFCVGated: true` and
+    set in the `version` field, unless `enable_on_transitional_fcv: true` is specified (see below). For example, if a feature flag has `fcv_gated: true` and
     `version: 8.0`, this means that in a mixed version replica set, where some nodes are on the
     7.0 binary version while others are on 8.0 binary version, the feature flag will not be enabled.
     It will only be enabled once all nodes are on the 8.0 binary version AND the FCV of the replica
     set is upgraded to 8.0 through the setFeatureCompatibilityVersion command.
   - When set to `false`, a binary-compatible feature flag will be created. It should not have a `version` field, and it will only be
     gated based on whether it is enabled by default on that binary version. For example, if a feature
-    flag has `shouldBeFCVGated: false`, this means that during upgrade/downgrade, in a mixed version
+    flag has `fcv_gated: false`, this means that during upgrade/downgrade, in a mixed version
     replica set, where some nodes are still on the 7.0 binary version while others are on 8.0 binary
     version, the feature flag will already be enabled on the nodes on the 8.0 binary version, but not
     on the nodes with the 7.0 binary version.
   - See [Determining if a feature flag should be binary-compatible or FCV-gated](#determining-if-a-feature-flag-should-be-binary-compatible-or-fcv-gated) for guidelines on when each type of feature flag should be used.
 - enable_on_transitional_fcv: boolean
-  - Optional. Can only be specified for FCV-gated feature flags (`shouldBeFCVGated: true`). Default
+  - Optional. Can only be specified for FCV-gated feature flags (`fcv_gated: true`). Default
     value is `false`.
   - When set to `true`, an FCV-gated feature flag will also be enabled during `kUpgradingFrom_X_To_Y`
     or `kDowngradingFrom_Y_To_X`, where `Y` is the version specified in `version`. For example, if
@@ -712,7 +712,7 @@ A feature flag has the following properties:
     the feature, along with a different feature flag that is enabled normally in fully upgraded
     state.
 - fcv_context_unaware: boolean
-  - Optional. Can only be specified for FCV-gated feature flags (`shouldBeFCVGated: true`). Default value is `false`.
+  - Optional. Can only be specified for FCV-gated feature flags (`fcv_gated: true`). Default value is `false`.
   - `true` for feature flags that have not yet been adapted to the new feature flag API introduced in SERVER-99351.
     Those feature flags are compiled to a C++ type that allows checking them without considering Operation FCV.
     Do not set this property on new flags.
@@ -783,7 +783,7 @@ Furthermore, FCV-gated feature flag checks _must_ pass the `VersionContext` deco
 This requires propagating the `OperationContext`/`VersionContext` all the way from the beginning of the operation to the point of the feature flag check.
 In the unusual case where a feature flag is checked outside of an operation (e.g. during startup), the `kNoVersionContext` constant should be passed.
 
-This does not apply to feature flags where `shouldBeFCVGated` is set to false, since `isEnabled`
+This does not apply to feature flags where `fcv_gated` is set to false, since `isEnabled`
 always returns the same value after it is initialized during startup.
 
 If the registration of a command should be gated by a feature flag, use `requiresFeatureFlag` when

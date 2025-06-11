@@ -48,5 +48,5 @@ feature_flags:
             require tenantID to be a part of NamespaceString and TenantDatabase.
         cpp_varname: gFeatureFlagRequireTenantID
         default: false
-        shouldBeFCVGated: true
+        fcv_gated: true
         fcv_context_unaware: true
