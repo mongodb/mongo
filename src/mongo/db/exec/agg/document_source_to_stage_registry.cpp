@@ -53,7 +53,7 @@ MONGO_INITIALIZER_GROUP(EndDocumentSourceStageRegistration,
                         ("BeginDocumentSourceStageRegistration"),
                         ())
 
-boost::intrusive_ptr<Stage> buildStage(const boost::intrusive_ptr<DocumentSource>& ds) {
+StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds) {
     if (auto it = stageBuildersMap.find(ds->getId()); it != stageBuildersMap.end()) {
         return (it->second)(ds);
     }

@@ -38,8 +38,6 @@
 namespace mongo::exec::agg {
 class Pipeline {
 public:
-    // TODO SERVER-105494: Use 'std::unique_ptr' instead of 'boost::intrusive_ptr'.
-    using StagePtr = boost::intrusive_ptr<Stage>;
     using StageContainer = std::vector<StagePtr>;
 
     // Deleting implicit copy constructor, because it was not needed so far.

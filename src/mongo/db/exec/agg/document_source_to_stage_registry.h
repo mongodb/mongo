@@ -62,7 +62,7 @@ namespace agg {
     }
 
 using DocumentSourceToStageFn =
-    std::function<boost::intrusive_ptr<Stage>(const boost::intrusive_ptr<const DocumentSource>&)>;
+    std::function<StagePtr(const boost::intrusive_ptr<const DocumentSource>&)>;
 
 /**
  * Registers a DocumentSource with a function that builds an aggregation 'Stage' from
@@ -74,14 +74,9 @@ using DocumentSourceToStageFn =
 void registerDocumentSourceToStageFn(DocumentSource::Id dsid, DocumentSourceToStageFn fn);
 
 /**
- * This method is for unit-testing only. DO NOT use it in productive code.
- */
-stdx::unordered_map<DocumentSource::Id, DocumentSourceToStageFn>& getStageBuildersMap_forTest();
-
-/**
  * For an instance of DocumentSource create appropriate Stage object.
  */
-boost::intrusive_ptr<Stage> buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
+StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
 
 }  // namespace agg
 }  // namespace exec

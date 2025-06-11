@@ -37,7 +37,7 @@ namespace mongo::test {
 
 using Pipeline = mongo::exec::agg::Pipeline;
 using Stage = mongo::exec::agg::Stage;
-using StagePtr = mongo::exec::agg::Pipeline::StagePtr;
+using StagePtr = mongo::exec::agg::StagePtr;
 using StageContainer = mongo::exec::agg::Pipeline::StageContainer;
 using GetNextResult = mongo::exec::agg::GetNextResult;
 

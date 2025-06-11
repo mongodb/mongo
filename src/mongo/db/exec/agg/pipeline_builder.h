@@ -37,4 +37,4 @@
 namespace mongo::exec::agg {
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
     const std::list<boost::intrusive_ptr<DocumentSource>>& sources);
-}
+}  // namespace mongo::exec::agg

@@ -305,6 +305,9 @@ private:
     }
 };
 
+// TODO SERVER-105494: Use 'std::unique_ptr' instead of 'boost::intrusive_ptr'.
+using StagePtr = boost::intrusive_ptr<Stage>;
+
 }  // namespace agg
 }  // namespace exec
 }  // namespace mongo
