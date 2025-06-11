@@ -1742,7 +1742,7 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                                            Shard::RetryPolicy::kIdempotent,
                                            abortRequests);
 
-    // TODO SERVER-100938: Replace the following with appendRawResponses when that helper has been
+    // TODO (SERVER-103580): Replace the following with appendRawResponses when that helper has been
     // fixed to properly return WCE.
     BSONObj lastResult;
     boost::optional<BSONObj> errorResult;
