@@ -5498,6 +5498,11 @@ export const authCommandsLib = {
               {runOnDb: firstDbName, privileges: [], expectAuthzFailure: true},
           ]
         },
+        {
+            testname: "listCollections_rawData",
+            command: {listCollections: 1, rawData: true},
+            testcases: [{runOnDb: firstDbName, roles: {__system: 1}}]
+        },
 
         {
           testname: "listIndexes",

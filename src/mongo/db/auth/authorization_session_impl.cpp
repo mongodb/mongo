@@ -594,6 +594,15 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
     const auto& dbname = cmd.getDbName();
     _contract.addAccessCheck(AccessCheckEnum::kCheckAuthorizedToListCollections);
 
+    if (cmd.getRawData() &&
+        !AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(cmd.getDbName().tenantId()),
+            ActionType::internal)) {
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream() << "Not authorized to list collections with rawData on db: "
+                                    << dbname.toStringForErrorMsg());
+    }
+
     if (cmd.getAuthorizedCollections() && cmd.getNameOnly() &&
         AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
         return PrivilegeVector();

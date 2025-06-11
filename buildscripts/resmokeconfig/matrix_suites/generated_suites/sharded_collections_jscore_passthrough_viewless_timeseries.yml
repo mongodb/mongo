@@ -72,6 +72,7 @@ selector:
     - jstests/core/timeseries/ddl/timeseries_list_catalog.js
     - jstests/core/timeseries/ddl/timeseries_list_collections.js
     - jstests/core/timeseries/ddl/timeseries_list_collections_filter_name.js
+    - jstests/core/timeseries/ddl/timeseries_list_collections_rawdata.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_ascending_descending.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_compound.js
     - jstests/core/timeseries/ddl/timeseries_metric_index_hashed.js

@@ -73,6 +73,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
@@ -243,7 +244,10 @@ BSONObj buildTimeseriesBson(OperationContext* opCtx, StringData collName, bool n
 /**
  * Return an object describing the collection. Takes a collection lock if nameOnly is false.
  */
-BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collection, bool nameOnly) {
+BSONObj buildCollectionBson(OperationContext* opCtx,
+                            const Collection* collection,
+                            bool nameOnly,
+                            bool isRawData) {
     if (!collection) {
         return {};
     }
@@ -253,7 +257,8 @@ BSONObj buildCollectionBson(OperationContext* opCtx, const Collection* collectio
     b.append("name", nss.coll());
 
     const auto collectionType = [&] {
-        if (collection->isTimeseriesCollection() && collection->isNewTimeseriesWithoutView()) {
+        if (collection->isTimeseriesCollection() && collection->isNewTimeseriesWithoutView() &&
+            !isRawData) {
             return "timeseries";
         } else {
             return "collection";
@@ -341,6 +346,10 @@ public:
             return true;
         }
 
+        bool supportsRawData() const final {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
             uassertStatusOK(authzSession->checkAuthorizedToListCollections(request()));
@@ -359,6 +368,7 @@ public:
             const auto dbName = listCollRequest.getDbName();
             const bool nameOnly = listCollRequest.getNameOnly();
             const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
+            const bool isRawData = isRawDataOperation(opCtx);
 
             // We need to copy the serialization context from the request to the reply object
             const auto respSerializationContext =
@@ -413,7 +423,8 @@ public:
                                 auto collection =
                                     catalog->establishConsistentCollection(opCtx, nss, boost::none);
                                 if (collection) {
-                                    return buildCollectionBson(opCtx, collection.get(), nameOnly);
+                                    return buildCollectionBson(
+                                        opCtx, collection.get(), nameOnly, isRawData);
                                 }
 
                                 std::shared_ptr<const ViewDefinition> view =
@@ -471,7 +482,8 @@ public:
                                 return true;
                             }
 
-                            BSONObj collBson = buildCollectionBson(opCtx, collection, nameOnly);
+                            BSONObj collBson =
+                                buildCollectionBson(opCtx, collection, nameOnly, isRawData);
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
                                     opCtx, collBson, matcher.get(), ws.get(), results);

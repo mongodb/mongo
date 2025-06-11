@@ -1021,8 +1021,8 @@ DBCollection.prototype.convertToCapped = function(bytes) {
  *
  * If the collection does not exists return null.
  */
-DBCollection.prototype.getMetadata = function() {
-    var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}});
+DBCollection.prototype.getMetadata = function(params) {
+    var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}, ...params});
     if (res.ok) {
         const cursor = new DBCommandCursor(this._db, res);
         if (!cursor.hasNext())
