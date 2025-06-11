@@ -56,7 +56,7 @@ public:
 
     void addNumHostsTargeted(QueryType queryType, TargetType targetType);
 
-    void appendSection(BSONObjBuilder* builder);
+    void report(BSONObjBuilder* builder) const;
 
     TargetType parseTargetType(OperationContext* opCtx,
                                int nShardsTargeted,

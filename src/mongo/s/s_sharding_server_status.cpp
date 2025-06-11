@@ -108,19 +108,19 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        auto const grid = Grid::get(opCtx);
-        auto const catalogCache = grid->catalogCache();
-        auto& numHostsTargetedMetrics = NumHostsTargetedMetrics::get(opCtx);
+
+        const auto grid = Grid::get(opCtx);
+        if (!grid->isInitialized()) {
+            return {};
+        }
 
         BSONObjBuilder result;
+        auto configServerInShardCache = grid->shardRegistry()->cachedClusterHasConfigShard();
+        result.appendBool("configServerInShardCache", configServerInShardCache.value_or(false));
 
-        numHostsTargetedMetrics.appendSection(&result);
-        catalogCache->report(&result);
-
-        if (grid->isInitialized()) {
-            auto configServerInShardCache = grid->shardRegistry()->cachedClusterHasConfigShard();
-            result.appendBool("configServerInShardCache", configServerInShardCache.value_or(false));
-        }
+        NumHostsTargetedMetrics::get(opCtx).report(&result);
+        grid->catalogCache()->report(&result);
+        grid->shardRegistry()->report(&result);
 
         return result.obj();
     }

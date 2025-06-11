@@ -94,6 +94,8 @@ public:
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
+        shardRegistry->report(&result);
+
         const auto vcTime = VectorClock::get(opCtx)->getTime();
 
         const auto configOpTime = [&]() {

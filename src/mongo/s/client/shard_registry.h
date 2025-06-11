@@ -383,6 +383,11 @@ public:
      */
     std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost) const;
 
+    /**
+     * Reports statistics about the shard registry to be used by serverStatus
+     */
+    void report(BSONObjBuilder* builder) const;
+
 private:
     friend class ShardRegistryTest;
 
@@ -473,6 +478,14 @@ private:
         Increment _forceReloadIncrement{0};
         Timestamp _topologyTime;
     };
+
+    struct Stats {
+        AtomicWord<long long> activeRefreshCount{0};
+        AtomicWord<long long> totalRefreshCount{0};
+        AtomicWord<long long> failedRefreshCount{0};
+
+        void report(BSONObjBuilder* builder) const;
+    } _stats;
 
     enum class Singleton { Only };
     static constexpr auto _kSingleton = Singleton::Only;

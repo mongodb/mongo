@@ -160,134 +160,148 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
                                                           const Cache::ValueHandle& cachedData,
                                                           const Time& timeInStore) {
     invariant(key == _kSingleton);
-    // This function can potentially block for a long time on network activity, so holding of locks
-    // is disallowed.
-    tassert(7032320,
-            "Can't perform ShardRegistry lookup while holding locks",
-            !shard_role_details::getLocker(opCtx)->isLocked());
 
-    LOGV2_DEBUG(4620250,
-                2,
-                "Starting ShardRegistry::_lookup",
-                "cachedData"_attr = cachedData ? cachedData->toBSON() : BSONObj{},
-                "cachedData.getTime()"_attr = cachedData ? cachedData.getTime() : Time{},
-                "timeInStore"_attr = timeInStore);
+    try {
+        _stats.totalRefreshCount.fetchAndAdd(1);
+        _stats.activeRefreshCount.fetchAndAdd(1);
+        ON_BLOCK_EXIT([&]() { _stats.activeRefreshCount.fetchAndSubtract(1); });
 
-    auto [returnData, returnTime, removedShards] =
-        [&]() -> std::tuple<ShardRegistryData, Time, ShardRegistryData::ShardMap> {
-        ShardRegistryData lookupData;
+        // This function can potentially block for a long time on network activity, so holding of
+        // locks
+        // is disallowed.
+        tassert(7032320,
+                "Can't perform ShardRegistry lookup while holding locks",
+                !shard_role_details::getLocker(opCtx)->isLocked());
 
-        // If the latest _forceReloadIncrement before the lookup is greater than the one in
-        // timeInStore, at least one force reload request sneaked in while the lookup was started.
-        // This lookup will be causally consistent with any force reload requests up to this point,
-        // so it is fine to merge the requests to avoid extra lookups.
+        LOGV2_DEBUG(4620250,
+                    2,
+                    "Starting ShardRegistry::_lookup",
+                    "cachedData"_attr = cachedData ? cachedData->toBSON() : BSONObj{},
+                    "cachedData.getTime()"_attr = cachedData ? cachedData.getTime() : Time{},
+                    "timeInStore"_attr = timeInStore);
 
-        // This also covers the case where no cachedData was available (null timeInStore). Using the
-        // timeInStore._forceReloadIncrement (0) for the lookup result would cause an unnecessary
-        // additional lookup on the next get request if the current lookup was in fact caused by a
-        // forceReload (meaning _forceReloadIncrement >= 1).
-        auto returnTime = Time::makeWithLookup([&] {
-            Timestamp maxTopologyTime;
-            std::tie(lookupData, maxTopologyTime) =
-                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
+        auto [returnData, returnTime, removedShards] =
+            [&]() -> std::tuple<ShardRegistryData, Time, ShardRegistryData::ShardMap> {
+            ShardRegistryData lookupData;
 
-            // TODO (SERVER-102087): remove invariant relaxation after 9.0 is branched.
-            {
-                // Detect topologyTime corruption due to SERVER-63742. If config.shards has no
-                // entries with a topologyTime, but there is a non-initial topologyTime being
-                // gossiped, there has been corruption. This scenario is benign, and thus we relax
-                // the time monotonicity invariant by making the expected topologyTime accepted.
-                //
-                // For cases where there is a topologyTime in config.shards, but the gossiped time
-                // is greater than the maximum topologyTime found there, or for cases where
-                // config.shards has no shards but there is a gossiped topologyTime, we still want
-                // to fail.
-                //
-                // Caveat: by design, force reloads install the actual config.shards topologyTime as
-                // the timeInStore, which should be Timestamp(0, 1) in the accepted scenario.
-                // Subsequent getData calls will advance the timeInStore to the corrupted
-                // topologyTime, causing another refresh. Meaning that each forced reload will end
-                // up causing two lookups.
-                const Timestamp kInitialTopologyTime =
-                    VectorClock::kInitialComponentTime.asTimestamp();
-                if (MONGO_unlikely(!lookupData.getAllShardIds().empty() &&
-                                   maxTopologyTime == kInitialTopologyTime &&
-                                   // '>' also ignores Timestamp(0, 0), used for force reloads, or
-                                   // when the cache is empty.
-                                   timeInStore.getTopologyTime() > kInitialTopologyTime)) {
+            // If the latest _forceReloadIncrement before the lookup is greater than the one in
+            // timeInStore, at least one force reload request sneaked in while the lookup was
+            // started. This lookup will be causally consistent with any force reload requests up to
+            // this point, so it is fine to merge the requests to avoid extra lookups.
 
-                    // Log severity suppressor for inconsistent topology time message.
-                    static logv2::SeveritySuppressor severitySuppressor{
-                        Days{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+            // This also covers the case where no cachedData was available (null timeInStore). Using
+            // the timeInStore._forceReloadIncrement (0) for the lookup result would cause an
+            // unnecessary additional lookup on the next get request if the current lookup was in
+            // fact caused by a forceReload (meaning _forceReloadIncrement >= 1).
+            auto returnTime = Time::makeWithLookup([&] {
+                Timestamp maxTopologyTime;
+                std::tie(lookupData, maxTopologyTime) =
+                    ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
 
-                    LOGV2_DEBUG(10173900,
-                                severitySuppressor().toInt(),
-                                "Inconsistent $topologyTime detected. 'config.shards' does not "
-                                "contain any 'topologyTime' in its entries, but a non-initial "
-                                "$topologyTime has been gossiped. An inconsistent $topologyTime "
-                                "could have been created by SERVER-63742, while 'config.shards' "
-                                "not containing any 'topologyTime' is expected when there have "
-                                "been no add or remove shard operations made after upgrading to "
-                                "version 5.0. This scenario is benign and the topologyTime is "
-                                "accepted as valid.",
-                                "topologyTime"_attr = timeInStore.getTopologyTime());
+                // TODO (SERVER-102087): remove invariant relaxation after 9.0 is branched.
+                {
+                    // Detect topologyTime corruption due to SERVER-63742. If config.shards has no
+                    // entries with a topologyTime, but there is a non-initial topologyTime being
+                    // gossiped, there has been corruption. This scenario is benign, and thus we
+                    // relax the time monotonicity invariant by making the expected topologyTime
+                    // accepted.
+                    //
+                    // For cases where there is a topologyTime in config.shards, but the gossiped
+                    // time is greater than the maximum topologyTime found there, or for cases where
+                    // config.shards has no shards but there is a gossiped topologyTime, we still
+                    // want to fail.
+                    //
+                    // Caveat: by design, force reloads install the actual config.shards
+                    // topologyTime as the timeInStore, which should be Timestamp(0, 1) in the
+                    // accepted scenario. Subsequent getData calls will advance the timeInStore to
+                    // the corrupted topologyTime, causing another refresh. Meaning that each forced
+                    // reload will end up causing two lookups.
+                    const Timestamp kInitialTopologyTime =
+                        VectorClock::kInitialComponentTime.asTimestamp();
+                    if (MONGO_unlikely(!lookupData.getAllShardIds().empty() &&
+                                       maxTopologyTime == kInitialTopologyTime &&
+                                       // '>' also ignores Timestamp(0, 0), used for force reloads,
+                                       // or when the cache is empty.
+                                       timeInStore.getTopologyTime() > kInitialTopologyTime)) {
 
-                    maxTopologyTime = timeInStore.getTopologyTime();
+                        // Log severity suppressor for inconsistent topology time message.
+                        static logv2::SeveritySuppressor severitySuppressor{
+                            Days{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(2)};
+
+                        LOGV2_DEBUG(
+                            10173900,
+                            severitySuppressor().toInt(),
+                            "Inconsistent $topologyTime detected. 'config.shards' does not "
+                            "contain any 'topologyTime' in its entries, but a non-initial "
+                            "$topologyTime has been gossiped. An inconsistent $topologyTime "
+                            "could have been created by SERVER-63742, while 'config.shards' "
+                            "not containing any 'topologyTime' is expected when there have "
+                            "been no add or remove shard operations made after upgrading to "
+                            "version 5.0. This scenario is benign and the topologyTime is "
+                            "accepted as valid.",
+                            "topologyTime"_attr = timeInStore.getTopologyTime());
+
+                        maxTopologyTime = timeInStore.getTopologyTime();
+                    }
                 }
+
+                return maxTopologyTime;
+            });
+
+            if (!cachedData) {
+                return {lookupData, returnTime, {}};
             }
 
-            return maxTopologyTime;
-        });
+            // If there was cached data, merge connection strings of new and old data.
+            auto [mergedData, removedShards] =
+                ShardRegistryData::mergeExisting(*cachedData, lookupData);
+            return {mergedData, returnTime, removedShards};
+        }();
 
-        if (!cachedData) {
-            return {lookupData, returnTime, {}};
+        // Always apply the latest conn strings.
+        auto latestConnStrings = _getLatestConnStrings();
+
+        for (const auto& latestConnString : latestConnStrings) {
+            auto shard = returnData.findByRSName(latestConnString.first.toString());
+            if (shard == nullptr || shard->getConnString() == latestConnString.second) {
+                continue;
+            }
+
+            auto newData = ShardRegistryData::createFromExisting(
+                returnData, latestConnString.second, _shardFactory.get());
+            returnData = newData;
         }
 
-        // If there was cached data, merge connection strings of new and old data.
-        auto [mergedData, removedShards] =
-            ShardRegistryData::mergeExisting(*cachedData, lookupData);
-        return {mergedData, returnTime, removedShards};
-    }();
+        // Remove RSMs that are not in the catalog any more.
+        for (auto& pair : removedShards) {
+            auto& shardId = pair.first;
+            auto& shard = pair.second;
+            invariant(shard);
 
-    // Always apply the latest conn strings.
-    auto latestConnStrings = _getLatestConnStrings();
-
-    for (const auto& latestConnString : latestConnStrings) {
-        auto shard = returnData.findByRSName(latestConnString.first.toString());
-        if (shard == nullptr || shard->getConnString() == latestConnString.second) {
-            continue;
+            auto name = shard->getConnString().getSetName();
+            if (shardId != ShardId::kConfigServerId) {
+                // Don't remove the config shard's RSM because it is used to target the config
+                // server.
+                ReplicaSetMonitor::remove(name);
+            }
+            _removeReplicaSet(name);
+            for (auto& callback : _shardRemovalHooks) {
+                // Run callbacks asynchronously.
+                ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                    .getAsync([=](const Status&) { callback(shardId); });
+            }
         }
 
-        auto newData = ShardRegistryData::createFromExisting(
-            returnData, latestConnString.second, _shardFactory.get());
-        returnData = newData;
+        LOGV2_DEBUG(4620251,
+                    2,
+                    "Finished ShardRegistry::_lookup",
+                    "returnData"_attr = returnData.toBSON(),
+                    "returnTime"_attr = returnTime);
+        return Cache::LookupResult{returnData, returnTime};
+    } catch (const DBException&) {
+        _stats.failedRefreshCount.fetchAndAdd(1);
+        throw;
     }
-
-    // Remove RSMs that are not in the catalog any more.
-    for (auto& pair : removedShards) {
-        auto& shardId = pair.first;
-        auto& shard = pair.second;
-        invariant(shard);
-
-        auto name = shard->getConnString().getSetName();
-        if (shardId != ShardId::kConfigServerId) {
-            // Don't remove the config shard's RSM because it is used to target the config server.
-            ReplicaSetMonitor::remove(name);
-        }
-        _removeReplicaSet(name);
-        for (auto& callback : _shardRemovalHooks) {
-            // Run callbacks asynchronously.
-            ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                .getAsync([=](const Status&) { callback(shardId); });
-        }
-    }
-
-    LOGV2_DEBUG(4620251,
-                2,
-                "Finished ShardRegistry::_lookup",
-                "returnData"_attr = returnData.toBSON(),
-                "returnTime"_attr = returnTime);
-    return Cache::LookupResult{returnData, returnTime};
 }
 
 void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
@@ -703,6 +717,17 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     }
 
     return data->findByHostAndPort(host);
+}
+
+void ShardRegistry::report(BSONObjBuilder* builder) const {
+    BSONObjBuilder statsBuilder = builder->subobjStart("shardRegistry");
+    _stats.report(&statsBuilder);
+}
+
+void ShardRegistry::Stats::report(BSONObjBuilder* builder) const {
+    builder->append("activeRefreshCount", activeRefreshCount.load());
+    builder->append("totalRefreshCount", totalRefreshCount.load());
+    builder->append("failedRefreshCount", failedRefreshCount.load());
 }
 
 void ShardRegistry::_scheduleForcedLookup() {

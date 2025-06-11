@@ -80,7 +80,7 @@ void NumHostsTargetedMetrics::addNumHostsTargeted(NumHostsTargetedMetrics::Query
     }
 }
 
-void NumHostsTargetedMetrics::appendSection(BSONObjBuilder* builder) {
+void NumHostsTargetedMetrics::report(BSONObjBuilder* builder) const {
     BSONObjBuilder numHostsTargetedStatsBuilder(builder->subobjStart("numHostsTargeted"));
     for (auto i = 0; i < kNumQueryType; i++) {
         auto& targetStat = _numHostsTargeted[i];
