@@ -55,7 +55,6 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -415,26 +414,35 @@ void logStartup(OperationContext* opCtx) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDb(opCtx, NamespaceString::kStartupLogNamespace.dbName(), mongo::MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
-    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-        opCtx, NamespaceString::kStartupLogNamespace);
+    // kStartupLogNamespace is always local and doesn't require a placement version check.
+    auto collection =
+        acquireCollection(opCtx,
+                          CollectionAcquisitionRequest{NamespaceString::kStartupLogNamespace,
+                                                       PlacementConcern::kPretendUnsharded,
+                                                       repl::ReadConcernArgs::get(opCtx),
+                                                       AcquisitionPrerequisites::kWrite},
+                          MODE_X);
     WriteUnitOfWork wunit(opCtx);
-    if (!collection) {
+    if (!collection.exists()) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
         CollectionOptions collectionOptions = uassertStatusOK(
             CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForCommand));
-        collection =
+        auto newColl =
             db->createCollection(opCtx, NamespaceString::kStartupLogNamespace, collectionOptions);
+        invariant(newColl);
+        // Re-acquire after creation
+        collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest{NamespaceString::kStartupLogNamespace,
+                                                           PlacementConcern::kPretendUnsharded,
+                                                           repl::ReadConcernArgs::get(opCtx),
+                                                           AcquisitionPrerequisites::kWrite},
+                              MODE_X);
     }
-    invariant(collection);
 
-    // TODO(SERVER-103406): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    uassertStatusOK(
-        collection_internal::insertDocument(opCtx,
-                                            CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                            InsertStatement(o),
-                                            nullptr /* OpDebug */,
-                                            false));
+    uassertStatusOK(collection_internal::insertDocument(
+        opCtx, collection.getCollectionPtr(), InsertStatement(o), nullptr /* OpDebug */, false));
     wunit.commit();
 }
 
