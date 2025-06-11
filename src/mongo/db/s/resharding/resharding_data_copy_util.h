@@ -189,35 +189,31 @@ std::vector<ReshardingRecipientResumeData> getRecipientResumeData(OperationConte
  *
  * If a StaleConfig error is thrown during its execution, then this function will attempt to refresh
  * the collection and invoke the supplied lambda function a second time.
+ *
+ * TODO SERVER-77402: Replace this function with the new ShardRole retry loop utility
  */
 template <typename Callable>
-auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
+auto staleConfigShardLoop(OperationContext* opCtx, Callable&& callable) {
     try {
         return callable();
     } catch (const ExceptionFor<ErrorCategory::StaleShardVersionError>& ex) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
-            // Cause a catalog cache refresh in case the index information is stale. Invalidate even
-            // if the shard metadata was unknown so that we require only one stale config retry.
-            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(sce->getNss(),
-                                                                       sce->getVersionWanted());
+
+            if (sce->getVersionWanted() &&
+                sce->getVersionReceived().placementVersion().isOlderThan(
+                    sce->getVersionWanted()->placementVersion())) {
+                // The shard is recovered and the router is staler than the shard, so we cannot
+                // retry locally.
+                throw;
+            }
 
             // Recover the sharding metadata if there was no wanted version in the staleConfigInfo
-            bool shardRefreshSucceeded;
-            if (!sce->getVersionWanted()) {
-                shardRefreshSucceeded =
-                    FilteringMetadataCache::get(opCtx)
-                        ->onCollectionPlacementVersionMismatch(
-                            opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
-                        .isOK();
-            }
+            // or it was older than the received version.
+            uassertStatusOK(
+                FilteringMetadataCache::get(opCtx)->onCollectionPlacementVersionMismatch(
+                    opCtx, sce->getNss(), sce->getVersionReceived().placementVersion()));
 
-            // If a wanted version was returned, the metadata is already known, so we care about the
-            // advancement of the catalog cache rather than the shard refresh. If the wanted version
-            // is not set, then we only want to retry if we succeeded in recovering the collection
-            // metadata.
-            if (sce->getVersionWanted() || shardRefreshSucceeded) {
-                return callable();
-            }
+            return callable();
         }
         throw;
     }

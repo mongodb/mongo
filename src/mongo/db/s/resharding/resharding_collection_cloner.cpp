@@ -66,6 +66,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_shard_version_helpers.h"
@@ -447,95 +448,103 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                 "ReshardingCollectionCloner resume data",
                 "reshardingUUID"_attr = _reshardingUUID,
                 "resumeData"_attr = resumeData);
-    AsyncRequestsSender::ShardHostMap designatedHostsMap;
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap;
-    std::set<ShardId> shardsToSkip;
-    for (auto&& shardResumeData : resumeData) {
-        const auto& shardId = shardResumeData.getId().getShardId();
-        const auto& optionalDonorHost = shardResumeData.getDonorHost();
-        const auto& optionalResumeToken = shardResumeData.getResumeToken();
 
-        if (optionalResumeToken) {
-            // If we see a null $recordId, this means that there are no more records to read from
-            // this shard. As such, we skip it.
-            if ((*optionalResumeToken)["$recordId"].isNull()) {
-                shardsToSkip.insert(shardId);
-                continue;
-            } else {
-                resumeTokenMap[shardId] = optionalResumeToken->getOwned();
-            }
-        }
-
-        if (optionalDonorHost) {
-            designatedHostsMap[shardId] = *optionalDonorHost;
-        }
-    }
-
-    auto [rawPipeline, expCtx] = makeRawNaturalOrderPipeline(opCtx, mongoProcessInterface);
-    MakePipelineOptions pipelineOpts;
-    pipelineOpts.attachCursorSource = false;
-
-    // We associate the aggregation cursors established on each donor shard with a logical
-    // session to prevent them from killing the cursor when it is idle locally.  While we
-    // read from all cursors simultaneously, it is possible (though unlikely) for one to be starved
-    // for an arbitrary period of time.
-    {
-        auto lk = stdx::lock_guard(*opCtx->getClient());
-        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
-    }
-
-    auto request = AggregateCommandRequest(expCtx->getNamespaceString(), rawPipeline);
-    // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound or
-    // CollectionUUIDMismatch errors.
-    if (!_relaxed) {
-        request.setCollectionUUID(_sourceUUID);
-    }
-    // If running in "relaxed" mode, also instruct the receiving shards to ignore collection uuid
-    // mismatches between the local and sharding catalogs.
+    // If running in "relaxed" mode, also instruct the receiving shards to ignore collection
+    // uuid mismatches between the local and sharding catalogs.
     boost::optional<RouterRelaxCollectionUUIDConsistencyCheckBlock>
         routerRelaxCollectionUUIDConsistencyCheckBlock(boost::in_place_init_if, _relaxed, opCtx);
 
-    // In the case of a single-shard command, dispatchShardPipeline uses the passed-in batch
-    // size instead of 0.  The ReshardingCloneFetcher does not handle cursors with a populated
-    // first batch nor a cursor already complete (id 0), so avoid that by setting the batch size
-    // to 0 here.
-    SimpleCursorOptions cursorOpts;
-    cursorOpts.setBatchSize(0);
-    request.setCursor(cursorOpts);
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), _sourceNss);
+    auto dispatchResults = router.route(
+        opCtx,
+        "resharding collection cloner fetching with natural order (query stage)"_sd,
+        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            AsyncRequestsSender::ShardHostMap designatedHostsMap;
+            stdx::unordered_map<ShardId, BSONObj> resumeTokenMap;
+            std::set<ShardId> shardsToSkip;
+            for (auto&& shardResumeData : resumeData) {
+                const auto& shardId = shardResumeData.getId().getShardId();
+                const auto& optionalDonorHost = shardResumeData.getDonorHost();
+                const auto& optionalResumeToken = shardResumeData.getResumeToken();
 
-    // This is intentionally not 'setRequestReshardingResumeToken'; that is used for getting
-    // oplog.
-    request.setRequestResumeToken(true);
-    request.setHint(BSON("$natural" << 1));
+                if (optionalResumeToken) {
+                    // If we see a null $recordId, this means that there are no more records to read
+                    // from this shard. As such, we skip it.
+                    if ((*optionalResumeToken)["$recordId"].isNull()) {
+                        shardsToSkip.insert(shardId);
+                        continue;
+                    } else {
+                        resumeTokenMap[shardId] = optionalResumeToken->getOwned();
+                    }
+                }
 
-    auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
+                if (optionalDonorHost) {
+                    designatedHostsMap[shardId] = *optionalDonorHost;
+                }
+            }
 
-    repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
-    readConcern.setArgsAtClusterTimeForSnapshot(_atClusterTime);
-    readConcern.setWaitLastStableRecoveryTimestamp(true);
-    request.setReadConcern(readConcern);
+            auto [rawPipeline, expCtx] = makeRawNaturalOrderPipeline(opCtx, mongoProcessInterface);
+            MakePipelineOptions pipelineOpts;
+            pipelineOpts.attachCursorSource = false;
 
-    auto readPref = ReadPreferenceSetting{
-        ReadPreference::Nearest,
-        Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
-    // The read preference on the request is merely informational (e.g. for profiler entries) -- the
-    // pipeline's opCtx setting is actually used when sending the request.
-    request.setUnwrappedReadPref(readPref.toContainingBSON());
-    ReadPreferenceSetting::get(opCtx) = readPref;
+            // We associate the aggregation cursors established on each donor shard with a logical
+            // session to prevent them from killing the cursor when it is idle locally.  While we
+            // read from all cursors simultaneously, it is possible (though unlikely) for one to be
+            // starved for an arbitrary period of time.
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+            }
 
-    auto dispatchResults =
-        sharded_agg_helpers::dispatchShardPipeline(Document(request.toBSON()),
-                                                   sharded_agg_helpers::PipelineDataSource::kNormal,
-                                                   false /* eligibleForSampling */,
-                                                   std::move(pipeline),
-                                                   boost::none /* explain */,
-                                                   false /* requestQueryStatsFromRemotes */,
-                                                   boost::none /* cri */,
-                                                   ShardTargetingPolicy::kAllowed,
-                                                   readConcern.toBSONInner(),
-                                                   std::move(designatedHostsMap),
-                                                   std::move(resumeTokenMap),
-                                                   std::move(shardsToSkip));
+            auto request = AggregateCommandRequest(expCtx->getNamespaceString(), rawPipeline);
+            // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound
+            // or CollectionUUIDMismatch errors.
+            if (!_relaxed) {
+                request.setCollectionUUID(_sourceUUID);
+            }
+
+            // In the case of a single-shard command, dispatchShardPipeline uses the passed-in batch
+            // size instead of 0.  The ReshardingCloneFetcher does not handle cursors with a
+            // populated first batch nor a cursor already complete (id 0), so avoid that by setting
+            // the batch size to 0 here.
+            SimpleCursorOptions cursorOpts;
+            cursorOpts.setBatchSize(0);
+            request.setCursor(cursorOpts);
+
+            // This is intentionally not 'setRequestReshardingResumeToken'; that is used for getting
+            // oplog.
+            request.setRequestResumeToken(true);
+            request.setHint(BSON("$natural" << 1));
+
+            auto pipeline = Pipeline::makePipeline(rawPipeline, expCtx, pipelineOpts);
+
+            repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kSnapshotReadConcern);
+            readConcern.setArgsAtClusterTimeForSnapshot(_atClusterTime);
+            readConcern.setWaitLastStableRecoveryTimestamp(true);
+            request.setReadConcern(readConcern);
+
+            auto readPref = ReadPreferenceSetting{
+                ReadPreference::Nearest,
+                Seconds(resharding::gReshardingCollectionClonerMaxStalenessSeconds.load())};
+            // The read preference on the request is merely informational (e.g. for profiler
+            // entries) -- the pipeline's opCtx setting is actually used when sending the request.
+            request.setUnwrappedReadPref(readPref.toContainingBSON());
+            ReadPreferenceSetting::get(opCtx) = readPref;
+
+            return sharded_agg_helpers::dispatchShardPipeline(
+                Document(request.toBSON()),
+                sharded_agg_helpers::PipelineDataSource::kNormal,
+                false /* eligibleForSampling */,
+                std::move(pipeline),
+                boost::none /* explain */,
+                false /* requestQueryStatsFromRemotes */,
+                cri,
+                ShardTargetingPolicy::kAllowed,
+                readConcern.toBSONInner(),
+                std::move(designatedHostsMap),
+                std::move(resumeTokenMap),
+                std::move(shardsToSkip));
+        });
 
     bool hasSplitPipeline = !!dispatchResults.splitPipeline;
     std::string shardsPipelineStr;
@@ -583,7 +592,7 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
 
     if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
         uassert(StaleConfigInfo(
-                    _sourceNss,
+                    _outputNss,
                     ShardVersionFactory::make(ChunkVersion::IGNORED()) /* receivedVersion */,
                     boost::none /* wantedVersion */,
                     ShardId{"0"}),
@@ -620,30 +629,17 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken) {
-    // We can run into StaleConfig errors when cloning collections. To make it
-    // safe during retry, we retry the whole cloning process and rely on the
-    // resume token to be correct. Note that the remote cursors need to be reestablished during
-    // retry since _writeOnceWithNaturalOrder can partially or completely consume them.
-    resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
-        auto dispatchResults = shardVersionRetry(
-            opCtx,
-            Grid::get(opCtx)->catalogCache(),
-            _sourceNss,
-            "resharding collection cloner fetching with natural order (query stage)"_sd,
-            [&] { return _queryOnceWithNaturalOrder(opCtx, mongoProcessInterface); });
 
-        // If we don't establish any cursors, there is no work to do. Return.
-        if (dispatchResults.remoteCursors.empty()) {
-            return;
-        }
+    auto dispatchResults = _queryOnceWithNaturalOrder(opCtx, mongoProcessInterface);
 
-        reshardingCollectionClonerPauseBeforeWriteNaturalOrder.pauseWhileSet();
-        _writeOnceWithNaturalOrder(opCtx,
-                                   executor,
-                                   cleanupExecutor,
-                                   cancelToken,
-                                   std::move(dispatchResults.remoteCursors));
-    });
+    // If we don't establish any cursors, there is no work to do. Return.
+    if (dispatchResults.remoteCursors.empty()) {
+        return;
+    }
+
+    reshardingCollectionClonerPauseBeforeWriteNaturalOrder.pauseWhileSet();
+    _writeOnceWithNaturalOrder(
+        opCtx, executor, cleanupExecutor, cancelToken, std::move(dispatchResults.remoteCursors));
 }
 
 void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
@@ -652,27 +648,31 @@ void ReshardingCollectionCloner::writeOneBatch(OperationContext* opCtx,
                                                ShardId donorShard,
                                                HostAndPort donorHost,
                                                BSONObj resumeToken) {
-    Timer batchInsertTimer;
-    int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
+    resharding::data_copy::staleConfigShardLoop(opCtx, [&] {
         // ReshardingOpObserver depends on the collection metadata being known when processing
-        // writes to the temporary resharding collection. We attach shard version IGNORED to the
-        // insert operations and retry once on a StaleConfig error to allow the collection metadata
-        // information to be recovered.
-        const auto cri = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
-        return resharding::data_copy::insertBatchTransactionally(opCtx,
-                                                                 _outputNss,
-                                                                 txnNum,
-                                                                 batch,
-                                                                 _reshardingUUID,
-                                                                 donorShard,
-                                                                 donorHost,
-                                                                 resumeToken,
-                                                                 _storeProgress);
-    });
+        // writes to the temporary resharding collection. We attach placement version IGNORED to the
+        // write operations to retry on a StaleConfig error and allow the collection metadata to be
+        // recovered.
+        ScopedSetShardRole scopedSetShardRole(
+            opCtx,
+            _outputNss,
+            ShardVersionFactory::make(ChunkVersion::IGNORED()) /* shardVersion */,
+            boost::none /* databaseVersion */);
 
-    _metrics->onDocumentsProcessed(
-        batch.size(), bytesInserted, Milliseconds(batchInsertTimer.millis()));
+        Timer batchInsertTimer;
+        int bytesInserted = resharding::data_copy::insertBatchTransactionally(opCtx,
+                                                                              _outputNss,
+                                                                              txnNum,
+                                                                              batch,
+                                                                              _reshardingUUID,
+                                                                              donorShard,
+                                                                              donorHost,
+                                                                              resumeToken,
+                                                                              _storeProgress);
+
+        _metrics->onDocumentsProcessed(
+            batch.size(), bytesInserted, Milliseconds(batchInsertTimer.millis()));
+    });
 }
 
 SemiFuture<void> ReshardingCollectionCloner::run(

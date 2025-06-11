@@ -98,17 +98,12 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                                    std::move(*conflictingTxnCompletionFuture), cancelToken);
                            }
                        } else {
-                           resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
+                           resharding::data_copy::staleConfigShardLoop(opCtx.get(), [&] {
                                // ReshardingOpObserver depends on the collection metadata being
                                // known when processing writes to the temporary resharding
                                // collection. We attach placement version IGNORED to the write
                                // operations and retry once on a StaleConfig error to allow the
                                // collection metadata information to be recovered.
-                               const auto cri = uassertStatusOK(
-                                   Grid::get(opCtx.get())
-                                       ->catalogCache()
-                                       ->getCollectionRoutingInfo(opCtx.get(),
-                                                                  _crudApplication.getOutputNss()));
                                ScopedSetShardRole scopedSetShardRole(
                                    opCtx.get(),
                                    _crudApplication.getOutputNss(),

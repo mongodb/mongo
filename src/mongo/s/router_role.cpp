@@ -249,10 +249,23 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
 CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* opCtx,
                                                               const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx->getServiceContext())->catalogCache();
-    // When in a multi-document transaction, allow getting routing info from the CatalogCache even
-    // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
-    // entry is not already cached.
-    const auto allowLocks = opCtx->inMultiDocumentTransaction();
+
+    // Note that we only do this if we indeed hold a lock. Otherwise first executions on a mongos
+    // would cause this to unnecessarily throw a transient CannotRefreshDueToLocksHeld error.
+    const auto allowLocks =
+        opCtx->inMultiDocumentTransaction() && shard_role_details::getLocker(opCtx)->isLocked();
+
+    // Call getCollectionRoutingInfoAt if we need to read the CollectionRoutingInfo at a specific
+    // point in time. Otherwise just return the most recent one.
+    auto maybeAtClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    if (!maybeAtClusterTime && TransactionRouter::get(opCtx)) {
+        maybeAtClusterTime = TransactionRouter::get(opCtx).getSelectedAtClusterTime();
+    }
+
+    if (maybeAtClusterTime) {
+        return uassertStatusOK(catalogCache->getCollectionRoutingInfoAt(
+            opCtx, nss, maybeAtClusterTime->asTimestamp(), allowLocks));
+    }
     return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
 }
 

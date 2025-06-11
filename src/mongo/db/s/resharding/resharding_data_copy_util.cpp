@@ -428,16 +428,6 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     TxnNumber txnNumber = *opCtx->getTxnNumber();
     opCtx->setInMultiDocumentTransaction();
 
-    // ReshardingOpObserver depends on the collection metadata being known when processing writes to
-    // the temporary resharding collection. We attach placement version IGNORED to the write
-    // operations and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a
-    // StaleConfig error to allow the collection metadata information to be recovered.
-    ScopedSetShardRole scopedSetShardRole(
-        opCtx,
-        nss,
-        ShardVersionFactory::make(ChunkVersion::IGNORED()) /* shardVersion */,
-        boost::none /* databaseVersion */);
-
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
