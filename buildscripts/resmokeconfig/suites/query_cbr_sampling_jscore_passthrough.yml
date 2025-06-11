@@ -36,9 +36,8 @@ selector:
 
     # TODO SERVER-100417
     - jstests/core/query/explain/explain_multi_plan_count.js
-    # TODO SERVER-100434
-    - jstests/core/query/expr/expr.js
-      # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
+
+    # TODO SERVER-92589: Fails in all feature flags variant because SBE explain not supported
     - jstests/core/query/index_deduplication.js
     - jstests/core/query/explain/explain_all_plans_execution_stats.js
     - jstests/core/query/explain/explain_multi_plan.js
