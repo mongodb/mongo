@@ -4865,9 +4865,10 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     HostAndPort newSyncSource =
         _topCoord->chooseNewSyncSource(_replExecutor->now(), lastOpTimeFetched, readPreference);
     auto primary = _topCoord->getCurrentPrimaryMember();
-    // If read preference is SecondaryOnly, we should never choose the primary.
+    // If read preference is SecondaryOnly, we should never choose the primary. If the sync source
+    // was forced through unsupportedSyncSource, we may sync from any node, so skip this check.
     invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
-              primary->getHostAndPort() != newSyncSource);
+              primary->getHostAndPort() != newSyncSource || !repl::unsupportedSyncSource.empty());
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.
