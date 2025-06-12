@@ -18,7 +18,11 @@ mongo_cc_library(
         "sampling_test_utils.h",
     ],
     deps = [
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/catalog:catalog_control",
         "//src/mongo/db/catalog:catalog_test_fixture",
+        "//src/mongo/db/collection_crud",
+        "//src/mongo/db/query:query_planner",
         "//src/mongo/db/query/ce:ce_test_utils",
     ],
 )
@@ -57,6 +61,19 @@ mongo_cc_unit_test(
     deps = [
         ":sampling_test_utils",
         "//src/mongo/db:query_exec",
+    ],
+)
+
+# it's a utility that measures the accuracy of sampling CE.
+mongo_cc_unit_test(
+    name = "sampling_estimation_accuracy_analysis_test",
+    srcs = [
+        "sampling_accuracy_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+    deps = [
+        ":sampling_test_utils",
+        "//src/mongo/db/query:query_test_service_context",
     ],
 )
 

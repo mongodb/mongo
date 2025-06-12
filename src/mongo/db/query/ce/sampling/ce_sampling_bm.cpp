@@ -167,41 +167,11 @@ void BM_RunCardinalityEstimationOnSample(benchmark::State& state) {
     size_t i = 0;
     for (auto _ : state) {
         state.PauseTiming();
-
         auto first = queryIntervals[i].first;
         auto second = queryIntervals[i].second;
-
-        switch (configuration.queryType.value()) {
-            case kPoint: {
-                auto operand =
-                    SamplingEstimatorTest::createBSONObjOperandWithSBEValue("$eq", first);
-                EqualityMatchExpression eq("a"_sd, operand["$eq"]);
-
-                state.ResumeTiming();
-
-                benchmark::DoNotOptimize(samplingEstimator.estimateCardinality(&eq));
-                break;
-            }
-            case kRange: {
-                auto operand1 =
-                    SamplingEstimatorTest::createBSONObjOperandWithSBEValue("$gte", first);
-                auto pred1 = std::make_unique<GTEMatchExpression>("a"_sd, operand1["$gte"]);
-
-                auto operand2 =
-                    SamplingEstimatorTest::createBSONObjOperandWithSBEValue("$lte", second);
-                auto pred2 = std::make_unique<LTMatchExpression>("a"_sd, operand2["$lte"]);
-
-                auto andExpr = AndMatchExpression{};
-                andExpr.add(std::move(pred1));
-                andExpr.add(std::move(pred2));
-
-                state.ResumeTiming();
-
-                benchmark::DoNotOptimize(samplingEstimator.estimateCardinality(&andExpr));
-                break;
-            }
-        }
-
+        auto matchExpr = createQueryMatchExpression(configuration.queryType.value(), first, second);
+        state.ResumeTiming();
+        benchmark::DoNotOptimize(samplingEstimator.estimateCardinality(matchExpr.get()));
         i = (i + 1) % queryIntervals.size();
     }
     state.SetItemsProcessed(state.iterations());
@@ -227,7 +197,7 @@ BENCHMARK(BM_CreateSample)
          /*ndv*/ {10},
          /*numberOfFields*/ {1},
          /*sampleSizeDef*/
-         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::Error1)},
+         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
          /*samplingAlgo-numChunks*/ {/*random*/ -1}});
 
 // Configuration of benchmark for evaluation:
@@ -239,7 +209,7 @@ BENCHMARK(BM_CreateSample)
 //      /*ndv*/ {1000},
 //      /*numberOfFields*/ {1, 20},
 //      /*sampleSizeDef*/
-//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::Error1)},
+//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
 //      /*samplingAlgo-numChunks*/ {/*random*/ -1, /*chunk*/ 10}});
 
 /**
@@ -268,7 +238,7 @@ BENCHMARK(BM_RunCardinalityEstimationOnSample)
          /*queryType*/ {kPoint},
          /*numberOfFields*/ {1},
          /*sampleSizeDef*/
-         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::Error1)},
+         {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
          /*samplingAlgo-numChunks*/ {/*random*/ -1},
          /*numberOfQueries*/ {1}});
 
@@ -282,7 +252,7 @@ BENCHMARK(BM_RunCardinalityEstimationOnSample)
 //      /*queryType*/ {kPoint, kRange},
 //      /*numberOfFields*/ {1},
 //      /*sampleSizeDef*/
-//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::Error1)},
+//      {static_cast<int>(SamplingEstimationBenchmarkConfiguration::SampleSizeDef::ErrorSetting1)},
 //      /*samplingAlgo-numChunks*/ {/*random*/ -1},
 //      /*numberOfQueries*/ {1}});
 

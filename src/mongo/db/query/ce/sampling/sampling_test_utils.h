@@ -181,12 +181,6 @@ public:
         return docs;
     }
 
-    static BSONObj createBSONObjOperandWithSBEValue(std::string str, stats::SBEValue value) {
-        BSONObjBuilder builder;
-        stats::addSbeValueToBSONBuilder(value, str, builder);
-        return builder.obj();
-    }
-
     static CardinalityEstimate makeCardinalityEstimate(
         double estimate,
         cost_based_ranker::EstimationSource source = cost_based_ranker::EstimationSource::Code) {
@@ -204,7 +198,7 @@ public:
 
 struct SamplingEstimationBenchmarkConfiguration : public BenchmarkConfiguration {
 
-    enum class SampleSizeDef { Error1 = 1, Error2 = 2 };
+    enum class SampleSizeDef { ErrorSetting1 = 1, ErrorSetting2 = 2, ErrorSetting5 = 3 };
 
     int numberOfFields;
     int sampleSize;
@@ -225,18 +219,7 @@ struct SamplingEstimationBenchmarkConfiguration : public BenchmarkConfiguration 
           numberOfFields(numberOfFields) {
 
         // Translate the sample size definition to corresponding sample size.
-        switch (sampleSizeDef) {
-            case SampleSizeDef::Error1: {
-                sampleSize = SamplingEstimatorForTesting::calculateSampleSize(
-                    SamplingConfidenceIntervalEnum::k95, 2.0);
-                break;
-            }
-            case SampleSizeDef::Error2: {
-                sampleSize = SamplingEstimatorForTesting::calculateSampleSize(
-                    SamplingConfidenceIntervalEnum::k95, 5.0);
-                break;
-            }
-        }
+        sampleSize = translateSampleDefToActualSampleSize(sampleSizeDef);
 
         // Translate the number of chunks variable to both number of chunks and sampling algo.
         // This benchmark given as input numOfChunks <= 0 will use kRandom.
@@ -248,11 +231,98 @@ struct SamplingEstimationBenchmarkConfiguration : public BenchmarkConfiguration 
             numChunks = numOfChunks;
         }
     };
+
+    static size_t translateSampleDefToActualSampleSize(SampleSizeDef sampleSizeDef) {
+        // Translate the sample size definition to corresponding sample size.
+        switch (sampleSizeDef) {
+            case SampleSizeDef::ErrorSetting1: {
+                return SamplingEstimatorForTesting::calculateSampleSize(
+                    SamplingConfidenceIntervalEnum::k95, 1.0);
+            }
+            case SampleSizeDef::ErrorSetting2: {
+                return SamplingEstimatorForTesting::calculateSampleSize(
+                    SamplingConfidenceIntervalEnum::k95, 2.0);
+            }
+            case SampleSizeDef::ErrorSetting5: {
+                return SamplingEstimatorForTesting::calculateSampleSize(
+                    SamplingConfidenceIntervalEnum::k95, 5.0);
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
 };
 
+void generateData(size_t ndv,
+                  size_t size,
+                  TypeCombination typeCombinationData,
+                  DataDistributionEnum dataDistribution,
+                  const std::pair<size_t, size_t>& dataInterval,
+                  size_t seedData,
+                  int arrayTypeLength,
+                  std::vector<stats::SBEValue>& data);
 
 void generateData(SamplingEstimationBenchmarkConfiguration& configuration,
                   size_t seedData,
                   std::vector<stats::SBEValue>& data);
+
+ErrorCalculationSummary runQueries(size_t size,
+                                   size_t numberOfQueries,
+                                   QueryType queryType,
+                                   std::pair<size_t, size_t> interval,
+                                   TypeProbability queryTypeInfo,
+                                   const std::vector<stats::SBEValue>& data,
+                                   const SamplingEstimatorImpl* ceSample,
+                                   size_t seedQueriesLow,
+                                   size_t seedQueriesHigh);
+
+void printResult(const DataDistributionEnum& dataDistribution,
+                 const TypeCombination& typeCombination,
+                 int size,
+                 int sampleSize,
+                 const TypeProbability& typeCombinationQuery,
+                 int numberOfQueries,
+                 QueryType queryType,
+                 const std::pair<size_t, size_t>& dataInterval,
+                 size_t seedData,
+                 size_t seedQueriesLow,
+                 size_t seedQueriesHigh,
+                 const std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>&
+                     samplingAlgoAndChunks,
+                 ErrorCalculationSummary error);
+
+void createCollAndInsertDocuments(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const std::vector<BSONObj>& docs);
+
+/**
+ * Sampling accuracy test extension used as a vessel to generate samples over collections and
+ * calculate the accuracy of cardinality estimation over those samples.
+ * Each test instance represents a specific dataset (collection) configuration (size, data types)
+ * and can run a variety of sample and query configurations
+ */
+class SamplingAccuracyTest : public CatalogTestFixture {
+public:
+    SamplingAccuracyTest() : CatalogTestFixture() {}
+
+    void runSamplingEstimatorTestConfiguration(
+        DataDistributionEnum dataDistribution,
+        const TypeCombination& typeCombinationData,
+        const TypeCombination& typeCombinationsQueries,
+        size_t size,
+        const std::pair<size_t, size_t>& dataInterval,
+        const std::pair<size_t, size_t>& queryInterval,
+        int numberOfQueries,
+        size_t seedData,
+        size_t seedQueriesLow,
+        size_t seedQueriesHigh,
+        int arrayTypeLength,
+        size_t ndv,
+        size_t numberOfFields,
+        std::vector<QueryType> queryTypes,
+        std::vector<SamplingEstimationBenchmarkConfiguration::SampleSizeDef> sampleSizes,
+        std::vector<std::pair<SamplingEstimatorImpl::SamplingStyle, boost::optional<int>>>
+            samplingAlgoAndChunks,
+        bool printResults = true);
+};
 
 }  // namespace mongo::ce

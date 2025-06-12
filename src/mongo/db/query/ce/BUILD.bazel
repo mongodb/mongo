@@ -33,6 +33,7 @@ mongo_cc_library(
     ],
     deps = [
         ":ce_common",
+        "//src/mongo/db:query_expressions",
         "//src/mongo/db/query/stats:stats_gen",
         "//src/mongo/db/query/stats:stats_test_utils",
         "//src/mongo/unittest",

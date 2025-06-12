@@ -46,7 +46,7 @@ namespace mongo::ce {
  */
 class SamplingEstimatorImpl : public SamplingEstimator {
 public:
-    enum class SamplingStyle { kRandom, kChunk };
+    enum class SamplingStyle { kRandom = 1, kChunk = 2 };
 
     /**
      * 'opCtx' is used to create a new CanonicalQuery for the sampling SBE plan.

@@ -29,7 +29,8 @@
 
 #include "mongo/db/query/ce/ce_test_utils.h"
 
-#include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/query/stats/value_utils.h"
 
@@ -37,76 +38,54 @@
 
 namespace mongo::ce {
 
-size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                          stats::SBEValue valueToCalculate,
-                                          bool includeScalar) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        if (value.getTag() == TypeTags::Array) {
-            auto array = sbe::value::getArrayView(value.getValue());
-
-            bool matched = std::any_of(
-                array->values().begin(), array->values().end(), [&](const auto& element) {
-                    return mongo::stats::compareValues(element.first,
-                                                       element.second,
-                                                       valueToCalculate.getTag(),
-                                                       valueToCalculate.getValue()) == 0;
-                });
-
-            if (matched) {
-                actualCard++;
-            }
-        } else {
-            if (includeScalar) {
-                if (mongo::stats::compareValues(value.getTag(),
-                                                value.getValue(),
-                                                valueToCalculate.getTag(),
-                                                valueToCalculate.getValue()) == 0) {
-                    actualCard++;
-                }
-            }
-        }
+std::vector<BSONObj> transformSBEValueVectorToBSONObjVector(std::vector<stats::SBEValue> data,
+                                                            std::string fieldName) {
+    std::vector<BSONObj> result;
+    for (const auto& temp : data) {
+        result.push_back(stats::sbeValueToBSON(temp, fieldName));
     }
-    return actualCard;
+    return result;
 }
 
-size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                              sbe::value::TypeTags type) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        if (type == value.getTag()) {
-            actualCard++;
-        }
-    }
-    return actualCard;
+BSONObj createBSONObjOperandWithSBEValue(std::string str, stats::SBEValue value) {
+    BSONObjBuilder builder;
+    stats::addSbeValueToBSONBuilder(value, str, builder);
+    return builder.obj();
 }
 
-size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                             stats::SBEValue valueToCalculateLow,
-                                             stats::SBEValue valueToCalculateHigh) {
-    int actualCard = 0;
-    for (const auto& value : data) {
-        // Higher OR equal to low AND lower OR equal to high.
-        if (((mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateLow.getTag(),
-                                          valueToCalculateLow.getValue()) > 0) ||
-             (mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateLow.getTag(),
-                                          valueToCalculateLow.getValue()) == 0)) &&
-            ((mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateHigh.getTag(),
-                                          valueToCalculateHigh.getValue()) < 0) ||
-             (mongo::stats::compareValues(value.getTag(),
-                                          value.getValue(),
-                                          valueToCalculateHigh.getTag(),
-                                          valueToCalculateHigh.getValue()) == 0))) {
-            actualCard++;
+std::unique_ptr<MatchExpression> createQueryMatchExpression(QueryType queryType,
+                                                            const stats::SBEValue& sbeValLow,
+                                                            const stats::SBEValue& sbeValHigh,
+                                                            StringData fieldName) {
+    switch (queryType) {
+        case kPoint: {
+            auto operand = createBSONObjOperandWithSBEValue("$eq", sbeValLow);
+            auto eqExpr =
+                std::make_unique<EqualityMatchExpression>(fieldName, mongo::Value(operand["$eq"]));
+            return std::move(eqExpr);
+        }
+        case kRange: {
+            auto operand1 = createBSONObjOperandWithSBEValue("$gte", sbeValLow);
+            auto pred1 = std::make_unique<GTEMatchExpression>(fieldName, Value(operand1["$gte"]));
+            auto operand2 = createBSONObjOperandWithSBEValue("$lte", sbeValHigh);
+            auto pred2 = std::make_unique<LTMatchExpression>(fieldName, Value(operand2["$lte"]));
+            auto andExpr = std::make_unique<AndMatchExpression>();
+            andExpr->add(std::move(pred1));
+            andExpr->add(std::move(pred2));
+            return std::move(andExpr);
         }
     }
-    return actualCard;
+    MONGO_UNREACHABLE;
+}
+
+size_t calculateCardinality(const MatchExpression* expr, std::vector<BSONObj> data) {
+    size_t cnt = 0;
+    for (const auto& doc : data) {
+        if (exec::matcher::matchesBSON(expr, doc, nullptr)) {
+            cnt++;
+        }
+    }
+    return cnt;
 }
 
 void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
@@ -325,6 +304,23 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
         }
     }
     return intervals;
+}
+
+bool checkTypeExistence(const sbe::value::TypeTags& checkType, const TypeCombination& typesInData) {
+    bool typeExists = false;
+    for (const auto& typeInSet : typesInData) {
+        if (checkType == typeInSet.typeTag) {
+            typeExists = true;
+            break;
+        } else if (typeInSet.typeTag == TypeTags::Array && checkType == TypeTags::NumberInt64) {
+            // If the data type is array, we accept queries on integers. (the default data type in
+            // arrays is integer.)
+            typeExists = true;
+            break;
+        }
+    }
+
+    return typeExists;
 }
 
 }  // namespace mongo::ce

@@ -159,26 +159,7 @@ constexpr double absCEDiff(const T1 v1, const T2 v2) {
     return std::abs(static_cast<double>(v1) - static_cast<double>(v2));
 }
 
-/**
- * Calculate the frequency of a specific SBEValue as found in a vector of SBEValues.
- */
-size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                          stats::SBEValue valueToCalculate,
-                                          bool includeScalar);
-
-/**
- * Calculate the frequency of a specific TypeTag as found in a vector of SBEValues.
- */
-size_t calculateTypeFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                              sbe::value::TypeTags type);
-
-/**
- * Calculate the frequency of a range in a given vector of values.
- * The range is always inclusive of the bounds.
- */
-size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                             stats::SBEValue valueToCalculateLow,
-                                             stats::SBEValue valueToCalculateHigh);
+size_t calculateCardinality(const MatchExpression* expr, std::vector<BSONObj> data);
 
 /**
  * Populates TypeDistrVector 'td' based on the input configuration.
@@ -230,6 +211,27 @@ void generateDataZipfian(size_t size,
                          int arrayLength = 0);
 
 /**
+ * Transform a vector of SBEValues to a vector BSONObj to allow the evaluation of MatchExpression on
+ * the generated data.
+ * This function assumes that the input vector represents a field in a collection (i.e., a column).
+ * The second argument corresponds to the name of that field to add in the resulting BSONObjects.
+ */
+std::vector<BSONObj> transformSBEValueVectorToBSONObjVector(std::vector<stats::SBEValue> data,
+                                                            std::string fieldName = "a");
+
+/**
+ * Translate a simple query as defined by histogram/sampling CE accuracy and performance benchmarks
+ * into a MatchExpression.
+ * This function assumes that the query is applied on a specific field on a collection.
+ * If the queryType is point query only the sbeValLow is taken into consideration.
+ * The last argument corresponds to the name of the field.
+ */
+std::unique_ptr<MatchExpression> createQueryMatchExpression(QueryType queryType,
+                                                            const stats::SBEValue& sbeValLow,
+                                                            const stats::SBEValue& sbeValHigh,
+                                                            StringData fieldName = "a");
+
+/**
  * Generates query intervals randomly according to testing configuration.
  *
  * @param queryType The type of query intervals. It can be either kPoint or kRange.
@@ -250,8 +252,19 @@ std::vector<std::pair<stats::SBEValue, stats::SBEValue>> generateIntervals(
     size_t seedQueriesLow,
     size_t seedQueriesHigh);
 
-bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
-                        const TypeCombination& typeCombinationsData);
+/**
+ * Helper function for CE accuracy and performance benchmarks for checking types in generated
+ * datasets.
+ * Checks the membership of the first argument (checkType) in the provided vector
+ * (typesInData).
+ * The benchmarks assumes that Arrays contain only Integer types.
+ *
+ * @param checkType The data type queries are using.
+ * @param typesInData The data types included in the dataset.
+ * @return Boolean value, true if the query data type is present in the dataset data types, false
+ *         otherwise.
+ */
+bool checkTypeExistence(const sbe::value::TypeTags& checkType, const TypeCombination& typesInData);
 
 /**
  * Helpful macros for asserting that the CE of a $match predicate is approximately what we were

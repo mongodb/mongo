@@ -306,31 +306,15 @@ ErrorCalculationSummary runQueries(size_t size,
     auto queryIntervals = generateIntervals(
         queryType, interval, numberOfQueries, queryTypeInfo, seedQueriesLow, seedQueriesHigh);
 
+    // Transform input data to vector of BSONObj to simplify calculation of actual cardinality.
+    std::vector<BSONObj> bsonData = transformSBEValueVectorToBSONObjVector(data);
+
     for (size_t i = 0; i < queryIntervals.size(); i++) {
 
-        size_t actualCard;
-        switch (queryType) {
-            case kPoint: {
-                // Find actual frequency.
-                actualCard = calculateFrequencyFromDataVectorEq(
-                    data, queryIntervals[i].first, includeScalar);
+        auto expr = createQueryMatchExpression(
+            queryType, queryIntervals[i].first, queryIntervals[i].second);
 
-                break;
-            }
-            case kRange: {
-                if (mongo::stats::compareValues(queryIntervals[i].first.getTag(),
-                                                queryIntervals[i].first.getValue(),
-                                                queryIntervals[i].second.getTag(),
-                                                queryIntervals[i].second.getValue()) >= 0) {
-                    continue;
-                }
-
-                // Find actual frequency.
-                actualCard = calculateFrequencyFromDataVectorRange(
-                    data, queryIntervals[i].first, queryIntervals[i].second);
-                break;
-            }
-        }
+        size_t actualCard = calculateCardinality(expr.get(), bsonData);
 
         EstimationResult estimatedCard = runSingleQuery(queryType,
                                                         queryIntervals[i].first,
@@ -361,24 +345,6 @@ ErrorCalculationSummary runQueries(size_t size,
     }
 
     return finalResults;
-}
-
-bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
-                        const TypeCombination& typeCombinationsData) {
-
-    bool typeExists = false;
-    for (const auto& typeCombinationData : typeCombinationsData) {
-        if (typeCombinationQuery.typeTag == typeCombinationData.typeTag) {
-            typeExists = true;
-        } else if (typeCombinationData.typeTag == TypeTags::Array &&
-                   typeCombinationQuery.typeTag == TypeTags::NumberInt64) {
-            // If the data type is array, we accept queries on integers. (the default data type in
-            // arrays is integer.)
-            typeExists = true;
-        }
-    }
-
-    return typeExists;
 }
 
 void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
@@ -443,7 +409,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             // Run queries.
             for (const auto& typeCombinationQuery : typeCombinationsQueries) {
 
-                if (!checkTypeExistence(typeCombinationQuery, typeCombinationData)) {
+                if (!checkTypeExistence(typeCombinationQuery.typeTag, typeCombinationData)) {
                     continue;
                 }
 
