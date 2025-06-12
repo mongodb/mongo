@@ -129,7 +129,7 @@ function testUserCollections({trackUnshardedCollections}) {
         assert.eq(
             transitionRes1.note,
             'you need to call moveCollection for collectionsToMove and afterwards movePrimary for the dbsToMove',
-            transitionRes0);
+            transitionRes1);
     } else {
         assert.gte(transitionRes1.remaining.chunks, 0, transitionRes1);
         assert.eq(transitionRes1.remaining.jumboChunks, 0, transitionRes1);
