@@ -5,42 +5,42 @@ import {describe, it, runTests} from "jstests/libs/mochalite.js";
 
 const log = [];
 
-it("test", function() {
+it("test0", function() {
     log.push(0);
 });
-it("test", function() {
+it("test1", function() {
     log.push(1);
 });
 
-describe("describe", function() {
-    it("test", function() {
+describe("describeA", function() {
+    it("test2", function() {
         log.push(2);
     });
-    it("test", function() {
+    it("test3", function() {
         log.push(3);
     });
 
-    describe("describe", function() {
-        it("test", function() {
+    describe("describeB", function() {
+        it("test4", function() {
             log.push(4);
         });
-        it("test", function() {
+        it("test5", function() {
             log.push(5);
         });
     });
 
-    it("test", function() {
+    it("test6", function() {
         log.push(6);
     });
-    it("test", function() {
+    it("test7", function() {
         log.push(7);
     });
 });
 
-it("test", function() {
+it("test8", function() {
     log.push(8);
 });
-it("test", function() {
+it("test9", function() {
     log.push(9);
 });
 
