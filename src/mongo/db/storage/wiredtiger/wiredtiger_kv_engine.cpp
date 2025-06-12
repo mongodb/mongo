@@ -3000,7 +3000,7 @@ bool WiredTigerKVEngine::_windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTige
 
     // Compute the exponentially decaying moving average from the current tickets.
     int64_t currentTickets = concurrentReadOuts + concurrentWriteOuts;
-    double edmaAlpha = gCachePressureEvictionStallThresholdProportion.load();
+    double edmaAlpha = gCachePressureExponentiallyDecayingMovingAverageAlphaValue.load();
     _totalTicketsEDMA = (edmaAlpha * currentTickets) + ((1.0 - edmaAlpha) * _totalTicketsEDMA);
     int64_t totalTickets =
         std::max(static_cast<int64_t>(std::round(_totalTicketsEDMA)), int64_t(1));
