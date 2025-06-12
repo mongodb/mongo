@@ -509,6 +509,10 @@ public:
         classicMisses.increment();
     }
 
+    void incrementClassicReplannedCounter() {
+        classicReplanned.increment();
+    }
+
     void incrementSbeHitsCounter() {
         sbeHits.increment();
     }
@@ -517,11 +521,22 @@ public:
         sbeMisses.increment();
     }
 
+    void incrementSbeReplannedCounter() {
+        sbeReplanned.increment();
+    }
+
 private:
+    // Counters that track the number of times a query plan is:
+    // a) found in the cache (hits),
+    // b) not found in cache (misses), or
+    // c) failed to finish trial run within budget, so we decided to replan it (replanned).
+    // Split into classic and SBE, depending on which execution engine is used.
     CounterMetric classicHits{"query.planCache.classic.hits"};
     CounterMetric classicMisses{"query.planCache.classic.misses"};
+    CounterMetric classicReplanned{"query.planCache.classic.replanned"};
     CounterMetric sbeHits{"query.planCache.sbe.hits"};
     CounterMetric sbeMisses{"query.planCache.sbe.misses"};
+    CounterMetric sbeReplanned{"query.planCache.sbe.replanned"};
 };
 extern PlanCacheCounters planCacheCounters;
 

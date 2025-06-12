@@ -49,6 +49,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
@@ -201,6 +202,7 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, std::string reason) {
+    planCacheCounters.incrementClassicReplannedCounter();
     // We're going to start over with a new plan. Clear out info from our old plan.
     {
         std::queue<WorkingSetID> emptyQueue;
