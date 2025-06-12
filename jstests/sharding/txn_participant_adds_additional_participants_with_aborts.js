@@ -330,6 +330,14 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
     // Insert documents for shard2:
     assert.commandWorked(st.s.getDB(dbName).bar.insert([{_id: 1, x: 10}]));
 
+    // Workaround to refresh the routing cache for the foreign collection on shards 0 and 1.
+    // Otherwise, the following $lookup-transaction will fail with a StaleConfig error.
+    const pipeline = [
+        {$lookup: {from: foreignColl, localField: "_id", foreignField: "x", as: "result"}},
+        {$limit: NumberInt(200)},
+    ];
+    st.s.getDB(dbName).getCollection(localColl).aggregate(pipeline).toArray();
+
     const session = st.s.startSession();
     const txnNum = 1;
     const sessionId = session.getSessionId();

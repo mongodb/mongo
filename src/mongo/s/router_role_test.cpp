@@ -142,31 +142,26 @@ TEST_F(RouterRoleTest, DBPrimaryRouterDoesNotRetryForSubRouter) {
     ASSERT_EQ(tries, 1);
 }
 
-TEST_F(RouterRoleTest, DBPrimaryRouterRetriesOnStaleDbVersionForNonSubRouter) {
-    // The DBPrimaryRouter is expected to retry on StaleDbVersion error if the shard did not act
+TEST_F(RouterRoleTest, DBPrimaryRouterDoesNotRetryOnStaleDbVersionForNonSubRouter) {
+    // The DBPrimaryRouter should not retry on StaleDbVersion error if the shard did not act
     // as a sub-router.
-    bool firstTry = true;
+    int tries = 0;
     sharding::router::DBPrimaryRouter router(getServiceContext(), _nss.dbName());
-    auto future = launchAsync([&] {
-        router.route(
-            operationContext(),
-            "test",
-            [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                if (firstTry) {
-                    firstTry = false;
-                    uasserted(StaleDbRoutingVersion(_nss.dbName(),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
-                                                    DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
-                              "staleDbVersion");
-                } else {
-                    return BSONObj();
-                }
-            });
-    });
+    ASSERT_THROWS_CODE(
+        router.route(operationContext(),
+                     "test",
+                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                         tries++;
+                         uasserted(
+                             StaleDbRoutingVersion(_nss.dbName(),
+                                                   DatabaseVersion(UUID::gen(), Timestamp(0, 0)),
+                                                   DatabaseVersion(UUID::gen(), Timestamp(0, 0))),
+                             "staleDbVersion");
+                     }),
+        DBException,
+        ErrorCodes::StaleDbVersion);
 
-    future.default_timed_get();
-
-    ASSERT_EQ(firstTry, false);
+    ASSERT_EQ(tries, 1);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterDoesNotRetryForSubRouter) {
@@ -195,35 +190,30 @@ TEST_F(RouterRoleTest, CollectionRouterDoesNotRetryForSubRouter) {
     ASSERT_EQ(tries, 1);
 }
 
-TEST_F(RouterRoleTest, CollectionRouterRetriesOnStaleConfigForNonSubRouter) {
+TEST_F(RouterRoleTest, CollectionRouterDoesNotRetryOnStaleConfigForNonSubRouter) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
 
-    // The CollectionRouter is expected to retry on StaleConfig error if the shard did not act as
+    // The CollectionRouter should not retry on StaleConfig error if the shard did not act as
     // a sub-router.
-    bool firstTry = true;
+    int tries = 0;
     sharding::router::CollectionRouter router(getServiceContext(), _nss);
-    auto future = launchAsync([&] {
+    ASSERT_THROWS_CODE(
         router.route(operationContext(),
                      "test",
                      [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                         if (firstTry) {
-                             firstTry = false;
-                             uasserted(StaleConfigInfo(_nss,
-                                                       ShardVersionFactory::make(ChunkVersion(
-                                                           {epoch, timestamp}, {2, 0})),
-                                                       boost::none,
-                                                       ShardId{"0"}),
-                                       "StaleConfig error");
-                         } else {
-                             return BSONObj();
-                         }
-                     });
-    });
+                         tries++;
+                         uasserted(StaleConfigInfo(_nss,
+                                                   ShardVersionFactory::make(
+                                                       ChunkVersion({epoch, timestamp}, {2, 0})),
+                                                   boost::none,
+                                                   ShardId{"0"}),
+                                   "StaleConfig error");
+                     }),
+        DBException,
+        ErrorCodes::StaleConfig);
 
-    mockConfigServerQueries(_nss, epoch, timestamp);
-    future.default_timed_get();
-    ASSERT_EQ(firstTry, false);
+    ASSERT_EQ(tries, 1);
 }
 
 TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryForSubRouter) {
@@ -252,35 +242,32 @@ TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryForSubRoute
     ASSERT_EQ(tries, 1);
 }
 
-TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextRetriesOnStaleConfigForNonSubRouter) {
+TEST_F(RouterRoleTest, CollectionRouterWithRoutingContextDoesNotRetryOnStaleConfigForNonSubRouter) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
 
-    // The CollectionRouter is expected to retry on StaleConfig error if the shard did not act as
+    // The CollectionRouter should not retry on StaleConfig error if the shard did not act as
     // a sub-router.
-    bool firstTry = true;
+    int tries = 0;
     sharding::router::CollectionRouter router(getServiceContext(), _nss);
-    auto future = launchAsync([&] {
+    ASSERT_THROWS_CODE(
+        // auto future = launchAsync([&] {
         router.routeWithRoutingContext(
-            operationContext(), "test", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-                if (firstTry) {
-                    firstTry = false;
-                    uasserted(StaleConfigInfo(_nss,
-                                              ShardVersionFactory::make(
-                                                  ChunkVersion({epoch, timestamp}, {2, 0})),
-                                              boost::none,
-                                              ShardId{"0"}),
-                              "StaleConfig error");
-                } else {
-                    routingCtx.onRequestSentForNss(_nss);
-                    return BSONObj();
-                }
-            });
-    });
+            operationContext(),
+            "test",
+            [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                tries++;
+                uasserted(StaleConfigInfo(
+                              _nss,
+                              ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {2, 0})),
+                              boost::none,
+                              ShardId{"0"}),
+                          "StaleConfig error");
+            }),
+        DBException,
+        ErrorCodes::StaleConfig);
 
-    mockConfigServerQueries(_nss, epoch, timestamp);
-    future.default_timed_get();
-    ASSERT_EQ(firstTry, false);
+    ASSERT_EQ(tries, 1);
 }
 
 TEST_F(RouterRoleTest, MultiCollectionRouterDoesNotRetryForSubRouter) {
@@ -310,36 +297,31 @@ TEST_F(RouterRoleTest, MultiCollectionRouterDoesNotRetryForSubRouter) {
     ASSERT_EQ(tries, 1);
 }
 
-TEST_F(RouterRoleTest, MultiCollectionRouterRetriesOnStaleConfigForNonSubRouter) {
+TEST_F(RouterRoleTest, MultiCollectionRouterDoesNotRetryOnStaleConfigForNonSubRouter) {
     const OID epoch{OID::gen()};
     const Timestamp timestamp{1, 0};
 
-    // The MultiCollectionRouter is expected to retry on StaleConfig error if the shard did not act
+    // The MultiCollectionRouter should not retry on StaleConfig error if the shard did not act
     // as a sub-router.
-    bool firstTry = true;
+    int tries = 0;
     sharding::router::MultiCollectionRouter router(getServiceContext(), {_nss});
-    auto future = launchAsync([&] {
+    ASSERT_THROWS_CODE(
         router.route(operationContext(),
                      "test",
                      [&](OperationContext* opCtx,
                          stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap) {
-                         if (firstTry) {
-                             firstTry = false;
-                             uasserted(StaleConfigInfo(_nss,
-                                                       ShardVersionFactory::make(ChunkVersion(
-                                                           {epoch, timestamp}, {2, 0})),
-                                                       boost::none,
-                                                       ShardId{"0"}),
-                                       "StaleConfig error");
-                         } else {
-                             return BSONObj();
-                         }
-                     });
-    });
+                         tries++;
+                         uasserted(StaleConfigInfo(_nss,
+                                                   ShardVersionFactory::make(
+                                                       ChunkVersion({epoch, timestamp}, {2, 0})),
+                                                   boost::none,
+                                                   ShardId{"0"}),
+                                   "StaleConfig error");
+                     }),
+        DBException,
+        ErrorCodes::StaleConfig);
 
-    mockConfigServerQueries(_nss, epoch, timestamp);
-    future.default_timed_get();
-    ASSERT_EQ(firstTry, false);
+    ASSERT_EQ(tries, 1);
 }
 
 // TODO SERVER-102931: Integrate RouterAcquisitionSnapshot into the tests below.

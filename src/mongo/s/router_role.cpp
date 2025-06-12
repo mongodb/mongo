@@ -100,9 +100,8 @@ void DBPrimaryRouter::_onException(OperationContext* opCtx, RouteContext* contex
         uassertStatusOK(s);
     }
 
-    // It is not safe for a shard to retry stale errors if it acted as a sub-router.
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (txnRouter && !txnRouter.isSafeToRetryStaleErrors(opCtx)) {
+    // It is not safe to retry stale errors if running in a transaction.
+    if (TransactionRouter::get(opCtx)) {
         uassertStatusOK(s);
     }
 
@@ -220,13 +219,18 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
         }
 
         uassertStatusOK(s);
+    } else if (s == ErrorCodes::ShardNotFound) {
+        // Shard has been removed. Attempting to route again.
+        for (const auto& nss : _targetedNamespaces) {
+            catalogCache->onStaleCollectionVersion(nss, boost::none);
+            catalogCache->onStaleDatabaseVersion(nss.dbName(), boost::none);
+        }
     } else {
         uassertStatusOK(s);
     }
 
-    // It is not safe for a shard to retry stale errors if it acted as a sub-router.
-    auto txnRouter = TransactionRouter::get(opCtx);
-    if (txnRouter && !txnRouter.isSafeToRetryStaleErrors(opCtx)) {
+    // It is not safe to retry stale errors if running in a transaction.
+    if (auto txnRouter = TransactionRouter::get(opCtx)) {
         uassertStatusOK(s);
     }
 
@@ -249,7 +253,10 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
 CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* opCtx,
                                                               const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx->getServiceContext())->catalogCache();
-
+    // When in a multi-document transaction, allow getting routing info from the CatalogCache even
+    // though locks may be held. The CatalogCache will throw CannotRefreshDueToLocksHeld if the
+    // entry is not already cached.
+    //
     // Note that we only do this if we indeed hold a lock. Otherwise first executions on a mongos
     // would cause this to unnecessarily throw a transient CannotRefreshDueToLocksHeld error.
     const auto allowLocks =

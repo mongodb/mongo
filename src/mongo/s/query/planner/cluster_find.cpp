@@ -84,7 +84,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard.h"
@@ -104,6 +103,7 @@
 #include "mongo/s/query/exec/collect_query_stats_mongos.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -298,12 +298,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  const boost::optional<UUID> sampleId,
-                                 RoutingContext* routingCtx,
+                                 RoutingContext& routingCtx,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
     const auto& findCommand = query.getFindCommandRequest();
     const auto& nss = query.nss();
-    const auto& cri = routingCtx->getCollectionRoutingInfo(nss);
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForCanonicalQuery(query, cri);
 
@@ -408,7 +408,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  readPref,
                                  std::move(requests),
                                  findCommand.getAllowPartialResults(),
-                                 routingCtx,
+                                 &routingCtx,
                                  Shard::RetryPolicy::kIdempotent,
                                  std::move(opKeys));
         });
@@ -675,8 +675,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> checkOutCursorWithRetries(
 
 }  // namespace
 
-const size_t ClusterFind::kMaxRetries = 10;
-
 CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const CanonicalQuery& query,
                                const ReadPreferenceSetting& readPref,
@@ -735,113 +733,33 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
     }
 
-    // Re-target and re-send the initial find command to the shards until we have established the
-    // shard version.
-    for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
-        auto swRoutingCtx = getRoutingContextForTxnCmd(opCtx, nss);
-        if (swRoutingCtx == ErrorCodes::NamespaceNotFound) {
-            // If the database doesn't exist, we successfully return an empty result set without
-            // creating a cursor.
-            return earlyExitWithNoResults(opCtx, query, findCommand);
-        }
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), query.nss());
+    try {
+        return router.routeWithRoutingContext(
+            opCtx, "find", [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
 
-        uassertStatusOK(swRoutingCtx.getStatus());
-        auto& routingCtx = swRoutingCtx.getValue();
-        const auto& cri = routingCtx->getCollectionRoutingInfo(nss);
-
-        // Create an RAII object that prints the collection's shard key in the case of a tassert
-        // or crash.
-        ScopedDebugInfo shardKeyDiagnostics(
-            "ShardKeyDiagnostics",
-            diagnostic_printers::ShardKeyDiagnosticPrinter{
-                cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON() : BSONObj()});
-
-        try {
-            const auto cursorId = runQueryWithoutRetrying(opCtx,
-                                                          query,
-                                                          readPref,
-                                                          sampleId,
-                                                          routingCtx.get(),
-                                                          results,
-                                                          partialResultsReturned);
-
-            routingCtx->validateOnContextEnd();
-            return cursorId;
-        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-            if (retries >= kMaxRetries) {
-                // Check if there are no retries remaining, so the last received error can be
-                // propagated to the caller.
-                ex.addContext(str::stream()
-                              << "Failed to run query after " << kMaxRetries << " retries");
-                throw;
-            }
-
-            LOGV2_DEBUG(22839,
-                        1,
-                        "Received error status for query",
-                        "query"_attr = redact(query.toStringShort()),
-                        "attemptNumber"_attr = retries,
-                        "maxRetries"_attr = kMaxRetries,
-                        "error"_attr = redact(ex));
-
-            // Mark database entry in cache as stale.
-            routingCtx->onStaleError(nss, ex.toStatus());
-
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
-                    throw;
-                }
-
-                // Reset the default global read timestamp so the retry's routing table reflects the
-                // chunk placement after the refresh (no-op if the transaction is not running with
-                // snapshot read concern).
-                txnRouter.onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
-                txnRouter.setDefaultAtClusterTime(opCtx);
-            }
-
-        } catch (DBException& ex) {
-            if (retries >= kMaxRetries) {
-                // Check if there are no retries remaining, so the last received error can be
-                // propagated to the caller.
-                ex.addContext(str::stream()
-                              << "Failed to run query after " << kMaxRetries << " retries");
-                throw;
-            } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
-                       ex.code() != ErrorCodes::ShardNotFound) {
-
-                if (ErrorCodes::isRetriableError(ex.code())) {
-                    ex.addContext("Encountered retryable error during query");
-                } else {
-                    // Errors other than stale metadata or from trying to reach a non existent shard
-                    // are fatal to the operation. Network errors and replication retries happen at
-                    // the level of the AsyncResultsMerger.
-                    ex.addContext("Encountered non-retryable error during query");
-                }
-                throw;
-            }
-
-            LOGV2_DEBUG(22840,
-                        1,
-                        "Received error status for query",
-                        "query"_attr = redact(query.toStringShort()),
-                        "attemptNumber"_attr = retries,
-                        "maxRetries"_attr = kMaxRetries,
-                        "error"_attr = redact(ex));
-
-            routingCtx->onStaleError(nss, ex.toStatus());
-
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
-                    throw;
-                }
-
-                // Reset the default global read timestamp so the retry's routing table reflects the
-                // chunk placement after the refresh (no-op if the transaction is not running with
-                // snapshot read concern).
-                txnRouter.onStaleShardOrDbError(opCtx, kFindCmdName, ex.toStatus());
-                txnRouter.setDefaultAtClusterTime(opCtx);
-            }
-        }
+                // Create an RAII object that prints the collection's shard key in the case of a
+                // tassert or crash.
+                ScopedDebugInfo shardKeyDiagnostics(
+                    "ShardKeyDiagnostics",
+                    diagnostic_printers::ShardKeyDiagnosticPrinter{
+                        cri.isSharded() ? cri.getChunkManager().getShardKeyPattern().toBSON()
+                                        : BSONObj()});
+                return runQueryWithoutRetrying(
+                    opCtx, query, readPref, sampleId, routingCtx, results, partialResultsReturned);
+            });
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If the database doesn't exist, we successfully return an empty result set without
+        // creating a cursor.
+        return earlyExitWithNoResults(opCtx, query, findCommand);
+    } catch (DBException& ex) {
+        LOGV2_DEBUG(10369901,
+                    1,
+                    "Received error status for query",
+                    "query"_attr = redact(query.toStringShort()),
+                    "error"_attr = redact(ex));
+        throw;
     }
 
     MONGO_UNREACHABLE
