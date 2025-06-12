@@ -142,13 +142,14 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
     static const BSONObj listStage = fromjson(R"({
        $listClusterCatalog: { "shards": true }
      })");
+    const BSONObj shardsCondition = BSON("shards" << shardId);
     const BSONObj matchStage = fromjson(str::stream() << R"({
        $match: {
            $and: [
                { sharded: false },
                { db: {$ne: 'config'} },
                { db: {$ne: 'admin'} },
-               { shards: ")" << shardId << R"("},
+               )" << shardsCondition.jsonString() << R"(,
                { type: {$nin: ["timeseries","view"]} },
                { ns: {$not: {$regex: "^enxcol_\..*(\.esc|\.ecc|\.ecoc|\.ecoc\.compact)$"} }},
                { $or: [
