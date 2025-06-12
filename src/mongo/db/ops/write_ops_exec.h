@@ -239,7 +239,8 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
  */
 bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
                                       const CanonicalQuery& cq,
-                                      const DuplicateKeyErrorInfo& errorInfo);
+                                      const DuplicateKeyErrorInfo& errorInfo,
+                                      int retryAttempts);
 
 /**
  * Returns an InsertCommandReply if the timeseries writes succeeded.
