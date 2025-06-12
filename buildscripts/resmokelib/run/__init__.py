@@ -1823,6 +1823,14 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
+            "--storageEngineCacheSizePct",
+            dest="storage_engine_cache_size_pct",
+            metavar="CONFIG",
+            help="Sets the storage engine cache size configuration as a percentage"
+            " setting for all mongod's.",
+        )
+
+        mongodb_server_options.add_argument(
             "--tlsMode",
             dest="tls_mode",
             metavar="TLS_MODE",

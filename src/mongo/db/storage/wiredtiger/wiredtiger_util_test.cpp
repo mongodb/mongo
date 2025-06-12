@@ -1138,13 +1138,26 @@ TEST(WiredTigerUtilTest, WTMainCacheSizeCalculation) {
     ProcessInfo pi;
     const double memSizeMB = pi.getMemSizeMB();
     const auto tooLargeCacheMB = 100 * 1000 * 1000;
+    const auto tooLargeCachePct = 1;
     const size_t defaultCacheSizeMB = std::max((memSizeMB - 1024) * 0.5, 256.0);
     const auto maxCacheSizeMB = 10 * 1000 * 1000;
 
-    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(-10), defaultCacheSizeMB);
-    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0), defaultCacheSizeMB);
-    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(10), 10 * 1024);
-    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(tooLargeCacheMB), maxCacheSizeMB);
+    // Testing cacheSizeGB
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(-10, 0), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0),
+                  defaultCacheSizeMB); /* requestedCachePct = 0 */
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(10, 0), 10 * 1024);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(tooLargeCacheMB, 0), maxCacheSizeMB);
+
+    // Testing cacheSizePct
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0, -0.1), defaultCacheSizeMB);
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0, 0.1), std::floor(0.1 * memSizeMB));
+    ASSERT_EQUALS(WiredTigerUtil::getMainCacheSizeMB(0, tooLargeCachePct),
+                  std::floor(0.8 * memSizeMB));
+}
+
+DEATH_TEST_F(WiredTigerUtilTest, WTMainCacheSizeInvalidValues, "invariant") {
+    WiredTigerUtil::getMainCacheSizeMB(10, 0.1);
 }
 
 TEST(WiredTigerUtilTest, WTSpillCacheSizeCalculation) {

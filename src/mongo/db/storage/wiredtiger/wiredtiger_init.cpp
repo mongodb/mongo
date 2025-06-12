@@ -126,11 +126,11 @@ public:
         }
 #endif
 
-        size_t cacheMB = WiredTigerUtil::getMainCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
-        const double memoryThresholdPercentage = 0.8;
+        size_t cacheMB = WiredTigerUtil::getMainCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB,
+                                                            wiredTigerGlobalOptions.cacheSizePct);
         ProcessInfo p;
         if (p.supported()) {
-            if (cacheMB > memoryThresholdPercentage * p.getMemSizeMB()) {
+            if (cacheMB > WiredTigerUtil::memoryThresholdPercentage * p.getMemSizeMB()) {
                 LOGV2_OPTIONS(22300,
                               {logv2::LogTag::kStartupWarnings},
                               "The configured WiredTiger cache size is more than 80% of available "

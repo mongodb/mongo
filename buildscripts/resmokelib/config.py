@@ -124,6 +124,7 @@ DEFAULTS = {
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
+    "storage_engine_cache_size_pct": None,
     "mozjs_js_gc_zeal": None,
     "suite_files": "with_server",
     "tag_files": [],
@@ -636,6 +637,10 @@ STORAGE_ENGINE = None
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
+
+# If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
+# storage engine cache size.
+STORAGE_ENGINE_CACHE_SIZE_PCT = None
 
 # Yaml suites that specify how tests should be executed.
 SUITE_FILES = None

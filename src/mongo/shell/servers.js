@@ -1513,6 +1513,11 @@ function appendSetParameterArgs(argArray) {
                         argArray.push(...['--wiredTigerCacheSizeGB',
                                           jsTest.options().storageEngineCacheSizeGB]);
                     }
+                    if (jsTest.options().storageEngineCacheSizePct &&
+                        !argArrayContains('--wiredTigerCacheSizePct')) {
+                        argArray.push(...['--wiredTigerCacheSizePct',
+                                          jsTest.options().storageEngineCacheSizePct]);
+                    }
                     if (jsTest.options().wiredTigerEngineConfigString &&
                         !argArrayContains('--wiredTigerEngineConfigString')) {
                         argArray.push(...['--wiredTigerEngineConfigString',

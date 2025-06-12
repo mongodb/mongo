@@ -95,6 +95,7 @@ private:
 public:
     static constexpr StringData kConfigStringField = "configString"_sd;
     static constexpr StringData kTableUriPrefix = "table:"_sd;
+    static constexpr double memoryThresholdPercentage = 0.8;
 
     static std::string buildTableUri(StringData ident);
 
@@ -254,10 +255,11 @@ public:
                                                         const std::string& uri);
 
     /**
-     * Return amount of memory to use for the WiredTiger cache based on either the startup
-     * option chosen or the amount of available memory on the host.
+     * Return amount of memory to use for the WiredTiger cache. The calculation has lower and upper
+     * bounds. A non-zero value for either parameter indicates that parameter should be used for the
+     * calculation. If both are zero, half of available memory will be returned.
      */
-    static size_t getMainCacheSizeMB(double requestedCacheSizeGB);
+    static size_t getMainCacheSizeMB(double requestedCacheSizeGB, double requestedCacheSizePct = 0);
 
     /**
      * Returns the amount of memory to use for the spill WiredTiger cache. If `requestedCacheSizeGB`

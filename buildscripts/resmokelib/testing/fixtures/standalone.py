@@ -512,6 +512,7 @@ class MongodLauncher(object):
             shortcut_opts["inMemorySizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
         elif self.config.STORAGE_ENGINE == "wiredTiger" or self.config.STORAGE_ENGINE is None:
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
+            shortcut_opts["wiredTigerCacheSizePct"] = self.config.STORAGE_ENGINE_CACHE_SIZE_PCT
 
         # If a JS_GC_ZEAL value has been provided in the configuration under MOZJS_JS_GC_ZEAL,
         # we inject this value directly as an environment variable to be passed to the spawned

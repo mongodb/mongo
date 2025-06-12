@@ -666,6 +666,7 @@ flags in common: {common_set}
     _config.SHELL_SEED = config.pop("shell_seed")
     _config.STAGGER_JOBS = config.pop("stagger_jobs") == "on"
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storage_engine_cache_size_gb")
+    _config.STORAGE_ENGINE_CACHE_SIZE_PCT = config.pop("storage_engine_cache_size_pct")
     _config.MOZJS_JS_GC_ZEAL = config.pop("mozjs_js_gc_zeal")
     _config.SUITE_FILES = config.pop("suite_files")
     if _config.SUITE_FILES is not None:
