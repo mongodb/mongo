@@ -12,7 +12,7 @@ If you update the default PR template, you also need to update the commit metada
 
 To create a custom template, create a new markdown file in this folder.
 
-Then create a link of the form `https://github.com/10gen/mongo/compare/main...my-branch?quick_pull=1&template=your_new_template.md`
+Then create a link of the form `https://github.com/mongodb/mongo/compare/main...my-branch?quick_pull=1&template=your_new_template.md`
 
 Share that link in your team docs to use for creating PRs. By selecting an unused values for `my-branch` it should show a branch selector when following the link.
 

@@ -11,7 +11,7 @@ important that they are periodically released and reacquired.
 
 ### DocumentSource
 
-[`mongo::DocumentSource`](https://github.com/10gen/mongo/blob/master/src/mongo/db/pipeline/document_source.h#L198)
+[`mongo::DocumentSource`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source.h#L198)
 execution model currently doesn't account for longer lived storage resources.
 
 Due to lack of yielding support, all acquired resources must have a strictly bounded lifecycle, e.g.
@@ -21,9 +21,9 @@ there.
 
 ### DocumentSourceCursor
 
-[`mongo::DocumentSourceCursor`](https://github.com/10gen/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.h#L73)
-acts as an adapter from [`mongo::PlanExecutor`](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/plan_executor.h#L129)  
-to [`mongo::DocumentSource`](https://github.com/10gen/mongo/blob/master/src/mongo/db/pipeline/document_source.h#L198). It
+[`mongo::DocumentSourceCursor`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source_cursor.h#L73)
+acts as an adapter from [`mongo::PlanExecutor`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/plan_executor.h#L129)  
+to [`mongo::DocumentSource`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/document_source.h#L198). It
 is responsible for acquiring and releasing the storage resources (snapshots, locks, etc.), so that
 they don't leave the `mongo::DocumentSourceCursor` scope. Some of the storage resources are acquired
 and released by `mongo::PlanExecutor` via `mongo::PlanExecutor::restoreState` and
@@ -42,9 +42,9 @@ are released. Buffered results are then used in subsequent calls to
 
 Classic plan executor performs yields outside of calls to work(). Classic plan stages also use
 interrupt style yielding. When yield is needed work() can be interruped and a
-[`mongo::PlanStage::StageState::NEED_YIELD`](https://github.com/10gen/mongo/blob/master/src/mongo/db/exec/plan_stage.h#L166-L184)
+[`mongo::PlanStage::StageState::NEED_YIELD`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/exec/plan_stage.h#L166-L184)
 is used to unwind the plan stage call stack. After that classic plan executor
-([`mongo::PlanExecutorImpl`](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/plan_executor_impl.h#L118`))
+([`mongo::PlanExecutorImpl`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/plan_executor_impl.h#L118`))
 will release and reaquire storage resources.
 
 ### SBE yielding
@@ -94,7 +94,7 @@ Such values must be either discarded, when no longer needed, or converted to own
 their copy before the storage resources are released.
 
 This is commongly done by using
-[mongo::sbe::CanChangeState::prepareForYielding](https://github.com/10gen/mongo/blob/master/src/mongo/db/exec/sbe/stages/stages.h#L126)
+[mongo::sbe::CanChangeState::prepareForYielding](https://github.com/mongodb/mongo/blob/master/src/mongo/db/exec/sbe/stages/stages.h#L126)
 utility.
 
 When stage slots are no longer needed, a `mongo::sbe::CanTrackStats::disableSlotAccess` method can

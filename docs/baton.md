@@ -80,6 +80,6 @@ must be non-blocking and preferably short-lived to ensure forward progress.
 [defaultBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/db/default_baton.h#L46-L75
 [networkingBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/transport/baton.h#L61-L96
 [asioNetworkingBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/transport/baton_asio_linux.h#L60-L529
-[asioNetworkingBatonScheduling]: https://github.com/10gen/mongo/blob/46b8c49b4e13cc4c8389b2822f9e30dd73b81d6e/src/mongo/executor/network_interface_tl.cpp#L910
-[asioNetworkingBatonPollingSetup]: https://github.com/10gen/mongo/blob/eab4ec41cc2b28bf0a38eb813f9690e1bfa6c9a6/src/mongo/transport/asio/asio_session_impl.cpp#L666-L696
+[asioNetworkingBatonScheduling]: https://github.com/mongodb/mongo/blob/46b8c49b4e13cc4c8389b2822f9e30dd73b81d6e/src/mongo/executor/network_interface_tl.cpp#L910
+[asioNetworkingBatonPollingSetup]: https://github.com/mongodb/mongo/blob/eab4ec41cc2b28bf0a38eb813f9690e1bfa6c9a6/src/mongo/transport/asio/asio_session_impl.cpp#L666-L696
 [example]: https://github.com/mongodb/mongo/blob/262e5a961fa7221bfba5722aeea2db719f2149f5/src/mongo/s/multi_statement_transaction_requests_sender.cpp#L91-L99

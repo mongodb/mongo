@@ -215,7 +215,7 @@ parameter.
 ## Batched Inserts
 
 When a batch of inserts is processed by the write path, this typically comes from an `insertMany` command,
-the batch is [organized by meta value and sorted](https://github.com/10gen/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L506-L527) in time ascending order to ensure efficient bucketing
+the batch is [organized by meta value and sorted](https://github.com/mongodb/mongo/blob/5e5a0d995995fc4404c6e32546ed0580954b1e39/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L506-L527) in time ascending order to ensure efficient bucketing
 and insertion. Prior versions would perform bucket targeting for each measurement in the order the user
 specified. This could lead to poor insert performance and very sub-optimal bucketing behavior if the user's
 batch was in time descending order. This change in batching also significantly reduces the number of stripe
@@ -375,7 +375,7 @@ some reasonable presets of "seconds", "minutes" and "hours".
 | _Minutes_   | 3,600 (1 hour)          | 86,400 (1 day)         |
 | _Hours_     | 86,400 (1 day)          | 2,592,000 (30 days)    |
 
-Chart sources: [bucketRoundingSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L368-L381) and [bucketMaxSpanSeconds](https://github.com/10gen/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L259-L273).
+Chart sources: [bucketRoundingSeconds](https://github.com/mongodb/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L368-L381) and [bucketMaxSpanSeconds](https://github.com/mongodb/mongo/blob/279417f986c9792b6477b060dc65b926f3608529/src/mongo/db/timeseries/timeseries_options.cpp#L259-L273).
 
 If the user does not specify any bucketing parameters when creating a collection, the default value
 is `{granularity: "seconds"}`.
@@ -472,7 +472,7 @@ We have three phases of a time-series write. Each phase of the time-series write
 ### Calculating Memory Usage
 
 Memory usage for Buckets, the BucketCatalog, and other aspects of time-series collection internals (Stripes, BucketMetadata, etc)
-is calculated using the [Timeseries Tracking Allocator](https://github.com/10gen/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
+is calculated using the [Timeseries Tracking Allocator](https://github.com/mongodb/mongo/blob/f726b6db3a361122a87555dbea053d98b01685a3/src/mongo/db/timeseries/timeseries_tracking_allocator.h).
 
 ### Freezing Buckets
 
@@ -491,7 +491,7 @@ each phase described above in [Errors When Staging and Committing Measurements](
 
 <img width="1364" alt="bucket_catalog_stripe" src="https://github.com/user-attachments/assets/c6016335-34e3-4f62-b46a-0f0a970f2c05" />
 
-Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
+Recall that each bucket contains up to [timeseriesBucketMaxCount](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/timeseries.idl#L58) (1,000) measurements within a span of time, `bucketMaxSpanSeconds`. And further, the bucket
 catalog maintains an invariant of at most 1 open bucket per unique meta value. This diagram shows
 how measurements map to each open bucket, which map to a specific stripe. The hashing function may not distribute the
 client's writes to stripes evenly, but on the whole there is a good chance that stripe contention won't be a bottleneck since
@@ -499,8 +499,8 @@ there are often more or the same number of stripes to cores on the database serv
 if the workload accesses many buckets (meta values) that map to the same stripe. In 8.2+, while holding the stripe lock during
 a write, only a small amount of work is done intentionally. This has lessened the impact of stripe contention.
 
-The [Stripe](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L152-L186) struct stores most of the core components of the [Bucket Catalog](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L198-L228). The structures within it generally compose
-the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/10gen/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L203-L219)).
+The [Stripe](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L152-L186) struct stores most of the core components of the [Bucket Catalog](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L198-L228). The structures within it generally compose
+the memory usage of the Bucket Catalog (see: [bucket_catalog::getMemoryUsage](https://github.com/mongodb/mongo/blob/0f3a0dfd67b05e8095c70a03c7d7406f9e623277/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.cpp#L203-L219)).
 
 # References
 
@@ -514,7 +514,7 @@ See:
 - **active bucket**: A bucket that is either archived or open. It forms the cardinality managed by the
   BucketCatalog.
 
-- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/10gen/mongo/blob/883a40fdd73056c88221aa668a627cd2e6c621a6/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L166-L175)
+- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/mongodb/mongo/blob/883a40fdd73056c88221aa668a627cd2e6c621a6/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L166-L175)
   to support efficient reopening without querying. Adding new measurements to this
   bucket will require materializing data from disk.
 

@@ -58,5 +58,12 @@ core.workflow(
         # If there are no trailers, then there will only be a single line of text, with no newline
         # chars, and so the pattern will fail to match.
         metadata.scrubber("(^.*?\n)((?:\n|.)*)", replacement = "$1\n$2"),
+        #
+        # STEP 5: Replace any private links with their public equivalent.
+        core.replace(
+            before = "https://github.com/10gen/mongo",
+            after = "https://github.com/mongodb/mongo",
+            paths = glob(["**/*.md"]),
+        ),
     ],
 )

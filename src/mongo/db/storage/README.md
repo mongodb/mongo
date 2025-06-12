@@ -495,7 +495,7 @@ Change stream collection that uses CollectionTruncateMarkers
   dedicated environments.
 
 The change stream pre-images collections has a periodic remover thread
-([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71).
+([ChangeStreamExpiredPreImagesRemover](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71).
 The remover thread:
 
 1. Creates the tenant's initial CollectionTruncateMarkers for the tenant if they do not yet exist
@@ -518,7 +518,7 @@ Each tenant has 1 pre-images collection. Each pre-images collection contains pre
 the tenant's pre-image enabled collections.
 
 A pre-images collection is clustered by
-[ChangeStreamPreImageId](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_preimage.idl#L69),
+[ChangeStreamPreImageId](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_preimage.idl#L69),
 which implicitly orders pre-images first by their `'nsUUID'` (the UUID of the collection the
 pre-image is from), their `'ts'` (the timestamp associated with the pre-images oplog entry), and
 then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the
@@ -545,13 +545,13 @@ record to the the minimum RecordId for the nsUUID when there is an expired trunc
   class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L78)
   - The main api for CollectionTruncateMarkers.
 - [The OplogTruncateMarkers
-  class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
+  class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
   - Oplog specific truncate markers.
 - [The PreImagesTruncateMarkersPerNsUUID
-  class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
+  class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
   - Truncate markers for a given nsUUID captured within a pre-images collection.
 - [The PreImagesTruncateManager
-  class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
+  class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
   - Manages pre image truncate markers for each tenant.
 
 # Oplog Collection

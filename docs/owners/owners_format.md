@@ -140,7 +140,7 @@ If someone changes `a/b/c/file.yaml` the owner resolution will not find a team. 
 
 ### v2.0.0
 
-See the [previous version](https://github.com/10gen/mongo/blob/79590effe86c471cc15d91c6785599ec2085d7c0/docs/owners/owners_format.md) of this documentation for details on v1.0.0.
+See the [previous version](https://github.com/mongodb/mongo/blob/79590effe86c471cc15d91c6785599ec2085d7c0/docs/owners/owners_format.md) of this documentation for details on v1.0.0.
 
 Patterns without a slash are no longer prepended with `**/` to make them apply recursively. If you want your pattern you apply recursively you must add the `**/` yourself now.
 

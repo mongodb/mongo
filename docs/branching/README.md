@@ -34,7 +34,7 @@ git checkout -b vX.Y-branching-task
 
 The reason they should be pushed as separate commits is in the case of needing to revert one aspect of this entire task.
 
-- [8.1 Branching commit](https://github.com/10gen/mongo/commit/359cbe95216ffaf1a6173884f6519b3d408f1fb5) for reference.
+- [8.1 Branching commit](https://github.com/mongodb/mongo/commit/359cbe95216ffaf1a6173884f6519b3d408f1fb5) for reference.
 
 ### Copybara configuration
 
@@ -104,7 +104,7 @@ The reason they should be pushed as separate commits is in the case of needing t
 
 - `buildscripts/generate_version_expansions.py`
 
-  - Update [suffixes](https://github.com/10gen/mongo/blob/41ebdd14567ee35bdda0942958a5dc193f97dd5f/buildscripts/generate_version_expansions.py#L64-L65) from "latest" to "vX.Y-latest", where `vX.Y` is a new branch name
+  - Update [suffixes](https://github.com/mongodb/mongo/blob/41ebdd14567ee35bdda0942958a5dc193f97dd5f/buildscripts/generate_version_expansions.py#L64-L65) from "latest" to "vX.Y-latest", where `vX.Y` is a new branch name
 
 ## 3. Test changes
 

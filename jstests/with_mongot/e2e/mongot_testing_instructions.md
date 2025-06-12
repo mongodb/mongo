@@ -126,7 +126,7 @@ This order is required to ensure correctness. This is due to the nature of data 
 
 You can download the mongot binary that a specific evergreen patch or version utilized, which can be useful for trying to replicate errors.
 
-You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/10gen/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
+You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/mongodb/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
 
 - Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2023-arm64-static-compile` _(! Amazon Linux 2023 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2023 arm64 Atlas Enterprise (all feature flags)_
 - Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2023-arm64-mongot-integration-patchable` _(AL2023 arm64 mongot integration tasks)_
@@ -158,4 +158,4 @@ General information about the `setup-repro-env` command can be found in its [REA
 
 ### Didn't Find What You're Looking For?
 
-Visit [the landing page](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.
+Visit [the landing page](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.

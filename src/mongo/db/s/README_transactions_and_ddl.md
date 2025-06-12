@@ -88,7 +88,7 @@ For **untracked** collections, the protocol is as follows:
 1. The targeted shard checks the attached metadata. All the following conditions must be
    met for the request to be considered valid:
    1. The received database version must match the current (latest) database version.
-   1. The received `atClusterTime` must not be earlier than the latest database version's [timestamp field](https://github.com/10gen/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version) known by the shard.
+   1. The received `atClusterTime` must not be earlier than the latest database version's [timestamp field](https://github.com/mongodb/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version) known by the shard.
       This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
    1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
    1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.
@@ -167,7 +167,7 @@ For **untracked** collections, the protocol is as follows:
 1. The targeted shard checks the attached metadata. All the following conditions must be
    met for the request to be considered valid:
    1. The received database version must match the current (latest) database version.
-   1. `placementConflictTime` must not be earlier than the database version's [timestamp field](https://github.com/10gen/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version).
+   1. `placementConflictTime` must not be earlier than the database version's [timestamp field](https://github.com/mongodb/mongo/blob/eeef1763cb0ff77757bb60eabb8ad1233c990786/src/mongo/db/s/README_versioning_protocols.md#database-version).
       This field represents the commit timestamp of the latest reincarnation (drop/create) or movePrimary operation for this database.
    1. The received placement version is UNSHARDED, and the shard checks the latest version matches.
    1. The collection in the snapshot must be the same incarnation (same UUID) as in the latest CollectionCatalog.

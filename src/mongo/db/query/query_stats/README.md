@@ -315,9 +315,9 @@ output one document per query stats key - output in the "key" field.
 
 <!-- Links -->
 
-[query stats store]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
-[partition calculation comment]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
-[register request]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
-[write query stats]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
-[write query stats comments]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L243-L252
-[query stats will never exhaust]: https://github.com/10gen/mongo/blob/8be794e1983e2b24938489ad2b018b630ea9b563/src/mongo/db/clientcursor.h#L510
+[query stats store]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
+[partition calculation comment]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
+[register request]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
+[write query stats]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
+[write query stats comments]: https://github.com/mongodb/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L243-L252
+[query stats will never exhaust]: https://github.com/mongodb/mongo/blob/8be794e1983e2b24938489ad2b018b630ea9b563/src/mongo/db/clientcursor.h#L510

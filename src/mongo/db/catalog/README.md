@@ -848,7 +848,7 @@ However, legacy indexes (indexes that were created pre-3.4) still need to be han
 where a customer with legacy indexes upgrades to MongoDB 3.4+. The server treats any non-negative
 numerical index key and non-numerical index key value as an ascending index, and treats negative
 numerical values as descending. The exception to this is any form of a negative 0 (-0, -0.0, etc);
-these are treated as ascending. Details on how these values are treated can be found in [ordering.h](https://github.com/10gen/mongo/blob/master/src/mongo/bson/ordering.h), and examples of legacy indexes can be found in [this test](https://github.com/10gen/mongo/blob/master/src/mongo/bson/ordering_test.cpp).
+these are treated as ascending. Details on how these values are treated can be found in [ordering.h](https://github.com/mongodb/mongo/blob/master/src/mongo/bson/ordering.h), and examples of legacy indexes can be found in [this test](https://github.com/mongodb/mongo/blob/master/src/mongo/bson/ordering_test.cpp).
 
 # Glossary
 

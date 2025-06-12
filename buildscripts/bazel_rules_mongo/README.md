@@ -4,13 +4,13 @@ This directory is a bazel rule we use to ship common code between bazel repos
 
 # Using in your repo
 
-1. Look at the latest version in [this](https://github.com/10gen/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml) file
+1. Look at the latest version in [this](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml) file
 
 2. Get the sha of the latest release at https://mdb-build-public.s3.amazonaws.com/bazel_rules_mongo/{version}/bazel_rules_mongo.tar.gz.sha256
 
 3. Get the link to the latest version at https://mdb-build-public.s3.amazonaws.com/bazel_rules_mongo/{version}/bazel_rules_mongo.tar.gz
 
-4. Add this as a http archive to your repo and implement the dependencies listed in the [WORKSPACE](https://github.com/10gen/mongo/blob/master/buildscripts/bazel_rules_mongo/WORKSPACE.bazel) file. It will look something like this
+4. Add this as a http archive to your repo and implement the dependencies listed in the [WORKSPACE](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/WORKSPACE.bazel) file. It will look something like this
 
 ```
 # Poetry rules for managing Python dependencies
@@ -61,5 +61,5 @@ alias(
 
 # Deploying
 
-When you are ready for a new version to be released, bump the version in the [pyproject.toml](https://github.com/10gen/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml) file.
+When you are ready for a new version to be released, bump the version in the [pyproject.toml](https://github.com/mongodb/mongo/blob/master/buildscripts/bazel_rules_mongo/pyproject.toml) file.
 This will be deployed the next time the `package_bazel_rules_mongo` task runs (nightly). You can schedule this earlier in the waterfall when your pr is merged if you want it quicker.

@@ -14,8 +14,8 @@ use Antithesis today.
 ## Base Images
 
 The `base_images` directory consists of the building blocks for creating a MongoDB test topology.
-These images are uploaded to the Antithesis Docker registry [nightly](https://github.com/10gen/mongo/blob/6cf8b162a61173eb372b54213def6dd61e1fd684/etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml#L28) during the
-[`antithesis image build and push`](https://github.com/10gen/mongo/blob/020632e3ae328f276b2c251417b5a39389af6141/etc/evergreen_yml_components/definitions.yml#L2823) function.
+These images are uploaded to the Antithesis Docker registry [nightly](https://github.com/mongodb/mongo/blob/6cf8b162a61173eb372b54213def6dd61e1fd684/etc/evergreen_yml_components/variants/ubuntu/test_dev_master_and_lts_branches_only.yml#L28) during the
+[`antithesis image build and push`](https://github.com/mongodb/mongo/blob/020632e3ae328f276b2c251417b5a39389af6141/etc/evergreen_yml_components/definitions.yml#L2823) function.
 
 ### mongo_binaries
 

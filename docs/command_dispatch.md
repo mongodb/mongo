@@ -85,4 +85,4 @@ For details on transport internals, including ingress networking, see [this docu
 [template_method_pattern]: https://en.wikipedia.org/wiki/Template_method_pattern
 [transport_internals]: ../src/mongo/transport/README.md
 [ACReadMe]: ../src/mongo/db/admission/README.md
-[IngressControl]: https://github.com/10gen/mongo/blob/a86c7f5de2a5de4d2f49e40e8970754ec6a5ba6c/src/mongo/db/service_entry_point_shard_role.cpp#L1803
+[IngressControl]: https://github.com/mongodb/mongo/blob/a86c7f5de2a5de4d2f49e40e8970754ec6a5ba6c/src/mongo/db/service_entry_point_shard_role.cpp#L1803

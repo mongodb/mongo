@@ -196,7 +196,7 @@ the storage mechanism is listed as a sub-bullet below.
     authentication. GSSAPI is the communication method used to communicate with Kerberos servers and
     with clients. When initializing this auth mechanism, the server tries to acquire its credential
     information from the KDC by calling
-    [`tryAcquireServerCredential`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
+    [`tryAcquireServerCredential`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/sasl/mongo_gssapi.h#L36).
     If this is not approved, the server fasserts and the mechanism is not registered. On Windows,
     SChannel provides a `GSSAPI` library for the server to use. On other platforms, the Cyrus SASL
     library is used to make calls to the KDC (Kerberos key distribution center).
@@ -770,30 +770,30 @@ The user must supply roles when running the `createUser` command. Roles are stor
 LDAP authorization is an external method of getting roles. When a user authenticates using LDAP,
 there are roles stored in the User document specified by the LDAP system. The LDAP system relies on
 the
-[`AuthorizationBackendLDAP`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
+[`AuthorizationBackendLDAP`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
 to make external requests to the LDAP server. The `AuthorizationBackendLDAP` overrides the
 `AuthorizationBackendLocal` for the current process, initially attempting to route all
 Authorization requests to LDAP and falling back on Local Authorization. LDAP queries are generated
 from
-[`UserRequest`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
+[`UserRequest`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
 objects, passing just the username into the query. If a user has specified the `userToDNMapping`
 server parameter, the `AuthorizationManager` calls the LDAPManager to transform the usernames into
 names that the LDAP server can understand. The LDAP subsystem relies on a complicated string
 escaping sequence, which is handled by the LDAPQuery class. After LDAP has returned the `User`
 document, it resolves role names into privileges by dispatching a call to
-[`Local::getUserObject`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.7.0/src/ldap/authz_manager_external_state_ldap.cpp#L110-L123)
+[`Local::getUserObject`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.7.0/src/ldap/authz_manager_external_state_ldap.cpp#L110-L123)
 with a `UserRequest` struct containing a set of roles to be resolved.
 
 Connections to LDAP servers are made by the `LDAPManager` through the
-[`LDAPRunner`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_runner.h)
+[`LDAPRunner`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_runner.h)
 by calling `bindAsUser()`. `BindAsUser()` attempts to set up a connection to the LDAP server using
 connection parameters specified through the command line when starting the process.The
-[`LDAPConnectionFactory`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/ldap_connection_factory.h)
+[`LDAPConnectionFactory`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/ldap_connection_factory.h)
 is the class that is actually tasked with establishing a connection and sending raw bytes over the
 wire to the LDAP server, all other classes decompose the information to send and use the factory to
 actually send the information. The `LDAPConnectionFactory` has its own thread pool and executor to
 drive throughput for authorization. LDAP has an
-[`LDAPUserCacheInvalidator`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
+[`LDAPUserCacheInvalidator`](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
 that periodically sweeps the `AuthorizationManager` and deletes user entries that have `$external` as
 their authentication database.
 
@@ -801,7 +801,7 @@ There are a few thread safety concerns when making connections to the LDAP serve
 LibLDAP to make connections to the LDAP server. LibLDAP comes without any thread safety guarantees,
 so all the calls to libLDAP are wrapped with mutexes to ensure thread safety when connecting to LDAP
 servers on certain distros. The logic to see whether libLDAP is thread-safe lives
-[here](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
+[here](https://github.com/mongodb/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
 
 #### <a name="x509azn"></a>X.509 Authorization
 
@@ -884,7 +884,7 @@ Refer to the following links for definitions of the Classes referenced in this d
 | `AuthorizationManager`           | [mongo/db/auth/authorization_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h)                       | Interface to external state providers                                                                                                    |
 | `AuthorizationSession`           | [mongo/db/auth/authorization_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h)                       | Representation of currently authenticated and authorized users on the `Client` connection                                                |
 | `AuthzManagerExternalStateLocal` | [.../authorization_baackend_local.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/auth/authorization_backend_local.h)                    | `Local` implementation of user/role provider                                                                                             |
-| `AuthzManagerExternalStateLDAP`  | [.../authorization_baackend_ldap.h](https://github.com/10gen/mongo/blob/master/src/mongo/db/modules/enterprise/src/ldap/authorization_backend_ldap.h) | `LDAP` implementation of users/role provider                                                                                             |
+| `AuthzManagerExternalStateLDAP`  | [.../authorization_baackend_ldap.h](https://github.com/mongodb/mongo/blob/master/src/mongo/db/modules/enterprise/src/ldap/authorization_backend_ldap.h) | `LDAP` implementation of users/role provider                                                                                             |
 | `Client`                         | [mongo/db/client.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h)                                                               | An active client session, typically representing a remote driver or shell                                                                |
 | `Privilege`                      | [mongo/db/auth/privilege.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h)                                               | A set of `ActionType`s permitted on a particular `resource'                                                                              |
 | `ResourcePattern`                | [mongo/db/auth/resource_pattern.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h)                                 | A reference to a namespace, db, collection, or cluster to apply a set of `ActionType` privileges to                                      |

@@ -12,31 +12,31 @@ The Query Optimization team is currently developing a cost-based plan ranker as 
 
 > ### Aside: Classic Runtime Planner for SBE
 >
-> This document outlines the multiplanning process that uses "classic" query plans. MongoDB also supports a Slot-Based Execution (SBE) engine that converts the result of classic multiplanning into SBE plans. For more details on this process, refer to the [Classic Runtime Planner for SBE README](https://github.com/10gen/mongo/blob/95d1830ce1acffd0108932d04538ed9dc995ade5/src/mongo/db/query/classic_runtime_planner_for_sbe/README.md).
+> This document outlines the multiplanning process that uses "classic" query plans. MongoDB also supports a Slot-Based Execution (SBE) engine that converts the result of classic multiplanning into SBE plans. For more details on this process, refer to the [Classic Runtime Planner for SBE README](https://github.com/mongodb/mongo/blob/95d1830ce1acffd0108932d04538ed9dc995ade5/src/mongo/db/query/classic_runtime_planner_for_sbe/README.md).
 
-## [`CachedPlanner`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L164)
+## [`CachedPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L164)
 
 If a query has been executed previously, its winning query plan might already be stored in the [plan cache](../plan_cache/README.md). If so, we can entirely bypass multiplanning by retrieving the winning query plan from the corresponding `PlanCacheEntry` via a `CachedPlanner`.
 
-Note that if execution of a cached plan fails because the cached plan is less efficient that expected, we [`replan()`](https://github.com/10gen/mongo/blob/0088f90ce188b8bc32575e7e4b75149ceab5da0e/src/mongo/db/exec/cached_plan.cpp#L213) by falling back to standard multiplanning. For more information on replanning, see [here](../plan_cache/README.md#aside-replanning)
+Note that if execution of a cached plan fails because the cached plan is less efficient that expected, we [`replan()`](https://github.com/mongodb/mongo/blob/0088f90ce188b8bc32575e7e4b75149ceab5da0e/src/mongo/db/exec/cached_plan.cpp#L213) by falling back to standard multiplanning. For more information on replanning, see [here](../plan_cache/README.md#aside-replanning)
 
-## [`MultiPlanner`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L182)
+## [`MultiPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L182)
 
-If we have [more than one](#singlesolutionpassthroughplanner) `QuerySolution`, multiplanning begins in [`buildMultiPlan()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L586). This function initializes a `MultiPlanner` that manages the multiplanning process. For each `QuerySolution`, [`buildExecutableTree()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L46) is called which constructs a tree of `PlanStage`s, where each stage corresponds to the tree in the `QuerySolution`. The `MultiPlanner` initiates planning within [`MultiPlanStage::pickBestPlan()`](https://github.com/10gen/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/exec/multi_plan.cpp#L246-L253).
+If we have [more than one](#singlesolutionpassthroughplanner) `QuerySolution`, multiplanning begins in [`buildMultiPlan()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L586). This function initializes a `MultiPlanner` that manages the multiplanning process. For each `QuerySolution`, [`buildExecutableTree()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L46) is called which constructs a tree of `PlanStage`s, where each stage corresponds to the tree in the `QuerySolution`. The `MultiPlanner` initiates planning within [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/exec/multi_plan.cpp#L246-L253).
 
 During multiplanning, each `QuerySolution` is evaluated by running each candidate for a trial period in a round-robin fashion. This round-robin execution successively calls `PlanStage::work()` on each query, performing one unit of work for each.
 
 > ### Aside: Works
 >
-> Each `PlanStage` defines its own [`doWork()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L383) method, which is called from [`PlanStage::work()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L207). The content of this function represents one unit of work for each stage. For example:
+> Each `PlanStage` defines its own [`doWork()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L383) method, which is called from [`PlanStage::work()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L207). The content of this function represents one unit of work for each stage. For example:
 >
-> - [`IndexScan::doWork()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/index_scan.cpp#L147) retrieves the next `IndexKeyEntry` from the index, if one exists.
-> - [`FetchStage::doWork()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/fetch.cpp#L76) consumes one element of the input stream and returns the result. This means the `FetchStage` may need more than one work call to fetch an entire document.
+> - [`IndexScan::doWork()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/index_scan.cpp#L147) retrieves the next `IndexKeyEntry` from the index, if one exists.
+> - [`FetchStage::doWork()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/fetch.cpp#L76) consumes one element of the input stream and returns the result. This means the `FetchStage` may need more than one work call to fetch an entire document.
 >
 > Some stages, like `GROUP` and `SORT`, require many successive calls to `work()` before generating a result.
-> For more information on `work()` refer to `plan_stage.h`'s [header comment](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L61-L122).
+> For more information on `work()` refer to `plan_stage.h`'s [header comment](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/plan_stage.h#L61-L122).
 
-`PlanStage::work()` returns a [`StageState`](https://github.com/10gen/mongo/blob/4f39d22a701b931862b1f1d9ba97011bcacb9f98/src/mongo/db/exec/plan_stage.h#L151), which indicates that after this incremental unit of work, query execution is in one of these states:
+`PlanStage::work()` returns a [`StageState`](https://github.com/mongodb/mongo/blob/4f39d22a701b931862b1f1d9ba97011bcacb9f98/src/mongo/db/exec/plan_stage.h#L151), which indicates that after this incremental unit of work, query execution is in one of these states:
 
 1. `ADVANCED`: A query result was returned.
 1. `IS_EOF`: Query execution is complete.
@@ -47,7 +47,7 @@ During multiplanning, each `QuerySolution` is evaluated by running each candidat
 >
 > "Yielding" refers to releasing locks on storage resources during execution to prevent long-running queries from blocking other queries. By default, queries are intended to yield every 10ms or 1000 iterations.
 >
-> During multiplanning, [`tryYield()`](https://github.com/10gen/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/exec/multi_plan.cpp#L207) is called both between `work()` calls and when a `work()` returns `NEED_YIELD`, in order to ensure yielding is performed adequately. `tryYield()` takes a [`PlanYieldPolicy`](https://github.com/10gen/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/query/plan_yield_policy.h#L78), which is passed through `work()` to indicate to the executor whether to yield under the current configuration.
+> During multiplanning, [`tryYield()`](https://github.com/mongodb/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/exec/multi_plan.cpp#L207) is called both between `work()` calls and when a `work()` returns `NEED_YIELD`, in order to ensure yielding is performed adequately. `tryYield()` takes a [`PlanYieldPolicy`](https://github.com/mongodb/mongo/blob/804e6f131091af60245b44ebada26cbdd2d34307/src/mongo/db/query/plan_yield_policy.h#L78), which is passed through `work()` to indicate to the executor whether to yield under the current configuration.
 
 As the query plans execute, statistics are recorded on their performance. These statistics will eventually be used to [determine a winner](#plan-ranking).
 
@@ -57,11 +57,11 @@ Multiplanning continues until at least one candidate plan does one of the follow
 
 1. Returns one full default `batchsize` of results.
    - Currently, a default `batchsize` of results is 101 documents.
-     - This value can be modified using the [`internalQueryPlanEvaluationMaxResults`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L156-L165) query knob.
+     - This value can be modified using the [`internalQueryPlanEvaluationMaxResults`](https://github.com/mongodb/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L156-L165) query knob.
 1. Hits "EOF", meaning the `QuerySolution` has finished execution during the trial period and returned all its results.
 1. Makes the maximum number of [`work()`](#aside-works) calls.
-   - Currently, the maximum number of `work()` calls is [calculated](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/exec/trial_period_utils.cpp#L44-L55) as `max(10K, 0.3 * collection_size)`.
-     - These values can be modified using the [`internalQueryPlanEvaluationWorks`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L101-L112) and [`internalQueryPlanEvaluationCollFraction`](https://github.com/10gen/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L129-L139) query knobs.
+   - Currently, the maximum number of `work()` calls is [calculated](https://github.com/mongodb/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/exec/trial_period_utils.cpp#L44-L55) as `max(10K, 0.3 * collection_size)`.
+     - These values can be modified using the [`internalQueryPlanEvaluationWorks`](https://github.com/mongodb/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L101-L112) and [`internalQueryPlanEvaluationCollFraction`](https://github.com/mongodb/mongo/blob/e60552830a722dc52422f39bf6be407933934392/src/mongo/db/query/query_knobs.idl#L129-L139) query knobs.
 
 Consider this setup, where `a` and `b` are random integers evenly distributed between 0 and 100:
 
@@ -82,7 +82,7 @@ Because the predicate on `a` is significantly more selective than the predicate 
 
 ## Plan Ranking
 
-After the trial period is complete, [`plan_ranker::pickBestPlan()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/plan_ranker_util.h#L210) assigns each `QuerySolution` a score based on its performance during the trial period. The [formula for the scores](https://github.com/10gen/mongo/blob/23fcb16382bb8962d5648adfa7a7a2a828c555ec/src/mongo/db/query/plan_ranker.h#L160) is as follows:
+After the trial period is complete, [`plan_ranker::pickBestPlan()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/plan_ranker_util.h#L210) assigns each `QuerySolution` a score based on its performance during the trial period. The [formula for the scores](https://github.com/mongodb/mongo/blob/23fcb16382bb8962d5648adfa7a7a2a828c555ec/src/mongo/db/query/plan_ranker.h#L160) is as follows:
 
 ```
 score = 1
@@ -116,14 +116,14 @@ Because the productivity ratio and tie-breakers will never surpass the EOF Bonus
 
 In the event of a tie between plans, there are a few metrics regarding the shape of the candidate `QuerySolution`s that can be used to determine which is marginally better.
 
-[Some such metrics](https://github.com/10gen/mongo/blob/95d1830ce1acffd0108932d04538ed9dc995ade5/src/mongo/db/query/plan_ranker.h#L120-L158) include:
+[Some such metrics](https://github.com/mongodb/mongo/blob/95d1830ce1acffd0108932d04538ed9dc995ade5/src/mongo/db/query/plan_ranker.h#L120-L158) include:
 
 - `noFetchBonus`: Bonus for covered plans (i.e. plans that do not have a `FETCH` stage)
 - `noSortBonus`: Bonus for plans that do not have a [blocking `SORT`](#aside-blocking-sort) stage.
 - `noIxisectBonus`: Bonus for plans that do not have an `AND_HASH` or `AND_SORTED` index intersection stage.
-- `groupByDistinctBonus`: Bonus for using a `DISTINCT_SCAN` in an aggregation context, where the bonus is [proportional](https://github.com/10gen/mongo/blob/340adb94bc0d348f42f7b427a06418dfd27f4bfc/src/mongo/db/query/plan_ranker.h#L156) to the productivity of the `DISTINCT_SCAN`.
+- `groupByDistinctBonus`: Bonus for using a `DISTINCT_SCAN` in an aggregation context, where the bonus is [proportional](https://github.com/mongodb/mongo/blob/340adb94bc0d348f42f7b427a06418dfd27f4bfc/src/mongo/db/query/plan_ranker.h#L156) to the productivity of the `DISTINCT_SCAN`.
 
-Standard bonus is a value of [`epsilon`](https://github.com/10gen/mongo/blob/340adb94bc0d348f42f7b427a06418dfd27f4bfc/src/mongo/db/query/plan_ranker.h#L115), unless noted otherwise.
+Standard bonus is a value of [`epsilon`](https://github.com/mongodb/mongo/blob/340adb94bc0d348f42f7b427a06418dfd27f4bfc/src/mongo/db/query/plan_ranker.h#L115), unless noted otherwise.
 
 Each `QuerySolution` that meets any of these specifications is awarded an additional point value to break the tie.
 
@@ -169,25 +169,25 @@ flowchart TD
 
 ## Alternative Planners
 
-Although `MultiPlanner` is our "standard" case, not all queries utilize a `MultiPlanner`. Under certain conditions, we may use a different planner that is a subclass of the abstract class [`ClassicPlannerInterface`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L59); [`CachedPlanner`](#plan-cache-consultation) is one such example. Each subclass of `ClassicPlannerInterface` overrides [`doPlan()`](https://github.com/10gen/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L117). `MultiPlanner`'s override, for example, calls [`MultiPlanStage::pickBestPlan()`](https://github.com/10gen/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L55).
+Although `MultiPlanner` is our "standard" case, not all queries utilize a `MultiPlanner`. Under certain conditions, we may use a different planner that is a subclass of the abstract class [`ClassicPlannerInterface`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L59); [`CachedPlanner`](#plan-cache-consultation) is one such example. Each subclass of `ClassicPlannerInterface` overrides [`doPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L117). `MultiPlanner`'s override, for example, calls [`MultiPlanStage::pickBestPlan()`](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/multi_planner.cpp#L55).
 
 Each subclass is detailed below:
 
-### [`SingleSolutionPassthroughPlanner`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L146)
+### [`SingleSolutionPassthroughPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L146)
 
-If only one `QuerySolution` exists for a query, no decision needs to be made about which plan to use. In this case, we initialize a `SingleSolutionPassthroughPlanner`, which [does no planning](https://github.com/10gen/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/single_solution_passthrough_planner.cpp#L44) and creates a classic plan executor for its plan immediately.
+If only one `QuerySolution` exists for a query, no decision needs to be made about which plan to use. In this case, we initialize a `SingleSolutionPassthroughPlanner`, which [does no planning](https://github.com/mongodb/mongo/blob/6b012bcbe4610ef1e88f9f75d171faa017503713/src/mongo/db/query/classic_runtime_planner/single_solution_passthrough_planner.cpp#L44) and creates a classic plan executor for its plan immediately.
 
-### [`IdHackPlanner`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L132)
+### [`IdHackPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L132)
 
-An `IDHACK` query is a special query of the form `{_id: {$eq: <value>}}`. If a query meets this specification, we can bypass query planning and construct a "find-by-\_id" plan. This is a ["fast path" optimization](https://github.com/10gen/mongo/blob/2ceaa45d0b28d1a057c7538327958bdd3c7222db/src/mongo/db/query/get_executor.cpp#L1170) and therefore does not consult the [plan cache](#cachedplanner). It is a guarantee that we will only use the default `_id` index to execute the query.
+An `IDHACK` query is a special query of the form `{_id: {$eq: <value>}}`. If a query meets this specification, we can bypass query planning and construct a "find-by-\_id" plan. This is a ["fast path" optimization](https://github.com/mongodb/mongo/blob/2ceaa45d0b28d1a057c7538327958bdd3c7222db/src/mongo/db/query/get_executor.cpp#L1170) and therefore does not consult the [plan cache](#cachedplanner). It is a guarantee that we will only use the default `_id` index to execute the query.
 
-### [`SubPlanner`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L199)
+### [`SubPlanner`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/classic_runtime_planner/planner_interface.h#L199)
 
 Rooted `$or` queries are eligible for subplanning.
 
 > **Rooted `$or`**: A query that contains an `$or` operator at its top level.
 
-In these cases, a [`SubplanStage`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/subplan.h#L82) calls [`buildSubPlan()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L720), which constructs a special `PlanStage` tree. Here, each branch undergoes multiplanning separately. After a winner has been determined from each branch, the branches are ranked against each other, until a winning plan prevails for the entire rooted `$or`.
+In these cases, a [`SubplanStage`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/subplan.h#L82) calls [`buildSubPlan()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/query/get_executor.cpp#L720), which constructs a special `PlanStage` tree. Here, each branch undergoes multiplanning separately. After a winner has been determined from each branch, the branches are ranked against each other, until a winning plan prevails for the entire rooted `$or`.
 
 For example:
 
@@ -197,9 +197,9 @@ db.c.find({$or: [{a: 1, x: 1}, {b: 1, y: 2}]})
 
 In this query, the two branches: `{a: 1, x: 1}` and `{b: 1, y: 2}` would be multiplanned separately. Once a winning plan exists for each branch, the plan with the better score becomes the plan for the whole query.
 
-Note that subplanning's interaction with the [plan cache](../plan_cache/README.md#subplanning) is done on a _per-clause basis_. For details on this interaction, see [here](https://github.com/10gen/mongo/blob/21e7b8cfb79f3a7baae651055d5e1b3549dbdfda/src/mongo/db/exec/subplan.h#L70-L80).
+Note that subplanning's interaction with the [plan cache](../plan_cache/README.md#subplanning) is done on a _per-clause basis_. For details on this interaction, see [here](https://github.com/mongodb/mongo/blob/21e7b8cfb79f3a7baae651055d5e1b3549dbdfda/src/mongo/db/exec/subplan.h#L70-L80).
 
-If, for any reason, subplanning fails on one of the children individually, [`choosePlanWholeQuery()`](https://github.com/10gen/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/subplan.cpp#L115) is called which falls back to multiplanning on the query as a whole.
+If, for any reason, subplanning fails on one of the children individually, [`choosePlanWholeQuery()`](https://github.com/mongodb/mongo/blob/12390d154c1d06b6082a03d2410ff2b3578a323e/src/mongo/db/exec/subplan.cpp#L115) is called which falls back to multiplanning on the query as a whole.
 
 ---
 

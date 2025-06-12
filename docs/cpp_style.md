@@ -334,7 +334,7 @@ in a `.h` file and provide `= default;` as the implementation in a `.cpp` file.
 
 The `noexcept` feature is easy to overuse. Do not use it solely as "documentation"
 since it affects runtime behavior. It's a large topic, covered in the [Exception
-Architecture](https://github.com/10gen/mongo/blob/master/docs/exception_architecture.md#using-noexcept)
+Architecture](https://github.com/mongodb/mongo/blob/master/docs/exception_architecture.md#using-noexcept)
 document.
 
 ### Overriding Virtuals
