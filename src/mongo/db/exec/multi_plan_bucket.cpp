@@ -143,9 +143,9 @@ boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedToke
                                                             OperationContext* opCtx) {
     const bool inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
 
+    stdx::unique_lock guard(_mutex);
     boost::optional<MultiPlanTokens> tokens{};
 
-    stdx::unique_lock guard(_mutex);
     if (_active && _tokens >= requestedTokens) {
         _tokens -= requestedTokens;
         guard.unlock();
@@ -154,27 +154,34 @@ boost::optional<MultiPlanTokens> MultiPlanBucket::getTokens(size_t requestedToke
         return tokens;
     }
 
-    while (_active && _tokens < requestedTokens &&
-           _cv.wait_for(
-               guard,
-               _yieldingTimeout,
-               [this, requestedTokens] { return _tokens >= requestedTokens; }) == false) {
-        // Multidocument transactions do not yield.
-        if (!inMultiDocumentTransaction) {
-            guard.unlock();  // unlock the mutex to avoid deadlocks during yielding
-            if (yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
-                uassertStatusOK(yieldPolicy->yieldOrInterrupt(
-                    opCtx, nullptr, RestoreContext::RestoreType::kYield));
+    static constexpr size_t kMaxAttempts = 5;
+    for (size_t i = 0; i < kMaxAttempts; i++) {
+        while (_active && _tokens < requestedTokens &&
+               _cv.wait_for(
+                   guard,
+                   _yieldingTimeout,
+                   [this, requestedTokens] { return _tokens >= requestedTokens; }) == false) {
+            // Multidocument transactions do not yield.
+            if (!inMultiDocumentTransaction) {
+                guard.unlock();  // unlock the mutex to avoid deadlocks during yielding
+                if (yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
+                    uassertStatusOK(yieldPolicy->yieldOrInterrupt(
+                        opCtx, nullptr, RestoreContext::RestoreType::kYield));
+                }
+                guard.lock();
             }
-            guard.lock();
+        }
+
+        // If the bucket is still active (the plan is not cached yet) we can try to get tokens.
+        if (_active && _tokens >= requestedTokens) {
+            _tokens -= requestedTokens;
+            guard.unlock();
+            tokens.emplace(requestedTokens, weak_from_this());
+            break;
         }
     }
 
-    // If the bucket is still active (the plan is not cached yet) we can try to get tokens.
-    if (_active && _tokens >= requestedTokens) {
-        _tokens -= requestedTokens;
-        guard.unlock();
-        tokens.emplace(requestedTokens, weak_from_this());
+    if (tokens) {
         rateLimiterDelayedCount.increment();
     } else {
         rateLimiterRefusedCount.increment();
