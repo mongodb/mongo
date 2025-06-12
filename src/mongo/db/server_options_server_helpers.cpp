@@ -231,6 +231,16 @@ Status validateServerOptions(const moe::Environment& params) {
                                       " and replication.replSet");
             }
         }
+
+        bool disableJavaScriptJITUsed = parameters.find("disableJavaScriptJIT") != parameters.end();
+        if (disableJavaScriptJITUsed) {
+            LOGV2_WARNING(
+                10201701,
+                "The Javascript Just In Time compiler is deprecated, and should be disabled "
+                "for security reasons. The server parameter will be removed in the next minor "
+                "version. See https://www.mongodb.com/docs/manual/reference/parameters for "
+                "more information.");
+        }
     }
     if ((params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") ||

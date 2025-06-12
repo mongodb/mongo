@@ -386,6 +386,15 @@ public:
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
 
+            if (parameterName == "disableJavaScriptJIT") {
+                LOGV2_WARNING(
+                    10201700,
+                    "The Javascript Just In Time compiler is deprecated, and should be disabled "
+                    "for security reasons. The server parameter will be removed in the next minor "
+                    "version. See https://www.mongodb.com/docs/manual/reference/parameters for "
+                    "more information.");
+            }
+
             // Check to see if this is actually a valid parameter
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "attempted to set unrecognized parameter [" << parameterName
