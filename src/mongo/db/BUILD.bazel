@@ -653,6 +653,7 @@ mongo_cc_library(
         "//src/mongo/db/catalog:collection_options",
         "//src/mongo/db/concurrency:lock_manager",
         "//src/mongo/db/query/collation:collator_factory_interface",
+        "//src/mongo/db/repl:intent_registry",
         "//src/mongo/s:common_s",
     ],
 )

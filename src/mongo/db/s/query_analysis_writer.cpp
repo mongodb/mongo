@@ -529,6 +529,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
 }
 
 void QueryAnalysisWriter::onShutdown() {
+    _isPrimary.store(false);
     if (_executor) {
         _executor->shutdown();
         _executor->join();
@@ -546,6 +547,7 @@ void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long te
         return;
     }
 
+    _isPrimary.store(true);
     createTTLIndexes(opCtx).getAsync([](auto) {});
 }
 
@@ -553,6 +555,7 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
     invariant(_executor);
 
     static unsigned int tryCount = 0;
+
     auto future =
         AsyncTry([this] {
             ++tryCount;
@@ -577,10 +580,11 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
             }
             return Status::OK();
         })
-            .until([](Status status) {
+            .until([this](Status status) {
                 // Stop retrying if index creation succeeds, or if server is no longer
                 // primary.
-                return (status.isOK() || ErrorCodes::isNotPrimaryError(status));
+                return (status.isOK() ||
+                        (ErrorCodes::isNotPrimaryError(status) && !_isPrimary.load()));
             })
             .withBackoffBetweenIterations(kExponentialBackoff)
             .on(_executor, CancellationToken::uncancelable());

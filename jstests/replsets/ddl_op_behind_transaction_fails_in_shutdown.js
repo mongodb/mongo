@@ -102,7 +102,7 @@ rst.stop(primary, undefined, {skipValidation: true});
 rst.start(primary, {}, true /*restart*/);
 primary = rst.getPrimary();
 
-joinDropCollection();
+joinDropCollection({checkExitSuccess: false});
 
 const numDocs = primary.getDB(dbName).getCollection(collName).find().length();
 // We expect two documents because the third is in an uncommitted transaction and not visible.

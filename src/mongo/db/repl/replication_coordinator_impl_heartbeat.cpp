@@ -599,8 +599,8 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(
-            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
+        rstg.emplace(_killConflictingOperations(
+            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
     }
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
@@ -848,7 +848,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                 // Initializing minvalid is not allowed to be interrupted.  Make sure it
                 // can't be interrupted by a storage change by taking the global lock first.
                 {
-                    Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+                    Lock::GlobalLock lk(
+                        opCtx.get(),
+                        MODE_IX,
+                        {false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
                     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(
                         opCtx.get());
                 }
@@ -924,7 +927,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstg.emplace(_killConflictingOperations(
-                rss::consensus::IntentRegistry::InterruptionType::StepDown));
+                rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
         }
         arsd.emplace(
             this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);

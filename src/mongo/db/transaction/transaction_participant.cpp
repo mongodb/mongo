@@ -72,6 +72,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -1068,6 +1069,10 @@ void TransactionParticipant::Participant::beginOrContinue(
     // method, as we otherwise risk stepping down in the interim and incorrectly updating the
     // transaction number, which can abort active transactions.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    boost::optional<rss::consensus::IntentGuard> txnGuard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+    }
     if (opCtx->writesAreReplicated()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(ErrorCodes::NotWritablePrimary,
@@ -1748,7 +1753,11 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     // Global intent lock before starting a transaction.  We pessimistically acquire an intent
     // exclusive lock here because we might be doing writes in this transaction, and it is currently
     // not deadlock-safe to upgrade IS to IX.
-    Lock::GlobalLock globalLock(opCtx, MODE_IX);
+    Lock::GlobalLock globalLock(
+        opCtx,
+        MODE_IX,
+        Lock::GlobalLockSkipOptions{.explicitIntent =
+                                        rss::consensus::IntentRegistry::Intent::LocalWrite});
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
     _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx), openSnapshotOptions);
@@ -2083,6 +2092,10 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     // Re-acquire the RSTL to prevent state transitions while committing the transaction. When the
     // transaction was prepared, we dropped the RSTL.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    boost::optional<rss::consensus::IntentGuard> txnGuard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+    }
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
     // transitions. If we do not commit the transaction we must unlock the RSTL explicitly so two
@@ -2405,6 +2418,10 @@ void TransactionParticipant::Participant::_abortActivePreparedTransaction(Operat
     // Re-acquire the RSTL to prevent state transitions while aborting the transaction. Since the
     // transaction was prepared, we dropped it on preparing the transaction.
     repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+    boost::optional<rss::consensus::IntentGuard> txnGuard;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        txnGuard.emplace(rss::consensus::IntentRegistry::Intent::PreparedTransaction, opCtx);
+    }
 
     // Prepared transactions cannot hold the RSTL, or else they will deadlock with state
     // transitions. If we do not abort the transaction we must unlock the RSTL explicitly so two

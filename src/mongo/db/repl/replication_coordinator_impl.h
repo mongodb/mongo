@@ -1353,7 +1353,7 @@ private:
                                   const std::string& replSetName);
 
     rss::consensus::ReplicationStateTransitionGuard _killConflictingOperations(
-        rss::consensus::IntentRegistry::InterruptionType interrupt);
+        rss::consensus::IntentRegistry::InterruptionType interrupt, OperationContext* opCtx);
 
     void _trackHeartbeatHandle(WithLock,
                                const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,

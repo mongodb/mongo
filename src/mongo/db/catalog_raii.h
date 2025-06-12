@@ -38,6 +38,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
@@ -118,13 +119,6 @@ class AutoGetDb {
     AutoGetDb(const AutoGetDb&) = delete;
     AutoGetDb& operator=(const AutoGetDb&) = delete;
 
-    AutoGetDb(OperationContext* opCtx,
-              const DatabaseName& dbName,
-              LockMode mode,
-              boost::optional<LockMode> tenantLockMode,
-              Date_t deadline,
-              Lock::DBLockSkipOptions options);
-
 public:
     /**
      * Acquires a lock on the specified database 'dbName' in the requested 'mode'.
@@ -153,6 +147,13 @@ public:
               LockMode mode,
               boost::optional<LockMode> tenantLockMode,
               Date_t deadline = Date_t::max());
+
+    AutoGetDb(OperationContext* opCtx,
+              const DatabaseName& dbName,
+              LockMode mode,
+              boost::optional<LockMode> tenantLockMode,
+              Date_t deadline,
+              Lock::DBLockSkipOptions options);
 
     AutoGetDb(AutoGetDb&&) = default;
 
@@ -502,6 +503,7 @@ enum class OplogAccessMode { kRead, kWrite, kLogOp };
 
 struct AutoGetOplogFastPathOptions {
     bool skipRSTLLock = false;
+    boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none;
 };
 
 class AutoGetOplogFastPath {

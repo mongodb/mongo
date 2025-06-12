@@ -51,7 +51,11 @@ const waitForStepDown = startParallelShell(() => {
 
 // Wait for the RstlKillOpThread to run again. It first ran when the secondary stepped up (earlier
 // in this test case), and it's running now when it's stepping down again.
-assert.soon(() => checkLog.checkContainsWithCountJson(secondary, 21343, {}, 2));
+assert.soon(() => {
+    // Check both the RSTL kill op thread and the Intent Registry kill op thread.
+    return checkLog.checkContainsWithCountJson(secondary, 21343, {}, 2) ||
+        checkLog.checkContainsWithCountJson(secondary, 9945003, {}, 2);
+});
 
 // Wait for the step-up task to be marked as killPending by the RstlKillOpThread.
 assert.soon(() => {

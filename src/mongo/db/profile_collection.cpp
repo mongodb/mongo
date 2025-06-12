@@ -176,7 +176,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                                       dbProfilingNS,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(newCtx.get()),
-                                      AcquisitionPrerequisites::kWrite),
+                                      AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX));
 
             Database* const db =

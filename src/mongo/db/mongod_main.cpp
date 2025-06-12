@@ -1815,7 +1815,9 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstg.emplace(rss::consensus::IntentRegistry::get(serviceContext)
                              .killConflictingOperations(
-                                 rss::consensus::IntentRegistry::InterruptionType::Shutdown)
+                                 rss::consensus::IntentRegistry::InterruptionType::Shutdown,
+                                 opCtx,
+                                 0 /* no timeout */)
                              .get());
         }
         // Acquire the RSTL in mode X. First we enqueue the lock request, then kill all

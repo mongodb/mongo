@@ -386,7 +386,9 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
         if (gFeatureFlagIntentRegistration.isEnabled()) {
             rstGuard.emplace(rss::consensus::IntentRegistry::get(opCtx)
                                  .killConflictingOperations(
-                                     rss::consensus::IntentRegistry::InterruptionType::Rollback)
+                                     rss::consensus::IntentRegistry::InterruptionType::Rollback,
+                                     opCtx,
+                                     0 /* no timeout */)
                                  .get());
         }
         rstlLock.emplace(opCtx, MODE_X, ReplicationStateTransitionLockGuard::EnqueueOnly());
@@ -606,7 +608,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
                                       nss,
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kWrite),
+                                      AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX);
             auto filter = BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON());
             UnreplicatedWritesBlock uwb(opCtx);
@@ -1420,7 +1422,13 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
 void RollbackImpl::_checkForAllIdIndexes(OperationContext* opCtx) {
     std::vector<DatabaseName> dbNames = catalog::listDatabases();
     for (const auto& dbName : dbNames) {
-        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+        Lock::DBLock dbLock(
+            opCtx,
+            dbName,
+            MODE_X,
+            Date_t::max(),
+            Lock::DBLockSkipOptions{
+                false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
         checkForIdIndexes(opCtx, dbName);
     }
 }

@@ -1177,7 +1177,10 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
     // underneath us.
     boost::optional<Lock::GlobalLock> lk;
     if (!shard_role_details::getLocker(opCtx)->isWriteLocked()) {
-        lk.emplace(opCtx, MODE_IX);
+        lk.emplace(opCtx,
+                   MODE_IX,
+                   Lock::GlobalLockSkipOptions{
+                       .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     }
 
     if (isResumable) {
