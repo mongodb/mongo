@@ -356,6 +356,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                         detectedOutOfOrder = true;
                     }
                 }
+                prevTimestamp = curTimestamp;
                 minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
                 ++(*bucketCount);
             } else {
