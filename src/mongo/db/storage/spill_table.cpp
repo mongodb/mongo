@@ -78,9 +78,22 @@ int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
 }
 
 Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* records) {
-    std::vector<Timestamp> timestamps(records->size());
-    return _rs->insertRecords(
-        opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx), records, timestamps);
+    if (!_ru) {
+        std::vector<Timestamp> timestamps(records->size());
+        return _rs->insertRecords(
+            opCtx, *storage_details::getRecoveryUnit(opCtx), records, timestamps);
+    }
+
+    for (auto&& record : *records) {
+        auto status =
+            _rs->insertRecord(opCtx, *_ru, record.id, record.data.data(), record.data.size(), {});
+        if (!status.isOK()) {
+            return status.getStatus();
+        }
+        record.id = status.getValue();
+    }
+
+    return Status::OK();
 }
 
 bool SpillTable::findRecord(OperationContext* opCtx, const RecordId& rid, RecordData* out) const {
