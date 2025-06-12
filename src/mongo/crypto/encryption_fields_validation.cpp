@@ -51,6 +51,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
@@ -61,6 +62,7 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(allowOutOfBoundsSubstringParameters);
 
 Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType) {
     BSONType valType = val.getType();
@@ -484,6 +486,35 @@ void validateTextSearchIndex(BSONType fieldType,
         uassert(9783408,
                 "strMaxQueryLength cannot be greater than strMaxLength",
                 query.getStrMaxQueryLength().value() <= query.getStrMaxLength().value());
+
+        // Substring specifically strictly bounds strMinQueryLength to >= 2, strMaxQueryLength to <=
+        // 10, and strMaxLength to <= 400.
+        uassert(10453200,
+                fmt::format("strMinQueryLength ({}) must be >= 2 and <= strMaxQueryLength ({}) for "
+                            "{} query type of field {}",
+                            query.getStrMinQueryLength().value(),
+                            query.getStrMaxQueryLength().value(),
+                            qTypeStr,
+                            fieldPath),
+                MONGO_unlikely(allowOutOfBoundsSubstringParameters.shouldFail()) ||
+                    query.getStrMinQueryLength().value() >= 2);
+        uassert(10453201,
+                fmt::format("strMaxQueryLength ({}) must be <= 10 and >= strMinQueryLength ({}) "
+                            "for {} query type of field {}",
+                            query.getStrMaxQueryLength().value(),
+                            query.getStrMinQueryLength().value(),
+                            qTypeStr,
+                            fieldPath),
+                MONGO_unlikely(allowOutOfBoundsSubstringParameters.shouldFail()) ||
+                    query.getStrMaxQueryLength().value() <= 10);
+        uassert(10453202,
+                fmt::format("strMaxLength ({}) must be <= 400 "
+                            "{} query type of field {}",
+                            query.getStrMaxLength().value(),
+                            qTypeStr,
+                            fieldPath),
+                MONGO_unlikely(allowOutOfBoundsSubstringParameters.shouldFail()) ||
+                    query.getStrMaxLength().value() <= 400);
     }
 
     if (previousCaseSensitivity.has_value() &&

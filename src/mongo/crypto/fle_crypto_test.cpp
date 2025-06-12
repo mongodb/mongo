@@ -2660,27 +2660,38 @@ TEST_F(ServiceContextTest, EncryptionInformation_TestTagLimitsForTextSearch) {
 
     // substring field under limit
     std::vector<QueryTypeConfig> qtc = {
-        makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 900)};
-    assertExpectedMaxTags(qtc, 76987);
+        makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 200)};
+    assertExpectedMaxTags(qtc, 1756);
     doOneTest(qtc, {});
 
-    // substring field at limit
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 1, 83'999);
-    assertExpectedMaxTags(qtc, 84'000);
+    // substring tag limit tests require a failpoint to circumvent parameter limits
+    {
+        FailPointEnableBlock fp("allowOutOfBoundsSubstringParameters");
+        // substring field at limit
+        qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 1, 83'999);
+        assertExpectedMaxTags(qtc, 84'000);
+        doOneTest(qtc, {});
+
+        qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 2, 42'000);
+        assertExpectedMaxTags(qtc, 84'000);
+        doOneTest(qtc, {});
+
+        // substring field over limit
+        qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 1000);
+        assertExpectedMaxTags(qtc, 86'087);
+        doOneTest(qtc, 10384602);
+
+        // overflow uint32_t
+        qtc.front() =
+            makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
+        doOneTest(qtc, 10384601);
+    }
+
+    // substring field should still be under tag limit even with min allowed lb and max allowed ub
+    // and mlen
+    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 2, 10, 400);
+    assertExpectedMaxTags(qtc, 3556);
     doOneTest(qtc, {});
-
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, 2, 42'000);
-    assertExpectedMaxTags(qtc, 84'000);
-    doOneTest(qtc, {});
-
-    // substring field over limit
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 10, 100, 1000);
-    assertExpectedMaxTags(qtc, 86'087);
-    doOneTest(qtc, 10384602);
-
-    // overflow uint32_t
-    qtc.front() = makeTextQueryTypeConfig(QueryTypeEnum::SubstringPreview, 1, INT32_MAX, INT32_MAX);
-    doOneTest(qtc, 10384601);
 
     for (auto qtype : {QueryTypeEnum::SuffixPreview, QueryTypeEnum::PrefixPreview}) {
         // suffix/prefix field under limit
