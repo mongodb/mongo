@@ -35,6 +35,8 @@ export const $config = (function() {
             // left to clone. This occurs when a MovePrimary joins an already existing MovePrimary
             // command that has purposefully triggered a failpoint.
             9046501,
+            // Suites with add remove shard might make the move primary to fail with ShardNotFound.
+            ErrorCodes.ShardNotFound,
         ],
     };
 
@@ -72,27 +74,13 @@ export const $config = (function() {
                 ]);
         },
         movePrimary: function(db, collName, connCache) {
-            let count = 0;
-            assert.soon(() => {
-                if (count === 5) {
-                    jsTestLog(`movePrimary failed ${
-                        count} times because the target was not found, giving up`);
-                    return true;
-                }
-                db = data.getRandomDb(db);
-                const shardId = data.getRandomShard(connCache);
+            db = data.getRandomDb(db);
+            const shardId = data.getRandomShard(connCache);
 
-                jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
-                const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
-                if (res.code == ErrorCodes.ShardNotFound) {
-                    count++;
-                    jsTestLog(`Fail #${count}: The movePrimary target ${
-                        shardId} was not found, retrying...`);
-                    return false;
-                }
-                assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
-                return true;
-            });
+            jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
+            const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
+            assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
+            return true;
         },
         collMod: function(db, collName, connCache) {
             db = data.getRandomDb(db);
