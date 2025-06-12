@@ -148,6 +148,8 @@ private:
     // Stores truncate markers for this oplog, can be nullptr e.g. when
     // the server is read-only.
     std::shared_ptr<OplogTruncateMarkers> _truncateMarkers;
+    // Mutex for concurrent access to above fields
+    mutable stdx::mutex _rsMutex;
 
     // Synchronizes the section where a new Timestamp is generated and when it is registered in the
     // storage engine.

@@ -80,10 +80,12 @@ OplogSlotTimeContext& LocalOplogInfo::getOplogSlotTimeContext(OperationContext* 
 }
 
 RecordStore* LocalOplogInfo::getRecordStore() const {
+    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     return _rs;
 }
 
 void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
+    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = rs;
     // If the server was started in read-only mode or if we are restoring the node, skip
     // calculating the oplog truncate markers. The OplogCapMaintainerThread does not get started
@@ -96,10 +98,12 @@ void LocalOplogInfo::setRecordStore(OperationContext* opCtx, RecordStore* rs) {
 }
 
 void LocalOplogInfo::resetRecordStore() {
+    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     _rs = nullptr;
 }
 
 std::shared_ptr<OplogTruncateMarkers> LocalOplogInfo::getTruncateMarkers() const {
+    stdx::lock_guard<stdx::mutex> lk(_rsMutex);
     return _truncateMarkers;
 }
 
