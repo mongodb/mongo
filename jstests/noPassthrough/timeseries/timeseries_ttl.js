@@ -119,6 +119,39 @@ testCase((coll, bucketsColl) => {
     assert.eq(0, bucketsColl.find().itcount());
 });
 
+testCase((coll, bucketsColl) => {
+    // Inserts measurements that fall into extended time range. Make sure TTL is able to make
+    // progress in the presence of these dates. All inserts fall into separate buckets.
+
+    const nowTime = new Date();
+
+    assert.commandWorked(coll.insertMany([
+        // This date is sorted at the end of the _id index and is eligible for TTL deletion
+        {[timeFieldName]: new ISODate("1969-12-31T23:59:59"), [metaFieldName]: "localhost"},
+        // This date is sorted at the beginning of the _id index but is NOT eligible for TTL
+        // deletion
+        {[timeFieldName]: new ISODate("2038-01-19T03:15:00"), [metaFieldName]: "localhost"},
+        // This date is sorted at the end of the _id index but is NOT eligible for TTL deletion
+        {[timeFieldName]: new ISODate("2106-02-07T06:29:00"), [metaFieldName]: "localhost"},
+        // Insert a date 5 minutes prior to now, this is will not be deleted as the max bucket span
+        // prevents it even if the bucket minimum is past the expiry.
+        {
+            [timeFieldName]: new Date(nowTime.getTime() - (1000 * 5 * 60)),
+            [metaFieldName]: "localhost"
+        },
+        // Insert earlier than the bucket span. This is eligible for deletion.
+        {
+            [timeFieldName]:
+                new Date(nowTime.getTime() - (1000 * defaultBucketMaxRange) - (1000 * 5 * 60)),
+            [metaFieldName]: "localhost"
+        }
+    ]));
+
+    TTLUtil.waitForPass(coll.getDB("test"));
+    assert.eq(3, coll.find().itcount());
+    assert.eq(3, bucketsColl.find().itcount());
+});
+
 // Make a collection TTL using collMod. Ensure data expires correctly.
 (function newlyTTLWithCollMod() {
     const coll = testDB.getCollection('ts');

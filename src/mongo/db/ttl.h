@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/ttl_collection_cache.h"
@@ -96,7 +97,7 @@ private:
     /**
      * Deletes all expired documents. May consist of several sub-passes.
      */
-    void _doTTLPass(OperationContext* opCtx);
+    void _doTTLPass(OperationContext* opCtx, Date_t at);
 
     /**
      * A sub-pass iterates over a list of TTL indexes until there are no more expired documents to
@@ -113,6 +114,7 @@ private:
      * Returns true if there are more expired documents to delete. False otherwise.
      */
     bool _doTTLSubPass(OperationContext* opCtx,
+                       Date_t at,
                        stdx::unordered_map<UUID, long long, UUID::Hash>& collSubpassHistory);
 
     /**
@@ -133,6 +135,7 @@ private:
      * scenarios as well.
      */
     bool _doTTLIndexDelete(OperationContext* opCtx,
+                           Date_t at,
                            TTLCollectionCache* ttlCollectionCache,
                            const UUID& uuid,
                            const TTLCollectionCache::Info& info);
@@ -148,6 +151,7 @@ private:
      * be removed.
      */
     bool _deleteExpiredWithIndex(OperationContext* opCtx,
+                                 Date_t at,
                                  TTLCollectionCache* ttlCollectionCache,
                                  const CollectionAcquisition& collection,
                                  std::string indexName);
@@ -164,8 +168,48 @@ private:
      * be removed.
      */
     bool _deleteExpiredWithCollscan(OperationContext* opCtx,
+                                    Date_t at,
                                     TTLCollectionCache* ttlCollectionCache,
-                                    const CollectionAcquisition& collection);
+                                    const CollectionAcquisition& collection,
+                                    int64_t expireAfterSeconds);
+
+    /*
+     * Removes expired documents from a timeseries collection containing extended range data using
+     * two bounded collection scans. On time-series buckets collections, TTL operates on type
+     * 'ObjectId'. On general purpose collections, TTL operates on type 'Date'.
+     *
+     * Returns true if there are more expired documents to delete through the clustered index at
+     * this time. False otherwise.
+     *
+     * When batching is disabled, always returns false since all expired documents are guaranteed to
+     * be removed.
+     */
+    bool _deleteExpiredWithCollscanForTimeseriesExtendedRange(
+        OperationContext* opCtx,
+        Date_t at,
+        TTLCollectionCache* ttlCollectionCache,
+        const CollectionAcquisition& collection,
+        int64_t expireAfterSeconds);
+
+
+    /*
+     * Helper to perform a bounded deletion collection scan with an optional match expression.
+     *
+     * Returns true if there are more expired documents to delete through the clustered index at
+     * this time. False otherwise.
+     *
+     * When batching is disabled, always returns false since all expired documents are guaranteed to
+     * be removed.
+     *
+     * Filter is an optional MatchExpression to use for the delete. Pass in nullptr to disable
+     * filtering.
+     */
+    bool _performDeleteExpiredWithCollscan(OperationContext* opCtx,
+                                           const CollectionAcquisition& collection,
+                                           const RecordIdBound& startBound,
+                                           const RecordIdBound& endBound,
+                                           bool forward,
+                                           const MatchExpression* filter);
 
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");
