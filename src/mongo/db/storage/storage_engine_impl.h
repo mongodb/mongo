@@ -189,6 +189,14 @@ public:
         return _engine.get();
     }
 
+    KVEngine* getSpillEngine() override {
+        return _spillKVEngine.get();
+    }
+
+    const KVEngine* getSpillEngine() const override {
+        return _spillKVEngine.get();
+    }
+
     void addDropPendingIdent(
         const std::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
         std::shared_ptr<Ident> ident,

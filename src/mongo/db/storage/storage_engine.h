@@ -818,6 +818,8 @@ public:
 
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;
+    virtual KVEngine* getSpillEngine() = 0;
+    virtual const KVEngine* getSpillEngine() const = 0;
     virtual MDBCatalog* getMDBCatalog() = 0;
     virtual const MDBCatalog* getMDBCatalog() const = 0;
     virtual std::set<std::string> getDropPendingIdents() = 0;

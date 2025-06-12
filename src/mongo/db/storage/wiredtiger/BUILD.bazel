@@ -133,11 +133,13 @@ mongo_cc_library(
 mongo_cc_library(
     name = "storage_wiredtiger",
     srcs = [
+        "spill_wiredtiger_server_status.cpp",
         "wiredtiger_init.cpp",
         "wiredtiger_options_init.cpp",
         "wiredtiger_server_status.cpp",
     ],
     hdrs = [
+        "spill_wiredtiger_server_status.h",
         "wiredtiger_server_status.h",
     ],
     target_compatible_with = WIREDTIGER_TARGET_COMPATIBLE_WITH,

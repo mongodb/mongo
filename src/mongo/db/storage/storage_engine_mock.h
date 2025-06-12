@@ -193,6 +193,12 @@ public:
     const KVEngine* getEngine() const final {
         return nullptr;
     }
+    KVEngine* getSpillEngine() override {
+        return nullptr;
+    }
+    const KVEngine* getSpillEngine() const override {
+        return nullptr;
+    }
     MDBCatalog* getMDBCatalog() final {
         return nullptr;
     }

@@ -58,6 +58,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/spill_wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/spill_wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -78,7 +79,8 @@ namespace mongo {
 
 namespace {
 std::string kWiredTigerBackupFile = "WiredTiger.backup";
-std::once_flag initializeServerStatusSectionFlag;
+std::once_flag wiredTigerServerStatusSectionFlag;
+std::once_flag spillWiredTigerServerStatusSectionFlag;
 
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
@@ -179,12 +181,18 @@ public:
                 params.getSpillDbPath(),
                 getGlobalServiceContext()->getFastClockSource(),
                 std::move(wtConfig));
+
+            std::call_once(spillWiredTigerServerStatusSectionFlag, [] {
+                *ServerStatusSectionBuilder<SpillWiredTigerServerStatusSection>(
+                     std::string{SpillWiredTigerServerStatusSection::kServerStatusSectionName})
+                     .forShard();
+            });
         }
 
         // We're using the WT engine; register the ServerStatusSection for it.
         // Only do so once; even if we re-create the StorageEngine for FCBIS. The section is
         // stateless.
-        std::call_once(initializeServerStatusSectionFlag, [] {
+        std::call_once(wiredTigerServerStatusSectionFlag, [] {
             *ServerStatusSectionBuilder<WiredTigerServerStatusSection>(
                  std::string{WiredTigerServerStatusSection::kServerStatusSectionName})
                  .forShard();
