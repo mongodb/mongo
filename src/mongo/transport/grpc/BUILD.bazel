@@ -148,6 +148,31 @@ mongo_cc_grpc_library(
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
 )
 
+mongo_proto_library(
+    name = "core_test_strip_prefix_proto",
+    srcs = [
+        "core_test_strip_prefix.proto",
+    ],
+    import_prefix = "cool/import/replacement",
+    strip_import_prefix = "/src/mongo/transport/grpc",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_proto_library(
+    name = "core_test_strip_prefix_cc_proto",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [":core_test_strip_prefix_proto"],
+)
+
+mongo_cc_grpc_library(
+    name = "core_test_strip_prefix_cc_grpc",
+    srcs = [":core_test_strip_prefix_proto"],
+    cc_proto = ":core_test_strip_prefix_cc_proto",
+    generate_mocks = True,
+    no_undefined_ref_DO_NOT_USE = False,
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
 mongo_cc_library(
     name = "grpc_transport_server_options",
     srcs = [
@@ -265,6 +290,7 @@ mongo_cc_unit_test(
     }),
     deps = [
         "core_test_cc_grpc",
+        "core_test_strip_prefix_cc_grpc",
         "//src/mongo:base",
         "//src/third_party/grpc:grpc++_reflection",
         "//src/third_party/protobuf",

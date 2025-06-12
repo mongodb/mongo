@@ -36,6 +36,7 @@
 #include <memory>
 #include <string>
 
+#include "cool/import/replacement/core_test_strip_prefix.grpc.pb.h"
 #include <grpcpp/grpcpp.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -106,6 +107,12 @@ TEST(GRPCCore, HelloWorld) {
     server->Shutdown();
     clientThread.join();
     serverThread.join();
+}
+
+TEST(GRPCCore, HelloWorld2) {
+    TestPerson person;
+    person.set_name("Joe");
+    ASSERT_EQ("Joe", person.name());
 }
 
 }  // namespace test
