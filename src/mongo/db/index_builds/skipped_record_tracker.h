@@ -103,8 +103,9 @@ public:
         RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     boost::optional<std::string> getTableIdent() const {
-        return _skippedRecordsTable ? boost::make_optional(_skippedRecordsTable->rs()->getIdent())
-                                    : boost::none;
+        return _skippedRecordsTable
+            ? boost::make_optional(std::string{_skippedRecordsTable->rs()->getIdent()})
+            : boost::none;
     }
 
     boost::optional<MultikeyPaths> getMultikeyPaths() const {

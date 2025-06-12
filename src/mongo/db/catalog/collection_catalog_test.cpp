@@ -35,6 +35,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -3435,10 +3436,10 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionAfterDropAndCreateWithSameN
     const Timestamp firstCollectionDropTs = Timestamp(20, 20);
     createCollectionWithUUID(opCtx.get(), nss, createCollectionTs, collUUID);
 
-    const auto firstIdent = CollectionCatalog::get(opCtx.get())
-                                ->lookupCollectionByNamespace(opCtx.get(), nss)
-                                ->getRecordStore()
-                                ->getIdent();
+    const auto firstIdent = std::string{CollectionCatalog::get(opCtx.get())
+                                            ->lookupCollectionByNamespace(opCtx.get(), nss)
+                                            ->getRecordStore()
+                                            ->getIdent()};
 
     dropCollection(opCtx.get(), nss, firstCollectionDropTs);
 

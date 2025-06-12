@@ -199,7 +199,7 @@ public:
      * Returns a pointer to the uncommitted writes for the given ident. The pointer is only valid
      * for the duration of this storage snapshot.
      */
-    UncommittedRecords* getUncommitedRecordsFor(const std::string& ident);
+    UncommittedRecords* getUncommitedRecordsFor(StringData ident);
 
 private:
     // This maps ident names to the uncommitted records for that collection.

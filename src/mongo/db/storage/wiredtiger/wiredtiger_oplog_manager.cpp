@@ -85,7 +85,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         setOplogReadTimestamp(Timestamp(std::numeric_limits<int64_t>::max()));
     }
 
-    _oplogIdent = oplog.getIdent();
+    _oplogIdent = std::string{oplog.getIdent()};
 
     stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     invariant(!_running);

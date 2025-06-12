@@ -81,7 +81,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore());
     checked_cast<WiredTigerRecordStore*>(rs.get())->setSizeStorer(&ss);
 
-    std::string ident = rs->getIdent();
+    std::string ident = std::string{rs->getIdent()};
     std::string uri = checked_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     int N = 12;
@@ -161,7 +161,7 @@ private:
         rs = harnessHelper.newRecordStore();
         WiredTigerRecordStore* wtRS = checked_cast<WiredTigerRecordStore*>(rs.get());
         wtRS->setSizeStorer(&sizeStorer);
-        ident = wtRS->getIdent();
+        ident = std::string{wtRS->getIdent()};
         uri = wtRS->getURI();
     }
     void tearDown() override {

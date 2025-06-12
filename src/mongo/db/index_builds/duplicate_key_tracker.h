@@ -95,7 +95,7 @@ public:
         OperationContext* opCtx, const IndexCatalogEntry* indexCatalogEntry) const;
 
     std::string getTableIdent() const {
-        return _keyConstraintsTable->rs()->getIdent();
+        return std::string{_keyConstraintsTable->rs()->getIdent()};
     }
 
 private:

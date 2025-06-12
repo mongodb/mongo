@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/string_map.h"
@@ -61,18 +62,18 @@ public:
      *
      * If the system is not currently undergoing replication recovery, always returns true.
      */
-    bool collectionNeedsSizeAdjustment(const std::string& ident) const;
+    bool collectionNeedsSizeAdjustment(StringData ident) const;
 
     /**
      * Returns whether 'ident' has been specifically marked as requiring adjustment even during
      * recovery.
      */
-    bool collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const;
+    bool collectionAlwaysNeedsSizeAdjustment(StringData ident) const;
 
     /**
      * Mark 'ident' as always requiring size adjustment, even if replication recovery is ongoing.
      */
-    void markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident);
+    void markCollectionAsAlwaysNeedsSizeAdjustment(StringData ident);
 
     /**
      * Clears all internal state. This method should be called before calling 'recover to a stable

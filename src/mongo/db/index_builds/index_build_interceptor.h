@@ -198,7 +198,7 @@ public:
     boost::optional<MultikeyPaths> getMultikeyPaths() const;
 
     std::string getSideWritesTableIdent() const {
-        return _sideWritesTable->rs()->getIdent();
+        return std::string{_sideWritesTable->rs()->getIdent()};
     }
 
     boost::optional<std::string> getDuplicateKeyTrackerTableIdent() const {

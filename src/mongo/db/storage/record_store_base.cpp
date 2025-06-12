@@ -58,7 +58,7 @@ std::shared_ptr<Ident> RecordStoreBase::getSharedIdent() const {
     return _ident;
 }
 
-const std::string& RecordStoreBase::getIdent() const {
+StringData RecordStoreBase::getIdent() const {
     return _ident->getIdent();
 }
 

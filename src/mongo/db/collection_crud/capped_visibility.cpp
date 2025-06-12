@@ -76,7 +76,7 @@ CappedWriter::~CappedWriter() {
     }
 }
 
-UncommittedRecords* CappedWriter::getUncommitedRecordsFor(const std::string& ident) {
+UncommittedRecords* CappedWriter::getUncommitedRecordsFor(StringData ident) {
     auto& uncommitted = _identToUncommittedRecords[ident];
     if (!uncommitted) {
         uncommitted = std::make_unique<UncommittedRecords>();

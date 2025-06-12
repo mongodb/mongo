@@ -164,7 +164,7 @@ public:
         });
     }
 
-    bool identExists(OperationContext* opCtx, const std::string& ident) {
+    bool identExists(OperationContext* opCtx, StringData ident) {
         auto idents = getAllKVEngineIdents(opCtx);
         return std::find(idents.begin(), idents.end(), ident) != idents.end();
     }

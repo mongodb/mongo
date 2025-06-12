@@ -58,7 +58,7 @@ public:
 
     std::shared_ptr<Ident> getSharedIdent() const final;
 
-    const std::string& getIdent() const final;
+    StringData getIdent() const final;
 
     void setIdent(std::shared_ptr<Ident>) final;
 

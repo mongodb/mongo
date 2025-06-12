@@ -77,7 +77,7 @@ public:
         return nullptr;
     }
 
-    const std::string& getIdent() const final {
+    StringData getIdent() const final {
         unimplementedTasserted();
         static std::string ident;
         return ident;

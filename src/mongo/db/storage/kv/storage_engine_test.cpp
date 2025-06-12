@@ -518,7 +518,7 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
 
         // Keep ident even when TemporaryRecordStore goes out of scope.
         rs->keep();
-        return rs->rs()->getIdent();
+        return std::string{rs->rs()->getIdent()};
     }();
     ASSERT(identExists(opCtx.get(), ident));
 
@@ -562,7 +562,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreEventuallyDropped)
     {
         auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
         ASSERT(tempRs.get());
-        ident = tempRs->rs()->getIdent();
+        ident = std::string{tempRs->rs()->getIdent()};
 
         ASSERT(identExists(opCtx.get(), ident));
     }
@@ -580,7 +580,7 @@ TEST_F(StorageEngineTimestampMonitorTest, TemporaryRecordStoreKeep) {
     {
         auto tempRs = _storageEngine->makeTemporaryRecordStore(opCtx.get(), KeyFormat::Long);
         ASSERT(tempRs.get());
-        ident = tempRs->rs()->getIdent();
+        ident = std::string{tempRs->rs()->getIdent()};
 
         ASSERT(identExists(opCtx.get(), ident));
         tempRs->keep();

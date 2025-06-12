@@ -385,7 +385,7 @@ public:
 
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 
-    virtual const std::string& getIdent() const = 0;
+    virtual StringData getIdent() const = 0;
 
     virtual void setIdent(std::shared_ptr<Ident>) = 0;
 

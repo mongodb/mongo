@@ -29,6 +29,7 @@
 
 #include "mongo/db/server_recovery.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/decorable.h"
 
 #include <mutex>
@@ -42,7 +43,7 @@ const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWo
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
-bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
+bool SizeRecoveryState::collectionNeedsSizeAdjustment(StringData ident) const {
     if (!InReplicationRecovery::isSet(getGlobalServiceContext())) {
         return true;
     }
@@ -50,14 +51,14 @@ bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) 
     return collectionAlwaysNeedsSizeAdjustment(ident);
 }
 
-bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const {
+bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(StringData ident) const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _collectionsAlwaysNeedingSizeAdjustment.count(ident) > 0;
 }
 
-void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident) {
+void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(StringData ident) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _collectionsAlwaysNeedingSizeAdjustment.insert(ident);
+    _collectionsAlwaysNeedingSizeAdjustment.insert(std::string{ident});
 }
 
 void SizeRecoveryState::clearStateBeforeRecovery() {
