@@ -82,6 +82,8 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                            tenantId,
                            skipValidation || serverGlobalParams.clusterRole.isShardOnly());
 
+    serverParameter->warnIfDeprecated("setClusterParameter");
+
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, std::string{parameterName}, tenantId);
     audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update, tenantId);

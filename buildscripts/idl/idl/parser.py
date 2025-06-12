@@ -911,6 +911,7 @@ def _parse_server_parameter_class(ctxt, node):
             "override_ctor": _RuleDesc("bool_scalar"),
             "override_set": _RuleDesc("bool_scalar"),
             "override_validate": _RuleDesc("bool_scalar"),
+            "override_warn_if_deprecated": _RuleDesc("bool_scalar"),
         },
     )
 

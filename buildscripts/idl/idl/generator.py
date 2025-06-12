@@ -1078,6 +1078,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_line(
                     "Status set(const BSONElement&, const boost::optional<TenantId>&) final;"
                 )
+            if cls.override_warn_if_deprecated:
+                self._writer.write_line("void warnIfDeprecated(StringData action) final;")
             self._writer.write_line(
                 "Status setFromString(StringData, const boost::optional<TenantId>&) final;"
             )

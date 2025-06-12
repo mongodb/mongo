@@ -274,6 +274,7 @@ StatusWith<BSONObj> applySetParameterOptions(const std::map<std::string, std::st
                           fmt::format("Cannot use --setParameter to set \"{}\" at startup", name));
         BSONObjBuilder sub(summaryBuilder.subobjStart(name));
         sp->append(nullptr, &sub, "default", boost::none);
+        sp->warnIfDeprecated("setAtStartup");
         Status status = sp->setFromString(value, boost::none);
         if (!status.isOK())
             return Status(ErrorCodes::BadValue,

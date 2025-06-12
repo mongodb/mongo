@@ -1474,6 +1474,7 @@ def _bind_server_parameter_class(ctxt, ast_param, param):
     ast_param.cpp_class.data = cls.data
     ast_param.cpp_class.override_ctor = cls.override_ctor
     ast_param.cpp_class.override_validate = cls.override_validate
+    ast_param.cpp_class.override_warn_if_deprecated = cls.override_warn_if_deprecated
 
     # If set_at is cluster, then set must be overridden. Otherwise, use the parsed value.
     ast_param.cpp_class.override_set = True if param.set_at == ["cluster"] else cls.override_set

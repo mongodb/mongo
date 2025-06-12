@@ -172,7 +172,9 @@ server_parameters:
     sslMode:
         description: "Transition from allowSSL to preferSSL, or from preferSSL to requireSSL"
         set_at: runtime
-        cpp_class: SSLModeServerParameter
+        cpp_class:
+            name: SSLModeServerParameter
+            override_warn_if_deprecated: true
         redact: false
 
     tlsMode:

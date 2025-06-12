@@ -300,6 +300,10 @@ public:
                 continue;
             }
 
+            if (requireNameMatch) {
+                i->second->warnIfDeprecated("getParameter");
+            }
+
             if (options.getShowDetails()) {
                 BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
                 i->second->append(opCtx, &detailBob, "value", boost::none);
@@ -450,6 +454,8 @@ public:
             if (oldValue) {
                 result.append(oldValue);
             }
+
+            foundParameter->second->warnIfDeprecated("setParameter");
 
             try {
                 uassertStatusOK(foundParameter->second->set(parameter, boost::none));

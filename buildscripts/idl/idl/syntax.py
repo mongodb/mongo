@@ -860,6 +860,7 @@ class ServerParameterClass(common.SourceLocation):
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
         self.override_validate = False  # type: bool
+        self.override_warn_if_deprecated = False  # type: bool
 
         super(ServerParameterClass, self).__init__(file_name, line, column)
 

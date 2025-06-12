@@ -284,6 +284,17 @@ public:
         _isOmittedInFTDC = true;
     }
 
+    /**
+     * User-initiated operations (e.g. CLI parsing or commands)
+     * that name a deprecated server parameter must emit a warning,
+     * so such code will call this function before applying such
+     * operations, giving deprecated parameters an opportunity to
+     * emit a warning. If the parameter is not deprecated, the
+     * function does nothing. Implementations are expected to ensure
+     * that such warnings are emitted only once per server parameter.
+     */
+    virtual void warnIfDeprecated(StringData action) {}
+
     void disable(bool permanent);
 
     /**
@@ -469,6 +480,12 @@ public:
     Status reset(const boost::optional<TenantId>& tenantId) final;
     Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) final;
     Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final;
+
+    /**
+     * This function generates "deprecated" warning log message.
+     * Once per server parameter.
+     */
+    void warnIfDeprecated(StringData action) final;
 
 private:
     std::once_flag _warnOnce;

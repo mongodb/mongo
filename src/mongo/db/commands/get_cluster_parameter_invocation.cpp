@@ -91,6 +91,11 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
             return;
         }
 
+        // Scans do not generate warnings for deprecated server parameters.
+        if (!skipOnError) {
+            requestedParameter->warnIfDeprecated("getClusterParameter");
+        }
+
         BSONObjBuilder bob;
         requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
         auto paramObj = bob.obj().getOwned();

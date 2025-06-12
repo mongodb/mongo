@@ -641,6 +641,9 @@ properties:
                   override_validate:
                     type: boolean
                     description: "True to allow defining a custom validate() method, default: false."
+                  override_warn_if_deprecated:
+                    type: boolean
+                    description: "True to allow defining a custom warnIfDeprecated() method, default: false."
           default:
             description: String or expression map representation of the initial value.
             oneOf:
