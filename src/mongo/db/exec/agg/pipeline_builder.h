@@ -35,6 +35,13 @@
 #include <memory>
 
 namespace mongo::exec::agg {
+
+/**
+ * Builds and returns a query execution pipeline corresponding to the given ordered list of document
+ * sources.
+ * TODO SERVER-105562: Return the resulting pipeline by value.
+ */
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& sources);
+    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources);
+
 }  // namespace mongo::exec::agg

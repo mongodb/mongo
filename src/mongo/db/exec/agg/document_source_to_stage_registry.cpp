@@ -66,6 +66,13 @@ StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds) {
                             << ds->getSourceName());
 }
 
+StagePtr buildStageAndStitch(const boost::intrusive_ptr<DocumentSource>& ds,
+                             const StagePtr& sourceStage) {
+    auto&& newStage = buildStage(ds);
+    newStage->setSource(sourceStage.get());
+    return newStage;
+}
+
 }  // namespace agg
 }  // namespace exec
 }  // namespace mongo

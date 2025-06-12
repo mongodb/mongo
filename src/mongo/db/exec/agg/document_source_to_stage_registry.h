@@ -74,9 +74,16 @@ using DocumentSourceToStageFn =
 void registerDocumentSourceToStageFn(DocumentSource::Id dsid, DocumentSourceToStageFn fn);
 
 /**
- * For an instance of DocumentSource create appropriate Stage object.
+ * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'.
  */
 StagePtr buildStage(const boost::intrusive_ptr<DocumentSource>& ds);
+
+/**
+ * Create the corresponding 'Stage' object for the given instance of 'DocumentSource'. Attach the
+ * given 'sourceStage' as the source for the newly created 'Stage' object.
+ */
+StagePtr buildStageAndStitch(const boost::intrusive_ptr<DocumentSource>& ds,
+                             const StagePtr& sourceStage);
 
 }  // namespace agg
 }  // namespace exec

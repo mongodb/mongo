@@ -33,12 +33,18 @@
 
 namespace mongo::exec::agg {
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& sources) {
+    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources) {
     Pipeline::StageContainer stages;
-    stages.reserve(sources.size());
+    stages.reserve(documentSources.size());
 
-    for (const auto& source : sources) {
-        stages.push_back(buildStage(source));
+    if (MONGO_likely(!documentSources.empty())) {
+        auto it = documentSources.cbegin();
+        stages.push_back(buildStage(*it));
+        for (++it; it != documentSources.cend(); ++it) {
+            // 'Stitch' stages together in the given order - a stage becomes the 'source' for the
+            // following stage.
+            stages.push_back(buildStageAndStitch(*it, stages.back()));
+        }
     }
 
     return std::make_unique<Pipeline>(std::move(stages));

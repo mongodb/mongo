@@ -49,7 +49,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
-#include "mongo/db/exec/agg/stage.h"
+#include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -255,9 +255,8 @@ public:
                              const std::vector<repl::OplogEntry> transactionEntries = {},
                              std::vector<Document> documentsForLookup = {},
                              const boost::optional<std::int32_t> expectedErrorCode = {}) {
-        vector<intrusive_ptr<exec::agg::Stage>> stages =
-            makeStages(entry.getEntry().toBSON(), spec);
-        auto lastStage = stages.back();
+        auto execPipeline = makeExecPipeline(entry.getEntry().toBSON(), spec);
+        auto lastStage = execPipeline->getStages().back();
 
         getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>(
             transactionEntries, std::move(documentsForLookup)));
@@ -293,24 +292,20 @@ public:
      * Stages such as DSEnsureResumeTokenPresent which can swallow results are removed from the
      * returned list.
      */
-    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(BSONObj entry, const BSONObj& spec) {
-        return makeStages({entry}, spec, true /* removeEnsureResumeTokenStage */);
+    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(BSONObj entry, const BSONObj& spec) {
+        return makeExecPipeline({entry}, spec, true /* removeEnsureResumeTokenStage */);
     }
 
     /**
      * Returns a list of the stages expanded from a $changStream specification, starting with a
      * DocumentSourceMock which contains a list of document representing 'entries'.
      */
-    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(
+    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(
         std::vector<BSONObj> entries,
         const BSONObj& spec,
         bool removeEnsureResumeTokenStage = false) {
         std::list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
-        std::vector<intrusive_ptr<exec::agg::Stage>> stages;
-        for (auto& source : result) {
-            stages.push_back(exec::agg::buildStage(source));
-        }
         getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
         // This match stage is a DocumentSourceChangeStreamOplogMatch, which we explicitly disallow
@@ -319,43 +314,35 @@ public:
         // executing that stage here, we'll up-convert it from the non-executable
         // DocumentSourceChangeStreamOplogMatch to a fully-executable DocumentSourceMatch. This is
         // safe because all of the unit tests will use the 'simple' collation.
-        auto match = dynamic_cast<DocumentSourceMatch*>(stages[0].get());
+        auto match = dynamic_cast<DocumentSourceMatch*>(result.front().get());
         ASSERT(match);
         auto executableMatch = DocumentSourceMatch::create(match->getQuery(), getExpCtx());
         // Replace the original match with the executable one.
-        stages[0] = executableMatch;
+        result.front() = executableMatch;
 
         // Check the oplog entry is transformed correctly.
-        auto transform = stages[2].get();
+        auto transform = std::next(result.begin(), 2)->get();
         ASSERT(transform);
         ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform));
 
         // Create mock stage and insert at the front of the stages.
         auto mock = DocumentSourceMock::createForTest(entries, getExpCtx());
-        stages.insert(stages.begin(), mock);
+        result.insert(result.begin(), mock);
 
         if (removeEnsureResumeTokenStage) {
-            auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
+            auto newEnd = std::remove_if(result.begin(), result.end(), [](auto& stage) {
                 return dynamic_cast<DocumentSourceChangeStreamEnsureResumeTokenPresent*>(
                     stage.get());
             });
-            stages.erase(newEnd, stages.end());
+            result.erase(newEnd, result.end());
         }
 
-        // Wire up the stages by setting the source stage.
-        auto prevIt = stages.begin();
-        for (auto stageIt = stages.begin() + 1; stageIt != stages.end(); stageIt++) {
-            auto stage = (*stageIt).get();
-            stage->setSource((*prevIt).get());
-            prevIt = stageIt;
-        }
-
-        return stages;
+        return exec::agg::buildPipeline(result);
     }
 
-    std::vector<intrusive_ptr<exec::agg::Stage>> makeStages(const OplogEntry& entry,
-                                                            const BSONObj& spec = kDefaultSpec) {
-        return makeStages(entry.getEntry().toBSON(), spec);
+    std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(const OplogEntry& entry,
+                                                          const BSONObj& spec = kDefaultSpec) {
+        return makeExecPipeline(entry.getEntry().toBSON(), spec);
     }
 
     OplogEntry createCommand(const BSONObj& oField,
@@ -396,8 +383,8 @@ public:
         BSONObj oplogEntry = builder.done();
 
         // Create the stages and check that the documents produced matched those in the applyOps.
-        vector<intrusive_ptr<exec::agg::Stage>> stages = makeStages(oplogEntry, spec);
-        auto transform = stages[3].get();
+        auto execPipeline = makeExecPipeline(oplogEntry, spec);
+        auto transform = execPipeline->getStages()[3].get();
         invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
         std::vector<Document> res;
@@ -2042,8 +2029,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect
     // multiple documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry2, kDefaultSpec);
-    auto transform = stages[3].get();
+    auto execPipeline = makeExecPipeline(transactionEntry2, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -2221,8 +2208,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry5);
-    auto transform = stages[3].get();
+    auto execPipeline = makeExecPipeline(transactionEntry5);
+    auto transform = execPipeline->getStages()[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -2314,8 +2301,8 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(transactionEntry2);
-    auto transform = stages[3].get();
+    auto execPipeline = makeExecPipeline(transactionEntry2);
+    auto transform = execPipeline->getStages()[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -2410,8 +2397,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
-    auto stages = makeStages(commitEntry);
-    auto transform = stages[3].get();
+    auto execPipeline = makeExecPipeline(commitEntry);
+    auto transform = execPipeline->getStages()[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -2557,8 +2544,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
 
     // We do not use the checkTransformation() pattern that other tests use since we expect
     // multiple documents to be returned from one applyOps.
-    auto stages = makeStages(commitEntry, kDefaultSpec);
-    auto transform = stages[3].get();
+    auto execPipeline = makeExecPipeline(commitEntry, kDefaultSpec);
+    auto transform = execPipeline->getStages()[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -3440,8 +3427,8 @@ TEST_F(ChangeStreamStageTest, DSCSLookupChangePostImageStageSerialization) {
 
 TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
-    auto stages = makeStages(dropColl);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline(dropColl);
+    auto lastStage = execPipeline->getStages().back();
 
     Document expectedDrop{
         {DSChangeStream::kIdField,
@@ -3477,8 +3464,8 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
 
 TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
-    auto stages = makeStages(dropColl);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline(dropColl);
+    auto lastStage = execPipeline->getStages().back();
     // Add a match stage after change stream to filter out the invalidate entries.
     auto match = DocumentSourceMatch::create(fromjson("{operationType: 'insert'}"), getExpCtx());
     match->setSource(lastStage.get());
@@ -3699,13 +3686,13 @@ TEST_F(ChangeStreamStageTest, UsesResumeTokenAsSortKeyIfNeedsMergeIsFalse) {
                                  boost::none,                    // fromMigrate
                                  BSON("x" << 2 << "_id" << 1));  // o2
 
-    auto stages = makeStages(insert.getEntry().toBSON(), kDefaultSpec);
+    auto execPipeline = makeExecPipeline(insert.getEntry().toBSON(), kDefaultSpec);
 
     getExpCtx()->setMongoProcessInterface(std::make_unique<MockMongoInterface>());
 
     getExpCtx()->setNeedsMerge(false);
 
-    auto next = stages.back()->getNext();
+    auto next = execPipeline->getStages().back()->getNext();
 
     auto expectedSortKey = makeResumeToken(
         kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1), DSChangeStream::kInsertOpType);
@@ -5067,13 +5054,13 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
         BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
 
     // Make a pipeline from this spec and seed it with the oplog entries in order.
-    auto stages = makeStages({oplogBeforeResumeTime,
-                              oplogAtResumeTimeLowerDocKey,
-                              oplogResumeTime,
-                              oplogAtResumeTimeHigherDocKey,
-                              oplogAfterResumeTime},
-                             spec);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          oplogAtResumeTimeLowerDocKey,
+                                          oplogResumeTime,
+                                          oplogAtResumeTimeHigherDocKey,
+                                          oplogAfterResumeTime},
+                                         spec);
+    auto lastStage = execPipeline->getStages().back();
 
     // The stream will swallow everything up to and including the resume token. The first event we
     // get back has the same clusterTime as the resume token, and should therefore use the client
@@ -5130,13 +5117,13 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1Token) {
         BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
 
     // Make a pipeline from this spec and seed it with the oplog entries in order.
-    auto stages = makeStages({oplogBeforeResumeTime,
-                              oplogAtResumeTimeLowerDocKey,
-                              oplogResumeTime,
-                              oplogAtResumeTimeHigherDocKey,
-                              oplogAfterResumeTime},
-                             spec);
-    auto lastStage = stages.back();
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          oplogAtResumeTimeLowerDocKey,
+                                          oplogResumeTime,
+                                          oplogAtResumeTimeHigherDocKey,
+                                          oplogAfterResumeTime},
+                                         spec);
+    auto lastStage = execPipeline->getStages().back();
 
     // The stream will swallow everything up to and including the resume token. The first event we
     // get back has the same clusterTime as the resume token, and should therefore use the client
@@ -5191,17 +5178,17 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
         BSON("$changeStream" << BSON("resumeAfter" << ResumeToken(resumeToken).toBSON()));
 
     // Make a pipeline from this spec and seed it with the oplog entries in order.
-    auto stages = makeStages({oplogBeforeResumeTime,
-                              firstOplogAtResumeTime,
-                              secondOplogAtResumeTime,
-                              oplogAfterResumeTime},
-                             spec);
+    auto execPipeline = makeExecPipeline({oplogBeforeResumeTime,
+                                          firstOplogAtResumeTime,
+                                          secondOplogAtResumeTime,
+                                          oplogAfterResumeTime},
+                                         spec);
 
     // The high water mark token should be order ahead of every other entry with the same
     // clusterTime. So we should see both entries that match the resumeToken's clusterTime.
     // Even though the high watermark token has version 1, the resulting events should have
     // the default resume token version.
-    auto lastStage = stages.back();
+    auto lastStage = execPipeline->getStages().back();
     auto next = lastStage->getNext();
     ASSERT(next.isAdvanced());
     const auto sameTsResumeToken1 =
