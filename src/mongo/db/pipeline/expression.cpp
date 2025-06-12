@@ -181,7 +181,7 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
             it != parserMap.end());
 
     auto& entry = it->second;
-    expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(opName, entry.featureFlag);
+    expCtx->ignoreFeatureInParserOrRejectAndThrow(opName, entry.featureFlag);
 
     if (expCtx->getOperationContext()) {
         assertLanguageFeatureIsAllowed(expCtx->getOperationContext(),
@@ -2066,7 +2066,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithHybridScoringFeatureFlag(
     static const std::set<MetaType> kHybridScoringProtectedFields = {MetaType::kScore,
                                                                      MetaType::kScoreDetails};
     const bool usesHybridScoringProtectedField = kHybridScoringProtectedFields.contains(type);
-    const bool hybridScoringFeatureFlagEnabled =
+    const bool hybridScoringFeatureFlagEnabled = expCtx->shouldParserIgnoreFeatureFlagCheck() ||
         feature_flags::gFeatureFlagRankFusionFull.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     uassert(ErrorCodes::FailedToParse,
@@ -2098,7 +2098,7 @@ void ExpressionMeta::_assertMetaFieldCompatibleWithStreamsFeatureFlag(
     DocumentMetadataFields::MetaType type,
     StringData typeName,
     boost::optional<StringData> optionalPath) {
-    bool streamsEnabled = expCtx->isFeatureFlagStreamsEnabled();
+    bool streamsEnabled = expCtx->shouldParserAllowStreams();
     // $meta: "stream" is only supported when the ff is enabled.
     uassert(9692105,
             ExpressionMeta::kParseErrPrefix + typeName,
@@ -2117,7 +2117,7 @@ ExpressionMeta::ParseMetaTypeResult ExpressionMeta::_parseMetaType(ExpressionCon
                                                                    StringData typeName) {
     boost::optional<StringData> fieldPath;
     if (size_t idx = typeName.find_first_of('.');
-        idx != StringData::npos && expCtx->isFeatureFlagStreamsEnabled()) {
+        idx != StringData::npos && expCtx->shouldParserAllowStreams()) {
         // An optional path is supported for { $meta: "stream.<path>" }
         uassert(9692107, ExpressionMeta::kParseErrPrefix + typeName, idx + 1 < typeName.size());
         fieldPath = typeName.substr(idx + 1);
@@ -3759,7 +3759,7 @@ boost::intrusive_ptr<Expression> ExpressionConvert::create(
         nullptr,
         byteOrder ? ExpressionConstant::create(expCtx, Value(toStringData(*byteOrder))) : nullptr,
         checkBinDataConvertAllowed(),
-        checkBinDataConvertNumericAllowed());
+        checkBinDataConvertNumericAllowed(expCtx));
 }
 
 ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
@@ -3792,7 +3792,7 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
             expr.type() == BSONType::Object);
 
     const bool allowBinDataConvert = checkBinDataConvertAllowed();
-    const bool allowBinDataConvertNumeric = checkBinDataConvertNumericAllowed();
+    const bool allowBinDataConvertNumeric = checkBinDataConvertNumericAllowed(expCtx);
 
     boost::intrusive_ptr<Expression> input;
     boost::intrusive_ptr<Expression> to;
@@ -3982,9 +3982,10 @@ bool ExpressionConvert::checkBinDataConvertAllowed() {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
-bool ExpressionConvert::checkBinDataConvertNumericAllowed() {
-    return feature_flags::gFeatureFlagBinDataConvertNumeric.isEnabledUseLatestFCVWhenUninitialized(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+bool ExpressionConvert::checkBinDataConvertNumericAllowed(const ExpressionContext* expCtx) {
+    return expCtx->shouldParserIgnoreFeatureFlagCheck() ||
+        feature_flags::gFeatureFlagBinDataConvertNumeric.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
 namespace {

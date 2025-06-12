@@ -693,4 +693,11 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
             }));
 }
 
+void ExpressionContext::ignoreFeatureInParserOrRejectAndThrow(StringData name,
+                                                              CheckableFeatureFlagRef flag) {
+    if (!shouldParserIgnoreFeatureFlagCheck()) {
+        throwIfFeatureFlagIsNotEnabledOnFCV(name, flag);
+    }
+}
+
 }  // namespace mongo

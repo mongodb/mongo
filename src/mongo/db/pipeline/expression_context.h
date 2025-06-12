@@ -518,9 +518,26 @@ public:
     /**
      * Throws if the provided feature flag is not enabled in the current FCV or
      * 'maxFeatureCompatibilityVersion' if set. Will do nothing if the feature flag is enabled
-     * or boost::none.
+     * or boost::none.  This function assumes the caller has verified that the feature flag should
+     * be checked.
      */
     void throwIfFeatureFlagIsNotEnabledOnFCV(StringData name, CheckableFeatureFlagRef flag);
+
+    /**
+     * Returns true if parsers should not check if feature flags are enabled in the current FCV or
+     * 'maxFeatureCompatibilityVersion' if set.
+     *
+     */
+    bool shouldParserIgnoreFeatureFlagCheck() const {
+        return (_params.isParsingCollectionValidator || _params.isParsingViewDefinition) &&
+            _params.opCtx && !_params.opCtx->isEnforcingConstraints();
+    }
+
+    /**
+     * Throws only if the parser should check the feature flag and the feature flag provided is not
+     * enabled in the expressions VersionContext and IncrementalFeatureRolloutContext
+     */
+    void ignoreFeatureInParserOrRejectAndThrow(StringData name, CheckableFeatureFlagRef flag);
 
     void setOperationContext(OperationContext* opCtx) {
         _params.opCtx = opCtx;
@@ -939,8 +956,8 @@ public:
         return _featureFlagRankFusionBasic.get();
     }
 
-    bool isFeatureFlagStreamsEnabled() const {
-        return _featureFlagStreams.get();
+    bool shouldParserAllowStreams() const {
+        return shouldParserIgnoreFeatureFlagCheck() || _featureFlagStreams.get();
     }
 
     bool isMapReduceCommand() const {

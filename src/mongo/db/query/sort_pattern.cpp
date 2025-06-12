@@ -61,7 +61,7 @@ static const StringDataSet kValidMetaSorts{"textScore"_sd,
 
 bool isSupportedMetaSort(const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData name) {
     if (name == "searchScore"_sd || name == "vectorSearchScore"_sd || name == "score"_sd) {
-        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(
+        expCtx->ignoreFeatureInParserOrRejectAndThrow(
             "sorting by searchScore, vectorSearchScore, or score",
             feature_flags::gFeatureFlagRankFusionFull);
     }
