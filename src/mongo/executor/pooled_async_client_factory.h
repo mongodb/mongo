@@ -113,12 +113,12 @@ public:
         _pool->shutdown();
     }
 
-    void dropConnections() override {
-        _pool->dropConnections();
+    void dropConnections(const Status& status) override {
+        _pool->dropConnections(status);
     }
 
-    void dropConnections(const HostAndPort& hostAndPort) override {
-        _pool->dropConnections(hostAndPort);
+    void dropConnections(const HostAndPort& target, const Status& status) override {
+        _pool->dropConnections(target, status);
     }
 
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override {

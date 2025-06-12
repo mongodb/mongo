@@ -143,22 +143,22 @@ GRPCConnectionStats GRPCAsyncClientFactory::getStats() const {
     return stats;
 }
 
-void GRPCAsyncClientFactory::dropConnections() {
+void GRPCAsyncClientFactory::dropConnections(const Status& status) {
     stdx::unique_lock lk(_mutex);
     if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
-    _client->dropConnections();
+    _client->dropConnections(status);
     _dropConnections(lk);
 }
 
-void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target) {
+void GRPCAsyncClientFactory::dropConnections(const HostAndPort& target, const Status& status) {
     stdx::lock_guard lk(_mutex);
     if (_state == State::kShutdown || _state == State::kNew) {
         return;
     }
 
-    _client->dropConnections(target);
+    _client->dropConnections(target, status);
 
     auto it = _endpoints.find(target);
     if (it == _endpoints.end()) {

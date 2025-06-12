@@ -369,8 +369,9 @@ bool ReplicaSetMonitorManager::isShutdown() const {
     return _isShutdown;
 }
 
-void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& hostAndPort) {
-    _network->dropConnections(hostAndPort);
+void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& target,
+                                                         const Status& status) {
+    _network->dropConnections(target, status);
 }
 
 void ReplicaSetMonitorManager::installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor) {

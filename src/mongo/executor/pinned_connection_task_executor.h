@@ -157,7 +157,7 @@ public:
     void appendConnectionStats(ConnectionPoolStats*) const override;
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
     void appendDiagnosticBSON(BSONObjBuilder*) const override;
-    void dropConnections(const HostAndPort&) override;
+    void dropConnections(const HostAndPort&, const Status&) override;
     bool hasTasks() override;
 
 private:

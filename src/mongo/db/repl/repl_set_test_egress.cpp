@@ -132,7 +132,8 @@ public:
             auto net = getNetworkInterface();
             LOGV2_DEBUG(
                 4697203, 4, "Dropping any existing connections", "target"_attr = target.toString());
-            net->dropConnections(target);
+            net->dropConnections(
+                target, Status(ErrorCodes::PooledConnectionsDropped, kDisconnectStatus.reason()));
             LOGV2_DEBUG(4697204,
                         4,
                         "Opening test egress connection",

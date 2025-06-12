@@ -107,7 +107,9 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
         // Close all outgoing connections to servers with binary versions lower than ours.
         pauseBeforeCloseCxns.pauseWhileSet();
 
-        executor::EgressConnectionCloserManager::get(opCtx->getServiceContext()).dropConnections();
+        executor::EgressConnectionCloserManager::get(opCtx->getServiceContext())
+            .dropConnections(Status(ErrorCodes::PooledConnectionsDropped,
+                                    "Closing connection to servers with lower binary versions"));
 
         if (MONGO_unlikely(finishedDropConnections.shouldFail())) {
             LOGV2(575210, "Hit finishedDropConnections failpoint");

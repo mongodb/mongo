@@ -87,8 +87,8 @@ public:
 
     // EgressConnectionCloser requirements.
 
-    void dropConnections() override;
-    void dropConnections(const HostAndPort& target) override;
+    void dropConnections(const Status& status) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override;
 
 private:

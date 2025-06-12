@@ -29,8 +29,10 @@
 
 #include "mongo/executor/connection_pool.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/connection_pool_test_fixture.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -2338,6 +2340,41 @@ TEST_F(ConnectionPoolTest, DismissBeforeCancelGet) {
     ConnectionImpl::pushSetup(Status::OK());
     ASSERT_TRUE(connFuture.isReady());
     doneWith(connFuture.get());
+}
+
+TEST_F(ConnectionPoolTest, EnsureReasonIsLogged) {
+    // Bumping up the log severity for this unit test to catch all logs.
+    unittest::MinimumLoggedSeverityGuard logSeverityGuardNetwork{
+        logv2::LogComponent::kConnectionPool, logv2::LogSeverity::Debug(5)};
+
+    ConnectionPool::Options options;
+    options.minConnections = 0;
+    auto pool = makePool(options);
+
+    startCapturingLogMessages();
+
+    HostAndPort hap("a");
+
+    // Successfully get connection to host.
+    ConnectionImpl::pushSetup(Status::OK());
+    pool->get_forTest(
+        hap, Milliseconds(0), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+            doneWith(swConn.getValue());
+        });
+
+    std::string reason = "TEST: Ensuring reason is logged";
+
+    // Check number of connections before and after dropping connection to host.
+    ASSERT_EQ(1ul, pool->getNumConnectionsPerHost(hap));
+    pool->dropConnections(hap, Status(ErrorCodes::PooledConnectionsDropped, reason));
+    ASSERT_EQ(0ul, pool->getNumConnectionsPerHost(hap));
+
+    stopCapturingLogMessages();
+
+    // Check the BSON format for the specific log message.
+    auto msgCounter = countBSONFormatLogLinesIsSubset(
+        BSON("attr" << BSON("error" << "PooledConnectionsDropped: " + reason)));
+    ASSERT_EQ(1ul, msgCounter);
 }
 
 }  // namespace connection_pool_test_details

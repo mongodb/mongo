@@ -65,11 +65,11 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    void dropConnections() override {
+    void dropConnections(const Status& status) override {
         MONGO_UNIMPLEMENTED;
     }
 
-    void dropConnections(const HostAndPort& target) override {
+    void dropConnections(const HostAndPort& target, const Status& status) override {
         MONGO_UNIMPLEMENTED;
     }
 

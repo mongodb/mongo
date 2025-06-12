@@ -671,8 +671,8 @@ void ThreadPoolTaskExecutor::_setState_inlock(State newState) {
     _stateChange.notify_all();
 }
 
-void ThreadPoolTaskExecutor::dropConnections(const HostAndPort& hostAndPort) {
-    _net->dropConnections(hostAndPort);
+void ThreadPoolTaskExecutor::dropConnections(const HostAndPort& target, const Status& status) {
+    _net->dropConnections(target, status);
 }
 
 }  // namespace executor

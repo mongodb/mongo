@@ -836,14 +836,14 @@ Status GRPCClient::rotateCertificates(const SSLConfiguration& config) {
 }
 #endif
 
-void GRPCClient::dropConnections() {
+void GRPCClient::dropConnections(const Status& status) {
     _dropPendingStreamEstablishments([](const HostAndPort& remote) { return true; });
 
     // Now drop all of the channels themselves.
     static_cast<StubFactoryImpl&>(*_stubFactory).getChannelPool()->dropAllChannels();
 }
 
-void GRPCClient::dropConnections(const HostAndPort& target) {
+void GRPCClient::dropConnections(const HostAndPort& target, const Status& status) {
     _dropPendingStreamEstablishments(
         [target](const HostAndPort& remote) { return remote == target; });
 

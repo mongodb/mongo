@@ -413,9 +413,10 @@ public:
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const = 0;
 
     /**
-     * Drops all connections to the given host on the network interface.
+     * Drops all connections to the given host on the network interface and relays a status message
+     * describing why the connection was dropped.
      */
-    virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
+    virtual void dropConnections(const HostAndPort& target, const Status& status) = 0;
 
     /**
      * Appends statistics for the underlying network interface.

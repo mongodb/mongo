@@ -76,7 +76,11 @@ public:
                 executor::EgressConnectionCloserManager::get(opCtx->getServiceContext());
 
             for (const auto& hostAndPort : hostAndPorts) {
-                egressConnectionCloserManager.dropConnections(hostAndPort);
+                egressConnectionCloserManager.dropConnections(
+                    hostAndPort,
+                    Status(ErrorCodes::PooledConnectionsDropped,
+                           "Dropping egress connections to specific target due to the "
+                           "dropConnections command"));
             }
         }
 

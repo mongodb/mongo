@@ -688,19 +688,19 @@ void ConnectionPool::shutdown() {
     }
 }
 
-void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
+void ConnectionPool::dropConnections(const HostAndPort& target, const Status& status) {
     stdx::unique_lock lk(_mutex);
 
-    auto iter = _pools.find(hostAndPort);
+    auto iter = _pools.find(target);
 
     if (iter == _pools.end())
         return;
 
     auto& pool = iter->second;
-    pool->shutdown(lk, Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
+    pool->shutdown(lk, status);
 }
 
-void ConnectionPool::dropConnections() {
+void ConnectionPool::dropConnections(const Status& status) {
     stdx::unique_lock lk(_mutex);
 
     // Grab all of the pools we're going to drop connections for. This is necessary because
@@ -722,8 +722,7 @@ void ConnectionPool::dropConnections() {
 
     // Cascade the failure across all of the pools we're dropping.
     for (const auto& pool : pools) {
-        pool->processFailure(
-            lk, Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"));
+        pool->processFailure(lk, status);
         invariant(lk.owns_lock(), "processFailure released, but did not reacquire the lock.");
     }
 }

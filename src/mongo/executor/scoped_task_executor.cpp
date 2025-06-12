@@ -212,7 +212,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void dropConnections(const HostAndPort& hostAndPort) override {
+    void dropConnections(const HostAndPort& target, const Status& status) override {
         MONGO_UNREACHABLE;
     }
 

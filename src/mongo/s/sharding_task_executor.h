@@ -101,7 +101,7 @@ public:
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
 private:
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;

@@ -93,10 +93,10 @@ public:
     ReplicaSetMonitorConnectionManager(std::shared_ptr<executor::NetworkInterface> network)
         : _network(std::move(network)) {}
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
     // Not supported.
-    void dropConnections() override {
+    void dropConnections(const Status& status) override {
         MONGO_UNREACHABLE;
     };
     // Not supported.

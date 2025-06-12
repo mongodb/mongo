@@ -493,11 +493,13 @@ void StreamableReplicaSetMonitor::_failedHost(const HostAndPort& host,
 
     _doErrorActions(
         host,
+        status.reason(),
         _errorHandler->computeErrorActions(host, status, stage, isApplicationOperation, bson));
 }
 
 void StreamableReplicaSetMonitor::_doErrorActions(
     const HostAndPort& host,
+    const StringData reason,
     const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const {
     {
         stdx::lock_guard lock(_mutex);
@@ -505,7 +507,8 @@ void StreamableReplicaSetMonitor::_doErrorActions(
             return;
 
         if (errorActions.dropConnections)
-            _connectionManager->dropConnections(host);
+            _connectionManager->dropConnections(
+                host, Status(ErrorCodes::PooledConnectionsDropped, reason));
 
         if (errorActions.requestImmediateCheck && _serverDiscoveryMonitor)
             _serverDiscoveryMonitor->requestImmediateCheck();

@@ -441,7 +441,8 @@ void PinnedConnectionTaskExecutor::appendConnectionStats(ConnectionPoolStats* st
     MONGO_UNIMPLEMENTED;
 }
 
-void PinnedConnectionTaskExecutor::dropConnections(const HostAndPort& hostAndPort) {
+void PinnedConnectionTaskExecutor::dropConnections(const HostAndPort& target,
+                                                   const Status& status) {
     MONGO_UNIMPLEMENTED;
 }
 

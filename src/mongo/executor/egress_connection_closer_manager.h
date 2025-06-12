@@ -62,10 +62,12 @@ public:
     void remove(EgressConnectionCloser* etc);
 
     // Drops all closers' connections, deferring to their dropConnections().
+    void dropConnections(const Status& status);
     void dropConnections();
 
     // Drops all connections associated with the HostAndPort on any closer.
-    void dropConnections(const HostAndPort& hostAndPort);
+    void dropConnections(const HostAndPort& target, const Status& status);
+    void dropConnections(const HostAndPort& target);
 
     // Mark keep open on all connections associated with a HostAndPort on all closers.
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen);

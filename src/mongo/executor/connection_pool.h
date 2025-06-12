@@ -276,13 +276,25 @@ public:
 
     void shutdown();
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    /**
+     * Drops connection to a specific target in the connection pool and relays a message as to
+     * why the connection was dropped.
+     */
+    void dropConnections(const HostAndPort& target, const Status& status) override;
+    void dropConnections(const HostAndPort& target) {
+        dropConnections(
+            target,
+            Status(ErrorCodes::PooledConnectionsDropped, "Drop connections to a specific target"));
+    }
 
     /**
      * Drops all connections, but if a certain SpecificPool (and therefore HostAndPort) is
      * marked as keep open, that connection will not be dropped.
      */
-    void dropConnections() override;
+    void dropConnections(const Status& status) override;
+    void dropConnections() {
+        dropConnections(Status(ErrorCodes::PooledConnectionsDropped, "Drop all connections"));
+    }
 
     /**
      * Marks SpecificPool to be kept open for dropConnections(), must acquire connection pool

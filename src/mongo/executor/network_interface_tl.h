@@ -114,7 +114,7 @@ public:
 
     bool onNetworkThread() override;
 
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
 
     void testEgress(const HostAndPort& hostAndPort,
                     transport::ConnectSSLMode sslMode,

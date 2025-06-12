@@ -312,6 +312,7 @@ private:
     // Take action on error for the given host.
     void _doErrorActions(
         const HostAndPort& host,
+        StringData reason,
         const StreamableReplicaSetMonitorErrorHandler::ErrorActions& errorActions) const;
 
     void _failedHost(const HostAndPort& host,

@@ -202,7 +202,7 @@ public:
 
     bool onNetworkThread() override;
 
-    void dropConnections(const HostAndPort&) override {}
+    void dropConnections(const HostAndPort& target, const Status& status) override {}
 
     void testEgress(const HostAndPort&, transport::ConnectSSLMode, Milliseconds, Status) override {}
 

@@ -116,8 +116,18 @@ public:
 
     size_t getPendingStreamEstablishments(const HostAndPort& target);
 
-    virtual void dropConnections() = 0;
-    virtual void dropConnections(const HostAndPort& target) = 0;
+    virtual void dropConnections(const Status& status) = 0;
+    void dropConnections() {
+        dropConnections(Status(ErrorCodes::PooledConnectionsDropped, "Drop all connections"));
+    }
+
+    virtual void dropConnections(const HostAndPort& target, const Status& status) = 0;
+    void dropConnections(const HostAndPort& target) {
+        dropConnections(
+            target,
+            Status(ErrorCodes::PooledConnectionsDropped, "Drop connections to a specific target"));
+    }
+
     virtual void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) = 0;
 
 protected:
@@ -276,8 +286,16 @@ public:
     Status rotateCertificates(const SSLConfiguration& sslConfig) override;
 #endif
 
-    void dropConnections() override;
-    void dropConnections(const HostAndPort& target) override;
+    void dropConnections(const Status& status) override;
+    void dropConnections() {
+        dropConnections(Status(ErrorCodes::PooledConnectionsDropped, "Drop all connections"));
+    }
+    void dropConnections(const HostAndPort& target, const Status& status) override;
+    void dropConnections(const HostAndPort& target) {
+        dropConnections(
+            target,
+            Status(ErrorCodes::PooledConnectionsDropped, "Drop connections to a specific target"));
+    }
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override;
 
 private:

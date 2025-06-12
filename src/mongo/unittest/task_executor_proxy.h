@@ -97,7 +97,7 @@ public:
     void wait(const CallbackHandle& cbHandle,
               Interruptible* interruptible = Interruptible::notInterruptible()) override;
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
-    void dropConnections(const HostAndPort& hostAndPort) override;
+    void dropConnections(const HostAndPort& target, const Status& status) override;
     void appendNetworkInterfaceStats(BSONObjBuilder&) const override;
 
 private:

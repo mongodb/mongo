@@ -772,12 +772,12 @@ bool NetworkInterfaceTL::onNetworkThread() {
     return _reactor->onReactorThread();
 }
 
-void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
+void NetworkInterfaceTL::dropConnections(const HostAndPort& target, const Status& status) {
     if (MONGO_unlikely(!_initialized.load())) {
         return;
     }
 
-    _clientFactory->dropConnections(hostAndPort);
+    _clientFactory->dropConnections(target, status);
 }
 
 AsyncDBClient* NetworkInterfaceTL::LeasedStream::getClient() {

@@ -50,14 +50,28 @@ class EgressConnectionCloser {
 public:
     virtual ~EgressConnectionCloser() {}
 
-    // Drop connections.
-    virtual void dropConnections() = 0;
+    /**
+     * Drop connections to all targets not marked keep-open and relay a status message describing
+     * why the connection was dropped.
+     */
+    virtual void dropConnections(const Status& status) = 0;
+    void dropConnections() {
+        dropConnections(Status(ErrorCodes::PooledConnectionsDropped, "Drop all connections"));
+    }
 
-    // Drop connections, considering only those associated with a specific HostAndPort.
-    virtual void dropConnections(const HostAndPort& hostAndPort) = 0;
+    /**
+     * Drop connections to a specific target and relay a status message describing why the
+     * connection was dropped.
+     */
+    virtual void dropConnections(const HostAndPort& target, const Status& status) = 0;
+    void dropConnections(const HostAndPort& target) {
+        dropConnections(
+            target,
+            Status(ErrorCodes::PooledConnectionsDropped, "Drop connections to a specific target"));
+    }
 
     // Mark connections associated with a certain HostAndPort as to be kept open.
-    virtual void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) = 0;
+    virtual void setKeepOpen(const HostAndPort& target, bool keepOpen) = 0;
 
 protected:
     EgressConnectionCloser() {}
