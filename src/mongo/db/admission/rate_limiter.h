@@ -106,6 +106,12 @@ public:
     Status acquireToken(OperationContext*);
 
     /**
+     * Attempts to acquire a token without queuing. Returns an error status if the rate limit
+     * and the burst size is exceeded.
+     */
+    Status tryAcquireToken();
+
+    /**
      * Updates metrics for admission granted without having called acquireToken.
      * Use this function in place of acquireToken when admission must be granted immediately.
      * Admission granted in this way does not consume any tokens.

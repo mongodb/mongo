@@ -74,22 +74,21 @@ IngressRequestRateLimiter& IngressRequestRateLimiter::get(ServiceContext* servic
     return *getIngressRequestRateLimiter(service);
 }
 
-Status IngressRequestRateLimiter::admitRequest(OperationContext* opCtx,
-                                               bool commandInvocationSubjectToAdmissionControl) {
+Status IngressRequestRateLimiter::admitRequest(Client* client) {
     // TODO: SERVER-104934 Implement ip based exemption
-    // TODO: SERVER-104932 Remove commandInvocationSubjectToAdmissionControl in favor of
-    // a failpoint to bypass operations such as shutdown and setParameter
 
     // The rate limiter applies only requests when the client is authenticated to prevent DoS
     // attacks caused by many unauthenticated requests. In the case auth is disabled, all
     // requests will be subject to rate limiting.
-    if (!AuthorizationSession::get(opCtx->getClient())->isAuthenticated() ||
-        !commandInvocationSubjectToAdmissionControl) {
+    const auto authorizationSession = AuthorizationSession::get(client);
+
+    if (!authorizationSession->shouldIgnoreAuthChecks() &&
+        !authorizationSession->isAuthenticated()) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }
 
-    return _rateLimiter.acquireToken(opCtx);
+    return _rateLimiter.tryAcquireToken();
 }
 
 void IngressRequestRateLimiter::setAdmissionRatePerSec(std::int32_t refreshRatePerSec) {

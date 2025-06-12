@@ -17,6 +17,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "message.h",
+        "op_compressed.h",
         "op_msg.h",
     ],
     deps = [

@@ -158,6 +158,19 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     return Status::OK();
 }
 
+Status RateLimiter::tryAcquireToken() {
+    _impl->stats.attemptedAdmissions.incrementRelaxed();
+
+    if (!_impl->tokenBucket.consume(1.0)) {
+        _impl->stats.rejectedAdmissions.incrementRelaxed();
+        return Status{kRejectedErrorCode,
+                      fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
+    }
+
+    _impl->stats.successfulAdmissions.incrementRelaxed();
+    return Status::OK();
+}
+
 void RateLimiter::recordExemption() {
     _impl->stats.exemptedAdmissions.incrementRelaxed();
 }

@@ -40,8 +40,6 @@
 #include "mongo/db/admission/ingress_admission_context.h"
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
-#include "mongo/db/admission/ingress_request_rate_limiter.h"
-#include "mongo/db/admission/ingress_request_rate_limiter_gen.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -1763,12 +1761,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     const auto isProcessInternalCommand = isProcessInternalClient(*opCtx->getClient());
-
-    if (gFeatureFlagIngressRateLimiting.isEnabled() && gIngressRequestRateLimiterEnabled.load()) {
-        auto& requestRateLimiter = IngressRequestRateLimiter::get(opCtx->getServiceContext());
-        uassertStatusOK(requestRateLimiter.admitRequest(
-            opCtx, _invocation->isSubjectToIngressAdmissionControl()));
-    }
 
     if (gIngressAdmissionControlEnabled.load()) {
         // The way ingress admission works, one ticket should cover all the work for the operation.

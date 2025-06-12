@@ -27,61 +27,47 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/base/status.h"
-#include "mongo/db/admission/rate_limiter.h"
+#include "mongo/base/data_range_cursor.h"
 
 #include <cstddef>
 #include <cstdint>
 
 namespace mongo {
 
-class IngressRequestRateLimiter {
-public:
-    IngressRequestRateLimiter();
-    /**
-     * Returns the reference to IngressRequestRateLimiter associated with the operation's service
-     * context.
-     */
-    static IngressRequestRateLimiter& get(ServiceContext* opCtx);
+/**
+ * Simple struct that helps parsing op_compressed header.
+ *
+ * Should be replaced by a proper MsgCompressionHeader::View and MsgCompressionHeader::ConstView
+ * class just like message.h does.
+ *
+ * More about OP_COMPRESSED can be found in the documentation:
+ * https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.md
+ *
+ * TODO: SERVER-106196 Replace this struct with a View/ConstView class
+ */
+struct CompressionHeader {
+    std::int32_t originalOpCode;
+    std::int32_t uncompressedSize;
+    std::uint8_t compressorId;
 
-    /**
-     * Attempt to receive admission into the system. If the current rate of request admissions has
-     * exceeded the configured rate limit and consumed the burst size, the operation will be
-     * rejected with an error in the SystemOverloaded category.
-     */
-    Status admitRequest(Client* client);
+    void serialize(DataRangeCursor* cursor) {
+        cursor->writeAndAdvance<LittleEndian<std::int32_t>>(originalOpCode);
+        cursor->writeAndAdvance<LittleEndian<std::int32_t>>(uncompressedSize);
+        cursor->writeAndAdvance<LittleEndian<std::uint8_t>>(compressorId);
+    }
 
-    /**
-     * Adjusts the refresh rate of the rate limiter to 'refreshRatePerSec'.
-     */
-    void setAdmissionRatePerSec(std::int32_t refreshRatePerSec);
+    CompressionHeader(std::int32_t _opcode, std::int32_t _size, std::uint8_t _id)
+        : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
 
-    /**
-     * Adjusts the rate limiter's burst rate to 'burstSize'.
-     */
-    void setAdmissionBurstSize(std::int32_t burstSize);
+    CompressionHeader(ConstDataRangeCursor* cursor) {
+        originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
+        uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
+        compressorId = cursor->readAndAdvance<LittleEndian<std::uint8_t>>();
+    }
 
-    /**
-     * Called automatically when the value of the server parameter ingressRequestAdmissionRatePerSec
-     * changes value.
-     */
-    static Status onUpdateAdmissionRatePerSec(std::int32_t refreshRatePerSec);
-
-    /**
-     * Called automatically when the value of the server parameter ingressRequestAdmissionBurstSize
-     * changes value.
-     */
-    static Status onUpdateAdmissionBurstSize(std::int32_t burstSize);
-
-    /**
-     * Reports the ingress admission rate limiter metrics.
-     */
-    void appendStats(BSONObjBuilder* bob) const;
-
-private:
-    admission::RateLimiter _rateLimiter;
+    static constexpr std::size_t size() {
+        return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
+    }
 };
 
 }  // namespace mongo

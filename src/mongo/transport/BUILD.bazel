@@ -182,6 +182,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/rpc:message",
         "//src/mongo/util/options_parser",
         "//src/third_party/snappy",
         "//src/third_party/zlib",  # TODO(SERVER-93876): Remove.
@@ -292,10 +293,12 @@ mongo_cc_library(
         ":message_compressor",
         ":service_executor",
         ":transport_layer_common",
+        "//src/mongo/db:error_labels",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db:traffic_recorder",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/stats:counters",
         "//src/mongo/rpc:client_metadata",
