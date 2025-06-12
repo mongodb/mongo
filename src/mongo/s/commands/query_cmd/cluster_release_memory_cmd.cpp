@@ -154,18 +154,23 @@ public:
                     if (response.isOK()) {
                         response = pinnedCursor.getValue()->releaseMemory();
                     }
-                    // Check the status and decide where the result should go
-                    if (response.isOK()) {
-                        cursorsReleased.push_back(id);
-                    } else {
-                        handleError(id, response);
-                    }
-                    // Upon successful completion, transfer ownership of the cursor back to the
-                    // cursor manager.
+
                     pinnedCursor.getValue().returnCursor(
                         ClusterCursorManager::CursorState::NotExhausted);
                     returnCursorGuard.dismiss();
 
+                    Status interruptStatus = opCtx->checkForInterruptNoAssert();
+
+                    // Check the status and decide where the result should go. If releaseMemory
+                    // succeeded, but operation was interrupted, cursor will be killed anyway.
+                    if (response.isOK() && interruptStatus.isOK()) {
+                        cursorsReleased.push_back(id);
+                    } else {
+                        handleError(id, response.isOK() ? interruptStatus : response);
+                        if (!interruptStatus.isOK()) {
+                            break;
+                        }
+                    }
                 } else if (pinnedCursor.getStatus().code() == ErrorCodes::CursorInUse) {
                     cursorsCurrentlyPinned.push_back(id);
                 } else if (pinnedCursor.getStatus().code() == ErrorCodes::CursorNotFound) {
