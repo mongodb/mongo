@@ -26,4 +26,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "changePrimary",
     "autoSplitVector",
     "rotateFTDC",
+    "replicateSearchIndexCommand",
 ];

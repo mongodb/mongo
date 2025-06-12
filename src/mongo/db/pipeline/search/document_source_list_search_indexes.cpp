@@ -124,7 +124,6 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse =
             runSearchIndexCommand(pExpCtx->opCtx, pExpCtx->ns, bob.done());
-
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:
          * cursor: {

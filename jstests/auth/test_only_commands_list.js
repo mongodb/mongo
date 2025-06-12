@@ -10,5 +10,6 @@ export const testOnlyCommands = [
     'emptycapped',
     'sysprofile',
     '_dropConnectionsToMongot',
-    '_mongotConnPoolStats'
+    '_mongotConnPoolStats',
+    '_shardsvrRunSearchIndexCommand'
 ];

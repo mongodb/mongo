@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/search_index_commands_gen.h"
@@ -39,6 +38,19 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+namespace {
+template <typename CommandType>
+BSONObj retrieveSearchIndexManagerResponseHelper(OperationContext* opCtx, CommandType& cmd) {
+    const auto& nss = cmd.getNamespace();
+    auto collUUID = SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
+
+    // Run the search index command against the remote search index management server.
+    auto searchIndexManagerResponse = getSearchIndexManagerResponse(
+        opCtx, nss, collUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
+
+    return searchIndexManagerResponse;
+}
+}  // namespace
 namespace {
 
 /**
@@ -91,16 +103,13 @@ public:
             throwIfNotRunningWithRemoteSearchIndexManagement();
 
             const auto& cmd = request();
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            // Run the search index command against the remote search index management server.
-            BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
-                opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
 
             IDLParserContext ctx("CreateSearchIndexesReply Parser");
+
+            // Run the search index command against the remote search index management server.
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
+
             return CreateSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -170,15 +179,11 @@ public:
                     "Cannot set both 'name' and 'id'.",
                     !(cmd.getName() && cmd.getId()));
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
-                opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
-
             IDLParserContext ctx("DropSearchIndexReply Parser");
+
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
+
             return DropSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -256,15 +261,11 @@ public:
                     "Must set either 'name' or 'id'.",
                     cmd.getName() || cmd.getId());
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
-                opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
-
             IDLParserContext ctx("UpdateSearchIndexReply Parser");
+
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
+
             return UpdateSearchIndexReply::parseOwned(ctx, std::move(manageSearchIndexResponse));
         }
 
@@ -380,13 +381,8 @@ public:
                     "Cannot set both 'name' and 'id'.",
                     !(cmd.getName() && cmd.getId()));
 
-            const auto& nss = cmd.getNamespace();
-
-            auto collectionUUID =
-                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-
-            BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
-                opCtx, nss, collectionUUID, cmd.toBSON(BSONObj() /* commandPassthroughFields */));
+            BSONObj manageSearchIndexResponse =
+                retrieveSearchIndexManagerResponseHelper(opCtx, cmd);
 
             IDLParserContext ctx("ListSearchIndexesReply Parser");
             return ListSearchIndexesReply::parseOwned(ctx, std::move(manageSearchIndexResponse));

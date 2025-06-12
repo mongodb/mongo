@@ -93,6 +93,8 @@ env.Library(
         'rename_collection_common.cpp',
         'server_status_command.cpp',
         'sessions_commands.idl',
+        'shardsvr_run_search_index_command.cpp',
+        'shardsvr_run_search_index_command.idl',
         'start_session_command.cpp',
     ],
     LIBDEPS=['update_metrics', 'write_commands_common'],
@@ -102,6 +104,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/fle_crypto',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/dbdirectclient',
@@ -109,6 +112,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/mongo/db/query/search/search_index_common',
+        '$BUILD_DIR/mongo/db/query/search/search_index_options',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/kill_sessions',
         '$BUILD_DIR/mongo/db/session/logical_session_cache',
@@ -966,6 +971,9 @@ env.Library(
         'search_index_commands.cpp',
         'search_test_cmds.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/grid',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth_checks',
         '$BUILD_DIR/mongo/db/commands',
@@ -975,6 +983,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/search/search_task_executors',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/executor/async_multicaster',
     ],
 )
 
