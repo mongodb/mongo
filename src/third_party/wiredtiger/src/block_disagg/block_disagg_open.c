@@ -79,6 +79,8 @@ __wti_block_disagg_open(WT_SESSION_IMPL *session, const char *filename, const ch
     *blockp = NULL;
     block_disagg = NULL;
 
+    WT_ASSERT(session, filename != NULL);
+
     __wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
     conn = S2C(session);

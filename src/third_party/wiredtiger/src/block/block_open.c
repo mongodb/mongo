@@ -178,6 +178,8 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
 
     *blockp = NULL;
 
+    WT_ASSERT(session, filename != NULL);
+
     __wt_verbose(session, WT_VERB_BLOCK, "open: %s", filename);
 
     block = NULL;
