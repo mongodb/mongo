@@ -871,6 +871,15 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                                             : WriteUnitOfWork::kDontGroup);
 
                 if (!isOplogDisabledForTmpColl && !isGroupedOplogEntries) {
+                    if (autoTmpColl->needsCappedLock()) {
+                        // We do not expect any concurrency here, we acquire this lock to be
+                        // consistent with behavior in other inserts into non-clustered capped
+                        // collections where we acquire the lock before reserving oplog slots and to
+                        // satisfy a tassert. TODO SERVER-106004: Revisit this when cleaning up code
+                        // around reserving oplog slots for inserts into capped collections.
+                        Lock::ResourceLock heldUntilEndOfWUOW{
+                            opCtx, ResourceId(RESOURCE_METADATA, autoTmpColl->ns()), MODE_X};
+                    }
                     auto oplogInfo = LocalOplogInfo::get(opCtx);
                     auto slots = oplogInfo->getNextOpTimes(opCtx, 1U);
                     stmts[0].oplogSlot = slots[0];

@@ -89,6 +89,9 @@ namespace {
 
 constexpr char SKIP_TEMP_COLLECTION[] = "skipTempCollections";
 constexpr char EXCLUDE_RECORDIDS[] = "excludeRecordIds";
+// TODO SERVER-106005: Remove this option once all versions tested in multiversion suites can scan
+// in natural order for capped collections.
+constexpr char USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS[] = "useIndexScanForCappedCollections";
 
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
     // Loop until we get a consistent catalog and snapshot. This is only used for the lock-free
@@ -219,6 +222,15 @@ public:
             LOGV2(6859701, "Exclude recordIds in dbHash for recordIdsReplicated collections");
         }
 
+        const bool useIndexScanForCappedCollections =
+            cmdObj.hasField(USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS) &&
+            cmdObj[USE_INDEX_SCAN_FOR_CAPPED_COLLECTIONS].trueValue();
+        if (useIndexScanForCappedCollections) {
+            LOGV2(8218000,
+                  "Performing index scan on the _id index instead of using natural order for "
+                  "capped collections");
+        }
+
         uassert(ErrorCodes::InvalidNamespace,
                 "Cannot pass empty string for 'dbHash' field",
                 !(cmdObj.firstElement().type() == BSONType::string &&
@@ -290,8 +302,10 @@ public:
             // Compute the hash for this collection.
             // TODO(SERVER-103401): Investigate usage validity of
             // CollectionPtr::CollectionPtr_UNSAFE
-            std::string hash = _hashCollection(
-                opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection), excludeRecordIds);
+            std::string hash = _hashCollection(opCtx,
+                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
+                                               excludeRecordIds,
+                                               useIndexScanForCappedCollections);
 
             collectionToHashMap[std::string{collNss.coll()}] = hash;
 
@@ -361,7 +375,8 @@ public:
 private:
     std::string _hashCollection(OperationContext* opCtx,
                                 const CollectionPtr& collection,
-                                bool excludeRecordIds) {
+                                bool excludeRecordIds,
+                                bool useIndexScanForCappedCollections) {
         auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
@@ -372,7 +387,8 @@ private:
         // the one before upgrade.
         bool includeRids = collection->areRecordIdsReplicated() && !excludeRecordIds;
 
-        if (desc && !includeRids) {
+        if (desc && !includeRids &&
+            !(collection->isCapped() && !useIndexScanForCappedCollections)) {
             exec = InternalPlanner::indexScan(opCtx,
                                               &collection,
                                               desc,
@@ -382,7 +398,8 @@ private:
                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
-        } else if (collection->isClustered() || includeRids) {
+        } else if (collection->isClustered() || includeRids ||
+                   (collection->isCapped() && !useIndexScanForCappedCollections)) {
             exec = InternalPlanner::collectionScan(
                 opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         } else {

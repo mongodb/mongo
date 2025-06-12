@@ -366,6 +366,11 @@ void insertDocumentsAtomically(OperationContext* opCtx,
     // insert. In order to avoid that delete generating a second timestamp in a WUOW which
     // has un-timestamped writes (which is a violation of multi-timestamp constraints),
     // we must reserve the timestamp for the insert in advance.
+    // We take an exclusive lock on the metadata resource before reserving the timestamp.
+    if (collection.getCollectionPtr()->needsCappedLock()) {
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            opCtx, ResourceId(RESOURCE_METADATA, collection.getCollectionPtr()->ns()), MODE_X};
+    }
     if (oplogEntryGroupType != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
         !inTransaction && !oplogDisabled && collection.getCollectionPtr()->isCapped()) {
         acquireOplogSlotsForInserts(opCtx, collection, begin, end);

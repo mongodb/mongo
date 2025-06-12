@@ -1542,6 +1542,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // Do not use supplied timestamps if running through applyOps, as that would
                     // allow a user to dictate what timestamps appear in the oplog.
                     InsertStatement insertStmt(o);
+                    if (collection->needsCappedLock()) {
+                        Lock::ResourceLock heldUntilEndOfWUOW{
+                            opCtx, ResourceId(RESOURCE_METADATA, collection->ns()), MODE_X};
+                    }
                     if (assignOperationTimestamp) {
                         invariant(op.getTerm());
                         insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().value());
@@ -1562,7 +1566,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     if (op.getDurableReplOperation().getRecordId()) {
                         insertStmt.replicatedRecordId = *op.getDurableReplOperation().getRecordId();
                     }
-
                     OpDebug* const nullOpDebug = nullptr;
                     Status status = collection_internal::insertDocument(
                         opCtx, collection, insertStmt, nullOpDebug, false /* fromMigrate */);
