@@ -769,7 +769,7 @@ public:
 
     // Function for the implementation on how we load a new Collection pointer when restoring from
     // yield
-    using RestoreFn = std::function<const Collection*(OperationContext*, UUID)>;
+    using RestoreFn = std::function<const Collection*(OperationContext*, boost::optional<UUID>)>;
 
     // Creates non-yieldable CollectionPtr, performing yield/restore will invariant. To make this
     // CollectionPtr yieldable call `makeYieldable` and provide appropriate implementation depending
@@ -834,6 +834,9 @@ private:
     // If the collection is currently in the 'yielded' state (i.e. yield() has been called), this
     // field will contain what was the UUID of the collection at the time of yield.
     mutable boost::optional<UUID> _yieldedUUID;
+
+    // Contains whether we are in the 'yielded' state.
+    mutable bool _yielded = false;
 
     OperationContext* _opCtx = nullptr;
     RestoreFn _restoreFn;
