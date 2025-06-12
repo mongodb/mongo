@@ -80,7 +80,6 @@ export const $config = (function() {
             jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
             const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
             assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
-            return true;
         },
         collMod: function(db, collName, connCache) {
             db = data.getRandomDb(db);
