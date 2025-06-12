@@ -60,11 +60,15 @@ public:
     }
 
     void setStartFor(PhaseEnum phase, Date_t date) {
-        return _durations[toIndex(phase)].setStart(date);
+        if (!_durations[toIndex(phase)].getStart()) {
+            return _durations[toIndex(phase)].setStart(date);
+        }
     }
 
     void setEndFor(PhaseEnum phase, Date_t date) {
-        return _durations[toIndex(phase)].setEnd(date);
+        if (!_durations[toIndex(phase)].getEnd()) {
+            return _durations[toIndex(phase)].setEnd(date);
+        }
     }
 
     template <typename TimeUnit>

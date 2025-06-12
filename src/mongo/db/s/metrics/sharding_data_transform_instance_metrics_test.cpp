@@ -456,5 +456,41 @@ TEST_F(ShardingDataTransformInstanceMetricsTest,
         "collectionCloningTotalLocalInsertTimeMillis");
 }
 
+TEST_F(ShardingDataTransformInstanceMetricsTest, TestSetStartForIdempotency) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+    auto start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, boost::none);
+
+    auto now = getClockSource()->now();
+
+    metrics->setStartFor(resharding_metrics::TimedPhase::kCriticalSection, now);
+    start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+
+    auto later = now + Seconds(10);
+
+    metrics->setStartFor(resharding_metrics::TimedPhase::kCriticalSection, later);
+    start = metrics->getStartFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, TestSetEndForIdempotency) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kRecipient);
+    auto start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, boost::none);
+
+    auto now = getClockSource()->now();
+
+    metrics->setEndFor(resharding_metrics::TimedPhase::kCriticalSection, now);
+    start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+
+    auto later = now + Seconds(10);
+
+    metrics->setEndFor(resharding_metrics::TimedPhase::kCriticalSection, later);
+    start = metrics->getEndFor(resharding_metrics::TimedPhase::kCriticalSection);
+    ASSERT_EQ(start, now);
+}
+
 }  // namespace
 }  // namespace mongo

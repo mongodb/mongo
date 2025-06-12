@@ -801,5 +801,76 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeLowElapsed) {
     ASSERT_NE(report, Milliseconds{0});
 }
 
+TEST_F(ReshardingMetricsTest, OnStartedInformsCumulativeMetrics) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    assertAltersCumulativeMetrics(
+        metrics.get(),
+        [=](auto base) {
+            auto reshardingMetrics = dynamic_cast<ReshardingMetrics*>(base);
+            reshardingMetrics->onStarted();
+        },
+        [this](auto reportBefore, auto reportAfter) {
+            BSONObjBuilder reportBuilder;
+            getCumulativeMetrics()->reportForServerStatus(&reportBuilder);
+            auto report = reportBuilder.done();
+            ASSERT_EQ(report.getObjectField(kResharding).getIntField("countStarted"), 1);
+            return true;
+        });
+}
+
+TEST_F(ReshardingMetricsTest, OnSuccessInformsCumulativeMetrics) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    assertAltersCumulativeMetrics(
+        metrics.get(),
+        [=](auto base) {
+            auto reshardingMetrics = dynamic_cast<ReshardingMetrics*>(base);
+            reshardingMetrics->onStarted();
+            reshardingMetrics->onSuccess();
+        },
+        [this](auto reportBefore, auto reportAfter) {
+            BSONObjBuilder reportBuilder;
+            getCumulativeMetrics()->reportForServerStatus(&reportBuilder);
+            auto report = reportBuilder.done();
+            ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSucceeded"), 1);
+            return true;
+        });
+}
+
+TEST_F(ReshardingMetricsTest, OnCanceledInformsCumulativeMetrics) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    assertAltersCumulativeMetrics(
+        metrics.get(),
+        [=](auto base) {
+            auto reshardingMetrics = dynamic_cast<ReshardingMetrics*>(base);
+            reshardingMetrics->onStarted();
+            reshardingMetrics->onCanceled();
+        },
+        [this](auto reportBefore, auto reportAfter) {
+            BSONObjBuilder reportBuilder;
+            getCumulativeMetrics()->reportForServerStatus(&reportBuilder);
+            auto report = reportBuilder.done();
+            ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 1);
+            return true;
+        });
+}
+
+TEST_F(ReshardingMetricsTest, OnFailedInformsCumulativeMetrics) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    assertAltersCumulativeMetrics(
+        metrics.get(),
+        [=](auto base) {
+            auto reshardingMetrics = dynamic_cast<ReshardingMetrics*>(base);
+            reshardingMetrics->onStarted();
+            reshardingMetrics->onFailure();
+        },
+        [this](auto reportBefore, auto reportAfter) {
+            BSONObjBuilder reportBuilder;
+            getCumulativeMetrics()->reportForServerStatus(&reportBuilder);
+            auto report = reportBuilder.done();
+            ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 1);
+            return true;
+        });
+}
+
 }  // namespace
 }  // namespace mongo

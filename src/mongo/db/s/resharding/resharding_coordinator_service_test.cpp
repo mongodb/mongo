@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
@@ -46,6 +47,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_coordinator.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service_external_state.h"
@@ -820,6 +822,14 @@ public:
             }
         }
         coordinator->getCompletionFuture().get(opCtx);
+
+        BSONObjBuilder bob;
+        ShardingDataTransformCumulativeMetrics::getForResharding(
+            operationContext()->getServiceContext())
+            ->reportForServerStatus(&bob);
+        auto cumulativeMetricsBSON = bob.obj();
+        ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countStarted"].numberInt(), 1);
+        ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countSucceeded"].numberInt(), 1);
     }
 
     int64_t getDocumentsToCopyForDonor(const ShardId& shardId) {
@@ -1364,6 +1374,26 @@ TEST_F(ReshardingCoordinatorServiceTest, SuccessfullyAbortReshardOperationImmedi
     coordinator->getCompletionFuture().wait();
 }
 
+TEST_F(ReshardingCoordinatorServiceTest, AbortingReshardingOperationIncrementsMetrics) {
+    auto pauseAfterInsertCoordinatorDoc =
+        globalFailPointRegistry().find("pauseAfterInsertCoordinatorDoc");
+    auto timesEnteredFailPoint = pauseAfterInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
+    auto coordinator = initializeAndGetCoordinator();
+    pauseAfterInsertCoordinatorDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
+    coordinator->abort();
+    pauseAfterInsertCoordinatorDoc->setMode(FailPoint::off, 0);
+    coordinator->getCompletionFuture().wait();
+
+    BSONObjBuilder bob;
+    ShardingDataTransformCumulativeMetrics::getForResharding(
+        operationContext()->getServiceContext())
+        ->reportForServerStatus(&bob);
+    auto cumulativeMetricsBSON = bob.obj();
+
+    ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countStarted"].numberInt(), 1);
+    ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countCanceled"].numberInt(), 1);
+}
+
 TEST_F(ReshardingCoordinatorServiceTest, CoordinatorReturnsErrorCode) {
     const std::vector<CoordinatorStateEnum> states = {CoordinatorStateEnum::kPreparingToDonate,
                                                       CoordinatorStateEnum::kCloning,
@@ -1396,6 +1426,14 @@ TEST_F(ReshardingCoordinatorServiceTest, CoordinatorReturnsErrorCode) {
     ASSERT_THROWS_CODE(coordinator->getCompletionFuture().get(opCtx),
                        DBException,
                        ErrorCodes::SnapshotUnavailable);
+    BSONObjBuilder bob;
+    ShardingDataTransformCumulativeMetrics::getForResharding(
+        operationContext()->getServiceContext())
+        ->reportForServerStatus(&bob);
+    auto cumulativeMetricsBSON = bob.obj();
+
+    ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countStarted"].numberInt(), 1);
+    ASSERT_EQ(cumulativeMetricsBSON["resharding"]["countFailed"].numberInt(), 1);
 }
 
 TEST_F(ReshardingCoordinatorServiceTest, CoordinatorReturnsErrorCodeAfterRestart) {

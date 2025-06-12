@@ -888,29 +888,23 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
             _coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
             _ctHolder->abort();
         }
+    } else {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        reshardingPauseCoordinatorBeforeInitializing.pauseWhileSetAndNotCanceled(
+            opCtx.get(), _ctHolder->getStepdownToken());
+        ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
+        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
+        resharding::insertCoordDocAndChangeOrigCollEntry(
+            opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
+        installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
 
-        return;
-    }
-
-    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    reshardingPauseCoordinatorBeforeInitializing.pauseWhileSetAndNotCanceled(
-        opCtx.get(), _ctHolder->getStepdownToken());
-    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
-    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
-    resharding::insertCoordDocAndChangeOrigCollEntry(
-        opCtx.get(), _metrics.get(), updatedCoordinatorDoc);
-    installCoordinatorDocOnStateTransition(opCtx.get(), updatedCoordinatorDoc);
-
-    {
-        // Note: don't put blocking or interruptible code in this block.
-        const bool isSameKeyResharding =
-            _coordinatorDoc.getForceRedistribution() && *_coordinatorDoc.getForceRedistribution();
         _coordinatorDocWrittenPromise.emplaceValue();
-        // We need to call setIsSameKeyResharding first so the metrics can count same key resharding
-        // correctly.
-        _metrics->setIsSameKeyResharding(isSameKeyResharding);
-        _metrics->onStarted();
     }
+
+    const bool isSameKeyResharding =
+        _coordinatorDoc.getForceRedistribution() && *_coordinatorDoc.getForceRedistribution();
+    _metrics->setIsSameKeyResharding(isSameKeyResharding);
+    _metrics->onStarted();
 
     pauseAfterInsertCoordinatorDoc.pauseWhileSet();
 }

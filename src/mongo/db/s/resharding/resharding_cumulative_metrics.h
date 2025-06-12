@@ -34,6 +34,8 @@
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics_field_name_provider.h"
 
+#include <mutex>
+
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
@@ -48,10 +50,10 @@ public:
     static boost::optional<StringData> fieldNameFor(AnyState state);
     void reportForServerStatus(BSONObjBuilder* bob) const override;
 
-    void onStarted(bool isSameKeyResharding);
-    void onSuccess(bool isSameKeyResharding);
-    void onFailure(bool isSameKeyResharding);
-    void onCanceled(bool isSameKeyResharding);
+    void onStarted(bool isSameKeyResharding, const UUID& reshardingUUID);
+    void onSuccess(bool isSameKeyResharding, const UUID& reshardingUUID);
+    void onFailure(bool isSameKeyResharding, const UUID& reshardingUUID);
+    void onCanceled(bool isSameKeyResharding, const UUID& reshardingUUID);
 
 private:
     void reportActive(BSONObjBuilder* bob) const override;
@@ -64,6 +66,9 @@ private:
     AtomicWord<int64_t> _countSameKeySucceeded{0};
     AtomicWord<int64_t> _countSameKeyFailed{0};
     AtomicWord<int64_t> _countSameKeyCancelled{0};
+
+    std::set<UUID> _activeReshardingOperations;
+    std::mutex _activeReshardingOperationsMutex;
 };
 
 }  // namespace mongo

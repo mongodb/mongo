@@ -477,14 +477,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                                ShardingCatalogClient::writeConcernLocalHavingUpstreamWaiter(),
                                *onReleaseCriticalSectionAction);
 
-                       // Only set the current time if not already set, if we hit a transient error
-                       // when refreshing or updating the coordinator doc below, we would have
-                       // already released the critical section and set the end time. We won't want
-                       // to reset the end time in this case.
-                       if (!_metrics->getEndFor(ReshardingMetrics::TimedPhase::kCriticalSection)) {
-                           _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
-                                               resharding::getCurrentTime());
-                       }
+                       _metrics->setEndFor(ReshardingMetrics::TimedPhase::kCriticalSection,
+                                           resharding::getCurrentTime());
 
                        // We force a refresh to make sure that the placement information is updated
                        // in cache after abort decision before the donor state document is deleted.

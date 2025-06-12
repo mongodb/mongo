@@ -607,8 +607,11 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyStarted"), 0);
     }
 
-    _reshardingCumulativeMetrics->onStarted(false /*isSameKeyResharding*/);
-    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/);
+    auto uuidOne = UUID::gen();
+    auto uuidTwo = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(false /*isSameKeyResharding*/, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -633,8 +636,14 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeySucceeded"), 0);
     }
 
-    _reshardingCumulativeMetrics->onSuccess(false /*isSameKeyResharding*/);
-    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/);
+    auto uuidOne = UUID::gen();
+    auto uuidTwo = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(false, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
+
+    _reshardingCumulativeMetrics->onSuccess(false /*isSameKeyResharding*/, uuidOne);
+    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -658,8 +667,14 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyFailed"), 0);
     }
 
-    _reshardingCumulativeMetrics->onFailure(false /*isSameKeyResharding*/);
-    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/);
+    auto uuidOne = UUID::gen();
+    auto uuidTwo = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(false, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
+
+    _reshardingCumulativeMetrics->onFailure(false /*isSameKeyResharding*/, uuidOne);
+    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -683,8 +698,14 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyCanceled"), 0);
     }
 
-    _reshardingCumulativeMetrics->onCanceled(false /*isSameKeyResharding*/);
-    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/);
+    auto uuidOne = UUID::gen();
+    auto uuidTwo = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(false, uuidOne);
+    _reshardingCumulativeMetrics->onStarted(true, uuidTwo);
+
+    _reshardingCumulativeMetrics->onCanceled(false /*isSameKeyResharding*/, uuidOne);
+    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuidTwo);
 
     {
         BSONObjBuilder bob;
@@ -692,6 +713,112 @@ TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
         auto report = bob.done();
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 2);
         ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyCanceled"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnStartedDoesNotIncrementCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countStarted"), 0);
+    }
+
+    auto uuid = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/, uuid);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countStarted"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnFailedDoesNotIncrementCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 0);
+    }
+
+    auto uuid = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(true, uuid);
+
+    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/, uuid);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnSuccessDoesNotIncrementCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSucceeded"), 0);
+    }
+
+    auto uuid = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(true, uuid);
+
+    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/, uuid);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSucceeded"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, RepeatedCallsToOnCanceledDoesNotIncrementCount) {
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 0);
+    }
+
+    auto uuid = UUID::gen();
+
+    _reshardingCumulativeMetrics->onStarted(true, uuid);
+
+    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
+    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/, uuid);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 1);
     }
 }
 }  // namespace

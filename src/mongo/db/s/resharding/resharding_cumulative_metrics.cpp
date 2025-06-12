@@ -126,31 +126,67 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
     }
 }
 
-void ReshardingCumulativeMetrics::onStarted(bool isSameKeyResharding) {
+void ReshardingCumulativeMetrics::onStarted(bool isSameKeyResharding, const UUID& reshardingUUID) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        if (_activeReshardingOperations.contains(reshardingUUID)) {
+            return;
+        }
+        _activeReshardingOperations.insert(reshardingUUID);
+    }
+
     if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyStarted.fetchAndAdd(1);
     }
+
     Base::onStarted();
 }
 
-void ReshardingCumulativeMetrics::onSuccess(bool isSameKeyResharding) {
+void ReshardingCumulativeMetrics::onSuccess(bool isSameKeyResharding, const UUID& reshardingUUID) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        if (!_activeReshardingOperations.contains(reshardingUUID)) {
+            return;
+        }
+        _activeReshardingOperations.erase(reshardingUUID);
+    }
+
     if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeySucceeded.fetchAndAdd(1);
     }
+
     Base::onSuccess();
 }
 
-void ReshardingCumulativeMetrics::onFailure(bool isSameKeyResharding) {
+void ReshardingCumulativeMetrics::onFailure(bool isSameKeyResharding, const UUID& reshardingUUID) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        if (!_activeReshardingOperations.contains(reshardingUUID)) {
+            return;
+        }
+        _activeReshardingOperations.erase(reshardingUUID);
+    }
+
     if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyFailed.fetchAndAdd(1);
     }
+
     Base::onFailure();
 }
 
-void ReshardingCumulativeMetrics::onCanceled(bool isSameKeyResharding) {
+void ReshardingCumulativeMetrics::onCanceled(bool isSameKeyResharding, const UUID& reshardingUUID) {
+    {
+        stdx::lock_guard<stdx::mutex> lk(_activeReshardingOperationsMutex);
+        if (!_activeReshardingOperations.contains(reshardingUUID)) {
+            return;
+        }
+        _activeReshardingOperations.erase(reshardingUUID);
+    }
+
     if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyCancelled.fetchAndAdd(1);
     }
+
     Base::onCanceled();
 }
 

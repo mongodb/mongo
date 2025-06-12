@@ -360,19 +360,19 @@ void ReshardingMetrics::updateRecipientCtx(RecipientShardContext& recipientCtx) 
 }
 
 void ReshardingMetrics::onStarted() {
-    getReshardingCumulativeMetrics()->onStarted(_isSameKeyResharding.load());
+    getReshardingCumulativeMetrics()->onStarted(_isSameKeyResharding.load(), _instanceId);
 }
 
 void ReshardingMetrics::onSuccess() {
-    getReshardingCumulativeMetrics()->onSuccess(_isSameKeyResharding.load());
+    getReshardingCumulativeMetrics()->onSuccess(_isSameKeyResharding.load(), _instanceId);
 }
 
 void ReshardingMetrics::onFailure() {
-    getReshardingCumulativeMetrics()->onFailure(_isSameKeyResharding.load());
+    getReshardingCumulativeMetrics()->onFailure(_isSameKeyResharding.load(), _instanceId);
 }
 
 void ReshardingMetrics::onCanceled() {
-    getReshardingCumulativeMetrics()->onCanceled(_isSameKeyResharding.load());
+    getReshardingCumulativeMetrics()->onCanceled(_isSameKeyResharding.load(), _instanceId);
 }
 
 void ReshardingMetrics::setIsSameKeyResharding(bool isSameKeyResharding) {

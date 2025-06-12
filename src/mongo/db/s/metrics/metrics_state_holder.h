@@ -57,6 +57,10 @@ public:
 
     template <typename T>
     void onStateTransition(T before, T after) {
+        if (_state.load() != before) {
+            // We should only update the state if it matches the expected 'before' state.
+            return;
+        }
         setState(after);
         _cumulativeMetrics->template onStateTransition<T>(before, after);
     }
