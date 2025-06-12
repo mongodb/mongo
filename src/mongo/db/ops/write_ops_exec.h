@@ -193,7 +193,8 @@ void recordUpdateResultInOpDebug(const UpdateResult& updateResult, OpDebug* opDe
  * Requires that parsedUpdate.hasParsedQuery() is true.
  */
 bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
-                                      const DuplicateKeyErrorInfo& errorInfo);
+                                      const DuplicateKeyErrorInfo& errorInfo,
+                                      int retryAttempts);
 
 /**
  * Returns an InsertCommandReply if the timeseries writes succeeded.
