@@ -714,5 +714,17 @@ boost::optional<int> getIndexCount(OperationContext* opCtx, const NamespaceStrin
     return indexCount;
 }
 
+double calculateExponentialMovingAverage(double prevAvg, double currVal, double smoothingFactor) {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "The smoothing factor must be greater than 0 but it is equal to "
+                          << smoothingFactor,
+            smoothingFactor > 0);
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "The smoothing factor must be less than 1 but it is equal to "
+                          << smoothingFactor,
+            smoothingFactor < 1);
+    return (1 - smoothingFactor) * prevAvg + smoothingFactor * currVal;
+}
+
 }  // namespace resharding
 }  // namespace mongo

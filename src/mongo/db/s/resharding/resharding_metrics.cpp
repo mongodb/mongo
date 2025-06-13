@@ -41,6 +41,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -274,6 +275,14 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const {
 
 void ReshardingMetrics::restoreRecipientSpecificFields(
     const ReshardingRecipientDocument& document) {
+    const auto& donorShards = document.getDonorShards();
+    std::vector<ShardId> donorShardIds(donorShards.size());
+    std::transform(donorShards.begin(),
+                   donorShards.end(),
+                   donorShardIds.begin(),
+                   [](auto donorShard) { return donorShard.getShardId(); });
+    registerDonors(donorShardIds);
+
     auto metrics = document.getMetrics();
     if (!metrics) {
         return;

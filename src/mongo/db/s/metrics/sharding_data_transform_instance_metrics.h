@@ -69,6 +69,31 @@ public:
     using TimedPhaseNameMap = resharding_metrics::PhaseDurationTracker::TimedPhaseNameMap;
     using PhaseEnum = resharding_metrics::TimedPhase;
 
+    /**
+     * To be used by recipients only. Tracks the exponential moving average of the time it takes for
+     * a recipient to fetch an oplog entry from a donor and apply an oplog entry after it has been
+     * fetched.
+     */
+    struct OplogLatencyMetrics {
+    public:
+        OplogLatencyMetrics(ShardId donorShardId);
+
+        void updateAverageTimeToFetch(Milliseconds timeToFetch);
+        void updateAverageTimeToApply(Milliseconds timeToApply);
+
+        boost::optional<Milliseconds> getAverageTimeToFetch() const;
+        boost::optional<Milliseconds> getAverageTimeToApply() const;
+
+    private:
+        const ShardId _donorShardId;
+
+        mutable stdx::mutex _timeToFetchMutex;
+        boost::optional<Milliseconds> _avgTimeToFetch;
+
+        mutable stdx::mutex _timeToApplyMutex;
+        boost::optional<Milliseconds> _avgTimeToApply;
+    };
+
     ShardingDataTransformInstanceMetrics(UUID instanceId,
                                          BSONObj originalCommand,
                                          NamespaceString sourceNs,
@@ -150,6 +175,41 @@ public:
     void onDeleteApplied();
     void onOplogEntriesFetched(int64_t numEntries);
     void onOplogEntriesApplied(int64_t numEntries);
+
+    /**
+     * To be used by recipients only. Registers the donors with the given shard ids. The donor
+     * registration must be done exactly once and before the oplog fetchers and appliers start.
+     * Throws an error if any of the criteria are violated.
+     */
+    void registerDonors(const std::vector<ShardId>& donorShardIds);
+
+    /**
+     * Updates the exponential moving average of the time it takes to fetch an oplog entry from the
+     * given donor. Throws an error if the donor has not been registered.
+     */
+    void updateAverageTimeToFetchOplogEntries(const ShardId& donorShardId,
+                                              Milliseconds timeToFetch);
+
+    /**
+     * Updates the exponential moving average of the time it takes to apply an oplog entry after it
+     * has been fetched from the given donor. Throws an error if the donor has not been registered.
+     */
+    void updateAverageTimeToApplyOplogEntries(const ShardId& donorShardId,
+                                              Milliseconds timeToApply);
+
+    /**
+     * Returns the exponential moving average of the time it takes to fetch an oplog entry from the
+     * given donor. Throws an error if the donor has not been registered.
+     */
+    boost::optional<Milliseconds> getAverageTimeToFetchOplogEntries(
+        const ShardId& donorShardId) const;
+
+    /**
+     * Returns the exponential moving average of the time it takes to apply an oplog entry after it
+     * has been fetched from the given donor. Throws an error if the donor has not been registered.
+     */
+    boost::optional<Milliseconds> getAverageTimeToApplyOplogEntries(
+        const ShardId& donorShardId) const;
 
     void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);
@@ -266,6 +326,15 @@ private:
     AtomicWord<int64_t> _deletesApplied{0};
     AtomicWord<int64_t> _oplogEntriesApplied{0};
     AtomicWord<int64_t> _oplogEntriesFetched{0};
+
+    // To be used by recipients only. This map stores the OplogLatencyMetrics for each donor that a
+    // recipient is copying data from. The map is populated by 'registerDonors' before the oplog
+    // fetchers and appliers start running. After that, no inserting or erasing is permitted since
+    // this map is not protected by a mutex. The rationale for this setup is to avoid unnecessary
+    // lock contention by enabling the oplog fetchers and appliers for different donors to update
+    // the metrics without needing to take the mutex for the map, in addition to the mutex for their
+    // respective OplogLatencyMetrics.
+    std::map<ShardId, std::unique_ptr<OplogLatencyMetrics>> _oplogLatencyMetrics;
 
     resharding_metrics::PhaseDurationTracker _phaseDurations;
 };

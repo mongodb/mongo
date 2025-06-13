@@ -350,6 +350,20 @@ server_parameters:
         default: true
         redact: false
 
+    reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor:
+        description:
+            The smoothing factor for the exponential moving average calculation for the remaining
+            time estimate on a resharding recipient. The factor ranges between 0 and 1. The closer
+            to 1 it is, the more weight is given to recent data points.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<double>
+        cpp_varname: gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
+        default: 0.9
+        validator:
+            gt: 0
+            lt: 1
+        redact: false
+
     reshardingCoordinatorQuiescePeriodMillis:
         description: >-
             Controls the amount of time a resharding operation will remain in a quiesced state on

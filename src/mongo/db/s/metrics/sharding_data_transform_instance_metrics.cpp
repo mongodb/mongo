@@ -33,6 +33,8 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -347,6 +349,62 @@ void ShardingDataTransformInstanceMetrics::onOplogEntriesApplied(int64_t numEntr
     getTypedCumulativeMetrics()->onOplogEntriesApplied(numEntries);
 }
 
+void ShardingDataTransformInstanceMetrics::registerDonors(
+    const std::vector<ShardId>& donorShardIds) {
+    tassert(10626500,
+            str::stream() << "Only recipients can register donors",
+            _role == Role::kRecipient);
+    tassert(10626501,
+            str::stream() << "Cannot register donors multiple times",
+            _oplogLatencyMetrics.empty());
+    for (auto donorShardId : donorShardIds) {
+        _oplogLatencyMetrics.emplace(donorShardId,
+                                     std::make_unique<OplogLatencyMetrics>(donorShardId));
+    }
+}
+
+void ShardingDataTransformInstanceMetrics::updateAverageTimeToFetchOplogEntries(
+    const ShardId& donorShardId, Milliseconds timeToFetch) {
+    auto it = _oplogLatencyMetrics.find(donorShardId);
+    tassert(10626502,
+            str::stream() << "Cannot update the average time to fetch oplog entries for '"
+                          << donorShardId << "' since it has not been registered",
+            it != _oplogLatencyMetrics.end());
+    it->second->updateAverageTimeToFetch(timeToFetch);
+}
+
+void ShardingDataTransformInstanceMetrics::updateAverageTimeToApplyOplogEntries(
+    const ShardId& donorShardId, Milliseconds timeToApply) {
+    auto it = _oplogLatencyMetrics.find(donorShardId);
+    tassert(10626504,
+            str::stream() << "Cannot update the average time to apply oplog entries for '"
+                          << donorShardId << "' since it has not been registered",
+            it != _oplogLatencyMetrics.end());
+    it->second->updateAverageTimeToApply(timeToApply);
+}
+
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::getAverageTimeToFetchOplogEntries(
+    const ShardId& donorShardId) const {
+    auto it = _oplogLatencyMetrics.find(donorShardId);
+    tassert(10626503,
+            str::stream() << "Cannot get the average time to fetch oplog entries for '"
+                          << donorShardId << "' since it has not been registered",
+            it != _oplogLatencyMetrics.end());
+    return it->second->getAverageTimeToFetch();
+}
+
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::getAverageTimeToApplyOplogEntries(
+    const ShardId& donorShardId) const {
+    auto it = _oplogLatencyMetrics.find(donorShardId);
+    tassert(10626505,
+            str::stream() << "Cannot get the average time to apply oplog entries for '"
+                          << donorShardId << "' since it has not been registered",
+            it != _oplogLatencyMetrics.end());
+    return it->second->getAverageTimeToApply();
+}
+
 void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogFetching(
     Milliseconds elapsed) {
     getTypedCumulativeMetrics()->onBatchRetrievedDuringOplogFetching(elapsed);
@@ -430,6 +488,53 @@ void ShardingDataTransformInstanceMetrics::restoreOplogEntriesFetched(int64_t co
 
 void ShardingDataTransformInstanceMetrics::restoreOplogEntriesApplied(int64_t count) {
     _oplogEntriesApplied.store(count);
+}
+
+ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::OplogLatencyMetrics(ShardId donorShardId)
+    : _donorShardId(donorShardId) {}
+
+void ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::updateAverageTimeToFetch(
+    Milliseconds timeToFetch) {
+    stdx::lock_guard<stdx::mutex> lk(_timeToFetchMutex);
+
+    _avgTimeToFetch = [&]() -> Milliseconds {
+        if (!_avgTimeToFetch) {
+            return timeToFetch;
+        }
+        return Milliseconds{(int)resharding::calculateExponentialMovingAverage(
+            _avgTimeToFetch->count(),
+            timeToFetch.count(),
+            resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
+                .load())};
+    }();
+}
+
+void ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::updateAverageTimeToApply(
+    Milliseconds timeToApply) {
+    stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
+
+    _avgTimeToApply = [&]() -> Milliseconds {
+        if (!_avgTimeToApply) {
+            return timeToApply;
+        }
+        return Milliseconds{(int)resharding::calculateExponentialMovingAverage(
+            _avgTimeToApply->count(),
+            timeToApply.count(),
+            resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor
+                .load())};
+    }();
+}
+
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToFetch() const {
+    stdx::lock_guard<stdx::mutex> lk(_timeToFetchMutex);
+    return _avgTimeToFetch;
+}
+
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToApply() const {
+    stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
+    return _avgTimeToApply;
 }
 
 }  // namespace mongo

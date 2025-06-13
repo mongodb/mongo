@@ -499,6 +499,46 @@ TEST_F(ReshardingUtilTest, EmptyDemoModeReshardCollectionRequest) {
               gReshardingMinimumOperationDurationMillis.load());
 }
 
+TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageSmoothingFactorLessThanZero) {
+    ASSERT_THROWS_CODE(
+        calculateExponentialMovingAverage(0, 1, -0.1), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageSmoothingFactorEqualToZero) {
+    ASSERT_THROWS_CODE(
+        calculateExponentialMovingAverage(0, 1, 0), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageSmoothingFactorEqualToOne) {
+    ASSERT_THROWS_CODE(
+        calculateExponentialMovingAverage(0, 1, 1), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageSmoothingFactorEqualGreaterThanOne) {
+    ASSERT_THROWS_CODE(
+        calculateExponentialMovingAverage(0, 1, 1.1), DBException, ErrorCodes::InvalidOptions);
+}
+
+TEST_F(ReshardingUtilTest, CalculateExponentialMovingAverageBasic) {
+    auto smoothFactor = 0.75;
+
+    auto val0 = 1;
+    auto avg0 = calculateExponentialMovingAverage(0, val0, smoothFactor);
+    ASSERT_EQ(avg0, 0.75);
+
+    auto val1 = 10.5;
+    auto avg1 = calculateExponentialMovingAverage(avg0, val1, smoothFactor);
+    ASSERT_EQ(avg1, (1 - smoothFactor) * avg0 + smoothFactor * val1);
+
+    auto val2 = -0.2;
+    auto avg2 = calculateExponentialMovingAverage(avg1, val2, smoothFactor);
+    ASSERT_EQ(avg2, (1 - smoothFactor) * avg1 + smoothFactor * val2);
+
+    auto val3 = 0;
+    auto avg3 = calculateExponentialMovingAverage(avg2, val3, smoothFactor);
+    ASSERT_EQ(avg3, (1 - smoothFactor) * avg2 + smoothFactor * val3);
+}
+
 class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {
 
 protected:

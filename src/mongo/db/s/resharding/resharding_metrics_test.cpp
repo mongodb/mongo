@@ -40,7 +40,9 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 
 #include <algorithm>
@@ -229,6 +231,10 @@ public:
             section,
             fieldName);
     }
+
+protected:
+    ShardId shardId0{"shard0"};
+    ShardId shardId1{"shard1"};
 };
 
 TEST_F(ReshardingMetricsTest, ReportForCurrentOpShouldHaveReshardingMetricsDescription) {
@@ -480,6 +486,159 @@ TEST_F(ReshardingMetricsTest, RecipientRestoreFetchedOplogEntries) {
     metrics->restoreExternallyTrackedRecipientFields(external);
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("oplogEntriesFetched"), 50);
+}
+
+TEST_F(ReshardingMetricsTest, RecipientCanRegisterDonors) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->registerDonors({shardId0});
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   DonorCannotRegisterDonors,
+                   "Tripwire assertion.*10626500") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kDonor);
+    metrics->registerDonors({shardId0});
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CoordinatorCannotRegisterDonors,
+                   "Tripwire assertion.*10626500") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+    metrics->registerDonors({shardId0});
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CannotRegisterDonorsMultipleTimes,
+                   "Tripwire assertion.*10626501") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->registerDonors({shardId0});
+    metrics->registerDonors({shardId0});
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CannotGetAverageTimeToFetchForUnregisteredDonor,
+                   "Tripwire assertion.*10626503") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->getAverageTimeToFetchOplogEntries(shardId0);
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CannotUpdateAverageTimeToFetchForUnregisteredDonor,
+                   "Tripwire assertion.*10626502") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    auto timeToFetch0 = Milliseconds(100);
+    metrics->updateAverageTimeToFetchOplogEntries(shardId0, timeToFetch0);
+}
+
+TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToFetchBasic) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->registerDonors({shardId0, shardId1});
+
+    auto smoothingFactor = 0.7;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    ASSERT_FALSE(metrics->getAverageTimeToFetchOplogEntries(shardId0));
+    ASSERT_FALSE(metrics->getAverageTimeToFetchOplogEntries(shardId1));
+
+    // Update the average for shard0 only.
+
+    auto shard0TimeToFetch0 = Milliseconds(100);
+    metrics->updateAverageTimeToFetchOplogEntries(shardId0, shard0TimeToFetch0);
+
+    auto expectedShard0AvgTimeToFetch0 = shard0TimeToFetch0;
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId0), expectedShard0AvgTimeToFetch0);
+    ASSERT_FALSE(metrics->getAverageTimeToFetchOplogEntries(shardId1));
+
+    auto shard0TimeToFetch1 = Milliseconds(50);
+    metrics->updateAverageTimeToFetchOplogEntries(shardId0, shard0TimeToFetch1);
+
+    auto expectedShard0AvgTimeToFetch1 =
+        Milliseconds((int)resharding::calculateExponentialMovingAverage(
+            expectedShard0AvgTimeToFetch0.count(), shard0TimeToFetch1.count(), smoothingFactor));
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId0), expectedShard0AvgTimeToFetch1);
+    ASSERT_FALSE(metrics->getAverageTimeToFetchOplogEntries(shardId1));
+
+    // Update the average for shard1 only.
+
+    auto shard1TimeToFetch0 = Milliseconds(1000);
+    metrics->updateAverageTimeToFetchOplogEntries(shardId1, shard1TimeToFetch0);
+
+    auto expectedShard1AvgTimeToFetch0 = shard1TimeToFetch0;
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId0), expectedShard0AvgTimeToFetch1);
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId1), expectedShard1AvgTimeToFetch0);
+
+    auto shard1TimeToFetch1 = Milliseconds(5);
+    metrics->updateAverageTimeToFetchOplogEntries(shardId1, shard1TimeToFetch1);
+
+    auto expectedShard1AvgTimeToFetch1 =
+        Milliseconds((int)resharding::calculateExponentialMovingAverage(
+            expectedShard1AvgTimeToFetch0.count(), shard1TimeToFetch1.count(), smoothingFactor));
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId0), expectedShard0AvgTimeToFetch1);
+    ASSERT_EQ(metrics->getAverageTimeToFetchOplogEntries(shardId1), expectedShard1AvgTimeToFetch1);
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CannotGetAverageTimeToApplyForUnregisteredDonor,
+                   "Tripwire assertion.*10626505") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->getAverageTimeToApplyOplogEntries(shardId0);
+}
+
+DEATH_TEST_REGEX_F(ReshardingMetricsTest,
+                   CannotUpdateAverageTimeToApplyForUnregisteredDonor,
+                   "Tripwire assertion.*10626504") {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    auto timeToApply0 = Milliseconds(100);
+    metrics->updateAverageTimeToApplyOplogEntries(shardId0, timeToApply0);
+}
+
+TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToApplyBasic) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    metrics->registerDonors({shardId0, shardId1});
+
+    auto smoothingFactor = 0.8;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    ASSERT_FALSE(metrics->getAverageTimeToApplyOplogEntries(shardId0));
+    ASSERT_FALSE(metrics->getAverageTimeToApplyOplogEntries(shardId1));
+
+    // Update the average for shard0 only.
+
+    auto shard0TimeToApply0 = Milliseconds(100);
+    metrics->updateAverageTimeToApplyOplogEntries(shardId0, shard0TimeToApply0);
+
+    auto expectedShard0AvgTimeToApply0 = shard0TimeToApply0;
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId0), expectedShard0AvgTimeToApply0);
+    ASSERT_FALSE(metrics->getAverageTimeToApplyOplogEntries(shardId1));
+
+    auto shard0TimeToApply1 = Milliseconds(50);
+    metrics->updateAverageTimeToApplyOplogEntries(shardId0, shard0TimeToApply1);
+
+    auto expectedShard0AvgTimeToApply1 =
+        Milliseconds((int)resharding::calculateExponentialMovingAverage(
+            expectedShard0AvgTimeToApply0.count(), shard0TimeToApply1.count(), smoothingFactor));
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId0), expectedShard0AvgTimeToApply1);
+    ASSERT_FALSE(metrics->getAverageTimeToApplyOplogEntries(shardId1));
+
+    // Update the average for shard1 only.
+
+    auto shard1TimeToApply0 = Milliseconds(1000);
+    metrics->updateAverageTimeToApplyOplogEntries(shardId1, shard1TimeToApply0);
+
+    auto expectedShard1AvgTimeToApply0 = shard1TimeToApply0;
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId0), expectedShard0AvgTimeToApply1);
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId1), expectedShard1AvgTimeToApply0);
+
+    auto shard1TimeToApply1 = Milliseconds(5);
+    metrics->updateAverageTimeToApplyOplogEntries(shardId1, shard1TimeToApply1);
+
+    auto expectedShard1AvgTimeToApply1 =
+        Milliseconds((int)resharding::calculateExponentialMovingAverage(
+            expectedShard1AvgTimeToApply0.count(), shard1TimeToApply1.count(), smoothingFactor));
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId0), expectedShard0AvgTimeToApply1);
+    ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId1), expectedShard1AvgTimeToApply1);
 }
 
 TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTime) {

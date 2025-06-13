@@ -498,5 +498,13 @@ Milliseconds getMajorityReplicationLag(OperationContext* opCtx);
 // exist.
 boost::optional<int> getIndexCount(OperationContext* opCtx, const NamespaceString& nss);
 
+
+/**
+ * Re-calculates the exponential moving average based on the previous average and the current value.
+ * Please refer to https://en.wikipedia.org/wiki/Exponential_smoothing for the formula. Throws
+ * an error if the smoothing factor is not greater than 0 and less than 1.
+ */
+double calculateExponentialMovingAverage(double prevAvg, double currVal, double smoothingFactor);
+
 }  // namespace resharding
 }  // namespace mongo
