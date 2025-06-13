@@ -66,6 +66,7 @@ Dur floatScaleDuration(double scale, Dur dur) {
 }
 
 void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
+                                                RecoveryUnit& ru,
                                                 StringData opStr,
                                                 const NamespaceStringOrUUID& nssOrUUID,
                                                 const Status& s,
@@ -84,7 +85,7 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
     // Handle as write conflict.
     logAndRecordWriteConflictAndBackoff(
         opCtx, writeConflictAttempts, opStr, s.reason(), NamespaceStringOrUUID(nssOrUUID));
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    ru.abandonSnapshot();
 }
 }  // namespace
 
@@ -133,9 +134,24 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            const NamespaceStringOrUUID& nssOrUUID,
                                            const Status& s,
                                            size_t& writeConflictAttempts) {
+    handleTemporarilyUnavailableException(opCtx,
+                                          *shard_role_details::getRecoveryUnit(opCtx),
+                                          tempUnavailAttempts,
+                                          opStr,
+                                          nssOrUUID,
+                                          s,
+                                          writeConflictAttempts);
+}
+void handleTemporarilyUnavailableException(OperationContext* opCtx,
+                                           RecoveryUnit& ru,
+                                           size_t tempUnavailAttempts,
+                                           StringData opStr,
+                                           const NamespaceStringOrUUID& nssOrUUID,
+                                           const Status& s,
+                                           size_t& writeConflictAttempts) {
     recordTemporarilyUnavailableErrors(opCtx);
 
-    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+    ru.abandonSnapshot();
     temporarilyUnavailableErrors.increment(1);
 
     // Internal operations cannot escape a TUE to the client. Convert it to a write conflict
@@ -218,12 +234,17 @@ void WriteConflictRetryAlgorithm::_handleStorageUnavailable(const Status& status
             break;
         case ErrorCodes::TemporarilyUnavailable:
             ++_tempUnavailableCount;
-            handleTemporarilyUnavailableException(
-                _opCtx, _tempUnavailableCount, _opStr, _nssOrUUID, status, _wceCount);
+            handleTemporarilyUnavailableException(_opCtx,
+                                                  _recoveryUnit(),
+                                                  _tempUnavailableCount,
+                                                  _opStr,
+                                                  _nssOrUUID,
+                                                  status,
+                                                  _wceCount);
             break;
         case ErrorCodes::TransactionTooLargeForCache:
             handleTransactionTooLargeForCacheException(
-                _opCtx, _opStr, _nssOrUUID, status, _wceCount);
+                _opCtx, _recoveryUnit(), _opStr, _nssOrUUID, status, _wceCount);
             ++_wceCount;
             break;
         default:
@@ -247,7 +268,7 @@ void WriteConflictRetryAlgorithm::_handleStorageUnavailable(const Status& status
 void WriteConflictRetryAlgorithm::_handleWriteConflictException(const Status& s) {
     ++_wceCount;
     recordWriteConflict(_opCtx);
-    shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();
+    _recoveryUnit().abandonSnapshot();
     _emitLog(s.reason());
 
     sleepFor(floatScaleDuration(_backoffFactor / _attemptCount, _conflictTime));

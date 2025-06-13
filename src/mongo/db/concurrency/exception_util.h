@@ -88,8 +88,17 @@ void logAndRecordWriteConflictAndBackoff(OperationContext* opCtx,
  * For internal system operations, converts the temporarily unavailable error into a write
  * conflict and handles it, because unlike user operations, the error cannot eventually escape to
  * the client.
+ *
+ * TODO (SERVER-105773): Remove the overload without RecoveryUnit.
  */
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
+                                           size_t tempUnavailAttempts,
+                                           StringData opStr,
+                                           const NamespaceStringOrUUID& nssOrUUID,
+                                           const Status& e,
+                                           size_t& writeConflictAttempts);
+void handleTemporarilyUnavailableException(OperationContext* opCtx,
+                                           RecoveryUnit& ru,
                                            size_t tempUnavailAttempts,
                                            StringData opStr,
                                            const NamespaceStringOrUUID& nssOrUUID,
@@ -110,13 +119,26 @@ public:
     static constexpr double backoffGrowth = 1.1;
 
     WriteConflictRetryAlgorithm(OperationContext* opCtx,
+                                RecoveryUnit& ru,
                                 StringData opStr,
                                 const NamespaceStringOrUUID& nssOrUUID,
                                 boost::optional<size_t> retryLimit)
-        : _opCtx{opCtx}, _opStr{opStr}, _nssOrUUID{nssOrUUID}, _retryLimit{retryLimit} {
+        : _opCtx{opCtx}, _ru(ru), _opStr{opStr}, _nssOrUUID{nssOrUUID}, _retryLimit{retryLimit} {
         invariant(_opCtx);
         invariant(shard_role_details::getLocker(_opCtx));
-        invariant(shard_role_details::getRecoveryUnit(_opCtx));
+    }
+    WriteConflictRetryAlgorithm(OperationContext* opCtx,
+                                std::function<RecoveryUnit&()> ru,
+                                StringData opStr,
+                                const NamespaceStringOrUUID& nssOrUUID,
+                                boost::optional<size_t> retryLimit)
+        : _opCtx{opCtx},
+          _ru(std::move(ru)),
+          _opStr{opStr},
+          _nssOrUUID{nssOrUUID},
+          _retryLimit{retryLimit} {
+        invariant(_opCtx);
+        invariant(shard_role_details::getLocker(_opCtx));
     }
 
     /** Returns whatever `f` returns. */
@@ -164,7 +186,18 @@ private:
     void _handleStorageUnavailable(const Status& e);
     void _handleWriteConflictException(const Status& e);
 
+    RecoveryUnit& _recoveryUnit() const {
+        return visit(
+            OverloadedVisitor{
+                [](std::reference_wrapper<RecoveryUnit> ru) -> RecoveryUnit& { return ru; },
+                [](const std::function<RecoveryUnit&()>& ru) -> RecoveryUnit& {
+                    return ru();
+                }},
+            _ru);
+    }
+
     OperationContext* const _opCtx;
+    std::variant<std::reference_wrapper<RecoveryUnit>, std::function<RecoveryUnit&()>> _ru;
     const StringData _opStr;
     const NamespaceStringOrUUID& _nssOrUUID;
     const boost::optional<size_t> _retryLimit;
@@ -191,14 +224,30 @@ private:
  * If we are already in a WriteUnitOfWork, we assume that we are being called within a
  * WriteConflictException retry loop up the call stack. Hence, this retry loop is reduced to an
  * invocation of the argument function f without any exception handling and retry logic.
+ *
+ * TODO (SERVER-105773): Remove the overload without RecoveryUnit.
  */
+template <typename F>
+auto writeConflictRetry(OperationContext* opCtx,
+                        RecoveryUnit& ru,
+                        StringData opStr,
+                        const NamespaceStringOrUUID& nssOrUUID,
+                        F&& f,
+                        boost::optional<size_t> retryLimit = boost::none) {
+    return WriteConflictRetryAlgorithm{opCtx, ru, opStr, nssOrUUID, retryLimit}(std::forward<F>(f));
+}
 template <typename F>
 auto writeConflictRetry(OperationContext* opCtx,
                         StringData opStr,
                         const NamespaceStringOrUUID& nssOrUUID,
                         F&& f,
                         boost::optional<size_t> retryLimit = boost::none) {
-    return WriteConflictRetryAlgorithm{opCtx, opStr, nssOrUUID, retryLimit}(std::forward<F>(f));
+    return WriteConflictRetryAlgorithm{
+        opCtx,
+        [opCtx]() -> RecoveryUnit& { return *shard_role_details::getRecoveryUnit(opCtx); },
+        opStr,
+        nssOrUUID,
+        retryLimit}(std::forward<F>(f));
 }
 
 }  // namespace mongo
