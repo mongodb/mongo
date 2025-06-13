@@ -351,12 +351,17 @@ ScriptingFunction Scope::createFunction(const char* code) {
 }
 
 namespace JSFiles {
-extern const JSFile collection;
+extern const JSFile bulk_api;
+extern const JSFile bulk_api_global;
 extern const JSFile check_log;
+extern const JSFile check_log_global;
+extern const JSFile collection;
 extern const JSFile crud_api;
 extern const JSFile db;
+extern const JSFile db_global;
 extern const JSFile explain_query;
 extern const JSFile explainable;
+extern const JSFile explainable_global;
 extern const JSFile mongo;
 extern const JSFile prelude;
 extern const JSFile session;
@@ -364,25 +369,33 @@ extern const JSFile query;
 extern const JSFile utils;
 extern const JSFile utils_sh;
 extern const JSFile utils_auth;
-extern const JSFile bulk_api;
 extern const JSFile error_codes;
 }  // namespace JSFiles
 
 void Scope::execCoreFiles() {
+    // modules
+    execSetup(JSFiles::bulk_api);
+    execSetup(JSFiles::check_log);
+    execSetup(JSFiles::db);
+    execSetup(JSFiles::explainable);
+
+    // globals
+    execSetup(JSFiles::bulk_api_global);
+    execSetup(JSFiles::check_log_global);
+    execSetup(JSFiles::db_global);
+    execSetup(JSFiles::explainable_global);
+
+    // scripts
     execSetup(JSFiles::utils);
     execSetup(JSFiles::utils_sh);
     execSetup(JSFiles::utils_auth);
-    execSetup(JSFiles::db);
     execSetup(JSFiles::mongo);
     execSetup(JSFiles::session);
     execSetup(JSFiles::query);
-    execSetup(JSFiles::bulk_api);
     execSetup(JSFiles::error_codes);
-    execSetup(JSFiles::check_log);
     execSetup(JSFiles::collection);
     execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
-    execSetup(JSFiles::explainable);
 }
 
 void Scope::execPrelude() {

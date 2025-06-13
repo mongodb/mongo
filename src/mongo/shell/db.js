@@ -1,17 +1,12 @@
 // db.js
-var DB;
-
-(function() {
 
 var _defaultWriteConcern = {w: 'majority', wtimeout: 10 * 60 * 1000};
 const kWireVersionSupportingScramSha256Fallback = 15;
 
-if (DB === undefined) {
-    DB = function(mongo, name) {
-        this._mongo = mongo;
-        this._name = name;
-    };
-}
+const DB = globalThis.DB ?? function(mongo, name) {
+    this._mongo = mongo;
+    this._name = name;
+};
 
 /**
  * Rotate certificates, CRLs, and CA files.
@@ -1725,7 +1720,6 @@ DB.prototype.getDatabasePrimaryShardId = function() {
     }
     return x.primary;
 };
-}());
 
 // Checking the server buildinfo requires the client to be authenticated
 DB.prototype.getServerBuildInfo = function() {
@@ -1783,3 +1777,5 @@ DB.prototype.getServerBuildInfo = function() {
 
     return new BuildInfo(assert.commandWorked(this._runCommandWithoutApiStrict({buildinfo: 1})));
 };
+
+export {DB};
