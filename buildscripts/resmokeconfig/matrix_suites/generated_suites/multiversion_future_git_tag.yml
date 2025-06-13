@@ -9,7 +9,7 @@
 executor:
   archive:
     tests:
-    - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
+    - src/mongo/db/modules/enterprise/jstests/hot_backups_multiversion/*.js
     - src/mongo/db/modules/enterprise/jstests/search/multiVersion/*.js
   config:
     shell_options:
@@ -32,6 +32,6 @@ selector:
   - featureFlagSpoon
   roots:
   - jstests/multiVersion/**/*.js
-  - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
+  - src/mongo/db/modules/*/jstests/hot_backups_multiversion/*.js
   - src/mongo/db/modules/*/jstests/search/multiVersion/*.js
 test_kind: js_test
