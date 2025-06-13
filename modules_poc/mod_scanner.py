@@ -273,6 +273,12 @@ def get_visibility(
         if terms:
             alt = "::".join(terms)
             assert attr in ("use_replacement",)
+            # Must specify an alternate API
+            if not alt or alt.isspace():
+                perr_exit(
+                    pretty_location(c.location)
+                    + ": MONGO_MOD_USE_REPLACEMENT() must specify the replacement API"
+                )
         else:
             alt = None
             assert attr in (
