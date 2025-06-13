@@ -252,8 +252,6 @@ protected:
         int64_t newValueLength{0};
     };
 
-    RecoveryUnit& getRecoveryUnit(RecoveryUnit&) const;
-
     /**
      * Deletes the specified record from this WiredTiger table. Resets 'opStats' before populating
      * it with statistics corresponding to this operation.
@@ -515,8 +513,6 @@ public:
     }
 
 protected:
-    virtual RecoveryUnit& getRecoveryUnit() const;
-
     /**
      * Resets the cursor.
      */
