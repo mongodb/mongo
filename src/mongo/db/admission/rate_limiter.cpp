@@ -32,6 +32,7 @@
 #include <folly/TokenBucket.h>
 
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/scopeguard.h"
 
@@ -123,6 +124,10 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
         // don't advance the mock clock before the sleep deadline is calculated.
         Date_t deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() + napTime;
         if (auto status = _impl->enqueue(); !status.isOK()) {
+            {
+                auto lk = _impl->rwMutex.readLock();
+                _impl->tokenBucket.returnTokens(1.0);
+            }
             _impl->stats.rejectedAdmissions.increment();
             return status;
         }
@@ -157,6 +162,7 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
 
     _impl->stats.successfulAdmissions.increment();
     _impl->stats.averageTimeQueuedMicros.addSample(waitForTokenSecs * 1'000'000);
+
     return Status::OK();
 }
 
@@ -204,6 +210,11 @@ void RateLimiter::appendStats(BSONObjBuilder* bob) const {
 double RateLimiter::tokensAvailable() const {
     auto lk = _impl->rwMutex.readLock();
     return _impl->tokenBucket.available();
+}
+
+double RateLimiter::tokenBalance() const {
+    auto lk = _impl->rwMutex.readLock();
+    return _impl->tokenBucket.balance();
 }
 
 int64_t RateLimiter::queued() const {

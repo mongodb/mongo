@@ -69,32 +69,19 @@ const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
     [](ServiceContext* serviceContext) {
     }};
 
+auto makeClientsWithOpCtxs(ServiceContext* svcCtx, size_t numOps) {
+    std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
+        clientsWithOps;
+    for (size_t i = 0; i < numOps; i++) {
+        auto client = svcCtx->makeClient(fmt::format("test client {}", i));
+        auto opCtx = client->makeOperationContext();
+        clientsWithOps.emplace_back(std::move(client), std::move(opCtx));
+    }
+
+    return clientsWithOps;
+}
+
 class RateLimiterTest : public ServiceContextTest {
-public:
-    void setUp() {
-        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
-    }
-
-    auto makeClientsWithOpCtxs(size_t numOps) {
-        std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
-            clientsWithOps;
-        for (size_t i = 0; i < numOps; i++) {
-            auto client = getServiceContext()->makeClient(fmt::format("test client {}", i));
-            auto opCtx = client->makeOperationContext();
-            clientsWithOps.emplace_back(std::move(client), std::move(opCtx));
-        }
-
-        return clientsWithOps;
-    }
-
-    /**
-     * Note that the mocked clock in this test applies to sleeping on the opCtx rather than to the
-     * internal folly::TokenBucket's calculations.
-     */
-    void advanceTime(Milliseconds d) {
-        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(d);
-    }
-
 private:
     unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
                                                           logv2::LogSeverity::Debug(4)};
@@ -126,129 +113,68 @@ TEST_F(RateLimiterTest, InvalidBurstSize) {
         rateLimiter.updateRateParameters(1.0, 0), DBException, ErrorCodes::InvalidOptions);
 }
 
-// Verify that a newly initialized RateLimiter can immediately dispense up to its burst rate of
-// tokens, and thereafter releases tokens at its configured rate.
-// If multiple threads concurrently request tokens, then some of the threads will be admitted
-// immediately, while the remainder will be admitted as tokens become available.
-TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
+TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        const int maxTokens = 2;
-        const int refreshRate = 4;
-        const int64_t numThreads = 10;
-        const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
+        constexpr double burstSize = 1.0;
+        constexpr double refreshRate = 2.0;
+        constexpr int maxQueueDepth = 4;
+        constexpr int numThreads = 10;
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), numThreads + 1);
 
-        RateLimiter rateLimiter(refreshRate, maxTokens, INT_MAX);
+        RateLimiter rateLimiter(
+            refreshRate, burstSize, maxQueueDepth, "RateLimitIsValidAfterQueueing");
+        auto tickSource = getServiceContext()->getTickSource();
 
-        auto clientsWithOps = makeClientsWithOpCtxs(numThreads);
-
-        stdx::mutex mutex;
-        stdx::condition_variable cv;
-
-        std::vector<double> tokenAcquisitionTimes;
-
-        std::vector<unittest::JoinThread> threads;
-        for (int64_t i = 0; i < numThreads; i++) {
-            threads.emplace_back(monitor.spawn([&, threadNum = i]() {
-                ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[threadNum].second.get()));
-                stdx::lock_guard lg(mutex);
-                LOGV2(10440801,
-                      "Acquired token",
-                      "threadNum"_attr = threadNum,
-                      "mockClockNow"_attr =
-                          getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
-                tokenAcquisitionTimes.emplace_back(
-                    getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
-                cv.notify_one();
-            }));
-        }
-
-        // Make sure the initial burstRate fulfills the first requests
+        auto startTicks = tickSource->getTicks();
+        AtomicWord<size_t> numAdmitted{0};
+        AtomicWord<size_t> numRejected{0};
         {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
-            ASSERT_DOES_NOT_THROW(
-                cv.wait(lk, [&] { return (int)tokenAcquisitionTimes.size() == maxTokens; }));
-        }
-
-        // At this point, maxTokens threads have been allowed through. The rest of the threads
-        // are about to be blocked in sleep (or have been already).
-        // Queue timing metric samples have been collected, but they're also zero due to the
-        // burst availability.
-        // Some threads might have been enqueued, but none have been dequeued.
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
-
-        // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
-        // the mock clock.
-        int64_t maxBackoffMillis{5000};
-        int64_t backoffTimeMillis{2};
-        while (rateLimiter.queued() != numThreads - maxTokens &&
-               backoffTimeMillis < maxBackoffMillis) {
-            sleepmillis(backoffTimeMillis);
-            backoffTimeMillis *= backoffTimeMillis;
-        }
-
-        // Until we start moving the mock clock forward, no other requests will be fulfilled and all
-        // other requests will be waiting.
-        ASSERT_EQ(rateLimiter.queued(), numThreads - maxTokens);
-        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
-
-        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
-        ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), numThreads - maxTokens);
-        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
-        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
-
-        // Advancing time less than tokenInterval doesn't cause a token to be acquired.
-        auto smallAdvance = Milliseconds{10};
-        ASSERT_LT(smallAdvance, tokenInterval);
-        advanceTime(smallAdvance);
-        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
-
-        // For each remaining token, ensure that the rate limiter gives out a token every 1000 /
-        // refreshRate milliseconds.
-        // Time out overall after 20 seconds, though, so the test doesn't hang on failure.
-        const auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
-        for (int64_t i = 1; i <= numThreads - maxTokens; i++) {
-            stdx::unique_lock<stdx::mutex> lk(mutex);
-            advanceTime(tokenInterval);
-            // If the cv deadline, which is based on the system (rather than the mock) clock,
-            // passes, we want to explicitly kill all operations to ensure that the test does not
-            // hang and we can diagnose the issue.
-            if (!cv.wait_until(lk, deadline, [&] {
-                    return (int)tokenAcquisitionTimes.size() == maxTokens + i;
-                })) {
-                getServiceContext()->setKillAllOperations();
-                // We re-run this assertion so that proper diagnostics are output.
-                ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens + i);
-            }
-
-            // Metrics will reflect that an enqueued thread woke up and was dequeued, which
-            // takes some measurable (but still possibly zero) amount of time.
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens + i);
-            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), i);
-            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
-        }
-
-        ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
-
-        // Assert that the tokens were acquired at the correct intervals.
-        for (int64_t i = 0; i < numThreads; i++) {
-            if (i < maxTokens) {
-                ASSERT_APPROX_EQUAL(tokenAcquisitionTimes[i], 1, 1e-3);
-            } else {
-                ASSERT_APPROX_EQUAL(
-                    tokenAcquisitionTimes[i],
-                    1 + durationCount<Milliseconds>(smallAdvance) +
-                        (((i + 1) - maxTokens) * durationCount<Milliseconds>(tokenInterval)),
-                    1e-3);
+            std::vector<unittest::JoinThread> threads;
+            for (size_t i = 0; i < numThreads; i++) {
+                threads.emplace_back(monitor.spawn([&, threadNum = i]() {
+                    if (rateLimiter.acquireToken(clientsWithOps[threadNum].second.get()).isOK()) {
+                        LOGV2(10614903, "Acquired token", "threadNum"_attr = threadNum);
+                        numAdmitted.fetchAndAdd(1);
+                    } else {
+                        LOGV2(10614904,
+                              "Token acquisition request rejected",
+                              "threadNum"_attr = threadNum);
+                        numRejected.fetchAndAdd(1);
+                    }
+                }));
             }
         }
 
-        // By the end, there was one attempt per thread.
-        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), numThreads);
+        // We assert that the approx. correct amount of time has passed.
+        auto expectedElapsedMillis = (maxQueueDepth / refreshRate) * 1000;
+        Milliseconds elapsed =
+            tickSource->ticksTo<Milliseconds>(tickSource->getTicks() - startTicks);
+        LOGV2(10614901,
+              "Elapsed vs. expected elapsed millis",
+              "elapsed"_attr = elapsed,
+              "expected"_attr = expectedElapsedMillis);
+        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(elapsed), expectedElapsedMillis, 100);
+
+        // Once all the threads have joined, we expect that 3 threads were admitted and 2 were
+        // rejected.
+        ASSERT_EQ(numAdmitted.load(), burstSize + maxQueueDepth);
+        ASSERT_EQ(numRejected.load(), numThreads - (burstSize + maxQueueDepth));
+
+        // We also expect the token bucket balance to be ~0, because all threads have waited for the
+        // correct amount of time.
+        ASSERT_APPROX_EQUAL(rateLimiter.tokenBalance(), 0, .1);
+
+        // And finally, a new token acquisition will take approx. 1/refreshRate seconds.
+        auto expectedFinalMillis = (1 / refreshRate) * 1000;
+        auto finalStartTicks = tickSource->getTicks();
+        ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[numThreads].second.get()));
+        Milliseconds finalElapsed =
+            tickSource->ticksTo<Milliseconds>(tickSource->getTicks() - finalStartTicks);
+        LOGV2(10614902,
+              "Elapsed vs. expected elapsed millis",
+              "elapsed"_attr = finalElapsed,
+              "expected"_attr = expectedFinalMillis);
+        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(finalElapsed), expectedFinalMillis, 100);
     });
 }
 
@@ -257,8 +183,8 @@ TEST_F(RateLimiterTest, ConcurrentTokenAcquisitionWithQueueing) {
 // - but there are already the maximum number of threads enqueued.
 TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 1);
-        auto clientsWithOps = makeClientsWithOpCtxs(3);
+        RateLimiter rateLimiter(.01, 1.0, 1, "RejectOverMaxWaiters");
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 3);
         Notification<void> firstTokenAcquired;
         Notification<void> hasFailed;
         Status status1 = Status::OK();
@@ -291,10 +217,20 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
         // Wait until one of the operations has failed.
         hasFailed.get();
 
-        // Assert that exactly one of the statuses is a TemporarilyUnavailable error.
-        auto unavailableStatus = Status(ErrorCodes::TemporarilyUnavailable, "");
-        ASSERT((status1 == unavailableStatus) ^ (status2 == unavailableStatus));
+        LOGV2(10574302,
+              "At least one thread finished",
+              "status1"_attr = status1,
+              "status2"_attr = status2);
+
+        // Assert that exactly one of the statuses is from rate limiter rejection.
+        ASSERT((status1.code() == ErrorCodes::TemporarilyUnavailable) ^
+               (status2.code() == ErrorCodes::TemporarilyUnavailable));
         ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
+
+        // Assert that the token balance is between 0 and -1, as only one token should have been
+        // borrowed from the bucket.
+        ASSERT_LT(rateLimiter.tokenBalance(), 0);
+        ASSERT_GT(rateLimiter.tokenBalance(), -1);
 
         // Interrupt the other token acquisition.
         getServiceContext()->setKillAllOperations();
@@ -305,8 +241,8 @@ TEST_F(RateLimiterTest, RejectOverMaxWaiters) {
 // otherwise queue are instead rejected.
 TEST_F(RateLimiterTest, QueueingDisabled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, 0);
-        auto clientsWithOps = makeClientsWithOpCtxs(2);
+        RateLimiter rateLimiter(.01, 1.0, 0, "QueueingDisabled");
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
 
         std::vector<unittest::JoinThread> threads;
@@ -323,11 +259,16 @@ TEST_F(RateLimiterTest, QueueingDisabled) {
         threads.emplace_back(monitor.spawn([&]() {
             firstTokenAcquired.get();
             Status token = rateLimiter.acquireToken(clientsWithOps[1].second.get());
+            LOGV2(10574301, "Final token acquisition result", "status"_attr = token);
             ASSERT_EQ(token, Status(ErrorCodes::TemporarilyUnavailable, ""));
 
             ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
             ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 1);
             ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
+
+            // Assert that the token balance is ~0, as only one token should have been
+            // consumed from the bucket.
+            ASSERT_APPROX_EQUAL(rateLimiter.tokenBalance(), 0, .1);
         }));
     });
 }
@@ -336,8 +277,8 @@ TEST_F(RateLimiterTest, QueueingDisabled) {
 // the rate limiter wakes up the thread and returns the appropriate error status.
 TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
-        auto clientsWithOps = makeClientsWithOpCtxs(2);
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationKilled");
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
         std::vector<unittest::JoinThread> threads;
 
@@ -364,6 +305,9 @@ TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
             ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
             ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
             ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+            // Assert that the token balance is ~0, as only one token should have been
+            // consumed from the bucket.
+            ASSERT_APPROX_EQUAL(rateLimiter.tokenBalance(), 0, .1);
         }));
 
         firstTokenAcquired.get();
@@ -371,54 +315,13 @@ TEST_F(RateLimiterTest, InterruptedDueToOperationKilled) {
     });
 }
 
-// Verify that if the sleep within an enqueued thread is interrupted, then the rate limiter
-// returns the error status corresponding to the reason for the interruption.
-TEST_F(RateLimiterTest, InterruptedDueToOperationDeadline) {
-    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
-        auto clientsWithOps = makeClientsWithOpCtxs(2);
-        Notification<void> firstTokenAcquired;
-        std::vector<unittest::JoinThread> threads;
-
-        // Expect the first token acquisition to succeed.
-        threads.emplace_back(monitor.spawn([&]() {
-            ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[0].second.get()));
-            firstTokenAcquired.set();
-        }));
-
-        // The second token acquisition queues until its opCtx deadline passes.
-        clientsWithOps[1].second->setDeadlineByDate(
-            getServiceContext()->getFastClockSource()->now() + Milliseconds(5),
-            ErrorCodes::MaxTimeMSExpired);
-        threads.emplace_back(monitor.spawn([&]() {
-            firstTokenAcquired.get();
-            Status token = rateLimiter.acquireToken(clientsWithOps[1].second.get());
-            ASSERT_EQ(token, Status(ErrorCodes::MaxTimeMSExpired, ""));
-
-            // The first thread was immediately admitted.
-            // The second thread was enqueued, then timed out, and then was dequeued.
-            // The second thread was enqueued for some finite time, so the average queue time
-            // could be greater than zero.
-            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
-            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
-            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
-            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
-            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
-        }));
-
-        firstTokenAcquired.get();
-        advanceTime(Milliseconds(5));
-    });
-}
 
 // This is like the previous two tests, but instead of a client disconnect or a timeout, it's a
 // service shutdown.
 TEST_F(RateLimiterTest, InterruptedDueToKillAllOperations) {
     unittest::threadAssertionMonitoredTest([&](auto& monitor) {
-        RateLimiter rateLimiter(.01, 1.0, INT_MAX);
-        auto clientsWithOps = makeClientsWithOpCtxs(2);
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToKillAllOperations");
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
         Notification<void> firstTokenAcquired;
         Notification<void> secondTokenInterrupted;
         std::vector<unittest::JoinThread> threads;
@@ -466,7 +369,7 @@ TEST_F(RateLimiterTest, InterruptedDueToKillAllOperations) {
 
 // Verify that `RateLimiter::recordExemption()` increments the exemption metric but no others.
 TEST_F(RateLimiterTest, RecordExemption) {
-    RateLimiter rateLimiter(INT_MAX, INT_MAX, INT_MAX);
+    RateLimiter rateLimiter(INT_MAX, INT_MAX, INT_MAX, "RecordExemption");
     rateLimiter.recordExemption();
 
     ASSERT_EQ(rateLimiter.stats().exemptedAdmissions.get(), 1);
@@ -479,5 +382,192 @@ TEST_F(RateLimiterTest, RecordExemption) {
     ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
 }
 
+
+class RateLimiterWithMockClockTest : public ServiceContextTest {
+public:
+    void setUp() override {
+        getServiceContext()->setFastClockSource(std::make_unique<ClockSourceMock>());
+    }
+
+    /**
+     * Note that the mocked clock in this test applies to sleeping on the opCtx rather than to the
+     * internal folly::TokenBucket's calculations.
+     */
+    void advanceTime(Milliseconds d) {
+        static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())->advance(d);
+    }
+
+private:
+    unittest::MinimumLoggedSeverityGuard logSeverityGuard{logv2::LogComponent::kDefault,
+                                                          logv2::LogSeverity::Debug(4)};
+};
+
+// Verify that a newly initialized RateLimiter can immediately dispense up to its burst rate of
+// tokens, and thereafter releases tokens at its configured rate.
+// If multiple threads concurrently request tokens, then some of the threads will be admitted
+// immediately, while the remainder will be admitted as tokens become available.
+TEST_F(RateLimiterWithMockClockTest, ConcurrentTokenAcquisitionWithQueueing) {
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        const int maxTokens = 2;
+        const int refreshRate = 4;
+        const int64_t numThreads = 10;
+        const Milliseconds tokenInterval = Milliseconds(1000) / refreshRate;
+
+        RateLimiter rateLimiter(refreshRate, maxTokens, INT_MAX);
+
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), numThreads);
+
+        Mutex mutex;
+        stdx::condition_variable cv;
+
+        std::vector<double> tokenAcquisitionTimes;
+
+        std::vector<unittest::JoinThread> threads;
+        for (int64_t i = 0; i < numThreads; i++) {
+            threads.emplace_back(monitor.spawn([&, threadNum = i]() {
+                ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[threadNum].second.get()));
+                stdx::lock_guard lg(mutex);
+                LOGV2(10440801,
+                      "Acquired token",
+                      "threadNum"_attr = threadNum,
+                      "mockClockNow"_attr =
+                          getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
+                tokenAcquisitionTimes.emplace_back(
+                    getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch());
+                cv.notify_one();
+            }));
+        }
+
+        // Make sure the initial burstRate fulfills the first requests
+        {
+            stdx::unique_lock<Mutex> lk(mutex);
+            ASSERT_DOES_NOT_THROW(
+                cv.wait(lk, [&] { return (int)tokenAcquisitionTimes.size() == maxTokens; }));
+        }
+
+        // At this point, maxTokens threads have been allowed through. The rest of the threads
+        // are about to be blocked in sleep (or have been already).
+        // Queue timing metric samples have been collected, but they're also zero due to the
+        // burst availability.
+        // Some threads might have been enqueued, but none have been dequeued.
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
+        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
+        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+
+        // Make sure we've enqueued all the remaining waiters so that we don't race with advancing
+        // the mock clock.
+        int64_t maxBackoffMillis{5000};
+        int64_t backoffTimeMillis{2};
+        while (rateLimiter.queued() != numThreads - maxTokens &&
+               backoffTimeMillis < maxBackoffMillis) {
+            sleepmillis(backoffTimeMillis);
+            backoffTimeMillis *= backoffTimeMillis;
+        }
+
+        // Until we start moving the mock clock forward, no other requests will be fulfilled and all
+        // other requests will be waiting.
+        ASSERT_EQ(rateLimiter.queued(), numThreads - maxTokens);
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
+
+        ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens);
+        ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), numThreads - maxTokens);
+        ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 0);
+        ASSERT_EQ(rateLimiter.stats().rejectedAdmissions.get(), 0);
+        ASSERT_EQ(rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+
+        // Advancing time less than tokenInterval doesn't cause a token to be acquired.
+        auto smallAdvance = Milliseconds{10};
+        ASSERT_LT(smallAdvance, tokenInterval);
+        advanceTime(smallAdvance);
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens);
+
+        // For each remaining token, ensure that the rate limiter gives out a token every 1000 /
+        // refreshRate milliseconds.
+        // Time out overall after 20 seconds, though, so the test doesn't hang on failure.
+        const auto deadline = (Date_t::now() + Seconds(20)).toSystemTimePoint();
+        for (int64_t i = 1; i <= numThreads - maxTokens; i++) {
+            stdx::unique_lock<Mutex> lk(mutex);
+            advanceTime(tokenInterval);
+            // If the cv deadline, which is based on the system (rather than the mock) clock,
+            // passes, we want to explicitly kill all operations to ensure that the test does not
+            // hang and we can diagnose the issue.
+            if (!cv.wait_until(lk, deadline, [&] {
+                    return (int)tokenAcquisitionTimes.size() == maxTokens + i;
+                })) {
+                getServiceContext()->setKillAllOperations();
+                // We re-run this assertion so that proper diagnostics are output.
+                ASSERT_EQ((int)tokenAcquisitionTimes.size(), maxTokens + i);
+            }
+
+            // Metrics will reflect that an enqueued thread woke up and was dequeued, which
+            // takes some measurable (but still possibly zero) amount of time.
+            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), maxTokens + i);
+            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), i);
+            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
+            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+        }
+
+        ASSERT_EQ((int)tokenAcquisitionTimes.size(), numThreads);
+
+        // Assert that the tokens were acquired at the correct intervals.
+        for (int64_t i = 0; i < numThreads; i++) {
+            if (i < maxTokens) {
+                ASSERT_APPROX_EQUAL(tokenAcquisitionTimes[i], 1, 1e-3);
+            } else {
+                ASSERT_APPROX_EQUAL(
+                    tokenAcquisitionTimes[i],
+                    1 + durationCount<Milliseconds>(smallAdvance) +
+                        (((i + 1) - maxTokens) * durationCount<Milliseconds>(tokenInterval)),
+                    1e-3);
+            }
+        }
+
+        // By the end, there was one attempt per thread.
+        ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), numThreads);
+    });
+}
+
+// Verify that if the sleep within an enqueued thread is interrupted, then the rate limiter
+// returns the error status corresponding to the reason for the interruption.
+TEST_F(RateLimiterWithMockClockTest, InterruptedDueToOperationDeadline) {
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        RateLimiter rateLimiter(.01, 1.0, INT_MAX, "InterruptedDueToOperationDeadline");
+        auto clientsWithOps = makeClientsWithOpCtxs(getServiceContext(), 2);
+        Notification<void> firstTokenAcquired;
+        std::vector<unittest::JoinThread> threads;
+
+        // Expect the first token acquisition to succeed.
+        threads.emplace_back(monitor.spawn([&]() {
+            ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[0].second.get()));
+            firstTokenAcquired.set();
+        }));
+
+        // The second token acquisition queues until its opCtx deadline passes.
+        clientsWithOps[1].second->setDeadlineByDate(
+            getServiceContext()->getFastClockSource()->now() + Milliseconds(5),
+            ErrorCodes::MaxTimeMSExpired);
+        threads.emplace_back(monitor.spawn([&]() {
+            firstTokenAcquired.get();
+            Status token = rateLimiter.acquireToken(clientsWithOps[1].second.get());
+            ASSERT_EQ(token, Status(ErrorCodes::MaxTimeMSExpired, ""));
+
+            // The first thread was immediately admitted.
+            // The second thread was enqueued, then timed out, and then was dequeued.
+            // The second thread was enqueued for some finite time, so the average queue time
+            // could be greater than zero.
+            ASSERT_EQ(rateLimiter.stats().successfulAdmissions.get(), 1);
+            ASSERT_EQ(rateLimiter.stats().interruptedInQueue.get(), 1);
+            ASSERT_EQ(rateLimiter.stats().addedToQueue.get(), 1);
+            ASSERT_EQ(rateLimiter.stats().attemptedAdmissions.get(), 2);
+            ASSERT_EQ(rateLimiter.stats().removedFromQueue.get(), 1);
+            ASSERT_NE(rateLimiter.stats().averageTimeQueuedMicros.get(), boost::none);
+            ASSERT_GTE(*rateLimiter.stats().averageTimeQueuedMicros.get(), 0.0);
+        }));
+
+        firstTokenAcquired.get();
+        advanceTime(Milliseconds(5));
+    });
+}
 }  // namespace
 }  // namespace mongo::admission
