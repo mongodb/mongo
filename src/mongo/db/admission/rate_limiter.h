@@ -142,6 +142,12 @@ public:
     /** Returns the number of tokens available in the underlying token bucket. **/
     double tokensAvailable() const;
 
+    /**
+     * Returns the balance of tokens in the bucket, which may be negative if requests have
+     * "borrowed" tokens.
+     * */
+    double tokenBalance() const;
+
     /** Returns the number of sessions that are sleeping in acquireToken(...). **/
     int64_t queued() const;
 
