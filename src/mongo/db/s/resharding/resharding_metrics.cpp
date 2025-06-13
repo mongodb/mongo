@@ -34,6 +34,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -211,6 +212,15 @@ boost::optional<Milliseconds> ReshardingMetrics::getRecipientHighEstimateRemaini
     if (!_ableToEstimateRemainingRecipientTime.load()) {
         return boost::none;
     }
+
+    if (resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load()) {
+        // If the estimate based on moving average is available, return it. Otherwise, fall back to
+        // the estimate not based on moving average.
+        if (auto estimate = getMaxAverageTimeToFetchAndApplyOplogEntries()) {
+            return *estimate;
+        }
+    }
+
     return resharding::estimateRemainingRecipientTime(
         getStartFor(TimedPhase::kApplying).has_value(),
         getBytesWrittenCount(),

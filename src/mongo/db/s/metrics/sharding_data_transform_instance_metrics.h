@@ -84,6 +84,8 @@ public:
         boost::optional<Milliseconds> getAverageTimeToFetch() const;
         boost::optional<Milliseconds> getAverageTimeToApply() const;
 
+        boost::optional<Milliseconds> getAverageTimeToFetchAndApply() const;
+
     private:
         const ShardId _donorShardId;
 
@@ -210,6 +212,13 @@ public:
      */
     boost::optional<Milliseconds> getAverageTimeToApplyOplogEntries(
         const ShardId& donorShardId) const;
+
+    /**
+     * Returns the maximum exponential moving average of the time it takes to fetch and apply an
+     * oplog entry across all donors. Returns none if the metrics for any of the donors are not
+     * available yet.
+     */
+    boost::optional<Milliseconds> getMaxAverageTimeToFetchAndApplyOplogEntries() const;
 
     void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);

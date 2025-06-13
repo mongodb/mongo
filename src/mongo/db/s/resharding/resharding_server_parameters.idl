@@ -350,6 +350,17 @@ server_parameters:
         default: true
         redact: false
 
+    reshardingRemainingTimeEstimateBasedOnMovingAverage:
+        description: >-
+            Controls whether the remaining time estimate on a resharding recipient should be
+            based on the exponential moving average for the time it takes to fetch and apply an
+            oplog entry.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gReshardingRemainingTimeEstimateBasedOnMovingAverage
+        default: true
+        redact: false
+
     reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor:
         description:
             The smoothing factor for the exponential moving average calculation for the remaining
