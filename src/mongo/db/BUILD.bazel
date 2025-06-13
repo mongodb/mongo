@@ -3711,6 +3711,7 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/db/storage/devnull:storage_devnull",
         "//src/mongo/db/storage/wiredtiger:storage_wiredtiger",
+        "//src/mongo/idl:server_parameter_test_util",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:tick_source_mock",

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
 
 namespace mongo {
@@ -99,9 +100,12 @@ void RecordIdDeduplicator::spill(uint64_t maximumMemoryUsageBytes) {
                              " Pass allowDiskUse:true to opt in.",
             _expCtx->getAllowDiskUse());
 
-    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        storageGlobalParams.dbpath,
-        _expCtx->getQueryKnobConfiguration().getInternalQuerySpillingMinAvailableDiskSpaceBytes()));
+    if (!feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath,
+            _expCtx->getQueryKnobConfiguration()
+                .getInternalQuerySpillingMinAvailableDiskSpaceBytes()));
+    }
 
     uint64_t additionalSpilledBytes{0};
     uint64_t additionalSpilledRecords{0};

@@ -127,7 +127,8 @@ public:
                              const NamespaceString& nss) override;
 
     std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
-                                               KeyFormat keyFormat) override;
+                                               KeyFormat keyFormat,
+                                               int64_t thresholdBytes) override;
 
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                    KeyFormat keyFormat) override;

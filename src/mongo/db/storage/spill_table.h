@@ -33,7 +33,13 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 
+#include <memory>
+
+#include <boost/optional.hpp>
+
 namespace mongo {
+
+class DiskSpaceMonitor;
 
 /**
  * SpillTable provides an interface for interacting with a RecordStore used for spilling
@@ -66,7 +72,19 @@ public:
         std::unique_ptr<SeekableRecordCursor> _cursor;
     };
 
+    /**
+     * Creates a spill table using the given recovery unit and record store.
+     */
     SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs);
+
+    /**
+     * Creates a spill table using the given recovery unit and record store. If the available disk
+     * space falls below thresholdBytes, writes to the spill table will fail.
+     */
+    SpillTable(std::unique_ptr<RecoveryUnit> ru,
+               std::unique_ptr<RecordStore> rs,
+               DiskSpaceMonitor& diskMonitor,
+               int64_t thresholdBytes);
 
     virtual ~SpillTable() {}
 
@@ -149,6 +167,24 @@ public:
 protected:
     std::unique_ptr<RecoveryUnit> _ru;
     std::unique_ptr<RecordStore> _rs;
+
+private:
+    Status _checkDiskSpace() const;
+
+    class DiskState {
+    public:
+        DiskState(DiskSpaceMonitor& monitor, int64_t thresholdBytes);
+
+        ~DiskState();
+
+        bool full() const;
+
+    private:
+        DiskSpaceMonitor& _monitor;
+        int64_t _actionId = -1;
+        Atomic<bool> _full = false;
+    };
+    boost::optional<DiskState> _diskState;
 };
 
 }  // namespace mongo

@@ -478,6 +478,7 @@ mongo_cc_library(
         "spill_table.h",
     ],
     deps = [
+        ":disk_space_monitor",
         ":record_store_base",
     ],
 )
@@ -495,6 +496,7 @@ mongo_cc_library(
     ],
     deps = [
         ":backup_cursor_hooks",
+        ":disk_space_monitor",
         ":mdb_catalog",
         ":spill_table",
         ":storage_control",
@@ -693,6 +695,7 @@ mongo_cc_unit_test(
         "disk_space_monitor_test.cpp",
         "index_entry_comparison_test.cpp",
         "mdb_catalog_test.cpp",
+        "spill_table_test.cpp",
         "storage_engine_lock_file_test.cpp",
         "storage_engine_metadata_test.cpp",
         "storage_engine_test_fixture.h",
@@ -708,6 +711,7 @@ mongo_cc_unit_test(
     deps = [
         ":disk_space_monitor",
         ":record_store_base",
+        ":spill_table",
         ":storage_engine_common",
         ":storage_engine_lock_file",
         ":storage_engine_metadata",

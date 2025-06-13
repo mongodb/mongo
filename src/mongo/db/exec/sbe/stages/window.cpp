@@ -38,6 +38,7 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo::sbe {
 
@@ -162,8 +163,10 @@ void WindowStage::spill() {
             _allowDiskUse);
 
     // Ensure there is sufficient disk space for spilling
-    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    if (!feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
 
     // Create spilled record storage if not created.
     if (!_recordStore) {

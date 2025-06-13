@@ -29,7 +29,12 @@
 
 #include "mongo/db/storage/spill_table.h"
 
+#include "mongo/db/storage/disk_space_monitor.h"
+#include "mongo/db/storage/disk_space_util.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+
+#include <memory>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -62,8 +67,41 @@ bool SpillTable::Cursor::restore(RecoveryUnit& ru) {
     return _cursor->restore(_ru ? *_ru : ru);
 }
 
+SpillTable::DiskState::DiskState(DiskSpaceMonitor& monitor, int64_t thresholdBytes)
+    : _monitor(monitor) {
+    _actionId = _monitor.registerAction(
+        [thresholdBytes] { return thresholdBytes; },
+        [this](OperationContext* opCtx, int64_t availableBytes, int64_t thresholdBytes) {
+            LOGV2(10436000,
+                  "Failing writes to spill table because remaining disk space is less than the "
+                  "required minimum",
+                  "availableBytes"_attr = availableBytes,
+                  "thresholdBytes"_attr = thresholdBytes);
+            _full.store(true);
+        });
+    if (getAvailableDiskSpaceBytesInDbPath(storageGlobalParams.dbpath) < thresholdBytes) {
+        _full.store(true);
+    }
+}
+
+SpillTable::DiskState::~DiskState() {
+    _monitor.deregisterAction(_actionId);
+}
+
+bool SpillTable::DiskState::full() const {
+    return _full.load();
+}
+
 SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru, std::unique_ptr<RecordStore> rs)
     : _ru(std::move(ru)), _rs(std::move(rs)) {}
+
+SpillTable::SpillTable(std::unique_ptr<RecoveryUnit> ru,
+                       std::unique_ptr<RecordStore> rs,
+                       DiskSpaceMonitor& diskMonitor,
+                       int64_t thresholdBytes)
+    : _ru(std::move(ru)),
+      _rs(std::move(rs)),
+      _diskState(boost::in_place_init, diskMonitor, thresholdBytes) {}
 
 long long SpillTable::dataSize() const {
     return _rs->dataSize();
@@ -78,6 +116,10 @@ int64_t SpillTable::storageSize(RecoveryUnit& ru) const {
 }
 
 Status SpillTable::insertRecords(OperationContext* opCtx, std::vector<Record>* records) {
+    if (auto status = _checkDiskSpace(); !status.isOK()) {
+        return status;
+    }
+
     if (!_ru) {
         std::vector<Timestamp> timestamps(records->size());
         return _rs->insertRecords(
@@ -104,11 +146,15 @@ Status SpillTable::updateRecord(OperationContext* opCtx,
                                 const RecordId& rid,
                                 const char* data,
                                 int len) {
+    if (auto status = _checkDiskSpace(); !status.isOK()) {
+        return status;
+    }
     return _rs->updateRecord(
         opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx), rid, data, len);
 }
 
 void SpillTable::deleteRecord(OperationContext* opCtx, const RecordId& rid) {
+    uassertStatusOK(_checkDiskSpace());
     _rs->deleteRecord(opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx), rid);
 }
 
@@ -120,6 +166,9 @@ std::unique_ptr<SpillTable::Cursor> SpillTable::getCursor(OperationContext* opCt
 }
 
 Status SpillTable::truncate(OperationContext* opCtx) {
+    if (auto status = _checkDiskSpace(); !status.isOK()) {
+        return status;
+    }
     return _rs->truncate(opCtx, _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx));
 }
 
@@ -128,12 +177,22 @@ Status SpillTable::rangeTruncate(OperationContext* opCtx,
                                  const RecordId& maxRecordId,
                                  int64_t hintDataSizeIncrement,
                                  int64_t hintNumRecordsIncrement) {
+    if (auto status = _checkDiskSpace(); !status.isOK()) {
+        return status;
+    }
     return _rs->rangeTruncate(opCtx,
                               _ru ? *_ru : *storage_details::getRecoveryUnit(opCtx),
                               minRecordId,
                               maxRecordId,
                               hintDataSizeIncrement,
                               hintNumRecordsIncrement);
+}
+
+Status SpillTable::_checkDiskSpace() const {
+    return _diskState && _diskState->full()
+        ? Status(ErrorCodes::OutOfDiskSpace,
+                 "Failed to write to spill table as disk space is too low")
+        : Status::OK();
 }
 
 }  // namespace mongo

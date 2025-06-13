@@ -508,10 +508,12 @@ public:
      * Creates a temporary table that can be used for spilling in-memory state to disk. A table
      * created using this API does not interfere with the reads/writes happening on the main
      * KVEngine instance. This table is automatically dropped when the returned handle is
-     * destructed.
+     * destructed. If the available disk space falls below thresholdBytes, writes to the spill table
+     * will fail.
      */
     virtual std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
-                                                       KeyFormat keyFormat) = 0;
+                                                       KeyFormat keyFormat,
+                                                       int64_t thresholdBytes) = 0;
 
     /**
      * Creates a temporary RecordStore on the storage engine. On startup after an unclean shutdown,

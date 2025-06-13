@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/deferred_drop_record_store.h"
+#include "mongo/db/storage/disk_space_monitor.h"
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -621,13 +622,17 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 }
 
 std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* opCtx,
-                                                              KeyFormat keyFormat) {
+                                                              KeyFormat keyFormat,
+                                                              int64_t thresholdBytes) {
     invariant(_spillKVEngine);
     auto ru = _spillKVEngine->newRecoveryUnit();
     std::unique_ptr<RecordStore> rs =
         _spillKVEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
-    return std::make_unique<SpillTable>(std::move(ru), std::move(rs));
+    return std::make_unique<SpillTable>(std::move(ru),
+                                        std::move(rs),
+                                        *DiskSpaceMonitor::get(opCtx->getServiceContext()),
+                                        thresholdBytes);
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStore(

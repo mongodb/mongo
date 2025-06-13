@@ -98,8 +98,10 @@ public:
         return createCollection(opCtx, ns, options);
     }
 
-    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx) {
-        return _storageEngine->makeSpillTable(opCtx, KeyFormat::String);
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
+                                               KeyFormat keyFormat,
+                                               int64_t thresholdBytes) {
+        return _storageEngine->makeSpillTable(opCtx, keyFormat, thresholdBytes);
     }
 
     std::unique_ptr<TemporaryRecordStore> makeTemporary(OperationContext* opCtx) {

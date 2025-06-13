@@ -81,7 +81,9 @@ public:
                              const NamespaceString& ns) final {
         return Status::OK();
     }
-    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx, KeyFormat keyFormat) final {
+    std::unique_ptr<SpillTable> makeSpillTable(OperationContext* opCtx,
+                                               KeyFormat keyFormat,
+                                               int64_t thresholdBytes) final {
 
         return {};
     }

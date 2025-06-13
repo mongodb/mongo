@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/scopeguard.h"
 
@@ -81,8 +82,10 @@ void SpillableDocumentMapImpl::spillToDisk() {
         return;
     }
 
-    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
-        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    if (!feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+            storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+    }
 
     if (_diskMap == nullptr) {
         initDiskMap();

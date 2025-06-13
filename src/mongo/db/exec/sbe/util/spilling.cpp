@@ -102,7 +102,8 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
 SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
     auto lk = acquireLock(opCtx);
     if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
-        _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(opCtx, format);
+        _spillTable = opCtx->getServiceContext()->getStorageEngine()->makeSpillTable(
+            opCtx, format, internalQuerySpillingMinAvailableDiskSpaceBytes.load());
         return;
     }
 

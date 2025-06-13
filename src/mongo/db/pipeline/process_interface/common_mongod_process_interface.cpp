@@ -74,6 +74,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
@@ -1120,7 +1121,9 @@ std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
         return expCtx->getOperationContext()
             ->getServiceContext()
             ->getStorageEngine()
-            ->makeSpillTable(expCtx->getOperationContext(), keyFormat);
+            ->makeSpillTable(expCtx->getOperationContext(),
+                             keyFormat,
+                             internalQuerySpillingMinAvailableDiskSpaceBytes.load());
     }
     return expCtx->getOperationContext()
         ->getServiceContext()
