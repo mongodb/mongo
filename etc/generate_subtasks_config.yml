@@ -47,6 +47,8 @@ build_variant_large_distro_exceptions:
   - rhel8-debug-suggested
   - rhel8-debug-ubsan
   - rhel8-debug-ubsan-all-feature-flags
+  - rhel8-debug-ubsan-all-non-rollback-feature-flags
+  - rhel8-debug-ubsan-roll-back-incremental-feature-flags
   - rhel8-debug-ubsan-classic-engine
   - rhel-8-arm64
   - rhel93
