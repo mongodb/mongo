@@ -69,7 +69,6 @@ mongo_cc_library(
         "wiredtiger_util.cpp",
     ],
     hdrs = [
-        "spill_recovery_unit.h",
         "spill_wiredtiger_kv_engine.h",
         "wiredtiger_begin_transaction_block.h",
         "wiredtiger_compiled_configuration.h",
