@@ -786,9 +786,12 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
         // namespace (or the oplog), then we should retry the setup after resetting the read source
         // here using the resolved namespace. This only needs to be done once.
         if (nsOrUUID.isUUID() && !collection->ns().isReplicated() && !needsRetry) {
+            // We take a copy of the namespace since abandoning the snapshot could lead to the
+            // collection instance being deleted.
+            const auto ns = collection->ns();
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
             [[maybe_unused]] bool shouldReadAtLastApplied =
-                SnapshotHelper::changeReadSourceIfNeeded(opCtx, collection->ns());
+                SnapshotHelper::changeReadSourceIfNeeded(opCtx, ns);
             needsRetry = true;
             continue;
         }
