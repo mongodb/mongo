@@ -79,9 +79,7 @@ SpillTable::DiskState::DiskState(DiskSpaceMonitor& monitor, int64_t thresholdByt
                   "thresholdBytes"_attr = thresholdBytes);
             _full.store(true);
         });
-    if (getAvailableDiskSpaceBytesInDbPath(storageGlobalParams.dbpath) < thresholdBytes) {
-        _full.store(true);
-    }
+    _monitor.runAction(nullptr, _actionId);
 }
 
 SpillTable::DiskState::~DiskState() {

@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
 
 #include <utility>
 
@@ -66,17 +67,29 @@ TEST_F(DiskSpaceMonitorTest, Threshold) {
     auto action = std::make_unique<SimpleAction>(hitsCounter);
     int64_t actionId = action->registerSimpleAction(monitor);
 
-    monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(0, hitsCounter);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(0, hitsCounter);
+    }
 
-    monitor.takeAction(opCtx, 1024);
-    ASSERT_EQ(1, hitsCounter);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1024)};
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(1, hitsCounter);
+    }
 
-    monitor.takeAction(opCtx, 1000);
-    ASSERT_EQ(2, hitsCounter);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1000)};
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(2, hitsCounter);
+    }
 
-    monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(2, hitsCounter);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(2, hitsCounter);
+    }
 
     monitor.deregisterAction(actionId);
 }
@@ -90,29 +103,70 @@ TEST_F(DiskSpaceMonitorTest, TwoActions) {
     int64_t action1Id = action1->registerSimpleAction(monitor);
     int64_t action2Id = action2->registerSimpleAction(monitor);
 
-    // Check both actions don't get incremented.
-    monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(0, hitsCounter1);
-    ASSERT_EQ(0, hitsCounter2);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
 
-    // Check both actions get incremented.
-    monitor.takeAction(opCtx, 1024);
-    ASSERT_EQ(1, hitsCounter1);
-    ASSERT_EQ(1, hitsCounter2);
+        // Check both actions don't get incremented.
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(0, hitsCounter1);
+        ASSERT_EQ(0, hitsCounter2);
+
+        monitor.runAction(opCtx, action1Id);
+        ASSERT_EQ(0, hitsCounter1);
+        ASSERT_EQ(0, hitsCounter2);
+
+        monitor.runAction(opCtx, action2Id);
+        ASSERT_EQ(0, hitsCounter1);
+        ASSERT_EQ(0, hitsCounter2);
+    }
+
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1024)};
+
+        // Check both actions get incremented.
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(1, hitsCounter1);
+        ASSERT_EQ(1, hitsCounter2);
+
+        monitor.runAction(opCtx, action1Id);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(1, hitsCounter2);
+
+        monitor.runAction(opCtx, action2Id);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(2, hitsCounter2);
+    }
 
     // Deregister action1.
     monitor.deregisterAction(action1Id);
 
-    // Check that we increment action2.
-    monitor.takeAction(opCtx, 1000);
-    ASSERT_EQ(1, hitsCounter1);
-    ASSERT_EQ(2, hitsCounter2);
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 1000)};
 
-    // Check both actions remain unchanged.
-    monitor.takeAction(opCtx, 2000);
-    ASSERT_EQ(1, hitsCounter1);
-    ASSERT_EQ(2, hitsCounter2);
-    monitor.deregisterAction(action2Id);
+        // Check that we increment action2.
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(3, hitsCounter2);
+
+        monitor.runAction(opCtx, action2Id);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(4, hitsCounter2);
+    }
+
+    {
+        FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << 2000)};
+
+        // Check both actions remain unchanged.
+        monitor.runAllActions(opCtx);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(4, hitsCounter2);
+
+        monitor.runAction(opCtx, action2Id);
+        ASSERT_EQ(2, hitsCounter1);
+        ASSERT_EQ(4, hitsCounter2);
+
+        monitor.deregisterAction(action2Id);
+    }
 }
 
 }  // namespace

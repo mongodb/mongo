@@ -88,7 +88,8 @@ TEST_F(SpillTableTest, LaterBelowDiskSpaceThreshold) {
     ASSERT_OK(spillTable->truncate(opCtx.get()));
     ASSERT_OK(spillTable->rangeTruncate(opCtx.get(), rid, rid));
 
-    DiskSpaceMonitor::get(opCtx->getServiceContext())->takeAction(opCtx.get(), thresholdBytes - 1);
+    FailPointEnableBlock fp{"simulateAvailableDiskSpace", BSON("bytes" << thresholdBytes - 1)};
+    DiskSpaceMonitor::get(opCtx->getServiceContext())->runAllActions(opCtx.get());
 
     ASSERT_EQ(spillTable->insertRecords(opCtx.get(), &records), ErrorCodes::OutOfDiskSpace);
     ASSERT_EQ(spillTable->updateRecord(opCtx.get(), rid, obj.objdata(), obj.objsize()),

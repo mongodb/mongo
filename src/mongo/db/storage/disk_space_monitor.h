@@ -69,9 +69,16 @@ public:
     void deregisterAction(int64_t actionId);
 
     /**
-     * Immediately take action based on the provided available disk space in bytes.
+     * Immediately runs the action corresponding to the given id if the available disk space is
+     * below its threshold.
      */
-    void takeAction(OperationContext* opCtx, int64_t availableBytes);
+    void runAction(OperationContext* opCtx, int64_t id);
+
+    /**
+     * Immediately runs each registered action depending on whether the available disk space is
+     * below its threshold.
+     */
+    void runAllActions(OperationContext* opCtx);
 
 private:
     struct Action {
@@ -83,6 +90,8 @@ private:
     void _stop();
 
     void _run(Client*);
+
+    void _runAction(OperationContext* opCtx, const Action& action) const;
 
     PeriodicJobAnchor _job;
 

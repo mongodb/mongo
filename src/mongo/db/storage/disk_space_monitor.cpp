@@ -100,23 +100,35 @@ void DiskSpaceMonitor::deregisterAction(int64_t actionId) {
     invariant(_actions.erase(actionId));
 }
 
-void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableBytes) {
+void DiskSpaceMonitor::runAction(OperationContext* opCtx, int64_t id) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    auto it = _actions.find(id);
+    tassert(10624900,
+            fmt::format("Provided disk space monitor action id {} not found", id),
+            it != _actions.end());
+    _runAction(opCtx, it->second);
+}
+
+void DiskSpaceMonitor::runAllActions(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (auto&& [_, action] : _actions) {
-        auto thresholdBytes = action.getThresholdBytes();
-        if (availableBytes <= thresholdBytes) {
-            action.act(opCtx, availableBytes, thresholdBytes);
-            tookAction.increment();
-        }
+        _runAction(opCtx, action);
+    }
+}
+
+void DiskSpaceMonitor::_runAction(OperationContext* opCtx, const Action& action) const {
+    auto availableBytes = getAvailableDiskSpaceBytesInDbPath(_dbpath);
+    auto thresholdBytes = action.getThresholdBytes();
+    LOGV2_DEBUG(7333405, 2, "Available disk space", "bytes"_attr = availableBytes);
+    if (availableBytes <= thresholdBytes) {
+        action.act(opCtx, availableBytes, thresholdBytes);
+        tookAction.increment();
     }
 }
 
 void DiskSpaceMonitor::_run(Client* client) try {
     auto opCtx = client->makeOperationContext();
-
-    const auto availableBytes = getAvailableDiskSpaceBytesInDbPath(_dbpath);
-    LOGV2_DEBUG(7333405, 2, "Available disk space", "bytes"_attr = availableBytes);
-    takeAction(opCtx.get(), availableBytes);
+    runAllActions(opCtx.get());
     monitorPasses.increment();
 } catch (...) {
     LOGV2(7333404, "Caught exception in DiskSpaceMonitor", "error"_attr = exceptionToStatus());
