@@ -29,10 +29,6 @@ def get_binary_name() -> str:
     if machine == "amd64" or machine == "x86_64":
         machine = "x64"
 
-    binary_name = f"db-contrib-tool_{DB_CONTRIB_TOOL_VERSION}_{operating_system}_{machine}"
-    if operating_system == "windows":
-        binary_name = f"{binary_name}.exe"
-
     # On ppc64le RHEL, pyinstaller builds are not forward compatible (At least not from RHEL 8 -> 9),
     # so we need to create and name each binary with the exact OS.
     if machine == "ppc64le":
@@ -46,6 +42,10 @@ def get_binary_name() -> str:
         major_version = min(major_version, 9)
 
         operating_system = f"rhel{major_version}"
+
+    binary_name = f"db-contrib-tool_{DB_CONTRIB_TOOL_VERSION}_{operating_system}_{machine}"
+    if operating_system == "windows":
+        binary_name = f"{binary_name}.exe"
 
     return binary_name
 
