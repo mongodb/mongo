@@ -902,6 +902,17 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
     invariant(cursorId == pinnedCursor.getValue().getCursorId());
 
+    // Ensure cursor and getMore belong the same namespace.
+    if (const auto cursorNss = pinnedCursor.getValue().toGenericCursor().getNs();
+        cursorNss.has_value() && nss != cursorNss.get()) {
+        pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+        return Status(ErrorCodes::Unauthorized,
+                      str::stream()
+                          << "Requested getMore on namespace '" << nss.toStringForErrorMsg()
+                          << "', but cursor belongs to a different namespace "
+                          << cursorNss->toStringForErrorMsg());
+    }
+
     validateOperationSessionInfo(opCtx, cursorId, &pinnedCursor.getValue());
 
     // Ensure that the client still has the privileges to run the originating command.
