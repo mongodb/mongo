@@ -1,0 +1,5 @@
+{
+    "operationProfiling" : {
+        "filter" : "{$expr: {$toUUID: '$nreturned'}}"
+    }
+}

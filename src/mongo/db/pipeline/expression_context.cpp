@@ -680,13 +680,17 @@ void ExpressionContext::throwIfFeatureFlagIsNotEnabledOnFCV(StringData name,
                 // check the lowest FCV. We are guaranteed that maxFeatureCompatibilityVersion will
                 // always be greater than or equal to the last LTS. So we will check the last LTS.
                 const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-                mongo::multiversion::FeatureCompatibilityVersion versionToCheck = fcv.getVersion();
-                if (!fcv.isVersionInitialized()) {
-                    // (Generic FCV reference): This FCV reference should exist across LTS binary
-                    // versions.
-                    versionToCheck = multiversion::GenericFCV::kLastLTS;
-                } else if (_params.maxFeatureCompatibilityVersion) {
-                    versionToCheck = *_params.maxFeatureCompatibilityVersion;
+                // (Generic FCV reference): This FCV reference should exist across LTS binary
+                // versions.
+                mongo::multiversion::FeatureCompatibilityVersion versionToCheck =
+                    multiversion::GenericFCV::kLastLTS;
+
+                // Ensure 'fcv' is initialized before calling 'getVersion()' to prevent an invariant
+                // error.
+                if (fcv.isVersionInitialized()) {
+                    versionToCheck = _params.maxFeatureCompatibilityVersion
+                        ? *_params.maxFeatureCompatibilityVersion
+                        : fcv.getVersion();
                 }
 
                 return fcvGatedFlag.isEnabledOnVersion(versionToCheck);
