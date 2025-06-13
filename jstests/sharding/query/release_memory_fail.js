@@ -38,30 +38,23 @@ assert.commandWorked(coll.insertMany(docs));
 
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
 
-function runTest(cursorId, docIdx, failpointConn) {
+function runTest(cursorId, failpointConn) {
     // Activate the failpoint and set the exception that it will throw.
-    let failpoint = configureFailPoint(failpointConn, kFailPointName, kFailpointOptions);
+    const failpoint = configureFailPoint(failpointConn, kFailPointName, kFailpointOptions);
 
     // Test releaseMemory
     jsTest.log(`Running releaseMemory command ${tojson({releaseMemory: [cursorId]})}`);
     const res = mongosDB.runCommand({releaseMemory: [cursorId]});
     assertReleaseMemoryFailedWithCode(res, cursorId, ErrorCodes.SocketException);
+    failpoint.off();
 
     // Test getMore
-    let batchSize = 4;
-    let getMoreCmd = {getMore: cursorId, collection: coll.getName(), batchSize: batchSize};
-
-    while (cursorId != 0) {
-        jsTest.log(`Running getMore command ${tojson(getMoreCmd)}`);
-        let getMoreRes = mongosDB.runCommand(getMoreCmd);
-        assert.commandWorked(getMoreRes);
-        let cursor = getMoreRes.cursor;
-        assertArrayEq({actual: cursor.nextBatch, expected: docs.slice(docIdx, docIdx + batchSize)});
-        docIdx += batchSize;
-        cursorId = cursor.id;
-    }
-
-    failpoint.off();
+    assert.neq(cursorId, NumberLong(0));
+    const getMoreCmd = {getMore: cursorId, collection: coll.getName()};
+    jsTest.log.info("Running getMore command", getMoreCmd);
+    const getMoreRes = mongosDB.runCommand(getMoreCmd);
+    jsTest.log.info("getMore response:", getMoreRes);
+    assert.commandFailedWithCode(getMoreRes, [ErrorCodes.CursorNotFound]);
 }
 
 // Test failure propagation by setting up fail points on either shards or the router.
@@ -71,7 +64,7 @@ for (let failpointConn of [mongosDB, shard0DB, shard1DB]) {
     let cursor = findRes.cursor;
     assertArrayEq({actual: cursor.firstBatch, expected: docs.slice(0, 2)});
     assert.neq(cursor.id, NumberLong(0));
-    runTest(cursor.id, 2, failpointConn);
+    runTest(cursor.id, failpointConn);
 }
 
 st.stop();

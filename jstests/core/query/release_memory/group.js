@@ -24,7 +24,8 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
-    assertReleaseMemoryFailedWithCode
+    assertReleaseMemoryFailedWithCode,
+    setAvailableDiskSpaceMode
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -139,9 +140,6 @@ for (const pipeline of pipelines) {
             setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
             let initialSpillCount = getSpillCounter();
 
-            // Retrieve the first batch without spilling.
-            jsTest.log.info("Running pipeline: ", pipeline[0]);
-
             const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
             const cursorId = cursor.getId();
             const newSpillCount = getSpillCounter();
@@ -179,9 +177,6 @@ for (const pipeline of pipelines) {
             setServerParameter(classicMemorySizeKnob, 1);
             let initialSpillCount = getSpillCounter();
 
-            // Retrieve the first batch.
-            jsTest.log.info("Running pipeline: ", pipeline[0]);
-
             const cursor = coll.aggregate(pipeline, {allowDiskUse: true, cursor: {batchSize: 1}});
             const cursorId = cursor.getId();
             const newSpillCount = getSpillCounter();
@@ -212,9 +207,6 @@ for (const pipeline of pipelines) {
             setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
             let initialSpillCount = getSpillCounter();
 
-            // Retrieve the first batch without spilling.
-            jsTest.log.info("Running pipeline: ", pipeline[0]);
-
             const cursor = coll.aggregate(
                 pipeline, {"allowDiskUse": true, cursor: {batchSize: expectedResultsCount}});
             const cursorId = cursor.getId();
@@ -238,6 +230,31 @@ for (const pipeline of pipelines) {
             setServerParameter(classicMemorySizeKnob, classicMemorySizeInitialValue);
         }
 
+        // No disk space available for spilling.
+        {
+            const willNotSpill = isTimeSeriesCollection(db, coll.getName()) &&
+                expectedResults.length <= 128 && getEngine(explain) === "sbe";
+            if (!willNotSpill) {
+                jsTest.log(`Running releaseMemory with no disk space available`);
+                const cursor =
+                    coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+                const cursorId = cursor.getId();
+
+                // Release memory (i.e., spill)
+                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+                const releaseMemoryCmd = {releaseMemory: [cursorId]};
+                jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+                const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+                assert.commandWorked(releaseMemoryRes);
+                assertReleaseMemoryFailedWithCode(
+                    releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+
+                jsTest.log.info("Running getMore");
+                assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
+            }
+        }
+
         if (hasMergeCursors(explain)) {
             // When `allowDiskUse` is false and a pipeline with `$mergeCursors` is used, operations
             // might execute in `mongos`. So, the group operation will be performed on `mongos`, and
@@ -249,8 +266,6 @@ for (const pipeline of pipelines) {
         {
             jsTest.log(`Running releaseMemory with no allowDiskUse`);
 
-            // Retrieve the first batch without spilling.
-            jsTest.log.info("Running pipeline: ", pipeline[0]);
             const cursor =
                 coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
             const cursorId = cursor.getId();

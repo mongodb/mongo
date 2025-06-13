@@ -114,9 +114,11 @@ public:
                     cursorManager->checkOutCursorNoAuthCheck(id, opCtx, definition()->getName());
 
                 if (pinnedCursor.isOK()) {
-                    ScopeGuard returnCursorGuard([&pinnedCursor, opCtx] {
+                    ScopeGuard killCursorGuard([&pinnedCursor] {
+                        // Something went wrong. Return the cursor as exhausted so that it's deleted
+                        // immediately.
                         pinnedCursor.getValue().returnCursor(
-                            ClusterCursorManager::CursorState::NotExhausted);
+                            ClusterCursorManager::CursorState::Exhausted);
                     });
 
                     Status response = Status::OK();
@@ -155,20 +157,29 @@ public:
                         response = pinnedCursor.getValue()->releaseMemory();
                     }
 
-                    pinnedCursor.getValue().returnCursor(
-                        ClusterCursorManager::CursorState::NotExhausted);
-                    returnCursorGuard.dismiss();
-
                     Status interruptStatus = opCtx->checkForInterruptNoAssert();
 
                     // Check the status and decide where the result should go. If releaseMemory
                     // succeeded, but operation was interrupted, cursor will be killed anyway.
                     if (response.isOK() && interruptStatus.isOK()) {
                         cursorsReleased.push_back(id);
+                        pinnedCursor.getValue().returnCursor(
+                            ClusterCursorManager::CursorState::NotExhausted);
+                        killCursorGuard.dismiss();
                     } else {
                         handleError(id, response.isOK() ? interruptStatus : response);
                         if (!interruptStatus.isOK()) {
                             break;
+                        }
+
+                        // Do not destroy the cursor if the error is
+                        // QueryExceededMemoryLimitNoDiskUseAllowed since at this point spilling has
+                        // not yet started.
+                        if (response.code() ==
+                            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed) {
+                            pinnedCursor.getValue().returnCursor(
+                                ClusterCursorManager::CursorState::NotExhausted);
+                            killCursorGuard.dismiss();
                         }
                     }
                 } else if (pinnedCursor.getStatus().code() == ErrorCodes::CursorInUse) {

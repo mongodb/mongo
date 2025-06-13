@@ -59,3 +59,11 @@ export function accumulateServerStatusMetric(db, metricGetter) {
         return total;
     }, 10, 100, [ErrorCodes.InterruptedDueToStorageChange]);
 }
+
+// Sets the mode of the simulateAvailableDiskSpace failpoint.
+export function setAvailableDiskSpaceMode(db, mode, bytes = 450 * 1024 * 1024) {
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db,
+        cmdObj: {configureFailPoint: 'simulateAvailableDiskSpace', mode, 'data': {bytes: bytes}}
+    });
+}

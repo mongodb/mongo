@@ -16,7 +16,8 @@
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     accumulateServerStatusMetric,
-    assertReleaseMemoryFailedWithCode
+    assertReleaseMemoryFailedWithCode,
+    setAvailableDiskSpaceMode
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -118,6 +119,26 @@ assert.eq(previousSpillCount, getTextOrSpillCounter());
     assert.eq(previousSpillCount, getTextOrSpillCounter());
 
     assert.eq(expectedResults, cursor.toArray().sort(idCompare));
+}
+
+// No disk space available for spilling.
+{
+    jsTest.log(`Running releaseMemory with no disk space available`);
+    const cursor =
+        coll.find(predicate, {score: {$meta: "textScore"}}).batchSize(1).allowDiskUse(true);
+    const cursorId = cursor.getId();
+
+    // Release memory (i.e., spill)
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    const releaseMemoryCmd = {releaseMemory: [cursorId]};
+    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+    assert.commandWorked(releaseMemoryRes);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+
+    jsTest.log.info("Running getMore");
+    assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
 }
 
 {

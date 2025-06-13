@@ -90,13 +90,17 @@ public:
 
             for (CursorId cursorId : request().getCommandParameter()) {
                 if (auto status = opCtx->checkForInterruptNoAssert(); !status.isOK()) {
-                    handleError(cursorId, status);
                     break;
                 }
 
                 auto cursorPin =
                     CursorManager::get(opCtx)->pinCursor(opCtx, cursorId, definition()->getName());
                 if (cursorPin.isOK()) {
+                    ScopeGuard killCursorGuard([&cursorPin] {
+                        // Something went wrong. Destroy the cursor.
+                        cursorPin.getValue().deleteUnderlying();
+                    });
+
                     if (MONGO_unlikely(releaseMemoryHangAfterPinCursor.shouldFail())) {
                         LOGV2(9745500,
                               "releaseMemoryHangAfterPinCursor fail point enabled. Blocking until "
@@ -130,10 +134,15 @@ public:
 
                     if (response.isOK()) {
                         released.push_back(cursorId);
+                        killCursorGuard.dismiss();
                     } else {
                         handleError(cursorId, response);
-                        if (response.code() == ErrorCodes::Interrupted) {
-                            break;
+                        // Do not destroy the cursor if the error is
+                        // QueryExceededMemoryLimitNoDiskUseAllowed since at this point spilling has
+                        // not yet started.
+                        if (response.code() ==
+                            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed) {
+                            killCursorGuard.dismiss();
                         }
                     }
                 } else if (cursorPin.getStatus().code() == ErrorCodes::CursorNotFound) {

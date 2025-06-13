@@ -413,13 +413,17 @@ void LookupHashTable::reset(bool fromClose) {
     _memoryHt = boost::none;
 
     if (_recordStoreHt) {
-        _hashLookupStats.spillingHtStats.updateSpilledDataStorageSize(
-            _recordStoreHt->storageSize(_opCtx));
+        if (_opCtx) {
+            _hashLookupStats.spillingHtStats.updateSpilledDataStorageSize(
+                _recordStoreHt->storageSize(_opCtx));
+        }
         _recordStoreHt.reset(nullptr);
     }
     if (_recordStoreBuf) {
-        _hashLookupStats.spillingBuffStats.updateSpilledDataStorageSize(
-            _recordStoreBuf->storageSize(_opCtx));
+        if (_opCtx) {
+            _hashLookupStats.spillingBuffStats.updateSpilledDataStorageSize(
+                _recordStoreBuf->storageSize(_opCtx));
+        }
         _recordStoreBuf.reset(nullptr);
     }
 

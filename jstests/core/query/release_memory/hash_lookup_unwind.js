@@ -21,7 +21,11 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
-import {accumulateServerStatusMetric} from "jstests/libs/release_memory_util.js";
+import {
+    accumulateServerStatusMetric,
+    assertReleaseMemoryFailedWithCode,
+    setAvailableDiskSpaceMode
+} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
@@ -164,6 +168,25 @@ jsTest.log.info("Expected results: ", expectedResults);
     assertArrayEq({actual: results, expected: expectedResults});
 
     setServerParameter(memoryKnob, memoryInitialValue);
+}
+
+// No disk space available for spilling.
+{
+    jsTest.log(`Running releaseMemory with no disk space available`);
+    const cursor = animals.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+    const cursorId = cursor.getId();
+
+    // Release memory (i.e., spill)
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    const releaseMemoryCmd = {releaseMemory: [cursorId]};
+    jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
+    const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
+    assert.commandWorked(releaseMemoryRes);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+
+    jsTest.log.info("Running getMore");
+    assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
 }
 
 setServerParameter(sbeIncreasedSpillingKnob, sbeIncreasedSpillingInitialValue);
