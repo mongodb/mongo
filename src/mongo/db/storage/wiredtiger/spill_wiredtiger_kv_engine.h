@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/storage/wiredtiger/spill_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
 
@@ -59,7 +59,7 @@ public:
                                                           KeyFormat keyFormat) override;
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
-        return std::make_unique<SpillRecoveryUnit>(_connection.get());
+        return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
     }
 
     bool supportsDirectoryPerDB() const override {

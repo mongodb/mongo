@@ -150,12 +150,12 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
 }
 
 bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {
-    return _wtHasUri(*SpillRecoveryUnit::get(ru).getSession(),
+    return _wtHasUri(*WiredTigerRecoveryUnit::get(ru).getSession(),
                      WiredTigerUtil::buildTableUri(ident));
 }
 
 std::vector<std::string> SpillWiredTigerKVEngine::getAllIdents(RecoveryUnit& ru) const {
-    auto& wtRu = SpillRecoveryUnit::get(ru);
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     return _wtGetAllIdents(wtRu);
 }
 
@@ -165,7 +165,7 @@ Status SpillWiredTigerKVEngine::dropIdent(RecoveryUnit& ru,
                                           const StorageEngine::DropIdentCallback& onDrop) {
     std::string uri = WiredTigerUtil::buildTableUri(ident);
 
-    auto& wtRu = SpillRecoveryUnit::get(ru);
+    auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     wtRu.getSessionNoTxn()->closeAllCursors(uri);
 
     WiredTigerSession session(_connection.get());
