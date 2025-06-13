@@ -606,12 +606,7 @@ Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
         const NamespaceStringOrUUID nsOrUUID(nss.dbName(), collectionUUID);
         boost::optional<AutoGetCollection> autoColl;
         try {
-            autoColl.emplace(
-                opCtx,
-                nsOrUUID,
-                MODE_IX,
-                AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                    .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite}));
+            autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             return ex.toStatus();
         }
@@ -1392,10 +1387,7 @@ StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectio
 Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
                                                 const NamespaceStringOrUUID& nsOrUUID,
                                                 long long newCount) {
-    auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-    AutoGetCollection autoColl(opCtx, nsOrUUID, LockMode::MODE_X, autoGetCollOptions);
+    AutoGetCollection autoColl(opCtx, nsOrUUID, LockMode::MODE_X);
 
     auto collectionResult =
         getCollection(autoColl, nsOrUUID, "Unable to set number of documents in collection.");

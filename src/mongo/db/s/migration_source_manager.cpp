@@ -802,12 +802,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         // Unregister from the collection's sharding state.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-        // Cleanup might be happening because the node is stepping down from primary, we don't want
-        // to fail declaring write intent if that is the case.
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
+        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss());
 
@@ -879,10 +874,7 @@ void MigrationSourceManager::_cleanup(bool completeMigration) {
         // the next op to recover.
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx);  // NOLINT.
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX, autoGetCollOptions);
+        AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, nss())
             ->clearFilteringMetadata(_opCtx);
     }

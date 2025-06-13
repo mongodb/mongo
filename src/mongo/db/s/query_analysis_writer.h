@@ -272,13 +272,9 @@ private:
 
     void onStepUpBegin(OperationContext* opCtx, long long term) final {}
 
-    void onStepDown() final {
-        _isPrimary.store(false);
-    }
+    void onStepDown() final {}
 
-    void onRollbackBegin() final {
-        _isPrimary.store(false);
-    }
+    void onRollbackBegin() final {}
 
     void onBecomeArbiter() final {}
 
@@ -313,8 +309,6 @@ private:
      * amount of memory that the writer is allowed to use.
      */
     bool _exceedsMaxSizeBytes();
-
-    AtomicWord<bool> _isPrimary{false};
 
     mutable stdx::mutex _mutex;
 

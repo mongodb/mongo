@@ -60,7 +60,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/record_id.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/record_data.h"
@@ -131,14 +130,7 @@ public:
         LOGV2(20505, "Test-only command 'godinsert' invoked", "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
-        AutoGetDb autodb(
-            opCtx,
-            dbName,
-            MODE_X,
-            boost::none,
-            Date_t::max(),
-            Lock::DBLockSkipOptions{
-                false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+        AutoGetDb autodb(opCtx, dbName, MODE_X);
         Database* db = autodb.ensureDbExists(opCtx);
 
         AutoStatsTracker statsTracker(opCtx,
@@ -148,13 +140,10 @@ public:
                                       DatabaseProfileSettings::get(opCtx->getServiceContext())
                                           .getDatabaseProfileLevel(dbName));
 
-        // GodInsert is a test only command that can execute inserts on secondary nodes and uses an
-        // unreplicated writes block.
-        auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  opCtx, nss, AcquisitionPrerequisites::kUnreplicatedWrite),
-                              MODE_IX);
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         WriteUnitOfWork wunit(opCtx);
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);

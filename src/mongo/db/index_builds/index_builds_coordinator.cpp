@@ -102,7 +102,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
@@ -534,11 +533,9 @@ RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
 /**
  * Returns an AutoGetCollection::Options configured to skip the RSTL if 'skipRSTL' is true.
  */
-AutoGetCollection::Options makeAutoGetCollectionOptions(
-    bool skipRSTL,
-    boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none) {
+AutoGetCollection::Options makeAutoGetCollectionOptions(bool skipRSTL) {
     return AutoGetCollection::Options{}.globalLockSkipOptions(
-        Lock::GlobalLockSkipOptions{.skipRSTLLock = skipRSTL, .explicitIntent = explicitIntent});
+        Lock::GlobalLockSkipOptions{.skipRSTLLock = skipRSTL});
 }
 
 }  // namespace
@@ -795,13 +792,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     // Don't use the AutoGet helpers because they require an open database, which may not be the
     // case when an index build is resumed during recovery.
-    Lock::DBLock dbLock(
-        opCtx,
-        dbName,
-        MODE_IX,
-        Date_t::max(),
-        Lock::DBLockSkipOptions{
-            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
@@ -1425,8 +1416,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         // Only on single phase builds, skip RSTL to avoid deadlocks with prepare conflicts and
         // state transitions caused by taking a strong collection lock. See SERVER-42621.
         const auto lockOptions =
-            makeAutoGetCollectionOptions(IndexBuildProtocol::kSinglePhase == replState->protocol,
-                                         rss::consensus::IntentRegistry::Intent::LocalWrite);
+            makeAutoGetCollectionOptions(IndexBuildProtocol::kSinglePhase == replState->protocol);
         AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_X, lockOptions);
         // Same options used here in order to avoid locking the RSTL after having taken the Global
         // lock.
@@ -1662,27 +1652,13 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
     const CollectionPtr& collection) {
-    // Retry loop to make sure we are able to declare the intent required to proceed.
-    int retryAttempts = 0;
-    for (;;) {
-        try {
-            // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
-            _indexBuildsManager.abortIndexBuildWithoutCleanup(
-                opCtx, collection, replState->buildUUID, replState->isResumable());
+    // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
+    _indexBuildsManager.abortIndexBuildWithoutCleanup(
+        opCtx, collection, replState->buildUUID, replState->isResumable());
 
-            replState->abortForShutdown(opCtx);
+    replState->abortForShutdown(opCtx);
 
-            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-            return;
-        } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
-            ++retryAttempts;
-            logAndBackoff(10262302,
-                          MONGO_LOGV2_DEFAULT_COMPONENT,
-                          logv2::LogSeverity::Debug(1),
-                          retryAttempts,
-                          "Retrying _completeAbortForShutdown until we can declare our intent");
-        }
-    }
+    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
 }
 
 std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* opCtx) {
@@ -2223,13 +2199,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     // Don't use the AutoGet helpers because they require an open database, which may not be the
     // case when an index build is restarted during recovery.
 
-    Lock::DBLock dbLock(
-        opCtx,
-        dbName,
-        MODE_IX,
-        Date_t::max(),
-        Lock::DBLockSkipOptions{
-            false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
     CollectionWriter collWriter(opCtx, collectionUUID);
     invariant(collWriter);
@@ -2244,9 +2214,7 @@ StatusWith<AutoGetCollection> IndexBuildsCoordinator::_autoGetCollectionExclusiv
     int retryCount = 0;
     while (true) {
         try {
-            auto autoGetCollOptions =
-                AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                    .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
+            AutoGetCollection::Options autoGetCollOptions;
             autoGetCollOptions.deadline(Date_t::now() + kStateTransitionBlockedMaxMs);
             return AutoGetCollection(
                 opCtx, {replState->dbName, replState->collectionUUID}, MODE_X, autoGetCollOptions);
@@ -3020,11 +2988,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         // if it waited.
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
+        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
 
@@ -3047,11 +3012,8 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     {
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
+        AutoGetCollection collLock(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
         uassertStatusOK(_indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(
@@ -3088,10 +3050,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        auto autoGetCollOptions =
-            AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-                .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX, autoGetCollOptions);
+        AutoGetCollection autoGetColl(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
@@ -3133,11 +3092,8 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    auto autoGetCollOptions =
-        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-            .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
     AutoGetCollection indexBuildEntryColl(
-        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX, autoGetCollOptions);
+        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
     // If we are no longer primary after receiving a commit quorum, we must restart and wait for a
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can

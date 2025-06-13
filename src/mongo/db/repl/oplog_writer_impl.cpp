@@ -71,12 +71,7 @@ Status insertDocsToOplogAndChangeCollections(OperationContext* opCtx,
     // performing any writes. This avoids potential deadlocks created by waiting for locks while
     // having generated oplog holes.
     if (writeOplogColl) {
-        autoOplog.emplace(
-            opCtx,
-            OplogAccessMode::kWrite,
-            Date_t::max(),
-            AutoGetOplogFastPathOptions{.explicitIntent =
-                                            rss::consensus::IntentRegistry::Intent::LocalWrite});
+        autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
     }
     if (writeChangeColl) {
         ccw.emplace(ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollectionsWriter(

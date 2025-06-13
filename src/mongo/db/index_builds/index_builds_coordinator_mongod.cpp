@@ -304,11 +304,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                 // to fail later on when locks are reacquired. Therefore, this assertion is not
                 // required for correctness, but only intended to rate limit index builds started on
                 // primaries.
-                Lock::GlobalLockSkipOptions options = {};
-                if (!nss.isReplicated()) {
-                    options.explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite;
-                }
-                Lock::GlobalLock globalLk(opCtx, MODE_IX, options);
+                Lock::GlobalLock globalLk(opCtx, MODE_IX);
 
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 uassert(ErrorCodes::NotWritablePrimary,

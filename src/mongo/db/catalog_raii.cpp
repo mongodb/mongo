@@ -39,7 +39,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/repl/collection_utils.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -203,12 +202,6 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
         dbLockOptions = *options._globalLockSkipOptions;
     } else {
         dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
-        // Do not use write intent for non-replicated collections.
-        if (nsOrUUID.isNamespaceString() && !nsOrUUID.nss().isReplicated()) {
-            dbLockOptions.explicitIntent = isSharedLockMode(modeColl)
-                ? rss::consensus::IntentRegistry::Intent::Read
-                : rss::consensus::IntentRegistry::Intent::LocalWrite;
-        }
         dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
     }
     // Skip checking direct connections for the database and only do so in AutoGetCollection
@@ -699,10 +692,11 @@ AutoGetOplogFastPath::AutoGetOplogFastPath(OperationContext* opCtx,
         // Invariant that global lock is already held for kLogOp mode.
         invariant(shard_role_details::getLocker(opCtx)->isWriteLocked());
     } else {
-        auto globalLkOptions = Lock::GlobalLockSkipOptions{
-            .skipRSTLLock = options.skipRSTLLock, .explicitIntent = options.explicitIntent};
-        _globalLock.emplace(
-            opCtx, lockMode, deadline, Lock::InterruptBehavior::kThrow, globalLkOptions);
+        _globalLock.emplace(opCtx,
+                            lockMode,
+                            deadline,
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLockSkipOptions{.skipRSTLLock = options.skipRSTLLock});
     }
 
     _stashedCatalog = CollectionCatalog::get(opCtx);

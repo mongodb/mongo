@@ -51,7 +51,6 @@
 #include "mongo/db/index_builds/index_builds_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -143,12 +142,9 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
     const NamespaceString& systemUsers = NamespaceString::kAdminUsersNamespace;
     const NamespaceString& systemRoles = NamespaceString::kAdminRolesNamespace;
 
-    auto options = AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-        .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
-
     // Create indexes for the admin.system.users collection.
     {
-        AutoGetCollection collection(opCtx, systemUsers, MODE_X, options);
+        AutoGetCollection collection(opCtx, systemUsers, MODE_X);
 
         if (collection) {
             SectionScopedTimer scopedTimer(opCtx->getServiceContext()->getFastClockSource(),
@@ -186,7 +182,7 @@ Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeE
 
     // Create indexes for the admin.system.roles collection.
     {
-        AutoGetCollection collection(opCtx, systemRoles, MODE_X, options);
+        AutoGetCollection collection(opCtx, systemRoles, MODE_X);
 
         // Ensure that system indexes exist for the roles collection, if it exists.
         if (collection) {

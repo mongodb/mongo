@@ -34,13 +34,10 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/intent_registry.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
 
 #include <boost/move/utility_core.hpp>
@@ -109,10 +106,9 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
         _result = LOCK_INVALID;
         if (options.skipRSTLLock) {
-            _declareIntent(lockMode, options.explicitIntent);
             _takeGlobalLockOnly(lockMode, deadline);
         } else {
-            _takeGlobalAndRSTLLocks(lockMode, deadline, options.explicitIntent);
+            _takeGlobalAndRSTLLocks(lockMode, deadline);
         }
         _result = LOCK_OK;
 
@@ -135,40 +131,16 @@ void Lock::GlobalLock::_takeGlobalLockOnly(LockMode lockMode, Date_t deadline) {
     shard_role_details::getLocker(_opCtx)->lockGlobal(_opCtx, lockMode, deadline);
 }
 
-void Lock::GlobalLock::_takeGlobalAndRSTLLocks(
-    LockMode lockMode,
-    Date_t deadline,
-    boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent) {
+void Lock::GlobalLock::_takeGlobalAndRSTLLocks(LockMode lockMode, Date_t deadline) {
     shard_role_details::getLocker(_opCtx)->lock(
         _opCtx, resourceIdReplicationStateTransitionLock, MODE_IX, deadline);
     ScopeGuard unlockRSTL([this] {
         shard_role_details::getLocker(_opCtx)->unlock(resourceIdReplicationStateTransitionLock);
     });
 
-    _declareIntent(lockMode, explicitIntent);
-
     shard_role_details::getLocker(_opCtx)->lockGlobal(_opCtx, lockMode, deadline);
 
     unlockRSTL.dismiss();
-}
-
-void Lock::GlobalLock::_declareIntent(
-    LockMode lockMode, boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent) {
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        if (explicitIntent) {
-            _guard.emplace(explicitIntent.get(), _opCtx);
-            if (isSharedLockMode(lockMode)) {
-                // Only read intent is allowed with MODE_IS global lock acquisitions.
-                invariant(explicitIntent.get() == rss::consensus::IntentRegistry::Intent::Read);
-            }
-        } else if (!isSharedLockMode(lockMode)) {
-            _guard.emplace(rss::consensus::IntentRegistry::Intent::Write, _opCtx);
-        } else if (isSharedLockMode(lockMode)) {
-            _guard.emplace(rss::consensus::IntentRegistry::Intent::Read, _opCtx);
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
 }
 
 Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
@@ -248,9 +220,6 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
       _mode(mode),
       _oldBlockingAllowed(shard_role_details::getRecoveryUnit((_opCtx))->getBlockingAllowed()) {
 
-    if ((dbName.isLocalDB() || !opCtx->writesAreReplicated()) && !isSharedLockMode(mode)) {
-        options.explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite;
-    }
     _globalLock.emplace(opCtx,
                         isSharedLockMode(_mode) ? MODE_IS : MODE_IX,
                         deadline,

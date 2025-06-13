@@ -547,7 +547,7 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                                       NamespaceString::makePreImageCollectionNSS(tenantId),
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kUnreplicatedWrite),
+                                      AcquisitionPrerequisites::kWrite),
                                   MODE_IX);
 
             if (!preImagesColl.exists()) {

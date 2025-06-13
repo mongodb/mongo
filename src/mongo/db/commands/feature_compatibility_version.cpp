@@ -49,7 +49,6 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -290,10 +289,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
-    auto options = AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
-        .explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
-    AutoGetCollection autoColl(
-        opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX, options);
+    AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
     invariant(autoColl.ensureDbExists(opCtx),
               redactTenant(NamespaceString::kServerConfigurationNamespace));
 

@@ -45,7 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/direct_connection_util.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -269,8 +268,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
                 shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_X));
 
     // Verify that we are using the latest instance if we intend to perform writes.
-    if (operationType == AcquisitionPrerequisites::OperationType::kWrite ||
-        operationType == AcquisitionPrerequisites::OperationType::kUnreplicatedWrite) {
+    if (operationType == AcquisitionPrerequisites::OperationType::kWrite) {
         auto latest = CollectionCatalog::latest(opCtx);
         if (!latest->isLatestCollection(opCtx, coll.get())) {
             throwWriteConflictException(str::stream() << "Unable to write to collection '"
@@ -1312,19 +1310,6 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
                             [](const auto& ar) {
                                 return AutoGetDb::canSkipFlowControlTicket(ar.prerequisites.nss);
                             });
-            auto mostRestrictiveIntent = rss::consensus::IntentRegistry::Intent::Read;
-            for (const auto& acquisition : sortedAcquisitionRequests) {
-                if (acquisition.prerequisites.operationType == AcquisitionPrerequisites::kWrite) {
-                    mostRestrictiveIntent = rss::consensus::IntentRegistry::Intent::Write;
-                    // Cannot get more restricted than Write intent so break out early.
-                    break;
-                }
-                if (acquisition.prerequisites.operationType ==
-                    AcquisitionPrerequisites::kUnreplicatedWrite) {
-                    mostRestrictiveIntent = rss::consensus::IntentRegistry::Intent::LocalWrite;
-                }
-            }
-            dbLockOptions.explicitIntent = mostRestrictiveIntent;
             return dbLockOptions;
         }();
 

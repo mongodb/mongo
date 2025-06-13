@@ -790,14 +790,7 @@ void MovePrimaryCoordinator::blockWritesLegacy(OperationContext* opCtx) const {
 }
 
 void MovePrimaryCoordinator::unblockWritesLegacy(OperationContext* opCtx) const {
-    // We need to be able to unset movePrimaryInProgress in the event of shutdown.
-    AutoGetDb autoDb(opCtx,
-                     _dbName,
-                     MODE_IX,
-                     boost::none,
-                     Date_t::max(),
-                     Lock::DBLockSkipOptions{
-                         false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+    AutoGetDb autoDb(opCtx, _dbName, MODE_IX);
     auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, _dbName);
     scopedDsr->unsetMovePrimaryInProgress(opCtx);
 }

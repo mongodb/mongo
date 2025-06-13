@@ -652,12 +652,7 @@ Status FilteringMetadataCache::_refreshDbMetadata(OperationContext* opCtx,
     catalogCache->onStaleDatabaseVersion(dbName, boost::none /* wantedVersion */);
     const auto swDbMetadata = catalogCache->getDatabase(opCtx, dbName);
 
-    Lock::DBLock dbLock(
-        opCtx,
-        dbName,
-        MODE_IX,
-        Date_t::max(),
-        Lock::DBLockSkipOptions{false, false, false, rss::consensus::IntentRegistry::Intent::Read});
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {

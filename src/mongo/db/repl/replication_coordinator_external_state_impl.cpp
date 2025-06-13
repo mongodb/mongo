@@ -1260,13 +1260,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
             continue;
 
         LOGV2_DEBUG(21309, 2, "Removing temporary collections", logAttrs(dbName));
-        Lock::DBLock dbLock(
-            opCtx,
-            dbName,
-            MODE_IX,
-            Date_t::max(),
-            Lock::DBLockSkipOptions{
-                false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
         clearTempCollections(opCtx, dbName);
     }
 }

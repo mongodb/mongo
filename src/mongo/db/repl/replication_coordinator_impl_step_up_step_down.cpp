@@ -275,8 +275,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
     if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(_killConflictingOperations(
-            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+        rstg.emplace(
+            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
     }
 
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
@@ -432,7 +432,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
             if (gFeatureFlagIntentRegistration.isEnabled()) {
                 rstg.emplace(_killConflictingOperations(
-                    rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+                    rss::consensus::IntentRegistry::InterruptionType::StepDown));
             }
             // Since we have released the RSTL lock at this point, there can be some read
             // operations sneaked in here, that might hold global lock in S mode or blocked on

@@ -38,7 +38,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -75,14 +74,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
       _validateLock(isBackground()
                         ? boost::none
                         : boost::optional<Lock::SharedLock>{obtainSharedValidationLock(opCtx)}),
-      _globalLock(opCtx,
-                  isBackground() ? MODE_IS : MODE_IX,
-                  {false,
-                   false,
-                   false,
-                   getRepairMode() != RepairMode::kNone
-                       ? rss::consensus::IntentRegistry::Intent::LocalWrite
-                       : rss::consensus::IntentRegistry::Intent::Read}),
+      _globalLock(opCtx, isBackground() ? MODE_IS : MODE_IX),
       _nss(nss),
       _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }) {
 
@@ -187,18 +179,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
         _collection =
             CollectionPtr(_catalog->establishConsistentCollection(opCtx, _nss, _validateTs));
     } else {
-        _databaseLock.emplace(
-            opCtx,
-            _nss.dbName(),
-            MODE_IX,
-            boost::none,
-            Date_t::max(),
-            Lock::DBLockSkipOptions{false,
-                                    false,
-                                    false,
-                                    getRepairMode() != RepairMode::kNone
-                                        ? rss::consensus::IntentRegistry::Intent::LocalWrite
-                                        : rss::consensus::IntentRegistry::Intent::Read});
+        _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
         _catalog = CollectionCatalog::get(opCtx);
         // TODO(SERVER-103401): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
