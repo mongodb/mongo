@@ -31,6 +31,8 @@ buildvariants:
     - name: compile_test_and_package_serial_no_unittests_TG
       distros:
       - amazon2023.3-large
+    # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+    - name: set_downstream_expansions_for_mongot
     - name: search
     - name: search_auth
     - name: search_end_to_end_sharded_cluster
@@ -89,6 +91,8 @@ buildvariants:
     - name: compile_test_and_package_serial_no_unittests_TG
       distros:
       - amazon2023.3-arm64-large
+    # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+    - name: set_downstream_expansions_for_mongot
     - name: search
     - name: search_auth
     - name: search_end_to_end_sharded_cluster
@@ -143,6 +147,8 @@ buildvariants:
     - name: compile_test_and_package_serial_no_unittests_TG
       distros:
       - amazon2-arm64-large
+    # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+    - name: set_downstream_expansions_for_mongot
     - name: search
     - name: search_auth
     - name: search_end_to_end_sharded_cluster
@@ -198,6 +204,8 @@ buildvariants:
     - name: compile_test_and_package_serial_no_unittests_TG
       distros:
       - amazon2-large
+    # downstream_expansions.set() is noop for evergreen versions, so fine to define in cron-only variants for sake of shared yaml anchor.
+    - name: set_downstream_expansions_for_mongot
     - name: search
     - name: search_auth
     - name: search_end_to_end_sharded_cluster
