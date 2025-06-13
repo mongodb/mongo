@@ -480,6 +480,7 @@ mongo_cc_library(
     deps = [
         ":disk_space_monitor",
         ":record_store_base",
+        "//src/mongo/db/concurrency:exception_util",
     ],
 )
 
