@@ -133,7 +133,8 @@ struct SortOptions {
     // If set, allows us to observe Sorter file handle usage.
     SorterFileStats* sorterFileStats;
 
-    // If set, allows us to observe aggregate Sorter behaviors.
+    // If set, allows us to observe aggregate Sorter behaviors. The lifetime of this object must
+    // exceed that of the Sorter instance; otherwise, it will lead to a user-after-free error.
     SorterTracker* sorterTracker;
 
     // When set, this sorter will own a memory pool that callers should used to allocate memory for
@@ -305,6 +306,12 @@ protected:
 class SorterBase {
 public:
     SorterBase(SorterTracker* sorterTracker = nullptr) : _stats(sorterTracker) {}
+    ~SorterBase() {
+        // After the Sorter is destroyed all memory it holds is gone so we are
+        // setting the memory usage to zero to have it reflected on the sorterTracker
+        // if it was provided.
+        _stats.setMemUsage(0);
+    }
 
     const SorterStats& stats() const {
         return _stats;
