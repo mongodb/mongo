@@ -157,6 +157,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    const SockAddr& getProxiedSrcRemoteAddr() const final {
+        MONGO_UNIMPLEMENTED;
+    }
+
 private:
     // TODO SERVER-74020: replace this with `GRPCTransportLayer`.
     TransportLayer* const _tl;
