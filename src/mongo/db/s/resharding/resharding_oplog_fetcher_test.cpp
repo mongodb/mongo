@@ -108,6 +108,7 @@
 #include "mongo/util/str.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <ostream>
 #include <string>
 #include <system_error>
@@ -179,6 +180,10 @@ private:
 
 class ReshardingOplogFetcherTest : public ShardServerTestFixture {
 public:
+    ReshardingOplogFetcherTest()
+        : ShardServerTestFixture(
+              Options{}.useMockClock(true).useMockTickSource<Milliseconds>(true)) {}
+
     void setUp() override {
         ShardServerTestFixture::setUp();
         _opCtx = operationContext();
@@ -222,6 +227,7 @@ public:
         _fetchTimestamp = queryOplog(BSONObj())["ts"].timestamp();
         _donorShard = kTwoShardIdList[0];
         _destinationShard = kTwoShardIdList[1];
+        _metrics->registerDonors({_donorShard});
     }
 
     auto makeFetcherEnv() {
@@ -357,6 +363,16 @@ public:
                                       BSONArray oplogEntries,
                                       CursorId cursorId = 0) {
         return BSON("cursor" << BSON("firstBatch"
+                                     << oplogEntries << "postBatchResumeToken"
+                                     << BSON("ts" << postBatchResumeToken) << "id" << cursorId
+                                     << "ns"
+                                     << NamespaceString::kRsOplogNamespace.toString_forTest()));
+    };
+
+    BSONObj makeMockGetMoreResponse(Timestamp postBatchResumeToken,
+                                    BSONArray oplogEntries,
+                                    CursorId cursorId = 0) {
+        return BSON("cursor" << BSON("nextBatch"
                                      << oplogEntries << "postBatchResumeToken"
                                      << BSON("ts" << postBatchResumeToken) << "id" << cursorId
                                      << "ns"
@@ -536,6 +552,57 @@ public:
     }
 
 protected:
+    ClockSourceMock* clockSource() {
+        return dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
+    }
+
+    TickSourceMock<Milliseconds>* tickSource() {
+        return dynamic_cast<TickSourceMock<Milliseconds>*>(getServiceContext()->getTickSource());
+    }
+
+    Date_t now() {
+        return clockSource()->now();
+    }
+
+    void advanceTime(Milliseconds millis) {
+        clockSource()->advance(millis);
+        tickSource()->advance(millis);
+    }
+
+    /**
+     * Advances the mock clock forward to the next whole second.
+     *
+     * If the current time is already at a second boundary, the clock is not advanced. Otherwise,
+     * the clock is advanced by the number of milliseconds needed so that the time is rounded up to
+     * the next second (i.e. the milliseconds component becomes zero).
+     */
+    void advanceTimeToNextSecond() {
+        long long currentMillis = now().toMillisSinceEpoch();
+        long long millisToNextSecond =
+            (1000 - (currentMillis % 1000)) % 1000;  // 0 if already at second boundary
+
+        if (millisToNextSecond > 0) {
+            advanceTime(Milliseconds(millisToNextSecond));
+            tickSource()->advance(Milliseconds(millisToNextSecond));
+        }
+    }
+
+    /**
+     * Makes a cluster timestamp at the given timestamp. Guarantees the "i" field, which is an
+     * increasing increment for differentiating operations within the same second, is strictly
+     * increasing.
+     */
+    Timestamp makeClusterTimestampAt(Date_t date) {
+        return Timestamp(date.toMillisSinceEpoch() / 1000, _clusterTimestampInc++);
+    }
+
+    /**
+     * Makes a cluster timestamp at the current timestamp.
+     */
+    Timestamp makeClusterTimestampAtNow() {
+        return makeClusterTimestampAt(now());
+    }
+
     void testFetcherBasic(const NamespaceString& outputCollectionNss,
                           const NamespaceString& dataCollectionNss,
                           bool storeProgress,
@@ -598,7 +665,10 @@ protected:
     // To be reset per test case.
     UUID _reshardingUUID = UUID::gen();
     std::unique_ptr<ReshardingMetrics> _metrics;
+
     Timestamp _fetchTimestamp;
+    int32_t _clusterTimestampInc = 0;
+
     ShardId _donorShard;
     ShardId _destinationShard;
 
@@ -1673,7 +1743,7 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
         auto executor = makeExecutor();
         executor->startup();
 
-        // Invoke onEnterCriticalSection() after the fetcher has consumed the final oplog entry.
+        // Invoke onPrepareCriticalSection() after the fetcher has consumed the final oplog entry.
         auto fp = globalFailPointRegistry().find("pauseReshardingOplogFetcherAfterConsuming");
         auto timesEnteredBefore = fp->setMode(FailPoint::alwaysOn);
 
@@ -1699,6 +1769,8 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
         auto timesEnteredAfter = fp->setMode(FailPoint::off);
         ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
 
+        // The thread below would block without the time advancing.
+        advanceTime(Seconds{1});
         aggBeforePrepareFuture.default_timed_get();
 
         // Schedule a response for the killCursor command to prevent its request from interfering
@@ -1723,6 +1795,499 @@ TEST_F(ReshardingOplogFetcherTest, PrepareForCriticalSectionAfterFetchingFinalOp
 
         resetResharding();
     }
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorAdvancedBasic) {
+    auto smoothingFactor = 0.5;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId = 123;
+    advanceTime(Seconds{10});
+    auto postBatchResumeToken0 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch0 = Milliseconds(5000);
+    advanceTime(timeToFetch0);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch0 = timeToFetch0;
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    advanceTime(Seconds{5});
+    auto postBatchResumeToken1 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch1 = Milliseconds(2000);
+    advanceTime(timeToFetch1);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockGetMoreResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got updated based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+              Milliseconds(avgTimeToFetch1));
+
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken2 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch2 = Milliseconds(1000);
+    advanceTime(timeToFetch2);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken2));
+        return makeMockGetMoreResponse(postBatchResumeToken2, oplogEntries, cursorId);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
+
+    // Verify that the average did not get updated when the fetcher joined.
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+              Milliseconds(avgTimeToFetch1));
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayLessThanOneSecond) {
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId = 123;
+    advanceTime(Seconds{10});
+    auto postBatchResumeToken0 = makeClusterTimestampAtNow();
+
+    // Advance the clock by less than one second before mocking a response with the resume token
+    // above.
+    auto timeToFetch0 = Milliseconds(321);
+    advanceTime(timeToFetch0);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch0 = timeToFetch0;
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    // Mock a response with the final oplog entry so the fetcher can join.
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken1 = makeClusterTimestampAtNow();
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken1));
+        return makeMockGetMoreResponse(postBatchResumeToken1, oplogEntries, cursorId);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayZeroSecond) {
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId = 123;
+    advanceTime(Seconds{10});
+    auto postBatchResumeToken0 = makeClusterTimestampAtNow();
+
+    // Do not advance the clock before mocking a response with the resume token above.
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp which is 0.
+    auto avgTimeToFetch0 = Milliseconds(0);
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    // Mock a response with the final oplog entry so the fetcher can join.
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken1 = makeClusterTimestampAtNow();
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken1));
+        return makeMockGetMoreResponse(postBatchResumeToken1, oplogEntries, cursorId);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchAdvancedDelayNegativeClockSkew) {
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId = 123;
+    advanceTime(Seconds{10});
+    // Make the resume timestamp greater than the current time on the recipient.
+    auto postBatchResumeToken0 = makeClusterTimestampAt(now() + Seconds(5));
+
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp. The difference was negative but got capped at 0.
+    auto avgTimeToFetch0 = Milliseconds(0);
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    // Mock a response with the final oplog entry so the fetcher can join.
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken1 = makeClusterTimestampAtNow();
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken1));
+        return makeMockGetMoreResponse(postBatchResumeToken1, oplogEntries, cursorId);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchCursorNotAdvanced) {
+    auto smoothingFactor = 0.6;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId = 123;
+    advanceTime(Seconds{10});
+    auto postBatchResumeToken0 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch0 = Milliseconds(5000);
+    advanceTime(timeToFetch0);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch0 = timeToFetch0;
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    // Make the cursor not advance.
+    auto postBatchResumeToken1 = postBatchResumeToken0;
+    auto getMoreDuration1 = Milliseconds(5);
+    auto timeToFetch1 = getMoreDuration1;
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        // Advance the clock before mocking a response with the resume token above.
+        advanceTime(getMoreDuration1);
+        return makeMockGetMoreResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got updated based on the time taken for the getMore command to
+    // return.
+    auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+              Milliseconds(avgTimeToFetch1));
+
+    // Make the cursor not advance again.
+    auto postBatchResumeToken2 = postBatchResumeToken0;
+    auto getMoreDuration2 = Milliseconds(1);
+    auto timeToFetch2 = getMoreDuration2;
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        // Advance the clock before mocking a response with the resume token above.
+        advanceTime(getMoreDuration2);
+        return makeMockGetMoreResponse(postBatchResumeToken2, {} /* oplogEntries */, cursorId);
+    });
+
+    // Verify that the average got updated based on the time taken for the getMore command to
+    // return.
+    auto avgTimeToFetch2 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToFetch1.count(), timeToFetch2.count(), smoothingFactor));
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+              Milliseconds(avgTimeToFetch2));
+
+    // Mock a response with the final oplog entry so the fetcher can join.
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken3 = makeClusterTimestampAtNow();
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken3));
+        return makeMockGetMoreResponse(postBatchResumeToken3, oplogEntries, cursorId);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
+}
+
+TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
+    auto smoothingFactor = 0.7;
+    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
+        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
+
+    const NamespaceString outputCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.outputCollection");
+    const NamespaceString dataCollectionNss =
+        NamespaceString::createNamespaceString_forTest("dbtests.runFetchIteration");
+
+    create(outputCollectionNss);
+    create(dataCollectionNss);
+
+    const auto& collectionUUID = [&] {
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        return dataColl->uuid();
+    }();
+
+    // To make the time difference calculation in this test work as expected, advance the clock to
+    // the next second since a clusterTime timestamp only has second granularity, as the "t" field
+    // is the number of seconds since epoch and the "i" field is just an increasing increment for
+    // differentiating operations within the same second.
+    advanceTimeToNextSecond();
+
+    advanceTime(Seconds{60});
+    _fetchTimestamp = makeClusterTimestampAtNow();
+
+    ReshardingOplogFetcher fetcher(makeFetcherEnv(),
+                                   _reshardingUUID,
+                                   collectionUUID,
+                                   {_fetchTimestamp, _fetchTimestamp},
+                                   _donorShard,
+                                   _destinationShard,
+                                   outputCollectionNss,
+                                   true /* storeProgress */);
+    auto executor = makeExecutor();
+    executor->startup();
+    auto fetcherFuture = fetcher.schedule(executor, CancellationToken::uncancelable());
+
+    // Verify that the average started out uninitialized.
+    ASSERT_FALSE(_metrics->getAverageTimeToFetchOplogEntries(_donorShard));
+
+    auto cursorId0 = 0;
+    advanceTime(Seconds{10});
+    auto postBatchResumeToken0 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch0 = Milliseconds(3000);
+    advanceTime(timeToFetch0);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken0, {} /* oplogEntries */, cursorId0);
+    });
+
+    // Verify that the average got initialized based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch0 = timeToFetch0;
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard), avgTimeToFetch0);
+
+    auto cursorId1 = 123;
+    advanceTime(Seconds{5});
+    auto postBatchResumeToken1 = makeClusterTimestampAtNow();
+
+    // Advance the clock before mocking a response with the resume token above.
+    auto timeToFetch1 = Milliseconds(2000);
+    advanceTime(timeToFetch1);
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        return makeMockAggregateResponse(postBatchResumeToken1, {} /* oplogEntries */, cursorId1);
+    });
+
+    // Verify that the average got updated based on the difference between the current timestamp
+    // and the latest resume timestamp.
+    auto avgTimeToFetch1 = Milliseconds((int)resharding::calculateExponentialMovingAverage(
+        avgTimeToFetch0.count(), timeToFetch1.count(), smoothingFactor));
+    ASSERT_EQ(_metrics->getAverageTimeToFetchOplogEntries(_donorShard),
+              Milliseconds(avgTimeToFetch1));
+
+    // Mock a response with the final oplog entry so the fetcher can join.
+    advanceTime(Seconds{1});
+    auto postBatchResumeToken2 = makeClusterTimestampAtNow();
+    onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        auto oplogEntries = BSON_ARRAY(
+            makeFinalNoopOplogEntry(dataCollectionNss, collectionUUID, postBatchResumeToken2));
+        return makeMockGetMoreResponse(postBatchResumeToken2, oplogEntries, cursorId1);
+    });
+
+    ASSERT_OK(fetcherFuture.getNoThrow());
+    executor->shutdown();
+    executor->join();
 }
 
 }  // namespace

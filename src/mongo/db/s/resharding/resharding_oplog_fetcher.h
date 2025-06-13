@@ -178,7 +178,6 @@ private:
 
     const UUID _reshardingUUID;
     const UUID _collUUID;
-    ReshardingDonorOplogId _startAt;
     const ShardId _donorShard;
     const ShardId _recipientShard;
     const NamespaceString _oplogBufferNss;
@@ -187,6 +186,7 @@ private:
     int _numOplogEntriesCopied = 0;
 
     stdx::mutex _mutex;
+    ReshardingDonorOplogId _startAt;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
     AtomicWord<bool> _isPreparingForCriticalSection;
