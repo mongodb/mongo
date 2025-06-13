@@ -167,11 +167,11 @@ static BSONObj buildIndexBoundsKeyPattern(const BSONObj& wiKeyPattern) {
  * 'indexBounds'. Returns the set of multikey paths represented by the keys.
  */
 static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opCtx,
-                                                           const IndexCatalogEntry* entry,
+                                                           const IndexCatalogEntry* index,
                                                            const IndexBounds& indexBounds,
                                                            MultikeyMetadataAccessStats* stats) {
     const WildcardAccessMethod* wam =
-        static_cast<const WildcardAccessMethod*>(entry->accessMethod());
+        static_cast<const WildcardAccessMethod*>(index->accessMethod());
     return writeConflictRetry(
         opCtx,
         "wildcard multikey path retrieval",
@@ -183,7 +183,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
             auto cursor = wam->newCursor(opCtx, ru);
 
             constexpr int kForward = 1;
-            const auto keyPattern = buildIndexBoundsKeyPattern(entry->descriptor()->keyPattern());
+            const auto keyPattern = buildIndexBoundsKeyPattern(index->descriptor()->keyPattern());
             IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
             IndexSeekPoint seekPoint;
             if (!checker.getStartSeekPoint(&seekPoint)) {
@@ -389,7 +389,7 @@ static std::pair<BSONObj, BSONObj> buildMetadataKeyRange(const BSONObj& keyPatte
 }
 
 std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
-                                              const IndexCatalogEntry* entry,
+                                              const IndexCatalogEntry* index,
                                               MultikeyMetadataAccessStats* stats) {
     return writeConflictRetry(
         opCtx, "wildcard multikey path retrieval", NamespaceString::kEmpty, [&]() {
@@ -398,12 +398,12 @@ std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
             stats->keysExamined = 0;
 
             const WildcardAccessMethod* wam =
-                static_cast<const WildcardAccessMethod*>(entry->accessMethod());
+                static_cast<const WildcardAccessMethod*>(index->accessMethod());
             auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
             auto cursor = wam->newCursor(opCtx, ru);
 
             const auto [metadataKeyRangeBegin, metadataKeyRangeEnd] =
-                buildMetadataKeyRange(entry->descriptor()->keyPattern());
+                buildMetadataKeyRange(index->descriptor()->keyPattern());
 
             constexpr bool inclusive = true;
             cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
