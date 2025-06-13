@@ -110,11 +110,11 @@ public:
     void restoreState(const RestoreContext&) override {}
 
     void detachFromOperationContext() override {
-        _pipeline->detachFromOperationContext();
+        _execPipeline->detachFromOperationContext();
     }
 
     void reattachToOperationContext(OperationContext* opCtx) override {
-        _pipeline->reattachToOperationContext(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
     }
 
     ExecState getNext(BSONObj* objOut, RecordId* recordIdOut) override;

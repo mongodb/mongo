@@ -395,7 +395,8 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest,
         auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
         pipelineStages.push_front(source);
         auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
-        auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+        auto execPipeline =
+            exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
         auto exhaustPipeline = [&]() {
             while (execPipeline->getNext().has_value()) {
@@ -449,7 +450,7 @@ TEST_F(DocumentSourceSetWindowFieldsSpillingTest, CanForceSpill) {
     auto source = DocumentSourceMock::createForTest(docs, getExpCtx());
     pipelineStages.push_front(source);
     auto pipeline = Pipeline::create(pipelineStages, getExpCtx());
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     int nextDocIndex = 0;
     auto assertNextDocument = [&](const boost::optional<Document>& doc) {

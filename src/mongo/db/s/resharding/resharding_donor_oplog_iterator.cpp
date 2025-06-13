@@ -167,14 +167,15 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
         Timer fetchTimer;
         if (_pipeline) {
-            _pipeline->reattachToOperationContext(opCtx.get());
+            _execPipeline->reattachToOperationContext(opCtx.get());
         } else {
             auto pipeline = makePipeline(opCtx.get(), MongoProcessInterface::create(opCtx.get()));
             _pipeline = pipeline->getContext()
                             ->getMongoProcessInterface()
                             ->attachCursorSourceToPipelineForLocalRead(pipeline.release());
             _pipeline.get_deleter().dismissDisposal();
-            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+            _execPipeline =
+                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
         }
 
         auto batch = _fillBatch();
@@ -188,7 +189,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 // Skip returning the final oplog entry because it is known to be a no-op.
                 batch.pop_back();
             } else {
-                _pipeline->detachFromOperationContext();
+                _execPipeline->detachFromOperationContext();
                 guard.dismiss();
             }
         }

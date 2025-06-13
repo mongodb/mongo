@@ -60,7 +60,7 @@ TEST(PipelineTest, OneStagePipeline) {
     // Assert that the source stage is initially set to nullptr.
     ASSERT_EQ(nullptr, dynamic_cast<FakeStage*>(stages.back().get())->getSource());
 
-    Pipeline pl(std::move(stages));
+    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
 
     // Assert that the source stage is still set to nullptr.
     ASSERT_EQ(nullptr, dynamic_cast<FakeStage*>(pl.getStages().back().get())->getSource());
@@ -73,7 +73,7 @@ TEST(PipelineTest, ThreeStagePipeline) {
 
     StageContainer stages{stage0, stage1, stage2};
 
-    Pipeline pl(std::move(stages));
+    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
 
     // Assert that the stage order does not change.
     ASSERT_EQ(stage0.get(), pl.getStages()[0].get());
@@ -83,7 +83,7 @@ TEST(PipelineTest, ThreeStagePipeline) {
 
 DEATH_TEST_REGEX(PipelineTest, GetNextResultOnEmptyPipelineThrows, "Tripwire assertion.*10394800") {
     StageContainer stages;
-    Pipeline pl(std::move(stages));
+    Pipeline pl(std::move(stages), make_intrusive<ExpressionContextForTest>());
     ASSERT_THROWS_CODE(pl.getNextResult(), AssertionException, 10395600);
 }
 

@@ -366,8 +366,8 @@ BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(
         auto pipelineWithCursor = attachCursorSourceToPipelineForLocalRead(ownedPipeline);
         // If we need execution stats, this runs the plan in order to gather the stats.
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            auto execPipelineWithCursor =
-                exec::agg::buildPipeline(pipelineWithCursor->getSources());
+            auto execPipelineWithCursor = exec::agg::buildPipeline(
+                pipelineWithCursor->getSources(), pipelineWithCursor->getContext());
             while (execPipelineWithCursor->getNext()) {
             }
         }

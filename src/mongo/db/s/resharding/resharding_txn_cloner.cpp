@@ -166,15 +166,16 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_restartPipeline
     auto pipeline = _targetAggregationRequest(
         opCtx, *makePipeline(opCtx, std::move(mongoProcessInterface), progressLsid));
 
-    pipeline->detachFromOperationContext();
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
+    execPipeline->detachFromOperationContext();
     pipeline.get_deleter().dismissDisposal();
     return pipeline;
 }
 
 boost::optional<SessionTxnRecord> ReshardingTxnCloner::_getNextRecord(
     OperationContext* opCtx, Pipeline& pipeline, exec::agg::Pipeline& execPipeline) {
-    pipeline.reattachToOperationContext(opCtx);
-    ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
+    execPipeline.reattachToOperationContext(opCtx);
+    ON_BLOCK_EXIT([&execPipeline] { execPipeline.detachFromOperationContext(); });
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
     // recipient spent waiting for documents from the donor shard. It doing so requires the CurOp to
@@ -263,8 +264,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                                             MONGO_unlikely(mongoProcessInterface_forTest)
                                                 ? mongoProcessInterface_forTest
                                                 : MongoProcessInterface::create(opCtx.get()));
-                       chainCtx->execPipeline =
-                           exec::agg::buildPipeline(chainCtx->pipeline->getSources());
+                       chainCtx->execPipeline = exec::agg::buildPipeline(
+                           chainCtx->pipeline->getSources(), chainCtx->pipeline->getContext());
                        chainCtx->donorRecord = boost::none;
                    }
 

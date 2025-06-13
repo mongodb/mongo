@@ -299,7 +299,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToIterateCursorsUntilEOF) {
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     // Iterate the $mergeCursors stage asynchronously on a different thread, since it will block
     // waiting for network responses, which we will manually schedule below.
@@ -371,7 +371,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     armParams.setRemotes(std::move(cursors));
     auto pipeline = Pipeline::create({}, expCtx);
     pipeline->addInitialSource(DocumentSourceMergeCursors::create(expCtx, std::move(armParams)));
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
     // network responses, which we will manually schedule below.
@@ -424,7 +424,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldEnforceSortSpecifiedViaARMParams) {
     ASSERT_EQ(pipeline->getSources().size(), 1UL);
     ASSERT_TRUE(dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     // Iterate the pipeline asynchronously on a different thread, since it will block waiting for
     // network responses, which we will manually schedule below.

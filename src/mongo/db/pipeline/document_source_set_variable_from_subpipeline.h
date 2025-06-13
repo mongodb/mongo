@@ -142,7 +142,8 @@ protected:
         : DocumentSource(kStageName, expCtx),
           exec::agg::Stage(kStageName, expCtx),
           _subPipeline(std::move(subpipeline)),
-          _subExecPipeline(exec::agg::buildPipeline(_subPipeline->getSources())),
+          _subExecPipeline(
+              exec::agg::buildPipeline(_subPipeline->getSources(), _subPipeline->getContext())),
           _variableID(varID) {}
 
     void doDispose() final;

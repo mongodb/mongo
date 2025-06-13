@@ -42,7 +42,7 @@ TEST(PipelineBuilderTest, OneStagePipeline) {
         make_intrusive<DocumentSourceTestOptimizations>(make_intrusive<ExpressionContextForTest>());
     std::list<boost::intrusive_ptr<DocumentSource>> sources{dsFake};
 
-    auto pl = exec::agg::buildPipeline(sources);
+    auto pl = exec::agg::buildPipeline(sources, make_intrusive<ExpressionContextForTest>());
 
     ASSERT_EQ(1UL, pl->getStages().size());
 

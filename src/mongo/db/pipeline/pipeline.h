@@ -246,24 +246,6 @@ public:
     }
 
     /**
-     * Sets the OperationContext of 'pCtx' to nullptr and calls 'detachFromOperationContext()' on
-     * all underlying DocumentSources.
-     */
-    void detachFromOperationContext();
-
-    /**
-     * Sets the OperationContext of 'pCtx' to 'opCtx', and reattaches all underlying DocumentSources
-     * to 'opCtx'.
-     */
-    void reattachToOperationContext(OperationContext* opCtx);
-
-    /**
-     * Recursively validate the operation contexts associated with this pipeline. Return true if
-     * all document sources and subpipelines point to the given operation context.
-     */
-    bool validateOperationContext(const OperationContext* opCtx) const;
-
-    /**
      * Releases any resources held by this pipeline such as PlanExecutors or in-memory structures.
      * Must be called before deleting a Pipeline.
      *
@@ -587,12 +569,6 @@ private:
      * in optimizePipeline().
      */
     void stitch();
-
-    /**
-     * Asserts whether operation contexts associated with this pipeline are consistent across
-     * sources.
-     */
-    void checkValidOperationContext() const;
 
     SourceContainer _sources;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;

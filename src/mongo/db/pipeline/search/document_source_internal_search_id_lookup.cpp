@@ -159,7 +159,8 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             pipeline =
                 pExpCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
                     pipeline.release(), boost::none, false, _shardFilterPolicy);
-            auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+            auto execPipeline =
+                exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
             result = execPipeline->getNext();
             if (auto next = execPipeline->getNext()) {
                 uasserted(ErrorCodes::TooManyMatchingDocuments,

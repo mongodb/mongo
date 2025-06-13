@@ -571,7 +571,7 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineSorted) {
         makeTransactions(10, 10, [](size_t) { return Timestamp::min(); });
 
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), boost::none);
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     ASSERT(pipelineMatchesDeque(execPipeline, expectedTransactions));
 }
@@ -585,7 +585,7 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     expectedTransactions.erase(expectedTransactions.begin(), middleTransaction + 1);
 
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), middleTransactionSessionId);
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     ASSERT(pipelineMatchesDeque(execPipeline, expectedTransactions));
 }

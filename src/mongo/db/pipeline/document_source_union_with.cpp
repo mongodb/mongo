@@ -118,7 +118,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
       _variables(original._variables),
       _variablesParseState(original._variablesParseState) {
     _pipeline->getContext()->setInUnionWith(true);
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -132,7 +132,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
     }
     _pipeline->getContext()->setInUnionWith(true);
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 DocumentSourceUnionWith::DocumentSourceUnionWith(
@@ -323,7 +323,8 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                         "pipeline"_attr = _pipeline->serializeToBson());
             _pipeline = pExpCtx->getMongoProcessInterface()->preparePipelineForExecution(
                 _pipeline.release());
-            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+            _execPipeline =
+                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
             LOGV2_DEBUG(9497003,
                         5,
                         "$unionWith POST pipeline prep: ",
@@ -336,7 +337,8 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe),
                 _userNss);
-            _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+            _execPipeline =
+                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
             logShardedViewFound(e);
             return doGetNext();
         }
@@ -583,8 +585,8 @@ void DocumentSourceUnionWith::detachFromOperationContext() {
     // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
     // use Pipeline::detachFromOperationContext() to take care of updating the Pipeline's
     // ExpressionContext.
-    if (_pipeline) {
-        _pipeline->detachFromOperationContext();
+    if (_execPipeline) {
+        _execPipeline->detachFromOperationContext();
     }
 }
 
@@ -592,14 +594,14 @@ void DocumentSourceUnionWith::reattachToOperationContext(OperationContext* opCtx
     // We have a pipeline we're going to be executing across multiple calls to getNext(), so we
     // use Pipeline::reattachToOperationContext() to take care of updating the Pipeline's
     // ExpressionContext.
-    if (_pipeline) {
-        _pipeline->reattachToOperationContext(opCtx);
+    if (_execPipeline) {
+        _execPipeline->reattachToOperationContext(opCtx);
     }
 }
 
 bool DocumentSourceUnionWith::validateOperationContext(const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
-        (!_pipeline || _pipeline->validateOperationContext(opCtx));
+        (!_execPipeline || _execPipeline->validateOperationContext(opCtx));
 }
 
 void DocumentSourceUnionWith::addInvolvedCollections(

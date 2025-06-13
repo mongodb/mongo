@@ -89,7 +89,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
         // For a resumable scan, set the initial _latestOplogTimestamp and _postBatchResumeToken.
         _initializeResumableScanState();
     }
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
 }
 
 PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId* recordIdOut) {

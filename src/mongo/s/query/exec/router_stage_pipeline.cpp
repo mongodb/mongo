@@ -54,7 +54,8 @@ namespace mongo {
 RouterStagePipeline::RouterStagePipeline(std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->getOperationContext()),
       _mergePipeline(std::move(mergePipeline)),
-      _mergeExecPipeline(exec::agg::buildPipeline(_mergePipeline->getSources())) {
+      _mergeExecPipeline(
+          exec::agg::buildPipeline(_mergePipeline->getSources(), _mergePipeline->getContext())) {
     invariant(!_mergePipeline->getSources().empty());
     _mergeCursorsStage =
         dynamic_cast<DocumentSourceMergeCursors*>(_mergePipeline->getSources().front().get());
@@ -76,11 +77,11 @@ StatusWith<ClusterQueryResult> RouterStagePipeline::next() {
 }
 
 void RouterStagePipeline::doReattachToOperationContext() {
-    _mergePipeline->reattachToOperationContext(getOpCtx());
+    _mergeExecPipeline->reattachToOperationContext(getOpCtx());
 }
 
 void RouterStagePipeline::doDetachFromOperationContext() {
-    _mergePipeline->detachFromOperationContext();
+    _mergeExecPipeline->detachFromOperationContext();
 }
 
 void RouterStagePipeline::kill(OperationContext* opCtx) {

@@ -254,20 +254,20 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
 
 void DocumentSourceFacet::detachFromOperationContext() {
     for (auto&& facet : _facets) {
-        facet.pipeline->detachFromOperationContext();
+        facet.getExecPipeline().detachFromOperationContext();
     }
 }
 
 void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
     for (auto&& facet : _facets) {
-        facet.pipeline->reattachToOperationContext(opCtx);
+        facet.getExecPipeline().reattachToOperationContext(opCtx);
     }
 }
 
 bool DocumentSourceFacet::validateOperationContext(const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
         std::all_of(_facets.begin(), _facets.end(), [opCtx](const auto& f) {
-               return f.pipeline->validateOperationContext(opCtx);
+               return f.getExecPipeline().validateOperationContext(opCtx);
            });
 }
 

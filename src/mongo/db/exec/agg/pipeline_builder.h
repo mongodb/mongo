@@ -42,6 +42,7 @@ namespace mongo::exec::agg {
  * TODO SERVER-105562: Return the resulting pipeline by value.
  */
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources);
+    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources,
+    boost::intrusive_ptr<ExpressionContext> expCtx);
 
 }  // namespace mongo::exec::agg

@@ -298,8 +298,6 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
                           << internalPipelineLengthLimit << " stages",
             static_cast<int>(_sources.size()) <= internalPipelineLengthLimit);
 
-    checkValidOperationContext();
-
     // Keep track of stages which can only appear once.
     std::set<StringData> singleUseStages;
 
@@ -416,44 +414,6 @@ bool Pipeline::aggHasWriteStage(const BSONObj& cmd) {
     }
 
     return false;
-}
-
-void Pipeline::detachFromOperationContext() {
-    pCtx->setOperationContext(nullptr);
-
-    for (auto&& source : _sources) {
-        dynamic_cast<exec::agg::Stage&>(*source).detachFromOperationContext();
-    }
-
-    // Check for a null operation context to make sure that all children detached correctly.
-    checkValidOperationContext();
-}
-
-void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
-    pCtx->setOperationContext(opCtx);
-
-    for (auto&& source : _sources) {
-        dynamic_cast<exec::agg::Stage&>(*source).reattachToOperationContext(opCtx);
-    }
-
-    checkValidOperationContext();
-}
-
-bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
-    return std::all_of(_sources.begin(), _sources.end(), [this, opCtx](const auto& s) {
-        // All sources in a pipeline must share its expression context. Subpipelines may have a
-        // different expression context, but must point to the same operation context. Let the
-        // sources validate this themselves since they don't all have the same subpipelines, etc.
-        auto& stage = dynamic_cast<exec::agg::Stage&>(*s);
-        return stage.getContext() == getContext() && stage.validateOperationContext(opCtx);
-    });
-}
-
-void Pipeline::checkValidOperationContext() const {
-    tassert(7406000,
-            str::stream()
-                << "All DocumentSources and subpipelines must have the same operation context",
-            validateOperationContext(getContext()->getOperationContext()));
 }
 
 void Pipeline::dispose(OperationContext* opCtx) {
@@ -655,7 +615,7 @@ void Pipeline::stitch(SourceContainer* container) {
     }
 
     // Chain together all the stages.
-    // TODO SERVER-105371: Temporary cast to Stage until method is moved to agg::Pipeline.
+    // TODO SERVER-105683: Temporary cast to Stage until method is moved to agg::Pipeline.
     auto prevSource = dynamic_cast<exec::agg::Stage*>(container->front().get());
     prevSource->setSource(nullptr);
     for (Pipeline::SourceContainer::iterator iter(++container->begin()), listEnd(container->end());

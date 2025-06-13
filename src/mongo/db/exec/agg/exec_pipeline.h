@@ -42,7 +42,7 @@ public:
 
     // Deleting implicit copy constructor, because it was not needed so far.
     Pipeline(const Pipeline&) = delete;
-    Pipeline(StageContainer&& stages);
+    Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> expCtx);
     const StageContainer& getStages() const {
         return _stages;
     }
@@ -62,7 +62,36 @@ public:
      */
     void accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) const;
 
+    /**
+     * Sets the OperationContext of 'expCtx' to nullptr and calls 'detachFromOperationContext()' on
+     * all underlying DocumentSources.
+     */
+    void detachFromOperationContext();
+
+    /**
+     * Sets the OperationContext of 'expCtx' to 'opCtx', and reattaches all underlying
+     * DocumentSources to 'opCtx'.
+     */
+    void reattachToOperationContext(OperationContext* opCtx);
+
+    /**
+     * Recursively validate the operation contexts associated with this pipeline. Return true if
+     * all document sources and subpipelines point to the given operation context.
+     */
+    bool validateOperationContext(const OperationContext* opCtx) const;
+
+    /**
+     * Asserts whether operation contexts associated with this pipeline are consistent across
+     * sources.
+     */
+    void checkValidOperationContext() const;
+
+    const boost::intrusive_ptr<ExpressionContext>& getContext() const {
+        return expCtx;
+    }
+
 private:
     StageContainer _stages;
+    boost::intrusive_ptr<ExpressionContext> expCtx;
 };
 }  // namespace mongo::exec::agg

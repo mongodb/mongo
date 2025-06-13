@@ -33,7 +33,8 @@
 
 namespace mongo::exec::agg {
 std::unique_ptr<exec::agg::Pipeline> buildPipeline(
-    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources) {
+    const std::list<boost::intrusive_ptr<DocumentSource>>& documentSources,
+    boost::intrusive_ptr<ExpressionContext> expCtx) {
     Pipeline::StageContainer stages;
     stages.reserve(documentSources.size());
 
@@ -47,6 +48,6 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(
         }
     }
 
-    return std::make_unique<Pipeline>(std::move(stages));
+    return std::make_unique<Pipeline>(std::move(stages), std::move(expCtx));
 }
 }  // namespace mongo::exec::agg

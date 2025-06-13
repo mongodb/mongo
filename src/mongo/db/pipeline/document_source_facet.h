@@ -98,13 +98,23 @@ public:
         // refactoring of this stage.
         exec::agg::Pipeline& getExecPipeline() {
             if (!execPipeline) {
-                execPipeline = exec::agg::buildPipeline(this->pipeline->getSources());
+                execPipeline =
+                    exec::agg::buildPipeline(this->pipeline->getSources(), pipeline->getContext());
             }
             return *execPipeline;
         }
+
+        const exec::agg::Pipeline& getExecPipeline() const {
+            if (!execPipeline) {
+                execPipeline =
+                    exec::agg::buildPipeline(this->pipeline->getSources(), pipeline->getContext());
+            }
+            return *execPipeline;
+        }
+
         std::string name;
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
-        std::unique_ptr<exec::agg::Pipeline> execPipeline;
+        mutable std::unique_ptr<exec::agg::Pipeline> execPipeline;
     };
 
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {

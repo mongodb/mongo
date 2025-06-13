@@ -153,18 +153,18 @@ void DocumentSourceSetVariableFromSubPipeline::addSubPipelineInitialSource(
 
 void DocumentSourceSetVariableFromSubPipeline::detachFromOperationContext() {
     if (_subPipeline) {
-        _subPipeline->detachFromOperationContext();
+        _subExecPipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceSetVariableFromSubPipeline::reattachToOperationContext(OperationContext* opCtx) {
-    _subPipeline->reattachToOperationContext(opCtx);
+    _subExecPipeline->reattachToOperationContext(opCtx);
 }
 
 bool DocumentSourceSetVariableFromSubPipeline::validateOperationContext(
     const OperationContext* opCtx) const {
     return getContext()->getOperationContext() == opCtx &&
-        (!_subPipeline || _subPipeline->validateOperationContext(opCtx));
+        (!_subPipeline || _subExecPipeline->validateOperationContext(opCtx));
 }
 
 }  // namespace mongo

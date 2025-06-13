@@ -160,10 +160,8 @@ Exchange::Exchange(ExchangeSpec spec, std::unique_ptr<Pipeline, PipelineDeleter>
         uassert(50899, "Exchange boundaries must not be specified.", _boundaries.empty());
     }
 
-    // We will manually detach and reattach when iterating '_pipeline', we expect it to start in the
-    // detached state.
-    _pipeline->detachFromOperationContext();
-    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+    _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
+    _execPipeline->detachFromOperationContext();
 }
 
 std::vector<std::string> Exchange::extractBoundaries(
@@ -318,7 +316,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                 // This consumer won the race and will fill the buffers.
                 _loadingThreadId = consumerId;
 
-                _pipeline->reattachToOperationContext(opCtx);
+                _execPipeline->reattachToOperationContext(opCtx);
 
                 // This will return when some exchange buffer is full and we cannot make any forward
                 // progress anymore.
@@ -331,7 +329,7 @@ DocumentSource::GetNextResult Exchange::getNext(OperationContext* opCtx,
                               "Asserting on loading the next batch due to failpoint.");
                 }
 
-                _pipeline->detachFromOperationContext();
+                _execPipeline->detachFromOperationContext();
 
                 // The loading cannot continue until the consumer with the full buffer consumes some
                 // documents.

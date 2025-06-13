@@ -271,7 +271,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsOnlyMatchingStatsAfterAbsorbingM
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     pipeline->optimizePipeline();
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
 
     ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
@@ -292,7 +292,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsHostNameWhenNotFromMongos) {
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
     ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "host"
@@ -313,7 +313,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) 
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());
     auto pipeline = Pipeline::create({planCacheStats}, getExpCtx());
-    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+    auto execPipeline = exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
     ASSERT_BSONOBJ_EQ(execPipeline->getNext()->toBson(),
                       BSON("foo" << "bar"
                                  << "host"

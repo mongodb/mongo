@@ -91,7 +91,8 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
         }
         try {
             _pipeline = Pipeline::makePipeline(stages, foreignExpCtx);
-            _execPipeline = exec::agg::buildPipeline((_pipeline->getSources()));
+            _execPipeline =
+                exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
         } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
             LOGV2(7807800,
                   "Failed to create aggregation pipeline to list sampled queries",
@@ -113,13 +114,13 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
 
 void DocumentSourceListSampledQueries::detachFromOperationContext() {
     if (_pipeline) {
-        _pipeline->detachFromOperationContext();
+        _execPipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceListSampledQueries::reattachToOperationContext(OperationContext* opCtx) {
     if (_pipeline) {
-        _pipeline->reattachToOperationContext(opCtx);
+        _execPipeline->reattachToOperationContext(opCtx);
     }
 }
 

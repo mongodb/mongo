@@ -202,7 +202,7 @@ protected:
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));
-        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
         _resumeTokenNum = 0;
     }
 
@@ -277,8 +277,8 @@ protected:
                     ShardId donorShard,
                     HostAndPort donorHost,
                     size_t batchSize) {
-        pipeline.reattachToOperationContext(opCtx);
-        ON_BLOCK_EXIT([&pipeline] { pipeline.detachFromOperationContext(); });
+        execPipeline.reattachToOperationContext(opCtx);
+        ON_BLOCK_EXIT([&execPipeline] { execPipeline.detachFromOperationContext(); });
         _advanceResumeToken(batchSize);
 
         std::vector<InsertStatement> batch;

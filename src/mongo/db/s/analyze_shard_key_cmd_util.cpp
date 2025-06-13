@@ -400,7 +400,8 @@ void runClusterAggregate(OperationContext* opCtx,
         "AnalyzeShardKey"_sd,
         [&] {
             auto pipeline = Pipeline::makePipeline(aggRequest, expCtx);
-            auto execPipeline = exec::agg::buildPipeline(pipeline->getSources());
+            auto execPipeline =
+                exec::agg::buildPipeline(pipeline->getSources(), pipeline->getContext());
             return std::make_pair(std::move(pipeline), std::move(execPipeline));
         },
         altNumRetries);

@@ -337,7 +337,7 @@ public:
             result.erase(newEnd, result.end());
         }
 
-        return exec::agg::buildPipeline(result);
+        return exec::agg::buildPipeline(result, getExpCtx());
     }
 
     std::unique_ptr<exec::agg::Pipeline> makeExecPipeline(const OplogEntry& entry,

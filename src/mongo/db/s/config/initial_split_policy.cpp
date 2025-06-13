@@ -911,7 +911,7 @@ SamplingBasedSplitPolicy::PipelineDocumentSource::PipelineDocumentSource(
 
 exec::agg::Pipeline& SamplingBasedSplitPolicy::PipelineDocumentSource::_getExecPipeline() {
     if (!_execPipeline) {
-        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources());
+        _execPipeline = exec::agg::buildPipeline(_pipeline->getSources(), _pipeline->getContext());
     }
     return *_execPipeline;
 }

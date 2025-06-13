@@ -34,7 +34,10 @@
 
 namespace mongo::exec::agg {
 
-Pipeline::Pipeline(StageContainer&& stages) : _stages(std::move(stages)) {}
+Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionContext> pCtx)
+    : _stages(std::move(stages)), expCtx(std::move(pCtx)) {
+    tassert(10537101, "Aggregation pipeline missing ExpressionContext", this->expCtx != nullptr);
+}
 
 boost::optional<Document> Pipeline::getNext() {
     // TODO SERVER-105493: Remove the following early exit after we prohibit creating empty
@@ -69,4 +72,42 @@ void Pipeline::accumulatePlanSummaryStats(PlanSummaryStats& planSummaryStats) co
         }
     }
 }
+
+void Pipeline::detachFromOperationContext() {
+    expCtx->setOperationContext(nullptr);
+
+    for (auto&& source : _stages) {
+        source->detachFromOperationContext();
+    }
+
+    // Check for a null operation context to make sure that all children detached correctly.
+    checkValidOperationContext();
+}
+
+void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
+    expCtx->setOperationContext(opCtx);
+
+    for (auto&& source : _stages) {
+        source->reattachToOperationContext(opCtx);
+    }
+
+    checkValidOperationContext();
+}
+
+bool Pipeline::validateOperationContext(const OperationContext* opCtx) const {
+    return std::all_of(_stages.begin(), _stages.end(), [this, opCtx](const auto& stage) {
+        // All sources in a pipeline must share its expression context. Subpipelines may have a
+        // different expression context, but must point to the same operation context. Let the
+        // sources validate this themselves since they don't all have the same subpipelines, etc.
+        return stage->getContext() == getContext() && stage->validateOperationContext(opCtx);
+    });
+}
+
+void Pipeline::checkValidOperationContext() const {
+    tassert(7406000,
+            str::stream()
+                << "All DocumentSources and subpipelines must have the same operation context",
+            validateOperationContext(getContext()->getOperationContext()));
+}
+
 }  // namespace mongo::exec::agg
