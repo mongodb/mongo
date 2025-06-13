@@ -337,51 +337,6 @@ TEST(VisitAllValuesAtPathTest, StrictNumericFields) {
     }
 }
 
-TEST(ExtractElementAlongNonArrayPathTest, ReturnsMissingIfPathDoesNotExist) {
-    Document doc{{"a", 1}, {"b", 2}};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"c.d"});
-    ASSERT_OK(result.getStatus());
-    ASSERT_VALUE_EQ(result.getValue(), Value{});
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, ReturnsMissingIfPathPartiallyExists) {
-    Document doc{fromjson("{a: {b: {c: 1}}}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
-    ASSERT_OK(result.getStatus());
-    ASSERT_VALUE_EQ(result.getValue(), Value{});
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, ReturnsValueIfPathExists) {
-    Document doc{fromjson("{a: {b: {c: {d: {e: 1}}}}}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
-    ASSERT_OK(result.getStatus());
-    ASSERT_VALUE_EQ(result.getValue(), Value{BSON("e" << 1)});
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtEmptyArray) {
-    Document doc{fromjson("{a: {b: {c: {d: []}}}}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
-    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathTerminatesAtNonEmptyArray) {
-    Document doc{fromjson("{a: {b: {c: {d: [1, 2, 3]}}}}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
-    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, FailsIfPathContainsArray) {
-    Document doc{fromjson("{a: {b: [{c: {d: 1}}]}}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b.c.d"});
-    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
-}
-
-TEST(ExtractElementAlongNonArrayPathTest, FailsIfFirstPathComponentIsArray) {
-    Document doc{fromjson("{a: [1, 2, {b: 1}]}")};
-    auto result = extractElementAlongNonArrayPath(doc, FieldPath{"a.b"});
-    ASSERT_EQ(result.getStatus(), ErrorCodes::InternalError);
-}
-
 TEST(DocumentToBsonWithPathsTest, ShouldExtractTopLevelFieldIfDottedFieldNeeded) {
     Document input(fromjson("{a: 1, b: {c: 1, d: 1}}"));
     BSONObj expected = fromjson("{b: {c: 1, d: 1}}");

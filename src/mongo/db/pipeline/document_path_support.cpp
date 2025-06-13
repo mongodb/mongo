@@ -127,22 +127,5 @@ void visitAllValuesAtPath(const Document& doc,
     visitAllValuesAtPathHelper(doc, path, 0, callback);
 }
 
-StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path) {
-    invariant(path.getPathLength() > 0);
-    Value curValue = doc.getField(path.getFieldName(0));
-    if (curValue.getType() == BSONType::array) {
-        return {ErrorCodes::InternalError, "array along path"};
-    }
-
-    for (size_t i = 1; i < path.getPathLength(); i++) {
-        curValue = curValue[path.getFieldName(i)];
-        if (curValue.getType() == BSONType::array) {
-            return {ErrorCodes::InternalError, "array along path"};
-        }
-    }
-
-    return curValue;
-}
-
 }  // namespace document_path_support
 }  // namespace mongo

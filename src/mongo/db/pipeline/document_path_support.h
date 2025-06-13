@@ -55,14 +55,6 @@ void visitAllValuesAtPath(const Document& doc,
                           std::function<void(const Value&)> callback);
 
 /**
- * Returns the element at 'path' in 'doc', or a missing Value if the path does not fully exist.
- *
- * Returns ErrorCodes::InternalError if an array is encountered along the path or at the end of the
- * path.
- */
-StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const FieldPath& path);
-
-/**
  * Extracts 'paths' from the input document and returns a BSON object containing only those paths.
  *
  * The template parameter 'EnsureUniquePrefixes' controls whether or not prefixes in the result
