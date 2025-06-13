@@ -122,6 +122,10 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
         bob.appendNumber(
             "spilledDataStorageSize",
             static_cast<long long>(_specificStats.spillingStats.getSpilledDataStorageSize()));
+        bob.appendNumber("spilledBytes",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledBytes()));
+        bob.appendNumber("spilledRecords",
+                         static_cast<long long>(_specificStats.spillingStats.getSpilledRecords()));
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
         for (size_t idx = 0; idx < _obs.size(); ++idx) {

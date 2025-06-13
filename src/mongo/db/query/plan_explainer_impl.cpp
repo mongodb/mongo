@@ -542,6 +542,10 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
                               static_cast<long long>(spec->totalDataSizeBytes));
             bob->appendBool("usedDisk", (spec->spillingStats.getSpills() > 0));
             bob->appendNumber("spills", static_cast<long long>(spec->spillingStats.getSpills()));
+            bob->appendNumber("spilledRecords",
+                              static_cast<long long>(spec->spillingStats.getSpilledRecords()));
+            bob->appendNumber("spilledBytes",
+                              static_cast<long long>(spec->spillingStats.getSpilledBytes()));
             bob->appendNumber(
                 "spilledDataStorageSize",
                 static_cast<long long>(spec->spillingStats.getSpilledDataStorageSize()));

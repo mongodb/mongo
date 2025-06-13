@@ -70,7 +70,7 @@ function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expected
     if (isExecExplain) {
         assert(stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
         assert(stage.hasOwnProperty("spilledDataStorageSize"), stage);
-        assert(stage.hasOwnProperty("numBytesSpilledEstimate"), stage);
+        assert(stage.hasOwnProperty("spilledBytes"), stage);
         assert(stage.hasOwnProperty("spilledRecords"), stage);
 
         const maxAccmMemUsages = stage["maxAccumulatorMemoryUsageBytes"];
@@ -87,7 +87,7 @@ function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expected
         }
 
         const spilledDataStorageSize = stage["spilledDataStorageSize"];
-        const numBytesSpilledEstimate = stage["numBytesSpilledEstimate"];
+        const spilledBytes = stage["spilledBytes"];
         const spilledRecords = stage["spilledRecords"];
         if (stage.usedDisk) {
             // We cannot compute the size of the spill file, so assert that it is non-zero if we
@@ -96,11 +96,11 @@ function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expected
 
             // The number of bytes spilled, on the other hand, is at least as much as the
             // accumulator memory usage.
-            assert.gt(numBytesSpilledEstimate, totalAccumMemoryUsageBytes);
+            assert.gt(spilledBytes, totalAccumMemoryUsageBytes);
             assert.gt(spilledRecords, 0, stage);
         } else {
             assert.eq(spilledDataStorageSize, 0, stage);
-            assert.eq(numBytesSpilledEstimate, 0, stage);
+            assert.eq(spilledBytes, 0, stage);
             assert.eq(spilledRecords, 0, stage);
         }
 
@@ -116,7 +116,7 @@ function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expected
         assert(!stage.hasOwnProperty("spills"), stage);
         assert(!stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
         assert(!stage.hasOwnProperty("spilledDataStorageSize"), stage);
-        assert(!stage.hasOwnProperty("numBytesSpilledEstimate"), stage);
+        assert(!stage.hasOwnProperty("spilledBytes"), stage);
         assert(!stage.hasOwnProperty("spilledRecords"), stage);
     }
 

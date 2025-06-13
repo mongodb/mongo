@@ -457,7 +457,7 @@ function runTest_MultipleLocalForeignRecords({
         assert.eq(hLookup.usedDisk, spillsToDisk, hLookup);
         if (hLookup.usedDisk) {
             assert.gt(hLookup.spilledRecords, 0, hLookup);
-            assert.gt(hLookup.spilledBytesApprox, 0, hLookup);
+            assert.gt(hLookup.spilledBytes, 0, hLookup);
         }
     }
 

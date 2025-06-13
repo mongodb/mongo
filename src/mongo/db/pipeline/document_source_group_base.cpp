@@ -131,7 +131,7 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpills()));
         out["spilledDataStorageSize"] = opts.serializeLiteral(
             static_cast<long long>(stats.spillingStats.getSpilledDataStorageSize()));
-        out["numBytesSpilledEstimate"] =
+        out["spilledBytes"] =
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(stats.spillingStats.getSpilledRecords()));

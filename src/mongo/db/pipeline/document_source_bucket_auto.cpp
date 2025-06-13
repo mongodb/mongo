@@ -455,9 +455,27 @@ Value DocumentSourceBucketAuto::serialize(const SerializationOptions& opts) cons
             Value(accum->serialize(
                 accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
+
     insides["output"] = outputSpec.freezeToValue();
 
-    return Value{Document{{getSourceName(), insides.freezeToValue()}}};
+    MutableDocument out;
+    out[getSourceName()] = insides.freezeToValue();
+
+    if (opts.isSerializingForExplain() &&
+        *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+
+        out["usedDisk"] = opts.serializeLiteral(_stats.spillingStats.getSpills() > 0);
+        out["spills"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
+        out["spilledDataStorageSize"] = opts.serializeLiteral(
+            static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
+        out["spilledBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
+        out["spilledRecords"] =
+            opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));
+    }
+
+    return out.freezeToValue();
 }
 
 intrusive_ptr<DocumentSourceBucketAuto> DocumentSourceBucketAuto::create(

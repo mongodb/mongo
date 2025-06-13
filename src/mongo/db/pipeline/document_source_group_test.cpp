@@ -567,7 +567,7 @@ TEST_F(DocumentSourceGroupTest, CanOutputExecutionStatsExplainWithoutProcessingD
             usedDisk: false,
             spills: 0,
             spilledDataStorageSize: 0,
-            numBytesSpilledEstimate: 0,
+            spilledBytes: 0,
             spilledRecords: 0
         })"));
 

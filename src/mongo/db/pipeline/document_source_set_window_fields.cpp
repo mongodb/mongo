@@ -382,7 +382,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(const SerializationOption
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
         out["spilledDataStorageSize"] = opts.serializeLiteral(
             static_cast<long long>(_stats.spillingStats.getSpilledDataStorageSize()));
-        out["numBytesSpilledEstimate"] =
+        out["spilledBytes"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledBytes()));
         out["spilledRecords"] =
             opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpilledRecords()));

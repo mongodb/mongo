@@ -258,10 +258,12 @@ std::unique_ptr<PlanStageStats> HashLookupStage::getStats(bool includeDebugInfo)
         // Spilling stats.
         auto spillingStats = specificStats->getTotalSpillingStats();
         bob.appendBool("usedDisk", specificStats->usedDisk)
+            .appendNumber("spills", static_cast<long long>(spillingStats.getSpills()))
             .appendNumber("spilledRecords",
                           static_cast<long long>(spillingStats.getSpilledRecords()))
-            .appendNumber("spilledBytesApprox",
-                          static_cast<long long>(spillingStats.getSpilledBytes()));
+            .appendNumber("spilledBytes", static_cast<long long>(spillingStats.getSpilledBytes()))
+            .appendNumber("spilledDataStorageSize",
+                          static_cast<long long>(spillingStats.getSpilledDataStorageSize()));
         ret->debugInfo = bob.obj();
     }
     return ret;

@@ -153,7 +153,7 @@ const readColl = secondary.getDB("test").foo;
         assert(hLookup.hasOwnProperty("usedDisk"), hLookup);
         assert(hLookup.usedDisk, hLookup);
         assert.gte(hLookup.spilledRecords, expectedSpilledRecordsAtLeast, hLookup);
-        assert.gte(hLookup.spilledBytesApprox, expectedSpilledBytesAtLeast, hLookup);
+        assert.gte(hLookup.spilledBytes, expectedSpilledBytesAtLeast, hLookup);
     } finally {
         assert.commandWorked(secondary.adminCommand({
             setParameter: 1,
