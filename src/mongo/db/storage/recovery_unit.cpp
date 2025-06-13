@@ -160,7 +160,9 @@ void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
 }
 
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
-    invariant(_opCtx);
+    invariant(_opCtx ||
+              (_changes.empty() && _changesForCatalogVisibility.empty() &&
+               _changesForTwoPhaseDrop.empty()));
     bool debugLoggingThreeEnabled =
         logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3));
     for (auto& change : _changesForTwoPhaseDrop) {

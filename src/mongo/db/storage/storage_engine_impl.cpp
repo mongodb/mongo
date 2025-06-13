@@ -626,7 +626,6 @@ std::unique_ptr<SpillTable> StorageEngineImpl::makeSpillTable(OperationContext* 
                                                               int64_t thresholdBytes) {
     invariant(_spillKVEngine);
     auto ru = _spillKVEngine->newRecoveryUnit();
-    ru->setOperationContext(opCtx);
     std::unique_ptr<RecordStore> rs =
         _spillKVEngine->makeTemporaryRecordStore(*ru, ident::generateNewInternalIdent(), keyFormat);
     LOGV2_DEBUG(10380301, 1, "Created spill table", "ident"_attr = rs->getIdent());
