@@ -26,10 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include <iostream>
+#include "mongo/bson/bsonobj.h"
 
-int main(int argc, char** argv) {
-    std::cout << "Hello from MongoR ... I am under construction!" << std::endl;
-    return 0;
-}
+#include <string>
+
+namespace mongo {
+class RawOpDocument {
+public:
+    explicit RawOpDocument();
+    explicit RawOpDocument(const std::string& opType, const BSONObj& body);
+    BSONObj getDocument() const;
+    BSONObj getBinaryCommand() const;
+    void updateBody(const BSONObj& newBody);
+    void updateHeaderField(const std::string& fieldName, int value);
+    void updateOpType(const std::string& newOpType);
+
+private:
+    /** Represents the `rawop` part. */
+    BSONObj _rawOp;
+    /** Represents the entire document. */
+    BSONObj _document;
+
+    void updateField(const std::string& fieldName, const BSONObj& newValue);
+    void updateField(const std::string& fieldName, const std::string& newValue);
+
+    /*
+     * This is the main method that allows any bson command to go inside a recorded packet,
+     * simulating a recorded messaged that respects the mongodb binary protocol.
+     */
+    std::vector<char> constructWireProtocolBinData(const BSONObj& command) const;
+};
+
+}  // namespace mongo

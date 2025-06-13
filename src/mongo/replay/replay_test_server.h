@@ -27,9 +27,34 @@
  *    it in the license file.
  */
 
-#include <iostream>
+#include "mongo/bson/bsonobj.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/stdx/unordered_map.h"
 
-int main(int argc, char** argv) {
-    std::cout << "Hello from MongoR ... I am under construction!" << std::endl;
-    return 0;
-}
+#include <memory>
+#include <string>
+
+namespace mongo {
+class ReplayTestServer {
+public:
+    explicit ReplayTestServer();
+    explicit ReplayTestServer(const std::vector<std::string>&, const std::vector<std::string>&);
+    ~ReplayTestServer();
+    const std::string& getFakeResponse(const std::string&) const;
+    std::string getConnectionString() const;
+    void setupServerResponse(const std::string& name, const std::string& response);
+    bool checkResponse(const std::string& name, const BSONObj& response) const;
+
+private:
+    void setUp();
+    void tearDown();
+
+    std::string _hostName = "$local:12345";
+    std::unique_ptr<MockRemoteDBServer> _mockServer;
+    int _originalSeverity;
+    stdx::unordered_map<std::string, std::string> _fakeResponseMap;
+};
+
+}  // namespace mongo

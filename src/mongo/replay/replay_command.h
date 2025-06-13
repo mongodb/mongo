@@ -27,9 +27,32 @@
  *    it in the license file.
  */
 
-#include <iostream>
+#pragma once
 
-int main(int argc, char** argv) {
-    std::cout << "Hello from MongoR ... I am under construction!" << std::endl;
-    return 0;
-}
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
+
+#include <chrono>
+#include <string>
+
+namespace mongo {
+class ReplayCommandExecutor;
+struct OpMsgRequest;
+class ReplayCommand {
+public:
+    explicit ReplayCommand(BSONObj bson) : _bsonCommand(std::move(bson)) {}
+
+    /*
+     * Converts a command to replay into an internal server msg request that is used to execute the
+     * command.
+     */
+    bool toRequest(OpMsgRequest&) const;
+
+    /** Mostly for debugging purposes, converts the replay command to string. */
+    std::string toString() const;
+
+private:
+    BSONObj _bsonCommand;
+};
+
+}  // namespace mongo
