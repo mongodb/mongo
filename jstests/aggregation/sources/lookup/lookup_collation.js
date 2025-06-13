@@ -143,6 +143,31 @@ let explain;
         }
     }
 
+    function assertJoinStrategyMulti(explain, expectedStrategies) {
+        // Check join strategy when $lookup is pushed down.
+        if (getAggPlanStages(explain, "$cursor").length === 0) {
+            const winningPlan = getWinningPlanFromExplain(explain);
+            if (winningPlan.stage === "EQ_LOOKUP") {
+                const strategies =
+                    Array.isArray(expectedStrategies) ? expectedStrategies : [expectedStrategies];
+
+                let foundMatch = false;
+                for (const expectedStrategy of strategies) {
+                    if (winningPlan.strategy === expectedStrategy.name) {
+                        foundMatch = true;
+                        // If we found the strategy, verify the index
+                        if (expectedStrategy.index !== null) {
+                            // We care about the index - must be an exact match
+                            assert.eq(expectedStrategy.index, winningPlan.indexName, explain);
+                            break;
+                        }
+                    }
+                }
+                assert(foundMatch, explain);
+            }
+        }
+    }
+
     for (let lookupInto of [lookupWithPipeline, lookupNoPipeline]) {
         // Local is case insensitive and foreign has an index with compatible collation (case
         // insensitive).
@@ -194,7 +219,10 @@ let explain;
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {allowDiskUse: false, collation: {locale: "fr"}});
             if (isMultiversion) {
-                assertJoinStrategy(explain, "NestedLoopJoin", null);
+                assertJoinStrategyMulti(explain, [
+                    {name: "NestedLoopJoin", index: null},
+                    {name: "DynamicIndexedLoopJoin", index: "key_1"}
+                ]);
             } else {
                 assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
             }
@@ -206,7 +234,10 @@ let explain;
             explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
                                                  {allowDiskUse: true, collation: {locale: "fr"}});
             if (isMultiversion) {
-                assertJoinStrategy(explain, "HashJoin", null);
+                assertJoinStrategyMulti(explain, [
+                    {name: "HashJoin", index: null},
+                    {name: "DynamicIndexedLoopJoin", index: "key_1"}
+                ]);
             } else {
                 assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
             }
@@ -242,7 +273,9 @@ let explain;
     if (areCollectionsCollocated) {
         explain = collAa.explain().aggregate([pipeline]);
         if (isMultiversion) {
-            assertJoinStrategy(explain, "HashJoin", null);
+            assertJoinStrategyMulti(
+                explain,
+                [{name: "HashJoin", index: null}, {name: "DynamicIndexedLoopJoin", index: "_id_"}]);
         } else {
             assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
         }
@@ -256,7 +289,9 @@ let explain;
     if (areCollectionsCollocated) {
         explain = collAa.explain().aggregate([pipeline]);
         if (isMultiversion) {
-            assertJoinStrategy(explain, "HashJoin", null);
+            assertJoinStrategyMulti(
+                explain,
+                [{name: "HashJoin", index: null}, {name: "DynamicIndexedLoopJoin", index: "_id_"}]);
         } else {
             assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "_id_");
         }
