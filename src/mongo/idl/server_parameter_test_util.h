@@ -28,11 +28,10 @@
  */
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_parameter.h"
-
-#include <string>
 
 namespace mongo {
 
@@ -46,7 +45,7 @@ public:
      * Constructor setting the server parameter to the specified value.
      */
     template <typename T>
-    ServerParameterControllerForTest(const std::string& name, T value)
+    ServerParameterControllerForTest(StringData name, T value)
         : _serverParam(ServerParameterSet::getNodeParameterSet()->get(name)) {
         // Save the old value.
         BSONObjBuilder bob;
@@ -78,7 +77,7 @@ public:
      * Constructor setting the server parameter to the specified value.
      */
     template <typename T>
-    RAIIServerParameterControllerForTest(const std::string& name, T value)
+    RAIIServerParameterControllerForTest(StringData name, T value)
         : _serverParamController(ServerParameterControllerForTest(name, value)) {}
 
     /**
