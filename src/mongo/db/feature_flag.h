@@ -327,7 +327,8 @@ public:
      *
      * NB: Unlike other feature flags, incremental rollout flags _can_ change their value at
      * runtime. Callers should take care not to assume that repeated calls to this check will return
-     * the same value. Consider using an 'IncrementalFeatureContext' when querying the flag value.
+     * the same value. Consider using an 'IncrementalFeatureRolloutContext' when querying the flag
+     * value.
      */
     bool checkEnabled();
 
