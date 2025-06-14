@@ -102,6 +102,8 @@ buildvariants:
       # This variant can also handle a higher number of remote execution jobs concurrently
       # since it's running on a c6g.16xlarge
       bazel_compile_flags: >-
+        --define=MONGO_DISTMOD=amazon2023
+        --//bazel/config:build_otel=True
         --remote_execution_priority=3
         --jobs=800
     tasks:
