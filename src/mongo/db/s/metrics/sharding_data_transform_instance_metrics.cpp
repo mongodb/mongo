@@ -470,21 +470,6 @@ int64_t ShardingDataTransformInstanceMetrics::getOplogEntriesApplied() const {
     return _oplogEntriesApplied.load();
 }
 
-boost::optional<Milliseconds>
-ShardingDataTransformInstanceMetrics::getMaxAverageTimeToFetchAndApplyOplogEntries() const {
-    boost::optional<Milliseconds> maxAvgTimeToFetchAndApply;
-    for (const auto& [_, metrics] : _oplogLatencyMetrics) {
-        auto avgTimeToFetchAndApply = metrics->getAverageTimeToFetchAndApply();
-        if (!avgTimeToFetchAndApply.has_value()) {
-            return boost::none;
-        }
-        maxAvgTimeToFetchAndApply = maxAvgTimeToFetchAndApply
-            ? std::max(*maxAvgTimeToFetchAndApply, *avgTimeToFetchAndApply)
-            : *avgTimeToFetchAndApply;
-    }
-    return maxAvgTimeToFetchAndApply;
-}
-
 void ShardingDataTransformInstanceMetrics::restoreInsertsApplied(int64_t count) {
     _insertsApplied.store(count);
 }
@@ -550,16 +535,6 @@ boost::optional<Milliseconds>
 ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToApply() const {
     stdx::lock_guard<stdx::mutex> lk(_timeToApplyMutex);
     return _avgTimeToApply;
-}
-
-boost::optional<Milliseconds>
-ShardingDataTransformInstanceMetrics::OplogLatencyMetrics::getAverageTimeToFetchAndApply() const {
-    stdx::lock_guard<stdx::mutex> fetchLk(_timeToFetchMutex);
-    stdx::lock_guard<stdx::mutex> applyLk(_timeToApplyMutex);
-    if (_avgTimeToFetch.has_value() && _avgTimeToApply.has_value()) {
-        return *_avgTimeToFetch + *_avgTimeToApply;
-    }
-    return boost::none;
 }
 
 }  // namespace mongo

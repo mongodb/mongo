@@ -232,40 +232,6 @@ public:
             fieldName);
     }
 
-    void validateEstimatedRemainingTimeIfDisableMovingAverage(
-        ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
-        _validateEstimatedRemainingTime(
-            metrics, false /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
-    }
-
-    void validateEstimatedRemainingTimeIfEnableMovingAverage(
-        ReshardingMetrics* metrics, boost::optional<Milliseconds> expectedEstimate) {
-        _validateEstimatedRemainingTime(
-            metrics, true /* enableEstimateBasedOnMovingAvg */, expectedEstimate);
-    }
-
-private:
-    void _validateEstimatedRemainingTime(ReshardingMetrics* metrics,
-                                         bool enableEstimateBasedOnMovingAvg,
-                                         boost::optional<Milliseconds> expectedEstimate) {
-        LOGV2(10626601,
-              "Validating estimated remaining time",
-              "enableEstimateBasedOnMovingAvg"_attr = enableEstimateBasedOnMovingAvg,
-              "expectedEstimate"_attr = expectedEstimate);
-
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-            "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
-
-        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), expectedEstimate);
-        auto report = metrics->reportForCurrentOp();
-        if (expectedEstimate.has_value()) {
-            ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"),
-                      duration_cast<Seconds>(*expectedEstimate).count());
-        } else {
-            ASSERT_FALSE(report.hasField("remainingOperationTimeEstimatedSecs"));
-        }
-    };
-
 protected:
     ShardId shardId0{"shard0"};
     ShardId shardId1{"shard1"};
@@ -675,10 +641,7 @@ TEST_F(ReshardingMetricsTest, GetAndUpdateAverageTimeToApplyBasic) {
     ASSERT_EQ(metrics->getAverageTimeToApplyOplogEntries(shardId1), expectedShard1AvgTimeToApply1);
 }
 
-TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeIfDisableMovingAvgCloningToDone) {
-    const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-        "reshardingRemainingTimeEstimateBasedOnMovingAverage", false};
-
+TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTime) {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
     const auto& clock = getClockSource();
     constexpr auto kIncrement = Milliseconds(5000);
@@ -725,150 +688,6 @@ TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeIfDisableMovingAvgClo
     metrics->setEndFor(TimedPhase::kApplying, getClockSource()->now());
     report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("remainingOperationTimeEstimatedSecs"), 0);
-}
-
-TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeIfDisableOrEnableMovingAvg) {
-    const auto& clock = getClockSource();
-    const auto elapsedTimeInc = Milliseconds(1200);
-
-    const auto smoothingFactor = 0.7;
-    const RAIIServerParameterControllerForTest smoothingFactorServerParameter{
-        "reshardingExponentialMovingAverageTimeToFetchAndApplySmoothingFactor", smoothingFactor};
-
-    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
-    ASSERT_FALSE(metrics->getHighEstimateRemainingTimeMillis());
-    metrics->registerDonors({shardId0, shardId1});
-
-    // The "applying" state has not started so the estimates are not available whether or not moving
-    // average is enabled.
-    boost::optional<Milliseconds> expectedEstimateIfDisableMovingAvg = boost::none;
-    boost::optional<Milliseconds> expectedEstimateIfEnableMovingAvg = boost::none;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    metrics->setStartFor(TimedPhase::kApplying, clock->now());
-    auto numOplogEntriesToApply = 0;
-    auto numOplogEntriesApplied = 0;
-    auto elapsedTime = Milliseconds(0);
-
-    clock->advance(elapsedTimeInc);
-    elapsedTime += elapsedTimeInc;
-
-    // If moving average is disabled, the estimate should be 0 since the "applying" state has
-    // started and the number of oplog entries fetched is 0.
-    expectedEstimateIfDisableMovingAvg = Milliseconds(0);
-    // If moving average is enabled, the estimate should also be 0 (based on non-moving average)
-    // since there are no latency metrics yet.
-    expectedEstimateIfEnableMovingAvg = expectedEstimateIfDisableMovingAvg;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    clock->advance(elapsedTimeInc);
-    elapsedTime += elapsedTimeInc;
-
-    auto shard0TimeToFetch0 = Milliseconds(100);
-    metrics->onOplogEntriesFetched(2);
-    metrics->updateAverageTimeToFetchOplogEntries(shardId0, shard0TimeToFetch0);
-    numOplogEntriesToApply += 2;
-
-    // If moving average is disabled, the estimate should be unavailable since the number of oplog
-    // fetched is greater than 0 but the the number of oplog entries applied is 0.
-    expectedEstimateIfDisableMovingAvg = boost::none;
-    // If moving average is enabled, the estimate should also be unavailable (based on non-moving
-    // average) since the latency metrics are still incomplete.
-    expectedEstimateIfEnableMovingAvg = expectedEstimateIfDisableMovingAvg;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    auto shard0TimeToApply0 = Milliseconds(50);
-    metrics->onOplogEntriesApplied(1);
-    metrics->updateAverageTimeToApplyOplogEntries(shardId0, shard0TimeToApply0);
-    numOplogEntriesToApply -= 1;
-    numOplogEntriesApplied += 1;
-
-    // If moving average is disabled, the estimate should be available since the numbers of oplog
-    // fetched and applied are both greater than 0.
-    expectedEstimateIfDisableMovingAvg =
-        elapsedTime * numOplogEntriesToApply / numOplogEntriesApplied;
-    // If moving average is enabled, the estimate should still be unavailable (based on non-moving
-    // average) since the latency metrics are still incomplete (still missing the fetcher and
-    // applier latency metrics for shard1).
-    expectedEstimateIfEnableMovingAvg = expectedEstimateIfDisableMovingAvg;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    clock->advance(elapsedTimeInc);
-    elapsedTime += elapsedTimeInc;
-
-    auto shard1TimeToFetch0 = Milliseconds(1);
-    metrics->onOplogEntriesFetched(1);
-    metrics->updateAverageTimeToFetchOplogEntries(shardId1, shard1TimeToFetch0);
-    numOplogEntriesToApply += 1;
-
-    // If moving average is disabled, the estimate should be available since the numbers of oplog
-    // fetched and applied are both greater than 0.
-    expectedEstimateIfDisableMovingAvg =
-        elapsedTime * numOplogEntriesToApply / numOplogEntriesApplied;
-    // If moving average is enabled, the estimate should still be unavailable (based on non-moving
-    // average) since the latency metrics are still incomplete (still missing the applier latency
-    // metrics for shard1).
-    expectedEstimateIfEnableMovingAvg = expectedEstimateIfDisableMovingAvg;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    clock->advance(elapsedTimeInc);
-    elapsedTime += elapsedTimeInc;
-
-    auto shard1TimeToApply0 = Milliseconds(5);
-    metrics->onOplogEntriesApplied(1);
-    metrics->updateAverageTimeToApplyOplogEntries(shardId1, shard1TimeToApply0);
-    numOplogEntriesToApply -= 1;
-    numOplogEntriesApplied += 1;
-
-    // If moving average is disabled, the estimate should be available since the numbers of oplog
-    // fetched and applied are both greater than 0.
-    expectedEstimateIfDisableMovingAvg =
-        elapsedTime * numOplogEntriesToApply / numOplogEntriesApplied;
-    // If moving average is enabled, the estimate should be available since the latency metrics are
-    // now complete.
-    expectedEstimateIfEnableMovingAvg = shard0TimeToFetch0 + shard0TimeToApply0;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
-
-    clock->advance(elapsedTimeInc);
-    elapsedTime += elapsedTimeInc;
-
-    auto shard1TimeToFetch1 = Milliseconds(1000);
-    metrics->onOplogEntriesFetched(1);
-    metrics->updateAverageTimeToFetchOplogEntries(shardId1, shard1TimeToFetch1);
-    numOplogEntriesToApply += 1;
-
-    // If moving average is disabled, the estimate should be available since the numbers of oplog
-    // fetched and applied are both greater than 0.
-    expectedEstimateIfDisableMovingAvg =
-        elapsedTime * numOplogEntriesToApply / numOplogEntriesApplied;
-    // If moving average is enabled, the estimate should be available since the latency metrics are
-    // now complete.
-    expectedEstimateIfEnableMovingAvg =
-        Milliseconds((int)resharding::calculateExponentialMovingAverage(
-            shard1TimeToFetch0.count(), shard1TimeToFetch1.count(), smoothingFactor)) +
-        shard1TimeToApply0;
-    validateEstimatedRemainingTimeIfDisableMovingAverage(metrics.get(),
-                                                         expectedEstimateIfDisableMovingAvg);
-    validateEstimatedRemainingTimeIfEnableMovingAverage(metrics.get(),
-                                                        expectedEstimateIfEnableMovingAvg);
 }
 
 TEST_F(ReshardingMetricsTest, RecipientRestoreAppliedOplogEntries) {
@@ -943,43 +762,27 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportsCriticalSectionTime) {
 }
 
 TEST_F(ReshardingMetricsTest, RecipientEstimatesNoneOnNewInstance) {
-    for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-            "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
-        auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
-        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
-    }
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
 }
 
 TEST_F(ReshardingMetricsTest,
        RecipientEstimatesNoneBeforeExternalFieldsRestoredForRestoredInstance) {
-    for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-            "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
-        auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
-        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
-    }
+    auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
+    ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
 }
 
 TEST_F(ReshardingMetricsTest, RecipientEstimatesAfterExternalFieldsRestoredForRestoredInstance) {
-    for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-            "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
-        auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
-        metrics->restoreExternallyTrackedRecipientFields(
-            ReshardingMetrics::ExternallyTrackedRecipientFields{});
-        ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), Milliseconds{0});
-    }
+    auto metrics = makeRecipientMetricsWithAmbiguousTimeRemaining();
+    metrics->restoreExternallyTrackedRecipientFields(
+        ReshardingMetrics::ExternallyTrackedRecipientFields{});
+    ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), Milliseconds{0});
 }
 
 TEST_F(ReshardingMetricsTest, CurrentOpDoesNotReportRecipientEstimateIfNotSet) {
-    for (bool enableEstimateBasedOnMovingAvg : {true, false}) {
-        const RAIIServerParameterControllerForTest estimateBasedOnMovingAvgServerParameter{
-            "reshardingRemainingTimeEstimateBasedOnMovingAverage", enableEstimateBasedOnMovingAvg};
-        auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
-        auto report = metrics->reportForCurrentOp();
-        ASSERT_FALSE(report.hasField("remainingOperationTimeEstimatedSecs"));
-    }
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("remainingOperationTimeEstimatedSecs"));
 }
 
 TEST_F(ReshardingMetricsTest, OnInsertAppliedIncrementsCumulativeMetrics) {
