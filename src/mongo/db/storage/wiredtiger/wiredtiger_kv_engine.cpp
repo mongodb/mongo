@@ -544,7 +544,7 @@ bool WiredTigerKVEngineBase::_wtHasUri(WiredTigerSession& session, const std::st
 }
 
 std::vector<std::string> WiredTigerKVEngineBase::_wtGetAllIdents(
-    WiredTigerRecoveryUnitBase& wtRu) const {
+    WiredTigerRecoveryUnit& wtRu) const {
     std::vector<std::string> all;
     int ret;
     // No need for a metadata:create cursor, since it gathers extra information and is slower.

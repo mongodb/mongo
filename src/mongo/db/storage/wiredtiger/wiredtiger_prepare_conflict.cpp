@@ -91,7 +91,7 @@ int wiredTigerPrepareConflictRetrySlow(Interruptible& interruptible,
         return WT_ROLLBACK;
     }
 
-    auto& recoveryUnit = WiredTigerRecoveryUnitBase::get(ru);
+    auto& recoveryUnit = WiredTigerRecoveryUnit::get(ru);
     while (true) {
         attempts++;
         auto lastCount = recoveryUnit.getConnection()->getPrepareCommitOrAbortCount();

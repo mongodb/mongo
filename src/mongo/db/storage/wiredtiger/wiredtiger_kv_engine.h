@@ -290,7 +290,7 @@ protected:
     /**
      * Returns all the idents known to this WiredTiger instance.
      */
-    std::vector<std::string> _wtGetAllIdents(WiredTigerRecoveryUnitBase& wtRu) const;
+    std::vector<std::string> _wtGetAllIdents(WiredTigerRecoveryUnit& wtRu) const;
 
     // Configuration parameters to configure the WiredTiger instance.
     WiredTigerConfig _wtConfig;

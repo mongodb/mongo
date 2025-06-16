@@ -92,10 +92,14 @@ void handleWriteContextForDebugging(WiredTigerRecoveryUnit& ru, Timestamp& ts) {
 
 AtomicWord<std::int64_t> snapshotTooOldErrorCount{0};
 
-WiredTigerRecoveryUnitBase::WiredTigerRecoveryUnitBase(WiredTigerConnection* connection)
-    : _connection(connection) {}
+WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
+    : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
 
-void WiredTigerRecoveryUnitBase::_ensureSession() {
+WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* connection,
+                                               WiredTigerOplogManager* oplogManager)
+    : _connection(connection), _oplogManager(oplogManager) {}
+
+void WiredTigerRecoveryUnit::_ensureSession() {
     if (_managedSession) {
         return;
     }
@@ -109,17 +113,10 @@ void WiredTigerRecoveryUnitBase::_ensureSession() {
     _session = _managedSession.get();
 }
 
-WiredTigerSession* WiredTigerRecoveryUnitBase::getSessionNoTxn() {
+WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
     return _session;
 }
-
-WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* sc)
-    : WiredTigerRecoveryUnit(sc, sc->getKVEngine()->getOplogManager()) {}
-
-WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerConnection* connection,
-                                               WiredTigerOplogManager* oplogManager)
-    : WiredTigerRecoveryUnitBase(connection), _oplogManager(oplogManager) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
@@ -948,7 +945,7 @@ size_t WiredTigerRecoveryUnit::getCacheDirtyBytes() {
     return result.isOK() ? result.getValue() : 0;
 }
 
-WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnitBase& wtRu,
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
                                                    uint64_t tableID,
                                                    bool allowOverwrite,
                                                    bool random) {

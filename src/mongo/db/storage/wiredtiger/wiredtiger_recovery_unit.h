@@ -65,42 +65,7 @@ using RoundUpReadTimestamp = WiredTigerBeginTxnBlock::RoundUpReadTimestamp;
 
 extern AtomicWord<std::int64_t> snapshotTooOldErrorCount;
 
-class WiredTigerRecoveryUnitBase : public RecoveryUnit {
-public:
-    WiredTigerRecoveryUnitBase(WiredTigerConnection* connection);
-
-    ~WiredTigerRecoveryUnitBase() override = default;
-
-    static WiredTigerRecoveryUnitBase& get(RecoveryUnit& ru) {
-        return checked_cast<WiredTigerRecoveryUnitBase&>(ru);
-    }
-
-    static WiredTigerRecoveryUnitBase* get(RecoveryUnit* ru) {
-        return checked_cast<WiredTigerRecoveryUnitBase*>(ru);
-    }
-
-    WiredTigerConnection* getConnection() {
-        return _connection;
-    }
-
-    virtual WiredTigerSession* getSession() = 0;
-
-    /**
-     * Returns a session without starting a new WT txn on the session. Will not close any already
-     * running session.
-     */
-    WiredTigerSession* getSessionNoTxn();
-
-protected:
-    void _ensureSession();
-
-    WiredTigerConnection* _connection{nullptr};  // not owned
-
-    WiredTigerManagedSession _managedSession;
-    WiredTigerSession* _session{nullptr};
-};
-
-class WiredTigerRecoveryUnit final : public WiredTigerRecoveryUnitBase {
+class WiredTigerRecoveryUnit final : public RecoveryUnit {
 public:
     WiredTigerRecoveryUnit(WiredTigerConnection* connection);
 
@@ -210,7 +175,17 @@ public:
 
     // ---- WT STUFF
 
-    WiredTigerSession* getSession() override;
+    WiredTigerConnection* getConnection() {
+        return _connection;
+    }
+
+    WiredTigerSession* getSession();
+
+    /**
+     * Returns a session without starting a new WT txn on the session. Will not close any already
+     * running session.
+     */
+    WiredTigerSession* getSessionNoTxn();
 
     /**
      * Enter a period of wait or computation during which there are no WT calls.
@@ -237,6 +212,7 @@ private:
     void _abort();
     void _commit();
 
+    void _ensureSession();
     void _txnClose(bool commit);
     void _txnOpen();
 
@@ -272,7 +248,10 @@ private:
      */
     void _updateMultiTimestampConstraint(Timestamp timestamp);
 
+    WiredTigerConnection* _connection;      // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
+    WiredTigerManagedSession _managedSession;
+    WiredTigerSession* _session = nullptr;
     bool _isTimestamped = false;
 
     // Helpers used to keep track of multi timestamp constraint violations on the transaction.
@@ -323,7 +302,7 @@ private:
 };
 
 // Constructs a WiredTigerCursor::Params instance from the given params and returns it.
-WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnitBase& wtRu,
+WiredTigerCursor::Params getWiredTigerCursorParams(WiredTigerRecoveryUnit& wtRu,
                                                    uint64_t tableID,
                                                    bool allowOverwrite = false,
                                                    bool random = false);

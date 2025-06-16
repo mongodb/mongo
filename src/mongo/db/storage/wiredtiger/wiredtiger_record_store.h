@@ -146,9 +146,7 @@ public:
         const WiredTigerRecordStore::WiredTigerTableConfig& wtTableConfig,
         bool isOplog = false);
 
-    WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine,
-                          WiredTigerRecoveryUnitBase&,
-                          Params params);
+    WiredTigerRecordStore(WiredTigerKVEngineBase* kvEngine, WiredTigerRecoveryUnit&, Params params);
 
     ~WiredTigerRecordStore() override;
 
@@ -257,7 +255,7 @@ protected:
      * it with statistics corresponding to this operation.
      */
     void wtDeleteRecord(OperationContext*,
-                        WiredTigerRecoveryUnitBase& wtRu,
+                        WiredTigerRecoveryUnit& wtRu,
                         const RecordId&,
                         OpStats& opStats);
 
@@ -267,7 +265,7 @@ protected:
      * statistics corresponding to this operation.
      */
     Status wtInsertRecord(OperationContext*,
-                          WiredTigerRecoveryUnitBase& wtRu,
+                          WiredTigerRecoveryUnit& wtRu,
                           WT_CURSOR* c,
                           const Record& record,
                           OpStats& opStats);
@@ -277,7 +275,7 @@ protected:
      * statistics corresponding to this operation.
      */
     Status wtUpdateRecord(OperationContext* opCtx,
-                          WiredTigerRecoveryUnitBase& wtRu,
+                          WiredTigerRecoveryUnit& wtRu,
                           const RecordId& id,
                           const char* data,
                           int len,
@@ -286,13 +284,13 @@ protected:
     /**
      * Deletes all records in this WiredTiger table.
      */
-    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnitBase& wtRu);
+    Status wtTruncate(OperationContext* opCtx, WiredTigerRecoveryUnit& wtRu);
 
     /**
      * Deletes all Records in the range [minRecordId, maxRecordId].
      */
     Status wtRangeTruncate(OperationContext* opCtx,
-                           WiredTigerRecoveryUnitBase& wtRu,
+                           WiredTigerRecoveryUnit& wtRu,
                            const RecordId& minRecordId = RecordId(),
                            const RecordId& maxRecordId = RecordId());
 
@@ -300,7 +298,7 @@ protected:
      * Compacts this WiredTiger table to attempt to reduce its storage space.
      */
     StatusWith<int64_t> wtCompact(OperationContext* opCtx,
-                                  WiredTigerRecoveryUnitBase& wtRu,
+                                  WiredTigerRecoveryUnit& wtRu,
                                   const CompactOptions& options);
 
     void _deleteRecord(OperationContext*, RecoveryUnit&, const RecordId&) override;

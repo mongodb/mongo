@@ -37,12 +37,12 @@ namespace mongo {
 
 // Helper functions that wrap around their respective WT_CURSOR data modification calls. These are
 // used to change the RecoveryUnit's state when a write has been performed on the snapshot.
-int wiredTigerCursorInsert(WiredTigerRecoveryUnitBase&, WT_CURSOR* cursor);
-int wiredTigerCursorModify(WiredTigerRecoveryUnitBase&,
+int wiredTigerCursorInsert(WiredTigerRecoveryUnit&, WT_CURSOR* cursor);
+int wiredTigerCursorModify(WiredTigerRecoveryUnit&,
                            WT_CURSOR* cursor,
                            WT_MODIFY* entries,
                            int nentries);
-int wiredTigerCursorUpdate(WiredTigerRecoveryUnitBase&, WT_CURSOR* cursor);
-int wiredTigerCursorRemove(WiredTigerRecoveryUnitBase&, WT_CURSOR* cursor);
+int wiredTigerCursorUpdate(WiredTigerRecoveryUnit&, WT_CURSOR* cursor);
+int wiredTigerCursorRemove(WiredTigerRecoveryUnit&, WT_CURSOR* cursor);
 
 }  // namespace mongo

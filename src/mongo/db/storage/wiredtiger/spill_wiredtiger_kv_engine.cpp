@@ -123,7 +123,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::getTemporaryRecordStore(Re
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = false;
     return std::make_unique<WiredTigerRecordStore>(
-        this, WiredTigerRecoveryUnitBase::get(ru), std::move(params));
+        this, WiredTigerRecoveryUnit::get(ru), std::move(params));
 }
 
 std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
