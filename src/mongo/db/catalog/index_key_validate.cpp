@@ -86,8 +86,9 @@ static const std::set<StringData> allowedClusteredIndexFieldNames = {
     ClusteredIndexSpec::kUniqueFieldName,
     ClusteredIndexSpec::kVFieldName,
     ClusteredIndexSpec::kKeyFieldName,
-    // This is for indexSpec creation only.
-    "clustered",
+    // These are for indexSpec creation only.
+    IndexDescriptor::kClusteredFieldName,
+    IndexDescriptor::kExpireAfterSecondsFieldName,
 };
 
 /**

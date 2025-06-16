@@ -110,11 +110,15 @@ bool requiresLegacyFormat(const NamespaceString& nss) {
 }
 
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
-                                       const BSONObj& collation) {
+                                       const BSONObj& collation,
+                                       const boost::optional<int64_t>& expireAfterSeconds) {
     BSONObjBuilder bob;
     collInfo.getIndexSpec().serialize(&bob);
     if (!collation.isEmpty()) {
         bob.append("collation", collation);
+    }
+    if (expireAfterSeconds) {
+        bob.append("expireAfterSeconds", expireAfterSeconds.value());
     }
     bob.append("clustered", true);
     return bob.obj();

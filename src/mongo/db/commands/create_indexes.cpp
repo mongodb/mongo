@@ -177,18 +177,10 @@ void appendFinalIndexFieldsToResult(CreateIndexesReply* reply,
  * Ensures that the options passed in for TTL indexes are valid.
  */
 void validateTTLOptions(OperationContext* opCtx,
-                        const NamespaceString& ns,
+                        const CollectionPtr& collection,
                         const CreateIndexesCommand& cmd) {
-    const auto clusteredAndCapped = [&](LockMode mode) {
-        AutoGetCollection collection(opCtx, ns, mode);
-        if (collection) {
-            const auto c = collection.getCollection().get();
-            if (c->getClusteredInfo() && c->isCapped()) {
-                return true;
-            }
-        }
-        return false;
-    }(MODE_IS);
+    const auto clusteredAndCapped =
+        collection && collection->getClusteredInfo() && collection->isCapped();
 
     for (const auto& index : cmd.getIndexes()) {
         uassert(ErrorCodes::Error(6049202),
@@ -486,7 +478,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.get()));
     }
 
-    validateTTLOptions(opCtx, ns, cmd);
     checkEncryptedFieldIndexRestrictions(opCtx, ns, cmd);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
@@ -518,6 +509,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                     .setLastOpToSystemLastOpTime(opCtx);
                 return true;
             }
+
+            validateTTLOptions(opCtx, collection.getCollection(), cmd);
 
             if (collection &&
                 !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {

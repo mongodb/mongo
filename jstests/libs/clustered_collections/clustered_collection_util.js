@@ -77,9 +77,16 @@ var ClusteredCollectionUtil = class {
     static validateListIndexes(db, collName, createOptions) {
         const fullCreateOptions = ClusteredCollectionUtil.constructFullCreateOptions(createOptions);
         const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
+        let extraData = {clustered: true};
+        // ttl is not stored on the clusteredIndex but on the collection info. Therefore, we have to
+        // add it back in this check to match the getIndexes output.
+        if (typeof (createOptions.expireAfterSeconds) !== 'undefined' &&
+            createOptions.expireAfterSeconds !== null) {
+            extraData.expireAfterSeconds = createOptions.expireAfterSeconds;
+        }
         const expectedListIndexesOutput =
-            Object.extend({clustered: true}, fullCreateOptions.clusteredIndex);
-        assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
+            Object.extend(extraData, fullCreateOptions.clusteredIndex);
+        assert.docEq(expectedListIndexesOutput, listIndexes.cursor.firstBatch[0]);
     }
 
     static testBasicClusteredCollection(db, collName, clusterKey) {

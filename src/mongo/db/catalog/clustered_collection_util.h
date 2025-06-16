@@ -73,7 +73,8 @@ bool requiresLegacyFormat(const NamespaceString& nss);
  * collection has the 'simple' collation this expects an empty BSONObj.
  */
 BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
-                                       const BSONObj& collation);
+                                       const BSONObj& collation,
+                                       const boost::optional<int64_t>& expireAfterSeconds);
 
 /**
  * Returns true if the BSON object matches the collection's cluster key. Caller's should ensure
