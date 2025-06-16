@@ -91,6 +91,20 @@ GenericArguments makeGenericArgs(const WriteConcernIdl& wc) {
 
 constexpr auto kCommandName = "doSomeWrite"_sd;
 
+TEST_F(WriteConcernTest, ExtractFailsOnNullBytes) {
+    WriteConcernIdl wc;
+    std::string s = "wcWithNullBytes ";
+    s[s.length() - 1] = '\0';
+    wc.setWriteConcernW(WriteConcernW(s));
+    auto expectedErrMsg = "illegal embedded NUL byte in write concern " + s;
+    expectedErrMsg.pop_back();
+    ASSERT_THROWS_CODE_AND_WHAT(
+        extractWriteConcern(_opCtx.get(), makeGenericArgs(wc), kCommandName, false /*internal*/),
+        DBException,
+        103742,
+        expectedErrMsg);
+}
+
 TEST_F(WriteConcernTest, ExtractOverridesWMajorityJFalse) {
     WriteConcernIdl wc;
     wc.setWriteConcernW(WriteConcernW("majority"));
