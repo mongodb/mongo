@@ -299,6 +299,32 @@ server_parameters:
         condition: {expr: false}
         redact: false
 
+    spillWiredTigerEvictionThreadsMin:
+        description: >-
+            The minimum number of threads that the spill WiredTiger instance will use for cache
+            eviction.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerEvictionThreadsMin
+        default: 1
+        validator:
+            gte: 1
+            lte: 20
+        redact: false
+
+    spillWiredTigerEvictionThreadsMax:
+        description: >-
+            The maximum number of threads that the spill WiredTiger instance will use for cache
+            eviction.
+        set_at: startup
+        cpp_vartype: int32_t
+        cpp_varname: gSpillWiredTigerEvictionThreadsMax
+        default: 1
+        validator:
+            gte: 1
+            lte: 20
+        redact: false
+
     enableTemporarilyUnavailableExceptions:
         description:
             "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
