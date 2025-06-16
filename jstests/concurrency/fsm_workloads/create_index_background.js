@@ -17,8 +17,8 @@ load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMong
 
 var $config = (function() {
     var data = {
-        nDocumentsToSeed: 1000,
-        nDocumentsToCreate: 200,
+        nDocumentsToSeed: 500,
+        nDocumentsToCreate: 100,
         nDocumentsToRead: 100,
         nDocumentsToUpdate: 50,
         nDocumentsToDelete: 50,
@@ -200,7 +200,7 @@ var $config = (function() {
     var internalQueryExecYieldPeriodMS;
 
     function setup(db, collName, cluster) {
-        var nSetupDocs = this.nDocumentsToSeed * 200;
+        var nSetupDocs = this.nDocumentsToSeed * 50;
         var coll = db[collName];
 
         var res = coll.createIndex({tid: 1});
