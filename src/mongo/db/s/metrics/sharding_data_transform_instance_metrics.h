@@ -46,6 +46,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -83,6 +84,8 @@ public:
 
         boost::optional<Milliseconds> getAverageTimeToFetch() const;
         boost::optional<Milliseconds> getAverageTimeToApply() const;
+
+        boost::optional<Milliseconds> getAverageTimeToFetchAndApply() const;
 
     private:
         const ShardId _donorShardId;
@@ -211,6 +214,13 @@ public:
     boost::optional<Milliseconds> getAverageTimeToApplyOplogEntries(
         const ShardId& donorShardId) const;
 
+    /**
+     * Returns the maximum exponential moving average of the time it takes to fetch and apply an
+     * oplog entry across all donors. Returns none if the metrics for any of the donors are not
+     * available yet.
+     */
+    boost::optional<Milliseconds> getMaxAverageTimeToFetchAndApplyOplogEntries() const;
+
     void onBatchRetrievedDuringOplogFetching(Milliseconds elapsed);
     void onLocalInsertDuringOplogFetching(const Milliseconds& elapsed);
     void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsed);
@@ -330,10 +340,11 @@ private:
     // To be used by recipients only. This map stores the OplogLatencyMetrics for each donor that a
     // recipient is copying data from. The map is populated by 'registerDonors' before the oplog
     // fetchers and appliers start running. After that, no inserting or erasing is permitted since
-    // this map is not protected by a mutex. The rationale for this setup is to avoid unnecessary
-    // lock contention by enabling the oplog fetchers and appliers for different donors to update
-    // the metrics without needing to take the mutex for the map, in addition to the mutex for their
-    // respective OplogLatencyMetrics.
+    // the oplog fetchers and appliers only take a shared mutex on the map. The rationale for this
+    // setup is to avoid unnecessary lock contention by enabling the fetchers and appliers for
+    // different donors to update the metrics without needing to take an exclusive mutex on the
+    // map, in addition to an exclusive mutex on their respective OplogLatencyMetrics.
+    mutable std::shared_mutex _oplogLatencyMetricsMutex;  // NOLINT
     std::map<ShardId, std::unique_ptr<OplogLatencyMetrics>> _oplogLatencyMetrics;
 
     resharding_metrics::PhaseDurationTracker _phaseDurations;
