@@ -125,6 +125,7 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
                                   const repl::OpTypeEnum& opType,
                                   const BSONObj& oField,
                                   const BSONObj& o2Field,
+                                  const Date_t wallClockTime,
                                   const ReshardingDonorOplogId& oplogId) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setNss(nss);
@@ -137,7 +138,7 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
     }
 
     oplogEntry.setOpTime({{}, {}});
-    oplogEntry.setWallClockTime({});
+    oplogEntry.setWallClockTime(wallClockTime);
     oplogEntry.set_id(Value(oplogId.toBSON()));
 
     return oplogEntry;
@@ -389,6 +390,7 @@ public:
                          BSONObj(),
                          BSON("type" << resharding::kReshardFinalOpLogType << "reshardingUUID"
                                      << _reshardingUUID),
+                         now(),
                          ReshardingDonorOplogId(postBatchResumeToken, postBatchResumeToken))
             .toBSON();
     }
@@ -1028,123 +1030,6 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
     // However, asking for `dataWriteTimestamp` wouldn't become ready until the next record is
     // inserted into the output collection.
     ASSERT_FALSE(fetcher.awaitInsert({dataWriteTimestamp, dataWriteTimestamp}).isReady());
-}
-
-TEST_F(ReshardingOplogFetcherTest, TestProgressMarkOplogInsert) {
-    for (bool storeProgress : {false, true}) {
-        LOGV2(9480005, "Running case", "storeProgress"_attr = storeProgress);
-
-        const NamespaceString outputCollectionNss = NamespaceString::createNamespaceString_forTest(
-            "dbtests.outputCollection" + std::to_string(storeProgress));
-        const NamespaceString dataCollectionNss = NamespaceString::createNamespaceString_forTest(
-            "dbtests.runFetchIteration" + std::to_string(storeProgress));
-
-        create(outputCollectionNss);
-        create(dataCollectionNss);
-
-        const auto& collectionUUID = [&] {
-            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
-            return dataColl->uuid();
-        }();
-
-        ReshardingDonorOplogId startAt{_fetchTimestamp, _fetchTimestamp};
-        ReshardingOplogFetcher fetcher(makeFetcherEnv(),
-                                       _reshardingUUID,
-                                       collectionUUID,
-                                       startAt,
-                                       _donorShard,
-                                       _destinationShard,
-                                       outputCollectionNss,
-                                       storeProgress);
-
-        // A progressMarkOplog should not be inserted if the donor's cursor response has the same
-        // timestamp as the initial startAt timestamp.
-        auto postBatchResumeToken = startAt.getTs();
-        auto oplogEntries = BSONArrayBuilder().arr();
-        auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        ASSERT_EQ(postBatchResumeToken, startAt.getTs());
-
-        auto fetcherJob = launchAsync([&, this] {
-            ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
-            auto factory = makeCancelableOpCtx();
-            return fetcher.iterate(&cc(), factory);
-        });
-        ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
-        ASSERT_EQ(0, currentOpFetchedCount()) << " Verify currentOp metrics";
-        ASSERT_EQ(0, persistedFetchedCount(_opCtx)) << " Verify persisted metrics";
-        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 0 /* numApplyOpsOplogEntries */);
-        ASSERT_TRUE(getLast(outputCollectionNss).isEmpty());
-
-        // A progressMarkOplog should be inserted if the donor's cursor response has an empty batch,
-        // and a timestamp larger than the lastSeenTimestamp.
-        postBatchResumeToken = _fetchTimestamp + 1;
-        oplogEntries = BSONArrayBuilder().arr();
-        mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        ASSERT_GT(postBatchResumeToken, fetcher.getLastSeenTimestamp().getTs());
-
-        fetcherJob = launchAsync([&, this] {
-            ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
-            auto factory = makeCancelableOpCtx();
-            return fetcher.iterate(&cc(), factory);
-        });
-        ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
-        ASSERT_EQ(1, currentOpFetchedCount()) << " Verify currentOp metrics";
-        ASSERT_EQ(storeProgress ? 1 : 0, persistedFetchedCount(_opCtx))
-            << " Verify persisted metrics";
-        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 1 /* numApplyOpsOplogEntries */);
-        auto lastOplogInOuptut = getLast(outputCollectionNss);
-        ASSERT_EQ(resharding::kReshardProgressMarkOpLogType,
-                  lastOplogInOuptut.getObjectField("o2")
-                      .getField(ReshardProgressMarkO2Field::kTypeFieldName)
-                      .String());
-        ASSERT_EQ(postBatchResumeToken,
-                  lastOplogInOuptut.getObjectField("_id").getField("ts").timestamp());
-
-        // A progressMarkOplog should not be inserted if the donor's cursor response has a non-empty
-        // batch.
-        postBatchResumeToken = _fetchTimestamp + 2;
-        auto oplog = makeOplog(dataCollectionNss,
-                               collectionUUID,
-                               repl::OpTypeEnum::kInsert,
-                               BSONObj(),
-                               BSONObj(),
-                               ReshardingDonorOplogId(postBatchResumeToken, postBatchResumeToken))
-                         .toBSON();
-        oplogEntries = BSON_ARRAY(oplog);
-        mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-
-        fetcherJob = launchAsync([&, this] {
-            ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
-            auto factory = makeCancelableOpCtx();
-            return fetcher.iterate(&cc(), factory);
-        });
-        ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
-        ASSERT_EQ(2, currentOpFetchedCount()) << " Verify currentOp metrics";
-        ASSERT_EQ(storeProgress ? 2 : 0, persistedFetchedCount(_opCtx))
-            << " Verify persisted metrics";
-        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 2 /* numApplyOpsOplogEntries */);
-        ASSERT_EQ(getLast(outputCollectionNss).woCompare(oplog), 0);
-
-        // A progressMarkOplog should not be inserted if the donor's cursor response has the same
-        // timestamp as the lastSeenTimestamp.
-        oplogEntries = BSONArrayBuilder().arr();
-        mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
-        ASSERT_EQ(postBatchResumeToken, fetcher.getLastSeenTimestamp().getTs());
-
-        fetcherJob = launchAsync([&, this] {
-            ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
-            auto factory = makeCancelableOpCtx();
-            return fetcher.iterate(&cc(), factory);
-        });
-        ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
-        ASSERT_EQ(2, currentOpFetchedCount()) << " Verify currentOp metrics";
-        ASSERT_EQ(storeProgress ? 2 : 0, persistedFetchedCount(_opCtx))
-            << " Verify persisted metrics";
-        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 2 /* numApplyOpsOplogEntries */);
-        ASSERT_EQ(getLast(outputCollectionNss).woCompare(oplog), 0);
-
-        resetResharding();
-    }
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
@@ -2291,6 +2176,333 @@ TEST_F(ReshardingOplogFetcherTest, UpdateAverageTimeToFetchMultipleCursors) {
     ASSERT_OK(fetcherFuture.getNoThrow());
     executor->shutdown();
     executor->join();
+}
+
+class ReshardingOplogFetcherProgressMarkOplogTest : public ReshardingOplogFetcherTest {
+protected:
+    struct OplogFetcherState {
+        bool storedProgress;
+        int lastFetchedCount;
+        ReshardingDonorOplogId lastFetchedOplogId;
+        Date_t lastFetchedOplogWallClockTime;
+        boost::optional<repl::MutableOplogEntry> lastFetchedOplogEntry;
+    };
+
+    struct TestOptions {
+        bool storeProgress;
+
+        BSONObj toBSON() const {
+            BSONObjBuilder bob;
+            bob.append("storeProgress", storeProgress);
+            return bob.obj();
+        }
+    };
+
+    struct TestContext {
+        std::unique_ptr<ReshardingOplogFetcher> fetcher;
+        ReshardingDonorOplogId startAt;
+        NamespaceString outputCollectionNss;
+        NamespaceString dataCollectionNss;
+        UUID dataCollectionUUID;
+    };
+
+    std::vector<TestOptions> makeAllTestOptions() {
+        std::vector<TestOptions> testOptions;
+        for (bool storeProgress : {false, true}) {
+            testOptions.push_back({storeProgress});
+        }
+        return testOptions;
+    }
+
+    TestContext makeTestContext(int testNum, TestOptions testOptions) {
+        auto outputCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.outputCollection" + std::to_string(testNum));
+        auto dataCollectionNss = NamespaceString::createNamespaceString_forTest(
+            "dbtests.runFetchIteration" + std::to_string(testNum));
+        create(outputCollectionNss);
+        create(dataCollectionNss);
+
+        auto dataCollectionUUID = [&] {
+            AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+            return dataColl->uuid();
+        }();
+
+        auto startAt = ReshardingDonorOplogId{_fetchTimestamp, _fetchTimestamp};
+        auto fetcher = std::make_unique<ReshardingOplogFetcher>(makeFetcherEnv(),
+                                                                _reshardingUUID,
+                                                                dataCollectionUUID,
+                                                                startAt,
+                                                                _donorShard,
+                                                                _destinationShard,
+                                                                outputCollectionNss,
+                                                                testOptions.storeProgress);
+
+        return {std::move(fetcher),
+                startAt,
+                outputCollectionNss,
+                dataCollectionNss,
+                dataCollectionUUID};
+    }
+
+    void runFetcher(ReshardingOplogFetcher* fetcher, const BSONObj& mockCursorResponse) {
+        auto fetcherJob = launchAsync([&, this] {
+            ThreadClient tc("RunnerForFetcher", _svcCtx->getService(), Client::noSession());
+            auto factory = makeCancelableOpCtx();
+            return fetcher->iterate(&cc(), factory);
+        });
+        ASSERT_TRUE(requestPassthroughHandler(fetcherJob, -1, mockCursorResponse));
+    }
+
+    void assertOplogEntriesCount(const NamespaceString& outputNss,
+                                 const OplogFetcherState& expected) {
+        ASSERT_EQ(currentOpFetchedCount(), expected.lastFetchedCount);
+        ASSERT_EQ(persistedFetchedCount(_opCtx),
+                  expected.storedProgress ? expected.lastFetchedCount : 0);
+        assertUsedApplyOpsToBatchInsert(outputNss, expected.lastFetchedCount);
+    }
+
+    void assertNoOplogEntries(const NamespaceString& outputNss) {
+        assertOplogEntriesCount(outputNss, OplogFetcherState{.lastFetchedCount = 0});
+        ASSERT_TRUE(getLast(outputNss).isEmpty());
+    }
+
+    void assertLastOplogEntryProgressMark(const NamespaceString& outputNss,
+                                          const OplogFetcherState& expected) {
+        auto lastOplogEntryBson = getLast(outputNss);
+        auto lastOplogEntry = uassertStatusOK(repl::OplogEntry::parse(lastOplogEntryBson));
+
+        ASSERT_EQ(lastOplogEntry.getOpType(), repl::OpTypeEnum::kNoop);
+        ASSERT_BSONOBJ_EQ(lastOplogEntry.get_id()->getDocument().toBson(),
+                          expected.lastFetchedOplogId.toBSON());
+
+        ASSERT_EQ(lastOplogEntry.getWallClockTime(), expected.lastFetchedOplogWallClockTime);
+        ReshardProgressMarkO2Field o2Field;
+        o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+        ASSERT_BSONOBJ_EQ(*lastOplogEntry.getObject2(), o2Field.toBSON());
+    }
+
+    void assertLastOplogNotProgressMark(const NamespaceString& outputNss,
+                                        const OplogFetcherState& expected) {
+        auto lastOplogEntryBson = getLast(outputNss);
+        auto lastOplogEntry = uassertStatusOK(repl::OplogEntry::parse(lastOplogEntryBson));
+
+        ASSERT_EQ(lastOplogEntry.getWallClockTime(), expected.lastFetchedOplogWallClockTime);
+        ASSERT_BSONOBJ_EQ(lastOplogEntryBson, expected.lastFetchedOplogEntry->toBSON());
+    }
+};
+
+TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
+       NotInsertProgressMarkOplog_EmptyBatchAndResumeTimestampEqualToStartAt) {
+    auto testNum = 0;
+    for (const auto& testOptions : makeAllTestOptions()) {
+        LOGV2(10635001,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        testNum++;
+        auto testCtx = makeTestContext(testNum, testOptions);
+
+        auto postBatchResumeToken = testCtx.startAt.getTs();
+        auto oplogEntries = BSONArrayBuilder().arr();
+        auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse);
+
+        assertNoOplogEntries(testCtx.outputCollectionNss);
+
+        resetResharding();
+    }
+}
+
+TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
+       InsertProgressMark_BatchEmptyAndResumeTimestampGreaterThanStartAt) {
+    auto testNum = 0;
+    for (const auto& testOptions : makeAllTestOptions()) {
+        LOGV2(10635002,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        testNum++;
+        auto testCtx = makeTestContext(testNum, testOptions);
+
+        auto postBatchResumeToken = testCtx.startAt.getTs() + 1;
+        auto oplogEntries = BSONArrayBuilder().arr();
+        auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
+        // Advance the clock to verify that the fetcher sets the wall clock time of the
+        // 'reshardProgressMark' oplog entry to the current time.
+        advanceTime(Milliseconds(1500));
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse);
+
+        OplogFetcherState expected;
+        expected.storedProgress = testOptions.storeProgress;
+        expected.lastFetchedCount = 1;
+        expected.lastFetchedOplogId = {postBatchResumeToken, postBatchResumeToken};
+        expected.lastFetchedOplogWallClockTime = now();
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogEntryProgressMark(testCtx.outputCollectionNss, expected);
+
+        resetResharding();
+    }
+}
+
+TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
+       NotInsertProgressMarkOplog_BatchNotEmptyAndResumeTimestampEqualToLastOplogTimestamp) {
+    auto testNum = 0;
+    for (const auto& testOptions : makeAllTestOptions()) {
+        LOGV2(10635003,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        testNum++;
+        auto testCtx = makeTestContext(testNum, testOptions);
+
+        auto oplogTs = testCtx.startAt.getTs() + 1;
+        auto postBatchResumeToken = oplogTs;
+        auto oplogId = ReshardingDonorOplogId(oplogTs, oplogTs);
+        auto oplogWallClockTime =
+            Date_t::fromMillisSinceEpoch(postBatchResumeToken.getSecs() * 1000);
+        auto oplogEntry = makeOplog(testCtx.dataCollectionNss,
+                                    testCtx.dataCollectionUUID,
+                                    repl::OpTypeEnum::kInsert,
+                                    BSONObj() /* oField */,
+                                    BSONObj() /* o2Field */,
+                                    oplogWallClockTime,
+                                    oplogId);
+        auto oplogEntries = BSON_ARRAY(oplogEntry.toBSON());
+        auto mockCursorResponse = makeMockAggregateResponse(postBatchResumeToken, oplogEntries);
+        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
+        // oplog entry it fetched.
+        advanceTime(Milliseconds(1500));
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse);
+
+        OplogFetcherState expected;
+        expected.storedProgress = testOptions.storeProgress;
+        expected.lastFetchedCount = 1;
+        expected.lastFetchedOplogId = oplogId;
+        expected.lastFetchedOplogWallClockTime = oplogWallClockTime;
+        expected.lastFetchedOplogEntry = oplogEntry;
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
+
+        resetResharding();
+    }
+}
+
+TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
+       NotInsertProgressMarkOplog_BatchEmptyAndTimestampEqualToLastSeen) {
+    auto testNum = 0;
+    for (const auto& testOptions : makeAllTestOptions()) {
+        LOGV2(10635004,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        testNum++;
+        auto testCtx = makeTestContext(testNum, testOptions);
+
+        // Mock a non-empty batch so that the last seen timestamp advances.
+        auto postBatchResumeToken0 = testCtx.startAt.getTs() + 1;
+        auto oplogId0 = ReshardingDonorOplogId(postBatchResumeToken0, postBatchResumeToken0);
+        auto oplogWallClockTime0 =
+            Date_t::fromMillisSinceEpoch(postBatchResumeToken0.getSecs() * 1000);
+        auto oplogEntry0 = makeOplog(testCtx.dataCollectionNss,
+                                     testCtx.dataCollectionUUID,
+                                     repl::OpTypeEnum::kInsert,
+                                     BSONObj() /* oField */,
+                                     BSONObj() /* o2Field */,
+                                     oplogWallClockTime0,
+                                     oplogId0);
+        auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
+        auto mockCursorResponse0 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries0);
+        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
+        // oplog entry it fetched.
+        advanceTime(Milliseconds(1500));
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse0);
+
+        OplogFetcherState expected;
+        expected.storedProgress = testOptions.storeProgress;
+        expected.lastFetchedCount = 1;
+        expected.lastFetchedOplogId = oplogId0;
+        expected.lastFetchedOplogWallClockTime = oplogWallClockTime0;
+        expected.lastFetchedOplogEntry = oplogEntry0;
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
+
+        // Mock an empty batch with a resume timestamp equal to the last seen timestamp and verify
+        // that the fetcher does not insert a 'reshardProgressMark' oplog entry.
+        auto oplogEntries1 = BSONArrayBuilder().arr();
+        auto mockCursorResponse1 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries1);
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse1);
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
+
+        resetResharding();
+    }
+}
+
+TEST_F(ReshardingOplogFetcherProgressMarkOplogTest,
+       InsertProgressMarkOplog_BatchEmptyAndTimestampGreaterThanLastSeen) {
+    auto testNum = 0;
+    for (const auto& testOptions : makeAllTestOptions()) {
+        LOGV2(10635005,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "testOptions"_attr = testOptions);
+
+        testNum++;
+        auto testCtx = makeTestContext(testNum, testOptions);
+
+        // Mock a non-empty batch so that the last seen timestamp advances.
+        auto postBatchResumeToken0 = testCtx.startAt.getTs() + 1;
+        auto oplogId0 = ReshardingDonorOplogId(postBatchResumeToken0, postBatchResumeToken0);
+        auto oplogWallClockTime0 =
+            Date_t::fromMillisSinceEpoch(postBatchResumeToken0.getSecs() * 1000);
+        auto oplogEntry0 = makeOplog(testCtx.dataCollectionNss,
+                                     testCtx.dataCollectionUUID,
+                                     repl::OpTypeEnum::kInsert,
+                                     BSONObj() /* oField */,
+                                     BSONObj() /* o2Field */,
+                                     oplogWallClockTime0,
+                                     oplogId0);
+        auto oplogEntries0 = BSON_ARRAY(oplogEntry0.toBSON());
+        auto mockCursorResponse0 = makeMockAggregateResponse(postBatchResumeToken0, oplogEntries0);
+        // Advance the clock to verify that the fetcher doesn't modify the wall clock time of the
+        // oplog entry it fetched.
+        advanceTime(Milliseconds(1500));
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse0);
+
+        OplogFetcherState expected;
+        expected.storedProgress = testOptions.storeProgress;
+        expected.lastFetchedCount = 1;
+        expected.lastFetchedOplogId = oplogId0;
+        expected.lastFetchedOplogWallClockTime = oplogWallClockTime0;
+        expected.lastFetchedOplogEntry = oplogEntry0;
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogNotProgressMark(testCtx.outputCollectionNss, expected);
+
+        // Mock an empty batch but with a resume timestamp greater than the last seen timestamp and
+        // verify that the fetcher inserts a 'reshardProgressMark' oplog entry.
+        auto postBatchResumeToken1 = postBatchResumeToken0 + 1;
+        auto oplogEntries1 = BSONArrayBuilder().arr();
+        auto mockCursorResponse1 = makeMockAggregateResponse(postBatchResumeToken1, oplogEntries1);
+        runFetcher(testCtx.fetcher.get(), mockCursorResponse1);
+
+        expected.lastFetchedCount = 2;
+        expected.lastFetchedOplogId = {postBatchResumeToken1, postBatchResumeToken1};
+        expected.lastFetchedOplogWallClockTime = now();
+
+        assertOplogEntriesCount(testCtx.outputCollectionNss, expected);
+        assertLastOplogEntryProgressMark(testCtx.outputCollectionNss, expected);
+
+        resetResharding();
+    }
 }
 
 }  // namespace
