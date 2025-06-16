@@ -439,7 +439,14 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal}));
+        }
     };
 
     bool adminOnly() const override {
