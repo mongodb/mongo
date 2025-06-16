@@ -68,8 +68,7 @@ IntentRegistry::Intent IntentRegistry::IntentToken::intent() const {
 }
 
 IntentRegistry::IntentRegistry()
-    : _tokenMaps((size_t)IntentRegistry::Intent::_NumDistinctIntents_),
-      _totalIntentsDeclared((size_t)IntentRegistry::Intent::_NumDistinctIntents_) {}
+    : _tokenMaps((size_t)IntentRegistry::Intent::_NumDistinctIntents_) {}
 
 IntentRegistry& IntentRegistry::get(ServiceContext* serviceContext) {
     return registryDecoration(serviceContext);
@@ -82,39 +81,60 @@ IntentRegistry& IntentRegistry::get(OperationContext* opCtx) {
 IntentRegistry::IntentToken IntentRegistry::registerIntent(IntentRegistry::Intent intent,
                                                            OperationContext* opCtx) {
     invariant(intent < Intent::_NumDistinctIntents_);
+    invariant(opCtx);
 
-    stdx::lock_guard<stdx::mutex> lock(_stateMutex);
-
-    uassert(ErrorCodes::InterruptedDueToReplStateChange,
-            "Cannot register intent due to ReplStateChange.",
-            _validIntent((intent)));
-
+    // Check these outside of the mutex to avoid a deadlock against the Replication Coordinator
+    // mutex.
     bool isReplSet =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
+    auto state = repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getMemberState();
 
-    if (isReplSet && intent == Intent::Write) {
-        bool isWritablePrimary =
-            repl::ReplicationCoordinator::get(opCtx->getServiceContext())
-                ->canAcceptWritesFor(opCtx, NamespaceString(DatabaseName::kAdmin));
-        uassert(ErrorCodes::NotWritablePrimary,
-                "Cannot register write intent if we are not primary.",
-                isWritablePrimary);
+    stdx::unique_lock<stdx::mutex> lock(_stateMutex);
+
+    // Downgrade Write intent to LocalWrite during initial sync.
+    if (intent == Intent::Write && isReplSet &&
+        (state == repl::MemberState::RS_STARTUP2 || state == repl::MemberState::RS_REMOVED)) {
+        intent = Intent::LocalWrite;
+    }
+
+    if (opCtx != _interruptionCtx) {
+        auto validIntent = _validIntent(intent);
+        if (_lastInterruption == InterruptionType::Shutdown) {
+            uassert(ErrorCodes::InterruptedAtShutdown,
+                    "Cannot register intent due to Shutdown.",
+                    validIntent);
+        } else {
+            uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                    "Cannot register intent due to ReplStateChange.",
+                    validIntent);
+        }
+
+        if (isReplSet && intent == Intent::Write) {
+            // canAcceptWritesFor asserts that we have the RSTL acquired.
+            bool isWritablePrimary =
+                repl::ReplicationCoordinator::get(opCtx->getServiceContext())
+                    ->canAcceptWritesFor_UNSAFE(opCtx, NamespaceString(DatabaseName::kAdmin));
+            uassert(ErrorCodes::NotWritablePrimary,
+                    "Cannot register write intent if we are not primary.",
+                    isWritablePrimary);
+        }
     }
 
     auto& tokenMap = _tokenMaps[(size_t)intent];
     IntentToken token(intent);
-    LOGV2(9945004, "Register Intent", "token"_attr = token.id(), "intent"_attr = intent);
+    LOGV2_DEBUG(9945004,
+                3,
+                "Register Intent",
+                "token"_attr = token.id(),
+                "intent"_attr = intentToString(intent));
     {
         stdx::unique_lock<stdx::mutex> lockTokenMap(tokenMap.lock);
         tokenMap.map.insert({token.id(), opCtx});
     }
     {
         stdx::unique_lock<stdx::mutex> lockOpCtxIntentMap(_opCtxIntentMap.lock);
-        auto ins = _opCtxIntentMap.map.insert({opCtx, token.intent()});
-        uassert(1026190, "Operation context already has a registered intent.", ins.second);
+        _opCtxIntentMap.map.insert({opCtx, token.intent()});
     }
-
-    _totalIntentsDeclared[(size_t)intent] += 1;
 
     return token;
 }
@@ -135,22 +155,22 @@ void IntentRegistry::deregisterIntent(IntentRegistry::IntentToken token) {
     if (tokenMap.map.empty()) {
         tokenMap.cv.notify_all();
     }
-
-    _totalIntentsDeclared[(size_t)token.intent()] -= 1;
 }
 
 stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOperations(
-    IntentRegistry::InterruptionType interrupt, boost::optional<uint32_t> timeout_sec) {
+    IntentRegistry::InterruptionType interrupt,
+    OperationContext* opCtx,
+    boost::optional<uint32_t> timeout_sec) {
     LOGV2(9945003, "Intent Registry killConflictingOperations", "interrupt"_attr = interrupt);
     auto timeOutSec = stdx::chrono::seconds(
         timeout_sec ? *timeout_sec : repl::fassertOnLockTimeoutForStepUpDown.load());
     {
         stdx::unique_lock<stdx::mutex> lock(_stateMutex);
-        if (_activeInterruption) {
+        if (_interruptionCtx) {
             LOGV2(9945001, "Existing kill ongoing. Blocking until it is finished.");
         }
         if (timeOutSec.count() && !_activeInterruptionCV.wait_for(lock, timeOutSec, [this] {
-                return !_activeInterruption;
+                return !_interruptionCtx;
             })) {
             LOGV2(9945005,
                   "Timeout while waiting on a previous interrupt to drain.",
@@ -158,20 +178,23 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
                   "new"_attr = interrupt);
             fasserted(9945002);
         } else if (!timeOutSec.count()) {
-            _activeInterruptionCV.wait(lock, [this] { return !_activeInterruption; });
+            _activeInterruptionCV.wait(lock, [this] { return !_interruptionCtx; });
         }
-        _activeInterruption = true;
         _lastInterruption = interrupt;
+        _interruptionCtx = opCtx;
     }
 
     return stdx::async(stdx::launch::async, [&, interrupt, timeOutSec] {
         const std::vector<Intent>* intents = nullptr;
         switch (interrupt) {
-            case InterruptionType::Rollback:
+            case InterruptionType::Rollback: {
+                static const std::vector<Intent> rollbackIntents = {Intent::Write, Intent::Read};
+                intents = &rollbackIntents;
+            } break;
             case InterruptionType::Shutdown: {
-                static const std::vector<Intent> rollbackShutdownIntents = {
+                static const std::vector<Intent> shutdownIntents = {
                     Intent::Write, Intent::Read, Intent::LocalWrite};
-                intents = &rollbackShutdownIntents;
+                intents = &shutdownIntents;
             } break;
             case InterruptionType::StepDown: {
                 static const std::vector<Intent> stepdownIntents = {Intent::Write};
@@ -209,8 +232,8 @@ stdx::future<ReplicationStateTransitionGuard> IntentRegistry::killConflictingOpe
 
         return ReplicationStateTransitionGuard([&]() {
             stdx::lock_guard<stdx::mutex> lock(_stateMutex);
+            _interruptionCtx = nullptr;
             _lastInterruption = InterruptionType::None;
-            _activeInterruption = false;
             _activeInterruptionCV.notify_one();
         });
     });
@@ -234,7 +257,7 @@ void IntentRegistry::enable() {
     stdx::lock_guard<stdx::mutex> lock(_stateMutex);
     _enabled = true;
     _lastInterruption = InterruptionType::None;
-    _activeInterruption = false;
+    _interruptionCtx = nullptr;
     _activeInterruptionCV.notify_one();
 }
 
@@ -263,11 +286,11 @@ bool IntentRegistry::_validIntent(IntentRegistry::Intent intent) const {
         return false;
     }
     switch (_lastInterruption) {
-        case InterruptionType::Rollback:
         case InterruptionType::Shutdown:
             return false;
+        case InterruptionType::Rollback:
+            return intent == Intent::LocalWrite;
         case InterruptionType::StepDown:
-        case InterruptionType::StepUp:
             return intent != Intent::Write && intent != Intent::PreparedTransaction;
         default:
             return true;
@@ -281,10 +304,12 @@ void IntentRegistry::_killOperationsByIntent(IntentRegistry::Intent intent) {
         auto serviceCtx = toKill->getServiceContext();
         auto client = toKill->getClient();
         ClientLock lock(client);
-        serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedDueToReplStateChange);
-
+        if (_lastInterruption == InterruptionType::Shutdown) {
+            serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedAtShutdown);
+        } else {
+            serviceCtx->killOperation(lock, toKill, ErrorCodes::InterruptedDueToReplStateChange);
+        }
         _totalOpsKilled += 1;
-
         LOGV2(9795400,
               "Repl state change interrupted a thread.",
               "name"_attr = client->desc(),
@@ -316,7 +341,17 @@ size_t IntentRegistry::getTotalOpsKilled() const {
 }
 
 std::vector<size_t> IntentRegistry::getTotalIntentsDeclared() const {
-    return _totalIntentsDeclared;
+    auto getTotalIntents = [&](IntentRegistry::Intent intent) {
+        auto& tokenMap = _tokenMaps[(size_t)intent];
+        stdx::unique_lock<stdx::mutex> lock(tokenMap.lock);
+        return tokenMap.map.size();
+    };
+    auto res = std::vector<size_t>();
+    res.emplace_back(getTotalIntents(IntentRegistry::Intent::Read));
+    res.emplace_back(getTotalIntents(IntentRegistry::Intent::Write));
+    res.emplace_back(getTotalIntents(IntentRegistry::Intent::LocalWrite));
+    res.emplace_back(getTotalIntents(IntentRegistry::Intent::PreparedTransaction));
+    return res;
 }
 
 std::string IntentRegistry::intentToString(IntentRegistry::Intent intent) {

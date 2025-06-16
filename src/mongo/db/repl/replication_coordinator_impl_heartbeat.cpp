@@ -597,13 +597,13 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     // kill all write operations which are no longer safe to run on step down. Also, operations that
     // have taken global lock in S mode and operations blocked on prepare conflict will be killed to
     // avoid 3-way deadlock between read, prepared transaction and step down thread.
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(
-            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
-    }
     AutoGetRstlForStepUpStepDown arsd(
         this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(_killConflictingOperations(
+            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
+    }
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // This node has already stepped down due to reconfig. So, signal anyone who is waiting on the
@@ -848,7 +848,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
                 // Initializing minvalid is not allowed to be interrupted.  Make sure it
                 // can't be interrupted by a storage change by taking the global lock first.
                 {
-                    Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+                    Lock::GlobalLock lk(
+                        opCtx.get(),
+                        MODE_IX,
+                        {false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite});
                     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(
                         opCtx.get());
                 }
@@ -912,8 +915,8 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     auto opCtx = cc().makeOperationContext();
 
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto rsc = _rsConfig.unsafePeek();
     if (_shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
@@ -922,12 +925,12 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
         // Primary node will be either unelectable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
-        if (gFeatureFlagIntentRegistration.isEnabled()) {
-            rstg.emplace(_killConflictingOperations(
-                rss::consensus::IntentRegistry::InterruptionType::StepDown));
-        }
         arsd.emplace(
             this, opCtx.get(), ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstg.emplace(_killConflictingOperations(
+                rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx.get()));
+        }
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {

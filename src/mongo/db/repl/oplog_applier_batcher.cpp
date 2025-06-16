@@ -55,6 +55,7 @@
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -354,31 +355,44 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
         // The only case we can get an interruption in this try/catch block is during shutdown since
         // this thread is unkillable by stepdown. Since this OplogApplierBatcher has its own way to
         // handle shutdown, we can just swallow the exception.
-        try {
-            auto opCtx = cc().makeOperationContext();
-            ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
-                opCtx.get(), AdmissionContext::Priority::kExempt);
+        int retryAttempts = 0;
+        for (;;) {
+            try {
+                auto opCtx = cc().makeOperationContext();
+                ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
+                    opCtx.get(), AdmissionContext::Priority::kExempt);
 
-            // During storage change operations, we may shut down storage under a global lock
-            // and wait for any storage-using opCtxs to exit, so we will take the global lock here
-            // to block the storage change.
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+                // During storage change operations, we may shut down storage under a global lock
+                // and wait for any storage-using opCtxs to exit, so we will take the global lock
+                // here to block the storage change.
+                Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
 
-            // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
-            batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
+                // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
+                batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
 
-            // When this feature flag is enabled, the oplogBatchDelayMillis is handled in
-            // OplogWriter.
-            auto waitToFillBatch = Milliseconds(
-                feature_flags::gReduceMajorityWriteLatency.isEnabled() ? 0 : oplogBatchDelayMillis);
-            ops = fassertNoTrace(31004,
-                                 getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
-        } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
-            LOGV2_DEBUG(6133400,
-                        1,
-                        "Cancelled getting the global lock in Repl Batcher",
-                        "error"_attr = e.toStatus());
-            invariant(ops.empty());
+                // When this feature flag is enabled, the oplogBatchDelayMillis is handled in
+                // OplogWriter.
+                auto waitToFillBatch = Milliseconds(
+                    feature_flags::gReduceMajorityWriteLatency.isEnabled() ? 0
+                                                                           : oplogBatchDelayMillis);
+                ops = fassertNoTrace(
+                    31004, getNextApplierBatch(opCtx.get(), batchLimits, waitToFillBatch));
+                break;
+            } catch (const ExceptionFor<ErrorCategory::ShutdownError>& e) {
+                LOGV2_DEBUG(6133400,
+                            1,
+                            "Cancelled getting the global lock in Repl Batcher",
+                            "error"_attr = e.toStatus());
+                invariant(ops.empty());
+                break;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+                ++retryAttempts;
+                logAndBackoff(10262303,
+                              MONGO_LOGV2_DEFAULT_COMPONENT,
+                              logv2::LogSeverity::Debug(1),
+                              retryAttempts,
+                              "Retrying oplog batcher until we can declare our intent.");
+            }
         }
 
         // If we don't have anything in the batch, wait a bit for something to appear.

@@ -34,6 +34,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/intent_guard.h"
+#include "mongo/db/repl/intent_registry.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/time_support.h"
 
@@ -139,6 +141,7 @@ public:
         bool skipFlowControlTicket = false;
         bool skipRSTLLock = false;
         bool skipDirectConnectionChecks = false;
+        boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none;
     };
 
     /**
@@ -157,6 +160,9 @@ public:
          */
         GlobalLock(OperationContext* opCtx, LockMode lockMode)
             : GlobalLock(opCtx, lockMode, Date_t::max(), InterruptBehavior::kThrow) {}
+
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, GlobalLockSkipOptions skipOptions)
+            : GlobalLock(opCtx, lockMode, Date_t::max(), InterruptBehavior::kThrow, skipOptions) {}
 
         /**
          * A GlobalLock with a deadline requires the interrupt behavior to be explicitly defined.
@@ -185,7 +191,12 @@ public:
          * Constructor helper functions, to handle skipping or taking the RSTL lock.
          */
         void _takeGlobalLockOnly(LockMode lockMode, Date_t deadline);
-        void _takeGlobalAndRSTLLocks(LockMode lockMode, Date_t deadline);
+        void _takeGlobalAndRSTLLocks(
+            LockMode lockMode,
+            Date_t deadline,
+            boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent = boost::none);
+        void _declareIntent(LockMode lockMode,
+                            boost::optional<rss::consensus::IntentRegistry::Intent> explicitIntent);
 
         void _unlock();
 
@@ -196,6 +207,7 @@ public:
 
         InterruptBehavior _interruptBehavior;
         bool _skipRSTLLock;
+        boost::optional<rss::consensus::IntentGuard> _guard;
     };
 
     /**
@@ -210,7 +222,12 @@ public:
         explicit GlobalWrite(OperationContext* opCtx)
             : GlobalWrite(opCtx, Date_t::max(), InterruptBehavior::kThrow) {}
         explicit GlobalWrite(OperationContext* opCtx, Date_t deadline, InterruptBehavior behavior)
-            : GlobalLock(opCtx, MODE_X, deadline, behavior) {}
+            : GlobalLock(
+                  opCtx,
+                  MODE_X,
+                  deadline,
+                  behavior,
+                  {false, false, false, rss::consensus::IntentRegistry::Intent::LocalWrite}) {}
     };
 
     /**

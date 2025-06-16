@@ -562,19 +562,25 @@ void ShardingRecoveryService::onConsistentDataAvailable(OperationContext* opCtx,
 void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
+    auto autoGetCollOptions =
+        AutoGetCollection::Options{}.globalLockSkipOptions(Lock::GlobalLockSkipOptions{
+            .explicitIntent = rss::consensus::IntentRegistry::Intent::Read});
+    autoGetCollOptions.viewMode(auto_get_collection::ViewMode::kViewsPermitted);
     // Release all in-memory critical sections
     for (const auto& nss : CollectionShardingState::getCollectionNames(opCtx)) {
-        AutoGetCollection collLock(
-            opCtx,
-            nss,
-            MODE_X,
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
+        AutoGetCollection collLock(opCtx, nss, MODE_X, autoGetCollOptions);
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
         scopedCsr->exitCriticalSectionNoChecks();
     }
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
-        AutoGetDb dbLock(opCtx, dbName, MODE_X);
+        AutoGetDb dbLock(opCtx,
+                         dbName,
+                         MODE_X,
+                         boost::none,
+                         Date_t::max(),
+                         Lock::DBLockSkipOptions{
+                             false, false, false, rss::consensus::IntentRegistry::Intent::Read});
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
         scopedDsr->exitCriticalSectionNoChecks();
     }
@@ -582,32 +588,39 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
     // Map the critical sections that are on disk to memory
     PersistentTaskStore<CollectionCriticalSectionDocument> store(
         NamespaceString::kCollectionCriticalSectionsNamespace);
-    store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
-        const auto& nss = doc.getNss();
-        if (nss.isDbOnly()) {
-            AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
-            auto scopedDsr =
-                DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
-            scopedDsr->enterCriticalSectionCatchUpPhase(doc.getReason());
-            if (doc.getBlockReads()) {
-                scopedDsr->enterCriticalSectionCommitPhase(doc.getReason());
+    store.forEach(
+        opCtx,
+        BSONObj{},
+        [&opCtx, &autoGetCollOptions](const CollectionCriticalSectionDocument& doc) {
+            const auto& nss = doc.getNss();
+            if (nss.isDbOnly()) {
+                AutoGetDb dbLock(
+                    opCtx,
+                    nss.dbName(),
+                    MODE_X,
+                    boost::none,
+                    Date_t::max(),
+                    Lock::DBLockSkipOptions{
+                        false, false, false, rss::consensus::IntentRegistry::Intent::Read});
+                auto scopedDsr =
+                    DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
+                scopedDsr->enterCriticalSectionCatchUpPhase(doc.getReason());
+                if (doc.getBlockReads()) {
+                    scopedDsr->enterCriticalSectionCommitPhase(doc.getReason());
+                }
+            } else {
+                AutoGetCollection collLock(opCtx, nss, MODE_X, autoGetCollOptions);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                         nss);
+                scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
+                if (doc.getBlockReads()) {
+                    scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
+                }
             }
-        } else {
-            AutoGetCollection collLock(opCtx,
-                                       nss,
-                                       MODE_X,
-                                       AutoGetCollection::Options{}.viewMode(
-                                           auto_get_collection::ViewMode::kViewsPermitted));
-            auto scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
-            scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
-            if (doc.getBlockReads()) {
-                scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
-            }
-        }
 
-        return true;
-    });
+            return true;
+        });
 
     LOGV2_DEBUG(5604001, 2, "Recovered all recoverable critical sections");
 }

@@ -1350,10 +1350,6 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
         return Status(ErrorCodes::NotSecondary,
                       "Cannot set follower mode when node is currently the leader");
     }
-    if (newState == MemberState::RS_RECOVERING) {
-        // In recovery state we do not accept any intent registration
-        _intentRegistry.disable();
-    }
     if (auto electionFinishedEvent = _cancelElectionIfNeeded(lk)) {
         // We were a candidate, which means _topCoord believed us to be in state RS_SECONDARY, and
         // we know that newState != RS_SECONDARY because we would have returned early, above if
@@ -1377,11 +1373,6 @@ Status ReplicationCoordinatorImpl::_setFollowerMode(OperationContext* opCtx,
     const PostMemberStateUpdateAction action = _updateMemberStateFromTopologyCoordinator(lk);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
-    if (newState == MemberState::RS_SECONDARY) {
-        // If we are transitioning from recovery state intent registry was disabled,
-        // so we must enable it
-        _intentRegistry.enable();
-    }
     return Status::OK();
 }
 
@@ -1451,18 +1442,19 @@ void ReplicationCoordinatorImpl::signalApplierDrainComplete(OperationContext* op
         LOGV2(4712800, "Hanging due to hangBeforeRSTLOnDrainComplete failpoint");
         hangBeforeRSTLOnDrainComplete.pauseWhileSet(opCtx);
     }
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
-    boost::optional<AutoGetRstlForStepUpStepDown> arsu;
 
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(
-            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepUp));
-    }
+    boost::optional<AutoGetRstlForStepUpStepDown> arsu;
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
+
     // Kill all user writes and user reads that encounter a prepare conflict. Also kills select
     // internal operations. Although secondaries cannot accept writes, a step up can kill writes
     // that were blocked behind the RSTL lock held by a step down attempt. These writes will be
     // killed with a retryable error code during step up.
     arsu.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp);
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(_killConflictingOperations(
+            rss::consensus::IntentRegistry::InterruptionType::StepUp, opCtx));
+    }
 
     lk.lock();
 
@@ -2971,6 +2963,13 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
     if (!_isCollectionReplicated(opCtx, nsOrUUID)) {
         return true;
     }
+
+    // Allow writes to admin and config in magicRestore mode.
+    if (storageGlobalParams.magicRestore && nsOrUUID.isNamespaceString() &&
+        (nsOrUUID.nss().isAdminDB() || nsOrUUID.nss().isConfigDB())) {
+        return true;
+    }
+
     // Otherwise, check whether we can currently accept replicated writes.
     return _canAcceptReplicatedWrites_UNSAFE(opCtx);
 }
@@ -3821,25 +3820,37 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     LOGV2(51814, "Persisting new config to disk");
     {
-        Lock::GlobalLock globalLock(opCtx, LockMode::MODE_IX);
-        if (!force && !_readWriteAbility->canAcceptNonLocalWrites(opCtx) && !skipSafetyChecks) {
-            return {ErrorCodes::NotWritablePrimary, "Stepped down when persisting new config"};
-        }
+        try {
+            auto globalLkOptions = Lock::GlobalLockSkipOptions{};
+            if (skipSafetyChecks || force) {
+                globalLkOptions.explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite;
+            }
+            Lock::GlobalLock globalLock(opCtx, LockMode::MODE_IX, globalLkOptions);
+            if (!force && !_readWriteAbility->canAcceptNonLocalWrites(opCtx) && !skipSafetyChecks) {
+                return {ErrorCodes::NotWritablePrimary, "Stepped down when persisting new config"};
+            }
 
-        // Don't write no-op for internal and external force reconfig.
-        // For non-force reconfigs with 'skipSafetyChecks' set to false, we are guaranteed that the
-        // node is a writable primary.
-        // When 'skipSafetyChecks' is true, it is possible the node is not yet a writable primary
-        // (eg. in the case where reconfig is called during stepup). In all other cases, we should
-        // still do the no-op write when possible.
-        status = _externalState->storeLocalConfigDocument(
-            opCtx,
-            newConfig.toBSON(),
-            !force && _readWriteAbility->canAcceptNonLocalWrites(opCtx) /* writeOplog */);
-        if (!status.isOK()) {
-            LOGV2_ERROR(
-                21422, "replSetReconfig failed to store config document", "error"_attr = status);
-            return status;
+            // Don't write no-op for internal and external force reconfig.
+            // For non-force reconfigs with 'skipSafetyChecks' set to false, we are guaranteed that
+            // the node is a writable primary. When 'skipSafetyChecks' is true, it is possible the
+            // node is not yet a writable primary (eg. in the case where reconfig is called during
+            // stepup). In all other cases, we should still do the no-op write when possible.
+            status = _externalState->storeLocalConfigDocument(
+                opCtx,
+                newConfig.toBSON(),
+                !force && _readWriteAbility->canAcceptNonLocalWrites(opCtx) /* writeOplog */);
+            if (!status.isOK()) {
+                LOGV2_ERROR(21422,
+                            "replSetReconfig failed to store config document",
+                            "error"_attr = status);
+                return status;
+            }
+        } catch (const ExceptionFor<ErrorCodes::NotWritablePrimary>&) {
+            return {ErrorCodes::NotWritablePrimary, "Stepped down when persisting new config"};
+        } catch (const ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>&) {
+            return {ErrorCodes::NotWritablePrimary, "Stepped down when persisting new config"};
+        } catch (const DBException&) {
+            throw;
         }
     }
     // Wait for durability of the new config document.
@@ -3859,8 +3870,8 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
 rss::consensus::ReplicationStateTransitionGuard
 ReplicationCoordinatorImpl::_killConflictingOperations(
-    rss::consensus::IntentRegistry::InterruptionType interrupt) {
-    return _intentRegistry.killConflictingOperations(interrupt).get();
+    rss::consensus::IntentRegistry::InterruptionType interrupt, OperationContext* opCtx) {
+    return _intentRegistry.killConflictingOperations(interrupt, opCtx).get();
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
@@ -3884,19 +3895,19 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor->waitForEvent(electionFinishedEvent);
     }
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (isForceReconfig && _shouldStepDownOnReconfig(lk, newConfig, myIndex)) {
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
-        if (gFeatureFlagIntentRegistration.isEnabled()) {
-            rstg.emplace(_killConflictingOperations(
-                rss::consensus::IntentRegistry::InterruptionType::StepDown));
-        }
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
         arsd.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
+        if (gFeatureFlagIntentRegistration.isEnabled()) {
+            rstg.emplace(_killConflictingOperations(
+                rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+        }
 
         lk.lock();
         if (_topCoord->isSteppingDownUnconditionally()) {
@@ -3924,8 +3935,8 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
             // ReplicationCoordinatorImpl::_rsConfigState state to "kConfigReconfiguring" which
             // prevents new elections from happening. So, its safe to release the RSTL lock.
             lk.unlock();
-            arsd.reset();
             rstg.reset();
+            arsd.reset();
             lk.lock();
         }
     }

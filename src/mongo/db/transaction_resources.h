@@ -105,7 +105,7 @@ struct AcquisitionPrerequisites {
 
     enum ViewMode { kMustBeCollection, kCanBeView };
 
-    enum OperationType { kRead, kWrite };
+    enum OperationType { kRead, kUnreplicatedWrite, kWrite };
 
     AcquisitionPrerequisites(NamespaceString nss,
                              boost::optional<UUID> uuid,

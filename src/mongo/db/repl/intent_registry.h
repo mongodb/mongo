@@ -144,12 +144,15 @@ public:
     /**
      * Provides a way for transition threads to kill operations with intents
      * which conflict with the state transition, and wait for all of those
-     * operations to deregsiter. While active, it will also prevent operations
+     * operations to deregister. While active, it will also prevent operations
      * that conflict with the ongoing state transtion from registering their
-     * intent.
+     * intent, except those that originate from the same OperationContext to allow transition
+     * threads to perform necessary work.
      */
     stdx::future<ReplicationStateTransitionGuard> killConflictingOperations(
-        InterruptionType interruption, boost::optional<uint32_t> timeout_sec = boost::none);
+        InterruptionType interruption,
+        OperationContext* opCtx,
+        boost::optional<uint32_t> timeout_sec = boost::none);
 
     /**
      * Updates metrics around user ops when a state transition that kills operations occurs (i.e.
@@ -188,7 +191,7 @@ public:
 
 private:
     struct tokenMap {
-        stdx::mutex lock;
+        mutable stdx::mutex lock;
         stdx::condition_variable cv;
         stdx::unordered_map<IntentToken::idType, OperationContext*> map;
     };
@@ -204,13 +207,10 @@ private:
     bool _enabled = true;
     stdx::mutex _stateMutex;
     stdx::condition_variable _activeInterruptionCV;
-    bool _activeInterruption = false;
     InterruptionType _lastInterruption = InterruptionType::None;
+    OperationContext* _interruptionCtx = nullptr;
     std::vector<tokenMap> _tokenMaps;
     mutable opCtxIntentMap _opCtxIntentMap;
-
-    // Tracks total number of intents declared per type of intent.
-    std::vector<size_t> _totalIntentsDeclared;
 
     // Tracks number of operations killed on state transition.
     size_t _totalOpsKilled = 0;

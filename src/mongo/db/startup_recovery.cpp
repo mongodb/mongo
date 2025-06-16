@@ -446,7 +446,7 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
         NamespaceString::makeChangeCollectionNSS(tenantId),
         [&] {
             AutoGetChangeCollection tenantChangeCollection{
-                opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+                opCtx, AutoGetChangeCollection::AccessMode::kUnreplicatedWrite, tenantId};
 
             if (!tenantChangeCollection) {
                 return;
@@ -547,7 +547,7 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                                       NamespaceString::makePreImageCollectionNSS(tenantId),
                                       PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                       repl::ReadConcernArgs::get(opCtx),
-                                      AcquisitionPrerequisites::kWrite),
+                                      AcquisitionPrerequisites::kUnreplicatedWrite),
                                   MODE_IX);
 
             if (!preImagesColl.exists()) {

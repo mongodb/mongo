@@ -315,7 +315,11 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
             invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive());
             RecoveryUnit::OpenSnapshotOptions openSnapshotOptions{.roundUpPreparedTimestamps =
                                                                       true};
-            Lock::GlobalLock globalLock(opCtx, MODE_IX);
+            Lock::GlobalLock globalLock(
+                opCtx,
+                MODE_IX,
+                Lock::GlobalLockSkipOptions{
+                    .explicitIntent = rss::consensus::IntentRegistry::Intent::LocalWrite});
             allocateSnapshotWithConsistentCatalog(opCtx, openSnapshotOptions);
 
             status = _applyOperationsForTransaction(opCtx, ops, mode);

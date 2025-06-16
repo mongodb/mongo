@@ -232,7 +232,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
         CollectionAcquisitionRequest(preImagesCollectionNamespace,
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
+                                     AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);
 
     if (preImagesCollectionNamespace.tenantId() &&

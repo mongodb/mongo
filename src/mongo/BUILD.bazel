@@ -688,6 +688,8 @@ filegroup(
         "//src/mongo/db/query/write_ops:write_ops_gen",
         "//src/mongo/db/query/write_ops:write_ops_parsers.h",
         "//src/mongo/db/repl:apply_ops_gen",
+        "//src/mongo/db/repl:intent_guard.h",
+        "//src/mongo/db/repl:intent_registry.h",
         "//src/mongo/db/repl:member_data.h",
         "//src/mongo/db/repl:member_state.h",
         "//src/mongo/db/repl:oplog.h",

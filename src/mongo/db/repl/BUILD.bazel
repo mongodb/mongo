@@ -1100,6 +1100,7 @@ mongo_cc_library(
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/auth:authorization_manager_global",
         "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/util:log_and_backoff",
         "//src/mongo/util:processinfo",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/concurrency:thread_pool",

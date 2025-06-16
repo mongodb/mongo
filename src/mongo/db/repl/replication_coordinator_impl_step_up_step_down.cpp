@@ -272,12 +272,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &stepdownHangBeforeRSTLEnqueue, opCtx, "stepdownHangBeforeRSTLEnqueue");
 
-    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
     boost::optional<AutoGetRstlForStepUpStepDown> arsd;
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        rstg.emplace(
-            _killConflictingOperations(rss::consensus::IntentRegistry::InterruptionType::StepDown));
-    }
+    boost::optional<rss::consensus::ReplicationStateTransitionGuard> rstg;
 
     // Using 'force' sets the default for the wait time to zero, which means the stepdown will
     // fail if it does not acquire the lock immediately. In such a scenario, we use the
@@ -285,6 +281,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     auto deadline = force ? stepDownUntil : waitUntil;
     arsd.emplace(
         this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown, deadline);
+    if (gFeatureFlagIntentRegistration.isEnabled()) {
+        rstg.emplace(_killConflictingOperations(
+            rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
+    }
 
     stepdownHangAfterGrabbingRSTL.pauseWhileSet();
 
@@ -387,10 +387,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         termAtStart, _replExecutor->now(), waitUntil, stepDownUntil, force)) {
         // The stepdown attempt failed. We now release the RSTL to allow secondaries to read the
         // oplog, then wait until enough secondaries are caught up for us to finish stepdown.
+        rstg = boost::none;
         if (arsd) {
             arsd->rstlRelease();
         }
-        rstg = boost::none;
 
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -430,10 +430,6 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 opCtx->checkForInterrupt();
             }
 
-            if (gFeatureFlagIntentRegistration.isEnabled()) {
-                rstg.emplace(_killConflictingOperations(
-                    rss::consensus::IntentRegistry::InterruptionType::StepDown));
-            }
             // Since we have released the RSTL lock at this point, there can be some read
             // operations sneaked in here, that might hold global lock in S mode or blocked on
             // prepare conflict. We need to kill those operations to avoid 3-way deadlock
@@ -443,6 +439,10 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // acquisition. So, we won't get into problems like SERVER-27534.
             if (arsd) {
                 arsd->rstlReacquire();
+            }
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                rstg.emplace(_killConflictingOperations(
+                    rss::consensus::IntentRegistry::InterruptionType::StepDown, opCtx));
             }
             lk.lock();
         } catch (const DBException& ex) {

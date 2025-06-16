@@ -62,7 +62,7 @@ auto acquirePreImagesCollectionForWrite(OperationContext* opCtx, NamespaceString
         CollectionAcquisitionRequest(std::move(nssOrUUID),
                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                      repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
+                                     AcquisitionPrerequisites::kUnreplicatedWrite),
         MODE_IX);
 }
 
