@@ -61,6 +61,11 @@ static void storageUnavailableRetry(OperationContext* opCtx,
                                     StringData opStr,
                                     F&& f,
                                     boost::optional<size_t> retryLimit = boost::none) {
+    if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
+        // Storage unavailable exceptions are handled internally by the spill table.
+        return f();
+    }
+
     // writeConflictRetry already implements a retryBackoff for storage unavailable.
     writeConflictRetry(opCtx, opStr, NamespaceString::kEmpty, f, retryLimit);
 }
