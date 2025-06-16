@@ -206,6 +206,27 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/server_storage_engine_integration.yml @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /buildscripts/smoke_tests/**/server_ttl.yml @10gen/server-ttl @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/tests/burn_in_tests_end2end/OWNERS.yml
+/buildscripts/tests/burn_in_tests_end2end/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/monitor_build_status/OWNERS.yml
+/buildscripts/tests/monitor_build_status/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/resmoke_end2end/OWNERS.yml
+/buildscripts/tests/resmoke_end2end/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/resmoke_proxy/OWNERS.yml
+/buildscripts/tests/resmoke_proxy/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/resmoke_validation/OWNERS.yml
+/buildscripts/tests/resmoke_validation/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/resmokelib/OWNERS.yml
+/buildscripts/tests/resmokelib/ @10gen/devprod-correctness @svc-auto-approve-bot
+
+# The following patterns are parsed from ./buildscripts/tests/timeouts/OWNERS.yml
+/buildscripts/tests/timeouts/ @10gen/devprod-correctness @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/timeouts/OWNERS.yml
 /buildscripts/timeouts/ @10gen/devprod-correctness @svc-auto-approve-bot
 
