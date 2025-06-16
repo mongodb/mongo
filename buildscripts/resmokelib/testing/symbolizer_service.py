@@ -10,6 +10,8 @@ from datetime import timedelta
 from threading import Lock
 from typing import List, NamedTuple, Optional, Set
 
+from opentelemetry import trace
+
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
@@ -24,6 +26,7 @@ _processed_files_lock = Lock()
 STACKTRACE_FILE_EXTENSION = ".stacktrace"
 SYMBOLIZE_RETRY_TIMEOUT_SECS = timedelta(minutes=4).total_seconds()
 PROCESSED_FILES_LIST_FILE_PATH = "symbolizer-processed-files.txt"  # noqa
+TRACER = trace.get_tracer("resmoke")
 
 
 class ResmokeSymbolizerConfig(NamedTuple):
@@ -129,20 +132,21 @@ class ResmokeSymbolizer:
 
         test.logger.info("Starting symbolization once no other tests are being symbolized.")
         with _symbolizer_lock:
-            test.logger.info("\nBEGIN Symbolization")
+            with TRACER.start_as_current_span("stack_trace_symbolization"):
+                test.logger.info("\nBEGIN Symbolization")
 
-            start_time = time.perf_counter()
-            for file_path in files:
-                test.logger.info("Working on: %s", file_path)
-                symbolizer_script_timeout = int(
-                    symbolize_retry_timeout - (time.perf_counter() - start_time)
-                )
-                symbolized_out = self.symbolizer_service.run_symbolizer_script(
-                    file_path, symbolizer_script_timeout
-                )
-                test.logger.info(symbolized_out)
-                if time.perf_counter() - start_time > symbolize_retry_timeout:
-                    break
+                start_time = time.perf_counter()
+                for file_path in files:
+                    test.logger.info("Working on: %s", file_path)
+                    symbolizer_script_timeout = int(
+                        symbolize_retry_timeout - (time.perf_counter() - start_time)
+                    )
+                    symbolized_out = self.symbolizer_service.run_symbolizer_script(
+                        file_path, symbolizer_script_timeout
+                    )
+                    test.logger.info(symbolized_out)
+                    if time.perf_counter() - start_time > symbolize_retry_timeout:
+                        break
 
             test.logger.info("\nEND Symbolization")
             test.logger.info("Symbolization process completed.")
