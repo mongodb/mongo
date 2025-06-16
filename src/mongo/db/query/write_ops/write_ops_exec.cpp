@@ -94,6 +94,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
@@ -563,6 +564,16 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     opCtx, nss, AcquisitionPrerequisites::kWrite, collectionUUID),
                 fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
             if (collection->exists()) {
+                uassert(10551700,
+                        "Collection was created as time-series collection since the beginning of "
+                        "the insert, cannot insert to it like a normal collection",
+                        !(gFeatureFlagCreateViewlessTimeseriesCollections
+                              .isEnabledUseLatestFCVWhenUninitialized(
+                                  VersionContext::getDecoration(opCtx),
+                                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+                          collection->getCollectionPtr()->isTimeseriesCollection() &&
+                          source == OperationSource::kStandard && !isRawDataOperation(opCtx)));
+
                 break;
             }
 
@@ -619,6 +630,18 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
             source == OperationSource::kTimeseriesInsert) {
             uasserted(9748801, "Collection was changed during insert");
+        }
+
+        // We want to fail a write in the scenario where:
+        // 1) a collection with the ns that we are inserting to doesn't exist, so we choose to
+        // insert into it as normal collection and create it implicitly
+        // 2) a collection with this ns is created as a time-series collection
+        // 3) we acquire this time-series collection to insert into in the regular collection write
+        // path.
+        // We should fail the insert in this scenario to avoid writing normal documents into a
+        // time-series collection.
+        if (ex.code() == 10551700) {
+            throw;
         }
     }
 

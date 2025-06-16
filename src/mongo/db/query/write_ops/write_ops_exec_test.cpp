@@ -56,6 +56,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/write_concern_idl.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/idl_parser.h"
@@ -344,6 +345,47 @@ TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
     wcb.setOriginalCollation(fromjson("{locale: 'fr'}"));
     deleteReq.setWriteCommandRequestBase(wcb);
     ASSERT(write_ops::verifySizeEstimate(deleteReq));
+}
+
+TEST_F(WriteOpsExecTest, InsertFailsIfTimeseriesCollectionCreatedDuringInsert) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    BSONObj docToInsert(fromjson(R"({"t":{"$date":"2022-06-06T15:34:00.000Z"}, "x":1})"));
+    insertCmdReq.setDocuments({docToInsert});
+    // At this point, our collection does not exist, so we proceed to the normal insert path.
+    ASSERT_FALSE(timeseries::isTimeseriesViewRequest(opCtx, insertCmdReq).first);
+    // After this check, a concurrent operation could create a time-series collection with the same
+    // namespace.
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(ns);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    ASSERT_OK(createCollection(opCtx, cmd));
+
+    write_ops_exec::LastOpFixer lastOpFixer(opCtx);
+    write_ops_exec::WriteResult out;
+    std::vector<InsertStatement> batch;
+    for (auto&& doc : insertCmdReq.getDocuments()) {
+        batch.emplace_back(std::vector<StmtId>{0}, doc);
+    }
+
+    // Now when we try to insert into the collection "ns", we should fail because we detect that a
+    // time-series collection was created with this same namespace. This prevents us from writing to
+    // the time-series collection as if it were a normal collection, which would result in a
+    // collection that has both bucket documents and regular documents.
+    ASSERT_THROWS_CODE(insertBatchAndHandleErrors(opCtx,
+                                                  insertCmdReq.getNamespace(),
+                                                  insertCmdReq.getCollectionUUID(),
+                                                  insertCmdReq.getOrdered(),
+                                                  batch,
+                                                  OperationSource::kStandard,
+                                                  &lastOpFixer,
+                                                  &out),
+                       DBException,
+                       10551700);
 }
 
 class OpObserverMock : public OpObserverNoop {
