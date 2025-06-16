@@ -83,11 +83,6 @@ const testOptions = function(options) {
     assert.eq(areViewlessTimeseriesEnabled(db), collectionDocument.info.uuid !== undefined);
     delete collectionDocument.info.uuid;
 
-    if (areViewlessTimeseriesEnabled(db)) {
-        // TODO(SERVER-105339): listCollections should not return clusteredIndex field
-        delete collectionDocument.options.clusteredIndex;
-    }
-
     assert.docEq(
         {name: coll.getName(), type: 'timeseries', options: options, info: {readOnly: false}},
         collectionDocument);

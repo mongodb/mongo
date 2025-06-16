@@ -256,9 +256,10 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     BSONObjBuilder b;
     b.append("name", nss.coll());
 
+    const auto showAsTimeseries = collection->isTimeseriesCollection() &&
+        collection->isNewTimeseriesWithoutView() && !isRawData;
     const auto collectionType = [&] {
-        if (collection->isTimeseriesCollection() && collection->isNewTimeseriesWithoutView() &&
-            !isRawData) {
+        if (showAsTimeseries) {
             return "timeseries";
         } else {
             return "collection";
@@ -272,11 +273,19 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     }
 
     const auto& options = collection->getCollectionOptions();
+    const auto includeOptionsFields = [&]() -> auto& {
+        if (showAsTimeseries) {
+            return timeseries::kAllowedCollectionCreationOptions;
+        } else {
+            static const StringDataSet INCLUDE_ALL_OPTIONS = {};
+            return INCLUDE_ALL_OPTIONS;
+        }
+    }();
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
     // unsettable read-only property, so put it in the 'info' section. Pass 'false' to toBSON so it
     // doesn't include 'uuid' here.
-    b.append("options", options.toBSON(false));
+    b.append("options", options.toBSON(false /* includeUUID */, includeOptionsFields));
 
     BSONObjBuilder infoBuilder;
     infoBuilder.append("readOnly", opCtx->readOnly());

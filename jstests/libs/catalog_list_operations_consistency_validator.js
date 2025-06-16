@@ -94,6 +94,12 @@ function mapListCatalogToListCollectionsEntry(listCatalogEntry, listCatalogMap, 
         // The `uuid` from `md.options` is moved to the `info` field from `listCollections`.
         const {uuid: mdOptionsUuid, ...mdOptionsRest} = mdOptions;
 
+        // `listCollections` only lists the options provided by the user to `createCollection`,
+        // so it will hide remove any fields we add internally for timeseries collections
+        if (nsType == 'timeseries') {
+            delete mdOptionsRest.clusteredIndex;
+        }
+
         return {
             name: nsName,
             type: nsType,

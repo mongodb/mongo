@@ -1962,6 +1962,9 @@ OptionsAndIndexes CreateCollectionCoordinator::_getCollectionOptionsAndIndexes(
     ListCollections listCollections;
     listCollections.setDbName(nss().dbName());
     listCollections.setFilter(BSON("info.uuid" << *_uuid));
+    if (viewlessTimeseriesEnabled(opCtx)) {
+        listCollections.setRawData(true);
+    }
 
     auto collectionResponse =
         uassertStatusOK(destinationShard->runExhaustiveCursorCommand(

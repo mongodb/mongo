@@ -28,11 +28,6 @@ const collectionDocument = collections[0];
 assert.eq(areViewlessTimeseriesEnabled(db), collectionDocument.info.uuid !== undefined);
 delete collectionDocument.info.uuid;
 
-if (areViewlessTimeseriesEnabled(db)) {
-    // TODO(SERVER-105339): listCollections should not return clusteredIndex field
-    delete collectionDocument.options.clusteredIndex;
-}
-
 const timeseriesOptions = {
     timeField: timeFieldName,
     granularity: 'seconds',
