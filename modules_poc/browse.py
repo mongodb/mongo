@@ -85,7 +85,7 @@ def fancy_kind(kind: str):
         case "CONVERSION_FUNCTION":
             return Text.assemble(("conversion", style("type")))
         case "CXX_METHOD":
-            return Text.assemble(("meth", style("type")))
+            return Text.assemble(("method", style("type")))
         case "DESTRUCTOR":
             return Text.assemble(("dtor", style("type")))
         case "ENUM_CONSTANT_DECL":

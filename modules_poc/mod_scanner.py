@@ -669,7 +669,7 @@ def find_usages(mod: str, c: Cursor, context: DecoratedCursor | None):
     # Ignore any declarations not declared in a header.
     # TODO what if a local type is passed to a template? For now doesn't matter because we
     # don't look at usages from instantiations.
-    if ref.location.file.name.endswith(".cpp"):
+    if ref.location.file.name.endswith(".cpp") or ref.location.file.name.endswith(".cc"):
         return
 
     usr = ref.normalized_usr
