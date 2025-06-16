@@ -135,6 +135,7 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     wtTableConfig.keyFormat = keyFormat;
     // We don't log writes to spill tables.
     wtTableConfig.logEnabled = false;
+    wtTableConfig.extraCreateOptions = _rsOptions;
     std::string config =
         WiredTigerRecordStore::generateCreateString({} /* internal table */, wtTableConfig);
 
@@ -147,6 +148,20 @@ std::unique_ptr<RecordStore> SpillWiredTigerKVEngine::makeTemporaryRecordStore(
     uassertStatusOK(wtRCToStatus(session.create(uri.c_str(), config.c_str()), session));
 
     return getTemporaryRecordStore(ru, ident, keyFormat);
+}
+
+int64_t SpillWiredTigerKVEngine::storageSize(RecoveryUnit& ru) {
+    WiredTigerSession session(_connection.get());
+    auto idents = getAllIdents(ru);
+
+    return std::accumulate(idents.begin(),
+                           idents.end(),
+                           int64_t{0},
+                           [&session](int64_t storageSize, const std::string& ident) {
+                               return storageSize +
+                                   WiredTigerUtil::getIdentSize(
+                                          session, WiredTigerUtil::buildTableUri(ident));
+                           });
 }
 
 bool SpillWiredTigerKVEngine::hasIdent(RecoveryUnit& ru, StringData ident) const {

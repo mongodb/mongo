@@ -261,6 +261,8 @@ public:
         return _wtConfig.cacheSizeMB;
     }
 
+    void setRecordStoreExtraOptions(const std::string& options);
+
     bool isEphemeral() const override {
         return _wtConfig.inMemory;
     }
@@ -294,6 +296,7 @@ protected:
     WiredTigerConfig _wtConfig;
     std::string _canonicalName;
     std::string _path;
+    std::string _rsOptions;
 
     WT_CONNECTION* _conn{nullptr};
     WiredTigerEventHandler _eventHandler;
@@ -323,7 +326,6 @@ public:
     void notifyReplStartupRecoveryComplete(RecoveryUnit&) override;
     void setInStandaloneMode() override;
 
-    void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);
 
     bool supportsDirectoryPerDB() const override;
@@ -808,7 +810,6 @@ private:
 
     std::unique_ptr<WiredTigerSessionSweeper> _sessionSweeper;
 
-    std::string _rsOptions;
     std::string _indexOptions;
 
     std::unique_ptr<WiredTigerSession> _backupSession;

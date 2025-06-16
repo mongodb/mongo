@@ -516,6 +516,10 @@ WiredTigerKVEngineBase::WiredTigerKVEngineBase(const std::string& canonicalName,
       _path(path),
       _clockSource(clockSource) {}
 
+void WiredTigerKVEngineBase::setRecordStoreExtraOptions(const std::string& options) {
+    _rsOptions = options;
+}
+
 Status WiredTigerKVEngineBase::reconfigureLogging() {
     auto verboseConfig = WiredTigerUtil::generateWTVerboseConfiguration();
     return wtRCToStatus(_conn->reconfigure(_conn, verboseConfig.c_str()), nullptr);
@@ -1544,10 +1548,6 @@ std::unique_ptr<RecoveryUnit> WiredTigerKVEngine::newRecoveryUnit() {
         ru->allowAllUntimestampedWrites();
     }
     return ru;
-}
-
-void WiredTigerKVEngine::setRecordStoreExtraOptions(const std::string& options) {
-    _rsOptions = options;
 }
 
 void WiredTigerKVEngine::setSortedDataInterfaceExtraOptions(const std::string& options) {

@@ -58,6 +58,8 @@ public:
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;
 
+    int64_t storageSize(RecoveryUnit& ru);
+
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
         return std::make_unique<WiredTigerRecoveryUnit>(_connection.get());
     }

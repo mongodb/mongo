@@ -188,6 +188,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "storage_wiredtiger_test",
     srcs = [
+        "spill_wiredtiger_kv_engine_test.cpp",
         "wiredtiger_c_api_test.cpp",
         "wiredtiger_connection_test.cpp",
         "wiredtiger_error_util_test.cpp",
