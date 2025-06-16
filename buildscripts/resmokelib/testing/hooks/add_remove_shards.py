@@ -147,6 +147,7 @@ class _AddRemoveShardThread(threading.Thread):
     _RESHARD_COLLECTION_IN_PROGRESS = 338
     _LOCK_BUSY = 46
     _FAILED_TO_SATISFY_READ_PREFERENCE = 133
+    _OPLOG_OPERATION_UNSUPPORTED = 62
 
     _CONFIG_DATABASE_NAME = "config"
     _LOGICAL_SESSIONS_COLLECTION_NAME = "system.sessions"
@@ -345,6 +346,12 @@ class _AddRemoveShardThread(threading.Thread):
             for regex in self._UNMOVABLE_NAMESPACE_REGEXES:
                 if re.search(regex, namespace):
                     return True
+
+        if err.code == self._OPLOG_OPERATION_UNSUPPORTED:
+            # If the collection is untracked and the balancer is off, the moveCollection operation
+            # is attempted by the hook but the coordinator cannot proceed because operations are not
+            # supported for untracked collections.
+            return True
 
         return False
 
