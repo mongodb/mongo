@@ -543,6 +543,10 @@ last-continuous:
     ticket: SERVER-91784
   - test_file: jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js
     ticket: SERVER-92603
+  - test_file: jstests/noPassthrough/explain_optimization_stats.js
+    ticket: SERVER-92476
+  - test_file: jstests/noPassthrough/profile_planning_time_stats.js
+    ticket: SERVER-92476
   - test_file: jstests/core/index/geo/negated_geo_queries.js
     ticket: SERVER-92193
   - test_file: jstests/core/ddl/collmod.js
@@ -1210,6 +1214,10 @@ last-lts:
     ticket: SERVER-92292
   - test_file: jstests/core/sparse_index_supports_ne_null.js
     ticket: SERVER-37164
+  - test_file: jstests/noPassthrough/explain_optimization_stats.js
+    ticket: SERVER-92476
+  - test_file: jstests/noPassthrough/profile_planning_time_stats.js
+    ticket: SERVER-92476
   - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
     ticket: SERVER-93099
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js

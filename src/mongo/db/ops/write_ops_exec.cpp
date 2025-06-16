@@ -1384,6 +1384,9 @@ WriteResult performUpdates(OperationContext* opCtx,
             }
         });
 
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         auto sampleId = analyze_shard_key::getOrGenerateSampleId(
             opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kUpdate, singleOp);
         if (sampleId) {
@@ -1666,6 +1669,9 @@ WriteResult performDeletes(OperationContext* opCtx,
                     &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
             }
         });
+
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                 opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kDelete, singleOp)) {

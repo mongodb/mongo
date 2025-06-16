@@ -291,6 +291,10 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
+            // We want to start the query planning timer right after parsing. In the explain code
+            // path, we have already parsed the FindCommandRequest, so start timing here.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
@@ -314,8 +318,6 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
@@ -402,6 +404,8 @@ public:
             // does not have a UUID.
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
+
+            // Start the query planning timer right after parsing.
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.

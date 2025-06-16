@@ -1111,6 +1111,7 @@ Status _runAggregate(OperationContext* opCtx,
                                                            origRequest);
         expCtx = pipeline->getContext();
 
+        // Start the query planning timer right after parsing.
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (!request.getAllowDiskUse().value_or(true)) {

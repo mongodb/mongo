@@ -163,6 +163,7 @@ public:
             return exceptionToStatus();
         }
 
+        // Start the query planning timer right after parsing.
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (shouldDoFLERewrite(request)) {
@@ -247,8 +248,11 @@ public:
 
         auto request = CountCommandRequest::parse(
             IDLParserContext("count", false /* apiStrict */, dbName.tenantId()), cmdObj);
+
+        // Start the query planning timer right after parsing.
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
+
         if (shouldDoFLERewrite(request)) {
             LOGV2_DEBUG(7964102, 2, "Processing Queryable Encryption command", "cmd"_attr = cmdObj);
             if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {

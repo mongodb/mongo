@@ -167,6 +167,7 @@ public:
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
+        // Start the query planning timer right after parsing.
         CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (ctx->getView()) {
@@ -244,6 +245,9 @@ public:
             ctx->getCollection() ? ctx->getCollection()->getDefaultCollator() : nullptr;
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false, defaultCollation));
+
+        // Start the query planning timer right after parsing.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (parsedDistinct.isMirrored()) {
             const auto& invocation = CommandInvocation::get(opCtx);
