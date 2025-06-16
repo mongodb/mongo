@@ -148,12 +148,14 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     let inconsistencies = db.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("CollectionUUIDMismatch", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Collection level mode command
     const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
     assert.eq(1, collInconsistencies.length);
     assert.eq(
         "CollectionUUIDMismatch", collInconsistencies[0].type, tojson(collInconsistencies[0]));
+    assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
@@ -173,11 +175,13 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     let inconsistencies = db.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(1, inconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Collection level mode command
     const collInconsistencies = db.coll.checkMetadataConsistency().toArray();
     assert.eq(1, collInconsistencies.length, tojson(inconsistencies));
     assert.eq("MisplacedCollection", collInconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(1, collInconsistencies[0].details.numDocs, tojson(inconsistencies[0]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();

@@ -104,6 +104,9 @@ structs:
             localUUID:
                 type: uuid
                 description: "The UUID of the collection that is misplaced."
+            numDocs:
+                type: long
+                description: "The number of documents in the collection that is misplaced."
 
     MissingLocalCollectionDetails:
         description: "Details about a local collection not found inconsistency."
@@ -149,6 +152,9 @@ structs:
             uuid:
                 type: uuid
                 description: "The UUID of the collection found on the config server."
+            numDocs:
+                type: long
+                description: "The number of documents in the collection found on the shard."
 
     MissingShardKeyIndexDetails:
         description: "Details about a missing shard key index inconsistency."
