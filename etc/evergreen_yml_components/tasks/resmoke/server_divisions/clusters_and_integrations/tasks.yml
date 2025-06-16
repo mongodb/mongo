@@ -629,18 +629,6 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
-    name: embedded_router_sharded_collections_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "suggested_excluding_required__for_devprod_mitigation_only",
-        "embedded_router",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
-  - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_txns_gen
     tags:
       [
