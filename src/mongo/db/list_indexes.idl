@@ -40,8 +40,8 @@ imports:
 structs:
     ListIndexesReplyItem:
         description: "An item in the listIndexes command's reply"
-        # If adding new fields, the set 'allowedFieldsNames' in
-        # 'src/mongo/db/commands/list_indexes.cpp' should also be updated.
+        # If adding new fields, the set 'kAllowedListIndexesFieldNames' in
+        # 'src/mongo/db/commands/list_indexes_allowed_fields.h' should also be updated.
         fields:
             #
             # A built index appears with these fields, which must be the same as NewIndexSpec's

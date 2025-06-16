@@ -208,7 +208,7 @@ public:
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild,
-        bool removeInProgressIndexBuilds) const override;
+        IndexCatalog::RemoveExistingIndexesFlags flags) const override;
 
     void dropIndexes(OperationContext* opCtx,
                      Collection* collection,
@@ -377,10 +377,12 @@ private:
      * Returns IndexAlreadyExists for both ready and in-progress index builds. Can also return other
      * errors.
      */
-    Status _doesSpecConflictWithExisting(OperationContext* opCtx,
-                                         const CollectionPtr& collection,
-                                         const BSONObj& spec,
-                                         InclusionPolicy inclusionPolicy) const;
+    Status _doesSpecConflictWithExisting(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const BSONObj& spec,
+        InclusionPolicy inclusionPolicy,
+        const std::map<StringData, std::set<IndexType>>* allowedFieldNames = nullptr) const;
 
     /**
      * Returns true if the replica set member's config has {buildIndexes:false} set, which means
