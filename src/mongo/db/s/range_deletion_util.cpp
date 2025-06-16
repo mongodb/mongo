@@ -347,7 +347,11 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
 
                             {
                                 ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_IX);
-                                AutoGetCollection collection(opCtx, nss, MODE_IX);
+                                AutoGetCollection collection(
+                                    opCtx,
+                                    nss,
+                                    MODE_IX,
+                                    AutoGetCollectionViewMode::kViewsPermitted);
 
                                 // Ensure the collection exists and has not been dropped or dropped
                                 // and recreated
