@@ -705,22 +705,45 @@ __evict_update_work(WT_SESSION_IMPL *session)
      */
     bytes_max = conn->cache_size + 1;
     bytes_inuse = __wt_cache_bytes_inuse(cache);
-    if (__wt_evict_clean_needed(session, NULL))
+    if (__wt_evict_clean_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_CLEAN_HARD);
-    else if (bytes_inuse > (target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_reached);
+    } else if (bytes_inuse > (target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_CLEAN);
+    }
 
     bytes_dirty = __wt_cache_dirty_leaf_inuse(cache);
-    if (__wt_evict_dirty_needed(session, NULL))
+    if (__wt_evict_dirty_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_DIRTY | WT_EVICT_CACHE_DIRTY_HARD);
-    else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_dirty_reached);
+    } else if (bytes_dirty > (uint64_t)(dirty_target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_DIRTY);
+    }
 
     bytes_updates = __wt_cache_bytes_updates(cache);
-    if (__wti_evict_updates_needed(session, NULL))
+    if (__wti_evict_updates_needed(session, NULL)) {
         LF_SET(WT_EVICT_CACHE_UPDATES | WT_EVICT_CACHE_UPDATES_HARD);
-    else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100)
+        WT_STAT_CONN_INCR(session, cache_eviction_trigger_updates_reached);
+    } else if (bytes_updates > (uint64_t)(updates_target * bytes_max) / 100) {
         LF_SET(WT_EVICT_CACHE_UPDATES);
+    }
+
+    /*
+     * If application threads are blocked by data in cache, track the fill ratio.
+     *
+     */
+    uint64_t cache_fill_ratio = bytes_inuse / bytes_max;
+    bool evict_is_hard = LF_ISSET(WT_EVICT_CACHE_HARD);
+    if (evict_is_hard) {
+        if (cache_fill_ratio < 0.25)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_lt_25);
+        else if (cache_fill_ratio < 0.50)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_25_50);
+        else if (cache_fill_ratio < 0.75)
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_50_75);
+        else
+            WT_STAT_CONN_INCR(session, cache_eviction_app_threads_fill_ratio_gt_75);
+    }
 
     /*
      * If application threads are blocked by the total volume of data in cache, try dirty pages as
@@ -2064,16 +2087,17 @@ __evict_get_min_pages(WT_SESSION_IMPL *session, uint32_t target_pages)
 
     /*
      * Examine at least a reasonable number of pages before deciding whether to give up. When we are
-     * only looking for dirty pages, search the tree for longer.
+     * not looking for clean pages, search the tree for longer.
      */
     min_pages = 10 * (uint64_t)target_pages;
-    if (!F_ISSET(evict, WT_EVICT_CACHE_DIRTY | WT_EVICT_CACHE_UPDATES))
+    if (F_ISSET(evict, WT_EVICT_CACHE_CLEAN))
         WT_STAT_CONN_INCR(session, eviction_target_strategy_clean);
-    else if (!F_ISSET(evict, WT_EVICT_CACHE_CLEAN)) {
+    else
         min_pages *= 10;
+    if (F_ISSET(evict, WT_EVICT_CACHE_UPDATES))
+        WT_STAT_CONN_INCR(session, eviction_target_strategy_updates);
+    if (F_ISSET(evict, WT_EVICT_CACHE_DIRTY))
         WT_STAT_CONN_INCR(session, eviction_target_strategy_dirty);
-    } else
-        WT_STAT_CONN_INCR(session, eviction_target_strategy_both_clean_and_dirty);
 
     return (min_pages);
 }
@@ -2861,10 +2885,9 @@ __wti_evict_app_assist_worker(
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
                 __wt_atomic_decrement_if_positive(&evict->evict_aggressive_score);
-
-                WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
-                __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
-                  session->txn->rollback_reason);
+                if (F_ISSET(session, WT_SESSION_SAVE_ERRORS))
+                    __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "rollback reason: %s",
+                      session->err_info.err_msg);
             }
             WT_ERR(ret);
         }
