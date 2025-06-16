@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
@@ -51,6 +52,21 @@ namespace metadata_consistency_util {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(insertFakeInconsistencies);
+
+/*
+ * Returns the number of documents in the local collection.
+ *
+ * TODO SERVER-24266: get rid of the `getNumDocs` function and simply rely on `numRecords`.
+ */
+long long getNumDocs(OperationContext* opCtx, const Collection* localColl) {
+    // Since users are advised to delete empty misplaced collections, rely on isEmpty
+    // that is safe because the implementation guards against SERVER-24266.
+    if (AutoGetCollection ac(opCtx, localColl->ns(), MODE_IS); ac->isEmpty(opCtx)) {
+        return 0;
+    }
+    DBDirectClient client(opCtx);
+    return client.count(localColl->ns());
+}
 
 /*
  * Emit a warning log containing information about the given inconsistency
@@ -169,7 +185,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
         for (int i = 0; i < numInconsistencies; i++) {
             inconsistencies.emplace_back(makeInconsistency(
                 MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
-                CollectionUUIDMismatchDetails{nss, ShardId{"shard"}, UUID::gen(), UUID::gen()}));
+                CollectionUUIDMismatchDetails{nss, ShardId{"shard"}, UUID::gen(), UUID::gen(), 0}));
         }
     });
 
@@ -277,7 +293,8 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             if (UUID != localUUID) {
                 inconsistencies.emplace_back(makeInconsistency(
                     MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
-                    CollectionUUIDMismatchDetails{localNss, shardId, localUUID, UUID}));
+                    CollectionUUIDMismatchDetails{
+                        localNss, shardId, localUUID, UUID, getNumDocs(opCtx, localColl.get())}));
             } else {
                 _checkShardKeyIndexInconsistencies(opCtx,
                                                    nss,
@@ -296,9 +313,10 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             // TODO SERVER-59957 use function introduced in this ticket to decide if a namesapce
             // should be ignored and stop using isNamepsaceAlwaysUnsharded().
             if (!nss.isNamespaceAlwaysUnsharded() && shardId != primaryShardId) {
-                inconsistencies.emplace_back(
-                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                                      MisplacedCollectionDetails{localNss, shardId, localUUID}));
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                    MisplacedCollectionDetails{
+                        localNss, shardId, localUUID, getNumDocs(opCtx, localColl.get())}));
             }
             itLocalCollections++;
         }
@@ -312,9 +330,12 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             // TODO SERVER-59957 use function introduced in this ticket to decide if a namesapce
             // should be ignored and stop using isNamepsaceAlwaysUnsharded().
             if (!localColl->ns().isNamespaceAlwaysUnsharded()) {
-                inconsistencies.emplace_back(makeInconsistency(
-                    MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                    MisplacedCollectionDetails{localColl->ns(), shardId, localColl->uuid()}));
+                inconsistencies.emplace_back(
+                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                                      MisplacedCollectionDetails{localColl->ns(),
+                                                                 shardId,
+                                                                 localColl->uuid(),
+                                                                 getNumDocs(opCtx, localColl)}));
             }
             itLocalCollections++;
         }
