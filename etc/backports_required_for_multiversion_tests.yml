@@ -450,6 +450,8 @@ last-continuous:
       ticket: SERVER-102477
     - test_file: jstests/core/query/partial_index_pbt.js
       ticket: SERVER-102825
+    - test_file: jstests/core/query/update/update_set_unset.js
+      ticket: SERVER-103960
   suites: null
 last-lts:
   all:
@@ -955,4 +957,6 @@ last-lts:
       ticket: SERVER-102477
     - test_file: jstests/core/query/partial_index_pbt.js
       ticket: SERVER-102825
+    - test_file: jstests/core/query/update/update_set_unset.js
+      ticket: SERVER-103960
   suites: null

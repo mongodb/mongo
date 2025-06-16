@@ -483,6 +483,11 @@ TEST(FieldRefTest, AppendPartRejectsEmbeddedNullChars) {
         FieldRef::FieldRefTempAppend(fieldRef, embeddedNull), AssertionException, 9867600);
 }
 
+TEST(FieldRefTest, ContainsTooManyDots) {
+    std::string path(255, '.');
+    ASSERT_THROWS_CODE(FieldRef(path), AssertionException, 10396001);
+}
+
 // The "medium" append tests feature an append operation that spills out of reserve space (i.e.,
 // we append to a path that has _size == kReserveAhead).
 TEST(FieldRefTest, AppendMediumSimple) {

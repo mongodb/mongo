@@ -149,6 +149,7 @@ void FieldRef::appendPart(StringData part) {
 
     _replacements.push_back(ValidatedPathString{std::string{part}});
     _parts.push_back(boost::none);
+    uassert(10396002, "Field paths cannot contain more than 255 '.'", _parts.size() <= 255);
 }
 
 void FieldRef::removeLastPart() {
@@ -176,6 +177,7 @@ void FieldRef::removeFirstPart() {
 size_t FieldRef::appendParsedPart(FieldRef::StringView part) {
     _parts.push_back(part);
     _cachedSize++;
+    uassert(10396001, "Field paths cannot contain more than 255 '.'", _parts.size() <= 255);
     return _parts.size();
 }
 
@@ -213,7 +215,9 @@ void FieldRef::reserialize() const {
         // There is one case where we expect to see the "where" iterator to be at "end" here: we
         // are at the last part of the FieldRef and that part is the empty string. In that case, we
         // need to make sure we do not dereference the "where" iterator.
-        invariant(where != end || (size == 0 && i == parts - 1));
+        tassert(10396003,
+                "FieldRef was incorrectly dereferenced",
+                where != end || (size == 0 && i == parts - 1));
         if (!size) {
             part = StringView{};
         } else {
