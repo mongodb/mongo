@@ -5,6 +5,9 @@
 #if JS_HAS_INTL_API
 // This cache, once primed, has these properties:
 //
+//   locale:
+//     The requested locale, either |undefined| or a string. Not necessarily a
+//     valid and supported DateTimeFormat locale.
 //   runtimeDefaultLocale:
 //     Locale information provided by the embedding, guiding SpiderMonkey's
 //     selection of a default locale.  See intl_RuntimeDefaultLocale(), whose
@@ -15,10 +18,10 @@
 //     whose value controls the value returned by DefaultTimeZone() that's
 //     what's *actually* used.
 //   formatters:
-//     A Record storing formatters consistent with the above
-//     runtimeDefaultLocale/localTZA values, for use with the appropriate
-//     ES6 toLocale*String Date method when called with its first two
-//     arguments having the value |undefined|.
+//     A Record storing formatters consistent with the above locale and time
+//     zone values, for use with the appropriate toLocale*String Date method
+//     when called with the |locales| argument either |undefined| or a string,
+//     and the |options| argument having the value |undefined|.
 //
 // The "formatters" Record has (some subset of) these properties, as determined
 // by all values of the first argument passed to |GetCachedFormat|:
@@ -28,20 +31,25 @@
 //   timeFormat: for Date's toLocaleTimeString operation
 //
 // Using this cache, then, requires
-// 1) verifying the current runtimeDefaultLocale/icuDefaultTimeZone are
+// 1) verifying the requested locale is consistent with the cached value, then
+// 2) verifying the current runtimeDefaultLocale/icuDefaultTimeZone are
 //    consistent with cached values, then
-// 2) seeing if the desired formatter is cached and returning it if so, or else
-// 3) create the desired formatter and store and return it.
+// 3) seeing if the desired formatter is cached and returning it if so, or else
+// 4) create the desired formatter and store and return it.
 var dateTimeFormatCache = new_Record();
 
 /**
  * Get a cached DateTimeFormat formatter object, created like so:
  *
- *   CreateDateTimeFormat(undefined, undefined, required, defaults);
+ *   CreateDateTimeFormat(locale, undefined, required, defaults);
  *
  * |format| must be a key from the "formatters" Record described above.
  */
-function GetCachedFormat(format, required, defaults) {
+function GetCachedFormat(locale, format, required, defaults) {
+  assert(
+    locale === undefined || typeof locale === "string",
+    "bad locale type"
+  );
   assert(
     format === "dateTimeFormat" ||
       format === "dateFormat" ||
@@ -51,10 +59,12 @@ function GetCachedFormat(format, required, defaults) {
 
   var formatters;
   if (
+    locale !== dateTimeFormatCache.locale ||
     !intl_IsRuntimeDefaultLocale(dateTimeFormatCache.runtimeDefaultLocale) ||
     !intl_isDefaultTimeZone(dateTimeFormatCache.icuDefaultTimeZone)
   ) {
     formatters = dateTimeFormatCache.formatters = new_Record();
+    dateTimeFormatCache.locale = locale;
     dateTimeFormatCache.runtimeDefaultLocale = intl_RuntimeDefaultLocale();
     dateTimeFormatCache.icuDefaultTimeZone = intl_defaultTimeZone();
   } else {
@@ -63,7 +73,7 @@ function GetCachedFormat(format, required, defaults) {
 
   var fmt = formatters[format];
   if (fmt === undefined) {
-    fmt = formatters[format] = intl_CreateDateTimeFormat(undefined, undefined, required, defaults);
+    fmt = formatters[format] = intl_CreateDateTimeFormat(locale, undefined, required, defaults);
   }
 
   return fmt;
@@ -89,10 +99,12 @@ function Date_toLocaleString() {
 
   // Step 5-6.
   var dateTimeFormat;
-  if (locales === undefined && options === undefined) {
-    // This cache only optimizes for the old ES5 toLocaleString without
-    // locales and options.
-    dateTimeFormat = GetCachedFormat("dateTimeFormat", "any", "all");
+  if (
+    (locales === undefined || typeof locales === "string") &&
+    options === undefined
+  ) {
+    // This cache only optimizes when |options| isn't used.
+    dateTimeFormat = GetCachedFormat(locales, "dateTimeFormat", "any", "all");
   } else {
     dateTimeFormat = intl_CreateDateTimeFormat(locales, options, "any", "all");
   }
@@ -121,10 +133,12 @@ function Date_toLocaleDateString() {
 
   // Step 5-6.
   var dateTimeFormat;
-  if (locales === undefined && options === undefined) {
-    // This cache only optimizes for the old ES5 toLocaleDateString without
-    // locales and options.
-    dateTimeFormat = GetCachedFormat("dateFormat", "date", "date");
+  if (
+    (locales === undefined || typeof locales === "string") &&
+    options === undefined
+  ) {
+    // This cache only optimizes when |options| isn't used.
+    dateTimeFormat = GetCachedFormat(locales, "dateFormat", "date", "date");
   } else {
     dateTimeFormat = intl_CreateDateTimeFormat(locales, options, "date", "date");
   }
@@ -153,10 +167,12 @@ function Date_toLocaleTimeString() {
 
   // Step 5-6.
   var dateTimeFormat;
-  if (locales === undefined && options === undefined) {
-    // This cache only optimizes for the old ES5 toLocaleTimeString without
-    // locales and options.
-    dateTimeFormat = GetCachedFormat("timeFormat", "time", "time");
+  if (
+    (locales === undefined || typeof locales === "string") &&
+    options === undefined
+  ) {
+    // This cache only optimizes when |options| isn't used.
+    dateTimeFormat = GetCachedFormat(locales, "timeFormat", "time", "time");
   } else {
     dateTimeFormat = intl_CreateDateTimeFormat(locales, options, "time", "time");
   }
