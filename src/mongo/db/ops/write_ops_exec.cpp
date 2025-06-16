@@ -1299,7 +1299,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
             }
 
             if (!shouldRetryDuplicateKeyException(
-                    parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>(), numAttempts)) {
+                    opCtx, parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>(), numAttempts)) {
                 throw;
             }
 
@@ -1896,7 +1896,8 @@ bool matchContainsOnlyAndedEqualityNodes(const MatchExpression& root) {
 }
 }  // namespace
 
-bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
+bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
+                                      const ParsedUpdate& parsedUpdate,
                                       const DuplicateKeyErrorInfo& errorInfo,
                                       int retryAttempts) {
     invariant(parsedUpdate.hasParsedQuery());
@@ -1905,6 +1906,14 @@ bool shouldRetryDuplicateKeyException(const ParsedUpdate& parsedUpdate,
 
     // In order to be retryable, the update must be an upsert with multi:false.
     if (!updateRequest->isUpsert() || updateRequest->isMulti()) {
+        return false;
+    }
+
+    // In multi document transactions, there is an outer WriteUnitOfWork and inner WriteUnitOfWork.
+    // The inner WriteUnitOfWork exists per-document. Aborting the inner one necessitates aborting
+    // the outer one. Otherwise, retrying the inner one will read the writes of the
+    // previously-aborted inner WriteUnitOfWork.
+    if (opCtx->inMultiDocumentTransaction()) {
         return false;
     }
 

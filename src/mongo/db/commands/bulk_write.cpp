@@ -468,7 +468,10 @@ bool handleUpdateOp(OperationContext* opCtx,
                     }
 
                     if (!write_ops_exec::shouldRetryDuplicateKeyException(
-                            parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>(), retryAttempts)) {
+                            opCtx,
+                            parsedUpdate,
+                            *ex.extraInfo<DuplicateKeyErrorInfo>(),
+                            retryAttempts)) {
                         throw;
                     }
 
