@@ -90,6 +90,40 @@ void processAdditionalTransactionParticipantFromResponse(
     }
 }
 
+Status getStatusFromReleaseMemoryCommandResponse(const AsyncRequestsSender::Response& response) {
+    auto status = AsyncRequestsSender::Response::getEffectiveStatus(response);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    auto generateReason = [&](CursorId cursorId) -> std::string {
+        return str::stream() << "Failed to release memory from cursor " << cursorId << " on "
+                             << response.shardId;
+    };
+
+    auto reply = ReleaseMemoryCommandReply::parse(IDLParserContext("ReleaseMemoryCommandReply"),
+                                                  response.swResponse.getValue().data);
+
+    tassert(10247600,
+            str::stream() << "Release memory command reply from shard contains more than 1 cursor: "
+                          << reply.toBSON(),
+            (reply.getCursorsReleased().size() + reply.getCursorsCurrentlyPinned().size() +
+             reply.getCursorsNotFound().size() + reply.getCursorsWithErrors().size()) == 1);
+    if (!reply.getCursorsCurrentlyPinned().empty()) {
+        return Status{ErrorCodes::CursorInUse,
+                      generateReason(reply.getCursorsCurrentlyPinned().front())};
+    }
+    if (!reply.getCursorsNotFound().empty()) {
+        return Status{ErrorCodes::CursorNotFound,
+                      generateReason(reply.getCursorsNotFound().front())};
+    }
+    if (!reply.getCursorsWithErrors().empty()) {
+        const auto& error = reply.getCursorsWithErrors().front();
+        return error.getStatus()->withContext(generateReason(error.getCursorId()));
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
@@ -414,10 +448,6 @@ void AsyncResultsMerger::_cancelCallbackForRemote(WithLock, const RemoteCursorPt
     if (remote->cbHandle.isValid()) {
         _executor->cancel(remote->cbHandle);
     }
-
-    if (remote->releaseMemoryCbHandle.isValid()) {
-        _executor->cancel(remote->releaseMemoryCbHandle);
-    }
 }
 
 void AsyncResultsMerger::_removeRemoteFromPromisedMinSortKeys(WithLock,
@@ -710,52 +740,42 @@ Status AsyncResultsMerger::scheduleGetMores() {
 }
 
 
-stdx::shared_future<void> AsyncResultsMerger::releaseMemory() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (_releaseMemoryCompleteInfo) {
-        // There is already a 'releasMemoryCompleteInfo' future. Do not create another one.
-        return _releaseMemoryCompleteInfo->getFuture();
-    }
-
-    // Create a 'releasMemoryCompleteInfo' future, which will be signaled when all remotes have
-    // responded to the releaseMemory command.
-    _releaseMemoryCompleteInfo.emplace();
-
-    _status = _scheduleReleaseMemory(lk);
-    if (!_status.isOK()) {
-        LOGV2_ERROR(
-            9745606, "Scheduling releaseMemory encountered an issue", "status"_attr = _status);
-        _releaseMemoryCompleteInfo->signalFutures();
-    }
-
-    if (!_haveOutstandingReleaseMemoryRequests(lk)) {
-        // Signal the future right now, as there's nothing to wait for.
-        _releaseMemoryCompleteInfo->signalFutures();
-    }
-
-    return _releaseMemoryCompleteInfo->getFuture();
-}
-
-Status AsyncResultsMerger::releaseMemoryResult() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    if (!_status.isOK()) {
-        return _status;
-    }
+Status AsyncResultsMerger::releaseMemory() {
+    AsyncRequestsSender::ShardHostMap shardHostMap;
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.reserve(_remotes.size());
     for (const auto& remote : _remotes) {
+        if (!remote->status.isOK()) {
+            return remote->status;
+        }
         if (remote->exhausted()) {
             continue;
         }
-        // If we are done, all remotes should have sent a response.
-        tassert(9745603, "remote should have releaseMemoryResponse", remote->releaseMemoryResponse);
-        auto response = remote->releaseMemoryResponse.get();
-        if (!response.getCursorsWithErrors().empty()) {
-            // AsyncResultsMerger sends one cursor per remote.
-            ReleaseMemoryError error = response.getCursorsWithErrors().front();
-            return response.getCursorsWithErrors().front().getStatus()->withContext(
-                str::stream() << "Failed to release memory from cursor " << error.getCursorId()
-                              << " on " << remote->getTargetHost());
+        const std::vector<mongo::CursorId> params{remote->cursorId};
+        ReleaseMemoryCommandRequest releaseMemoryCmd(params);
+        releaseMemoryCmd.setDbName(remote->cursorNss.dbName());
+        BSONObjBuilder commandObj;
+        releaseMemoryCmd.serialize(&commandObj);
+
+        shardHostMap.emplace(remote->shardId, remote->shardHostAndPort);
+        requests.emplace_back(remote->shardId, commandObj.obj());
+    }
+
+    AsyncRequestsSender sender{_opCtx,
+                               _executor,
+                               _params.getNss().dbName(),
+                               requests,
+                               ReadPreferenceSetting::get(_opCtx),
+                               Shard::RetryPolicy::kNoRetry,
+                               nullptr /*resourceYielder*/,
+                               shardHostMap};
+
+
+    while (!sender.done()) {
+        auto response = sender.next();
+        if (auto status = getStatusFromReleaseMemoryCommandResponse(response); !status.isOK()) {
+            sender.stopRetrying();
+            return status;
         }
     }
 
@@ -1087,20 +1107,6 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
     _signalCurrentEventIfReady(lk);  // Wake up anyone waiting on '_currentEvent'.
 }
 
-void AsyncResultsMerger::_handleReleaseMemoryResponse(
-    WithLock lk,
-    StatusWith<ReleaseMemoryCommandReply>& parsedResponse,
-    const RemoteCursorPtr& remote) {
-    // Got a response from remote, so indicate we are no longer waiting for one.
-    remote->releaseMemoryCbHandle = executor::TaskExecutor::CallbackHandle();
-    remote->releaseMemoryResponse = std::move(parsedResponse.getValue());
-
-    if (!_haveOutstandingReleaseMemoryRequests(lk)) {
-        tassert(9745604, "_releaseMemoryCompleteInfo should exist", _releaseMemoryCompleteInfo);
-        _releaseMemoryCompleteInfo->signalFutures();
-    }
-}
-
 void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
     invariant(_lifecycleState == kKillStarted);
 
@@ -1208,12 +1214,6 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
     });
 }
 
-bool AsyncResultsMerger::_haveOutstandingReleaseMemoryRequests(WithLock) {
-    return std::any_of(_remotes.begin(), _remotes.end(), [](const auto& remote) {
-        return remote->releaseMemoryCbHandle.isValid();
-    });
-}
-
 void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opCtx) {
     invariant(_killCompleteInfo);
 
@@ -1267,62 +1267,6 @@ void AsyncResultsMerger::_scheduleKillCursorForRemote(WithLock lk,
                                 })
         .getStatus()
         .ignore();
-}
-
-Status AsyncResultsMerger::_scheduleReleaseMemory(WithLock) {
-    for (auto& remote : _remotes) {
-        if (!remote->status.isOK()) {
-            return remote->status;
-        }
-        if (remote->exhausted()) {
-            continue;
-        }
-
-        const std::vector<mongo::CursorId> params{remote->cursorId};
-        ReleaseMemoryCommandRequest releaseMemoryCmd(params);
-        releaseMemoryCmd.setDbName(remote->cursorNss.dbName());
-        BSONObjBuilder bob;
-        releaseMemoryCmd.serialize(&bob);
-
-        executor::RemoteCommandRequest executorRequest{
-            remote->getTargetHost(), remote->cursorNss.dbName(), bob.obj(), _opCtx};
-
-        LOGV2_DEBUG(99745600,
-                    2,
-                    "scheduling releaseMemory command",
-                    "remoteHost"_attr = remote->getTargetHost(),
-                    "shardId"_attr = remote->shardId.toString());
-
-        // Make a copy of the remote's cursorId here while holding the mutex. The copy is passed
-        // into the lambda so the cursorId can be accessed without holding the mutex.
-        const auto cursorId = remote->cursorId;
-        auto callbackStatus = _executor->scheduleRemoteCommand(
-            executorRequest,
-            [self = shared_from_this(), cursorId, remote /* intrusive_ptr copy! */](
-                auto const& cbData) {
-                // Parse response outside of the mutex.
-                auto parsedResponse =
-                    [&](const auto& cbData) -> StatusWith<ReleaseMemoryCommandReply> {
-                    if (!cbData.response.isOK()) {
-                        return cbData.response.status;
-                    }
-                    return ReleaseMemoryCommandReply::parse(
-                        IDLParserContext("ReleaseMemoryCommandReply"), cbData.response.data);
-                }(cbData);
-
-                // Handle the response and update the remote's status under the mutex.
-                stdx::lock_guard<stdx::mutex> lk(self->_mutex);
-                self->_handleReleaseMemoryResponse(lk, parsedResponse, remote);
-            });
-
-        if (!callbackStatus.isOK()) {
-            return callbackStatus.getStatus();
-        }
-
-        remote->releaseMemoryCbHandle = callbackStatus.getValue();
-    }
-
-    return Status::OK();
 }
 
 bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
