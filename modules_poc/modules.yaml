@@ -82,8 +82,8 @@ core.service:
     - src/mongo/db/initialize_server_global_state.*
     - src/mongo/db/default_max_time_ms_cluster_parameter*
     - src/mongo/db/commands/test_deprecation_command.cpp
-    - src/mongo/s/client_metadata_propagation_egress_hook*
     - src/mongo/db/s/forwardable_operation_metadata*
+    - src/mongo/embedded
 
 # stuff that is part of a *specific* mongo server (eg mongos, mongod)
 core.servers:
@@ -776,6 +776,7 @@ audit:
     - src/mongo/db/audit*
     - src/mongo/db/modules/enterprise/src/audit
     - src/mongo/rpc/metadata/audit*
+    - src/mongo/s/client_metadata_propagation_egress_hook*
 
 encrypted_storage_engine:
   meta:
@@ -814,7 +815,6 @@ field_level_encryption.cryptd:
   files:
     - src/mongo/db/modules/enterprise/src/fle/commands
     - src/mongo/util/cryptd
-    - src/mongo/embedded
 
 field_level_encryption.crypt_shared:
   meta:
