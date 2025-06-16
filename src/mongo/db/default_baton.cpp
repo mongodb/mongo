@@ -54,6 +54,8 @@ DefaultBaton::~DefaultBaton() {
 }
 
 void DefaultBaton::markKillOnClientDisconnect() noexcept {
+    stdx::lock_guard<Latch> lk(_mutex);
+
     if (_opCtx->getClient() && _opCtx->getClient()->session()) {
         _hasIngressSocket = true;
     }
