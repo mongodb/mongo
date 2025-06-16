@@ -45,7 +45,7 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
             // Always overrides anything else.
             sbeStatus = kSbeDisabled;
         } else if (TestData.setParameters.featureFlagSbeFull &&
-                   TestData.setParameters.featureFlagSbeFull == "true") {
+                   TestData.setParameters.featureFlagSbeFull == true) {
             // Otherwise, if this feature flag is enabled, we ignore the query knob.
             sbeStatus = kFeatureFlagSbeFullEnabled;
         } else if (frameworkControl === "trySbeEngine") {
