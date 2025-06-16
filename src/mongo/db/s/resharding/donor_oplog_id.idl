@@ -51,3 +51,12 @@ structs:
             ts:
                 type: timestamp
                 description: "The oplog entry timestamp associated with this operation."
+            progressMarkId:
+                type: int
+                description: >-
+                    This is only set if this is a progress mark noop oplog entry created by the
+                    oplog fetcher during the "applying" state. The increasing integer id is used
+                    to differentiate a progress marker oplog entry from a regular oplog entry or
+                    another progress marker oplog entry that corresponds to the same oplog entry
+                    on the donor.
+                optional: true

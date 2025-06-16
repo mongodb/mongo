@@ -375,6 +375,19 @@ server_parameters:
             lt: 1
         redact: false
 
+    reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis:
+        description:
+            The minimum interval for updating the exponential moving average for the time it takes
+            to fetch and apply an oplog entry.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis
+        default:
+            expr: 1000
+        validator:
+            gt: 0
+        redact: false
+
     reshardingCoordinatorQuiescePeriodMillis:
         description: >-
             Controls the amount of time a resharding operation will remain in a quiesced state on

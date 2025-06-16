@@ -127,6 +127,11 @@ public:
     bool iterate(Client* client, CancelableOperationContextFactory factory);
 
     /**
+     * Notifies the fetcher that oplog application has started.
+     */
+    void onStartingOplogApplication();
+
+    /**
      * Makes the oplog fetcher prepare for the critical section. Currently, this makes the fetcher
      * start doing the following to reduce the likelihood of not finishing oplog fetching within the
      * critical section timeout:
@@ -173,10 +178,31 @@ private:
                                      const CancellationToken& cancelToken);
 
     /**
+     * Returns true if the recipient has been configured to estimate the remaining time based on
+     * the exponential moving average of the time it takes to fetch and apply oplog entries.
+     */
+    bool _needToEstimateRemainingTimeBasedOnMovingAverage(OperationContext* opCtx);
+
+    /**
+     * Returns true if the average for time to apply oplog entries needs to be updated, i.e. if the
+     * recipient is in the 'apply' state and it has been more than
+     * 'reshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis' since the last update
+     * which is when the last progress mark oplog entry was inserted.
+     */
+    bool _needToUpdateAverageTimeToApply(WithLock, OperationContext* opCtx) const;
+
+    /**
+     * If a progress mark oplog entry with the given timestamp needs to be inserted, returns an
+     * oplog id for it. Otherwise, returns none.
+     */
+    boost::optional<ReshardingDonorOplogId> _makeProgressMarkOplogIdIfNeedToInsert(
+        OperationContext* opCtx, const Timestamp& currBatchLastOplogTs);
+
+    /**
      * Returns a progress mark noop oplog entry with the given oplog id.
      */
     repl::MutableOplogEntry _makeProgressMarkOplog(OperationContext* opCtx,
-                                                   const ReshardingDonorOplogId& oplogId);
+                                                   const ReshardingDonorOplogId& oplogId) const;
 
     ServiceContext* _service() const {
         return _env->service();
@@ -190,11 +216,15 @@ private:
     const ShardId _recipientShard;
     const NamespaceString _oplogBufferNss;
     const bool _storeProgress;
+    boost::optional<bool> _supportEstimatingRemainingTimeBasedOnMovingAverage;
 
     int _numOplogEntriesCopied = 0;
+    AtomicWord<bool> _oplogApplicationStarted{false};
 
-    stdx::mutex _mutex;
+    // The mutex that protects all the members below.
+    mutable stdx::mutex _mutex;
     ReshardingDonorOplogId _startAt;
+    boost::optional<Date_t> _lastUpdatedProgressMarkAt;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
     AtomicWord<bool> _isPreparingForCriticalSection;

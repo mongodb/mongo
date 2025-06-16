@@ -504,8 +504,82 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
     return aggRequest;
 }
 
+bool ReshardingOplogFetcher::_needToEstimateRemainingTimeBasedOnMovingAverage(
+    OperationContext* opCtx) {
+    if (!_supportEstimatingRemainingTimeBasedOnMovingAverage.has_value()) {
+        // Only check the feature flag once since the setFCV command aborts any in-progress
+        // resharding operation so no resharding operations can span multiple FCV versions.
+        _supportEstimatingRemainingTimeBasedOnMovingAverage =
+            resharding::gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage.isEnabled(
+                VersionContext::getDecoration(opCtx),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }
+
+    return *_supportEstimatingRemainingTimeBasedOnMovingAverage &&
+        resharding::gReshardingRemainingTimeEstimateBasedOnMovingAverage.load();
+}
+
+bool ReshardingOplogFetcher::_needToUpdateAverageTimeToApply(WithLock,
+                                                             OperationContext* opCtx) const {
+    if (!_oplogApplicationStarted.load()) {
+        return false;
+    }
+
+    if (!_lastUpdatedProgressMarkAt) {
+        return true;
+    }
+
+    auto elapsedTime =
+        opCtx->getServiceContext()->getFastClockSource()->now() - *_lastUpdatedProgressMarkAt;
+    return durationCount<Milliseconds>(elapsedTime) >=
+        resharding::gReshardingExponentialMovingAverageTimeToFetchAndApplyIntervalMillis.load();
+}
+
+boost::optional<ReshardingDonorOplogId>
+ReshardingOplogFetcher::_makeProgressMarkOplogIdIfNeedToInsert(
+    OperationContext* opCtx, const Timestamp& currBatchLastOplogTs) {
+    stdx::lock_guard lk(_mutex);
+
+    // If the recipient has been configured to estimate the remaining time based on moving average
+    // of the time it takes to fetch and apply oplog entries, write a progress mark noop oplog
+    // entry if the average time to apply needs to updated since it is the oplog entry used for
+    // recalculating the average.
+    if (_needToEstimateRemainingTimeBasedOnMovingAverage(opCtx) &&
+        _needToUpdateAverageTimeToApply(lk, opCtx)) {
+        auto oplogId = ReshardingDonorOplogId(currBatchLastOplogTs, currBatchLastOplogTs);
+        // Only set a progress mark id if the oplog entry is needed for updating the average time to
+        // apply oplog entries since:
+        // - The progress mark id was introduced in 8.2 to avoid DuplicateKey error when inserting
+        //   an existing progress timestamp, which is only permitted when the oplog entry is needed
+        //   for calculating the average time to apply.
+        // - Prior to 8.2, ReshardingDonorOplogId used strict parsing so the presence of an unknown
+        //   field is expected to lead parsing errors.
+        if (currBatchLastOplogTs == _startAt.getTs()) {
+            oplogId.setProgressMarkId(
+                _startAt.getProgressMarkId() ? *_startAt.getProgressMarkId() + 1 : 0);
+        } else {
+            oplogId.setProgressMarkId(0);
+        }
+        return std::move(oplogId);
+    }
+
+    // Otherwise, only write it if currBatchLastOplogTs is not equal to the timestamp of '_startAt'
+    // since:
+    //   1. There is already an oplog with timestamp equal to 'currBatchLastOplogTs' in the
+    //      oplogBufferColl collection from which the fetcher knows to resume from.
+    //   2. Or currBatchLastOplogTs equals the initial value for _startAt
+    //     (typically the minFetchTimestamp) in which case, the fetcher is going to
+    //     resume from there anyways.
+    if (currBatchLastOplogTs != _startAt.getTs()) {
+        auto oplogId = ReshardingDonorOplogId(currBatchLastOplogTs, currBatchLastOplogTs);
+        return std::move(oplogId);
+    }
+
+    return boost::none;
+}
+
 repl::MutableOplogEntry ReshardingOplogFetcher::_makeProgressMarkOplog(
-    OperationContext* opCtx, const ReshardingDonorOplogId& oplogId) {
+    OperationContext* opCtx, const ReshardingDonorOplogId& oplogId) const {
     repl::MutableOplogEntry oplog;
 
     oplog.setNss(_oplogBufferNss);
@@ -516,6 +590,9 @@ repl::MutableOplogEntry ReshardingOplogFetcher::_makeProgressMarkOplog(
 
     ReshardProgressMarkO2Field o2Field;
     o2Field.setType(resharding::kReshardProgressMarkOpLogType);
+    if (_oplogApplicationStarted.load()) {
+        o2Field.setCreatedAfterOplogApplicationStarted(true);
+    }
     oplog.setObject2(o2Field.toBSON());
 
     oplog.setOpTime(OplogSlot());
@@ -625,20 +702,11 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 // response. This will allow the fetcher to resume reading from the last oplog entry
                 // it fetched even if that entry is for a different collection, making resuming less
                 // wasteful.
-                try {
-                    auto currBatchLastOplogId =
-                        ReshardingDonorOplogId(currBatchLastOplogTs, currBatchLastOplogTs);
+                if (auto oplogId =
+                        _makeProgressMarkOplogIdIfNeedToInsert(opCtx, currBatchLastOplogTs)) {
+                    auto oplog = _makeProgressMarkOplog(opCtx, *oplogId);
 
-                    // If currBatchLastOplogId == _startAt then inserting a reshardProgressMark is
-                    // not needed. This is because:
-                    //   1. There is already an oplog with timestamp == currBatchLastOplogId in the
-                    //      oplogBufferColl collection from which the fetcher knows to resume from.
-                    //   2. Or currBatchLastOplogId equals the initial value for _startAt (typically
-                    //      the minFetchTimestamp) in which case, the fetcher is going to resume
-                    //      from there anyways.
-                    if (currBatchLastOplogId != _startAt) {
-                        auto oplog = _makeProgressMarkOplog(opCtx, currBatchLastOplogId);
-
+                    try {
                         insertOplogBatch(opCtx,
                                          oplogBufferColl.getCollectionPtr(),
                                          oplogFetcherProgressColl,
@@ -654,16 +722,18 @@ bool ReshardingOplogFetcher::consume(Client* client,
                         auto [p, f] = makePromiseFuture<void>();
                         {
                             stdx::lock_guard lk(_mutex);
-                            _startAt = currBatchLastOplogId;
+                            _startAt = *oplogId;
+                            _lastUpdatedProgressMarkAt =
+                                opCtx->getServiceContext()->getFastClockSource()->now();
                             _onInsertPromise.emplaceValue();
                             _onInsertPromise = std::move(p);
                             _onInsertFuture = std::move(f);
                         }
+                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                        // It's possible that the donor shard has not generated new oplog entries
+                        // since the previous getMore. In this case the latest oplog timestamp the
+                        // donor returns will be the same, so it's safe to ignore this error.
                     }
-                } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-                    // It's possible that the donor shard has not generated new oplog entries since
-                    // the previous getMore. In this case the latest oplog timestamp the donor
-                    // returns will be the same, so it's safe to ignore this error.
                 }
 
                 auto timeToFetch = calculateTimeToFetch(
@@ -681,6 +751,10 @@ bool ReshardingOplogFetcher::consume(Client* client,
         }));
 
     return moreToCome;
+}
+
+void ReshardingOplogFetcher::onStartingOplogApplication() {
+    _oplogApplicationStarted.store(true);
 }
 
 void ReshardingOplogFetcher::prepareForCriticalSection() {

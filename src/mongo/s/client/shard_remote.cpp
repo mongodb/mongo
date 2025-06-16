@@ -435,9 +435,7 @@ Status ShardRemote::runAggregation(
         }
 
         try {
-            boost::optional<BSONObj> postBatchResumeToken =
-                data.documents.empty() ? data.otherFields.postBatchResumeToken : boost::none;
-            if (!callback(data.documents, postBatchResumeToken)) {
+            if (!callback(data.documents, data.otherFields.postBatchResumeToken)) {
                 *nextAction = Fetcher::NextAction::kNoAction;
             }
         } catch (...) {

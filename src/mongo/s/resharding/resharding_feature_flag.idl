@@ -98,3 +98,11 @@ feature_flags:
         default: false
         fcv_gated: true
         fcv_context_unaware: true
+    featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage:
+        description:
+            "Feature flag to enable using exponential moving average when estimating the
+            remaining time to reach strict consistency."
+        cpp_varname: gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage
+        default: false
+        fcv_gated: true
+        fcv_context_unaware: true

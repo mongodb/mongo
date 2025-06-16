@@ -340,6 +340,9 @@ ReshardingDataReplication::ReshardingDataReplication(
 
 void ReshardingDataReplication::startOplogApplication() {
     ensureFulfilledPromise(_startOplogApplication);
+    for (auto& fetcher : _oplogFetchers) {
+        fetcher->onStartingOplogApplication();
+    }
 }
 
 void ReshardingDataReplication::prepareForCriticalSection() {
