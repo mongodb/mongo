@@ -253,6 +253,15 @@ bool isQEColl(const CollectionOrViewAcquisition& acquisition) {
     return acquisition.isCollection() && isQEColl(acquisition.getCollection());
 }
 
+[[nodiscard]] Lock::GlobalLock acquireLockForSpillTable(OperationContext* opCtx) {
+    return Lock::GlobalLock(
+        opCtx,
+        LockMode::MODE_IS,
+        Date_t::max(),
+        Lock::InterruptBehavior::kThrow,
+        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true});
+}
+
 }  // namespace
 
 std::unique_ptr<TransactionHistoryIteratorBase>
@@ -1103,7 +1112,7 @@ void CommonMongodProcessInterface::writeRecordsToSpillTable(
         "MPI::writeRecordsToSpillTable",
         expCtx->getNamespaceString(),
         [&] {
-            Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+            Lock::GlobalLock lk = acquireLockForSpillTable(expCtx->getOperationContext());
             WriteUnitOfWork wuow(expCtx->getOperationContext());
             auto writeResult = spillTable.insertRecords(expCtx->getOperationContext(), records);
             uassert(ErrorCodes::OutOfDiskSpace,
@@ -1116,7 +1125,7 @@ void CommonMongodProcessInterface::writeRecordsToSpillTable(
 std::unique_ptr<SpillTable> CommonMongodProcessInterface::createSpillTable(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, KeyFormat keyFormat) const {
     assertIgnorePrepareConflictsBehavior(expCtx);
-    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    Lock::GlobalLock lk = acquireLockForSpillTable(expCtx->getOperationContext());
     if (feature_flags::gFeatureFlagCreateSpillKVEngine.isEnabled()) {
         return expCtx->getOperationContext()
             ->getServiceContext()
@@ -1136,7 +1145,7 @@ Document CommonMongodProcessInterface::readRecordFromSpillTable(
     const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
-    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    Lock::GlobalLock lk = acquireLockForSpillTable(expCtx->getOperationContext());
     auto foundDoc =
         spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
     tassert(775101, str::stream() << "Could not find document id " << rID, foundDoc);
@@ -1148,7 +1157,7 @@ bool CommonMongodProcessInterface::checkRecordInSpillTable(
     const SpillTable& spillTable,
     RecordId rID) const {
     RecordData possibleRecord;
-    Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+    Lock::GlobalLock lk = acquireLockForSpillTable(expCtx->getOperationContext());
     return spillTable.findRecord(expCtx->getOperationContext(), RecordId(rID), &possibleRecord);
 }
 
@@ -1161,7 +1170,8 @@ void CommonMongodProcessInterface::deleteRecordFromSpillTable(
                        "MPI::deleteRecordFromSpillTable",
                        expCtx->getNamespaceString(),
                        [&] {
-                           Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+                           Lock::GlobalLock lk =
+                               acquireLockForSpillTable(expCtx->getOperationContext());
                            WriteUnitOfWork wuow(expCtx->getOperationContext());
                            spillTable.deleteRecord(expCtx->getOperationContext(), rID);
                            wuow.commit();
@@ -1175,7 +1185,8 @@ void CommonMongodProcessInterface::truncateSpillTable(
                        "MPI::truncateSpillTable",
                        expCtx->getNamespaceString(),
                        [&] {
-                           Lock::GlobalLock lk(expCtx->getOperationContext(), MODE_IS);
+                           Lock::GlobalLock lk =
+                               acquireLockForSpillTable(expCtx->getOperationContext());
                            WriteUnitOfWork wuow(expCtx->getOperationContext());
                            auto status = spillTable.truncate(expCtx->getOperationContext());
                            tassert(5643000, "Unable to clear record store", status.isOK());
